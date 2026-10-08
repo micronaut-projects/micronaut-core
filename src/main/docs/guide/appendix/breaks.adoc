@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== The WebSocket client handshake is read under the client read timeout (5.3)
+
+The response to the upgrade request of a api:websocket.WebSocketClient[] connect is now read under the `read-timeout` of the HTTP client, `10s` by default. Previously the connect waited for it without a limit. A server that answers the upgrade later than that now fails the connect with a api:http.client.exceptions.ReadTimeoutException[]. Raise `micronaut.http.client.read-timeout` (or the `read-timeout` of the service client) for such a server, or set it to a negative value to wait without a limit.
+
 === Refreshing the Logback configuration follows Logback's own lookup (5.3)
 
 When any `logger.*` property is set, the Micronaut framework resets Logback and configures it again. Previously that refresh used the first `Configurator` service regardless of its rank and of the status it returned, and otherwise the file set with `logback.configurationFile` or `logger.config`, or `logback.xml`. Now, unless a Logback XML configuration file is set in Micronaut configuration, the refresh configures Logback the same way Logback configures itself at startup:

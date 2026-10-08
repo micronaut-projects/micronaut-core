@@ -71,3 +71,7 @@ $ mn create-websocket-client MyChat
 | Rendered template WebsocketClient.java to destination src/main/java/example/MyChatClient.java
 ----
 ====
+
+==== Handshake timeout
+
+The response to the upgrade request is read under the `read-timeout` of the client (`micronaut.http.client.read-timeout`, or the `read-timeout` of a service client): a server that does not answer the upgrade in time fails the connect with a api:http.client.exceptions.ReadTimeoutException[], and the connection is closed. A negative or zero `read-timeout` disables the limit. Cancelling the subscription to `connect` before the endpoint is emitted closes the connection.

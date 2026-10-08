@@ -1119,7 +1119,7 @@ final class NettyHttpClient implements
     <T extends AutoCloseable> ExecutionFlow<NettyWebSocketClientHandler<T>> connectFlow(Class<T> clientEndpointType, MutableHttpRequest<?> request) {
         setupConversionService(request);
         return resolveRequestURI(request)
-            .flatMap(target -> connectWebSocket(target.uri(), request, clientEndpointType, null));
+            .flatMap(target -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, null));
     }
 
     /**
@@ -1137,7 +1137,7 @@ final class NettyHttpClient implements
         uri = UriTemplate.of(uri).expand(parameters);
         MutableHttpRequest<Object> request = io.micronaut.http.HttpRequest.GET(uri);
         return resolveRequestURI(request)
-            .flatMap(target -> connectWebSocket(target.uri(), request, clientEndpointType, webSocketBean));
+            .flatMap(target -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, webSocketBean));
     }
 
     @Override
@@ -1187,6 +1187,42 @@ final class NettyHttpClient implements
         }).doOnDiscard((Class) NettyWebSocketClientHandler.class, handler -> ((NettyWebSocketClientHandler<?>) handler).closeUnclaimed());
         return Flux.from(ReactivePropagation.propagate(propagatedContext, handlers))
             .map(NettyWebSocketClientHandler::getClientEndpoint);
+    }
+
+    /**
+     * Connect a websocket to the target the load balancer selected: the outcome is reported to the
+     * load balancer, and a handshake read timeout carries the service id like any other.
+     */
+    private <T> ExecutionFlow<NettyWebSocketClientHandler<T>> connectWebSocket(URI uri,
+                                                                             @Nullable LoadBalancerSelection selection,
+                                                                             MutableHttpRequest<?> request,
+                                                                             Class<T> clientEndpointType,
+                                                                             @Nullable WebSocketBean<T> webSocketBean) {
+        ExecutionFlow<NettyWebSocketClientHandler<T>> flow;
+        try {
+            flow = connectWebSocket(uri, request, clientEndpointType, webSocketBean);
+        } catch (RuntimeException e) {
+            releaseSelection(selection);
+            throw e;
+        }
+        if (selection != null) {
+            if (flow instanceof DelayedExecutionFlow<?> delayed) {
+                // a cancelled connect reports nothing: release the selection
+                delayed.onCancel(selection::release);
+            }
+            flow = flow.map(handler -> {
+                selection.report(LoadBalancer.Outcome.SUCCESS);
+                return handler;
+            });
+        }
+        return flow.onErrorResume(error -> {
+            if (error instanceof ReadTimeoutException timeout) {
+                report(selection, LoadBalancer.Outcome.TIMEOUT);
+                return ExecutionFlow.error(decorate(timeout));
+            }
+            releaseSelection(selection);
+            return ExecutionFlow.error(error);
+        });
     }
 
     private <T> ExecutionFlow<NettyWebSocketClientHandler<T>> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, @Nullable WebSocketBean<T> webSocketBean) {
