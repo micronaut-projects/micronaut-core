@@ -104,10 +104,7 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
                     return interceptedMethod.handleResult(invokeFnAsync(body, functionName, interceptedMethod.returnTypeValue()));
                 }
                 case SYNCHRONOUS -> {
-                    FunctionDefinition def = join(discoveryClient.getFunctionAsync(functionName).toCompletableFuture());
-                    if (def == null) {
-                        throw new FunctionNotFoundException(functionName);
-                    }
+                    FunctionDefinition def = join(functionDefinition(functionName).toCompletableFuture());
                     FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
                     return functionInvoker.invoke(def, body, context.getReturnType().asArgument());
                 }
@@ -137,27 +134,44 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
     /**
      * Invoke the function once the discovery client found it, and complete with the first item
      * of the publisher of the invoker. The future is completed with the errors as they are, not
-     * wrapped in a {@link CompletionException}.
+     * wrapped in a {@link CompletionException}. Cancelling the future cancels the lookup and the
+     * invocation, where the framework created their stages.
      */
     private CompletableFuture<@Nullable Object> invokeFnAsync(@Nullable Object body, String functionName, Argument<?> valueType) {
-        var completableFuture = new CompletableFuture<@Nullable Object>();
-        discoveryClient.getFunctionAsync(functionName).thenCompose(def -> {
-            if (def == null) {
-                throw new FunctionNotFoundException(functionName);
-            }
+        return CompletionStagePublishers.compose(functionDefinition(functionName), def -> {
             FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
             // an invoker that only returns publishers is adapted by the default invokeAsync
-            return (CompletionStage<@Nullable Object>) functionInvoker.invokeAsync(def, body, valueType);
-        }).whenComplete((value, throwable) -> {
-            if (throwable != null) {
-                completableFuture.completeExceptionally(CompletionStagePublishers.unwrap(throwable));
-            } else if (value == null) {
-                completableFuture.completeExceptionally(new FunctionNotFoundException(functionName));
-            } else {
-                completableFuture.complete(value);
-            }
+            CompletionStage<@Nullable Object> result = CompletionStagePublishers.orElse(
+                (CompletionStage<@Nullable Object>) functionInvoker.invokeAsync(def, body, valueType),
+                // a mock invoker that only stubs invoke returns no stage
+                () -> CompletionStagePublishers.first(Objects.requireNonNull(
+                    (Publisher<Object>) functionInvoker.invoke(def, body, Argument.of(Publisher.class, valueType)),
+                    "The function invoker returned no publisher"
+                ), null)
+            );
+            return CompletionStagePublishers.map(result, value -> {
+                if (value == null) {
+                    throw new FunctionNotFoundException(functionName);
+                }
+                return value;
+            });
         });
-        return completableFuture;
+    }
+
+    /**
+     * The function definition from {@link FunctionDiscoveryClient#getFunctionAsync(String)}, or
+     * from {@link FunctionDiscoveryClient#getFunction(String)} when the former returns no stage,
+     * or a stage completed with {@code null}, like a mock that only stubs the publisher method.
+     */
+    private CompletionStage<FunctionDefinition> functionDefinition(String functionName) {
+        return CompletionStagePublishers.orElseIfNull(discoveryClient.getFunctionAsync(functionName), () ->
+            CompletionStagePublishers.map(CompletionStagePublishers.first(discoveryClient.getFunction(functionName), null), def -> {
+                if (def == null) {
+                    throw new FunctionNotFoundException(functionName);
+                }
+                return def;
+            })
+        );
     }
 
     /**

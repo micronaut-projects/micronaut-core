@@ -35,7 +35,7 @@ class JdbcIndicatorAsyncSpec extends Specification {
         HealthResult published = Mono.from(indicator.result).block()
 
         then:
-        indicator instanceof AsyncJdbcIndicator
+        indicator.getClass() == JdbcIndicator
         async.name == 'jdbc'
         async.status == HealthStatus.UP
         async.details.'jdbc:h2:mem:asyncOneDb'.status == HealthStatus.UP
@@ -52,7 +52,7 @@ class JdbcIndicatorAsyncSpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.run()
         DataSource failing = [getConnection: { -> throw new SQLException('no connection') }] as DataSource
-        def indicator = new AsyncJdbcIndicator(executor, [failing] as DataSource[], null, context.getBean(HealthAggregator))
+        def indicator = new JdbcIndicator(executor, [failing] as DataSource[], null, context.getBean(HealthAggregator))
 
         when:
         HealthResult result = indicator.resultAsync.toCompletableFuture().get(10, TimeUnit.SECONDS).first()
@@ -69,7 +69,7 @@ class JdbcIndicatorAsyncSpec extends Specification {
 
     void 'without data sources the indicator has no result'() {
         given:
-        def indicator = new AsyncJdbcIndicator(executor, new DataSource[0], null, Mock(HealthAggregator))
+        def indicator = new JdbcIndicator(executor, new DataSource[0], null, Mock(HealthAggregator))
 
         expect:
         indicator.resultAsync.toCompletableFuture().getNow(null) == []
@@ -92,7 +92,7 @@ class JdbcIndicatorAsyncSpec extends Specification {
                 }
             }
         }
-        def indicator = new AsyncJdbcIndicator(executor, [failing, failing] as DataSource[], null, publisherOnly)
+        def indicator = new JdbcIndicator(executor, [failing, failing] as DataSource[], null, publisherOnly)
 
         when:
         HealthResult result = indicator.resultAsync.toCompletableFuture().get(10, TimeUnit.SECONDS).first()
@@ -114,5 +114,22 @@ class JdbcIndicatorAsyncSpec extends Specification {
 
         expect:
         indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS)*.name == ['overridden']
+    }
+
+    void 'a mock aggregator that only stubs the publisher is called through it'() {
+        given:
+        DataSource failing = [getConnection: { -> throw new SQLException('no connection') }] as DataSource
+        HealthAggregator<HealthResult> aggregator = Mock(HealthAggregator)
+        aggregator.aggregate('jdbc', _ as Publisher) >> { String name, Publisher<HealthResult> results ->
+            Flux.from(results).collectList().map { list -> HealthResult.builder(name, HealthStatus.DOWN).details([count: list.size()]).build() }
+        }
+        def indicator = new JdbcIndicator(executor, [failing] as DataSource[], null, aggregator)
+
+        when:
+        HealthResult result = indicator.resultAsync.toCompletableFuture().get(10, TimeUnit.SECONDS).first()
+
+        then:
+        result.name == 'jdbc'
+        result.details == [count: 1]
     }
 }

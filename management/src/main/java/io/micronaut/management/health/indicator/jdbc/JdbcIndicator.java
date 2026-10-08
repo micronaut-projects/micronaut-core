@@ -15,15 +15,20 @@
  */
 package io.micronaut.management.health.indicator.jdbc;
 
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
+import io.micronaut.core.util.StringUtils;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.jdbc.DataSourceResolver;
+import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.aggregator.HealthAggregator;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -32,10 +37,14 @@ import java.net.URI;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
@@ -43,16 +52,21 @@ import java.util.stream.Collectors;
  * <p>A {@link io.micronaut.management.health.indicator.HealthIndicator} used to display information about the jdbc
  * status.
  *
- * <p>The bean checks the data sources and aggregates their results without a publisher. This
- * class only implements the publisher method, so that a subclass that overrides it, and replaces
- * the bean, is called through it by the default {@link #getResultAsync()}.</p>
+ * <p>{@link #getResultAsync()} checks the data sources on the blocking executor and aggregates
+ * their results without a publisher. A subclass is called through {@link #getResult()} instead,
+ * so that its override keeps working.</p>
  *
  * @author James Kleeh
  * @since 1.0
  */
+@Singleton
+@Requires(beans = HealthEndpoint.class)
+@Requires(property = HealthEndpoint.PREFIX + ".jdbc.enabled", notEquals = StringUtils.FALSE)
+@Requires(classes = DataSourceResolver.class)
+@Requires(beans = DataSource.class)
 public class JdbcIndicator implements HealthIndicator {
 
-    static final String NAME = "jdbc";
+    private static final String NAME = "jdbc";
     private static final int CONNECTION_TIMEOUT = 3;
 
     private final ExecutorService executorService;
@@ -84,12 +98,59 @@ public class JdbcIndicator implements HealthIndicator {
     }
 
     /**
+     * Checks the data sources on the blocking executor, and aggregates their results with
+     * {@link HealthAggregator#aggregateAsync(String, List)}, without a publisher. A subclass is
+     * called through {@link #getResult()}.
+     *
+     * @return A {@link CompletionStage} completed with the aggregated result, or with no result without data sources
+     * @since 5.3.0
+     */
+    @Override
+    public CompletionStage<List<HealthResult>> getResultAsync() {
+        if (getClass() != JdbcIndicator.class) {
+            return HealthIndicator.super.getResultAsync();
+        }
+        if (dataSources.length == 0) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        if (executorService == null) {
+            throw new IllegalStateException("I/O ExecutorService is null");
+        }
+        List<CompletionStage<List<HealthResult>>> stages = new ArrayList<>(dataSources.length);
+        for (DataSource dataSource : dataSources) {
+            stages.add(check(dataSource));
+        }
+        CompletableFuture<List<HealthResult>> results = CompletionStagePublishers.concat(stages);
+        CompletableFuture<@Nullable HealthResult> aggregated = CompletionStagePublishers.compose(results, list -> CompletionStagePublishers.orElse(
+            healthAggregator.aggregateAsync(NAME, list),
+            // a mock aggregator that only stubs the publisher method returns no stage
+            () -> CompletionStagePublishers.first(healthAggregator.aggregate(NAME, CompletionStagePublishers.fromList(list)), null)
+        ));
+        return CompletionStagePublishers.map(aggregated, result -> result == null ? List.of() : List.of(result));
+    }
+
+    private CompletableFuture<List<HealthResult>> check(DataSource dataSource) {
+        CompletableFuture<List<HealthResult>> result = CompletionStagePublishers.future();
+        try {
+            DataSource resolved = dataSourceResolver.resolve(dataSource);
+            executorService.execute(() -> {
+                if (!result.isDone()) {
+                    result.complete(List.of(checkDataSource(resolved)));
+                }
+            });
+        } catch (Exception e) {
+            result.completeExceptionally(e);
+        }
+        return result;
+    }
+
+    /**
      * Checks a data source, blocking.
      *
      * @param dataSource The data source
      * @return The result of the data source
      */
-    final HealthResult checkDataSource(DataSource dataSource) {
+    private HealthResult checkDataSource(DataSource dataSource) {
         Optional<Throwable> throwable = Optional.empty();
         Map<String, Object> details = null;
         String key;

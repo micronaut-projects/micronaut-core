@@ -17,6 +17,7 @@ package io.micronaut.discovery.config;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.naming.Described;
 import org.reactivestreams.Publisher;
@@ -60,10 +61,14 @@ public interface ConfigurationClient extends Described {
      * default, it collects all the {@link PropertySource} instances emitted by
      * {@link #getPropertySources(Environment)}. Cancelling the stage cancels the subscription.
      *
+     * <p>An implementation returns a new stage for each call, which a caller may cancel. The
+     * framework never cancels a stage it did not create: it ignores its result instead.</p>
+     *
      * @param environment The environment
      * @return A {@link CompletionStage} completed with the {@link PropertySource} instances discovered for the given environment
      * @since 5.3.0
      */
+    @Experimental
     default CompletionStage<List<PropertySource>> getPropertySourcesAsync(Environment environment) {
         return CompletionStagePublishers.collect(getPropertySources(environment));
     }

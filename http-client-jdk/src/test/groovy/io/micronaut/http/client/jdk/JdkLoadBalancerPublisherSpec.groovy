@@ -53,6 +53,20 @@ class JdkLoadBalancerPublisherSpec extends Specification {
         ctx.getBean(HttpClientRegistry).getClient(HttpVersion.HTTP_1_1, serviceId, null)
     }
 
+    def 'a mock load balancer that only stubs select is selected through it'() {
+        given:
+        LoadBalancer loadBalancer = Mock(LoadBalancer)
+        loadBalancer.select(_) >> Mono.just(ServiceInstance.of('server', server.URI))
+        loadBalancer.getContextPath() >> Optional.empty()
+        HttpClient client = ctx.createBean(HttpClient, loadBalancer)
+
+        expect:
+        Mono.from(client.retrieve(HttpRequest.GET('/jdk-lb-publisher/hello'), String)).block() == 'hello'
+
+        cleanup:
+        client.close()
+    }
+
     def 'a subclass of the fixed load balancer that overrides select is selected through it'() {
         given:
         def calls = new AtomicInteger()

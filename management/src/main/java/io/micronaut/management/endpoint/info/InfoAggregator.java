@@ -15,7 +15,9 @@
  */
 package io.micronaut.management.endpoint.info;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.async.publisher.CompletionStagePublishers;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.util.concurrent.CompletionStage;
@@ -47,10 +49,11 @@ public interface InfoAggregator<T> {
      * sources, so that the sources that only implement {@link InfoSource#getSource()} keep working.
      *
      * @param sources an array of InfoSources
-     * @return A {@link CompletionStage} completed with the aggregated <code>T</code>
+     * @return A {@link CompletionStage} completed with the aggregated <code>T</code>, or with {@code null} for none
      * @since 5.3.0
      */
-    default CompletionStage<T> aggregateAsync(InfoSource[] sources) {
+    @Experimental
+    default CompletionStage<@Nullable T> aggregateAsync(InfoSource[] sources) {
         return CompletionStagePublishers.first(aggregate(sources), null);
     }
 }

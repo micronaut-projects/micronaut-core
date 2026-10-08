@@ -18,6 +18,7 @@ package io.micronaut.function.client.aop;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.function.client.DefaultFunctionDiscoveryClient;
 import io.micronaut.function.client.FunctionClient;
@@ -44,9 +45,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The {@link FunctionClient} advice finds the function with
@@ -155,9 +158,38 @@ class FunctionClientAdviceAsyncTest {
         FunctionDiscoveryClient failing = name -> Publishers.just(new FunctionNotFoundException(name));
 
         assertSame(definition, publisherOnly.getFunctionAsync("max").toCompletableFuture().getNow(null));
-        assertEquals(null, empty.getFunctionAsync("max").toCompletableFuture().getNow(definition));
-        ExecutionException e = assertThrows(ExecutionException.class, () -> failing.getFunctionAsync("max").toCompletableFuture().get());
+        ExecutionException e = assertThrows(ExecutionException.class, () -> empty.getFunctionAsync("max").toCompletableFuture().get());
         assertInstanceOf(FunctionNotFoundException.class, e.getCause());
+        e = assertThrows(ExecutionException.class, () -> failing.getFunctionAsync("max").toCompletableFuture().get());
+        assertInstanceOf(FunctionNotFoundException.class, e.getCause());
+    }
+
+    @Test
+    void aDiscoveryClientWithoutStageIsCalledThroughItsPublisher() throws Exception {
+        // like a mock that only stubs the publisher method
+        assertEquals(42L, client.mockedAsync().get());
+        assertEquals(42L, client.mockedSync());
+        assertEquals(2, discoveryClient.publisherCalls.get());
+    }
+
+    @Test
+    void cancellingTheStageCancelsTheLookupOfTheFramework() {
+        CompletableFuture<FunctionDefinition> pending = CompletionStagePublishers.future();
+        discoveryClient.next.set(pending);
+
+        client.maxAsync().cancel(false);
+
+        assertTrue(pending.isCancelled());
+    }
+
+    @Test
+    void cancellingTheStageLeavesASharedLookupAlone() {
+        CompletableFuture<FunctionDefinition> shared = new CompletableFuture<>();
+        discoveryClient.next.set(shared);
+
+        client.maxAsync().cancel(false);
+
+        assertFalse(shared.isDone());
     }
 
     @FunctionClient
@@ -198,11 +230,17 @@ class FunctionClientAdviceAsyncTest {
 
         @Named("failing")
         Long failingSync();
+
+        @Named("mocked")
+        CompletableFuture<Long> mockedAsync();
+
+        @Named("mocked")
+        Long mockedSync();
     }
 
     /**
      * Knows every function but "missing", which fails, and "undiscovered", which completes
-     * without a definition.
+     * without a definition. Its stage of "mocked" is null.
      */
     @Singleton
     @Replaces(DefaultFunctionDiscoveryClient.class)
@@ -228,6 +266,7 @@ class FunctionClientAdviceAsyncTest {
             return switch (functionName) {
                 case "missing" -> CompletableFuture.failedFuture(new FunctionNotFoundException(functionName));
                 case "undiscovered" -> CompletableFuture.completedFuture(null);
+                case "mocked" -> null;
                 default -> CompletableFuture.completedFuture(definition(functionName));
             };
         }
@@ -240,7 +279,7 @@ class FunctionClientAdviceAsyncTest {
     @Singleton
     @Requires(property = "spec.name", value = SPEC)
     static final class StubInvokerChooser implements FunctionInvokerChooser {
-        private static final Set<String> KNOWN = Set.of("max", "empty", "failing");
+        private static final Set<String> KNOWN = Set.of("max", "empty", "failing", "mocked");
 
         @SuppressWarnings("unchecked")
         @Override
@@ -250,7 +289,7 @@ class FunctionClientAdviceAsyncTest {
             }
             FunctionInvoker<I, Object> invoker = (def, input, outputType) -> {
                 Publisher<Long> result = switch (def.getName()) {
-                    case "max" -> Publishers.just(42L);
+                    case "max", "mocked" -> Publishers.just(42L);
                     case "empty" -> Publishers.empty();
                     default -> Publishers.just(BOOM);
                 };

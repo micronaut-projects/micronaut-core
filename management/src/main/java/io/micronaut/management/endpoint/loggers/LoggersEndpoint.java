@@ -82,7 +82,11 @@ public class LoggersEndpoint {
     @Read
     @SingleResult
     public Publisher<Map<String, Object>> loggers() {
-        return CompletionStagePublishers.toPublisher(() -> loggersManager.getLoggersAsync(loggingSystem));
+        return CompletionStagePublishers.toPublisher(() -> CompletionStagePublishers.orElse(
+            loggersManager.getLoggersAsync(loggingSystem),
+            // a mock manager that only stubs the publisher method returns no stage
+            () -> CompletionStagePublishers.first(loggersManager.getLoggers(loggingSystem), null)
+        ));
     }
 
     /**
@@ -92,7 +96,10 @@ public class LoggersEndpoint {
     @Read
     @SingleResult
     public Publisher<Map<String, Object>> logger(@NotBlank @Selector String name) {
-        return CompletionStagePublishers.toPublisher(() -> loggersManager.getLoggerAsync(loggingSystem, name));
+        return CompletionStagePublishers.toPublisher(() -> CompletionStagePublishers.orElse(
+            loggersManager.getLoggerAsync(loggingSystem, name),
+            () -> CompletionStagePublishers.first(loggersManager.getLogger(loggingSystem, name), null)
+        ));
     }
 
     /**

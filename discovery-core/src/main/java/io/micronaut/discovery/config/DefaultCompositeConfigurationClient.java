@@ -15,28 +15,37 @@
  */
 package io.micronaut.discovery.config;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.util.ArrayUtils;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
 /**
  * The default {@link ConfigurationClient} implementation.
  *
- * <p>The bean is an {@link AsyncCompositeConfigurationClient}, which combines the
- * {@link java.util.concurrent.CompletionStage}s of the configuration clients without a publisher.
- * This class only implements the publisher method, so that a subclass that overrides it, and
- * replaces the bean, is called through it by the default
- * {@link #getPropertySourcesAsync(Environment)}.</p>
+ * <p>{@link #getPropertySourcesAsync(Environment)} combines the {@link CompletionStage}s of the
+ * configuration clients without a publisher: the property sources are concatenated in the order
+ * of the clients, and the first client that fails fails the result. A subclass is called through
+ * {@link #getPropertySources(Environment)} instead, so that its override keeps working.</p>
  *
  * @author graemerocher
  * @since 1.0
  */
+@Singleton
+@Primary
+@BootstrapContextCompatible
 public class DefaultCompositeConfigurationClient implements ConfigurationClient {
 
     private final ConfigurationClient[] configurationClients;
@@ -65,6 +74,32 @@ public class DefaultCompositeConfigurationClient implements ConfigurationClient 
             .collect(Collectors.toList());
 
         return Flux.merge(publishers);
+    }
+
+    @Override
+    public CompletionStage<List<PropertySource>> getPropertySourcesAsync(Environment environment) {
+        if (getClass() != DefaultCompositeConfigurationClient.class) {
+            return ConfigurationClient.super.getPropertySourcesAsync(environment);
+        }
+        if (ArrayUtils.isEmpty(configurationClients)) {
+            return CompletableFuture.completedFuture(new ArrayList<>());
+        }
+        List<CompletionStage<List<PropertySource>>> stages = new ArrayList<>(configurationClients.length);
+        for (ConfigurationClient configurationClient : configurationClients) {
+            stages.add(propertySourcesOf(configurationClient, environment));
+        }
+        return CompletionStagePublishers.concat(stages);
+    }
+
+    private static CompletionStage<List<PropertySource>> propertySourcesOf(ConfigurationClient configurationClient, Environment environment) {
+        try {
+            return CompletionStagePublishers.orElseIfNull(
+                configurationClient.getPropertySourcesAsync(environment),
+                () -> CompletionStagePublishers.collect(configurationClient.getPropertySources(environment))
+            );
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Override

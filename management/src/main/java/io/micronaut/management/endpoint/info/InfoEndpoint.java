@@ -61,6 +61,10 @@ public class InfoEndpoint {
     @Read
     @SingleResult
     Publisher getInfo() {
-        return CompletionStagePublishers.toPublisher(() -> infoAggregator.aggregateAsync(infoSources));
+        return CompletionStagePublishers.toPublisher(() -> CompletionStagePublishers.orElse(
+            infoAggregator.aggregateAsync(infoSources),
+            // a mock aggregator that only stubs the publisher method returns no stage
+            () -> CompletionStagePublishers.first(infoAggregator.aggregate(infoSources), null)
+        ));
     }
 }

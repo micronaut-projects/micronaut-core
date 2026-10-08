@@ -3,9 +3,9 @@ package io.micronaut.management.endpoint.info
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
+import io.micronaut.core.async.publisher.CompletionStagePublishers
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.io.ResourceResolver
-import io.micronaut.management.endpoint.info.impl.AsyncInfoAggregator
 import io.micronaut.management.endpoint.info.impl.ReactiveInfoAggregator
 import io.micronaut.management.endpoint.info.source.BuildInfoSource
 import io.micronaut.management.endpoint.info.source.ConfigurationInfoSource
@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class InfoAsyncSpec extends Specification {
 
-    ReactiveInfoAggregator aggregator = new AsyncInfoAggregator()
+    ReactiveInfoAggregator aggregator = new ReactiveInfoAggregator()
 
     void 'the default getSourceAsync adapts the first property source of the publisher'() {
         given:
@@ -64,34 +64,29 @@ class InfoAsyncSpec extends Specification {
 
     void 'aggregate emits the same result as aggregateAsync'() {
         given:
-        InfoSource[] sources = [new AsyncSource(CompletableFuture.completedFuture(new MapPropertySource('one', [a: 1])))]
+        InfoSource[] sources = [new PublisherOnlySource(Mono.just(new MapPropertySource('one', [a: 1]) as PropertySource))]
 
         expect:
         Mono.from(aggregator.aggregate(sources)).block() == [a: 1]
         aggregator.aggregateAsync(sources).toCompletableFuture().get(5, TimeUnit.SECONDS) == [a: 1]
     }
 
-    void 'aggregateResultsAsync keys each property source by the index of its source'() {
+    void 'a mock source that only stubs getSource is called through it'() {
         given:
-        InfoSource[] sources = [
-                new AsyncSource(CompletableFuture.completedFuture(new MapPropertySource('one', [a: 1]))),
-                new PublisherOnlySource(Publishers.empty())
-        ]
+        InfoSource mock = Mock(InfoSource)
+        mock.getSource() >> Mono.just(new MapPropertySource('mocked', [m: 1]) as PropertySource)
+        InfoSource[] sources = [mock]
 
-        when:
-        List<Map.Entry<Integer, PropertySource>> results = aggregator.aggregateResultsAsync(sources).toCompletableFuture().get(5, TimeUnit.SECONDS)
-
-        then:
-        results*.key == [0, 1]
-        results[0].value.name == 'one'
-        !results[1].value.iterator().hasNext()
+        expect:
+        aggregator.aggregateAsync(sources).toCompletableFuture().get(5, TimeUnit.SECONDS) == [m: 1]
     }
 
-    void 'the first failing source fails the aggregation and cancels the others'() {
+    void 'the first failing source fails the aggregation and cancels the stages of the framework'() {
         given:
         def error = new IllegalStateException('boom')
-        def pending = new CompletableFuture<PropertySource>()
-        InfoSource[] sources = [new AsyncSource(pending), new PublisherOnlySource(Mono.error(error))]
+        CompletableFuture<PropertySource> pending = CompletionStagePublishers.future()
+        def shared = new CompletableFuture<PropertySource>()
+        InfoSource[] sources = [new AsyncSource(pending), new AsyncSource(shared), new PublisherOnlySource(Mono.error(error))]
 
         when:
         aggregator.aggregateAsync(sources).toCompletableFuture().get(5, TimeUnit.SECONDS)
@@ -100,9 +95,10 @@ class InfoAsyncSpec extends Specification {
         def e = thrown(ExecutionException)
         e.cause.is(error)
         pending.cancelled
+        !shared.done
 
         when:
-        InfoSource[] publisherSources = [new AsyncSource(new CompletableFuture<PropertySource>()), new PublisherOnlySource(Mono.error(error))]
+        InfoSource[] publisherSources = [new PublisherOnlySource(Mono.never()), new PublisherOnlySource(Mono.error(error))]
         Mono.from(aggregator.aggregate(publisherSources)).block()
 
         then:
@@ -203,17 +199,17 @@ class InfoAsyncSpec extends Specification {
         context.close()
     }
 
-    void 'cancelling the publisher of the aggregation cancels the sources'() {
+    void 'cancelling the aggregation cancels the sources'() {
         given:
         def cancelled = new java.util.concurrent.atomic.AtomicInteger()
-        def pending = new CompletableFuture<PropertySource>()
+        CompletableFuture<PropertySource> pending = CompletionStagePublishers.future()
         InfoSource[] publisherOnly = [new PublisherOnlySource(Mono.<PropertySource> never().doOnCancel { cancelled.incrementAndGet() })]
         InfoSource[] async = [new AsyncSource(pending)]
 
         when:
-        Mono.from(new ReactiveInfoAggregator().aggregate(publisherOnly)).subscribe().dispose()
         Mono.from(aggregator.aggregate(publisherOnly)).subscribe().dispose()
-        Mono.from(aggregator.aggregate(async)).subscribe().dispose()
+        aggregator.aggregateAsync(publisherOnly).toCompletableFuture().cancel(false)
+        aggregator.aggregateAsync(async).toCompletableFuture().cancel(false)
 
         then:
         cancelled.get() == 2
@@ -223,7 +219,7 @@ class InfoAsyncSpec extends Specification {
     void 'the default bean is the aggregator that combines the stages'() {
         expect:
         ApplicationContext.run(['endpoints.info.enabled': true]).withCloseable {
-            it.getBean(InfoAggregator).getClass().name == 'io.micronaut.management.endpoint.info.impl.AsyncInfoAggregator'
+            it.getBean(InfoAggregator).getClass() == ReactiveInfoAggregator
         }
     }
 

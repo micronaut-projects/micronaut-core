@@ -25,7 +25,6 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionServiceAware;
-import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
@@ -90,7 +89,7 @@ import io.micronaut.http.client.exceptions.StreamResetException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
-import io.micronaut.http.client.loadbalance.AsyncFixedLoadBalancer;
+import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.loadbalance.LoadBalancerKey;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
 import io.micronaut.http.client.multipart.MultipartBody;
@@ -195,7 +194,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -1638,13 +1640,19 @@ final class NettyHttpClient implements
             return ExecutionFlow.error(decorate(new NoHostException("Request URI specifies no host to connect to")));
         }
         ExecutionFlow<ServiceInstance> selected;
-        if (loadBalancer instanceof AsyncFixedLoadBalancer fixed) {
+        if (loadBalancer instanceof FixedLoadBalancer fixed && fixed.getClass() == FixedLoadBalancer.class) {
             // only the built-in one: a subclass of FixedLoadBalancer may override select
             selected = ExecutionFlow.just(fixed.getServiceInstance());
         } else {
             // a synchronous balancer (round-robin) completes right away, so the request proceeds
             // without an asynchronous chain
-            selected = toFlow(loadBalancer.selectAsync(getLoadBalancerDiscriminator(request)).toCompletableFuture(), PropagatedContext.getOrEmpty());
+            LoadBalancer lb = loadBalancer;
+            Object discriminator = getLoadBalancerDiscriminator(request);
+            CompletionStage<@Nullable ServiceInstance> selection = CompletionStagePublishers.orElse(
+                lb.selectAsync(discriminator),
+                () -> CompletionStagePublishers.first(lb.select(discriminator), null)
+            );
+            selected = toFlow(selection.toCompletableFuture(), PropagatedContext.getOrEmpty());
         }
 
         LoadBalancer balancer = loadBalancer;
@@ -1667,17 +1675,21 @@ final class NettyHttpClient implements
 
     /**
      * The flow of a selection of the load balancer. A selection that is not complete yet is
-     * cancelled when the flow is, and completes the flow in the propagated context of the
-     * request, so that the steps of the flow run in it, as they did with the publisher of the
-     * selection.
+     * cancelled when the flow is, if the framework created it, and completes the flow in the
+     * propagated context of the request, so that the steps of the flow run in it, as they did
+     * with the publisher of the selection.
      *
      * @param future            The selection
      * @param propagatedContext The propagated context of the request
      * @return The flow
      */
-    private static ExecutionFlow<ServiceInstance> toFlow(CompletableFuture<ServiceInstance> future, PropagatedContext propagatedContext) {
+    private static ExecutionFlow<ServiceInstance> toFlow(CompletableFuture<@Nullable ServiceInstance> future, PropagatedContext propagatedContext) {
         if (future.isDone()) {
-            return CompletableFutureExecutionFlow.just(future);
+            try {
+                return ExecutionFlow.just(future.join());
+            } catch (CompletionException | CancellationException e) {
+                return ExecutionFlow.error(CompletionStagePublishers.unwrap(e));
+            }
         }
         DelayedExecutionFlow<ServiceInstance> flow = DelayedExecutionFlow.create();
         future.whenComplete((instance, throwable) -> {
@@ -1687,7 +1699,7 @@ final class NettyHttpClient implements
                 propagatedContext.propagate(() -> complete(flow, instance, throwable));
             }
         });
-        flow.onCancel(() -> future.cancel(false));
+        flow.onCancel(() -> CompletionStagePublishers.cancel(future));
         return flow;
     }
 

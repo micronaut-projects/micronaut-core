@@ -15,6 +15,7 @@
  */
 package io.micronaut.management.health.indicator;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.order.Ordered;
 import org.reactivestreams.Publisher;
@@ -43,13 +44,17 @@ public interface HealthIndicator extends Ordered {
      * collects all the {@link HealthResult}s emitted by {@link #getResult()}, as the aggregator
      * always merged them: an indicator may emit several results, or none, in which case it
      * contributes no result. Cancelling the stage cancels the subscription.
-     * An indicator that computes its results without a publisher overrides this method. The
-     * built-in indicator classes do not, so that a subclass that overrides {@link #getResult()} is
-     * called through it.
+     * An indicator that computes its results without a publisher overrides this method. A
+     * built-in indicator that does calls a subclass through {@link #getResult()}, so that its
+     * override keeps working.
+     *
+     * <p>An implementation returns a new stage for each call, which a caller may cancel. The
+     * framework never cancels a stage it did not create: it ignores its result instead.</p>
      *
      * @return A {@link CompletionStage} completed with the {@link HealthResult}s, in the order they were emitted
      * @since 5.3.0
      */
+    @Experimental
     default CompletionStage<List<HealthResult>> getResultAsync() {
         return CompletionStagePublishers.collect(getResult());
     }

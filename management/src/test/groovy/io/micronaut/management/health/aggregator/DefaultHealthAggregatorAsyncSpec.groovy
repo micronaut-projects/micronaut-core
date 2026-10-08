@@ -29,7 +29,7 @@ class DefaultHealthAggregatorAsyncSpec extends Specification {
     ApplicationContext context = ApplicationContext.run(['micronaut.application.name': 'foo'])
 
     @Shared
-    DefaultHealthAggregator aggregator = new AsyncHealthAggregator(context.getBean(ApplicationConfiguration))
+    DefaultHealthAggregator aggregator = new DefaultHealthAggregator(context.getBean(ApplicationConfiguration))
 
     void 'aggregateAsync combines the async results and the publisher-only indicators'() {
         given:
@@ -61,19 +61,47 @@ class DefaultHealthAggregatorAsyncSpec extends Specification {
         result.details.c.status == HealthStatus.UP
     }
 
-    void 'aggregateResultsAsync keeps the order of the indicators, not of completion'() {
+    void 'aggregateAsync keeps the order of the indicators, not of completion'() {
         given:
         def first = new CompletableFuture<HealthResult>()
         def second = new CompletableFuture<HealthResult>()
         HealthIndicator[] indicators = [new AsyncIndicator(first), new AsyncIndicator(second)]
 
-        when:
-        def stage = aggregator.aggregateResultsAsync(indicators).toCompletableFuture()
-        second.complete(HealthResult.builder('second', HealthStatus.UP).build())
-        first.complete(HealthResult.builder('first', HealthStatus.UP).build())
+        when: 'two results have the same name, the later indicator wins'
+        def stage = aggregator.aggregateAsync(indicators, HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS).toCompletableFuture()
+        second.complete(HealthResult.builder('same', HealthStatus.DOWN).build())
+        first.complete(HealthResult.builder('same', HealthStatus.UP).build())
 
         then:
-        stage.get(5, TimeUnit.SECONDS)*.name == ['first', 'second']
+        stage.get(5, TimeUnit.SECONDS).details.same.status == HealthStatus.DOWN
+    }
+
+    void 'a mock indicator that only stubs getResult is called through it'() {
+        given:
+        HealthIndicator mock = Mock(HealthIndicator)
+        mock.getResult() >> Mono.just(HealthResult.builder('mocked', HealthStatus.UP).build())
+        HealthIndicator[] indicators = [mock]
+
+        when:
+        HealthResult result = aggregator.aggregateAsync(indicators, HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS)
+                .toCompletableFuture().get(5, TimeUnit.SECONDS)
+
+        then:
+        (result.details as Map).keySet() == ['mocked'] as Set
+    }
+
+    void 'an indicator whose stage completes with null is called through getResult'() {
+        given:
+        HealthIndicator[] indicators = [new PublisherOnlyIndicator(Mono.just(HealthResult.builder('published', HealthStatus.UP).build())) {
+            @Override
+            CompletionStage<List<HealthResult>> getResultAsync() {
+                CompletableFuture.completedFuture(null)
+            }
+        }]
+
+        expect:
+        (aggregator.aggregateAsync(indicators, HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS)
+                .toCompletableFuture().get(5, TimeUnit.SECONDS).details as Map).keySet() == ['published'] as Set
     }
 
     void 'the overall status is the most severe status, or UNKNOWN without results'() {
@@ -100,13 +128,15 @@ class DefaultHealthAggregatorAsyncSpec extends Specification {
         result.status == HealthStatus.UP
     }
 
-    void 'the first failing indicator fails the aggregation and cancels the others'() {
+    void 'the first failing indicator fails the aggregation and cancels the stages of the framework'() {
         given:
         def error = new IllegalStateException('boom')
-        def pending = new CompletableFuture<HealthResult>()
+        CompletableFuture<HealthResult> pending = CompletionStagePublishers.future()
+        def shared = new CompletableFuture<HealthResult>()
         def cancelled = new AtomicBoolean()
         HealthIndicator[] indicators = [
                 new AsyncIndicator(pending),
+                new AsyncIndicator(shared),
                 new PublisherOnlyIndicator(Mono.<HealthResult> never().doOnCancel { cancelled.set(true) }),
                 new AsyncIndicator(CompletableFuture.failedFuture(error))
         ]
@@ -118,6 +148,7 @@ class DefaultHealthAggregatorAsyncSpec extends Specification {
         def e = thrown(ExecutionException)
         e.cause.is(error)
         pending.cancelled
+        !shared.done
         cancelled.get()
     }
 
@@ -141,9 +172,9 @@ class DefaultHealthAggregatorAsyncSpec extends Specification {
         e2.is(error)
     }
 
-    void 'cancelling the aggregation cancels the indicators'() {
+    void 'cancelling the aggregation cancels the stages of the framework'() {
         given:
-        def pending = new CompletableFuture<HealthResult>()
+        CompletableFuture<HealthResult> pending = CompletionStagePublishers.future()
         HealthIndicator[] indicators = [new AsyncIndicator(pending)]
 
         when:
@@ -151,34 +182,6 @@ class DefaultHealthAggregatorAsyncSpec extends Specification {
 
         then:
         pending.cancelled
-    }
-
-    void 'aggregate emits the result of aggregateAsync and calls the indicators on subscription'() {
-        given:
-        def calls = new AtomicInteger()
-        HealthIndicator[] indicators = [new AsyncIndicator(null) {
-            @Override
-            CompletionStage<List<HealthResult>> getResultAsync() {
-                calls.incrementAndGet()
-                return CompletableFuture.completedFuture([HealthResult.builder('a', HealthStatus.UP).build()])
-            }
-        }]
-
-        when:
-        Publisher<HealthResult> publisher = aggregator.aggregate(indicators, HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS)
-
-        then:
-        calls.get() == 0
-
-        when:
-        List<HealthResult> results = Flux.from(publisher).collectList().block()
-
-        then:
-        calls.get() == 1
-        results.size() == 1
-        results[0].name == 'foo'
-        results[0].status == HealthStatus.UP
-        results[0].details.a.status == HealthStatus.UP
     }
 
     void 'aggregateAsync with a name combines a list of results'() {
@@ -310,24 +313,20 @@ class DefaultHealthAggregatorAsyncSpec extends Specification {
     void 'cancelling the publisher of the aggregation cancels the indicators'() {
         given:
         def cancelled = new AtomicInteger()
-        def pending = new CompletableFuture<HealthResult>()
         HealthIndicator[] publisherOnly = [new PublisherOnlyIndicator(Mono.<HealthResult> never().doOnCancel { cancelled.incrementAndGet() })]
-        HealthIndicator[] async = [new AsyncIndicator(pending)]
 
         when:
-        Mono.from(new DefaultHealthAggregator(context.getBean(ApplicationConfiguration)).aggregate(publisherOnly, HealthLevelOfDetail.STATUS)).subscribe().dispose()
         Mono.from(aggregator.aggregate(publisherOnly, HealthLevelOfDetail.STATUS)).subscribe().dispose()
-        Mono.from(aggregator.aggregate(async, HealthLevelOfDetail.STATUS)).subscribe().dispose()
+        aggregator.aggregateAsync(publisherOnly, HealthLevelOfDetail.STATUS).toCompletableFuture().cancel(false)
 
         then:
         cancelled.get() == 2
-        pending.cancelled
     }
 
     void 'the default bean is the aggregator that combines the stages'() {
         expect:
         ApplicationContext.run(['endpoints.health.enabled': true]).withCloseable {
-            it.getBean(HealthAggregator) instanceof AsyncHealthAggregator
+            it.getBean(HealthAggregator).getClass() == DefaultHealthAggregator
         }
     }
 
@@ -352,7 +351,7 @@ class DefaultHealthAggregatorAsyncSpec extends Specification {
 
         @Override
         CompletionStage<List<HealthResult>> getResultAsync() {
-            return CompletionStagePublishers.cancelling(future, future.thenApply { [it] })
+            return CompletionStagePublishers.map(future, { [it] })
         }
     }
 

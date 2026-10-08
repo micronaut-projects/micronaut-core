@@ -15,13 +15,18 @@
  */
 package io.micronaut.management.endpoint.info.impl;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.EmptyPropertySource;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcePropertyResolver;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.management.endpoint.info.InfoAggregator;
+import io.micronaut.management.endpoint.info.InfoEndpoint;
 import io.micronaut.management.endpoint.info.InfoSource;
+import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -30,19 +35,23 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * <p>Default implementation of {@link InfoAggregator}.
  *
- * <p>The bean combines the {@link InfoSource#getSourceAsync()} stages of the sources without a
- * publisher. This class only implements the publisher methods, so that a subclass that overrides
- * them, and replaces the bean, is called through them by the default
- * {@link #aggregateAsync(InfoSource[])} the info endpoint calls.</p>
+ * <p>{@link #aggregateAsync(InfoSource[])} combines the {@link InfoSource#getSourceAsync()}
+ * stages of the sources without a publisher. A subclass is called through its publisher methods
+ * instead, so that its overrides of {@link #aggregate(InfoSource[])} or
+ * {@link #aggregateResults(InfoSource[])} keep working.</p>
  *
  * @author James Kleeh
  * @author Zachary Klein
  * @since 1.0
  */
+@Singleton
+@Requires(beans = InfoEndpoint.class)
 public class ReactiveInfoAggregator implements InfoAggregator<Map<String, Object>> {
 
     @Override
@@ -50,6 +59,41 @@ public class ReactiveInfoAggregator implements InfoAggregator<Map<String, Object
         return aggregateResults(sources)
             .collectList()
             .map(ReactiveInfoAggregator::toProperties).flux();
+    }
+
+    /**
+     * Combines the {@link InfoSource#getSourceAsync()} stages of the sources without a publisher.
+     * A source that completes with {@code null} contributes an {@link EmptyPropertySource}. The
+     * first source that fails, or that throws, fails the aggregation. A subclass is called
+     * through {@link #aggregate(InfoSource[])}.
+     *
+     * @param sources an array of InfoSources
+     * @return A {@link CompletionStage} completed with the aggregated properties
+     * @since 5.3.0
+     */
+    @Override
+    public CompletionStage<@Nullable Map<String, Object>> aggregateAsync(InfoSource[] sources) {
+        if (getClass() != ReactiveInfoAggregator.class) {
+            return InfoAggregator.super.aggregateAsync(sources);
+        }
+        List<CompletionStage<List<Map.Entry<Integer, PropertySource>>>> stages = new ArrayList<>(sources.length);
+        for (int i = 0; i < sources.length; i++) {
+            stages.add(sourceOf(i, sources[i]));
+        }
+        return CompletionStagePublishers.map(CompletionStagePublishers.<Map.Entry<Integer, PropertySource>>concat(stages), ReactiveInfoAggregator::toProperties);
+    }
+
+    private static CompletionStage<List<Map.Entry<Integer, PropertySource>>> sourceOf(int index, InfoSource source) {
+        CompletionStage<@Nullable PropertySource> propertySource;
+        try {
+            // a mock that only stubs getSource returns no stage
+            propertySource = CompletionStagePublishers.orElse(source.getSourceAsync(), () -> CompletionStagePublishers.first(source.getSource(), null));
+        } catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
+        return CompletionStagePublishers.map(propertySource, ps ->
+            List.of(new AbstractMap.SimpleEntry<>(index, ps == null ? new EmptyPropertySource() : ps))
+        );
     }
 
     /**

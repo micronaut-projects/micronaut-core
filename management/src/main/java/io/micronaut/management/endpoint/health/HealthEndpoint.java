@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletionStage;
 
 /**
  * <p>Exposes an {@link Endpoint} to provide information about the health of the application.</p>
@@ -107,7 +108,7 @@ public class HealthEndpoint {
     public Publisher<HealthResult> getHealth(@Nullable Principal principal) {
         HealthLevelOfDetail detail = levelOfDetail(principal);
 
-        return CompletionStagePublishers.toPublisher(() -> healthAggregator.aggregateAsync(healthIndicators, detail));
+        return CompletionStagePublishers.toPublisher(() -> aggregate(healthIndicators, detail));
     }
 
     /**
@@ -126,7 +127,7 @@ public class HealthEndpoint {
             default -> readinessHealthIndicators;
         };
 
-        return CompletionStagePublishers.toPublisher(() -> healthAggregator.aggregateAsync(indicators, detail));
+        return CompletionStagePublishers.toPublisher(() -> aggregate(indicators, detail));
     }
 
     /**
@@ -206,6 +207,14 @@ public class HealthEndpoint {
         } else {
             return HealthLevelOfDetail.STATUS;
         }
+    }
+
+    private CompletionStage<? extends @Nullable HealthResult> aggregate(HealthIndicator[] indicators, HealthLevelOfDetail detail) {
+        // a mock aggregator that only stubs the publisher method returns no stage
+        return CompletionStagePublishers.orElse(
+            healthAggregator.aggregateAsync(indicators, detail),
+            () -> CompletionStagePublishers.first(healthAggregator.aggregate(indicators, detail), null)
+        );
     }
 
     /**
