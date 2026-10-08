@@ -255,6 +255,9 @@ public @interface Introspected {
      * <p>Defaults to {@code false} since the generated introspection grows by the code describing the
      * hierarchy. The hierarchy is built when it is first asked for.</p>
      *
+     * <p>As with {@link #constructors()}, a type introspected through {@link #classes()} or {@link #packages()} that
+     * carries its own {@code @Introspected} annotation follows that annotation, not the one importing it.</p>
+     *
      * @return True if the hierarchy of the type should be described
      * @since 5.3.0
      */

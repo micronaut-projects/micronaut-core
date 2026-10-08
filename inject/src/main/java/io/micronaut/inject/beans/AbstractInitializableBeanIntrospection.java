@@ -105,9 +105,8 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @Nullable
     private IntrospectionBuilderData builderData;
 
-    @SuppressWarnings("java:S3077") // an immutable value: a racing read computes an equal one
-    private volatile @Nullable BeanTypeHierarchy typeHierarchy;
-    private volatile boolean typeHierarchyRead;
+    @SuppressWarnings({"java:S3077", "OptionalUsedAsFieldOrParameterType"}) // immutable once published
+    private volatile @Nullable Optional<BeanTypeHierarchy> typeHierarchy;
 
     protected AbstractInitializableBeanIntrospection(Class<B> beanType,
                                                      @Nullable AnnotationMetadata annotationMetadata,
@@ -992,12 +991,18 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
     @Override
     public final Optional<BeanTypeHierarchy> getTypeHierarchy() {
-        // built once, when first asked for
-        if (!typeHierarchyRead) {
-            typeHierarchy = buildTypeHierarchy();
-            typeHierarchyRead = true;
+        Optional<BeanTypeHierarchy> hierarchy = typeHierarchy;
+        if (hierarchy == null) {
+            // built once, when first asked for, so every caller sees the same instance
+            synchronized (this) {
+                hierarchy = typeHierarchy;
+                if (hierarchy == null) {
+                    hierarchy = Optional.ofNullable(buildTypeHierarchy());
+                    typeHierarchy = hierarchy;
+                }
+            }
         }
-        return Optional.ofNullable(typeHierarchy);
+        return hierarchy;
     }
 
     /**

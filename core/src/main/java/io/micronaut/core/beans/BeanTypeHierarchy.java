@@ -27,11 +27,23 @@ import java.util.Optional;
  *
  * <p>The types are those the compiler saw: the type itself first, then, depth first, its super class and the
  * super classes and interfaces of that, then its interfaces and theirs, each once. {@link Object} is reported
- * as a super class, it is not described itself. A type whose class cannot be loaded at runtime is left out.</p>
+ * as a super class, it is not described itself.</p>
+ *
+ * <p>The types are raw: the type arguments a type passes to its super class and interfaces are not described.</p>
  *
  * <p>Each {@link BeanIntrospection#getBeanMethods() bean method} of the introspection knows its declaring levels:
  * the type declaring it and every type of the hierarchy declaring a method it overrides, whether or not that
- * method is a bean method. A bean method the introspected type does not declare is inherited.</p>
+ * method is a bean method. A bean method the introspected type does not declare is inherited. The methods are
+ * looked up by identity: pass the {@link BeanMethod} instances of the introspection the hierarchy belongs to.</p>
+ *
+ * <p>Only bean methods are described here. The declarations of a property, the field and the accessor of every
+ * type declaring one, are the {@link BeanProperty#getMembers() members} of the property, each reporting its
+ * {@link BeanPropertyMember#getDeclaringType() declaring type}, when the introspection is generated with
+ * {@link io.micronaut.core.annotation.Introspected#members()}. A bean method has no such per-declaration
+ * element, so its declaring levels are listed here.</p>
+ *
+ * <p>This interface is implemented by generated code only. Methods may be added to it in later versions without
+ * a default implementation.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -75,9 +87,12 @@ public interface BeanTypeHierarchy {
 
     /**
      * The declaring levels of a bean method: the type declaring it, then every type of the hierarchy declaring a
-     * method it overrides, nearest first. A level that is an interface is one {@link Class#isInterface()} tells.
+     * method it overrides, each once, nearest first: in the breadth first order of the super types of the
+     * declaring type, the super class before the interfaces, so a type the declaring type extends or implements
+     * directly comes before a type that one extends or implements in turn. {@link Class#isInterface()} tells
+     * which levels are interfaces.
      *
-     * @param method A bean method of the introspection
+     * @param method A bean method instance of the introspection, compared by identity
      * @return The declaring types, empty for a method that is not a bean method of the introspection
      */
     List<Class<?>> getDeclaringTypes(BeanMethod<?, ?> method);
@@ -90,8 +105,8 @@ public interface BeanTypeHierarchy {
     /**
      * Whether the introspected type declares a bean method itself, rather than inheriting it.
      *
-     * @param method A bean method of the introspection
-     * @return True if the type declares it, false if it inherits it
+     * @param method A bean method instance of the introspection, compared by identity
+     * @return True if the type declares it, false if it inherits it or it is not a bean method of the introspection
      */
     default boolean isDeclared(BeanMethod<?, ?> method) {
         List<Class<?>> levels = getDeclaringTypes(method);

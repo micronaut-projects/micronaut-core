@@ -15,18 +15,22 @@ public class Book extends Publication implements Comparable<Book> {
 ----
 BeanTypeHierarchy hierarchy = introspection.getTypeHierarchy().orElseThrow();
 
-hierarchy.getTypes();                           // [Book, Publication, ..., Comparable]
-hierarchy.getSuperclass(Book.class);            // Optional[Publication]
-hierarchy.getInterfaces(Book.class);            // [Comparable]
-hierarchy.isDeclared(method);              // whether Book declares a bean method itself
+hierarchy.getTypes();                    // [Book, Publication, ..., Comparable]
+hierarchy.getSuperclass(Book.class);     // Optional[Publication]
+hierarchy.getInterfaces(Book.class);     // [Comparable]
+hierarchy.getDeclaringTypes(method);     // [Book, Comparable] for compareTo
+hierarchy.isDeclared(method);            // whether Book declares a bean method itself
 ----
 
 api:core.beans.BeanTypeHierarchy[] exposes:
 
 * `getTypes()` - the type and every super class and interface of it, each once, depth first: the super class and its super types, then the interfaces and theirs. `Object` is reported as a super class but not described itself.
 * `getSuperclass(type)` and `getInterfaces(type)` - what a type of the hierarchy extends and implements itself
+* `getDeclaringTypes(method)` - the levels a bean method is declared on: the type declaring it, then every type declaring a method it overrides, nearest first. A level whose method is not a bean method is included.
 * `getDeclaredMethods()` and `isDeclared(method)` - which of the bean methods of the introspection the type declares itself, overrides included; the others it inherits
 
-The hierarchy is the one the compiler saw. A type whose class cannot be loaded at runtime is left out.
+The methods are looked up by identity, so pass the api:core.beans.BeanMethod[] instances of the same introspection. The declarations of properties are not part of the hierarchy: they are the members of each property, see <<propertyMembers, Bean Property Members>>.
+
+The hierarchy is the one the compiler saw, with raw types: the type arguments passed to super types are not described.
 
 IMPORTANT: `hierarchy` defaults to `false` because the generated introspection grows by the code describing the hierarchy. The hierarchy is built, and its classes loaded, when it is first asked for.

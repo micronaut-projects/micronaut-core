@@ -56,6 +56,9 @@ class Child extends Base<String> implements Titled {
         hierarchy.isDeclared(methods.value)
         hierarchy.isDeclared(methods.own)
         !hierarchy.isDeclared(methods.getName)
+        hierarchy.getDeclaringTypes(methods.value) == [child, base]
+        hierarchy.getDeclaringTypes(methods.own) == [child]
+        hierarchy.getDeclaringTypes(methods.getName) == [base, named]
     }
 
     void "an introspection does not describe the hierarchy by default"() {

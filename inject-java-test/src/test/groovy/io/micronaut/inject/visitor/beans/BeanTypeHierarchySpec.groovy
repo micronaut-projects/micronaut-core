@@ -84,6 +84,123 @@ class Child extends Base<String> implements Titled, Comparable<Child> {
 
         and: 'read once'
         introspection.getTypeHierarchy().get().is(hierarchy)
+        hierarchy.types.is(hierarchy.types)
+    }
+
+    void "the declaring levels of a method are listed nearest first, each once"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Diamond', '''
+package test;
+
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Introspected;
+
+interface Deep {
+    void run();
+}
+
+interface Mid extends Deep {
+    void run();
+}
+
+interface Side extends Deep {
+    void run();
+}
+
+interface Far {
+    void run();
+}
+
+@Introspected(hierarchy = true)
+class Diamond implements Mid, Side, Far {
+    @Executable
+    public void run() { }
+}
+''')
+        def hierarchy = introspection.getTypeHierarchy().orElseThrow()
+        def loader = introspection.beanType.classLoader
+        def (mid, deep, side, far) = ['Mid', 'Deep', 'Side', 'Far'].collect { loader.loadClass('test.' + it) }
+        def run = introspection.beanMethods.find { it.name == 'run' }
+
+        then: 'the types once, depth first; the levels breadth first'
+        hierarchy.types == [introspection.beanType, mid, deep, side, far]
+        hierarchy.getDeclaringTypes(run) == [introspection.beanType, mid, side, far, deep]
+        hierarchy.isDeclared(run)
+    }
+
+    void "a bean method of another introspection is not one of the hierarchy"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Child', SOURCE)
+        def other = buildBeanIntrospection('test.Child', SOURCE)
+        def hierarchy = introspection.getTypeHierarchy().orElseThrow()
+        def foreign = other.beanMethods.find { it.name == 'own' }
+
+        then:
+        hierarchy.getDeclaringTypes(foreign).isEmpty()
+        !hierarchy.isDeclared(foreign)
+    }
+
+    void "the hierarchy of an interface, an enum and a record"() {
+        when:
+        def loader = buildClassLoader('test.Shape', '''
+package test;
+
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Introspected;
+
+interface Sized {
+    int size();
+}
+
+@Introspected(hierarchy = true)
+interface Shape extends Sized {
+    @Executable
+    String name();
+}
+
+@Introspected(hierarchy = true)
+enum Color implements Sized {
+    RED;
+    @Executable
+    public int size() { return 1; }
+}
+
+@Introspected(hierarchy = true)
+record Point(int x, int y) implements Sized {
+    @Executable
+    public int size() { return 2; }
+}
+''')
+        def sized = loader.loadClass('test.Sized')
+        def shape = introspection(loader, 'test.Shape')
+        def color = introspection(loader, 'test.Color')
+        def point = introspection(loader, 'test.Point')
+        def shapeHierarchy = shape.getTypeHierarchy().orElseThrow()
+        def colorHierarchy = color.getTypeHierarchy().orElseThrow()
+        def pointHierarchy = point.getTypeHierarchy().orElseThrow()
+
+        then: 'an interface has no super class'
+        shapeHierarchy.types == [shape.beanType, sized]
+        !shapeHierarchy.getSuperclass(shape.beanType).isPresent()
+        shapeHierarchy.getInterfaces(shape.beanType) == [sized]
+        shapeHierarchy.isDeclared(shape.beanMethods.find { it.name == 'name' })
+
+        and: 'an enum extends Enum'
+        colorHierarchy.getSuperclass(color.beanType).get() == Enum
+        colorHierarchy.contains(Enum)
+        colorHierarchy.contains(Comparable)
+        colorHierarchy.getDeclaringTypes(color.beanMethods.find { it.name == 'size' }) == [color.beanType, sized]
+
+        and: 'a record extends Record'
+        pointHierarchy.types == [point.beanType, Record, sized]
+        pointHierarchy.getSuperclass(point.beanType).get() == Record
+        pointHierarchy.getSuperclass(Record).get() == Object
+        pointHierarchy.getDeclaringTypes(point.beanMethods.find { it.name == 'size' }) == [point.beanType, sized]
+    }
+
+    private static io.micronaut.core.beans.BeanIntrospection<?> introspection(ClassLoader loader, String name) {
+        def simpleName = name.substring(name.lastIndexOf('.') + 1)
+        (loader.loadClass('test.$' + simpleName + '$Introspection').getDeclaredConstructor().newInstance() as BeanIntrospectionReference).load()
     }
 
     void "an introspection does not describe the hierarchy by default"() {

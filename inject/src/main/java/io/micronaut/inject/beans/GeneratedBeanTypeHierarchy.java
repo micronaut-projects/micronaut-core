@@ -26,6 +26,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,9 +57,7 @@ public final class GeneratedBeanTypeHierarchy implements BeanTypeHierarchy {
     private final int[][] superTypes;
     private final int[][] methodLevels;
     private final BeanIntrospection<?> introspection;
-    private volatile @Nullable List<BeanMethod<?, ?>> declaredMethods;
-    private volatile @Nullable Map<Class<?>, TypeEntry> types;
-    private volatile Class<?> @Nullable [] classes;
+    private volatile @Nullable Resolved resolved;
 
     /**
      * The hierarchy as the generated introspection describes it.
@@ -89,126 +88,129 @@ public final class GeneratedBeanTypeHierarchy implements BeanTypeHierarchy {
 
     @Override
     public List<Class<?>> getTypes() {
-        return List.copyOf(types().keySet());
+        return resolved().typeList;
     }
 
     @Override
     public boolean contains(Class<?> type) {
-        return types().containsKey(type);
+        return resolved().types.containsKey(type);
     }
 
     @Override
     public Optional<Class<?>> getSuperclass(Class<?> type) {
-        TypeEntry entry = types().get(type);
+        TypeEntry entry = resolved().types.get(type);
         return entry == null ? Optional.empty() : Optional.ofNullable(entry.superclass());
     }
 
     @Override
     public List<Class<?>> getInterfaces(Class<?> type) {
-        TypeEntry entry = types().get(type);
+        TypeEntry entry = resolved().types.get(type);
         return entry == null ? List.of() : entry.interfaces();
     }
 
     @Override
     public List<Class<?>> getDeclaringTypes(BeanMethod<?, ?> method) {
-        int index = indexOf(method);
-        if (index < 0) {
-            return List.of();
-        }
-        Class<?>[] resolved = classes();
-        List<Class<?>> levels = new ArrayList<>(methodLevels[index].length);
-        for (int level : methodLevels[index]) {
-            if (resolved[level] != null) {
-                levels.add(resolved[level]);
-            }
-        }
-        return Collections.unmodifiableList(levels);
+        Resolved r = resolved();
+        Integer index = r.methodIndexes.get(method);
+        return index == null ? List.of() : r.methodLevels.get(index);
     }
 
     @Override
     public boolean isDeclared(BeanMethod<?, ?> method) {
-        int index = indexOf(method);
+        Integer index = resolved().methodIndexes.get(method);
         // the introspected type is the first of the types
-        return index >= 0 && methodLevels[index].length > 0 && methodLevels[index][0] == 0;
+        return index != null && methodLevels[index].length > 0 && methodLevels[index][0] == 0;
     }
 
     @Override
     public List<BeanMethod<?, ?>> getDeclaredMethods() {
-        List<BeanMethod<?, ?>> resolved = declaredMethods;
-        if (resolved == null) {
-            List<? extends BeanMethod<?, ?>> beanMethods = List.copyOf(introspection.getBeanMethods());
-            List<BeanMethod<?, ?>> declared = new ArrayList<>();
-            for (int i = 0; i < beanMethods.size(); i++) {
-                if (methodLevels[i].length > 0 && methodLevels[i][0] == 0) {
-                    declared.add(beanMethods.get(i));
-                }
-            }
-            resolved = Collections.unmodifiableList(declared);
-            declaredMethods = resolved;
-        }
-        return resolved;
+        return resolved().declaredMethods;
     }
 
-    private int indexOf(BeanMethod<?, ?> method) {
-        int i = 0;
-        for (BeanMethod<?, ?> beanMethod : introspection.getBeanMethods()) {
-            if (beanMethod == method) {
-                return i;
-            }
-            i++;
+    private Resolved resolved() {
+        Resolved r = resolved;
+        if (r == null) {
+            r = resolve();
+            resolved = r;
         }
-        return -1;
+        return r;
     }
 
-    private Class<?>[] classes() {
-        Class<?>[] resolved = classes;
-        if (resolved == null) {
-            // each type is loaded once, here, and found by its index after that
-            resolved = new Class<?>[typeValues.length];
-            for (int i = 0; i < typeValues.length; i++) {
-                resolved[i] = typeValues[i].getType().orElse(null);
-            }
-            classes = resolved;
+    private Resolved resolve() {
+        // each type is loaded once, here, and found by its index after that
+        Class<?>[] classes = new Class<?>[typeValues.length];
+        for (int i = 0; i < typeValues.length; i++) {
+            AnnotationClassValue<?> value = typeValues[i];
+            classes[i] = value.getType().orElseThrow(() -> new IllegalStateException(
+                "Type " + value.getName() + " of the hierarchy of " + beanType.getName() + " cannot be loaded"));
         }
-        return resolved;
-    }
 
-    private Map<Class<?>, TypeEntry> types() {
-        Map<Class<?>, TypeEntry> resolved = types;
-        if (resolved == null) {
-            Class<?>[] classes = classes();
-            Map<Class<?>, TypeEntry> map = new LinkedHashMap<>();
-            for (int i = 0; i < classes.length; i++) {
-                Class<?> type = classes[i];
-                if (type == null) {
-                    continue;
-                }
-                int[] parents = superTypes[i];
-                Class<?> superclass = switch (parents[0]) {
-                    case NO_SUPERCLASS -> null;
-                    case OBJECT_SUPERCLASS -> Object.class;
-                    default -> classes[parents[0]];
-                };
-                List<Class<?>> interfaces = new ArrayList<>(parents.length - 1);
-                for (int j = 1; j < parents.length; j++) {
-                    Class<?> anInterface = classes[parents[j]];
-                    if (anInterface != null) {
-                        interfaces.add(anInterface);
-                    }
-                }
-                map.put(type, new TypeEntry(superclass, Collections.unmodifiableList(interfaces)));
+        Map<Class<?>, TypeEntry> types = new LinkedHashMap<>(classes.length);
+        for (int i = 0; i < classes.length; i++) {
+            int[] parents = superTypes[i];
+            Class<?> superclass = switch (parents[0]) {
+                case NO_SUPERCLASS -> null;
+                case OBJECT_SUPERCLASS -> Object.class;
+                default -> classes[parents[0]];
+            };
+            Class<?>[] interfaces = new Class<?>[parents.length - 1];
+            for (int j = 1; j < parents.length; j++) {
+                interfaces[j - 1] = classes[parents[j]];
             }
-            resolved = Collections.unmodifiableMap(map);
-            types = resolved;
+            types.put(classes[i], new TypeEntry(superclass, List.of(interfaces)));
         }
-        return resolved;
+
+        List<? extends BeanMethod<?, ?>> beanMethods = List.copyOf(introspection.getBeanMethods());
+        if (beanMethods.size() != methodLevels.length) {
+            throw new IllegalStateException("The hierarchy of " + beanType.getName() + " describes " + methodLevels.length
+                + " bean methods, the introspection has " + beanMethods.size());
+        }
+        Map<BeanMethod<?, ?>, Integer> methodIndexes = new IdentityHashMap<>(beanMethods.size());
+        List<List<Class<?>>> levels = new ArrayList<>(beanMethods.size());
+        List<BeanMethod<?, ?>> declared = new ArrayList<>();
+        for (int i = 0; i < beanMethods.size(); i++) {
+            BeanMethod<?, ?> beanMethod = beanMethods.get(i);
+            methodIndexes.put(beanMethod, i);
+            int[] methodLevel = methodLevels[i];
+            Class<?>[] declaring = new Class<?>[methodLevel.length];
+            for (int j = 0; j < methodLevel.length; j++) {
+                declaring[j] = classes[methodLevel[j]];
+            }
+            levels.add(List.of(declaring));
+            if (methodLevel.length > 0 && methodLevel[0] == 0) {
+                declared.add(beanMethod);
+            }
+        }
+        return new Resolved(
+            Collections.unmodifiableMap(types),
+            List.of(classes),
+            methodIndexes,
+            levels,
+            List.copyOf(declared)
+        );
     }
 
     @Override
     public String toString() {
-        return "BeanTypeHierarchy{" + beanType.getName() + ", types=" + types().keySet() + ", methodLevels=" + Arrays.deepToString(methodLevels) + '}';
+        return "BeanTypeHierarchy{" + beanType.getName() + ", types=" + getTypes() + ", methodLevels=" + Arrays.deepToString(methodLevels) + '}';
     }
 
     private record TypeEntry(@Nullable Class<?> superclass, List<Class<?>> interfaces) {
+    }
+
+    /**
+     * Everything derived from the generated indexes, published at once.
+     *
+     * @param types The entry of each type
+     * @param typeList The types
+     * @param methodIndexes The index of each bean method, by identity; only read after publication
+     * @param methodLevels The declaring levels of each bean method
+     * @param declaredMethods The bean methods the introspected type declares
+     */
+    private record Resolved(Map<Class<?>, TypeEntry> types,
+                            List<Class<?>> typeList,
+                            Map<BeanMethod<?, ?>, Integer> methodIndexes,
+                            List<List<Class<?>>> methodLevels,
+                            List<BeanMethod<?, ?>> declaredMethods) {
     }
 }

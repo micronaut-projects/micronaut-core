@@ -23,7 +23,10 @@ import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.TypeDef;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -79,9 +82,9 @@ record TypeHierarchyDef(ExpressionDef types, ExpressionDef superTypes, Expressio
         List<ExpressionDef> methodLevels = new ArrayList<>(beanMethods.size());
         for (MethodElement method : beanMethods) {
             // the declaring type, then the types declaring a method it overrides, nearest first, each once; Object
-            // is no level of the table
+            // is not in the table, so it is no level
             Set<Integer> levels = new LinkedHashSet<>();
-            collectLevels(method, table, levels);
+            collectLevels(method, hierarchy, table, levels);
             methodLevels.add(TypeDef.Primitive.INT.array().instantiate(
                 levels.stream().<ExpressionDef>map(ExpressionDef::constant).toList()));
         }
@@ -94,14 +97,50 @@ record TypeHierarchyDef(ExpressionDef types, ExpressionDef superTypes, Expressio
         );
     }
 
-    private static void collectLevels(MethodElement method, Map<String, Integer> table, Set<Integer> levels) {
-        Integer level = table.get(method.getDeclaringType().getName());
-        if (level != null && !levels.add(level)) {
+    /**
+     * Collects the declaring levels of a method: the type declaring it and the types declaring a method it
+     * overrides, in the breadth first order of the super types of the declaring type, so a type the declaring
+     * type extends or implements directly comes before a type that one extends or implements in turn.
+     */
+    private static void collectLevels(MethodElement method, Map<String, ClassElement> hierarchy,
+                                      Map<String, Integer> table, Set<Integer> levels) {
+        Set<String> declaring = new HashSet<>();
+        collectDeclaringTypes(method, declaring);
+        for (String type : breadthFirst(method.getDeclaringType().getName(), hierarchy)) {
+            if (declaring.remove(type)) {
+                levels.add(table.get(type));
+            }
+        }
+    }
+
+    private static void collectDeclaringTypes(MethodElement method, Set<String> declaring) {
+        if (!declaring.add(method.getDeclaringType().getName())) {
             return;
         }
         for (MethodElement overridden : method.getOverriddenMethods()) {
-            collectLevels(overridden, table, levels);
+            collectDeclaringTypes(overridden, declaring);
         }
+    }
+
+    /**
+     * The types of the hierarchy a type is or extends, breadth first: the super class before the interfaces.
+     */
+    private static Set<String> breadthFirst(String start, Map<String, ClassElement> hierarchy) {
+        Set<String> visited = new LinkedHashSet<>();
+        Deque<String> queue = new ArrayDeque<>();
+        queue.add(start);
+        while (!queue.isEmpty()) {
+            String name = queue.poll();
+            ClassElement type = hierarchy.get(name);
+            if (type == null || !visited.add(name)) {
+                continue;
+            }
+            if (!type.isInterface()) {
+                type.getSuperType().ifPresent(parent -> queue.add(parent.getName()));
+            }
+            type.getInterfaces().forEach(anInterface -> queue.add(anInterface.getName()));
+        }
+        return visited;
     }
 
     /**
