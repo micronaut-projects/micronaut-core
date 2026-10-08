@@ -28,5 +28,15 @@ public enum ReloadStrategy {
     /**
      * The application context is stopped and a new one started on the new classes.
      */
-    RESTART
+    RESTART,
+    /**
+     * The application context stays: the changed classes are redefined in place, and the running beans see
+     * the new method bodies.
+     */
+    RELOAD,
+    /**
+     * {@link #RELOAD} when the instrumentation agent is attached and the change allows it, {@link #RESTART}
+     * otherwise. A launcher setting only: a published change carries the strategy it applied.
+     */
+    AUTO
 }

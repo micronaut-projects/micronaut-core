@@ -896,7 +896,7 @@ public final class DevRuntime implements Closeable {
         redefinitions++;
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         if (current != null && current.isRunning()) {
-            ClassChangeEvent event = new ClassChangeEvent(this, generation.generation(), Set.of(), generation, changeSet.classes(), ReloadStrategy.RELOAD);
+            ClassChangeEvent event = new ClassChangeEvent(this, Set.of(), generation, changeSet.classes(), ReloadStrategy.RELOAD);
             try {
                 current.publishEvent(event);
                 current.publishEvent(new ReloadCompletedEvent(this, event, List.of(), List.of(), elapsed));
