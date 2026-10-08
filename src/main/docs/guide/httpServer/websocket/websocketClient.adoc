@@ -61,6 +61,24 @@ chatClient.send("Hello World!");
 
 NOTE: For illustration purposes we use `blockFirst()` to obtain the client. It is however possible to combine `connect` (which returns a reactor:Flux[]) to perform non-blocking interaction via WebSocket.
 
+==== Connecting without Reactor
+
+api:websocket.AsyncWebSocketClient[] is the counterpart of api:websocket.WebSocketClient[] whose `connect` methods return a `CompletionStage` that completes with the connected client endpoint. Inject it like a `WebSocketClient`, or obtain it from one with `toAsyncWebSocket()`:
+
+[source,java]
+----
+@Inject
+@Client("http://localhost:8080")
+AsyncWebSocketClient webSocketClient;
+
+webSocketClient.connect(ChatClientWebSocket.class, "/chat/football/fred")
+    .thenAccept(chatClient -> chatClient.sendAsync("Hello World!"));
+----
+
+Each call connects once. Cancelling the future of the stage before the connection is established, or completing it otherwise, for example with `orTimeout`, aborts the connect; an endpoint that connects after that is closed. The stage may complete on an event loop thread, so its continuations must not block. They run with the propagated context of the caller of `connect`.
+
+The injected client, and the one returned by `toAsyncWebSocket()`, are views of the underlying HTTP client: closing them closes that client, which is shared with the other injection points of the same client. Outside of an application use `AsyncWebSocketClient.create(uri)`, and close the client once done.
+
 [TIP]
 .Using the CLI
 ====
