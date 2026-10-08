@@ -300,8 +300,8 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
      * has started when this is asked, and no bean has been created yet.
      */
     @Override
-    boolean isTrackBeanDependenciesOnStart() {
-        boolean switchedOff = configuration instanceof DefaultApplicationContextBuilder builder && builder.isTrackBeanDependenciesSwitchedOff();
+    boolean isBeanDependencyTrackingEnabledOnStart() {
+        boolean switchedOff = configuration instanceof DefaultApplicationContextBuilder builder && builder.isBeanDependencyTrackingSwitchedOff();
         return !switchedOff && DevelopmentMode.isEnabled(environment);
     }
 

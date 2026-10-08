@@ -56,7 +56,7 @@ class BeanDependencyGraphSpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.builder()
             .properties('spec.name': 'BeanDependencyGraphSpec', 'micronaut.dev.enabled': true)
-            .trackBeanDependencies(false)
+            .beanDependencyTrackingEnabled(false)
             .start()
 
         expect:
@@ -70,7 +70,7 @@ class BeanDependencyGraphSpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.builder()
             .properties('spec.name': 'BeanDependencyGraphSpec')
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .start()
         BeanDependencyGraph graph = context.findDependencyGraph().get()
         def repo = context.getBeanDefinition(Repo)
@@ -135,6 +135,17 @@ class BeanDependencyGraphSpec extends Specification {
         consumersOfA.size() == 1
         consumersOfA.first().dependent().declaredQualifier == io.micronaut.inject.qualifiers.Qualifiers.byName("a")
         graph.transitiveDependenciesOf(context.getBeanDefinition(Holder))*.beanType.containsAll([Produced, Repo, ProducedFactory])
+
+        and: "a registration names its node, whichever definition object the caller would otherwise have to pick"
+        def regA = context.getBeanRegistration(Conn, io.micronaut.inject.qualifiers.Qualifiers.byName("a"))
+        graph.dependentsOf(regA).findAll { it.dependent().beanType == ConnConsumer } == consumersOfA
+        def consumerA = context.getBeanRegistration(ConnConsumer, io.micronaut.inject.qualifiers.Qualifiers.byName("a"))
+        graph.dependenciesOf(consumerA)*.dependency()*.declaredQualifier == [io.micronaut.inject.qualifiers.Qualifiers.byName("a")]
+        graph.transitiveDependenciesOf(context.getBeanRegistration(Holder, null))*.beanType.containsAll([Produced, Repo, ProducedFactory])
+
+        and: "a dependency is equal to another joining the same nodes in the same way, as the graph's index is"
+        graph.dependenciesOf(context.getBeanRegistration(Holder, null)).contains(
+            new BeanDependencyGraph.BeanDependency(context.getBeanDefinition(Holder), context.getBeanDefinition(Produced), InjectionKind.CONSTRUCTOR, false, false))
 
         and: "a path through a prototype is kept"
         context.getBean(PrototypeHolder)

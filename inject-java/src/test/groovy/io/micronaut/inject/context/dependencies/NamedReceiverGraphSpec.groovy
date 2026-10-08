@@ -27,7 +27,7 @@ class NamedReceiverGraphSpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.builder()
             .properties('spec.name': 'NamedReceiverGraphSpec')
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .start()
         BeanDependencyGraph graph = context.findDependencyGraph().get()
 
@@ -65,7 +65,7 @@ class NamedReceiverGraphSpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.builder()
             .properties('spec.name': 'NamedReceiverGraphSpec')
-            .trackBeanDependencies(true)
+            .beanDependencyTrackingEnabled(true)
             .start()
         BeanDependencyGraph graph = context.findDependencyGraph().get()
 

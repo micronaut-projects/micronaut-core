@@ -95,7 +95,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean eagerBeansEnabled = true;
     private boolean eventsEnabled = true;
     @Nullable
-    private Boolean trackBeanDependencies;
+    private Boolean beanDependencyTracking;
     @Nullable
     private Predicate<QualifiedBeanType<?>> beansPredicate;
     @Nullable
@@ -226,22 +226,22 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    public boolean isTrackBeanDependencies() {
-        return trackBeanDependencies != null ? trackBeanDependencies : ApplicationContextConfiguration.super.isTrackBeanDependencies();
+    public boolean beanDependencyTrackingEnabled() {
+        return beanDependencyTracking != null ? beanDependencyTracking : ApplicationContextConfiguration.super.beanDependencyTrackingEnabled();
     }
 
     @Override
-    public ApplicationContextBuilder trackBeanDependencies(boolean enabled) {
-        this.trackBeanDependencies = enabled;
+    public ApplicationContextBuilder beanDependencyTrackingEnabled(boolean enabled) {
+        this.beanDependencyTracking = enabled;
         return this;
     }
 
     /**
-     * @return Whether {@link #trackBeanDependencies(boolean)} switched tracking off, which development mode
+     * @return Whether {@link #beanDependencyTrackingEnabled(boolean)} switched tracking off, which development mode
      * switched on by configuration does not override
      */
-    boolean isTrackBeanDependenciesSwitchedOff() {
-        return Boolean.FALSE.equals(trackBeanDependencies);
+    boolean isBeanDependencyTrackingSwitchedOff() {
+        return Boolean.FALSE.equals(beanDependencyTracking);
     }
 
     @Override

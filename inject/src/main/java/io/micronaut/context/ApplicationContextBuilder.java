@@ -397,7 +397,7 @@ public interface ApplicationContextBuilder {
 
     /**
      * Record which bean received which other bean, as a {@link BeanDependencyGraph} the built context
-     * exposes through {@link BeanContext#findDependencyGraph()}. A development launcher switches this on;
+     * exposes through {@link ConfigurableBeanContext#findDependencyGraph()}. A development launcher switches this on;
      * it defaults to on only in {@link io.micronaut.context.env.DevelopmentMode development mode}, whether switched
      * on by system property or by the configuration of the context. Switching it off here wins over both.
      *
@@ -405,7 +405,7 @@ public interface ApplicationContextBuilder {
      * @return This builder
      * @since 5.3.0
      */
-    default ApplicationContextBuilder trackBeanDependencies(boolean enabled) {
+    default ApplicationContextBuilder beanDependencyTrackingEnabled(boolean enabled) {
         return this;
     }
 

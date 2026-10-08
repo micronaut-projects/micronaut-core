@@ -502,7 +502,14 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
         }
     }
 
-    private record Key(Class<?> definitionClass, @Nullable Object qualifier, @Nullable Class<?> beanType) {
+    /**
+     * The identity of a node: the definition class, with the qualifier and bean type of a delegate or runtime definition.
+     *
+     * @param definitionClass The class of the definition, or of the definition a delegate wraps
+     * @param qualifier The qualifier of a delegate or runtime definition
+     * @param beanType The bean type of a delegate or runtime definition
+     */
+    record Key(Class<?> definitionClass, @Nullable Object qualifier, @Nullable Class<?> beanType) {
         static Key of(BeanDefinition<?> definition) {
             if (definition instanceof BeanDefinitionDelegate<?> delegate) {
                 return new Key(delegate.getDelegate().getClass(), delegate.getDeclaredQualifier(), delegate.getBeanType());

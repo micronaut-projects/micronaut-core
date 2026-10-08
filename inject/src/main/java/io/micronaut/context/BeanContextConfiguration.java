@@ -117,12 +117,12 @@ public interface BeanContextConfiguration {
      * is switched on by system property, since a production run has no use for the graph. An application
      * context whose configuration switches development mode on ({@value DevelopmentMode#PROPERTY}) tracks
      * dependencies too, deciding so as it starts and before it creates any bean, unless its builder switched
-     * tracking off with {@link ApplicationContextBuilder#trackBeanDependencies(boolean)}.
+     * tracking off with {@link ApplicationContextBuilder#beanDependencyTrackingEnabled(boolean)}.
      *
      * @return True to record the graph
      * @since 5.3.0
      */
-    default boolean isTrackBeanDependencies() {
+    default boolean beanDependencyTrackingEnabled() {
         return DevelopmentMode.isEnabledBySystemProperty();
     }
 

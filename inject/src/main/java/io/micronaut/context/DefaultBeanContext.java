@@ -261,7 +261,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private final boolean eagerBeansEnabled;
     /**
      * The recorded dependency graph, null when the context does not track dependencies. Decided by the configuration
-     * as the context is constructed, or by its environment as it starts (see {@link #isTrackBeanDependenciesOnStart()}),
+     * as the context is constructed, or by its environment as it starts (see {@link #isBeanDependencyTrackingEnabledOnStart()}),
      * in both cases before the context creates a bean; it only ever goes from null to a graph.
      */
     @Nullable
@@ -354,7 +354,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         this.tracePatterns = traceConfiguration.classPatterns();
         this.eventsEnabled = contextConfiguration.eventsEnabled();
         this.eagerBeansEnabled = contextConfiguration.eagerBeansEnabled();
-        this.dependencyGraph = contextConfiguration.isTrackBeanDependencies() ? new DefaultBeanDependencyGraph() : null;
+        this.dependencyGraph = contextConfiguration.beanDependencyTrackingEnabled() ? new DefaultBeanDependencyGraph() : null;
         this.conversionService = MutableConversionService.create();
         beanDefinitionProvider = new DefaultBeanDefinitionService(beanContextConfiguration);
     }
@@ -408,7 +408,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Starting BeanContext");
                 }
-                if (dependencyGraph == null && isTrackBeanDependenciesOnStart()) {
+                if (dependencyGraph == null && isBeanDependencyTrackingEnabledOnStart()) {
                     // development mode was switched on by configuration rather than by system property: the
                     // environment is started and no bean has been created yet, so the graph sees every bean
                     dependencyGraph = new DefaultBeanDependencyGraph();
@@ -443,7 +443,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      *
      * @return True to start recording the dependency graph
      */
-    boolean isTrackBeanDependenciesOnStart() {
+    boolean isBeanDependencyTrackingEnabledOnStart() {
         return false;
     }
 

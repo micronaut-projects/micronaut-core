@@ -22,19 +22,18 @@ import org.jspecify.annotations.NullMarked;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Set;
-
 /**
- * Which singleton received which other singleton through injection.
+ * Which bean received which other bean through injection, whatever the scope of either.
  *
  * <p>The graph is recorded while beans are created, only when the context was configured to
- * {@link BeanContextConfiguration#isTrackBeanDependencies() track dependencies}, which a development
+ * {@link BeanContextConfiguration#beanDependencyTrackingEnabled() track dependencies}, which a development
  * launcher does and a production run does not. A development launcher uses it to decide, when the
  * application's classes change, which beans of the framework received an instance of a changed
  * class and how: through the constructor, in which case the bean must be recreated, or through a
  * field or method, in which case it can be injected again, or through a provider, in which case
  * nothing is needed because the provider resolves the bean anew on every call.</p>
  *
- * <p>The graph records every bean a bean received, whatever its scope. A prototype instance belongs
+ * <p>Singletons, scoped beans, scoped proxies and prototypes are all recorded. A prototype instance belongs
  * to the bean that received it and follows its lifecycle; what the prototype itself received is
  * recorded under the prototype's definition, so a singleton reached through a prototype is still a
  * transitive dependent of what it holds.</p>
@@ -43,6 +42,12 @@ import java.util.Set;
  * under its definition, as any instance does, and a singleton's fresh instance shares those edges with the scoped
  * one until both are destroyed. What a bean resolves or creates through an injected {@link BeanDependencyResolver},
  * or a group the resolver opened, is recorded as received by that bean, with {@link InjectionKind#OTHER}.</p>
+ *
+ * <p>A node is a bean definition together with the qualifier the context registers its bean under: the members of
+ * an {@code @EachBean} or {@code @EachProperty} set and the beans of an {@code @Any} factory are distinct nodes.
+ * The overloads taking a {@link BeanRegistration} look up the node of that registration, which is the node
+ * a caller holding the bean wants; those taking a {@link BeanDefinition} expect the definition the registration
+ * carries.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -54,36 +59,78 @@ public interface BeanDependencyGraph {
     /**
      * The beans the given bean received.
      *
-     * @param dependent The bean definition of the receiving bean
+     * @param dependent The bean definition of the receiving bean, as its {@link BeanRegistration} carries it
      * @return The dependencies, empty if none were recorded
      */
     Collection<BeanDependency> dependenciesOf(BeanDefinition<?> dependent);
 
     /**
+     * The beans the bean of the given registration received.
+     *
+     * @param dependent The registration of the receiving bean
+     * @return The dependencies, empty if none were recorded
+     */
+    default Collection<BeanDependency> dependenciesOf(BeanRegistration<?> dependent) {
+        return dependenciesOf(dependent.getBeanDefinition());
+    }
+
+    /**
      * The beans that received the given bean.
      *
-     * @param dependency The bean definition of the received bean
+     * @param dependency The bean definition of the received bean, as its {@link BeanRegistration} carries it
      * @return The dependents, empty if none were recorded
      */
     Collection<BeanDependency> dependentsOf(BeanDefinition<?> dependency);
 
     /**
+     * The beans that received the bean of the given registration.
+     *
+     * @param dependency The registration of the received bean
+     * @return The dependents, empty if none were recorded
+     */
+    default Collection<BeanDependency> dependentsOf(BeanRegistration<?> dependency) {
+        return dependentsOf(dependency.getBeanDefinition());
+    }
+
+    /**
      * Every bean that received the given bean, or received a bean that received it, and so on, apart
      * from those that hold it only {@link BeanDependency#lazy() lazily}.
      *
-     * @param dependency The bean definition of the received bean
+     * @param dependency The bean definition of the received bean, as its {@link BeanRegistration} carries it
      * @return The transitive dependents, in the order they were reached
      */
     Set<BeanDefinition<?>> transitiveDependentsOf(BeanDefinition<?> dependency);
 
     /**
+     * Every bean that received the bean of the given registration, or received a bean that received it, and so on,
+     * apart from those that hold it only {@link BeanDependency#lazy() lazily}.
+     *
+     * @param dependency The registration of the received bean
+     * @return The transitive dependents, in the order they were reached
+     */
+    default Set<BeanDefinition<?>> transitiveDependentsOf(BeanRegistration<?> dependency) {
+        return transitiveDependentsOf(dependency.getBeanDefinition());
+    }
+
+    /**
      * Every bean the given bean received, or a bean it received did, and so on, apart from those held
      * only {@link BeanDependency#lazy() lazily}: what must stay alive for the bean to keep working.
      *
-     * @param dependent The bean definition of the receiving bean
+     * @param dependent The bean definition of the receiving bean, as its {@link BeanRegistration} carries it
      * @return The transitive dependencies, in the order they were reached
      */
     Set<BeanDefinition<?>> transitiveDependenciesOf(BeanDefinition<?> dependent);
+
+    /**
+     * Every bean the bean of the given registration received, or a bean it received did, and so on, apart from
+     * those held only {@link BeanDependency#lazy() lazily}.
+     *
+     * @param dependent The registration of the receiving bean
+     * @return The transitive dependencies, in the order they were reached
+     */
+    default Set<BeanDefinition<?>> transitiveDependenciesOf(BeanRegistration<?> dependent) {
+        return transitiveDependenciesOf(dependent.getBeanDefinition());
+    }
 
     /**
      * Every dependency recorded so far.
@@ -97,8 +144,8 @@ public interface BeanDependencyGraph {
      */
     enum InjectionKind {
         /**
-         * A constructor or factory method argument. The receiving bean holds the instance in a way that
-         * cannot be replaced; it must be recreated when the dependency is.
+         * A constructor or factory method argument, or the factory a bean is produced by. The receiving bean holds
+         * the instance in a way that cannot be replaced; it must be recreated when the dependency is.
          */
         CONSTRUCTOR,
         /**
@@ -110,13 +157,21 @@ public interface BeanDependencyGraph {
          */
         METHOD,
         /**
-         * Another injection point, such as an annotation member.
+         * Anything else the bean received: an injection point that is neither a constructor, a field nor a method,
+         * such as an annotation member, and every bean the bean resolved or created through an injected
+         * {@link BeanDependencyResolver} or a group the resolver opened. The receiving bean holds such a bean as it
+         * holds a constructor argument: it is not {@link BeanDependency#reinjectable() reinjectable}, and the edge
+         * stays until the receiving instance is destroyed.
          */
         OTHER
     }
 
     /**
      * One recorded injection.
+     *
+     * <p>Two dependencies are equal when they join the same nodes, as the graph identifies them (a definition with
+     * the qualifier its bean is registered under), in the same way: whichever definition object stands for a node,
+     * a delegate or the definition it wraps, does not matter.</p>
      *
      * @param dependent The definition of the bean that received the dependency; for a bean created per qualifier
      *                  (an {@code @EachBean} member) a delegate carrying that qualifier, so that the member is told apart
@@ -153,6 +208,21 @@ public interface BeanDependencyGraph {
          */
         public boolean reinjectable() {
             return !lazy && (kind == InjectionKind.FIELD || kind == InjectionKind.METHOD);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof BeanDependency that
+                && kind == that.kind
+                && lazy == that.lazy
+                && collection == that.collection
+                && DefaultBeanDependencyGraph.Key.of(dependent).equals(DefaultBeanDependencyGraph.Key.of(that.dependent))
+                && DefaultBeanDependencyGraph.Key.of(dependency).equals(DefaultBeanDependencyGraph.Key.of(that.dependency));
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(DefaultBeanDependencyGraph.Key.of(dependent), DefaultBeanDependencyGraph.Key.of(dependency), kind, lazy, collection);
         }
     }
 }

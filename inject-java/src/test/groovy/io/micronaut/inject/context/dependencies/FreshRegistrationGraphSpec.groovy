@@ -26,7 +26,7 @@ class FreshRegistrationGraphSpec extends Specification {
     @AutoCleanup
     ApplicationContext context = ApplicationContext.builder()
         .properties('spec.name': 'BeanDependencyGraphSpec')
-        .trackBeanDependencies(true)
+        .beanDependencyTrackingEnabled(true)
         .start()
     BeanDependencyGraph graph = context.findDependencyGraph().get()
 
