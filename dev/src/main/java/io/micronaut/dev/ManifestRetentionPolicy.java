@@ -17,7 +17,7 @@ package io.micronaut.dev;
 
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.env.DevelopmentMode;
+import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.context.reload.BeanRetentionPolicy;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
@@ -40,7 +40,7 @@ import java.util.List;
  */
 @Internal
 @Singleton
-@Requires(condition = DevelopmentMode.Active.class)
+@DevelopmentActive
 @Requires(beans = DevRuntime.class)
 final class ManifestRetentionPolicy implements BeanRetentionPolicy {
 

@@ -44,7 +44,6 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import io.micronaut.scheduling.io.watch.FileChange;
 import io.micronaut.scheduling.io.watch.FileChangeBatch;
-import io.micronaut.scheduling.io.watch.WatchOptions;
 import io.micronaut.scheduling.io.watch.event.WatchEventType;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -467,11 +466,11 @@ public final class DevRuntime implements Closeable {
             }
             // both spellings: the glob syntax alone leaves a file directly under the root out of "**/"
             String[] globs = root.kind().extensions().stream().flatMap(extension -> Stream.of("*." + extension, "**/*." + extension)).toArray(String[]::new);
-            directoryWatcher.watch(root.path(), WatchOptions.DEFAULT.including(globs), batch -> enqueue(sourceBatch(root, batch)));
+            directoryWatcher.directory(root.path()).include(globs).watch(batch -> enqueue(sourceBatch(root, batch)));
         }
         for (ResourceRoot root : manifest.resourceRoots()) {
             if (Files.isDirectory(root.path())) {
-                directoryWatcher.watch(root.path(), WatchOptions.DEFAULT, batch -> enqueue(resourceBatch(root, batch)));
+                directoryWatcher.directory(root.path()).watch(batch -> enqueue(resourceBatch(root, batch)));
             }
         }
         boolean external = false;
@@ -491,7 +490,7 @@ public final class DevRuntime implements Closeable {
                         throw new UncheckedIOException("Cannot create the trigger directory " + directory, e);
                     }
                     String name = trigger.getFileName().toString();
-                    directoryWatcher.watch(directory, WatchOptions.nonRecursive().including(name), batch -> enqueue(new Pending(Map.of(), Map.of(), false)));
+                    directoryWatcher.directory(directory).recursive(false).include(name).watch(batch -> enqueue(new Pending(Map.of(), Map.of(), false)));
                 }
             } else {
                 // without a trigger the class output itself is watched, which may see a compilation half written
@@ -499,7 +498,7 @@ public final class DevRuntime implements Closeable {
                 for (SourceKind kind : SourceKind.values()) {
                     Path output = manifest.classOutput(kind);
                     if (!manifest.sourceRoots(kind).isEmpty() && Files.isDirectory(output) && !directoryWatcher.isWatching(output)) {
-                        directoryWatcher.watch(output, WatchOptions.DEFAULT, batch -> enqueue(new Pending(Map.of(), Map.of(), false)));
+                        directoryWatcher.directory(output).watch(batch -> enqueue(new Pending(Map.of(), Map.of(), false)));
                     }
                 }
             }
@@ -682,10 +681,10 @@ public final class DevRuntime implements Closeable {
 
     private void restart(ChangeSet changeSet, boolean retentionAllowed, long startNanos) {
         ApplicationContext old = context;
-        GenerationClassLoader retired = classLoader.swap();
+        classLoader.swap();
         Collection<BeanRegistration<?>> retained = List.of();
         if (old != null) {
-            ClassChangeEvent event = new ClassChangeEvent(this, retired.generation(), classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART);
+            ClassChangeEvent event = new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART);
             try {
                 old.publishEvent(event);
             } catch (RuntimeException e) {
@@ -720,7 +719,7 @@ public final class DevRuntime implements Closeable {
         startFailed = false;
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         List<BeanDefinition<?>> added = definitionsNamed(fresh, changeSet.classNames());
-        fresh.publishEvent(new ReloadCompletedEvent(this, new ClassChangeEvent(this, retired.generation(), classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));
+        fresh.publishEvent(new ReloadCompletedEvent(this, new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));
         LOG.info("Reloaded: generation {} started in {} ms ({} class(es) changed, {} bean(s) retained)", classLoader.generation(), elapsed.toMillis(), changeSet.classes().size(), retainedCount);
         detectLeaks();
     }

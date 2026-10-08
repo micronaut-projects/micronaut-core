@@ -17,7 +17,7 @@ package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.env.DevelopmentMode;
+import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.core.annotation.Internal;
@@ -31,7 +31,7 @@ import jakarta.inject.Singleton;
  */
 @Internal
 @Singleton
-@Requires(condition = DevelopmentMode.Active.class)
+@DevelopmentActive
 @Requires(beans = DevRuntime.class)
 final class DevStartupListener implements ApplicationEventListener<StartupEvent> {
 

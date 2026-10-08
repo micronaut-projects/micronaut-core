@@ -53,7 +53,7 @@ public final class DevApplicationContextConfigurer implements ApplicationContext
             FileWatchConfiguration.RESTART, false,
             FileWatchConfiguration.ENABLED, false
         ));
-        builder.trackBeanDependencies(true);
+        builder.beanDependencyTrackingEnabled(true);
         builder.retainedRegistrations(runtime.takeRetainedRegistrations());
         builder.singletons(runtime);
     }

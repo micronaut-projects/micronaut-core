@@ -16,7 +16,7 @@
 package io.micronaut.dev.http;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.env.DevelopmentMode;
+import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.CompileFailure;
 import io.micronaut.dev.DevRuntime;
@@ -46,7 +46,7 @@ import java.util.concurrent.CompletableFuture;
 @Internal
 @ServerFilter("/**")
 @Requires(classes = ServerFilter.class)
-@Requires(condition = DevelopmentMode.Active.class)
+@DevelopmentActive
 @Requires(beans = DevRuntime.class)
 public final class DevGateFilter {
 
