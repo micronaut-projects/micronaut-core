@@ -391,6 +391,24 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, R
     }
 
     /**
+     * Whether {@link DevelopmentMode development mode} is on: a development launcher sets the
+     * {@value DevelopmentMode#PROPERTY} switch to {@code true}, in any case. It is the same test as
+     * {@link DevelopmentActive}. It is not the {@value #DEVELOPMENT} environment, a configuration profile any run
+     * may activate.
+     *
+     * <p>A bean meant to be retained across the restarts of development mode must not inject the environment to
+     * call this method: the environment is bound to its context, so the context refuses to retain a bean that holds
+     * it. Such a bean depends on an optional {@link DevelopmentActive} bean instead.</p>
+     *
+     * @return True if development mode is on
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean isDevelopmentMode() {
+        return DevelopmentMode.isEnabled(this);
+    }
+
+    /**
      * Retrieves the conversion service instance associated with the environment.
      *
      * @return A {@link io.micronaut.core.convert.ConversionService} that allows adding new type converters.
