@@ -39,6 +39,7 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.CorePublisher;
 import reactor.core.publisher.Flux;
 
 import java.nio.charset.Charset;
@@ -177,12 +178,17 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
                 }
                 result.complete(form);
             });
-        // the fields of a request of another implementation may come from a reactive publisher
-        // that releases the fields it holds when the subscriber cancels, with the discard hook of
-        // the subscriber: the fields waiting behind the one being read when the reading stops
-        Flux.from(source)
-            .doOnDiscard(RawFormField.class, RawFormField::close)
-            .subscribe(subscription);
+        if (source instanceof CorePublisher<RawFormField>) {
+            // the fields of a request of another implementation may come from a Reactor publisher
+            // that releases the fields it holds when the subscriber cancels, with the discard hook
+            // of the subscriber: the fields waiting behind the one being read when the reading stops
+            Flux.from(source)
+                .doOnDiscard(RawFormField.class, RawFormField::close)
+                .subscribe(subscription);
+        } else {
+            // another publisher, e.g. the fields of the Netty server, releases them itself
+            source.subscribe(subscription);
+        }
         owned.reading(subscription);
         return new Collection(result, subscription);
     }

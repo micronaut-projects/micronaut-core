@@ -23,7 +23,10 @@ import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.FormFieldMetadata;
 import io.micronaut.http.multipart.RawFormField;
+import io.micronaut.http.server.multipart.FormFieldFlows;
 import org.junit.jupiter.api.Test;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
 import reactor.core.publisher.Sinks;
 
 import java.io.IOException;
@@ -31,7 +34,9 @@ import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -79,6 +84,23 @@ class FormDataArgumentBinderTest {
         fields.disposal.forEach(Runnable::run);
         assertTrue(queued.discarded, "the field that was not read yet is closed");
         fields.releaseAll();
+    }
+
+    @Test
+    void fieldsOfAnotherPublisherThanReactorAreReadWithoutReactor() {
+        AtomicReference<Subscriber<?>> subscriber = new AtomicReference<>();
+        Publisher<RawFormField> source = subscriber::set;
+        FormCapableHttpRequest<?> request = (FormCapableHttpRequest<?>) Proxy.newProxyInstance(FormDataArgumentBinderTest.class.getClassLoader(), new Class<?>[]{FormCapableHttpRequest.class}, (proxy, method, args) -> {
+            if (method.getName().equals("getRawFormFields")) {
+                return source;
+            }
+            if (method.getName().equals("addDisposalResource")) {
+                return null;
+            }
+            throw new UnsupportedOperationException(method.getName());
+        });
+        FormDataArgumentBinder.start(CONTEXT, null, ConversionService.SHARED, request);
+        assertInstanceOf(FormFieldFlows.Concat.class, subscriber.get(), "subscribed without a Reactor operator");
     }
 
     /**
