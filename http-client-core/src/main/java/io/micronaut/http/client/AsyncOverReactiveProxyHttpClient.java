@@ -22,6 +22,7 @@ import io.micronaut.http.MutableHttpResponse;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -45,7 +46,11 @@ final class AsyncOverReactiveProxyHttpClient implements AsyncProxyHttpClient {
 
     @Override
     public CompletionStage<MutableHttpResponse<?>> proxy(HttpRequest<?> request, ProxyRequestOptions options) {
-        return RawResponseFuture.ofMutable(client.proxy(request, options));
+        try {
+            return RawResponseFuture.ofMutable(client.proxy(request, options));
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedStage(e);
+        }
     }
 
     @Override

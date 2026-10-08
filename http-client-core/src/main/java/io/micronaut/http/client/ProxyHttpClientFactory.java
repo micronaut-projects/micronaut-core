@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 
 import java.net.MalformedURLException;
@@ -59,6 +60,7 @@ public interface ProxyHttpClientFactory {
      * @return The client
      * @since 5.3.0
      */
+    @Experimental
     default AsyncProxyHttpClient createAsyncProxyClient(@Nullable URI url) {
         return createProxyClient(toUrl(url)).toAsyncProxy();
     }
@@ -73,6 +75,7 @@ public interface ProxyHttpClientFactory {
      * @return The client
      * @since 5.3.0
      */
+    @Experimental
     default AsyncProxyHttpClient createAsyncProxyClient(@Nullable URI url, HttpClientConfiguration configuration) {
         return createProxyClient(toUrl(url), configuration).toAsyncProxy();
     }
