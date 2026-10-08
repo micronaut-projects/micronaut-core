@@ -69,8 +69,9 @@ final class AsyncOverReactiveWebSocketClient implements AsyncWebSocketClient {
     }
 
     /**
-     * Completes with the first endpoint: cancelling it cancels the subscription, and an endpoint
-     * that arrives after that is closed.
+     * Completes with the first endpoint: cancelling it, or completing it otherwise, e.g. with
+     * {@link CompletableFuture#orTimeout}, cancels the subscription, and an endpoint that arrives
+     * after that is closed.
      *
      * @param <T> The endpoint type
      */
@@ -78,14 +79,18 @@ final class AsyncOverReactiveWebSocketClient implements AsyncWebSocketClient {
         private @Nullable Subscription subscription;
         private boolean done;
 
+        FirstEndpoint() {
+            whenComplete((ignored, error) -> cancelUnlessDone());
+        }
+
         @Override
         public void onSubscribe(Subscription s) {
-            boolean cancelled;
+            boolean completed;
             synchronized (this) {
                 subscription = s;
-                cancelled = isCancelled();
+                completed = isDone();
             }
-            if (cancelled) {
+            if (completed) {
                 s.cancel();
             } else {
                 s.request(1);
@@ -132,17 +137,21 @@ final class AsyncOverReactiveWebSocketClient implements AsyncWebSocketClient {
             }
         }
 
-        @Override
-        public boolean cancel(boolean mayInterruptIfRunning) {
-            boolean cancelled = super.cancel(mayInterruptIfRunning);
+        /**
+         * The future completed before the publisher signaled: nobody waits for the endpoint.
+         */
+        private void cancelUnlessDone() {
             Subscription s;
             synchronized (this) {
-                s = done ? null : subscription;
+                if (done) {
+                    return;
+                }
+                done = true;
+                s = subscription;
             }
-            if (cancelled && s != null) {
+            if (s != null) {
                 s.cancel();
             }
-            return cancelled;
         }
 
         private static void closeQuietly(AutoCloseable endpoint) {

@@ -17,9 +17,11 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.websocket.AsyncWebSocketClient;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -74,38 +76,53 @@ final class NettyAsyncWebSocketClient implements AsyncWebSocketClient {
     }
 
     private static <T extends AutoCloseable> CompletionStage<T> toStage(ExecutionFlow<NettyWebSocketClientHandler<T>> flow) {
-        ConnectFuture<T> future = new ConnectFuture<>(flow);
+        // the connect completes on the event loop: the continuations of the stage run in the
+        // context of the caller, as the subscriber of the reactive connect does
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        ConnectFuture<T> future = new ConnectFuture<>();
         flow.onComplete((handler, error) -> {
-            if (error != null) {
-                future.completeExceptionally(error);
-            } else if (handler != null && !future.complete(handler.getClientEndpoint())) {
-                // cancelled while the handshake completed: nobody waits for this endpoint. Close
-                // the session itself: the close method of a concrete endpoint class may not
+            future.completedByConnect = true;
+            boolean completed;
+            if (propagatedContext.isEmpty()) {
+                completed = complete(future, handler, error);
+            } else {
+                completed = propagatedContext.propagate(() -> complete(future, handler, error));
+            }
+            if (!completed && handler != null) {
+                // cancelled, or completed otherwise, while the handshake completed: nobody waits
+                // for this endpoint. Close the session itself: the close method of a concrete
+                // endpoint class may not
                 handler.closeUnclaimed();
+            }
+        });
+        // cancelling the future, or completing it otherwise, e.g. with orTimeout, aborts the connect
+        future.whenComplete((ignored, error) -> {
+            if (!future.completedByConnect) {
+                flow.cancel();
             }
         });
         return future;
     }
 
+    private static <T extends AutoCloseable> boolean complete(CompletableFuture<T> future,
+                                                              @Nullable NettyWebSocketClientHandler<T> handler,
+                                                              @Nullable Throwable error) {
+        if (error != null) {
+            return future.completeExceptionally(error);
+        }
+        return handler != null && future.complete(handler.getClientEndpoint());
+    }
+
     /**
-     * The future of a connect: cancelling it cancels the connect.
+     * The future of a connect.
      *
      * @param <T> The endpoint type
      */
     private static final class ConnectFuture<T> extends CompletableFuture<T> {
-        private final ExecutionFlow<?> flow;
-
-        ConnectFuture(ExecutionFlow<?> flow) {
-            this.flow = flow;
-        }
-
-        @Override
-        public boolean cancel(boolean mayInterruptIfRunning) {
-            boolean cancelled = super.cancel(mayInterruptIfRunning);
-            if (cancelled) {
-                flow.cancel();
-            }
-            return cancelled;
-        }
+        /**
+         * Set before the connect completes this future: a completion before that, e.g. a cancel or
+         * a timeout, aborts the connect.
+         */
+        volatile boolean completedByConnect;
     }
 }

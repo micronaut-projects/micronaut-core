@@ -147,6 +147,58 @@ class WebSocketConnectCancelSpec extends Specification {
         adapter << ['netty', 'reactive adapter']
     }
 
+    void 'a timeout of the async connect future during the handshake closes the connection with #adapter'() {
+        given:
+        RawWebSocketServer server = new RawWebSocketServer(false)
+        ApplicationContext ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
+        WebSocketClient client = ctx.createBean(WebSocketClient, server.uri)
+        AsyncWebSocketClient async = adapter == 'netty' ? client.toAsyncWebSocket() : reactiveOnly(client).toAsyncWebSocket()
+
+        when: 'orTimeout completes the future exceptionally, without a cancel'
+        CompletableFuture<CancelClient> future = async.connect(CancelClient, '/ws').toCompletableFuture()
+        server.awaitUpgradeRequest()
+        future.orTimeout(100, TimeUnit.MILLISECONDS)
+
+        then:
+        server.closedWithin(5000)
+        future.isCompletedExceptionally()
+
+        cleanup:
+        async?.close()
+        ctx?.close()
+        server?.close()
+
+        where:
+        adapter << ['netty', 'reactive adapter']
+    }
+
+    void 'the async connect stage completes in the context of the caller'() {
+        given:
+        RawWebSocketServer server = new RawWebSocketServer(true)
+        ApplicationContext ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
+        WebSocketClient client = ctx.createBean(WebSocketClient, server.uri)
+        AsyncWebSocketClient async = client.toAsyncWebSocket()
+        OpenedEndpoints opened = ctx.getBean(OpenedEndpoints)
+
+        when: 'the open method completes on a thread without the context'
+        CompletableFuture<SlowOpenClient> future = io.micronaut.core.propagation.PropagatedContext.getOrEmpty().plus(new MarkerElement())
+            .propagate({ async.connect(SlowOpenClient, '/ws').toCompletableFuture() } as java.util.function.Supplier<CompletableFuture<SlowOpenClient>>)
+        CompletableFuture<Boolean> seen = future.thenApply { io.micronaut.core.propagation.PropagatedContext.find().flatMap { it.find(MarkerElement) }.isPresent() }
+        CompletableFuture<?> openStage = opened.slowOpens.poll(10, TimeUnit.SECONDS)
+        Thread.start { openStage.complete(null) }
+
+        then:
+        seen.get(10, TimeUnit.SECONDS)
+
+        cleanup:
+        async?.close()
+        ctx?.close()
+        server?.close()
+    }
+
+    static class MarkerElement implements io.micronaut.core.propagation.PropagatedContextElement {
+    }
+
     /**
      * Only the reactive connect methods: {@link WebSocketClient#toAsyncWebSocket()} adapts them.
      */
