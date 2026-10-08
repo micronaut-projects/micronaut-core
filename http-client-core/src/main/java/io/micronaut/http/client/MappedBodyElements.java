@@ -17,6 +17,7 @@ package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.body.BodyElements;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -56,6 +57,22 @@ public final class MappedBodyElements<S, T> implements BodyElements<T> {
     @Override
     public CompletionStage<Optional<T>> next() {
         return source.next().thenApply(element -> element.map(mapper));
+    }
+
+    @Override
+    public @Nullable T poll() {
+        S element = source.poll();
+        return element == null ? null : mapper.apply(element);
+    }
+
+    @Override
+    public State state() {
+        return source.state();
+    }
+
+    @Override
+    public @Nullable Throwable failure() {
+        return source.failure();
     }
 
     @Override

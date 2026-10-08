@@ -18,7 +18,7 @@ package io.micronaut.http.client.sse;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
-import io.micronaut.http.client.PulledBodyElements;
+import io.micronaut.http.body.stream.PulledBodyElements;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.sse.Event;
 

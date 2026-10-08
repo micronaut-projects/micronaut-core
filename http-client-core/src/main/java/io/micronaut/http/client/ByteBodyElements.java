@@ -20,6 +20,7 @@ import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.BodyElements;
+import io.micronaut.http.body.stream.PulledBodyElements;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.client.exceptions.HttpClientException;
