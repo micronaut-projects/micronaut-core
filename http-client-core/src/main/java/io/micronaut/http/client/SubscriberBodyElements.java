@@ -17,6 +17,7 @@ package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.body.BodyElements;
+import io.micronaut.http.body.stream.PulledBodyElements;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
