@@ -28,7 +28,7 @@ snippet::io.micronaut.docs.server.functional.WebSocketRoutes[tags="filter", inde
 
 <1> A request without the header is answered with `403`, and the connection is not upgraded.
 
-The conditions of `where(...)`, the order and the port select the route like for any other request: of the WebSocket routes that match an upgrade request, the closest one is upgraded, then the one of the lowest order. A `GET` request to a WebSocket route that is not an upgrade is answered with `400`.
+The conditions of `where(...)`, the order and the port select the route like for any other request: of the WebSocket routes that match an upgrade request, the closest one is upgraded, then the one of the lowest order. A WebSocket route of the route builder is preferred to a `@ServerWebSocket` bean, whose routes are selected as before: the first one whose URI template matches the path. A `GET` request to a WebSocket route that is not an upgrade is answered with `400`.
 
 A WebSocket route is a route of an `HttpRoutes` bean: the server finds the route of an upgrade request among the routes it knows when it starts, so a located route, see <<functionalRoutesLocators, Locator Routes>>, cannot be a WebSocket route, and declaring one fails with an `IllegalStateException`.
 

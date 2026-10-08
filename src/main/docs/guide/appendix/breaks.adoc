@@ -1,22 +1,6 @@
 
 This section documents breaking changes between Micronaut versions
 
-=== A WebSocket upgrade selects its route like any other request (5.3)
-
-The server selects the ann:websocket.annotation.ServerWebSocket[] bean that upgrades a request the way it selects the route of any other request. Previously it took the first WebSocket route whose URI template matched the path, whatever its conditions and ports.
-
-* When a route is bound to a port of its own, e.g. a management port or `@Controller(port = ...)`, a `@ServerWebSocket` bean is upgraded only on the default ports of the server, like a controller, and no longer on the port of that route.
-* A route condition of the bean's `@OnOpen` or `@OnMessage` method, e.g. `@RouteCondition`, is now evaluated: an upgrade request that does not meet it is answered with `404`.
-* Of several WebSocket routes that match a path, the most specific URI template wins, then the lowest order.
-
-=== A `CompletionStage` returned by a WebSocket client handler is awaited (5.3)
-
-A ann:websocket.annotation.ClientWebSocket[] method annotated with ann:websocket.annotation.OnOpen[] or ann:websocket.annotation.OnMessage[] that returns a `CompletionStage` is now done when the stage completes, as it was already for a returned `Publisher`, and a failed stage reaches the ann:websocket.annotation.OnError[] method. Previously the stage was treated as a plain value and its failure was lost. As a consequence, the `connect` of a client whose `@OnOpen` method returns a stage completes only once that stage completes. The messages of a client are still handled as they are read: the next message does not wait for the stage of the previous one. The stage of an ann:websocket.annotation.OnClose[] or `@OnError` method does not hold the close back.
-
-=== The Netty WebSocket broadcaster broadcasts through `broadcastAsync` (5.3)
-
-`NettyServerWebSocketBroadcaster`, the api:websocket.WebSocketBroadcaster[] of the Netty server, implements `broadcastAsync` natively, and its `broadcast` method calls it. Previously `broadcastAsync` was the interface default that subscribed to `broadcast`. A subclass that overrides `broadcast` to change how messages are broadcast should override `broadcastAsync(Object, MediaType, Predicate)` instead; a subclass that overrides `broadcastAsync` must not call `super.broadcast`, which calls `broadcastAsync` again.
-
 === Refreshing the Logback configuration follows Logback's own lookup (5.3)
 
 When any `logger.*` property is set, the Micronaut framework resets Logback and configures it again. Previously that refresh used the first `Configurator` service regardless of its rank and of the status it returned, and otherwise the file set with `logback.configurationFile` or `logger.config`, or `logback.xml`. Now, unless a Logback XML configuration file is set in Micronaut configuration, the refresh configures Logback the same way Logback configures itself at startup:
