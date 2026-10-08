@@ -33,7 +33,7 @@ NOTE: The no-argument `getTypeArguments()` reports the arguments the introspecte
 
 == Reading the shape of an argument
 
-An api:core.type.Argument[] is written as one of three things: a type, a type variable that was left open, or a wildcard. A wildcard and a type resolved in place of a variable are both compiled as a api:core.type.GenericPlaceholder[], so `instanceof GenericPlaceholder` and `isTypeVariable()` do not tell them apart; `isWildcard()` and `isUnresolvedTypeVariable()` do.
+An api:core.type.Argument[] is written as one of three things: a type, a type variable that was left open, or a wildcard. A wildcard and a type resolved in place of a variable are both compiled as a api:core.type.GenericPlaceholder[], so `instanceof GenericPlaceholder` and `isTypeVariable()` do not tell them apart; `isWildcard()` and `isUnresolvedTypeVariable()` do. An array of a variable, `T[]`, is a placeholder of that variable too, but it is an array, so `isUnresolvedTypeVariable()` is false for it; `isArrayOfUnresolvedTypeVariable()` is true for it instead.
 
 Given an introspected type that declares a type variable and, where the language has them, a wildcard and an array of the variable:
 
