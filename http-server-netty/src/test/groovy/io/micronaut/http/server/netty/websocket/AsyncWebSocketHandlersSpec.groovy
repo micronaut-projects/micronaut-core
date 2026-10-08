@@ -62,7 +62,8 @@ class AsyncWebSocketHandlersSpec extends Specification {
 
         then:
         conditions.eventually {
-            stageClient.handled == ['first', 'second']
+            // the messages of a client are handled as they are read: the stages complete in any order
+            stageClient.handled.sort(false) == ['first', 'second']
         }
         stageClient.errors.empty
 
