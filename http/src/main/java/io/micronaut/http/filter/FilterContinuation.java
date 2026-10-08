@@ -34,11 +34,14 @@ import io.micronaut.http.HttpRequest;
  * not block, starts the downstream processing, and returns a stage that completes with its result.
  * With a reactive wrapper, {@link #proceed()} will not block, and downstream processing will
  * happen asynchronously (after the reactive stream is subscribed to).<br>
- * A filter method with a {@link java.util.concurrent.CompletionStage} or an
- * {@link io.micronaut.core.execution.ExecutionFlow} continuation must return the response (e.g. as a
- * {@code CompletionStage<HttpResponse<?>>}), a {@code void} method is rejected. Cancelling the
- * stage returned by {@link #proceed()} is a hint to the downstream that the response is no longer
- * needed.
+ * A filter method with a {@link java.util.concurrent.CompletionStage} continuation must return the
+ * response (e.g. as a {@code CompletionStage<HttpResponse<?>>}), a {@code void} method is
+ * rejected. The continuation is declared with exactly {@code CompletionStage} or
+ * {@code CompletableFuture}, no other subtype. It proceeds once: a second {@link #proceed()} throws
+ * an {@link IllegalStateException}. The stage and the stages derived from it complete with the
+ * propagated context of the downstream, so that their callbacks see it when they run as the stage
+ * completes. Cancelling the stage returned by {@link #proceed()}, a stage derived from it, or the
+ * filter itself, is a hint to the downstream that the response is no longer needed.
  *
  * @param <R> The type to return in {@link #proceed()}
  */
@@ -61,13 +64,15 @@ public interface FilterContinuation<R> {
      * <br>
      * If {@link R} is a {@link java.util.concurrent.CompletionStage}, this method will return
      * immediately, after starting the downstream processing, with a stage that completes with the
-     * downstream result.
+     * downstream result. It can only be called once.
      * <br>
      * If {@link R} is a reactive type, this method will return immediately. Downstream processing
      * will happen when the reactive stream is subscribed to, and the reactive stream will produce
      * the downstream result when available.
      *
      * @return The downstream result, or reactive stream wrapper thereof
+     * @throws IllegalStateException if {@link R} is a {@link java.util.concurrent.CompletionStage}
+     * and the continuation proceeded already
      */
     R proceed();
 }
