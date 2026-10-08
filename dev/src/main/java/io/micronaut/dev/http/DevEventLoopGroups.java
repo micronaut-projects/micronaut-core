@@ -17,7 +17,7 @@ package io.micronaut.dev.http;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Retain;
-import io.micronaut.context.env.DevelopmentMode;
+import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.DevRuntime;
 import io.micronaut.dev.loader.GenerationClassLoader;
@@ -69,7 +69,7 @@ import java.util.function.Supplier;
 @Singleton
 @Retain(invalidatedBy = {EventLoopGroupConfiguration.EVENT_LOOPS, NettyGlobalConfiguration.PREFIX})
 @Requires(classes = RetainedEventLoopGroups.class)
-@Requires(condition = DevelopmentMode.Active.class)
+@DevelopmentActive
 @Requires(beans = DevRuntime.class)
 final class DevEventLoopGroups implements RetainedEventLoopGroups {
 
