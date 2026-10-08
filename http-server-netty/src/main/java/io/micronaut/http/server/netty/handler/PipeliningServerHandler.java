@@ -1142,18 +1142,25 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void writeFull(FullHttpResponse response, boolean headResponse) {
-            response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
-            if (canHaveBody(response.status())) {
-                if (!headResponse) {
-                    response.headers().set(HttpHeaderNames.CONTENT_LENGTH, response.content().readableBytes());
+            FullOutboundHandler oh;
+            try {
+                response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
+                if (canHaveBody(response.status())) {
+                    if (!headResponse) {
+                        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, response.content().readableBytes());
+                    }
+                } else {
+                    response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                 }
-            } else {
-                response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
-            }
-            preprocess(response);
-            FullOutboundHandler oh = new FullOutboundHandler(this, response);
-            if (response.content().isReadable()) {
-                prepareCompression(response, oh, response.content().readableBytes());
+                preprocess(response);
+                oh = new FullOutboundHandler(this, response);
+                if (response.content().isReadable()) {
+                    prepareCompression(response, oh, response.content().readableBytes());
+                }
+            } catch (Throwable t) {
+                // the response never reached the connection
+                response.release();
+                throw t;
             }
             write(oh);
         }

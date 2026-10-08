@@ -26,6 +26,7 @@ import io.netty.handler.codec.compression.ZlibWrapper
 import io.netty.handler.codec.http.DefaultFullHttpRequest
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpContent
+import io.netty.handler.codec.http.DefaultHttpHeaders
 import io.netty.handler.codec.http.DefaultHttpRequest
 import io.netty.handler.codec.http.DefaultHttpResponse
 import io.netty.handler.codec.http.DefaultLastHttpContent
@@ -35,6 +36,7 @@ import io.netty.handler.codec.http.FullHttpResponse
 import io.netty.handler.codec.http.HttpContent
 import io.netty.handler.codec.http.HttpHeaderNames
 import io.netty.handler.codec.http.HttpHeaderValues
+import io.netty.handler.codec.http.HttpHeaders
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpRequest
 import io.netty.handler.codec.http.HttpResponse
@@ -1580,6 +1582,46 @@ class PipeliningServerHandlerSpec extends Specification {
         then:
         ch.isOpen()
         ((FullHttpResponse) ch.readOutbound()).status() == HttpResponseStatus.NO_CONTENT
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
+    def 'a full response that fails before it reaches the connection releases its content'() {
+        given:
+        def content = Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)
+        Throwable failure = null
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                def headers = new DefaultHttpHeaders() {
+                    @Override
+                    HttpHeaders remove(CharSequence name) {
+                        throw new OutOfMemoryError("Simulated failure")
+                    }
+                }
+                try {
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, headers), new NettyByteBodyFactory(ctx.channel()).adapt(content))
+                } catch (Throwable t) {
+                    failure = t
+                    // the response did not reach the connection, so another one can be written
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR), NettyByteBodyFactory.empty())
+                }
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        then:
+        failure instanceof OutOfMemoryError
+        content.refCnt() == 0
+        ((FullHttpResponse) ch.readOutbound()).status() == HttpResponseStatus.INTERNAL_SERVER_ERROR
 
         cleanup:
         ch.finishAndReleaseAll()
