@@ -63,6 +63,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -1129,26 +1130,26 @@ record MethodFilter<T>(FilterOrder order,
     private static sealed class CompletionStageContinuationImpl implements FilterContinuation<CompletableFuture<HttpResponse<?>>>,
         InternalFilterContinuation<CompletableFuture<HttpResponse<?>>> {
 
-        protected volatile FilterContext filterContext;
+        protected final AtomicReference<FilterContext> filterContext;
         private final Function<FilterContext, ExecutionFlow<FilterContext>> downstream;
         private final MutablePropagatedContext mutablePropagatedContext;
         private final AtomicBoolean proceeded = new AtomicBoolean();
         /**
          * The downstream, once {@link #proceed()} was called.
          */
-        private volatile @Nullable ExecutionFlow<?> downstreamFlow;
+        private final AtomicReference<@Nullable ExecutionFlow<?>> downstreamFlow = new AtomicReference<>();
 
         private CompletionStageContinuationImpl(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
                                                 FilterContext filterContext,
                                                 MutablePropagatedContext mutablePropagatedContext) {
             this.downstream = downstream;
-            this.filterContext = filterContext;
+            this.filterContext = new AtomicReference<>(filterContext);
             this.mutablePropagatedContext = mutablePropagatedContext;
         }
 
         @Override
         public FilterContinuation<CompletableFuture<HttpResponse<?>>> request(HttpRequest<?> request) {
-            filterContext = filterContext.withRequest(request);
+            filterContext.updateAndGet(context -> context.withRequest(request));
             return this;
         }
 
@@ -1159,25 +1160,27 @@ record MethodFilter<T>(FilterOrder order,
                 // skip the filters, and return the first response
                 throw new IllegalStateException("A FilterContinuation<CompletionStage<HttpResponse<?>>> can only proceed once");
             }
-            PropagatedContext propagatedContext = filterContext.propagatedContext();
+            FilterContext context = afterMethodContext();
+            PropagatedContext propagatedContext = context.propagatedContext();
             PropagatedContext mutatedPropagatedContext = mutablePropagatedContext.getContext();
             if (propagatedContext != mutatedPropagatedContext && mutatedPropagatedContext != null) {
-                filterContext = filterContext.withPropagatedContext(mutatedPropagatedContext);
+                context = context.withPropagatedContext(mutatedPropagatedContext);
             } else {
-                filterContext = filterContext.withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext()));
+                context = context.withPropagatedContext(PropagatedContext.find().orElse(context.propagatedContext()));
             }
-            PropagatedContext downstreamContext = filterContext.propagatedContext();
+            filterContext.set(context);
+            PropagatedContext downstreamContext = context.propagatedContext();
             ExecutionFlow<FilterContext> flow;
             try {
-                flow = downstream.apply(filterContext);
+                flow = downstream.apply(context);
             } catch (Exception e) {
                 return CompletableFuture.failedFuture(e);
             }
             ExecutionFlow<HttpResponse<?>> responseFlow = flow.map(newFilterContext -> {
-                filterContext = newFilterContext;
+                filterContext.set(newFilterContext);
                 return Objects.requireNonNull(newFilterContext.response(), RESPONSE_MISSING_MESSAGE);
             });
-            downstreamFlow = responseFlow;
+            downstreamFlow.set(responseFlow);
             DownstreamFuture<HttpResponse<?>> future = new DownstreamFuture<>(responseFlow);
             responseFlow.onComplete((response, error) -> {
                 // the callbacks of the stages run with the context of the downstream
@@ -1201,7 +1204,7 @@ record MethodFilter<T>(FilterOrder order,
          * Cancel the downstream, if it runs.
          */
         void cancelDownstream() {
-            ExecutionFlow<?> flow = downstreamFlow;
+            ExecutionFlow<?> flow = downstreamFlow.get();
             if (flow != null) {
                 flow.cancel();
             }
@@ -1209,7 +1212,7 @@ record MethodFilter<T>(FilterOrder order,
 
         @Override
         public FilterContext afterMethodContext() {
-            return filterContext;
+            return Objects.requireNonNull(filterContext.get());
         }
     }
 
@@ -1239,7 +1242,8 @@ record MethodFilter<T>(FilterOrder order,
                     return ExecutionFlow.error(error);
                 }
                 HttpResponse<?> response = done.getValue();
-                return ExecutionFlow.just(response == null ? filterContext : filterContext.withResponse(response));
+                FilterContext context = afterMethodContext();
+                return ExecutionFlow.just(response == null ? context : context.withResponse(response));
             }
             DelayedExecutionFlow<FilterContext> result = DelayedExecutionFlow.create();
             result.onCancel(() -> {
@@ -1251,7 +1255,8 @@ record MethodFilter<T>(FilterOrder order,
                     result.completeExceptionally(error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
                 } else {
                     // a stage completed with null proceeds with the context after the continuation
-                    result.complete(response == null ? filterContext : filterContext.withResponse(response));
+                    FilterContext context = afterMethodContext();
+                    result.complete(response == null ? context : context.withResponse(response));
                 }
             });
             return result;
