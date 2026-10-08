@@ -17,6 +17,7 @@ package io.micronaut.runtime.context.scope.refresh;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.ConfigurableBeanContext;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.ConfigurationReader;
@@ -258,9 +259,9 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
             // received the old one: without it, a holder that cached the old instance, as the router caches a filter,
             // would keep a configuration that no refresh reaches any more, so the bean is rebound in place as before
             boolean recreate = bindsThroughConstructor(definition)
-                || (prefix != null && lostKeys(change, prefix) && context.findDependencyGraph().isPresent());
+                || (prefix != null && lostKeys(change, prefix) && dependencyGraph().isPresent());
             if (recreate && context instanceof DefaultBeanContext defaultBeanContext && bean != null) {
-                if (context.findDependencyGraph().isEmpty()) {
+                if (dependencyGraph().isEmpty()) {
                     // no graph outside development mode: the beans that received the instance are found by the
                     // type of their injection points, and destroyed first so that they are created again on top
                     destroyDependentsByType(defaultBeanContext, definition);
@@ -279,11 +280,18 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
     }
 
     /**
+     * @return The dependency graph of the context, if it records one
+     */
+    private Optional<io.micronaut.context.BeanDependencyGraph> dependencyGraph() {
+        return context instanceof ConfigurableBeanContext configurable ? configurable.findDependencyGraph() : Optional.empty();
+    }
+
+    /**
      * Destroys the singletons that received the bean: through the graph when one is recorded, by the
      * types of their injection points otherwise.
      */
     private void destroyDependents(DefaultBeanContext beanContext, BeanDefinition<?> definition) {
-        Optional<io.micronaut.context.BeanDependencyGraph> graph = context.findDependencyGraph();
+        Optional<io.micronaut.context.BeanDependencyGraph> graph = dependencyGraph();
         if (graph.isEmpty()) {
             destroyDependentsByType(beanContext, definition);
             return;
