@@ -1906,6 +1906,23 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             if self._is_annotation_class(class_element)
         }
 
+    def visit_AnnAssign(self, node: ast.AnnAssign):
+        """
+        Drop the marker value of a module attribute (``embedded_server: EmbeddedServer = Inject()``): the injection
+        sets the attribute when the module's bean is created, and the module body would otherwise bind the marker
+        over it. The statement keeps its annotation and its source position.
+        """
+        if (self.class_depth == 0 and self.function_depth == 0 and node.value is not None
+                and isinstance(node.target, ast.Name) and self._is_annotation_marker(node.value)):
+            node.value = None
+        return self.generic_visit(node)
+
+    def _is_annotation_marker(self, node) -> bool:
+        """Whether a value calls annotations: ``Inject()``, ``inject.Named("a") & inject.Inject()``."""
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitAnd):
+            return self._is_annotation_marker(node.left) and self._is_annotation_marker(node.right)
+        return isinstance(node, ast.Call) and self._is_annotation_decorator(node.func)
+
     def _is_annotation_decorator(self, decorator) -> bool:
         if isinstance(decorator, ast.Attribute):
             qualifier = dotted_name(decorator.value)
