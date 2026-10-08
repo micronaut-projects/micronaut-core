@@ -23,20 +23,18 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-import reactor.core.CoreSubscriber;
-import reactor.core.publisher.Operators;
-import reactor.util.context.Context;
 
 import java.util.ArrayDeque;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
  * Publishers of the pieces of bodies, without Reactor operators. A publisher that subscribes to
- * a source passes on the Reactor context of its subscriber, or a context with a discard hook of
- * its own, so that a Reactor source releases the items it drops when it is cancelled: that is
- * interop with Reactor sources, not a use of Reactor.
+ * a Reactor source passes on the Reactor context of its subscriber, or a context with a discard
+ * hook of its own, so that the source releases the items it drops when it is cancelled, see
+ * {@link ReactorInterop}.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -114,17 +112,19 @@ public final class BodyPublishers {
     /**
      * Wait for the first item of a source: the flow completes with a publisher of all the items
      * once the first item arrived, or once the source completed without items, and fails with a
-     * failure before the first item.
+     * failure before the first item. Cancelling the flow before anyone subscribed to the items
+     * cancels the source and releases the first item.
      *
      * @param source  The source
      * @param discard Releases the first item when the subscriber of the items cancels before it
-     *                took it
+     *                took it, and the items that arrive after a cancellation
      * @param <T>     The type of an item
      * @return The flow of the items
      */
     public static <T> ExecutionFlow<Publisher<T>> awaitFirst(Publisher<T> source, Consumer<? super T> discard) {
         FirstItem<T> first = new FirstItem<>(discard);
-        source.subscribe(first);
+        first.result.onCancel(first::abandon);
+        ReactorInterop.subscribe(source, first, first::downstream, null);
         return first.result;
     }
 
@@ -140,21 +140,36 @@ public final class BodyPublishers {
     }
 
     /**
-     * The Reactor context of a subscriber, if it has one.
+     * Reject a subscriber of a publisher that has one already: it gets a subscription that does
+     * nothing, and an {@link IllegalStateException}.
      *
      * @param subscriber The subscriber
-     * @return Its context
+     * @param message    The message of the failure
      */
-    static Context contextOf(Subscriber<?> subscriber) {
-        return subscriber instanceof CoreSubscriber<?> core ? core.currentContext() : Context.empty();
-    }
-
-    private static void reject(Subscriber<?> subscriber, String message) {
+    public static void reject(Subscriber<?> subscriber, String message) {
         subscriber.onSubscribe(REJECTED);
         subscriber.onError(new IllegalStateException(message));
     }
 
-    private static long addCap(long demand, long n) {
+    /**
+     * The failure of a request for no items, which the reactive streams specification requires
+     * (rule 3.9).
+     *
+     * @param n The number of items requested
+     * @return The failure
+     */
+    public static IllegalArgumentException nonPositiveRequest(long n) {
+        return new IllegalArgumentException("§3.9 violated: the number of items requested must be positive, but was " + n);
+    }
+
+    /**
+     * Add to a demand, capped at {@link Long#MAX_VALUE}, which means an unbounded demand.
+     *
+     * @param demand The demand
+     * @param n      The number of items requested, positive
+     * @return The new demand
+     */
+    public static long addCap(long demand, long n) {
         return Long.MAX_VALUE - demand < n ? Long.MAX_VALUE : demand + n;
     }
 
@@ -163,7 +178,7 @@ public final class BodyPublishers {
                                       @Nullable Consumer<Object> discard) implements Publisher<R> {
         @Override
         public void subscribe(Subscriber<? super R> actual) {
-            source.subscribe(new MapSubscriber<>(actual, mapper, discard));
+            ReactorInterop.subscribe(source, new MapSubscriber<>(actual, mapper, discard), () -> actual, discard);
         }
     }
 
@@ -173,11 +188,10 @@ public final class BodyPublishers {
      * @param <T> The type of an item of the source
      * @param <R> The type of a mapped item
      */
-    private static final class MapSubscriber<T, R> implements CoreSubscriber<T> {
+    private static final class MapSubscriber<T, R> implements Subscriber<T> {
         private final Subscriber<? super R> actual;
         private final Function<? super T, ? extends R> mapper;
         private final @Nullable Consumer<Object> discard;
-        private final Context context;
         private @Nullable Subscription upstream;
         private boolean done;
 
@@ -185,13 +199,6 @@ public final class BodyPublishers {
             this.actual = actual;
             this.mapper = mapper;
             this.discard = discard;
-            Context downstream = contextOf(actual);
-            this.context = discard == null ? downstream : Operators.enableOnDiscard(downstream, discard);
-        }
-
-        @Override
-        public Context currentContext() {
-            return context;
         }
 
         @Override
@@ -264,10 +271,15 @@ public final class BodyPublishers {
                 @Override
                 public void request(long n) {
                     synchronized (this) {
-                        if (done || n <= 0) {
+                        if (done) {
                             return;
                         }
                         done = true;
+                    }
+                    if (n <= 0) {
+                        discard.accept(item);
+                        subscriber.onError(nonPositiveRequest(n));
+                        return;
                     }
                     subscriber.onNext(item);
                     subscriber.onComplete();
@@ -290,7 +302,7 @@ public final class BodyPublishers {
     private record AppendPublisher<T>(Publisher<T> source, T last, Consumer<? super T> discard) implements Publisher<T> {
         @Override
         public void subscribe(Subscriber<? super T> actual) {
-            source.subscribe(new AppendSubscriber<>(actual, last, discard));
+            ReactorInterop.subscribe(source, new AppendSubscriber<>(actual, last, discard), () -> actual, null);
         }
     }
 
@@ -300,11 +312,10 @@ public final class BodyPublishers {
      *
      * @param <T> The type of an item
      */
-    private static final class AppendSubscriber<T> implements CoreSubscriber<T>, Subscription {
+    private static final class AppendSubscriber<T> implements Subscriber<T>, Subscription {
         private final Subscriber<? super T> actual;
         private final T last;
         private final Consumer<? super T> discard;
-        private final Context context;
         private @Nullable Subscription upstream;
 
         // guarded by this
@@ -319,12 +330,6 @@ public final class BodyPublishers {
             this.actual = actual;
             this.last = last;
             this.discard = discard;
-            this.context = contextOf(actual);
-        }
-
-        @Override
-        public Context currentContext() {
-            return context;
         }
 
         @Override
@@ -367,6 +372,8 @@ public final class BodyPublishers {
         @Override
         public void request(long n) {
             if (n <= 0) {
+                // the source reports it
+                Objects.requireNonNull(upstream).request(n);
                 return;
             }
             boolean done;
@@ -413,7 +420,7 @@ public final class BodyPublishers {
      *
      * @param <T> The type of an item
      */
-    private static final class FirstItem<T> implements CoreSubscriber<T>, Publisher<T>, Subscription {
+    private static final class FirstItem<T> implements Subscriber<T>, Publisher<T>, Subscription {
         private final Consumer<? super T> discard;
         private final DelayedExecutionFlow<Publisher<T>> result = DelayedExecutionFlow.create();
         private @Nullable Subscription upstream;
@@ -430,19 +437,32 @@ public final class BodyPublishers {
         private @Nullable Throwable failure;
         private boolean terminated;
         private boolean cancelled;
+        /**
+         * The flow was cancelled before anyone subscribed to the items.
+         */
+        private boolean abandoned;
         private long heldDemand;
 
         FirstItem(Consumer<? super T> discard) {
             this.discard = discard;
         }
 
-        @Override
-        public Context currentContext() {
-            Subscriber<? super T> d;
+        synchronized @Nullable Subscriber<? super T> downstream() {
+            return downstream;
+        }
+
+        /**
+         * The hook of the flow, which also runs when the flow is cancelled after it completed:
+         * the items then belong to their subscriber.
+         */
+        void abandon() {
             synchronized (this) {
-                d = downstream;
+                if (downstream != null) {
+                    return;
+                }
+                abandoned = true;
             }
-            return d == null ? Context.empty() : contextOf(d);
+            cancel();
         }
 
         @Override
@@ -454,16 +474,20 @@ public final class BodyPublishers {
         @Override
         public void onNext(T t) {
             boolean firstItem;
+            boolean drop;
             Subscriber<? super T> d;
             synchronized (this) {
+                drop = cancelled;
                 firstItem = !received;
                 received = true;
-                if (firstItem) {
+                if (firstItem && !drop) {
                     first = t;
                 }
                 d = downstream;
             }
-            if (firstItem) {
+            if (drop) {
+                discard.accept(t);
+            } else if (firstItem) {
                 result.complete(this);
             } else {
                 Objects.requireNonNull(d).onNext(t);
@@ -509,20 +533,31 @@ public final class BodyPublishers {
 
         @Override
         public void subscribe(Subscriber<? super T> s) {
+            boolean wasAbandoned;
             synchronized (this) {
                 if (downstream != null) {
                     reject(s, "The items are published to a single subscriber");
                     return;
                 }
                 downstream = s;
+                wasAbandoned = abandoned && !terminated;
+                if (wasAbandoned) {
+                    terminated = true;
+                }
             }
             s.onSubscribe(this);
+            if (wasAbandoned) {
+                s.onError(new CancellationException("The items were cancelled before they were subscribed to"));
+                return;
+            }
             deliverTerminal();
         }
 
         @Override
         public void request(long n) {
             if (n <= 0) {
+                // the source reports it
+                Objects.requireNonNull(upstream).request(n);
                 return;
             }
             T item = null;
@@ -608,47 +643,98 @@ public final class BodyPublishers {
     /**
      * A publisher of items that are pushed to it, for one subscriber, like a unicast sink that
      * buffers: the items that arrive before they are requested are queued, and a failure is
-     * delivered after the queued items. A cancellation releases the queued items.
+     * delivered after the queued items. A cancellation releases the queued items. Signals are
+     * delivered one at a time, never while the subscriber runs {@code onSubscribe}, and a request
+     * from {@code onNext} is not delivered reentrantly.
+     * <p>
+     * The hooks run around the signals: {@link #onSubscribing()} before the subscriber gets its
+     * subscription, {@link #beforeNext} before an item is delivered, {@link #beforeError()} before
+     * the failure is delivered, {@link #discard} for an item that is not delivered, and
+     * {@link #onCancelled()} once, when the subscriber cancels or makes a request for no items.
      *
      * @param <T> The type of an item
      */
-    public static final class Unicast<T> implements Publisher<T>, Subscription {
-        private final Consumer<? super T> discard;
-        private final Runnable onSubscribe;
-        private final Runnable onCancel;
-
+    public static class Unicast<T> implements Publisher<T>, Subscription {
         // all of the following are guarded by this
         private final ArrayDeque<T> queue = new ArrayDeque<>(2);
+        /**
+         * A subscriber subscribed; a later one is rejected.
+         */
+        private boolean claimed;
+        /**
+         * The subscriber, until it cancels or receives its terminal signal (rule 3.13).
+         */
         private @Nullable Subscriber<? super T> subscriber;
+        /**
+         * The subscriber has its subscription, so signals may be delivered.
+         */
         private boolean subscribed;
         private long demand;
+        /**
+         * The items ended: completed or failed.
+         */
         private boolean done;
         private @Nullable Throwable failure;
         private boolean cancelled;
+        /**
+         * The failure of a request for no items, delivered instead of anything else.
+         */
+        private @Nullable Throwable badRequest;
+        /**
+         * The subscriber received its terminal signal.
+         */
         private boolean terminated;
+        /**
+         * A thread delivers signals; another one that has signals to deliver leaves them to it.
+         */
         private boolean draining;
         private boolean missed;
 
         /**
-         * @param discard     Releases a queued item when the subscriber cancels
-         * @param onSubscribe Runs when the subscriber subscribes, before it gets its subscription
-         * @param onCancel    Runs when the subscriber cancels
+         * Runs when the subscriber subscribes, before it gets its subscription.
          */
-        public Unicast(Consumer<? super T> discard, Runnable onSubscribe, Runnable onCancel) {
-            this.discard = discard;
-            this.onSubscribe = onSubscribe;
-            this.onCancel = onCancel;
+        protected void onSubscribing() {
+        }
+
+        /**
+         * Runs before an item is delivered.
+         *
+         * @param item The item
+         */
+        protected void beforeNext(T item) {
+        }
+
+        /**
+         * Runs before the failure of the items is delivered.
+         */
+        protected void beforeError() {
+        }
+
+        /**
+         * Releases an item that is not delivered: queued when the subscriber cancelled, or pushed
+         * after the end.
+         *
+         * @param item The item
+         */
+        protected void discard(T item) {
+        }
+
+        /**
+         * Runs once, when the subscriber cancels or makes a request for no items.
+         */
+        protected void onCancelled() {
         }
 
         /**
          * Push an item.
          *
          * @param item The item, which this takes over when it is accepted
-         * @return Whether the item was accepted: not after a cancellation or the end
+         * @return Whether the item was accepted: not after a cancellation or the end. An item that
+         * is not accepted is not discarded
          */
-        public boolean tryNext(T item) {
+        public final boolean tryNext(T item) {
             synchronized (this) {
-                if (done || cancelled) {
+                if (done || cancelled || terminated) {
                     return false;
                 }
                 queue.add(item);
@@ -662,7 +748,7 @@ public final class BodyPublishers {
          *
          * @return Whether this ended them: not when they already ended
          */
-        public boolean tryComplete() {
+        public final boolean tryComplete() {
             synchronized (this) {
                 if (done) {
                     return false;
@@ -679,7 +765,7 @@ public final class BodyPublishers {
          * @param e The failure
          * @return Whether this failed them: not when they already ended
          */
-        public boolean tryError(Throwable e) {
+        public final boolean tryError(Throwable e) {
             synchronized (this) {
                 if (done) {
                     return false;
@@ -692,15 +778,20 @@ public final class BodyPublishers {
         }
 
         @Override
-        public void subscribe(Subscriber<? super T> s) {
+        public final void subscribe(Subscriber<? super T> s) {
+            boolean accepted;
             synchronized (this) {
-                if (subscriber != null) {
-                    reject(s, "The items are published to a single subscriber");
-                    return;
+                accepted = !claimed;
+                if (accepted) {
+                    claimed = true;
+                    subscriber = s;
                 }
-                subscriber = s;
             }
-            onSubscribe.run();
+            if (!accepted) {
+                reject(s, "The items are published to a single subscriber");
+                return;
+            }
+            onSubscribing();
             s.onSubscribe(this);
             synchronized (this) {
                 subscribed = true;
@@ -710,32 +801,44 @@ public final class BodyPublishers {
         }
 
         @Override
-        public void request(long n) {
-            if (n <= 0) {
-                return;
-            }
+        public final void request(long n) {
             synchronized (this) {
-                demand = addCap(demand, n);
+                if (n <= 0) {
+                    if (badRequest == null) {
+                        badRequest = nonPositiveRequest(n);
+                    }
+                } else {
+                    demand = addCap(demand, n);
+                }
             }
             drain();
         }
 
         @Override
-        public void cancel() {
+        public final void cancel() {
             Object[] dropped;
             synchronized (this) {
                 if (cancelled) {
                     return;
                 }
                 cancelled = true;
+                subscriber = null;
+                if (badRequest != null && terminated) {
+                    // already released
+                    return;
+                }
                 dropped = queue.toArray();
                 queue.clear();
             }
+            discardAll(dropped);
+            onCancelled();
+        }
+
+        @SuppressWarnings("unchecked")
+        private void discardAll(Object[] dropped) {
             for (Object item : dropped) {
-                //noinspection unchecked
-                discard.accept((T) item);
+                discard((T) item);
             }
-            onCancel.run();
         }
 
         private void drain() {
@@ -750,6 +853,7 @@ public final class BodyPublishers {
                 Subscriber<? super T> s;
                 T next = null;
                 Throwable error = null;
+                Object[] dropped = null;
                 synchronized (this) {
                     s = subscriber;
                     if (s == null || !subscribed || cancelled || terminated) {
@@ -757,13 +861,20 @@ public final class BodyPublishers {
                         missed = false;
                         return;
                     }
-                    if (demand > 0 && !queue.isEmpty()) {
+                    if (badRequest != null) {
+                        terminated = true;
+                        subscriber = null;
+                        error = badRequest;
+                        dropped = queue.toArray();
+                        queue.clear();
+                    } else if (demand > 0 && !queue.isEmpty()) {
                         next = queue.poll();
                         if (demand != Long.MAX_VALUE) {
                             demand--;
                         }
                     } else if (done && queue.isEmpty()) {
                         terminated = true;
+                        subscriber = null;
                         error = failure;
                     } else if (missed) {
                         missed = false;
@@ -773,11 +884,17 @@ public final class BodyPublishers {
                         return;
                     }
                 }
-                if (next != null) {
+                if (dropped != null) {
+                    discardAll(dropped);
+                    onCancelled();
+                    s.onError(Objects.requireNonNull(error));
+                } else if (next != null) {
+                    beforeNext(next);
                     s.onNext(next);
                 } else if (error == null) {
                     s.onComplete();
                 } else {
+                    beforeError();
                     s.onError(error);
                 }
             }

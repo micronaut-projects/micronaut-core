@@ -26,10 +26,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -875,23 +872,12 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * {@link BufferConsumer} that can subscribe to a {@link BaseSharedBuffer} and publish its
      * buffers to one subscriber, without Reactor. Used to implement
      * {@link ByteBody#toReadBufferPublisher()} and similar methods. The buffers that arrive before
-     * they are requested are queued, and a failure is delivered after the queued buffers.
+     * they are requested are queued, and a failure is delivered after the queued buffers, see
+     * {@link BodyPublishers.Unicast}.
      *
      * @since 5.3.0
      */
-    public static final class AsPublisher implements BufferConsumer, Publisher<ReadBuffer>, Subscription {
-        private static final Subscription REJECTED = new Subscription() {
-            @Override
-            public void request(long n) {
-                // a rejected subscriber is only failed
-            }
-
-            @Override
-            public void cancel() {
-                // a rejected subscriber is only failed
-            }
-        };
-
+    public static final class AsPublisher extends BodyPublishers.Unicast<ReadBuffer> implements BufferConsumer {
         private final BaseSharedBuffer sharedBuffer;
         /**
          * The tracker of this reader alone, see {@link #setReaderBufferLimit(long)}, or
@@ -906,30 +892,6 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         private final boolean unbuffered;
         private boolean first = true;
         private BufferConsumer.@Nullable Upstream upstream;
-
-        // all of the following are guarded by this
-        private final ArrayDeque<ReadBuffer> queue = new ArrayDeque<>(2);
-        private @Nullable Subscriber<? super ReadBuffer> subscriber;
-        /**
-         * The subscriber has its subscription, so signals may be delivered.
-         */
-        private boolean subscribed;
-        private long demand;
-        /**
-         * The shared buffer completed or failed.
-         */
-        private boolean done;
-        private @Nullable Throwable failure;
-        private boolean cancelled;
-        /**
-         * The subscriber received its terminal signal.
-         */
-        private boolean terminated;
-        /**
-         * A thread delivers signals; another one that has signals to deliver leaves them to it.
-         */
-        private boolean draining;
-        private boolean missed;
 
         public AsPublisher(BaseSharedBuffer sharedBuffer) {
             this(sharedBuffer, false);
@@ -968,8 +930,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
         @Override
         public void add(ReadBuffer buf) {
-            int size = buf.readable();
             if (!unbuffered) {
+                int size = buf.readable();
                 Exception bufferExceededExc;
                 SizeLimitTracker readerTracker = ownTracker;
                 if (readerTracker != null) {
@@ -991,157 +953,62 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                     return;
                 }
             }
-            boolean accepted;
-            synchronized (this) {
-                accepted = !done && !cancelled;
-                if (accepted) {
-                    queue.add(buf);
-                }
+            if (!tryNext(buf)) {
+                discard(buf);
             }
-            if (!accepted) {
-                if (ownTracker != null) {
-                    ownTracker.subtract(size);
-                }
-                buf.close();
-                return;
-            }
-            drain();
         }
 
         @Override
         public void complete() {
-            synchronized (this) {
-                if (done) {
-                    return;
-                }
-                done = true;
-            }
-            drain();
+            tryComplete();
         }
 
         @Override
         public void error(Throwable e) {
-            synchronized (this) {
-                if (done) {
-                    return;
-                }
-                done = true;
-                failure = e;
-            }
-            drain();
+            tryError(e);
         }
 
         @Override
-        public void subscribe(Subscriber<? super ReadBuffer> s) {
-            boolean accepted;
-            synchronized (this) {
-                accepted = subscriber == null;
-                if (accepted) {
-                    subscriber = s;
-                }
-            }
-            if (!accepted) {
-                s.onSubscribe(REJECTED);
-                s.onError(new IllegalStateException("The buffers of a body are published to a single subscriber"));
-                return;
-            }
+        protected void onSubscribing() {
             upstream().start();
-            synchronized (this) {
-                subscribed = true;
-            }
-            s.onSubscribe(this);
-            // a completion or failure needs no demand
-            drain();
         }
 
         @Override
-        public void request(long n) {
-            if (n <= 0) {
-                return;
-            }
-            synchronized (this) {
-                demand = Long.MAX_VALUE - demand < n ? Long.MAX_VALUE : demand + n;
-            }
-            drain();
+        protected void beforeNext(ReadBuffer item) {
+            int size = item.readable();
+            uncharge(size);
+            upstream().onBytesConsumed(size);
         }
 
         @Override
-        public void cancel() {
-            ReadBuffer[] dropped;
-            synchronized (this) {
-                if (cancelled) {
-                    return;
-                }
-                cancelled = true;
-                dropped = queue.toArray(new ReadBuffer[0]);
-                queue.clear();
-            }
-            for (ReadBuffer buf : dropped) {
-                if (ownTracker != null) {
-                    ownTracker.subtract(buf.readable());
-                }
-                buf.close();
-            }
+        protected void beforeError() {
+            // a reader that failed, e.g. over its limit, reads nothing more
+            upstream().allowDiscard();
+            upstream().disregardBackpressure();
+        }
+
+        @Override
+        protected void discard(ReadBuffer item) {
+            uncharge(item.readable());
+            item.close();
+        }
+
+        @Override
+        protected void onCancelled() {
             upstream().allowDiscard();
             upstream().disregardBackpressure();
         }
 
         /**
-         * Deliver the queued buffers the subscriber requested, then the completion or the failure
-         * once no buffer is queued.
+         * The bytes of a buffer that is delivered or dropped are no longer held for this reader.
+         *
+         * @param size The number of bytes
          */
-        private void drain() {
-            synchronized (this) {
-                if (draining) {
-                    missed = true;
-                    return;
-                }
-                draining = true;
-            }
-            while (true) {
-                Subscriber<? super ReadBuffer> s;
-                ReadBuffer next = null;
-                Throwable error = null;
-                synchronized (this) {
-                    s = subscriber;
-                    if (s == null || !subscribed || cancelled || terminated) {
-                        draining = false;
-                        missed = false;
-                        return;
-                    }
-                    if (demand > 0 && !queue.isEmpty()) {
-                        next = queue.poll();
-                        if (demand != Long.MAX_VALUE) {
-                            demand--;
-                        }
-                    } else if (done && queue.isEmpty()) {
-                        terminated = true;
-                        error = failure;
-                    } else if (missed) {
-                        missed = false;
-                        continue;
-                    } else {
-                        draining = false;
-                        return;
-                    }
-                }
-                if (next != null) {
-                    int size = next.readable();
-                    if (ownTracker != null) {
-                        ownTracker.subtract(size);
-                    } else if (!unbuffered) {
-                        sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
-                    }
-                    upstream().onBytesConsumed(size);
-                    s.onNext(next);
-                } else if (error == null) {
-                    s.onComplete();
-                } else {
-                    // a reader that failed, e.g. over its limit, reads nothing more
-                    upstream().allowDiscard();
-                    upstream().disregardBackpressure();
-                    s.onError(error);
-                }
+        private void uncharge(int size) {
+            if (ownTracker != null) {
+                ownTracker.subtract(size);
+            } else if (!unbuffered) {
+                sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
             }
         }
 

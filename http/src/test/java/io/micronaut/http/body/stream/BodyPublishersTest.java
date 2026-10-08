@@ -1,6 +1,5 @@
 package io.micronaut.http.body.stream;
 
-import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
@@ -13,7 +12,7 @@ import reactor.util.context.Context;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -207,7 +206,7 @@ class BodyPublishersTest {
     @Test
     void unicastQueuesItemsAndDeliversAFailureAfterThem() {
         AtomicBoolean subscribed = new AtomicBoolean();
-        BodyPublishers.Unicast<String> unicast = new BodyPublishers.Unicast<>(item -> { }, () -> subscribed.set(true), () -> { });
+        BodyPublishers.Unicast<String> unicast = unicast(item -> { }, () -> subscribed.set(true), () -> { });
         assertTrue(unicast.tryNext("a"));
         IllegalStateException failure = new IllegalStateException("boom");
         assertTrue(unicast.tryError(failure));
@@ -231,7 +230,7 @@ class BodyPublishersTest {
     void cancellingAUnicastReleasesTheQueuedItems() {
         List<String> discarded = new ArrayList<>();
         AtomicBoolean cancelled = new AtomicBoolean();
-        BodyPublishers.Unicast<String> unicast = new BodyPublishers.Unicast<>(discarded::add, () -> { }, () -> cancelled.set(true));
+        BodyPublishers.Unicast<String> unicast = unicast(discarded::add, () -> { }, () -> cancelled.set(true));
         Recorder<String> recorder = new Recorder<>();
         unicast.subscribe(recorder);
         unicast.tryNext("a");
@@ -242,6 +241,175 @@ class BodyPublishersTest {
         assertEquals(List.of("a", "b"), discarded);
         assertTrue(cancelled.get());
         assertFalse(unicast.tryNext("c"));
+    }
+
+    @Test
+    void cancellingTheFlowOfAwaitFirstBeforeAnyoneSubscribedCancelsTheSource() {
+        List<String> discarded = new ArrayList<>();
+        AtomicBoolean cancelled = new AtomicBoolean();
+        ExecutionFlow<Publisher<String>> flow = BodyPublishers.awaitFirst(Flux.just("a", "b").doOnCancel(() -> cancelled.set(true)), discarded::add);
+        Publisher<String> items = flow.tryCompleteValue();
+
+        flow.cancel();
+
+        assertTrue(cancelled.get());
+        assertEquals(List.of("a"), discarded);
+        // a late subscriber is failed, not left waiting
+        Recorder<String> late = new Recorder<>();
+        items.subscribe(late);
+        assertInstanceOf(CancellationException.class, late.error);
+    }
+
+    @Test
+    void cancellingTheFlowOfAwaitFirstAfterTheSubscriptionLeavesTheItemsToTheSubscriber() {
+        ExecutionFlow<Publisher<String>> flow = BodyPublishers.awaitFirst(Flux.just("a", "b"), item -> { });
+        Recorder<String> recorder = new Recorder<>();
+        flow.tryCompleteValue().subscribe(recorder);
+
+        flow.cancel();
+
+        recorder.subscription.request(5);
+        assertEquals(List.of("a", "b"), recorder.items);
+        assertTrue(recorder.completed);
+    }
+
+    @Test
+    void anItemThatArrivesAfterAwaitFirstWasCancelledIsReleased() {
+        List<String> discarded = new ArrayList<>();
+        Sinks.Many<String> sink = Sinks.many().unicast().onBackpressureBuffer();
+        ExecutionFlow<Publisher<String>> flow = BodyPublishers.awaitFirst(new Publisher<String>() {
+            @Override
+            public void subscribe(Subscriber<? super String> s) {
+                // not a Reactor publisher: it delivers what it has even after the cancellation
+                sink.asFlux().subscribe(new Subscriber<>() {
+                    @Override
+                    public void onSubscribe(Subscription subscription) {
+                        s.onSubscribe(new Subscription() {
+                            @Override
+                            public void request(long n) {
+                                subscription.request(n);
+                            }
+
+                            @Override
+                            public void cancel() {
+                                // ignored, as a slow source may
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onNext(String item) {
+                        s.onNext(item);
+                    }
+
+                    @Override
+                    public void onError(Throwable t) {
+                        s.onError(t);
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        s.onComplete();
+                    }
+                });
+            }
+        }, discarded::add);
+
+        flow.cancel();
+        sink.tryEmitNext("late");
+
+        assertEquals(List.of("late"), discarded);
+    }
+
+    @Test
+    void justFailsARequestForNoItems() {
+        List<String> discarded = new ArrayList<>();
+        Recorder<String> recorder = new Recorder<>();
+        BodyPublishers.just("a", discarded::add).subscribe(recorder);
+
+        recorder.subscription.request(0);
+
+        assertInstanceOf(IllegalArgumentException.class, recorder.error);
+        assertEquals(List.of("a"), discarded);
+        assertEquals(List.of(), recorder.items);
+    }
+
+    @Test
+    void aUnicastFailsARequestForNoItemsAndReleasesTheQueuedItems() {
+        List<String> discarded = new ArrayList<>();
+        AtomicInteger cancelled = new AtomicInteger();
+        BodyPublishers.Unicast<String> unicast = unicast(discarded::add, () -> { }, cancelled::incrementAndGet);
+        Recorder<String> recorder = new Recorder<>();
+        unicast.subscribe(recorder);
+        unicast.tryNext("a");
+
+        recorder.subscription.request(-1);
+
+        assertInstanceOf(IllegalArgumentException.class, recorder.error);
+        assertEquals(List.of("a"), discarded);
+        assertEquals(1, cancelled.get());
+        assertFalse(unicast.tryNext("b"));
+        recorder.subscription.cancel();
+        assertEquals(1, cancelled.get());
+    }
+
+    @Test
+    void aUnicastDoesNotSignalWhileTheSubscriberRunsOnSubscribe() throws Exception {
+        BodyPublishers.Unicast<String> unicast = unicast(item -> { }, () -> { }, () -> { });
+        AtomicBoolean inOnSubscribe = new AtomicBoolean();
+        AtomicBoolean violation = new AtomicBoolean();
+        AtomicBoolean completed = new AtomicBoolean();
+        unicast.subscribe(new Subscriber<>() {
+            @Override
+            public void onSubscribe(Subscription s) {
+                inOnSubscribe.set(true);
+                // the items end on another thread, e.g. an event loop, while onSubscribe runs
+                Thread thread = new Thread(unicast::tryComplete);
+                thread.start();
+                try {
+                    thread.join(5000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                inOnSubscribe.set(false);
+            }
+
+            @Override
+            public void onNext(String s) {
+            }
+
+            @Override
+            public void onError(Throwable t) {
+            }
+
+            @Override
+            public void onComplete() {
+                violation.compareAndSet(false, inOnSubscribe.get());
+                completed.set(true);
+            }
+        });
+
+        assertTrue(completed.get());
+        assertFalse(violation.get());
+    }
+
+    private static <T> BodyPublishers.Unicast<T> unicast(Consumer<T> discard, Runnable onSubscribe, Runnable onCancel) {
+        return new BodyPublishers.Unicast<>() {
+            @Override
+            protected void onSubscribing() {
+                onSubscribe.run();
+            }
+
+            @Override
+            protected void discard(T item) {
+                discard.accept(item);
+            }
+
+            @Override
+            protected void onCancelled() {
+                onCancel.run();
+            }
+        };
     }
 
     private static final class Recorder<T> implements CoreSubscriber<T> {

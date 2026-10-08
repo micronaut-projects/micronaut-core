@@ -4,6 +4,7 @@ import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.exceptions.BufferLengthExceededException;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.reactivestreams.Subscription;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -142,6 +144,86 @@ class AsPublisherTest {
         assertEquals(1000, reader.items.size());
         assertTrue(reader.completed);
         assertEquals(1, maxDepth[0]);
+    }
+
+    @Test
+    void noSignalIsDeliveredWhileTheReaderRunsOnSubscribe() {
+        ByteBodyFactory.StreamingBody body = FACTORY.createStreamingBody(BodySizeLimits.UNLIMITED, new RecordingUpstream());
+        AtomicBoolean inOnSubscribe = new AtomicBoolean();
+        AtomicBoolean violation = new AtomicBoolean();
+        AtomicBoolean completed = new AtomicBoolean();
+        body.rootBody().toReadBufferPublisher().subscribe(new Subscriber<>() {
+            @Override
+            public void onSubscribe(Subscription s) {
+                inOnSubscribe.set(true);
+                // the body completes on another thread, e.g. the event loop, while onSubscribe runs
+                Thread thread = new Thread(() -> body.sharedBuffer().complete());
+                thread.start();
+                try {
+                    thread.join(5000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                inOnSubscribe.set(false);
+            }
+
+            @Override
+            public void onNext(ReadBuffer readBuffer) {
+                readBuffer.close();
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                violation.compareAndSet(false, inOnSubscribe.get());
+            }
+
+            @Override
+            public void onComplete() {
+                violation.compareAndSet(false, inOnSubscribe.get());
+                completed.set(true);
+            }
+        });
+
+        assertTrue(completed.get());
+        assertFalse(violation.get());
+    }
+
+    @Test
+    void aRequestForNoBuffersFailsAndClosesTheQueuedBuffers() {
+        RecordingUpstream upstream = new RecordingUpstream();
+        ByteBodyFactory.StreamingBody body = FACTORY.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        Recorder reader = new Recorder();
+        body.rootBody().toReadBufferPublisher().subscribe(reader);
+        ReadBuffer queued = buffer("a");
+        body.sharedBuffer().add(queued);
+
+        reader.subscription.request(0);
+
+        assertInstanceOf(IllegalArgumentException.class, reader.error);
+        assertEquals(List.of(), reader.items);
+        assertTrue(upstream.discardAllowed);
+        assertTrue(upstream.backpressureDisregarded);
+    }
+
+    @Test
+    void theBytesQueuedForACancelledReaderAreNoLongerChargedToTheBody() {
+        RecordingUpstream upstream = new RecordingUpstream();
+        ByteBodyFactory.StreamingBody body = FACTORY.createStreamingBody(new BodySizeLimits(Long.MAX_VALUE, 6), upstream);
+        CloseableByteBody other = body.rootBody().split();
+        Recorder cancelled = new Recorder();
+        Recorder kept = new Recorder();
+        body.rootBody().toReadBufferPublisher().subscribe(cancelled);
+        other.toReadBufferPublisher().subscribe(kept);
+        // both readers hold the three bytes: six of the six bytes the body may buffer
+        body.sharedBuffer().add(buffer("abc"));
+
+        cancelled.subscription.cancel();
+        kept.subscription.request(1);
+        body.sharedBuffer().add(buffer("defg"));
+
+        assertNull(kept.error);
+        kept.subscription.request(1);
+        assertEquals(List.of("abc", "defg"), kept.items);
     }
 
     private static ReadBuffer buffer(String text) {
