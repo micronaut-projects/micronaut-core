@@ -30,8 +30,8 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
 
-import java.io.IOException;
 import java.io.InputStream;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.concurrent.Executor;
 
@@ -178,6 +178,10 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
         private boolean reading;
         private boolean cancelled;
         private boolean done;
+        /**
+         * The failure of a request for no arrays, delivered by the read task.
+         */
+        private @Nullable Throwable badRequest;
 
         StreamPublisher(ExtendedInputStream stream, Executor executor) {
             this.stream = stream;
@@ -188,18 +192,7 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
         public void subscribe(Subscriber<? super byte[]> s) {
             synchronized (this) {
                 if (subscriber != null) {
-                    s.onSubscribe(new Subscription() {
-                        @Override
-                        public void request(long n) {
-                            // a rejected subscriber is only failed
-                        }
-
-                        @Override
-                        public void cancel() {
-                            // a rejected subscriber is only failed
-                        }
-                    });
-                    s.onError(new IllegalStateException("The bytes of a stream are published to a single subscriber"));
+                    BodyPublishers.reject(s, "The bytes of a stream are published to a single subscriber");
                     return;
                 }
                 subscriber = s;
@@ -209,11 +202,14 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
 
         @Override
         public void request(long n) {
-            if (n <= 0) {
-                return;
-            }
             synchronized (this) {
-                demand = Long.MAX_VALUE - demand < n ? Long.MAX_VALUE : demand + n;
+                if (n <= 0) {
+                    if (badRequest == null) {
+                        badRequest = BodyPublishers.nonPositiveRequest(n);
+                    }
+                } else {
+                    demand = BodyPublishers.addCap(demand, n);
+                }
                 if (reading || done || cancelled) {
                     return;
                 }
@@ -224,36 +220,41 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
 
         @Override
         public void run() {
-            Subscriber<? super byte[]> s = subscriber;
+            Subscriber<? super byte[]> s = Objects.requireNonNull(subscriber);
             while (true) {
+                Throwable bad;
                 synchronized (this) {
                     if (cancelled) {
                         reading = false;
                         break;
                     }
-                    if (demand == 0) {
-                        reading = false;
-                        return;
+                    bad = badRequest;
+                    if (bad == null) {
+                        if (demand == 0) {
+                            reading = false;
+                            return;
+                        }
+                        if (demand != Long.MAX_VALUE) {
+                            demand--;
+                        }
                     }
-                    if (demand != Long.MAX_VALUE) {
-                        demand--;
-                    }
+                }
+                if (bad != null) {
+                    finish();
+                    s.onError(bad);
+                    return;
                 }
                 byte @Nullable [] bytes;
                 try {
                     bytes = stream.readSome();
-                } catch (IOException e) {
+                } catch (Throwable e) {
                     finish();
-                    if (s != null) {
-                        s.onError(e);
-                    }
+                    s.onError(e);
                     return;
                 }
                 if (bytes == null) {
                     finish();
-                    if (s != null) {
-                        s.onComplete();
-                    }
+                    s.onComplete();
                     return;
                 }
                 synchronized (this) {
@@ -263,8 +264,15 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
                         break;
                     }
                 }
-                if (s != null) {
+                try {
                     s.onNext(bytes);
+                } catch (Throwable e) {
+                    // a subscriber that throws is cancelled (rule 2.13)
+                    synchronized (this) {
+                        cancelled = true;
+                        reading = false;
+                    }
+                    break;
                 }
             }
             // cancelled while reading

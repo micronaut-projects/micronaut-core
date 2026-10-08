@@ -92,4 +92,84 @@ class InputStreamByteBodySpec extends Specification {
         cleanup:
         pool.shutdown()
     }
+
+    def "a stream that fails with an unchecked exception fails the subscriber and is closed"() {
+        given:
+        def failure = new IllegalStateException("boom")
+        def closed = new CountDownLatch(1)
+        def stream = new InputStream() {
+            @Override
+            int read() {
+                throw failure
+            }
+
+            @Override
+            int read(byte[] b, int off, int len) {
+                throw failure
+            }
+
+            @Override
+            void close() {
+                closed.countDown()
+            }
+        }
+        def body = InputStreamByteBody.create(stream, OptionalLong.empty(), Runnable::run, ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE))
+        def received = []
+        Subscription subscription = null
+
+        when:
+        body.toReadBufferPublisher().subscribe(recorder(received, { subscription = it }))
+        subscription.request(1)
+
+        then:
+        received == [failure]
+        closed.count == 0
+    }
+
+    def "a request for no arrays fails the subscriber and closes the stream"() {
+        given:
+        def closed = new CountDownLatch(1)
+        def stream = new ByteArrayInputStream("abc".getBytes(StandardCharsets.UTF_8)) {
+            @Override
+            void close() {
+                closed.countDown()
+            }
+        }
+        def body = InputStreamByteBody.create(stream, OptionalLong.empty(), Runnable::run, ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE))
+        def received = []
+        Subscription subscription = null
+
+        when:
+        body.toReadBufferPublisher().subscribe(recorder(received, { subscription = it }))
+        subscription.request(0)
+
+        then:
+        received.size() == 1
+        received[0] instanceof IllegalArgumentException
+        closed.count == 0
+    }
+
+    private static Subscriber<ReadBuffer> recorder(List<Object> received, Closure onSubscribe) {
+        return new Subscriber<ReadBuffer>() {
+            @Override
+            void onSubscribe(Subscription s) {
+                onSubscribe.call(s)
+            }
+
+            @Override
+            void onNext(ReadBuffer readBuffer) {
+                received.add(readBuffer)
+            }
+
+            @Override
+            void onError(Throwable t) {
+                received.add(t)
+            }
+
+            @Override
+            void onComplete() {
+                received.add("complete")
+            }
+        }
+    }
 }
