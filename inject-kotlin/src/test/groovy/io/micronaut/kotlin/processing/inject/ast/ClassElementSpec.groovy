@@ -1266,13 +1266,13 @@ class MyBean {
             def saveAll2 = ce.findMethod("saveAll2").get()
             def listTypeArgument2 = saveAll2.getParameters()[0].getType().getTypeArguments(List).get("E")
         then:
-            validateMyBookArgument(listTypeArgument2)
+            validateMyBookArgumentOfAnnotatedTypeParameter(listTypeArgument2)
 
         when:
             def saveAll3 = ce.findMethod("saveAll3").get()
             def listTypeArgument3 = saveAll3.getParameters()[0].getType().getTypeArguments(List).get("E")
         then:
-            validateMyBookArgument(listTypeArgument3)
+            validateMyBookArgumentOfAnnotatedTypeParameter(listTypeArgument3)
 
         when:
             def saveAll4 = ce.findMethod("saveAll4").get()
@@ -1297,7 +1297,7 @@ class MyBean {
             def save3 = ce.findMethod("save3").get()
             def parameter3 = save3.getParameters()[0].getType()
         then:
-            validateMyBookArgument(parameter3)
+            validateMyBookArgumentOfAnnotatedTypeParameter(parameter3)
 
         when:
             def save4 = ce.findMethod("save4").get()
@@ -1384,8 +1384,7 @@ class MyBean {
             validateMyBookArgument(listTypeArgument5)
     }
 
-    @PendingFeature
-    void "test how the type annotations from the type are propagated - pending 2"() {
+    void "test type annotations on a type parameter use are propagated"() {
         given:
             ClassElement ce = buildClassElementTransformed('test.MyBean','''\
 package test;
@@ -1422,6 +1421,14 @@ class MyBean {
         then:
             validateMyBookArgument(parameter5)
 
+    }
+
+    void validateMyBookArgumentOfAnnotatedTypeParameter(ClassElement classElement) {
+        // The annotations of the type parameter declaration don't apply to its uses
+        assert !classElement.hasAnnotation(TypeUseRuntimeAnn.class)
+        assert classElement.hasAnnotation(MyEntity.class)
+        assert classElement.hasAnnotation(Introspected.class)
+        assert !classElement.getTypeAnnotationMetadata().hasAnnotation(TypeUseRuntimeAnn.class)
     }
 
     void validateMyBookArgument(ClassElement classElement) {
