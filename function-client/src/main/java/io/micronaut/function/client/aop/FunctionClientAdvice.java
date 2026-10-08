@@ -150,7 +150,7 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
                 ), null)
             );
             return CompletionStagePublishers.map(result, value -> {
-                if (value == null) {
+                if (value == null && !valueType.isVoid() && valueType.getType() != Void.class) {
                     throw new FunctionNotFoundException(functionName);
                 }
                 return value;

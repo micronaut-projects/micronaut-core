@@ -28,27 +28,30 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.HttpClient;
 import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.io.Closeable;
 import java.net.URI;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * A {@link io.micronaut.function.executor.FunctionExecutor} that uses a {@link io.micronaut.http.client.HttpClient} to execute a remote function definition.
  *
- * <p>The bean invokes the functions asynchronously with the
+ * <p>{@link #invokeAsync(FunctionDefinition, Object, Argument)} invokes the functions with the
  * {@link io.micronaut.http.client.AsyncHttpClient} of the HTTP client, without Reactive Streams.
- * This class only implements {@link #invoke(FunctionDefinition, Object, Argument)}, so that a
- * subclass that overrides it, and replaces the bean, is called through it by the default
- * {@link #invokeAsync(FunctionDefinition, Object, Argument)}.</p>
+ * A subclass is called through {@link #invoke(FunctionDefinition, Object, Argument)} instead, so
+ * that its override keeps working.</p>
  *
  * @param <I> input type
  * @param <O> output type
  * @author graemerocher
  * @since 1.0
  */
+@Singleton
 public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closeable, FunctionInvokerChooser {
 
     private final ConversionService conversionService;
@@ -81,11 +84,45 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
             Publisher<?> publisher = httpClient.retrieve(request, outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
             return Publishers.convertPublisher(conversionService, publisher, outputJavaType);
         } else if (outputType.isVoid()) {
-            httpClient.toBlocking().exchange(request);
+            // the body is not needed, and a Void body is not buffered
+            httpClient.toBlocking().exchange(request, Argument.VOID);
             return null;
         } else {
             return httpClient.toBlocking().retrieve(request, outputType);
         }
+    }
+
+    /**
+     * Invoke the function with the {@link io.micronaut.http.client.AsyncHttpClient} of the HTTP
+     * client. The request is the one {@link #invoke(FunctionDefinition, Object, Argument)} sends
+     * for a {@link Publisher} of the value, which the default implementation asks for: a
+     * {@code java.lang} value type does not ask for {@code text/plain}, as the type of the
+     * result is a publisher. A {@link Void} result completes with {@code null}. A subclass is
+     * called through {@link #invoke(FunctionDefinition, Object, Argument)}.
+     *
+     * @param definition The definition
+     * @param input      The input
+     * @param valueType  The type of the result
+     * @param <T>        The type of the result
+     * @return A stage that completes with the result
+     * @since 5.3.0
+     */
+    @Override
+    public <T> CompletionStage<@Nullable T> invokeAsync(FunctionDefinition definition, @Nullable I input, Argument<T> valueType) {
+        if (getClass() != HttpFunctionExecutor.class) {
+            return FunctionInvoker.super.invokeAsync(definition, input, valueType);
+        }
+        MutableHttpRequest<?> request;
+        try {
+            request = toRequest(definition, input, Publisher.class);
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+        if (valueType.isVoid() || valueType.getType() == Void.class) {
+            // the body is not needed, and a Void body is not buffered
+            return httpClient.toAsync().exchange(request, Argument.VOID).thenApply(response -> null);
+        }
+        return httpClient.toAsync().retrieve(request, valueType);
     }
 
     /**

@@ -47,6 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -77,7 +78,7 @@ class HttpFunctionExecutorAsyncTest {
         });
         server.start();
         context = ApplicationContext.run();
-        executor = new AsyncHttpFunctionExecutor<>(context.getBean(ConversionService.class), HttpClient.create(null));
+        executor = new HttpFunctionExecutor<>(context.getBean(ConversionService.class), HttpClient.create(null));
     }
 
     @AfterEach
@@ -98,6 +99,12 @@ class HttpFunctionExecutorAsyncTest {
     void invokeAsyncOfAVoidFunctionCompletesWithNull() throws Exception {
         CompletionStage<Void> result = executor.invokeAsync(definition("/max"), null, Argument.VOID);
         assertNull(result.toCompletableFuture().get(10, TimeUnit.SECONDS));
+        assertEquals(1, calls.get());
+    }
+
+    @Test
+    void invokeOfAVoidFunctionReturnsNull() {
+        assertNull(executor.invoke(definition("/max"), null, (Argument) Argument.VOID));
         assertEquals(1, calls.get());
     }
 
@@ -179,7 +186,7 @@ class HttpFunctionExecutorAsyncTest {
 
     @Test
     void theDefaultBeanInvokesWithoutAPublisher() {
-        assertInstanceOf(AsyncHttpFunctionExecutor.class, context.getBean(HttpFunctionExecutor.class));
+        assertSame(HttpFunctionExecutor.class, context.getBean(HttpFunctionExecutor.class).getClass());
     }
 
     private FunctionInvoker<Object, Object> publisherInvoker(Publisher<?> publisher) {
