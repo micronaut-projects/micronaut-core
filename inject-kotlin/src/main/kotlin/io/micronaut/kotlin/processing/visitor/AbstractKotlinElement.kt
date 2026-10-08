@@ -64,11 +64,25 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         false
     }
 
-    override fun isStatic() = if (annotatedInfo is KSDeclaration) {
-        annotatedInfo.modifiers.contains(Modifier.JAVA_STATIC)
-    } else {
-        false
+    @OptIn(KspExperimental::class)
+    private val javaModifiers: Set<Modifier> by lazy {
+        if (annotatedInfo is KSDeclaration) {
+            val modifiers = visitorContext.resolver.effectiveJavaModifiers(annotatedInfo).toMutableSet()
+            if (annotatedInfo is KSClassDeclaration && annotatedInfo.isCompanionObject) {
+                // a companion object compiles to a static nested class
+                modifiers.add(Modifier.JAVA_STATIC)
+            } else if ((annotatedInfo.parentDeclaration as? KSClassDeclaration)?.isCompanionObject == true) {
+                // a @JvmStatic member of a companion object is an instance member of the companion class,
+                // the static copy is generated on the enclosing class
+                modifiers.remove(Modifier.JAVA_STATIC)
+            }
+            modifiers
+        } else {
+            emptySet()
+        }
     }
+
+    override fun isStatic() = javaModifiers.contains(Modifier.JAVA_STATIC)
 
     private fun makeCopy(): AbstractKotlinElement<T> {
         val element: AbstractKotlinElement<T> = copyThis()
@@ -159,10 +173,8 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         }
     }
 
-    @OptIn(KspExperimental::class)
     override fun getModifiers(): MutableSet<ElementModifier> {
         if (annotatedInfo is KSDeclaration) {
-            val javaModifiers = visitorContext.resolver.effectiveJavaModifiers(annotatedInfo)
             return javaModifiers.mapNotNull {
                 when (it) {
                     Modifier.ABSTRACT -> ElementModifier.ABSTRACT
