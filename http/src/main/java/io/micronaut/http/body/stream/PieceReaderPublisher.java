@@ -69,6 +69,18 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
     private volatile boolean pieceRequested;
     private volatile boolean inputEnded;
     private final AtomicReference<@Nullable Throwable> inputFailure = new AtomicReference<>();
+    /**
+     * The §3.9 failure of a request that is not positive, signalled instead of the cancellation.
+     */
+    private volatile @Nullable Throwable badRequest;
+    /**
+     * The input emitted more pieces than were requested: it is cancelled.
+     */
+    private volatile boolean overflow;
+    /**
+     * The context of a Reactor input, with the discard hook: created once.
+     */
+    private final Context context;
     private volatile boolean cancelled;
 
     // only accessed by the drain loop
@@ -109,6 +121,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
         this.discard = discard;
         this.reader = reader;
         this.foreignDiscard = foreignDiscard;
+        this.context = Operators.enableOnDiscard(Context.empty(), this::discardObject);
     }
 
     @Override
@@ -136,8 +149,8 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
     @Override
     public void request(long n) {
         if (n <= 0) {
+            badRequest = new IllegalArgumentException("§3.9: the number of requested elements must be positive: " + n);
             cancelled = true;
-            inputFailure.set(new IllegalArgumentException("§3.9: the number of requested elements must be positive: " + n));
         } else {
             long current;
             long next;
@@ -173,7 +186,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
      */
     @Override
     public Context currentContext() {
-        return Operators.enableOnDiscard(Context.empty(), this::discardObject);
+        return context;
     }
 
     private void discardObject(Object piece) {
@@ -195,9 +208,10 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
     @Override
     public void onNext(I next) {
         if (!piece.compareAndSet(null, next)) {
-            // §1.1: more pieces than requested
+            // §1.1: more pieces than requested; the input is cancelled
             discard.accept(next);
-            inputFailure.set(new IllegalStateException("The input emitted more pieces than were requested"));
+            overflow = true;
+            inputFailure.compareAndSet(null, new IllegalStateException("The input emitted more pieces than were requested"));
         }
         drain();
     }
@@ -247,9 +261,9 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
         try {
             while (true) {
                 if (cancelled) {
-                    Throwable failure = inputFailure.get();
+                    Throwable failure = badRequest;
                     terminate(true);
-                    if (failure instanceof IllegalArgumentException) {
+                    if (failure != null) {
                         // §3.9
                         subscriber.onError(failure);
                     }
@@ -258,7 +272,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
                 Throwable failure = inputFailure.get();
                 if (failure != null && readerFailure == null) {
                     // the input failed: the elements not emitted yet are dropped
-                    terminate(false);
+                    terminate(overflow);
                     subscriber.onError(failure);
                     return;
                 }
@@ -293,7 +307,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
                             cancelUpstream();
                         }
                     } else {
-                        discardObject(next);
+                        discard.accept(next);
                     }
                     continue;
                 }

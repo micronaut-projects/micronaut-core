@@ -35,8 +35,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
- * {@link BodyElements} as a publisher, without Reactor: one {@link BodyElements#next()} per
- * requested element, one at a time. Cancelling closes the elements.
+ * {@link BodyElements} as a publisher, without Reactor: the requested elements that are
+ * available at once ({@link BodyElements#poll()}) are emitted in a loop, the others with one
+ * {@link BodyElements#next()} at a time. Cancelling closes the elements.
  *
  * <p>One subscriber.</p>
  *
@@ -56,6 +57,8 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
     private volatile boolean cancelled;
     private volatile boolean reading;
     private volatile boolean done;
+    private volatile @Nullable Throwable badRequest;
+    private final AtomicReference<@Nullable Arrival<T>> arrived = new AtomicReference<>();
     // only accessed by the drain
     private boolean closed;
 
@@ -100,16 +103,9 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
     @Override
     public void request(long n) {
         if (n <= 0) {
-            if (done || cancelled) {
-                // §3.6: no signal after the terminal one
-                return;
-            }
-            done = true;
+            // signalled by the drain, never concurrently with an element
+            badRequest = new IllegalArgumentException("§3.9: the number of requested elements must be positive: " + n);
             cancel();
-            Subscriber<? super T> subscriber = downstream.get();
-            if (subscriber != null) {
-                subscriber.onError(new IllegalArgumentException("§3.9: the number of requested elements must be positive: " + n));
-            }
             return;
         }
         long current;
@@ -131,26 +127,34 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
         drain();
     }
 
+    /**
+     * Emit the elements that are requested: those that are available at once without a stage,
+     * then one read at a time. Every signal is emitted here, one at a time.
+     */
     private void drain() {
         if (wip.getAndIncrement() != 0) {
             return;
         }
         int missed = 1;
         while (true) {
+            Subscriber<? super T> subscriber = downstream.get();
             if (cancelled) {
                 if (!closed) {
                     closed = true;
                     elements.close();
+                    Throwable failure = badRequest;
+                    if (failure != null && !done && subscriber != null) {
+                        done = true;
+                        subscriber.onError(failure);
+                    }
                 }
-            } else if (!done && !reading && requested.get() > 0) {
-                reading = true;
-                CompletionStage<Optional<T>> read;
-                try {
-                    read = elements.next();
-                } catch (Throwable e) {
-                    read = CompletableFuture.failedFuture(e);
+                Arrival<T> late = arrived.getAndSet(null);
+                if (late != null && late.element != null) {
+                    // read while the subscription was cancelled: e.g. a reference counted buffer
+                    late.element.ifPresent(this::discard);
                 }
-                read.whenComplete((element, error) -> onRead(Objects.requireNonNullElse(element, Optional.empty()), error));
+            } else if (!done && subscriber != null) {
+                emit(subscriber);
             }
             missed = wip.addAndGet(-missed);
             if (missed == 0) {
@@ -159,29 +163,58 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
         }
     }
 
-    private void onRead(Optional<T> element, @Nullable Throwable error) {
-        Subscriber<? super T> subscriber = downstream.get();
-        if (cancelled || done || subscriber == null) {
-            // read while the subscription was cancelled: e.g. a reference counted buffer
-            element.ifPresent(this::discard);
-            return;
+    private void emit(Subscriber<? super T> subscriber) {
+        Arrival<T> arrival = arrived.getAndSet(null);
+        if (arrival != null) {
+            reading = false;
+            if (arrival.error != null) {
+                done = true;
+                Throwable error = arrival.error;
+                subscriber.onError(error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
+                return;
+            }
+            Optional<T> element = Objects.requireNonNullElse(arrival.element, Optional.empty());
+            if (element.isEmpty()) {
+                done = true;
+                subscriber.onComplete();
+                return;
+            }
+            produced();
+            subscriber.onNext(element.get());
         }
-        if (error != null) {
-            done = true;
-            subscriber.onError(error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
-            return;
+        while (!reading && !cancelled && requested.get() > 0) {
+            T available;
+            try {
+                available = elements.poll();
+            } catch (Throwable e) {
+                done = true;
+                subscriber.onError(e);
+                return;
+            }
+            if (available != null) {
+                produced();
+                subscriber.onNext(available);
+                continue;
+            }
+            reading = true;
+            CompletionStage<Optional<T>> read;
+            try {
+                read = elements.next();
+            } catch (Throwable e) {
+                read = CompletableFuture.failedFuture(e);
+            }
+            // a read that completes at once is emitted by the loop of the drain
+            read.whenComplete((element, error) -> {
+                arrived.set(new Arrival<>(element, error));
+                drain();
+            });
         }
-        if (element.isEmpty()) {
-            done = true;
-            subscriber.onComplete();
-            return;
-        }
+    }
+
+    private void produced() {
         if (requested.get() != Long.MAX_VALUE) {
             requested.decrementAndGet();
         }
-        subscriber.onNext(element.get());
-        reading = false;
-        drain();
     }
 
     private void discard(T element) {
@@ -191,5 +224,15 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
         } else if (element instanceof ReferenceCounted counted) {
             counted.release();
         }
+    }
+
+    /**
+     * The result of a read.
+     *
+     * @param element The element, or empty at the end
+     * @param error   The failure
+     * @param <T>     The type of an element
+     */
+    private record Arrival<T>(@Nullable Optional<T> element, @Nullable Throwable error) {
     }
 }

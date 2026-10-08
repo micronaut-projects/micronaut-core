@@ -29,6 +29,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -185,6 +186,95 @@ class PieceReadersTest {
         recorder.request(1);
         recorder.subscription.cancel();
         assertTrue(closed.get());
+    }
+
+    @Test
+    void thePublisherOfElementsEmitsTheAvailableElementsWithoutAStage() {
+        AtomicInteger reads = new AtomicInteger();
+        List<Integer> available = new ArrayList<>(List.of(1, 2, 3));
+        BodyElements<Integer> elements = new BodyElements<>() {
+            @Override
+            public @Nullable Integer poll() {
+                return available.isEmpty() ? null : available.remove(0);
+            }
+
+            @Override
+            public CompletionStage<Optional<Integer>> next() {
+                reads.incrementAndGet();
+                return CompletableFuture.completedStage(Optional.empty());
+            }
+        };
+        Recorder<Integer> recorder = new Recorder<>();
+        new BodyElementsPublisher<>(elements).subscribe(recorder);
+
+        recorder.request(Long.MAX_VALUE);
+        assertEquals(List.of(1, 2, 3), recorder.elements);
+        assertTrue(recorder.complete);
+        assertEquals(1, reads.get());
+    }
+
+    @Test
+    void aRequestThatIsNotPositiveFailsThePublisherOfElementsOnce() {
+        AtomicBoolean closed = new AtomicBoolean();
+        Recorder<Integer> recorder = new Recorder<>();
+        new BodyElementsPublisher<>(new CountingElements(3, closed)).subscribe(recorder);
+
+        recorder.request(0);
+        assertInstanceOf(IllegalArgumentException.class, recorder.failure);
+        assertTrue(closed.get());
+        recorder.failure = null;
+        recorder.request(-1);
+        assertNull(recorder.failure);
+    }
+
+    @Test
+    void anInputThatEmitsMoreThanRequestedIsCancelled() {
+        AtomicBoolean cancelled = new AtomicBoolean();
+        Publisher<ReadBuffer> eager = subscriber -> subscriber.onSubscribe(new Subscription() {
+            @Override
+            public void request(long n) {
+                // ignores the demand
+                subscriber.onNext(piece("a\n"));
+                subscriber.onNext(piece("b\n"));
+            }
+
+            @Override
+            public void cancel() {
+                cancelled.set(true);
+            }
+        });
+        Recorder<String> recorder = new Recorder<>();
+        PieceReaders.publisher(eager, new LineReader(new AtomicInteger())).subscribe(recorder);
+
+        recorder.request(1);
+        assertInstanceOf(IllegalStateException.class, recorder.failure);
+        assertTrue(cancelled.get());
+    }
+
+    @Test
+    void anInputFailureAfterCancellingIsNotSignalled() {
+        AtomicReference<Subscriber<? super ReadBuffer>> input = new AtomicReference<>();
+        Publisher<ReadBuffer> pieces = subscriber -> {
+            input.set(subscriber);
+            subscriber.onSubscribe(new Subscription() {
+                @Override
+                public void request(long n) {
+                    // the test signals
+                }
+
+                @Override
+                public void cancel() {
+                    // the test signals
+                }
+            });
+        };
+        Recorder<String> recorder = new Recorder<>();
+        PieceReaders.publisher(pieces, new LineReader(new AtomicInteger())).subscribe(recorder);
+
+        recorder.request(1);
+        recorder.subscription.cancel();
+        input.get().onError(new IllegalArgumentException("late"));
+        assertNull(recorder.failure);
     }
 
     private static Flux<ReadBuffer> pieces(String... pieces) {
