@@ -2419,6 +2419,120 @@ class ProductMappers:
     }
 
     @Test
+    void testDataclassClassVarsAreStaticAndNotConstructorArguments() {
+        for (String annotation : List.of("ClassVar[str]", "Shared[str]", "typing.ClassVar[str]", "t.ClassVar[str]",
+            "'ClassVar[str]'", "ClassVar")) {
+            try (PythonEnvironment environment = new PythonAstParser().parse("""
+                from dataclasses import dataclass
+                from typing import ClassVar, ClassVar as Shared
+                import typing
+                import typing as t
+
+                @dataclass
+                class Contact:
+                    name: str
+                    kind: %s = "service"
+                    VERSION: int = 1
+                """.formatted(annotation))) {
+                var contact = environment.classes().get("Contact");
+                var kind = contact.attributes().get(1);
+                assertTrue(kind.isStatic(), annotation);
+                assertEquals(annotation.equals("ClassVar") ? "object" : "str", kind.typeName().name());
+                assertEquals("service", kind.value());
+                assertFalse(contact.attributes().get(2).isStatic(), "capitalization is not a static-field marker");
+                assertEquals(List.of("name", "VERSION"), contact.constructor().arguments().arguments().stream()
+                    .map(ArgumentDef::name).toList(), annotation);
+
+                try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                    ClassElement element = processingEnvironment.classes().get("Contact");
+                    assertEquals(List.of("kind"), element.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyStatic())
+                        .stream().map(FieldElement::getName).toList(), annotation);
+                    assertEquals(List.of("name", "VERSION"), element.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyInstance())
+                        .stream().map(FieldElement::getName).toList(), annotation);
+                    assertEquals(List.of("name", "VERSION"), element.getBeanProperties().stream()
+                        .map(PropertyElement::getName).toList(), annotation);
+                    assertEquals(List.of("name", "kind", "VERSION"), element.getBeanProperties(
+                        PropertyElementQuery.of(element).allowStaticProperties(true)).stream()
+                        .map(PropertyElement::getName).toList(), annotation);
+                    assertEquals(annotation.equals("ClassVar") ? "java.lang.Object" : "java.lang.String",
+                        element.findField("kind").orElseThrow().getType().getName(), annotation);
+                }
+            }
+        }
+    }
+
+    @Test
+    void testDataclassClassVarDetectionRequiresTheTopLevelTypingType() {
+        try (PythonEnvironment environment = new PythonAstParser().parse("""
+            from dataclasses import dataclass
+            from typing import Annotated, ClassVar as TypingClassVar
+            from other_package import ClassVar as Foreign
+
+            class ClassVar:
+                pass
+
+            Wrapped = Annotated[TypingClassVar[str], "not a class variable"]
+
+            @dataclass
+            class Contact:
+                local: ClassVar = None
+                foreign: Foreign[str] = "foreign"
+                nested: list[TypingClassVar[str]] = None
+                wrapped: Wrapped = "wrapped"
+                VERSION: int = 1
+            """)) {
+            var contact = environment.classes().get("Contact");
+            assertTrue(contact.attributes().stream().noneMatch(attribute -> attribute.isStatic()));
+            assertEquals(List.of("local", "foreign", "nested", "wrapped", "VERSION"),
+                contact.constructor().arguments().arguments().stream().map(ArgumentDef::name).toList());
+        }
+    }
+
+    @Test
+    void testDataclassClassVarsStayStaticAcrossInheritedOverrides() {
+        try (PythonEnvironment environment = new PythonAstParser().parse("""
+            from dataclasses import dataclass
+            from typing import ClassVar
+
+            @dataclass
+            class Base:
+                name: str
+                kind: ClassVar[str] = "shared"
+
+            @dataclass
+            class Child(Base):
+                kind = "changed"
+
+            class Mid(Base):
+                kind: str = "annotated change"
+
+            @dataclass
+            class Leaf(Mid):
+                pass
+            """)) {
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                ClassElement child = processingEnvironment.classes().get("Child");
+                FieldElement kind = child.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyDeclared()).stream()
+                    .filter(field -> field.getName().equals("kind")).findFirst().orElseThrow();
+                assertTrue(kind.isStatic());
+                assertTrue(kind.getModifiers().contains(io.micronaut.inject.ast.ElementModifier.STATIC));
+                assertEquals("changed", kind.getConstantValue());
+                assertEquals(List.of("name"), java.util.Arrays.stream(child.getPrimaryConstructor().orElseThrow().getParameters())
+                    .map(ParameterElement::getName).toList());
+                assertEquals(List.of("name"), child.getBeanProperties().stream().map(PropertyElement::getName).toList());
+                assertEquals(List.of("kind"), child.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyStatic().onlyDeclared()).stream()
+                    .map(FieldElement::getName).toList());
+                assertEquals(List.of("name"), child.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyInstance()).stream()
+                    .map(FieldElement::getName).toList());
+                ClassElement mid = processingEnvironment.classes().get("Mid");
+                assertTrue(mid.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyDeclared()).getFirst().isStatic());
+                assertEquals(List.of("name"), processingEnvironment.classes().get("Leaf").getBeanProperties().stream()
+                    .map(PropertyElement::getName).toList());
+            }
+        }
+    }
+
+    @Test
     void testDataclassAnnotatedDataInfersMappedEntity() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         try (PythonEnvironment environment = pythonProcessor.parse("""

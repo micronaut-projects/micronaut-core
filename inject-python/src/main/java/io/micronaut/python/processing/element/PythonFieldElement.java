@@ -92,7 +92,9 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
 
     @Override
     public boolean isStatic() {
-        return getNativeType().isStatic();
+        AttributeDef attribute = getNativeType();
+        return attribute.isStatic()
+            || (owningType instanceof PythonClassElement pythonClass && pythonClass.isDataclassClassVar(attribute.name()));
     }
 
     @Override

@@ -781,7 +781,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     for attr in self.current_class_attributes:
                         # Only annotated attributes are dataclass fields; an unannotated
                         # class attribute (typed from its literal) is a plain class variable
-                        if attr.annotation() is not None and attr.typeName() and attr.typeName() != "None":
+                        if not attr.isStatic() and attr.annotation() is not None and attr.typeName() and attr.typeName() != "None":
                             # Create argument with same name as attribute
                             # a default factory is called by Python: it is not a value the generated code can reproduce
                             default_value = DefaultFactoryDef(attr.defaultFactoryName()) if attr.defaultFactoryName() is not None else attr.value()
@@ -932,9 +932,15 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         nullable_decorator = DecoratorDef("Nullable", "jakarta.annotation.Nullable", None, {}, [])
                         decorators.append(nullable_decorator)
 
-                # Determine if static (heuristic)
-                # For Micronaut properties, treat annotated attributes as instance fields
-                is_static = False
+                # Only a top-level ClassVar is static; Annotated[ClassVar[T], ...] is a dataclass field.
+                type_node = node.annotation
+                if isinstance(type_node, ast.Constant) and isinstance(type_node.value, str):
+                    type_node = self._parse_forward_reference_type(type_node.value)
+                if isinstance(type_node, ast.Subscript):
+                    type_node = type_node.value
+                is_static = type_node is not None and self._extract_type_name(type_node) in ("typing.ClassVar", "typing_extensions.ClassVar")
+                if is_static:
+                    type_name = type_name.typeArguments()[0] if type_name.typeArguments() else TypeRef("object")
 
                 if node.value:
                     self._track_current_class_constant(attr_name, node.value)
