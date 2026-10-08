@@ -57,6 +57,7 @@ public final class GeneratedBeanTypeHierarchy implements BeanTypeHierarchy {
     private final int[][] superTypes;
     private final int[][] methodLevels;
     private final BeanIntrospection<?> introspection;
+    @SuppressWarnings("java:S3077") // an immutable record: a racing read resolves an equal one
     private volatile @Nullable Resolved resolved;
 
     /**

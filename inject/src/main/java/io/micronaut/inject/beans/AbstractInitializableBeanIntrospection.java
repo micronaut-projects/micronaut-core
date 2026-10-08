@@ -105,8 +105,11 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @Nullable
     private IntrospectionBuilderData builderData;
 
-    @SuppressWarnings({"java:S3077", "OptionalUsedAsFieldOrParameterType"}) // immutable once published
-    private volatile @Nullable Optional<BeanTypeHierarchy> typeHierarchy;
+    private static final Object NO_TYPE_HIERARCHY = new Object();
+
+    // null until built, then the hierarchy or NO_TYPE_HIERARCHY; immutable once published
+    @SuppressWarnings("java:S3077")
+    private volatile @Nullable Object typeHierarchy;
 
     protected AbstractInitializableBeanIntrospection(Class<B> beanType,
                                                      @Nullable AnnotationMetadata annotationMetadata,
@@ -991,18 +994,19 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
     @Override
     public final Optional<BeanTypeHierarchy> getTypeHierarchy() {
-        Optional<BeanTypeHierarchy> hierarchy = typeHierarchy;
+        Object hierarchy = typeHierarchy;
         if (hierarchy == null) {
             // built once, when first asked for, so every caller sees the same instance
             synchronized (this) {
                 hierarchy = typeHierarchy;
                 if (hierarchy == null) {
-                    hierarchy = Optional.ofNullable(buildTypeHierarchy());
+                    BeanTypeHierarchy built = buildTypeHierarchy();
+                    hierarchy = built == null ? NO_TYPE_HIERARCHY : built;
                     typeHierarchy = hierarchy;
                 }
             }
         }
-        return hierarchy;
+        return hierarchy instanceof BeanTypeHierarchy beanTypeHierarchy ? Optional.of(beanTypeHierarchy) : Optional.empty();
     }
 
     /**
