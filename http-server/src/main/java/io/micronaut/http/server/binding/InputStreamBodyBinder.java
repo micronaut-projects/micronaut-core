@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.binders;
+package io.micronaut.http.server.binding;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -22,7 +22,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
-import io.micronaut.http.server.netty.NettyHttpServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,12 +35,15 @@ import java.util.Optional;
  * @since 2.5.0
  */
 @Internal
-final class NettyInputStreamBodyBinder implements NonBlockingBodyArgumentBinder<InputStream> {
+public final class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<InputStream> {
 
     public static final Argument<InputStream> TYPE = Argument.of(InputStream.class);
-    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(InputStreamBodyBinder.class);
+    private final ServerBodyAnnotationBinder<?> bodyAnnotationBinder;
 
-    NettyInputStreamBodyBinder() {
+    /** @param bodyAnnotationBinder Body annotation binder */
+    public InputStreamBodyBinder(ServerBodyAnnotationBinder<?> bodyAnnotationBinder) {
+        this.bodyAnnotationBinder = bodyAnnotationBinder;
     }
 
     @Override
@@ -51,7 +53,7 @@ final class NettyInputStreamBodyBinder implements NonBlockingBodyArgumentBinder<
 
     @Override
     public BindingResult<InputStream> bind(ArgumentConversionContext<InputStream> context, HttpRequest<?> source) {
-        ServerHttpRequest<?> server = NettyBodyAnnotationBinder.bodyOf(source);
+        ServerHttpRequest<?> server = bodyAnnotationBinder.bodyOf(source);
         if (server != null) {
             if (server.byteBody().expectedLength().orElse(-1) == 0) {
                 return BindingResult.empty();

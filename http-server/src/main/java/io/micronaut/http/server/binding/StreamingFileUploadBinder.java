@@ -13,61 +13,56 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.binders;
+package io.micronaut.http.server.binding;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
-import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
-import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormFieldFlows;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
-import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.form.FormCapableHttpRequest;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Binds {@link CompletedFileUpload}.
+ * Binds {@link StreamingFileUpload}.
  *
  * @author Denis Stepanov
  * @since 4.0.0
  */
 @Internal
-final class NettyCompletedFileUploadBinder implements TypedRequestArgumentBinder<CompletedFileUpload>, NettyRequestArgumentBinder<CompletedFileUpload> {
+public final class StreamingFileUploadBinder implements TypedRequestArgumentBinder<StreamingFileUpload>, FormRequestArgumentBinder<StreamingFileUpload> {
 
-    private static final Argument<CompletedFileUpload> STREAMING_FILE_UPLOAD_ARGUMENT = Argument.of(CompletedFileUpload.class);
+    private static final Argument<StreamingFileUpload> STREAMING_FILE_UPLOAD_ARGUMENT = Argument.of(StreamingFileUpload.class);
 
     private final BeanProvider<FormFactory> formFactory;
 
-    NettyCompletedFileUploadBinder(BeanProvider<FormFactory> formFactory) {
+    /** @param formFactory Form utilities */
+    public StreamingFileUploadBinder(BeanProvider<FormFactory> formFactory) {
         this.formFactory = formFactory;
     }
 
     @Override
-    public BindingResult<CompletedFileUpload> bindForNettyRequest(ArgumentConversionContext<CompletedFileUpload> context,
-                                                                  NettyHttpRequest<?> request) {
-        if (request.getContentType().isEmpty() || !request.hasFormBody()) {
-            return BindingResult.unsatisfied();
-        }
+    public BindingResult<StreamingFileUpload> bindForFormRequest(ArgumentConversionContext<StreamingFileUpload> context,
+                                                               FormCapableHttpRequest<?> request) {
 
-        Argument<CompletedFileUpload> argument = context.getArgument();
+        Argument<StreamingFileUpload> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
-        FormRouteCompleter frc = formFactory.get().getOrCreateCompleter(request);
-        // we implicitly just use the first field of this name.
-        CompletableFuture<@Nullable CompletedFileUpload> completableFuture = FormFieldFlows.firstFlatMap(frc.subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, argument)),
-            raw -> formFactory.get().completeFileUpload(request, raw));
-
-        BasicHttpAttributes.addRouteWaitsFor(request, CompletableFutureExecutionFlow.just(completableFuture).onErrorResume(t -> ExecutionFlow.empty()));
+        CompletableFuture<? extends @Nullable StreamingFileUpload> completableFuture =
+            FormFieldFlows.first(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_START, argument)),
+                raw -> formFactory.get().streamFileUpload(raw));
+        BasicHttpAttributes.addRouteWaitsFor(request, CompletableFutureExecutionFlow.just(completableFuture));
 
         return new PendingRequestBindingResult<>() {
 
@@ -77,14 +72,14 @@ final class NettyCompletedFileUploadBinder implements TypedRequestArgumentBinder
             }
 
             @Override
-            public Optional<CompletedFileUpload> getValue() {
+            public Optional<StreamingFileUpload> getValue() {
                 return Optional.ofNullable(completableFuture.getNow(null));
             }
         };
     }
 
     @Override
-    public Argument<CompletedFileUpload> argumentType() {
+    public Argument<StreamingFileUpload> argumentType() {
         return STREAMING_FILE_UPLOAD_ARGUMENT;
     }
 }

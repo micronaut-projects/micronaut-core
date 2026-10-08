@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.binders;
+package io.micronaut.http.server.binding;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
@@ -32,7 +32,6 @@ import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
-import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
@@ -50,19 +49,19 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publisher<?>> {
+public final class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publisher<?>> {
 
     public static final String MSG_CONVERT_DEBUG = "Cannot convert message for argument [{}] and value: {}";
-    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(PublisherBodyBinder.class);
     private static final Argument<Publisher<?>> TYPE = (Argument) Argument.of(Publisher.class);
 
-    private final NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder;
+    private final ServerBodyAnnotationBinder<Object> bodyAnnotationBinder;
 
     /**
-     * @param nettyBodyAnnotationBinder Body annotation binder
+     * @param bodyAnnotationBinder Body annotation binder
      */
-    NettyPublisherBodyBinder(NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder) {
-        this.nettyBodyAnnotationBinder = nettyBodyAnnotationBinder;
+    public PublisherBodyBinder(ServerBodyAnnotationBinder<Object> bodyAnnotationBinder) {
+        this.bodyAnnotationBinder = bodyAnnotationBinder;
     }
 
     @Override
@@ -72,7 +71,7 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
 
     @Override
     public BindingResult<Publisher<?>> bind(ArgumentConversionContext<Publisher<?>> context, HttpRequest<?> source) {
-        ServerHttpRequest<?> server = NettyBodyAnnotationBinder.bodyOf(source);
+        ServerHttpRequest<?> server = bodyAnnotationBinder.bodyOf(source);
         if (server != null) {
             ByteBody rootBody = server.byteBody();
             if (rootBody.expectedLength().orElse(-1) == 0) {
@@ -85,10 +84,10 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
                 // the route reads the elements of its body argument with a reader specialized for them
                 Optional<ChunkedMessageBodyReader<Object>> reader = RouteAttributes.getRouteInfo(source)
                     .map(RouteInfo::getMessageBodyReader)
-                    .flatMap(NettyPublisherBodyBinder::chunked)
+                    .flatMap(PublisherBodyBinder::chunked)
                     .filter(r -> r.isReadable(targetType, mediaType))
-                    .or(() -> nettyBodyAnnotationBinder.bodyHandlerRegistry.findReader(targetType, List.of(mediaType))
-                        .flatMap(NettyPublisherBodyBinder::chunked));
+                    .or(() -> bodyAnnotationBinder.bodyHandlerRegistry.findReader(targetType, List.of(mediaType))
+                        .flatMap(PublisherBodyBinder::chunked));
                 if (reader.isPresent()) {
                     Publisher<?> pub = reader.get().readChunked(targetType, mediaType, source.getHeaders(), rootBody.toByteBufferPublisher());
                     return () -> Optional.of(pub);
@@ -96,9 +95,9 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
             }
             // bind a single result
             ExecutionFlow<Object> flow = InternalByteBody.bufferFlow(rootBody)
-                .map(bytes -> {
-                    Optional<Object> value = nettyBodyAnnotationBinder.transform(source, server, context.with(targetType), bytes);
-                    return value.orElseThrow(() -> NettyPublisherBodyBinder.extractError(null, context));
+                .flatMap(bytes -> {
+                    return bodyAnnotationBinder.transform(source, server, context.with(targetType), bytes)
+                        .map(value -> value.orElseThrow(() -> PublisherBodyBinder.extractError(null, context)));
                 });
             Publisher<Object> future = ReactiveExecutionFlow.toPublisher(flow);
             return () -> Optional.of(future);
