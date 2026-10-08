@@ -357,8 +357,8 @@ public final class BodyPublishers {
             }
             if (drop) {
                 discard.accept(last);
+                actual.onError(t);
             }
-            actual.onError(t);
         }
 
         @Override
@@ -372,12 +372,22 @@ public final class BodyPublishers {
         @Override
         public void request(long n) {
             if (n <= 0) {
-                // the source reports it
-                Objects.requireNonNull(upstream).request(n);
+                synchronized (this) {
+                    if (lastDone) {
+                        return;
+                    }
+                    lastDone = true;
+                }
+                Objects.requireNonNull(upstream).cancel();
+                discard.accept(last);
+                actual.onError(nonPositiveRequest(n));
                 return;
             }
             boolean done;
             synchronized (this) {
+                if (lastDone) {
+                    return;
+                }
                 demand = addCap(demand, n);
                 done = sourceDone;
             }
@@ -556,8 +566,23 @@ public final class BodyPublishers {
         @Override
         public void request(long n) {
             if (n <= 0) {
-                // the source reports it
-                Objects.requireNonNull(upstream).request(n);
+                T item;
+                Subscriber<? super T> d;
+                synchronized (this) {
+                    if (cancelled || terminated) {
+                        return;
+                    }
+                    terminated = true;
+                    cancelled = true;
+                    item = first;
+                    first = null;
+                    d = downstream;
+                }
+                Objects.requireNonNull(upstream).cancel();
+                if (item != null) {
+                    discard.accept(item);
+                }
+                Objects.requireNonNull(d).onError(nonPositiveRequest(n));
                 return;
             }
             T item = null;

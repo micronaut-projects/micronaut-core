@@ -52,6 +52,7 @@ class InputStreamByteBodySpec extends Specification {
             @Override
             void close() {
                 closed.countDown()
+                readMayEnd.countDown()
             }
         }
         def body = InputStreamByteBody.create(stream, OptionalLong.empty(), pool, ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE))
@@ -83,7 +84,6 @@ class InputStreamByteBodySpec extends Specification {
         subscription.request(1)
         readStarted.await(10, TimeUnit.SECONDS)
         subscription.cancel()
-        readMayEnd.countDown()
 
         then:
         closed.await(10, TimeUnit.SECONDS)
@@ -146,6 +146,31 @@ class InputStreamByteBodySpec extends Specification {
         then:
         received.size() == 1
         received[0] instanceof IllegalArgumentException
+        closed.count == 0
+    }
+
+    def "executor rejection fails the subscriber and closes the stream"() {
+        given:
+        def closed = new CountDownLatch(1)
+        def failure = new java.util.concurrent.RejectedExecutionException("shutdown")
+        def stream = new ByteArrayInputStream(new byte[1]) {
+            @Override
+            void close() {
+                closed.countDown()
+            }
+        }
+        def body = InputStreamByteBody.create(stream, OptionalLong.empty(), { throw failure }, ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE))
+        def received = []
+        Subscription subscription = null
+        body.toReadBufferPublisher().subscribe(recorder(received, { subscription = it }))
+
+        when:
+        subscription.request(1)
+        subscription.request(1)
+        subscription.cancel()
+
+        then:
+        received == [failure]
         closed.count == 0
     }
 

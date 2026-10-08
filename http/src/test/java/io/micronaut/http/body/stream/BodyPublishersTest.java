@@ -30,6 +30,32 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BodyPublishersTest {
 
     @Test
+    void invalidDemandReleasesThePendingLastItemAfterSourceCompletion() {
+        List<String> discarded = new ArrayList<>();
+        Recorder<String> recorder = new Recorder<>();
+        BodyPublishers.append(Flux.<String>empty(), "last", discarded::add).subscribe(recorder);
+        recorder.subscription.request(0);
+        recorder.subscription.request(-1);
+        assertInstanceOf(IllegalArgumentException.class, recorder.error);
+        assertEquals(List.of("last"), discarded);
+        assertTrue(recorder.items.isEmpty());
+        assertFalse(recorder.completed);
+    }
+
+    @Test
+    void invalidDemandReleasesThePendingFirstItemAfterSourceCompletion() {
+        List<String> discarded = new ArrayList<>();
+        Recorder<String> recorder = new Recorder<>();
+        BodyPublishers.awaitFirst(Flux.just("first"), discarded::add).tryCompleteValue().subscribe(recorder);
+        recorder.subscription.request(0);
+        recorder.subscription.request(-1);
+        assertInstanceOf(IllegalArgumentException.class, recorder.error);
+        assertEquals(List.of("first"), discarded);
+        assertTrue(recorder.items.isEmpty());
+        assertFalse(recorder.completed);
+    }
+
+    @Test
     void mapMapsUnderTheDemandOfTheSubscriber() {
         Recorder<String> recorder = new Recorder<>();
         BodyPublishers.map(Flux.range(1, 3), i -> "v" + i).subscribe(recorder);

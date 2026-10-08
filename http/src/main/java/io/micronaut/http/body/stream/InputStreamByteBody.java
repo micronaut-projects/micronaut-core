@@ -215,7 +215,20 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
                 }
                 reading = true;
             }
-            executor.execute(this);
+            try {
+                executor.execute(this);
+            } catch (java.util.concurrent.RejectedExecutionException e) {
+                boolean signal;
+                synchronized (this) {
+                    signal = !cancelled && !done;
+                    done = true;
+                    reading = false;
+                }
+                stream.close();
+                if (signal) {
+                    Objects.requireNonNull(subscriber).onError(e);
+                }
+            }
         }
 
         @Override
@@ -248,11 +261,23 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
                 try {
                     bytes = stream.readSome();
                 } catch (Throwable e) {
+                    synchronized (this) {
+                        if (cancelled) {
+                            reading = false;
+                            return;
+                        }
+                    }
                     finish();
                     s.onError(e);
                     return;
                 }
                 if (bytes == null) {
+                    synchronized (this) {
+                        if (cancelled) {
+                            reading = false;
+                            return;
+                        }
+                    }
                     finish();
                     s.onComplete();
                     return;
@@ -289,18 +314,14 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
 
         @Override
         public void cancel() {
-            boolean closeNow;
             synchronized (this) {
                 if (cancelled || done) {
                     return;
                 }
                 cancelled = true;
-                // a running read closes the stream once it is done
-                closeNow = !reading;
             }
-            if (closeNow) {
-                stream.close();
-            }
+            // Closing must unblock an active read, not wait for it to finish.
+            stream.close();
         }
     }
 
