@@ -125,7 +125,7 @@ public final class EventStreams {
             } else {
                 // a single body, such as JSON, is one event
                 MediaType mediaType = contentType == null ? MediaType.APPLICATION_JSON_TYPE : contentType;
-                elements = new SingleBodyElements<>(body, dataReader(handlerRegistry, eventType, mediaType, headers), wrap);
+                elements = new SingleBodyElements<>(body, dataReader(handlerRegistry, eventType, mediaType, headers), wrap, maxBufferSize);
             }
             return ElementsResponse.of(response, elements);
         } catch (RuntimeException e) {
