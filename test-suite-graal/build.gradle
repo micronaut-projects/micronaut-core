@@ -57,6 +57,10 @@ def openGraalModules = [
 
 graalvmNative {
     toolchainDetection = false
+    metadataRepository {
+        enabled = true
+        version = "0.3.15"
+    }
     binaries {
         all {
             openGraalModules.each { module ->

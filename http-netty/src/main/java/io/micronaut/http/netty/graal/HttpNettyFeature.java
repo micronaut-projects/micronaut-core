@@ -44,6 +44,10 @@ public class HttpNettyFeature implements Feature {
                 "io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler",
                 "io.micronaut.buffer.netty.NettyByteBufferFactory"
         );
+        RuntimeClassInitialization.initializeAtBuildTime(
+                "io.netty.util.internal.logging.LocationAwareSlf4JLogger",
+                "io.netty.util.internal.logging.Slf4JLoggerFactory$NopInstanceHolder"
+        );
         RuntimeClassInitialization.initializeAtRunTime(
                 NettyWebSocketSession.class,
                 NettyThreadFactory.class,
