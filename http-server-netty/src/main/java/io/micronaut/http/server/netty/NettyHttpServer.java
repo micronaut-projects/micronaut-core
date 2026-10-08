@@ -52,6 +52,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
+import io.micronaut.runtime.graceful.GracefulShutdownListener;
 import io.micronaut.runtime.server.event.ServerShutdownEvent;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskExecutors;
@@ -426,6 +427,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public NettyEmbeddedServer stop() {
+        shutdownGracefullyBeforeStop();
         CompletableFuture<Void> contextStopped = null;
         synchronized (this) {
             if (stop(false)) {
@@ -448,6 +450,27 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     public NettyEmbeddedServer stopServerOnly() {
         stop(true);
         return this;
+    }
+
+    /**
+     * Stopping the server closes the connections it has accepted, cutting the requests in flight
+     * on them. If graceful shutdown is enabled and stopping this server stops the application
+     * context, run the graceful shutdown that the context stop would run first, so that those
+     * requests can complete within the grace period. This is the path of the shutdown hook
+     * registered by {@code Micronaut.run}. It must not hold the server's lock, see
+     * {@link #start()}.
+     */
+    private void shutdownGracefullyBeforeStop() {
+        // When the current thread holds the context's lock, this is the context stop calling
+        // back into this server, after its ShutdownEvent has already run the graceful shutdown
+        if (isDefault && isRunning() && applicationContext.isRunning() && !Thread.holdsLock(applicationContext)) {
+            try {
+                applicationContext.findBean(GracefulShutdownListener.class)
+                    .ifPresent(GracefulShutdownListener::shutdownGracefully);
+            } catch (Throwable e) {
+                LOG.warn("Error in graceful shutdown before stopping the server: {}", e.getMessage(), e);
+            }
+        }
     }
 
     private boolean stop(boolean stopServerOnly) {
