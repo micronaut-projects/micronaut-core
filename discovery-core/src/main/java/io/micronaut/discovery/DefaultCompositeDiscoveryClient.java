@@ -15,20 +15,33 @@
  */
 package io.micronaut.discovery;
 
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
+import io.micronaut.core.naming.NameUtils;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * The default {@link CompositeDiscoveryClient} that is activated when caching is disabled.
  *
- * <p>The bean is an {@link AsyncCompositeDiscoveryClient}, which combines the
- * {@link java.util.concurrent.CompletionStage}s of the discovery clients without a publisher.
- * This class only implements the publisher methods, so that a subclass that overrides them, and
- * replaces the bean, is called through them by the default
- * {@link #getInstancesAsync(String)} and {@link #getServiceIdsAsync()}.</p>
+ * <p>{@link #getInstancesAsync(String)} and {@link #getServiceIdsAsync()} combine the
+ * {@link CompletionStage}s of the discovery clients without a publisher: the lists are
+ * concatenated in the order of the clients, and the first client that fails fails the result.
+ * A subclass is called through its publisher methods instead, so that its overrides of
+ * {@link #getInstances(String)} and {@link #getServiceIds()} keep working; it may override the
+ * {@link CompletionStage} methods to combine the stages itself.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
+@Primary
+@Singleton
 public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient {
 
     /**
@@ -36,6 +49,7 @@ public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient {
      *
      * @param discoveryClients The Discovery clients used for service discovery
      */
+    @Inject
     public DefaultCompositeDiscoveryClient(List<DiscoveryClient> discoveryClients) {
         super(discoveryClients.toArray(new DiscoveryClient[0]));
     }
@@ -47,5 +61,44 @@ public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient {
      */
     public DefaultCompositeDiscoveryClient(DiscoveryClient... discoveryClients) {
         super(discoveryClients);
+    }
+
+    @Override
+    public CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
+        if (getClass() != DefaultCompositeDiscoveryClient.class) {
+            return super.getInstancesAsync(serviceId);
+        }
+        DiscoveryClient[] discoveryClients = getDiscoveryClients();
+        if (discoveryClients.length == 0) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+        String hyphenated = NameUtils.hyphenate(serviceId);
+        if (discoveryClients.length == 1) {
+            return DiscoveryClientStages.getInstances(discoveryClients[0], hyphenated);
+        }
+        List<CompletionStage<List<ServiceInstance>>> stages = new ArrayList<>(discoveryClients.length);
+        for (DiscoveryClient discoveryClient : discoveryClients) {
+            stages.add(DiscoveryClientStages.getInstances(discoveryClient, hyphenated));
+        }
+        return CompletionStagePublishers.concat(stages);
+    }
+
+    @Override
+    public CompletionStage<List<String>> getServiceIdsAsync() {
+        if (getClass() != DefaultCompositeDiscoveryClient.class) {
+            return super.getServiceIdsAsync();
+        }
+        DiscoveryClient[] discoveryClients = getDiscoveryClients();
+        if (discoveryClients.length == 0) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+        if (discoveryClients.length == 1) {
+            return DiscoveryClientStages.getServiceIds(discoveryClients[0]);
+        }
+        List<CompletionStage<List<String>>> stages = new ArrayList<>(discoveryClients.length);
+        for (DiscoveryClient discoveryClient : discoveryClients) {
+            stages.add(DiscoveryClientStages.getServiceIds(discoveryClient));
+        }
+        return CompletionStagePublishers.concat(stages);
     }
 }

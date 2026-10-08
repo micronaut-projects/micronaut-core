@@ -21,6 +21,8 @@ import io.micronaut.discovery.ServiceInstanceList;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * @author Graeme Rocher
@@ -49,6 +51,26 @@ public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobi
     @Override
     public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
         return Mono.fromCallable(() -> getNextAvailable(serviceInstanceList.getInstances(), discriminator));
+    }
+
+    /**
+     * Selects without a publisher. A subclass is selected through {@link #select(Object)}, so
+     * that its override keeps working.
+     *
+     * @param discriminator An object used to discriminate the server to select
+     * @return A completed stage
+     * @since 5.3.0
+     */
+    @Override
+    public CompletionStage<@Nullable ServiceInstance> selectAsync(@Nullable Object discriminator) {
+        if (getClass() != ServiceInstanceListRoundRobinLoadBalancer.class) {
+            return super.selectAsync(discriminator);
+        }
+        try {
+            return CompletableFuture.completedFuture(getNextAvailable(serviceInstanceList.getInstances(), discriminator));
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Override

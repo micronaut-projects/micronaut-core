@@ -87,7 +87,7 @@ class ConfigurationClientAsyncTest {
     @Test
     void theCompositeConcatenatesTheClientsInOrder() {
         AsyncClient first = new AsyncClient();
-        DefaultCompositeConfigurationClient composite = new AsyncCompositeConfigurationClient(new ConfigurationClient[] {
+        DefaultCompositeConfigurationClient composite = new DefaultCompositeConfigurationClient(new ConfigurationClient[] {
             first,
             new PublisherClient(Flux.just(THREE))
         });
@@ -102,14 +102,15 @@ class ConfigurationClientAsyncTest {
     void oneFailingClientFailsTheComposite() {
         AsyncClient first = new AsyncClient();
         IllegalStateException error = new IllegalStateException("boom");
-        DefaultCompositeConfigurationClient composite = new AsyncCompositeConfigurationClient(new ConfigurationClient[] {
+        DefaultCompositeConfigurationClient composite = new DefaultCompositeConfigurationClient(new ConfigurationClient[] {
             first,
             new PublisherClient(Mono.error(error))
         });
 
         ExecutionException e = assertThrows(ExecutionException.class, () -> composite.getPropertySourcesAsync(environment).toCompletableFuture().get());
         assertSame(error, e.getCause());
-        assertTrue(first.futures.get(0).isCancelled());
+        // the stage of a client may be shared: it is not cancelled
+        assertFalse(first.futures.get(0).isDone());
         // like the publisher
         assertSame(error, assertThrows(IllegalStateException.class, () -> Flux.from(new DefaultCompositeConfigurationClient(new ConfigurationClient[] {
             new PublisherClient(Flux.just(ONE)),
@@ -119,7 +120,7 @@ class ConfigurationClientAsyncTest {
 
     @Test
     void aCompositeWithoutClientsIsEmpty() {
-        DefaultCompositeConfigurationClient composite = new AsyncCompositeConfigurationClient(new ConfigurationClient[0]);
+        DefaultCompositeConfigurationClient composite = new DefaultCompositeConfigurationClient(new ConfigurationClient[0]);
 
         assertEquals(List.of(), composite.getPropertySourcesAsync(environment).toCompletableFuture().getNow(null));
     }
@@ -144,8 +145,54 @@ class ConfigurationClientAsyncTest {
     @Test
     void theDefaultBeanCombinesTheStages() {
         try (ApplicationContext ctx = ApplicationContext.run()) {
-            assertTrue(ctx.getBean(ConfigurationClient.class) instanceof AsyncCompositeConfigurationClient);
-            assertTrue(ctx.getBean(DefaultCompositeConfigurationClient.class) instanceof AsyncCompositeConfigurationClient);
+            assertSame(DefaultCompositeConfigurationClient.class, ctx.getBean(ConfigurationClient.class).getClass());
+        }
+    }
+
+    @Test
+    void aClientWithoutStagesIsCalledThroughItsPublisher() {
+        // a mock that only stubs the publisher method returns null, or a stage completed with null
+        ConfigurationClient composite = new DefaultCompositeConfigurationClient(new ConfigurationClient[] {
+            new MockLikeClient(null, Flux.just(ONE)),
+            new MockLikeClient(CompletableFuture.completedFuture(null), Flux.just(TWO))
+        });
+
+        assertEquals(List.of(ONE, TWO), composite.getPropertySourcesAsync(environment).toCompletableFuture().getNow(null));
+    }
+
+    @Test
+    void cancellingTheCompositeCancelsTheSubscriptionsOfTheClients() {
+        AtomicInteger cancelled = new AtomicInteger();
+        AsyncClient async = new AsyncClient();
+        ConfigurationClient composite = new DefaultCompositeConfigurationClient(new ConfigurationClient[] {
+            new PublisherClient(Flux.<PropertySource>never().doOnCancel(cancelled::incrementAndGet)),
+            async
+        });
+
+        composite.getPropertySourcesAsync(environment).toCompletableFuture().cancel(false);
+
+        assertEquals(1, cancelled.get());
+        assertFalse(async.futures.get(0).isDone());
+    }
+
+    /**
+     * Like a mock that only stubs the publisher method.
+     */
+    private record MockLikeClient(CompletionStage<List<PropertySource>> stage, Publisher<PropertySource> propertySources) implements ConfigurationClient {
+
+        @Override
+        public Publisher<PropertySource> getPropertySources(Environment environment) {
+            return propertySources;
+        }
+
+        @Override
+        public CompletionStage<List<PropertySource>> getPropertySourcesAsync(Environment environment) {
+            return stage;
+        }
+
+        @Override
+        public String getDescription() {
+            return "mock";
         }
     }
 

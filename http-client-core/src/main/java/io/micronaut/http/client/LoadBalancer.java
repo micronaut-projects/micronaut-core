@@ -21,12 +21,11 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.http.client.loadbalance.AsyncFixedLoadBalancer;
+import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.loadbalance.OutlierEjectionState;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.List;
 import java.util.Optional;
@@ -54,14 +53,18 @@ public interface LoadBalancer {
      * stage is cancelled. The stage completes with {@code null} when the publisher completes
      * without an instance, which the clients handle as they handle an empty publisher.
      * A load balancer that can select without a publisher overrides this method. The built-in
-     * load balancer classes do not, so that a subclass that overrides {@link #select(Object)} is
-     * selected through it; the load balancers the framework creates select without a publisher.
+     * load balancers select without a publisher, and a subclass of them is selected through
+     * {@link #select(Object)}, so that its override keeps working.
+     *
+     * <p>An implementation returns a new stage for each call, which a caller may cancel. The
+     * framework never cancels a stage it did not create: it ignores its result instead.</p>
      *
      * @param discriminator An object used to discriminate the server to select. Usually the service ID
-     * @return A stage completed with the selected {@link ServiceInstance}, or with the error of the selection
+     * @return A stage completed with the selected {@link ServiceInstance}, with {@code null} for no instance, or with the error of the selection
      * @since 5.3.0
      */
-    default CompletionStage<ServiceInstance> selectAsync(@Nullable Object discriminator) {
+    @Experimental
+    default CompletionStage<@Nullable ServiceInstance> selectAsync(@Nullable Object discriminator) {
         return CompletionStagePublishers.first(select(discriminator), null);
     }
 
@@ -147,11 +150,12 @@ public interface LoadBalancer {
     /**
      * The {@link CompletionStage} counterpart of {@link #select()}.
      *
-     * @return A stage completed with the selected {@link ServiceInstance}
+     * @return A stage completed with the selected {@link ServiceInstance}, or with {@code null} for no instance
      * @see #selectAsync(Object)
      * @since 5.3.0
      */
-    default CompletionStage<ServiceInstance> selectAsync() {
+    @Experimental
+    default CompletionStage<@Nullable ServiceInstance> selectAsync() {
         return selectAsync(null);
     }
 
@@ -164,11 +168,7 @@ public interface LoadBalancer {
      */
     @Deprecated
     static LoadBalancer fixed(URL url) {
-        try {
-            return new AsyncFixedLoadBalancer(url.toURI());
-        } catch (URISyntaxException e) {
-            throw new IllegalArgumentException("Illegal URI", e);
-        }
+        return new FixedLoadBalancer(url);
     }
 
     /**
@@ -178,7 +178,7 @@ public interface LoadBalancer {
      * @return The {@link LoadBalancer}
      */
     static LoadBalancer fixed(URI uri) {
-        return new AsyncFixedLoadBalancer(uri);
+        return new FixedLoadBalancer(uri);
     }
 
     /**

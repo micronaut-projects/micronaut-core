@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-import reactor.core.CoreSubscriber;
+import reactor.core.CorePublisher;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -33,6 +33,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -41,8 +43,13 @@ import java.util.function.Supplier;
  * publisher right away, and cancelling the future cancels the subscription.
  *
  * <p>A publisher is subscribed to in the {@link PropagatedContext} of the caller, as a thread-local
- * and, when Reactor is present, in the Reactor context, and its signals are handled in that context,
- * so that the continuations of the future run in it.</p>
+ * and, for a Reactor publisher, in the Reactor context, and its signals are handled in that
+ * context, so that the continuations of the future run in it.</p>
+ *
+ * <p>The futures this class creates are owned by the framework: they are new for each call, and
+ * {@link #cancel(CompletionStage)} cancels them. A stage that an implementation of an SPI returned
+ * may be shared, a cached one for example, so the framework never cancels it, and ignores its
+ * result once it is no longer needed.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -85,7 +92,8 @@ public final class CompletionStagePublishers {
     /**
      * Concatenate the lists of several stages, in the order of the stages. A stage completed
      * with {@code null} adds nothing. The first stage that fails fails the result with its
-     * error, and the other stages are cancelled. Cancelling the result cancels the stages.
+     * error. Once the result is complete, or cancelled, the futures of this class among the
+     * stages are cancelled, and the results of the other stages are ignored.
      *
      * @param stages The stages
      * @param <T>    The item type
@@ -96,7 +104,7 @@ public final class CompletionStagePublishers {
         for (CompletionStage<? extends @Nullable List<? extends T>> stage : stages) {
             futures.add(stage.toCompletableFuture());
         }
-        CompletableFuture<List<T>> result = new CompletableFuture<>();
+        CompletableFuture<List<T>> result = future();
         if (futures.isEmpty()) {
             result.complete(new ArrayList<>());
             return result;
@@ -134,7 +142,7 @@ public final class CompletionStagePublishers {
      * stage is obtained once per subscription, when an item is first requested, the publisher emits its value, or completes
      * without an item when the value is {@code null}, and fails with the error of the stage
      * without the {@link CompletionException} wrapper. Cancelling the subscription cancels the
-     * stage.
+     * stage when it is a future of this class.
      *
      * @param stageSupplier The supplier of the stage, called for each subscription
      * @param <T>           The value type
@@ -145,20 +153,166 @@ public final class CompletionStagePublishers {
     }
 
     /**
-     * Cancel a source future once the future derived from it is cancelled, since the futures
-     * derived with {@code thenApply} and the like do not cancel their source.
+     * A publisher of the items of a list, for the publisher methods of the SPIs that take the
+     * items a caller already holds.
      *
-     * @param source  The source future
+     * @param items The items
+     * @param <T>   The item type
+     * @return A publisher of the items
+     */
+    public static <T> Publisher<T> fromList(List<T> items) {
+        return new ListPublisher<>(items);
+    }
+
+    /**
+     * A future of the value of a stage transformed by a function. The future fails with the
+     * error of the stage, without the {@link CompletionException} wrapper, or with the error the
+     * function throws. Cancelling the future cancels the stage when it is a future of this class.
+     *
+     * @param stage    The stage
+     * @param function The function
+     * @param <T>      The type of the stage
+     * @param <R>      The type of the result
+     * @return The future
+     */
+    public static <T extends @Nullable Object, R extends @Nullable Object> CompletableFuture<R> map(CompletionStage<T> stage,
+                                                                                                    Function<? super T, ? extends R> function) {
+        CompletableFuture<R> result = future();
+        stage.whenComplete((value, throwable) -> {
+            if (throwable != null) {
+                result.completeExceptionally(unwrap(throwable));
+                return;
+            }
+            R mapped;
+            try {
+                mapped = function.apply(value);
+            } catch (Throwable e) {
+                result.completeExceptionally(e);
+                return;
+            }
+            result.complete(mapped);
+        });
+        cancelling(stage, result);
+        return result;
+    }
+
+    /**
+     * A future of the stage that a function returns for the value of a stage. The future fails
+     * with the error of either stage, without the {@link CompletionException} wrapper, or with the
+     * error the function throws. Cancelling the future cancels the stages that are futures of
+     * this class.
+     *
+     * @param stage    The stage
+     * @param function The function
+     * @param <T>      The type of the stage
+     * @param <R>      The type of the result
+     * @return The future
+     */
+    public static <T extends @Nullable Object, R extends @Nullable Object> CompletableFuture<R> compose(CompletionStage<T> stage,
+                                                                                                        Function<? super T, ? extends CompletionStage<R>> function) {
+        CompletableFuture<R> result = future();
+        stage.whenComplete((value, throwable) -> {
+            if (throwable != null) {
+                result.completeExceptionally(unwrap(throwable));
+                return;
+            }
+            CompletionStage<R> next;
+            try {
+                next = Objects.requireNonNull(function.apply(value), "The function returned no stage");
+            } catch (Throwable e) {
+                result.completeExceptionally(e);
+                return;
+            }
+            cancelling(next, result);
+            next.whenComplete((r, error) -> {
+                if (error != null) {
+                    result.completeExceptionally(unwrap(error));
+                } else {
+                    result.complete(r);
+                }
+            });
+        });
+        cancelling(stage, result);
+        return result;
+    }
+
+    /**
+     * The stage of an SPI method, or the fallback when the method returned {@code null}: the
+     * {@link CompletionStage} counterpart of a mocked bean, whose publisher method is stubbed.
+     *
+     * @param stage    The stage of the method
+     * @param fallback The stage of the publisher method
+     * @param <T>      The value type
+     * @return The stage
+     */
+    public static <T extends @Nullable Object> CompletionStage<T> orElse(@Nullable CompletionStage<T> stage,
+                                                                         Supplier<? extends CompletionStage<T>> fallback) {
+        return stage != null ? stage : fallback.get();
+    }
+
+    /**
+     * The stage of an SPI method whose value cannot be {@code null}, or the fallback when the
+     * method returned {@code null}, or a stage completed with {@code null}: the
+     * {@link CompletionStage} counterpart of a mocked bean, whose publisher method is stubbed.
+     *
+     * @param stage    The stage of the method
+     * @param fallback The stage of the publisher method
+     * @param <T>      The value type
+     * @return The stage
+     */
+    public static <T> CompletionStage<T> orElseIfNull(@Nullable CompletionStage<@Nullable T> stage,
+                                                      Supplier<? extends CompletionStage<T>> fallback) {
+        if (stage == null) {
+            return fallback.get();
+        }
+        CompletableFuture<@Nullable T> future = stage.toCompletableFuture();
+        if (future.isDone() && !future.isCompletedExceptionally()) {
+            T value = future.join();
+            return value != null ? (CompletionStage<T>) stage : fallback.get();
+        }
+        return compose(stage, value -> value != null ? CompletableFuture.completedFuture(value) : fallback.get());
+    }
+
+    /**
+     * A new future owned by the framework, which {@link #cancel(CompletionStage)} cancels.
+     *
+     * @param <T> The value type
+     * @return The future
+     */
+    public static <T extends @Nullable Object> CompletableFuture<T> future() {
+        return new OwnedFuture<>();
+    }
+
+    /**
+     * Cancel a stage if it is a future of this class. Any other stage is left as it is, since it
+     * may be shared by other callers of the SPI that returned it.
+     *
+     * @param stage The stage
+     */
+    public static void cancel(@Nullable CompletionStage<?> stage) {
+        if (stage instanceof OwnedFuture<?> future) {
+            future.cancel(false);
+        }
+    }
+
+    /**
+     * Cancel a source stage, if it is a future of this class, once the future derived from it is
+     * cancelled, since the futures derived with {@code thenApply} and the like do not cancel their
+     * source.
+     *
+     * @param source  The source stage
      * @param derived The derived future
      * @param <T>     The type of the derived future
      * @return The derived future
      */
-    public static <T> CompletableFuture<T> cancelling(CompletionStage<?> source, CompletableFuture<T> derived) {
-        derived.whenComplete((value, throwable) -> {
-            if (throwable instanceof CancellationException) {
-                source.toCompletableFuture().cancel(false);
-            }
-        });
+    public static <T extends @Nullable Object> CompletableFuture<T> cancelling(CompletionStage<?> source, CompletableFuture<T> derived) {
+        if (source instanceof OwnedFuture<?>) {
+            derived.whenComplete((value, throwable) -> {
+                if (throwable instanceof CancellationException) {
+                    cancel(source);
+                }
+            });
+        }
         return derived;
     }
 
@@ -177,7 +331,7 @@ public final class CompletionStagePublishers {
     private static boolean isReactorPresent() {
         try {
             // resolving the class literal fails when Reactor, an optional dependency, is absent
-            Class<?> type = CoreSubscriber.class;
+            Class<?> type = CorePublisher.class;
             return type != null;
         } catch (LinkageError e) {
             return false;
@@ -186,7 +340,7 @@ public final class CompletionStagePublishers {
 
     private static void cancelAll(List<? extends CompletableFuture<?>> futures) {
         for (CompletableFuture<?> future : futures) {
-            future.cancel(false);
+            cancel(future);
         }
     }
 
@@ -200,7 +354,7 @@ public final class CompletionStagePublishers {
             PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
             if (propagatedContext.isEmpty()) {
                 publisher.subscribe(subscriber);
-            } else if (REACTOR_PRESENT) {
+            } else if (REACTOR_PRESENT && isReactorPublisher(publisher)) {
                 // a Reactor publisher finds the context in its Reactor context, as it did when it
                 // was subscribed to by a Reactor chain of the caller
                 ReactivePropagation.propagate(propagatedContext, publisher).subscribe(subscriber);
@@ -209,6 +363,23 @@ public final class CompletionStagePublishers {
             }
         } catch (Throwable e) {
             future.completeExceptionally(e);
+        }
+    }
+
+    private static boolean isReactorPublisher(Publisher<?> publisher) {
+        return publisher instanceof CorePublisher<?>;
+    }
+
+    /**
+     * A future created by this class, new for each call, so that the framework may cancel it.
+     * The futures derived from it are not owned.
+     *
+     * @param <T> The value type
+     */
+    private static final class OwnedFuture<T extends @Nullable Object> extends CompletableFuture<T> {
+        @Override
+        public <U> CompletableFuture<U> newIncompleteFuture() {
+            return new CompletableFuture<>();
         }
     }
 
@@ -248,6 +419,93 @@ public final class CompletionStagePublishers {
             } else {
                 propagatedContext.propagate(signal);
             }
+        }
+    }
+
+    /**
+     * The publisher of {@link #fromList(List)}.
+     *
+     * @param items The items
+     * @param <T>   The item type
+     */
+    private record ListPublisher<T>(List<T> items) implements Publishers.MicronautPublisher<T> {
+
+        @Override
+        public void subscribe(Subscriber<? super T> subscriber) {
+            Objects.requireNonNull(subscriber, "Subscriber cannot be null");
+            subscriber.onSubscribe(new ListSubscription<>(items, subscriber));
+        }
+    }
+
+    /**
+     * Emits the items of a list as they are requested.
+     *
+     * @param <T> The item type
+     */
+    private static final class ListSubscription<T> implements Subscription {
+        private final List<T> items;
+        private final Subscriber<? super T> subscriber;
+        private final AtomicLong requested = new AtomicLong();
+        private volatile boolean cancelled;
+        private int index;
+
+        ListSubscription(List<T> items, Subscriber<? super T> subscriber) {
+            this.items = items;
+            this.subscriber = subscriber;
+        }
+
+        @Override
+        public void request(long n) {
+            if (n <= 0) {
+                cancelled = true;
+                subscriber.onError(new IllegalArgumentException("Cannot request a non-positive number"));
+                return;
+            }
+            // the thread that raises the demand from zero emits, a reentrant request only adds to it
+            if (addDemand(n) != 0) {
+                return;
+            }
+            long demand = n;
+            while (true) {
+                long emitted = 0;
+                while (emitted < demand && index < items.size()) {
+                    if (cancelled) {
+                        return;
+                    }
+                    subscriber.onNext(items.get(index++));
+                    emitted++;
+                }
+                if (cancelled) {
+                    return;
+                }
+                if (index == items.size()) {
+                    cancelled = true;
+                    subscriber.onComplete();
+                    return;
+                }
+                demand = requested.addAndGet(-emitted);
+                if (demand == 0) {
+                    return;
+                }
+            }
+        }
+
+        private long addDemand(long n) {
+            while (true) {
+                long current = requested.get();
+                long next = current + n;
+                if (next < 0) {
+                    next = Long.MAX_VALUE;
+                }
+                if (requested.compareAndSet(current, next)) {
+                    return current;
+                }
+            }
+        }
+
+        @Override
+        public void cancel() {
+            cancelled = true;
         }
     }
 
@@ -294,6 +552,7 @@ public final class CompletionStagePublishers {
         public void request(long n) {
             if (n <= 0) {
                 if (state.getAndSet(DONE) != DONE) {
+                    CompletionStagePublishers.cancel(future);
                     subscriber.onError(new IllegalArgumentException("Cannot request a non-positive number"));
                 }
                 return;
@@ -314,7 +573,7 @@ public final class CompletionStagePublishers {
             future = source;
             if (state.get() == DONE) {
                 // cancelled while the stage was obtained
-                source.cancel(false);
+                CompletionStagePublishers.cancel(source);
                 return;
             }
             source.whenComplete((value, throwable) -> {
@@ -335,10 +594,7 @@ public final class CompletionStagePublishers {
         @Override
         public void cancel() {
             if (state.getAndSet(DONE) != DONE) {
-                CompletableFuture<? extends @Nullable T> f = future;
-                if (f != null) {
-                    f.cancel(false);
-                }
+                CompletionStagePublishers.cancel(future);
             }
         }
     }
@@ -427,7 +683,7 @@ public final class CompletionStagePublishers {
      * @param <T> The item type
      */
     private static final class FirstSubscriber<T> extends AbstractSubscriber<T> {
-        final CompletableFuture<T> future = new CompletableFuture<>();
+        final CompletableFuture<T> future = new OwnedFuture<>();
         @Nullable
         private final T emptyValue;
 
@@ -464,7 +720,7 @@ public final class CompletionStagePublishers {
      * @param <T> The item type
      */
     private static final class CollectSubscriber<T> extends AbstractSubscriber<T> {
-        final CompletableFuture<List<T>> future = new CompletableFuture<>();
+        final CompletableFuture<List<T>> future = new OwnedFuture<>();
         private final List<T> items = new ArrayList<>();
 
         @Override

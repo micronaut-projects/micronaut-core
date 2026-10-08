@@ -15,6 +15,7 @@
  */
 package io.micronaut.discovery;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.async.publisher.CompletionStagePublishers;
@@ -55,10 +56,14 @@ public interface DiscoveryClient extends Closeable, AutoCloseable, Described {
      * adapts the single result of {@link #getInstances(String)}, an empty list when the publisher
      * completes without a result. Cancelling the stage cancels the subscription.
      *
+     * <p>An implementation returns a new stage for each call, which a caller may cancel. The
+     * framework never cancels a stage it did not create: it ignores its result instead.</p>
+     *
      * @param serviceId The service id
      * @return A {@link CompletionStage} completed with the list of {@link ServiceInstance}
      * @since 5.3.0
      */
+    @Experimental
     default CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
         return CompletionStagePublishers.first(getInstances(serviceId), Collections.emptyList());
     }
@@ -68,9 +73,13 @@ public interface DiscoveryClient extends Closeable, AutoCloseable, Described {
      * the single result of {@link #getServiceIds()}, an empty list when the publisher completes
      * without a result. Cancelling the stage cancels the subscription.
      *
+     * <p>An implementation returns a new stage for each call, which a caller may cancel. The
+     * framework never cancels a stage it did not create: it ignores its result instead.</p>
+     *
      * @return A {@link CompletionStage} completed with the known service IDs
      * @since 5.3.0
      */
+    @Experimental
     default CompletionStage<List<String>> getServiceIdsAsync() {
         return CompletionStagePublishers.first(getServiceIds(), Collections.emptyList());
     }

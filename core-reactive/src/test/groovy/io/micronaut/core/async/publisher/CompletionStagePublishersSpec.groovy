@@ -152,15 +152,16 @@ class CompletionStagePublishersSpec extends Specification {
         CompletionStagePublishers.concat([]).getNow(null) == []
     }
 
-    void 'the first stage that fails fails concat and cancels the others'() {
+    void 'the first stage that fails fails concat and cancels the futures of the class'() {
         given:
-        def pending = new CompletableFuture<List<String>>()
+        def pending = CompletionStagePublishers.<List<String>>future()
+        def foreign = new CompletableFuture<List<String>>()
         def failing = new CompletableFuture<List<String>>()
         def done = CompletableFuture.completedFuture(['a'])
         def error = new IllegalStateException('boom')
 
         when:
-        def result = CompletionStagePublishers.concat([done, pending, failing])
+        def result = CompletionStagePublishers.concat([done, pending, foreign, failing])
         failing.completeExceptionally(new CompletionException(error))
         result.get()
 
@@ -168,32 +169,163 @@ class CompletionStagePublishersSpec extends Specification {
         def e = thrown(ExecutionException)
         e.cause.is(error)
         pending.isCancelled()
+        !foreign.isDone()
+
+        when: 'a late result is ignored'
+        foreign.complete(['late'])
+
+        then:
+        result.isCompletedExceptionally()
     }
 
-    void 'cancelling concat cancels the stages'() {
+    void 'cancelling concat cancels the futures of the class only'() {
         given:
-        def first = new CompletableFuture<List<String>>()
-        def second = new CompletableFuture<List<String>>()
+        def owned = CompletionStagePublishers.<List<String>>future()
+        def foreign = new CompletableFuture<List<String>>()
 
         when:
-        def result = CompletionStagePublishers.concat([first, second])
+        def result = CompletionStagePublishers.concat([owned, foreign])
         result.cancel(false)
 
         then:
-        first.isCancelled()
-        second.isCancelled()
+        owned.isCancelled()
+        !foreign.isDone()
     }
 
-    void 'cancelling a derived future cancels its source'() {
+    void 'cancelling a derived future cancels its source when the source is a future of the class'() {
         given:
-        def source = new CompletableFuture<String>()
+        def source = CompletionStagePublishers.<String>future()
+        def foreign = new CompletableFuture<String>()
         def derived = CompletionStagePublishers.cancelling(source, source.thenApply(String::length))
+        def derivedFromForeign = CompletionStagePublishers.cancelling(foreign, foreign.thenApply(String::length))
 
         when:
         derived.cancel(false)
+        derivedFromForeign.cancel(false)
 
         then:
         source.isCancelled()
+        !foreign.isDone()
+    }
+
+    void 'the futures derived from a future of the class are not owned'() {
+        given:
+        def source = CompletionStagePublishers.<String>future()
+        def derived = source.thenApply(String::length)
+
+        when:
+        CompletionStagePublishers.cancel(derived)
+        CompletionStagePublishers.cancel(new CompletableFuture<String>())
+
+        then:
+        !derived.isDone()
+    }
+
+    void 'map transforms the value, unwraps errors and cancels an owned source'() {
+        given:
+        def source = CompletionStagePublishers.<String>future()
+        def failing = new CompletableFuture<String>()
+        def error = new IllegalStateException('boom')
+
+        when:
+        def mapped = CompletionStagePublishers.map(source, String::length)
+        def failed = CompletionStagePublishers.map(failing, String::length)
+        def thrown = CompletionStagePublishers.map(CompletableFuture.completedFuture('a'), { throw error })
+        failing.completeExceptionally(new CompletionException(error))
+        source.complete('abc')
+
+        then:
+        mapped.getNow(null) == 3
+        CompletionStagePublishers.unwrap(failed.handle { v, t -> t }.join()).is(error)
+        thrown.handle { v, t -> t }.join().is(error)
+
+        when:
+        def other = CompletionStagePublishers.<String>future()
+        CompletionStagePublishers.map(other, String::length).cancel(false)
+
+        then:
+        other.isCancelled()
+    }
+
+    void 'compose completes with the next stage and cancels the owned stages'() {
+        given:
+        def source = CompletionStagePublishers.<String>future()
+        def next = CompletionStagePublishers.<Integer>future()
+
+        when:
+        def composed = CompletionStagePublishers.compose(source, { next })
+        source.complete('abc')
+
+        then:
+        !composed.isDone()
+
+        when:
+        composed.cancel(false)
+
+        then:
+        next.isCancelled()
+
+        when:
+        def done = CompletionStagePublishers.compose(CompletableFuture.completedFuture('abc'), { CompletableFuture.completedFuture(it.length()) })
+
+        then:
+        done.getNow(null) == 3
+    }
+
+    void 'orElse uses the fallback when the stage is null'() {
+        given:
+        def stage = CompletableFuture.completedFuture('value')
+
+        expect:
+        CompletionStagePublishers.orElse(stage, { throw new AssertionError() }).is(stage)
+        CompletionStagePublishers.orElse(null, { CompletableFuture.completedFuture('fallback') }).toCompletableFuture().join() == 'fallback'
+    }
+
+    void 'orElseIfNull uses the fallback when the stage is null or completes with null'() {
+        given:
+        def stage = CompletableFuture.completedFuture('value')
+        def pending = new CompletableFuture<String>()
+
+        when:
+        def later = CompletionStagePublishers.orElseIfNull(pending, { CompletableFuture.completedFuture('fallback') })
+
+        then:
+        CompletionStagePublishers.orElseIfNull(stage, { throw new AssertionError() }).is(stage)
+        CompletionStagePublishers.orElseIfNull(null, { CompletableFuture.completedFuture('fallback') }).toCompletableFuture().join() == 'fallback'
+        CompletionStagePublishers.orElseIfNull(CompletableFuture.completedFuture(null), { CompletableFuture.completedFuture('fallback') }).toCompletableFuture().join() == 'fallback'
+        !later.toCompletableFuture().isDone()
+
+        when:
+        pending.complete(null)
+
+        then:
+        later.toCompletableFuture().join() == 'fallback'
+    }
+
+    void 'a publisher that is not a Reactor publisher is subscribed to without the Reactor context'() {
+        given:
+        def element = new TestElement('request')
+        def subscriberType = new AtomicReference<Class>()
+        def seen = new AtomicReference<String>()
+        def publisher = { org.reactivestreams.Subscriber s ->
+            subscriberType.set(s.getClass())
+            seen.set(PropagatedContext.find().flatMap { it.find(TestElement) }.map { it.value }.orElse('none'))
+            Publishers.just('value').subscribe(s)
+        } as org.reactivestreams.Publisher<String>
+
+        when:
+        def scope = PropagatedContext.getOrEmpty().plus(element).propagate()
+        CompletableFuture<String> future
+        try {
+            future = CompletionStagePublishers.first(publisher, null)
+        } finally {
+            scope.close()
+        }
+
+        then:
+        future.getNow(null) == 'value'
+        seen.get() == 'request'
+        !reactor.core.CoreSubscriber.isAssignableFrom(subscriberType.get())
     }
 
     void 'unwrap removes the completion exception'() {
@@ -251,15 +383,69 @@ class CompletionStagePublishersSpec extends Specification {
         e.is(error)
     }
 
-    void 'cancelling the toPublisher subscription cancels the stage'() {
+    void 'cancelling the toPublisher subscription cancels a stage of the class only'() {
         given:
-        def stage = new CompletableFuture<String>()
+        CompletableFuture<String> stage = CompletionStagePublishers.future()
+        def shared = new CompletableFuture<String>()
 
         when:
         Mono.from(CompletionStagePublishers.toPublisher { stage }).subscribe().dispose()
+        Mono.from(CompletionStagePublishers.toPublisher { shared }).subscribe().dispose()
 
         then:
         stage.cancelled
+        !shared.done
+    }
+
+    void 'a non-positive request after the stage is obtained cancels it'() {
+        given:
+        CompletableFuture<String> stage = CompletionStagePublishers.future()
+        def errors = []
+        org.reactivestreams.Subscription subscription
+        CompletionStagePublishers.toPublisher { stage }.subscribe(new org.reactivestreams.Subscriber<String>() {
+            void onSubscribe(org.reactivestreams.Subscription s) { subscription = s }
+            void onNext(String t) {}
+            void onError(Throwable t) { errors << t }
+            void onComplete() {}
+        })
+
+        when:
+        subscription.request(1)
+        subscription.request(0)
+
+        then:
+        stage.cancelled
+        errors.size() == 1
+        errors[0] instanceof IllegalArgumentException
+    }
+
+    void 'fromList emits the items as they are requested'() {
+        given:
+        def items = []
+        def completed = false
+        org.reactivestreams.Subscription subscription
+        CompletionStagePublishers.fromList(['a', 'b', 'c']).subscribe(new org.reactivestreams.Subscriber<String>() {
+            void onSubscribe(org.reactivestreams.Subscription s) { subscription = s }
+            void onNext(String t) { items << t }
+            void onError(Throwable t) {}
+            void onComplete() { completed = true }
+        })
+
+        when:
+        subscription.request(2)
+
+        then:
+        items == ['a', 'b']
+        !completed
+
+        when:
+        subscription.request(1)
+
+        then:
+        items == ['a', 'b', 'c']
+        completed
+        Flux.from(CompletionStagePublishers.fromList([])).collectList().block() == []
+        Flux.from(CompletionStagePublishers.fromList([1, 2, 3])).collectList().block() == [1, 2, 3]
     }
 
     void 'first subscribes with the propagated context in the Reactor context and as a thread-local'() {
