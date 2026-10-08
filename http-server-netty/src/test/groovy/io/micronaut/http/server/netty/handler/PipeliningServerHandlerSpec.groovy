@@ -9,6 +9,8 @@ import io.micronaut.http.body.stream.BodySizeLimits
 import io.micronaut.http.body.stream.BufferConsumer
 import io.micronaut.http.exceptions.ContentLengthExceededException
 import io.micronaut.http.netty.body.NettyByteBodyFactory
+import io.micronaut.http.netty.body.StreamingNettyByteBody
+import io.micronaut.buffer.netty.NettyReadBufferFactory
 import io.netty.buffer.AbstractByteBufAllocator
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.CompositeByteBuf
@@ -1512,7 +1514,7 @@ class PipeliningServerHandlerSpec extends Specification {
         }
     }
 
-    def 'a second response is refused and released, and abort closes the connection'() {
+    def 'a second response is refused and released, and abort closes the connection'(boolean streaming) {
         given:
         def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
         resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
@@ -1542,7 +1544,16 @@ class PipeliningServerHandlerSpec extends Specification {
         when:
         ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
         def second = Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)
-        access.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR), new NettyByteBodyFactory(ch).adapt(second))
+        def factory = new NettyByteBodyFactory(ch)
+        def refused
+        if (streaming) {
+            def buffer = factory.createStreamingBuffer(BodySizeLimits.UNLIMITED, new RecordingUpstream())
+            buffer.add(NettyReadBufferFactory.of(ch.alloc()).adapt(second))
+            refused = new StreamingNettyByteBody(buffer)
+        } else {
+            refused = factory.adapt(second)
+        }
+        access.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR), refused)
         then:
         thrown IllegalStateException
         second.refCnt() == 0
@@ -1557,6 +1568,9 @@ class PipeliningServerHandlerSpec extends Specification {
 
         cleanup:
         ch.finishAndReleaseAll()
+
+        where:
+        streaming << [false, true]
     }
 
     def 'abort does nothing after the response was written'() {
