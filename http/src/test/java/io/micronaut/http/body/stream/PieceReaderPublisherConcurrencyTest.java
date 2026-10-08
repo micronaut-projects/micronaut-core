@@ -43,6 +43,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PieceReaderPublisherConcurrencyTest {
 
     @Test
+    void passesDownstreamContextToTheInput() {
+        AtomicReference<String> tenant = new AtomicReference<>();
+        Publisher<String> lines = PieceReaders.publisher(Flux.deferContextual(context -> {
+            tenant.set(context.getOrDefault("tenant", "missing"));
+            return Flux.just(piece("value\n"));
+        }), new LineReader());
+        assertEquals(List.of("value"), Flux.from(lines)
+            .contextWrite(reactor.util.context.Context.of("tenant", "expected"))
+            .collectList().block());
+        assertEquals("expected", tenant.get());
+    }
+
+    @Test
     void requestsOnAnotherThreadNeverAskForASecondPiece() throws Exception {
         try (ExecutorService requester = Executors.newSingleThreadExecutor(); AutoCloseable stop = requester::shutdownNow) {
             for (int round = 0; round < 200; round++) {

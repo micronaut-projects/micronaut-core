@@ -80,7 +80,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
     /**
      * The context of a Reactor input, with the discard hook: created once.
      */
-    private final Context context;
+    private Context context;
     private volatile boolean cancelled;
 
     // only accessed by the drain loop
@@ -142,6 +142,8 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
             return;
         }
         downstream.set(subscriber);
+        context = Operators.enableOnDiscard(subscriber instanceof CoreSubscriber<?> coreSubscriber
+            ? coreSubscriber.currentContext() : Context.empty(), this::discardObject);
         subscriber.onSubscribe(this);
         input.subscribe(this);
     }
