@@ -2,6 +2,7 @@ package io.micronaut.http.client.jdk
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.publisher.CompletionStagePublishers
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.exceptions.NoAvailableServiceException
@@ -117,7 +118,8 @@ class JdkLoadBalancerSelectAsyncSpec extends Specification {
 
         @Override
         CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
-            def future = new CompletableFuture<List<ServiceInstance>>()
+            // a new stage for each call, which the framework may cancel
+            CompletableFuture<List<ServiceInstance>> future = CompletionStagePublishers.future()
             requested << serviceId
             futures << future
             return future

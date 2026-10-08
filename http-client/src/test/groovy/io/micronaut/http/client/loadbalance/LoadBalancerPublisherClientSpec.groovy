@@ -53,6 +53,16 @@ class LoadBalancerPublisherClientSpec extends Specification {
         }
     }
 
+    def 'a mock load balancer that only stubs select is selected through it'() {
+        given:
+        LoadBalancer loadBalancer = Mock(LoadBalancer)
+        loadBalancer.select(_) >> Publishers.just(ServiceInstance.of('server', server.URI))
+        loadBalancer.getContextPath() >> Optional.empty()
+
+        expect:
+        hello(loadBalancer) == 'hello'
+    }
+
     def 'a subclass of the fixed load balancer that overrides select is selected through it'() {
         given:
         def calls = new AtomicInteger()
