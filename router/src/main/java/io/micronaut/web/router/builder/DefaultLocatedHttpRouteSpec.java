@@ -281,6 +281,11 @@ final class DefaultLocatedHttpRouteSpec<T> implements LocatedHttpRouteSpec<T> {
         route.webSocket(endpoint);
     }
 
+    @Override
+    public void sse(SseHandler handler) {
+        route.sse(handler);
+    }
+
     private LocatedFilterSpec<T> filter(FilterSpec<HttpRouteSpec> filter) {
         return new DefaultLocatedFilterSpec<>(this, ((DefaultFilterSpec<HttpRouteSpec>) filter).registration());
     }

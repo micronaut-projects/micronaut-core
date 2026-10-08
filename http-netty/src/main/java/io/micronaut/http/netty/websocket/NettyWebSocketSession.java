@@ -26,7 +26,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.websocket.CloseReason;
-import io.micronaut.websocket.WebSocketMessagesSubscriber;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.buffer.ByteBuf;
@@ -228,6 +227,15 @@ public class NettyWebSocketSession implements WebSocketSession {
         return Flux.defer(() -> Mono.fromFuture(() -> sendAsync(message, mediaType), true));
     }
 
+    /**
+     * @param message   The message
+     * @param mediaType The media type of the message
+     * @return The frame of the message: the message itself if it is a frame
+     */
+    final WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
+        return message instanceof WebSocketFrame frame ? frame : messageEncoder.encodeMessage(message, mediaType);
+    }
+
     @Override
     public CompletableFuture<Boolean> sendAllAsync(Publisher<?> messages, MediaType mediaType) {
         Objects.requireNonNull(messages, "messages");
@@ -245,7 +253,7 @@ public class NettyWebSocketSession implements WebSocketSession {
             sendingAll.remove(sent);
             channel.closeFuture().removeListener(closed);
         });
-        messages.subscribe(new WebSocketMessagesSubscriber(this, mediaType, sent));
+        messages.subscribe(new NettyWebSocketMessagesSubscriber(this, channel, mediaType, sent));
         return sent;
     }
 

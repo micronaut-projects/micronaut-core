@@ -632,6 +632,60 @@ class HandlerRouteWebSocketTest {
         otherRoom.close(1000, "done");
     }
 
+    @Test
+    void aMessageHandlerStageThatFailsDuringTheFragmentsOfTheNextMessageKeepsThem() throws Exception {
+        Client client = connect("/ws/late-failure/message");
+        client.ws.sendText("first", true).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("late first", event());
+        assertLateFailureKeepsTheFragments(client);
+    }
+
+    @Test
+    void aPongHandlerStageThatFailsDuringTheFragmentsOfAMessageKeepsThem() throws Exception {
+        Client client = connect("/ws/late-failure/pong");
+        client.ws.sendText("hel", false).get(TIMEOUT, TimeUnit.SECONDS);
+        client.ws.sendPong(ByteBuffer.wrap("p".getBytes(StandardCharsets.UTF_8))).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("late pong", event());
+        failLate(client);
+    }
+
+    @Test
+    void aPingHandlerStageThatFailsDuringTheFragmentsOfAMessageKeepsThem() throws Exception {
+        Client client = connect("/ws/late-failure/ping");
+        client.ws.sendText("hel", false).get(TIMEOUT, TimeUnit.SECONDS);
+        client.ws.sendPing(ByteBuffer.wrap("p".getBytes(StandardCharsets.UTF_8))).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("late ping", event());
+        failLate(client);
+    }
+
+    private static void assertLateFailureKeepsTheFragments(Client client) throws Exception {
+        client.ws.sendText("hel", false).get(TIMEOUT, TimeUnit.SECONDS);
+        // the first fragment is read before the stage fails
+        Thread.sleep(200);
+        failLate(client);
+    }
+
+    private static void failLate(Client client) throws Exception {
+        Thread.sleep(200);
+        LATE_FAILURE.get().completeExceptionally(new IllegalStateException("late"));
+        assertEquals("error late", client.next());
+        client.ws.sendText("lo", true).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("got hello", client.next());
+        client.close(1000, "done");
+    }
+
+    /**
+     * The stage of the handler that fails later, see {@link #lateFailure}.
+     */
+    private static final java.util.concurrent.atomic.AtomicReference<CompletableFuture<Object>> LATE_FAILURE = new java.util.concurrent.atomic.AtomicReference<>();
+
+    private static CompletionStage<?> lateFailure(BlockingQueue<String> log, String what) {
+        CompletableFuture<Object> stage = new CompletableFuture<>();
+        LATE_FAILURE.set(stage);
+        log.add("late " + what);
+        return stage;
+    }
+
     private static String event() throws InterruptedException {
         String event = context.getBean(Events.class).events.poll(TIMEOUT, TimeUnit.SECONDS);
         assertNotNull(event, "no event");
@@ -1280,6 +1334,22 @@ class HandlerRouteWebSocketTest {
                         }));
                 routes.GET("/ws/ping").webSocket(ws -> ws
                     .onPing((session, ping) -> session.sendAsync("ping " + ping.getContent().toString(StandardCharsets.UTF_8))));
+
+                // a handler whose stage fails while the next message is read in fragments
+                routes.GET("/ws/late-failure/message").webSocket(ws -> ws
+                    .maxConcurrentMessages(2)
+                    .onMessage(String.class, (session, message) -> message.equals("first")
+                        ? lateFailure(log, message)
+                        : session.sendAsync("got " + message))
+                    .onError((session, error) -> session.sendAsync("error " + error.getMessage())));
+                routes.GET("/ws/late-failure/pong").webSocket(ws -> ws
+                    .onPong((session, pong) -> lateFailure(log, "pong"))
+                    .onMessage(String.class, (session, message) -> session.sendAsync("got " + message))
+                    .onError((session, error) -> session.sendAsync("error " + error.getMessage())));
+                routes.GET("/ws/late-failure/ping").webSocket(ws -> ws
+                    .onPing((session, ping) -> lateFailure(log, "ping"))
+                    .onMessage(String.class, (session, message) -> session.sendAsync("got " + message))
+                    .onError((session, error) -> session.sendAsync("error " + error.getMessage())));
 
                 // one message after the other, or concurrently
                 routes.GET("/ws/serial").webSocket(ws -> ws
