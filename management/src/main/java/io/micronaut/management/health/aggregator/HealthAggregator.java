@@ -15,12 +15,13 @@
  */
 package io.micronaut.management.health.aggregator;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.management.endpoint.health.HealthLevelOfDetail;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.concurrent.CompletionStage;
@@ -59,10 +60,11 @@ public interface HealthAggregator<T extends HealthResult> {
      *
      * @param indicators The health indicators to aggregate.
      * @param healthLevelOfDetail The {@link HealthLevelOfDetail}
-     * @return A {@link CompletionStage} completed with the aggregated response
+     * @return A {@link CompletionStage} completed with the aggregated response, or with {@code null} for none
      * @since 5.3.0
      */
-    default CompletionStage<T> aggregateAsync(HealthIndicator[] indicators, HealthLevelOfDetail healthLevelOfDetail) {
+    @Experimental
+    default CompletionStage<@Nullable T> aggregateAsync(HealthIndicator[] indicators, HealthLevelOfDetail healthLevelOfDetail) {
         return CompletionStagePublishers.first(aggregate(indicators, healthLevelOfDetail), null);
     }
 
@@ -75,10 +77,11 @@ public interface HealthAggregator<T extends HealthResult> {
      *
      * @param name The name of the new health result
      * @param results The health results to aggregate.
-     * @return A {@link CompletionStage} completed with the aggregated {@link HealthResult}
+     * @return A {@link CompletionStage} completed with the aggregated {@link HealthResult}, or with {@code null} for none
      * @since 5.3.0
      */
-    default CompletionStage<HealthResult> aggregateAsync(String name, List<HealthResult> results) {
-        return CompletionStagePublishers.first(aggregate(name, Flux.fromIterable(results)), null);
+    @Experimental
+    default CompletionStage<@Nullable HealthResult> aggregateAsync(String name, List<HealthResult> results) {
+        return CompletionStagePublishers.first(aggregate(name, CompletionStagePublishers.fromList(results)), null);
     }
 }

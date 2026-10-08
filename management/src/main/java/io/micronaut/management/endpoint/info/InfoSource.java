@@ -16,6 +16,7 @@
 package io.micronaut.management.endpoint.info;
 
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.order.Ordered;
 import org.jspecify.annotations.Nullable;
@@ -42,12 +43,15 @@ public interface InfoSource extends Ordered {
      * by {@link #getSource()}, and completes with {@code null} when the publisher completes
      * without one, which the aggregator handles as an empty property source. Cancelling the
      * stage cancels the subscription. A source that provides its property source without a
-     * publisher overrides this method. The built-in source classes do not, so that a subclass
-     * that overrides {@link #getSource()} is called through it.
+     * publisher overrides this method.
+     *
+     * <p>An implementation returns a new stage for each call, which a caller may cancel. The
+     * framework never cancels a stage it did not create: it ignores its result instead.</p>
      *
      * @return A {@link CompletionStage} completed with the {@link PropertySource} containing data to be added to the endpoint response, or with {@code null} when there is none
      * @since 5.3.0
      */
+    @Experimental
     default CompletionStage<@Nullable PropertySource> getSourceAsync() {
         return CompletionStagePublishers.first(getSource(), null);
     }

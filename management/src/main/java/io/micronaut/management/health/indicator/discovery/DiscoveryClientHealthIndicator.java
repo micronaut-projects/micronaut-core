@@ -15,21 +15,33 @@
  */
 package io.micronaut.management.health.indicator.discovery;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.CompositeDiscoveryClient;
-import io.micronaut.discovery.AsyncCompositeDiscoveryClient;
+import io.micronaut.discovery.DefaultCompositeDiscoveryClient;
 import io.micronaut.discovery.DiscoveryClient;
+import io.micronaut.discovery.DiscoveryClientStages;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.health.HealthStatus;
+import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -37,20 +49,22 @@ import java.util.stream.Stream;
 /**
  * A health indicator for the discovery client.
  *
- * <p>The bean combines the {@link java.util.concurrent.CompletionStage}s of the discovery client
- * without a publisher. This class only implements the publisher method, so that a subclass that
- * overrides it, and replaces the bean, is called through it by the default
- * {@link #getResultAsync()}.</p>
+ * <p>{@link #getResultAsync()} combines the {@link CompletionStage}s of the discovery client
+ * without a publisher. A subclass is called through {@link #getResult()} instead, so that its
+ * override keeps working.</p>
  *
  * @author graemerocher
  * @since 1.0
  */
+@Requires(beans = {DiscoveryClient.class, DiscoveryClientHealthIndicatorConfiguration.class})
+@Singleton
+@Requires(property = HealthEndpoint.PREFIX + ".discovery-client-health.enabled", defaultValue = StringUtils.TRUE, notEquals = StringUtils.FALSE)
 public class DiscoveryClientHealthIndicator implements HealthIndicator {
 
-    final DiscoveryClient discoveryClient;
-    final DiscoveryClient uncachedDiscoveryClient;
-    final String description;
-    final boolean hasNoChildClients;
+    private final DiscoveryClient discoveryClient;
+    private final DiscoveryClient uncachedDiscoveryClient;
+    private final String description;
+    private final boolean hasNoChildClients;
 
     /**
      * @param discoveryClient The Discovery client
@@ -63,7 +77,7 @@ public class DiscoveryClientHealthIndicator implements HealthIndicator {
             this.hasNoChildClients = childClients.length == 0;
             this.uncachedDiscoveryClient = hasNoChildClients
                 ? discoveryClient
-                : new AsyncCompositeDiscoveryClient(childClients);
+                : new DefaultCompositeDiscoveryClient(childClients);
         } else {
             this.uncachedDiscoveryClient = discoveryClient;
             this.hasNoChildClients = false;
@@ -89,6 +103,84 @@ public class DiscoveryClientHealthIndicator implements HealthIndicator {
                 builder.exception(throwable);
                 return Flux.just(builder.build());
             });
+    }
+
+    /**
+     * The result from the {@link CompletionStage}s of the discovery client, without a publisher.
+     * A {@link ConfigurationException} is retried once with the uncached child clients, and any
+     * other failure is reported as {@link HealthStatus#DOWN}. Cancelling the stage cancels the
+     * lookups the framework started. A subclass is called through {@link #getResult()}.
+     *
+     * @return A {@link CompletionStage} completed with the result
+     * @since 5.3.0
+     */
+    @Override
+    public CompletionStage<List<HealthResult>> getResultAsync() {
+        if (getClass() != DiscoveryClientHealthIndicator.class) {
+            return HealthIndicator.super.getResultAsync();
+        }
+        if (hasNoChildClients) {
+            return CompletableFuture.completedFuture(List.of(HealthResult.builder(description, HealthStatus.UP)
+                .details(Collections.singletonMap("services", Collections.emptyMap()))
+                .build()));
+        }
+        CompletableFuture<List<HealthResult>> result = CompletionStagePublishers.future();
+        CompletableFuture<HealthResult> first = resultAsync(discoveryClient);
+        AtomicReference<CompletableFuture<HealthResult>> current = new AtomicReference<>(first);
+        result.whenComplete((value, throwable) -> {
+            if (throwable instanceof CancellationException) {
+                CompletionStagePublishers.cancel(current.get());
+            }
+        });
+        first.whenComplete((healthResult, throwable) -> {
+            if (throwable == null) {
+                result.complete(List.of(healthResult));
+                return;
+            }
+            Throwable error = CompletionStagePublishers.unwrap(throwable);
+            if (!(error instanceof ConfigurationException) || uncachedDiscoveryClient == discoveryClient || result.isDone()) {
+                result.complete(List.of(down(error)));
+                return;
+            }
+            CompletableFuture<HealthResult> retry = resultAsync(uncachedDiscoveryClient);
+            current.set(retry);
+            if (result.isDone()) {
+                CompletionStagePublishers.cancel(retry);
+                return;
+            }
+            retry.whenComplete((retried, retryError) -> result.complete(List.of(
+                retryError == null ? retried : down(CompletionStagePublishers.unwrap(retryError))
+            )));
+        });
+        return result;
+    }
+
+    private HealthResult down(Throwable error) {
+        HealthResult.Builder builder = HealthResult.builder(description, HealthStatus.DOWN);
+        builder.exception(error);
+        return builder.build();
+    }
+
+    private static CompletableFuture<HealthResult> resultAsync(DiscoveryClient discoveryClient) {
+        CompletableFuture<List<Map.Entry<String, List<ServiceInstance>>>> services = CompletionStagePublishers.compose(
+            DiscoveryClientStages.getServiceIds(discoveryClient),
+            ids -> {
+                List<CompletionStage<List<Map.Entry<String, List<ServiceInstance>>>>> stages = new ArrayList<>(ids.size());
+                for (String id : ids) {
+                    stages.add(CompletionStagePublishers.map(DiscoveryClientStages.getInstances(discoveryClient, id), instances -> List.of(Map.entry(id, instances))));
+                }
+                return CompletionStagePublishers.concat(stages);
+            }
+        );
+        return CompletionStagePublishers.map(services, list -> {
+            Map<String, Object> value = new HashMap<>(list.size());
+            for (Map.Entry<String, List<ServiceInstance>> service : list) {
+                value.put(service.getKey(), service.getValue().stream().map(ServiceInstance::getURI).toList());
+            }
+            return HealthResult.builder(discoveryClient.getDescription(), HealthStatus.UP)
+                .details(Collections.singletonMap("services", value))
+                .build();
+        });
     }
 
     private Publisher<HealthResult> getResult(DiscoveryClient discoveryClient) {

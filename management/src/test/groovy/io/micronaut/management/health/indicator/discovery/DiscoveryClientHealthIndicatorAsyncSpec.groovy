@@ -1,6 +1,7 @@
 package io.micronaut.management.health.indicator.discovery
 
 import io.micronaut.context.exceptions.ConfigurationException
+import io.micronaut.core.async.publisher.CompletionStagePublishers
 import io.micronaut.discovery.CompositeDiscoveryClient
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
@@ -23,7 +24,7 @@ class DiscoveryClientHealthIndicatorAsyncSpec extends Specification {
                 foo: [ServiceInstance.of('foo', new URI('http://foo:8080'))],
                 bar: [ServiceInstance.of('bar', new URI('http://bar:8080')), ServiceInstance.of('bar', new URI('http://bar:8081'))]
         ])
-        def indicator = new AsyncDiscoveryClientHealthIndicator(client)
+        def indicator = new DiscoveryClientHealthIndicator(client)
 
         when:
         HealthResult async = indicator.resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
@@ -44,7 +45,7 @@ class DiscoveryClientHealthIndicatorAsyncSpec extends Specification {
                 [foo: CompletableFuture.completedFuture([ServiceInstance.of('foo', new URI('http://foo:8080'))])])
 
         when:
-        HealthResult result = new AsyncDiscoveryClientHealthIndicator(client).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
+        HealthResult result = new DiscoveryClientHealthIndicator(client).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
 
         then:
         result.name == 'async'
@@ -59,7 +60,7 @@ class DiscoveryClientHealthIndicatorAsyncSpec extends Specification {
         DiscoveryClient composite = new FailingCompositeClient(child)
 
         when:
-        HealthResult result = new AsyncDiscoveryClientHealthIndicator(composite).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
+        HealthResult result = new DiscoveryClientHealthIndicator(composite).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
 
         then:
         result.status == HealthStatus.UP
@@ -72,15 +73,12 @@ class DiscoveryClientHealthIndicatorAsyncSpec extends Specification {
                 [foo: CompletableFuture.failedFuture(error)])
 
         when:
-        HealthResult async = new AsyncDiscoveryClientHealthIndicator(client).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
-        HealthResult published = Mono.from(new AsyncDiscoveryClientHealthIndicator(client).result).block()
+        HealthResult async = new DiscoveryClientHealthIndicator(client).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
 
         then:
         async.name == 'failing'
         async.status == HealthStatus.DOWN
         async.details == [error: error.class.name + ': ' + error.message]
-        published.status == HealthStatus.DOWN
-        published.details == async.details
 
         where:
         error << [new IllegalStateException('unreachable'), new ConfigurationException('not composite, so not retried')]
@@ -96,7 +94,7 @@ class DiscoveryClientHealthIndicatorAsyncSpec extends Specification {
         }
 
         when:
-        HealthResult result = new AsyncDiscoveryClientHealthIndicator(client).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
+        HealthResult result = new DiscoveryClientHealthIndicator(client).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
 
         then:
         result.status == HealthStatus.DOWN
@@ -125,17 +123,61 @@ class DiscoveryClientHealthIndicatorAsyncSpec extends Specification {
                 return Mono.<List<String>> never().doOnCancel { cancelled.incrementAndGet() }
             }
         }
-        def pending = new CompletableFuture<List<String>>()
+        CompletableFuture<List<String>> pending = CompletionStagePublishers.future()
         DiscoveryClient asyncClient = new AsyncOnlyClient('async', pending, [:])
+        def shared = new CompletableFuture<List<String>>()
+        DiscoveryClient sharedClient = new AsyncOnlyClient('shared', shared, [:])
 
         when:
         Mono.from(new DiscoveryClientHealthIndicator(publisherClient).result).subscribe().dispose()
-        Mono.from(new AsyncDiscoveryClientHealthIndicator(publisherClient).result).subscribe().dispose()
-        new AsyncDiscoveryClientHealthIndicator(asyncClient).resultAsync.toCompletableFuture().cancel(false)
+        new DiscoveryClientHealthIndicator(publisherClient).resultAsync.toCompletableFuture().cancel(false)
+        new DiscoveryClientHealthIndicator(asyncClient).resultAsync.toCompletableFuture().cancel(false)
+        new DiscoveryClientHealthIndicator(sharedClient).resultAsync.toCompletableFuture().cancel(false)
 
         then:
         cancelled.get() == 2
         pending.cancelled
+        !shared.done
+    }
+
+    void 'cancelling the indicator cancels the lookups of the instances and of the retry'() {
+        given:
+        def cancelled = new java.util.concurrent.atomic.AtomicInteger()
+        DiscoveryClient publisherClient = new PublisherOnlyClient('publisher', [foo: []]) {
+            @Override
+            Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+                return Mono.<List<ServiceInstance>> never().doOnCancel { cancelled.incrementAndGet() }
+            }
+        }
+
+        when: 'the instances are being looked up'
+        def result = new DiscoveryClientHealthIndicator(publisherClient).resultAsync.toCompletableFuture()
+        result.cancel(false)
+
+        then:
+        cancelled.get() == 1
+
+        when: 'the uncached child clients are being looked up'
+        result = new DiscoveryClientHealthIndicator(new FailingCompositeClient(publisherClient)).resultAsync.toCompletableFuture()
+        result.cancel(false)
+
+        then:
+        cancelled.get() == 2
+    }
+
+    void 'a mock discovery client that only stubs the publishers is called through them'() {
+        given:
+        DiscoveryClient client = Mock(DiscoveryClient)
+        client.getDescription() >> 'mock'
+        client.getServiceIds() >> Mono.just(['foo'])
+        client.getInstances('foo') >> Mono.just([ServiceInstance.of('foo', new URI('http://foo:8080'))])
+
+        when:
+        HealthResult result = new DiscoveryClientHealthIndicator(client).resultAsync.toCompletableFuture().get(5, TimeUnit.SECONDS).first()
+
+        then:
+        result.status == HealthStatus.UP
+        result.details == [services: [foo: [new URI('http://foo:8080')]]]
     }
 
     static class PublisherOnlyClient implements DiscoveryClient {

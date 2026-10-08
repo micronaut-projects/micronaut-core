@@ -15,9 +15,11 @@
  */
 package io.micronaut.management.endpoint.loggers;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.util.concurrent.CompletionStage;
@@ -55,10 +57,11 @@ public interface LoggersManager<T> {
      * publisher completes without one. Cancelling the stage cancels the subscription.
      *
      * @param loggingSystem The {@link ManagedLoggingSystem} in use
-     * @return A {@link CompletionStage} completed with <code>T</code>
+     * @return A {@link CompletionStage} completed with <code>T</code>, or with {@code null} for none
      * @since 5.3.0
      */
-    default CompletionStage<T> getLoggersAsync(ManagedLoggingSystem loggingSystem) {
+    @Experimental
+    default CompletionStage<@Nullable T> getLoggersAsync(ManagedLoggingSystem loggingSystem) {
         return CompletionStagePublishers.first(getLoggers(loggingSystem), null);
     }
 
@@ -70,10 +73,11 @@ public interface LoggersManager<T> {
      *
      * @param loggingSystem The {@link ManagedLoggingSystem} in use
      * @param name The name of the logger to find or create
-     * @return A {@link CompletionStage} completed with <code>T</code>
+     * @return A {@link CompletionStage} completed with <code>T</code>, or with {@code null} for none
      * @since 5.3.0
      */
-    default CompletionStage<T> getLoggerAsync(ManagedLoggingSystem loggingSystem, @NotBlank String name) {
+    @Experimental
+    default CompletionStage<@Nullable T> getLoggerAsync(ManagedLoggingSystem loggingSystem, @NotBlank String name) {
         return CompletionStagePublishers.first(getLogger(loggingSystem, name), null);
     }
 
