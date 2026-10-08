@@ -18,16 +18,20 @@ package io.micronaut.http.server.netty;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
+import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,6 +43,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -79,18 +85,67 @@ class ResponseWriteFailureTest {
     }
 
     @Test
-    void theNextRequestIsAnsweredNormally() throws IOException {
+    void theRequestsBeforeTheFailureAreAnsweredAndTheServerStaysUsable() throws IOException {
+        // two requests on one keep-alive connection: the first is answered, the second fails
+        // and closes the connection
+        String responses = send("GET /write-failure/fine HTTP/1.1\r\nHost: x\r\n\r\n"
+            + "GET /write-failure/broken HTTP/1.1\r\nHost: x\r\n\r\n");
+        assertTrue(responses.startsWith("HTTP/1.1 200 "), responses);
+        int second = responses.indexOf("HTTP/1.1 ", 1);
+        assertTrue(second > 0, responses);
+        assertTrue(responses.substring(second).startsWith("HTTP/1.1 500 "), responses);
+        assertTrue(responses.substring(second).toLowerCase(Locale.ROOT).contains("connection: close"), responses);
+        // a request after the failure, on a new connection
         assertTrue(get("/write-failure/fine", true).startsWith("HTTP/1.1 200 "));
     }
 
+    @Test
+    void anHttp10RequestGetsTheErrorResponse() throws IOException {
+        String response = send("GET /write-failure/broken HTTP/1.0\r\n\r\n");
+        assertTrue(response.startsWith("HTTP/1.0 500 "), response);
+    }
+
+    @Test
+    void aResponseWrittenOnTheEventLoopGetsTheErrorResponse() throws IOException {
+        // the reactive route completes on the event loop, where the write is not handed over
+        String response = get("/write-failure/reactive", true);
+        assertTrue(response.startsWith("HTTP/1.1 500 "), response);
+    }
+
+    @Test
+    void anHttp2StreamGetsTheErrorResponse() {
+        try (ApplicationContext h2 = ApplicationContext.run(Map.of(
+            "spec.name", "ResponseWriteFailureTest",
+            "micronaut.server.http-version", "2.0",
+            "micronaut.server.ssl.enabled", false,
+            "micronaut.http.client.plaintext-mode", "h2c_prior_knowledge",
+            "micronaut.http.client.read-timeout", "10s"))) {
+            EmbeddedServer h2Server = h2.getBean(EmbeddedServer.class).start();
+            try (HttpClient client = h2.createBean(HttpClient.class, h2Server.getURL())) {
+                HttpClientResponseException e = assertThrows(HttpClientResponseException.class,
+                    () -> client.toBlocking().exchange(HttpRequest.GET("/write-failure/broken"), byte[].class));
+                assertEquals(500, e.getStatus().getCode());
+                // the connection is still used for the other streams
+                assertEquals("fine", client.toBlocking().retrieve("/write-failure/fine"));
+            }
+        }
+    }
+
     private static String get(String path, boolean close) throws IOException {
+        return send("GET " + path + " HTTP/1.1\r\n"
+            + "Host: " + server.getHost() + "\r\n"
+            + (close ? "Connection: close\r\n" : "")
+            + "\r\n");
+    }
+
+    /**
+     * Send the requests, and read the responses until the server closes the connection.
+     */
+    private static String send(String requests) throws IOException {
         try (Socket socket = new Socket(server.getHost(), server.getPort())) {
             socket.setSoTimeout(10_000);
             OutputStream out = socket.getOutputStream();
-            out.write(("GET " + path + " HTTP/1.1\r\n"
-                + "Host: " + server.getHost() + "\r\n"
-                + (close ? "Connection: close\r\n" : "")
-                + "\r\n").getBytes(StandardCharsets.US_ASCII));
+            out.write(requests.getBytes(StandardCharsets.US_ASCII));
             out.flush();
             InputStream in = socket.getInputStream();
             try {
@@ -109,6 +164,11 @@ class ResponseWriteFailureTest {
         @Get(value = "/broken", produces = MediaType.APPLICATION_OCTET_STREAM)
         HttpResponse<ByteBody> broken() {
             return HttpResponse.ok(AvailableByteArrayBody.create(new FailingReadBuffer(released)));
+        }
+
+        @Get(value = "/reactive", produces = MediaType.APPLICATION_OCTET_STREAM)
+        Mono<HttpResponse<ByteBody>> reactive() {
+            return Mono.fromSupplier(() -> HttpResponse.ok(AvailableByteArrayBody.create(new FailingReadBuffer(released))));
         }
 
         @Get(value = "/fine", produces = MediaType.TEXT_PLAIN)
