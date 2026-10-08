@@ -39,18 +39,16 @@ import java.util.function.Supplier;
  */
 @Internal
 public final class ReactorInterop {
-    private static final boolean REACTOR_PRESENT;
+    private static final boolean REACTOR_PRESENT = reactorType() != null;
 
-    static {
-        boolean present;
+    private static @Nullable Class<?> reactorType() {
         try {
             // A class literal uses normal linkage, not reflective class loading. Keep the
             // optional dependency out of native publisher paths when linkage fails.
-            present = !CorePublisher.class.getName().isEmpty();
+            return CorePublisher.class;
         } catch (NoClassDefFoundError e) {
-            present = false;
+            return null;
         }
-        REACTOR_PRESENT = present;
     }
 
     private ReactorInterop() {
