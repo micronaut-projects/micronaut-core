@@ -50,6 +50,9 @@ dependencies {
     testImplementation(libs.junit.jupiter.params)
     testImplementation(libs.awaitility)
     testImplementation(libs.managed.reactor.test)
+    // the Reactive Streams TCK of the pieces of the publisher streams, run by the TestNG engine
+    testImplementation(libs.reactive.streams.tck)
+    testRuntimeOnly(libs.junit.testng.engine)
 
     testRuntimeOnly(libs.managed.netty.tcnative.boringssl.static) {
         artifact {
