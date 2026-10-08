@@ -76,7 +76,7 @@ public final class FormFieldFlows {
     }
 
     private static <T> void subscribe(Publisher<T> source, FirstFuture<?> result, FirstSubscriber<T> subscriber) {
-        result.subscriber = subscriber;
+        result.subscriber.set(subscriber);
         source.subscribe(subscriber);
     }
 
@@ -176,8 +176,8 @@ public final class FormFieldFlows {
     private abstract static class FirstSubscriber<T> implements Subscriber<T> {
         private final CompletableFuture<?> result;
         private final AtomicBoolean done = new AtomicBoolean();
-        private volatile @Nullable Subscription subscription;
-        private volatile @Nullable ExecutionFlow<?> running;
+        private final AtomicReference<@Nullable Subscription> subscription = new AtomicReference<>();
+        private final AtomicReference<@Nullable ExecutionFlow<?>> running = new AtomicReference<>();
         private volatile boolean cancelled;
 
         FirstSubscriber(CompletableFuture<?> result) {
@@ -191,11 +191,11 @@ public final class FormFieldFlows {
         final void cancelled() {
             cancelled = true;
             done.set(true);
-            Subscription s = subscription;
+            Subscription s = subscription.get();
             if (s != null) {
                 s.cancel();
             }
-            ExecutionFlow<?> flow = running;
+            ExecutionFlow<?> flow = running.get();
             if (flow != null) {
                 flow.cancel();
             }
@@ -205,7 +205,7 @@ public final class FormFieldFlows {
          * @param flow The flow of the item, cancelled with the result
          */
         final void running(ExecutionFlow<?> flow) {
-            running = flow;
+            running.set(flow);
             if (cancelled) {
                 flow.cancel();
             }
@@ -220,7 +220,7 @@ public final class FormFieldFlows {
 
         @Override
         public final void onSubscribe(Subscription s) {
-            subscription = s;
+            subscription.set(s);
             if (cancelled) {
                 s.cancel();
                 return;
@@ -237,7 +237,7 @@ public final class FormFieldFlows {
                 }
                 return;
             }
-            Objects.requireNonNull(subscription).cancel();
+            Objects.requireNonNull(subscription.get()).cancel();
             onFirst(item);
         }
 
@@ -262,12 +262,12 @@ public final class FormFieldFlows {
      * @param <R> The type of the result
      */
     private static final class FirstFuture<R> extends CompletableFuture<R> {
-        private volatile @Nullable FirstSubscriber<?> subscriber;
+        private final AtomicReference<@Nullable FirstSubscriber<?>> subscriber = new AtomicReference<>();
 
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
             boolean cancelled = super.cancel(mayInterruptIfRunning);
-            FirstSubscriber<?> s = subscriber;
+            FirstSubscriber<?> s = subscriber.get();
             if (cancelled && s != null) {
                 s.cancelled();
             }
