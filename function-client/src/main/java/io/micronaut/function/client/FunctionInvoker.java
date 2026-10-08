@@ -15,6 +15,7 @@
  */
 package io.micronaut.function.client;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
@@ -48,6 +49,11 @@ public interface FunctionInvoker<I, O> {
      * {@link Publisher} of the result, and completes with its first item, or {@code null} if it
      * completes empty.
      *
+     * <p>An implementation returns a new stage for each call, which a caller may cancel. Do not
+     * call {@link #invoke} with a {@link CompletionStage} type from an override of this method:
+     * {@link io.micronaut.function.client.http.HttpFunctionExecutor} answers such a call with
+     * this method.</p>
+     *
      * @param definition The definition
      * @param input      The input
      * @param valueType  The type of the result
@@ -55,6 +61,7 @@ public interface FunctionInvoker<I, O> {
      * @return A stage that completes with the result
      * @since 5.3.0
      */
+    @Experimental
     @SuppressWarnings({"unchecked", "rawtypes"})
     default <T> CompletionStage<@Nullable T> invokeAsync(FunctionDefinition definition, @Nullable I input, Argument<T> valueType) {
         Publisher<T> result;

@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.type.Argument;
 import io.micronaut.function.client.DefaultFunctionDiscoveryClient;
 import io.micronaut.function.client.FunctionClient;
 import io.micronaut.function.client.FunctionDefinition;
@@ -136,6 +137,11 @@ class FunctionClientAdviceAsyncTest {
     }
 
     @Test
+    void anEmptyResultCompletesAVoidStage() throws Exception {
+        assertEquals(null, client.emptyVoidAsync().get());
+    }
+
+    @Test
     void aFunctionWithoutInvokerFailsWithFunctionNotFound() {
         ExecutionException e = assertThrows(ExecutionException.class, () -> client.noInvokerAsync().get());
         assertEquals("No function found for name: no-invoker", e.getCause().getMessage());
@@ -219,6 +225,9 @@ class FunctionClientAdviceAsyncTest {
         @Named("empty")
         CompletableFuture<Long> emptyAsync();
 
+        @Named("empty")
+        CompletableFuture<Void> emptyVoidAsync();
+
         @Named("no-invoker")
         CompletableFuture<Long> noInvokerAsync();
 
@@ -298,6 +307,21 @@ class FunctionClientAdviceAsyncTest {
                 }
                 return Mono.from(result).block();
             };
+            if (definition.getName().equals("mocked")) {
+                // like a mock invoker that only stubs invoke
+                FunctionInvoker<I, Object> stubbed = invoker;
+                invoker = new FunctionInvoker<>() {
+                    @Override
+                    public Object invoke(FunctionDefinition def, I input, Argument<Object> outputType) {
+                        return stubbed.invoke(def, input, outputType);
+                    }
+
+                    @Override
+                    public <T> CompletionStage<T> invokeAsync(FunctionDefinition def, I input, Argument<T> valueType) {
+                        return null;
+                    }
+                };
+            }
             return Optional.of((FunctionInvoker<I, O>) invoker);
         }
     }
