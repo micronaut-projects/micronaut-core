@@ -32,6 +32,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.FilterRunner;
@@ -396,6 +397,11 @@ public class RequestLifecycle {
                 protected ExecutionFlow<HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure, PropagatedContext propagatedContext) {
                     return onErrorNoFilter(request, failure, propagatedContext);
                 }
+
+                @Override
+                protected void closeElements(HttpRequest<?> request, BodyElements<?> elements) {
+                    routeExecutor.discardElements(request, elements);
+                }
             };
             return filterRunner.run(request);
         } catch (Throwable e) {
@@ -437,6 +443,11 @@ public class RequestLifecycle {
             protected ExecutionFlow<HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure, PropagatedContext propagatedContext) {
                 return onErrorNoFilter(request, failure, propagatedContext);
             }
+
+            @Override
+            protected void closeElements(HttpRequest<?> request, BodyElements<?> elements) {
+                routeExecutor.discardElements(request, elements);
+            }
         };
         return filterRunner.runResponseFilters(request, response, propagatedContext);
     }
@@ -454,6 +465,11 @@ public class RequestLifecycle {
 
                 @Nullable
                 UriRouteMatch<Object, Object> routeMatch;
+
+                @Override
+                protected void closeElements(HttpRequest<?> request, BodyElements<?> elements) {
+                    routeExecutor.discardElements(request, elements);
+                }
 
                 @Override
                 protected List<GenericHttpFilter> findFiltersAfterRouteMatch(HttpRequest<?> request) {
