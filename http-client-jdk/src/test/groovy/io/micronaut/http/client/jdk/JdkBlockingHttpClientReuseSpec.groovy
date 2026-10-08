@@ -18,7 +18,7 @@ class JdkBlockingHttpClientReuseSpec extends Specification {
         def blockingClients = (1..100).collect { parent.toBlocking() }
 
         then: 'every blocking client wraps the SAME java.net.http.HttpClient instance'
-        blockingClients.every { (it as AbstractJdkHttpClient).@client.is(parent.@client) }
+        blockingClients.every { (it as AbstractJdkHttpClient).@client.is(parent.transport().@client) }
 
         cleanup:
         parent.close()

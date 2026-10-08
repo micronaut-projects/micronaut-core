@@ -33,6 +33,7 @@ import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.Objects;
@@ -45,6 +46,13 @@ import java.util.Objects;
 @Internal
 @Experimental
 public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements BlockingHttpClient {
+    /**
+     * The pipeline of this client once its codecs were replaced, see
+     * {@link #setMediaTypeCodecRegistry}, else {@code null} for the one of its parent.
+     */
+    @Nullable
+    private volatile DefaultJdkHttpClient ownPipeline;
+
     JdkBlockingHttpClient(AbstractJdkHttpClient prototype) {
         super(prototype);
     }
@@ -93,12 +101,42 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
     public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request,
                                                                 @Nullable Argument<O> bodyType,
                                                                 @Nullable Argument<E> errorType) {
+        if (Schedulers.isInNonBlockingThread()) {
+            // same check (and message) as reactor's blockFirst(), which this client used before
+            throw new IllegalStateException("block()/blockFirst()/blockLast() are blocking, which is not supported in thread " + Thread.currentThread().getName());
+        }
         // the exchange of the client this client was made from
         Argument<?> error = errorType == null ? HttpClient.DEFAULT_ERROR_TYPE : errorType;
+        DefaultJdkHttpClient own = ownPipeline;
+        DefaultJdkHttpClient pipeline = own == null ? pipelineClient() : own;
         return Objects.requireNonNull(
-            AbstractHttpClient.awaitFlow(pipelineClient().exchangeFlow(request, bodyType, error)),
+            AbstractHttpClient.awaitFlow(pipeline.exchangeFlow(request, bodyType, error)),
             "The blocking HTTP client returned no response"
         );
+    }
+
+    /**
+     * Replaces the codecs of this client only, as before the client shared the pipeline of the
+     * client it was made from.
+     *
+     * @param mediaTypeCodecRegistry The {@link MediaTypeCodecRegistry}
+     */
+    @Override
+    public void setMediaTypeCodecRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry) {
+        super.setMediaTypeCodecRegistry(mediaTypeCodecRegistry);
+        ownPipeline = new DefaultJdkHttpClient(pipelineClient(), this);
+    }
+
+    /**
+     * Replaces the body handlers of this client only, as before the client shared the pipeline
+     * of the client it was made from.
+     *
+     * @param messageBodyHandlerRegistry The {@link MessageBodyHandlerRegistry}
+     */
+    @Override
+    public void setMessageBodyHandlerRegistry(MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
+        super.setMessageBodyHandlerRegistry(messageBodyHandlerRegistry);
+        ownPipeline = new DefaultJdkHttpClient(pipelineClient(), this);
     }
 
     @Override

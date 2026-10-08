@@ -31,6 +31,8 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.client.AbstractHttpClient;
+import io.micronaut.http.client.AsyncHttpClient;
+import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
@@ -38,6 +40,8 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CompositeCookieDecoder;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
@@ -80,13 +84,7 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
      * exchanges, shared with the blocking and the raw clients made from this client.
      */
     private final AbstractJdkHttpClient transport;
-    /**
-     * The JDK client of the transport, shared by the blocking clients. Not read here: it keeps the
-     * field the clients had before the transport was split off, which JdkBlockingHttpClientReuseSpec
-     * reads to check that a blocking client reuses the JDK client of its parent.
-     */
-    @SuppressWarnings({"unused", "FieldCanBeLocal"})
-    private final java.net.http.HttpClient client;
+    private final AsyncStreamingHttpClient asyncClient;
 
     @SuppressWarnings({"java:S107", "checkstyle:parameternumber"}) // too many parameters
     public DefaultJdkHttpClient(
@@ -120,22 +118,40 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
         );
         this.transport = new Transport(
             log,
-            loadBalancer,
-            httpVersion,
             configuration,
-            contextPath,
-            filterResolver,
-            this.clientFilterEntries,
             mediaTypeCodecRegistry,
             messageBodyHandlerRegistry,
-            requestBinderRegistry,
             clientId,
             conversionService,
             sslBuilder,
             cookieDecoder
         );
         this.transport.http = this;
-        this.client = transport.client;
+        this.asyncClient = super.toAsyncStreaming();
+    }
+
+    /**
+     * A client with the pipeline of the given client, which sends its requests with the given
+     * transport, e.g. a blocking client whose codecs were replaced.
+     *
+     * @param parent    The client whose pipeline is copied
+     * @param transport The transport, which encodes the requests with its codecs
+     */
+    DefaultJdkHttpClient(DefaultJdkHttpClient parent, AbstractJdkHttpClient transport) {
+        super(
+            parent.configuration,
+            parent.log,
+            parent.contextPath,
+            parent.loadBalancer,
+            transport.mediaTypeCodecRegistry,
+            transport.messageBodyHandlerRegistry == null ? parent.handlerRegistry : transport.messageBodyHandlerRegistry,
+            parent.filterResolver,
+            parent.clientFilterEntries,
+            parent.conversionService,
+            parent.informationalServiceId
+        );
+        this.transport = transport;
+        this.asyncClient = super.toAsyncStreaming();
     }
 
     public DefaultJdkHttpClient(@Nullable URI uri, ConversionService conversionService) {
@@ -207,6 +223,16 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
         return false;
     }
 
+    @Override
+    public AsyncHttpClient toAsync() {
+        return asyncClient;
+    }
+
+    @Override
+    public AsyncStreamingHttpClient toAsyncStreaming() {
+        return asyncClient;
+    }
+
     /**
      * @return The {@link MessageBodyHandlerRegistry}
      */
@@ -257,13 +283,28 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
     /**
      * The read timeout of the JDK client applies to the response headers, see
      * {@link HttpRequestFactory}, and a body that keeps coming is read to its end, as before
-     * the JDK client shared the pipeline: no overall timeout is derived from the read timeout.
+     * the JDK client shared the pipeline: no overall timeout is derived from the read timeout,
+     * and the request timeout only applies when the configuration opts in, see
+     * {@link HttpClientConfiguration#isJdkApplyRequestTimeout()}.
      *
-     * @return {@code null}
+     * @return The request timeout, or {@code null}
      */
     @Override
-    protected @Nullable Duration defaultRequestTimeout() {
-        return null;
+    protected @Nullable Duration requestTimeout() {
+        return configuration.isJdkApplyRequestTimeout() ? configuration.getRequestTimeout() : null;
+    }
+
+    /**
+     * The JDK client follows the redirects itself, as it always did, unless the configuration
+     * opts in to the redirects of the pipeline, see
+     * {@link HttpClientConfiguration#isJdkMicronautRedirects()}.
+     *
+     * @param request The request
+     * @return Whether its redirects are followed by the pipeline
+     */
+    @Override
+    protected boolean followsRedirects(MutableHttpRequest<?> request) {
+        return transport.micronautRedirects && super.followsRedirects(request);
     }
 
     @Override
@@ -296,18 +337,24 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
                                                                          byte[] bytes) {
         // the JDK client returns the response of an error status, decoded into the body type, when
         // it does not fail on an error status
-        boolean convert = !configuration.isExceptionOnErrorStatus() || convertsWithBodyType(response.code(), bodyType, errorType);
+        boolean error = response.code() >= 400 && configuration.isExceptionOnErrorStatus();
+        boolean decodeErrorType = configuration.isJdkDecodeErrorType();
         HttpResponseAdapter<O> full = new HttpResponseAdapter<>(
             new BufferedJdkResponse(response.jdkResponse(), bytes),
-            convert ? bodyType : null,
+            error && decodeErrorType ? null : bodyType,
             conversionService,
             mediaTypeCodecRegistry,
             handlerRegistry
         );
-        if (convert) {
+        if (!error) {
             return ExecutionFlow.just(full);
         }
-        return ExecutionFlow.error(errorStatusException(errorType, full));
+        if (decodeErrorType) {
+            return ExecutionFlow.error(errorStatusException(errorType, full));
+        }
+        // as the JDK client always did: the response decodes its body into the body type, and
+        // the error type is not used
+        return ExecutionFlow.error(decorate(new HttpClientResponseException(full.reason(), full)));
     }
 
     @Override
@@ -322,14 +369,16 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
 
     @Override
     protected boolean isSameOrigin(URI first, URI second) {
-        return AbstractJdkHttpClient.sameServer(first, second);
+        return sameServer(first, second);
     }
 
     @Override
     protected @Nullable HttpClientException mapReadFailure(Throwable cause) {
         if (cause instanceof IOException io) {
             // a failure of the body: the end of the body reported the outcome
-            return decorate(transport.sendError(null, null, io, true));
+            HttpClientException failure = transport.sendError(null, null, io, true);
+            // a shared timeout cannot take the service id of this client
+            return decorate(failure instanceof ReadTimeoutException timeout ? new ReadTimeoutException(timeout.isHeadersReceived()) : failure);
         }
         return null;
     }
@@ -365,23 +414,16 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
      * The JDK client and its state, for this client.
      */
     private static final class Transport extends AbstractJdkHttpClient {
-        @SuppressWarnings({"java:S107", "checkstyle:parameternumber"}) // too many parameters
+        @SuppressWarnings("java:S107") // too many parameters
         Transport(org.slf4j.Logger log,
-                  @Nullable LoadBalancer loadBalancer,
-                  @Nullable HttpVersionSelection httpVersion,
                   HttpClientConfiguration configuration,
-                  @Nullable String contextPath,
-                  @Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
-                  @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries,
                   @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
                   @Nullable MessageBodyHandlerRegistry messageBodyHandlerRegistry,
-                  RequestBinderRegistry requestBinderRegistry,
                   @Nullable String clientId,
                   ConversionService conversionService,
                   JdkClientSslBuilder sslBuilder,
                   CookieDecoder cookieDecoder) {
-            super(log, loadBalancer, httpVersion, configuration, contextPath, filterResolver, clientFilterEntries, mediaTypeCodecRegistry,
-                messageBodyHandlerRegistry, requestBinderRegistry, clientId, conversionService, sslBuilder, cookieDecoder);
+            super(log, configuration, mediaTypeCodecRegistry, messageBodyHandlerRegistry, clientId, conversionService, sslBuilder, cookieDecoder);
         }
     }
 

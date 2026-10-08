@@ -784,7 +784,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             // handle redirects or map the response bytes
             int code = byteBodyResponse.code();
             String location = byteBodyResponse.getHeaders().get(HttpHeaders.LOCATION);
-            if (code > 300 && code < 400 && configuration.isFollowRedirects() && request.getAttribute(NO_FOLLOW_REDIRECTS).isEmpty() && location != null) {
+            if (code > 300 && code < 400 && followsRedirects(request) && location != null) {
                 byteBodyResponse.close();
                 if (bufferedHeaders != null) {
                     // the headers of the redirect are not those of the response
@@ -829,6 +829,18 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 return readResponse.apply(request, byteBodyResponse);
             }
         });
+    }
+
+    /**
+     * Whether the redirects of a request are followed here: by default, as configured, unless the
+     * request disables them, see {@link #NO_FOLLOW_REDIRECTS}. A transport whose client follows
+     * the redirects itself returns {@code false}.
+     *
+     * @param request The request
+     * @return Whether its redirects are followed
+     */
+    protected boolean followsRedirects(MutableHttpRequest<?> request) {
+        return configuration.isFollowRedirects() && request.getAttribute(NO_FOLLOW_REDIRECTS).isEmpty();
     }
 
     /**
@@ -1005,6 +1017,22 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     }
 
     /**
+     * The failure of a streaming exchange whose response has an error status, with the error body
+     * decoded into the error type.
+     *
+     * @param errorType The error type
+     * @param response  The raw response
+     * @param body      The error body, which this takes over
+     * @return The flow of the failure
+     */
+    private ExecutionFlow<HttpResponse<?>> errorStatusResponse(Argument<?> errorType, R response, CloseableAvailableByteBody body) {
+        // a transport may return the response of an error status of an exchange, e.g. when the
+        // client does not fail on an error status: a stream fails in any case
+        return fullResponse(null, errorType, response, body)
+            .flatMap(full -> ExecutionFlow.error(errorStatusException(errorType, full)));
+    }
+
+    /**
      * Whether the body of an error response of a streaming call should be read and attached to
      * the {@link HttpClientResponseException}.
      *
@@ -1109,10 +1137,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             ).map(r -> (HttpResponse<O>) r);
         });
 
-        Duration requestTimeout = configuration.getRequestTimeout();
-        if (requestTimeout == null) {
-            requestTimeout = defaultRequestTimeout();
-        }
+        Duration requestTimeout = requestTimeout();
         if (requestTimeout != null) {
             if (!requestTimeout.isNegative()) {
                 flow = flow.timeout(requestTimeout, Objects.requireNonNull(scheduler.get()), null)
@@ -1128,13 +1153,17 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     }
 
     /**
-     * The timeout of an exchange whose response body is read whole, when no
-     * {@link HttpClientConfiguration#getRequestTimeout() request timeout} is configured: for
-     * compatibility, the read timeout plus one second.
+     * The timeout of an exchange whose response body is read whole: the
+     * {@link HttpClientConfiguration#getRequestTimeout() request timeout}, or, when none is
+     * configured, for compatibility, the read timeout plus one second.
      *
      * @return The timeout, or {@code null} for none
      */
-    protected @Nullable Duration defaultRequestTimeout() {
+    protected @Nullable Duration requestTimeout() {
+        Duration requestTimeout = configuration.getRequestTimeout();
+        if (requestTimeout != null) {
+            return requestTimeout;
+        }
         return configuration.getReadTimeout()
             .filter(d -> !d.isNegative())
             .map(d -> d.plusSeconds(1)).orElse(null);
@@ -1360,7 +1389,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                     // the error body is decoded into the error type, as for exchange
                     return InternalByteBody.bufferFlow(resp.byteBody())
                         .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t)))
-                        .flatMap(av -> fullResponse(null, errorType, resp, av));
+                        .flatMap(av -> errorStatusResponse(errorType, resp, av));
                 }
                 if (!hasBody(resp)) {
                     // no element

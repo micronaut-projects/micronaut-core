@@ -23,8 +23,9 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 /**
- * The redirects of the JDK client are followed by the pipeline it shares with the Netty client,
- * with the same behavior: these were followed by the JDK client itself before.
+ * The redirects of the JDK client are followed by the JDK client itself, as they always were,
+ * unless {@code jdk-micronaut-redirects} is enabled: then the pipeline it shares with the Netty
+ * client follows them, with the same behavior.
  */
 class JdkRedirectSpec extends Specification {
 
@@ -43,7 +44,78 @@ class JdkRedirectSpec extends Specification {
     @AutoCleanup
     ApplicationContext clientContext = ApplicationContext.run([
             'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+            'micronaut.http.client.jdk-micronaut-redirects'            : true,
     ])
+
+    @Shared
+    @AutoCleanup
+    ApplicationContext defaultContext = ApplicationContext.run([
+            'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+    ])
+
+    void "by default, a 301 or 302 redirect of a PUT is followed by the JDK client with a PUT with the body"() {
+        given:
+        HttpClient client = defaultContext.createBean(HttpClient, httpUrl())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.PUT("/jdk-redirect/put-$status", 'payload').contentType(MediaType.TEXT_PLAIN), String)
+
+        then:
+        response.body() == 'PUT payload'
+
+        cleanup:
+        client.close()
+
+        where:
+        status << [301, 302]
+    }
+
+    void "by default, a redirect loop returns the last redirect response"() {
+        given:
+        HttpClient client = defaultContext.createBean(HttpClient, httpUrl())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET('/jdk-redirect/loop'), String)
+
+        then:
+        response.code() == 301
+
+        cleanup:
+        client.close()
+    }
+
+    void "by default, a redirect from https to http is not followed"() {
+        given:
+        HttpClient client = defaultContext.createBean(HttpClient, httpsUrl())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/jdk-redirect/to-http?port=${httpPort()}"), String)
+
+        then:
+        response.code() == 301
+
+        cleanup:
+        client.close()
+    }
+
+    void "by default, a raw exchange follows redirects unless its options disable them"() {
+        given:
+        def raw = new JdkHttpClientFactory().createRawClient(httpUrl().toURI(), new io.micronaut.http.client.DefaultHttpClientConfiguration())
+
+        when:
+        HttpResponse<?> followed = reactor.core.publisher.Mono.from(raw.exchange(HttpRequest.GET('/jdk-redirect/to-content-type'), null, null)).block()
+        HttpResponse<?> notFollowed = reactor.core.publisher.Mono.from(raw.exchange(HttpRequest.GET('/jdk-redirect/to-content-type'), null, null,
+            io.micronaut.http.client.RawRequestOptions.builder().followRedirects(false).build())).block()
+
+        then:
+        followed.code() == 200
+        notFollowed.code() == 301
+
+        cleanup:
+        followed?.close()
+        notFollowed?.close()
+        raw.close()
+    }
 
     void "a 301 or 302 redirect of a PUT is followed with a GET without the body"() {
         given:

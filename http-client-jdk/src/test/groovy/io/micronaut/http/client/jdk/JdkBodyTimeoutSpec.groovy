@@ -14,8 +14,8 @@ import java.util.concurrent.TimeUnit
 /**
  * The timeouts of a response body read whole by the JDK client: the read timeout applies to the
  * response headers, and a body that keeps coming is read to its end, as before the JDK client
- * shared the pipeline of the clients; a configured request timeout that elapses while the body is
- * read says so.
+ * shared the pipeline of the clients. The request timeout is not applied, as before, unless the
+ * configuration opts in: then a request timeout that elapses while the body is read says so.
  */
 class JdkBodyTimeoutSpec extends Specification {
 
@@ -46,12 +46,41 @@ class JdkBodyTimeoutSpec extends Specification {
         upstream.close()
     }
 
-    void "a request timeout that elapses while the body is read says so"() {
+    void "the request timeout is not applied by default"() {
         given:
         RawSocketUpstream upstream = new RawSocketUpstream()
         ApplicationContext ctx = ApplicationContext.run([
                 'micronaut.http.client.read-timeout'   : '30s',
                 'micronaut.http.client.request-timeout': '1s',
+        ])
+        HttpClient client = ctx.createBean(HttpClient, upstream.uri('/').toURL())
+
+        when:
+        def pending = Mono.from(client.exchange(HttpRequest.GET('/slow'), String)).toFuture()
+        RawSocketUpstream.Connection connection = upstream.nextConnection(10)
+        connection.awaitRequest(10)
+        connection.write('HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 4\r\n\r\nab')
+        // longer than the request timeout
+        Thread.sleep(2000)
+        connection.write('cd')
+        HttpResponse<String> response = pending.get(10, TimeUnit.SECONDS)
+
+        then:
+        response.body() == 'abcd'
+
+        cleanup:
+        client.close()
+        ctx.close()
+        upstream.close()
+    }
+
+    void "an applied request timeout that elapses while the body is read says so"() {
+        given:
+        RawSocketUpstream upstream = new RawSocketUpstream()
+        ApplicationContext ctx = ApplicationContext.run([
+                'micronaut.http.client.read-timeout'             : '30s',
+                'micronaut.http.client.request-timeout'          : '1s',
+                'micronaut.http.client.jdk-apply-request-timeout': true,
         ])
         HttpClient client = ctx.createBean(HttpClient, upstream.uri('/').toURL())
 

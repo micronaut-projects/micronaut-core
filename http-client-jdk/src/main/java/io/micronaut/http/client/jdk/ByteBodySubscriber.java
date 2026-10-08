@@ -24,6 +24,8 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ReactiveByteBufferByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscription;
@@ -31,6 +33,7 @@ import org.reactivestreams.Subscription;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -60,18 +63,24 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
     @Nullable
     private final Consumer<@Nullable Throwable> onEnd;
     private final AtomicBoolean ended = new AtomicBoolean();
+    private final boolean clientFailures;
 
     public ByteBodySubscriber(BodySizeLimits limits) {
-        this(limits, null);
+        this(limits, false, null);
     }
 
     /**
-     * @param limits The body size limits
-     * @param onEnd  Called once when the body ends: with {@code null} when it is complete, or
-     *               when its consumer let the rest go, and with the failure when it failed
+     * @param limits         The body size limits
+     * @param clientFailures Whether an I/O failure of the body is passed on as an
+     *                       {@link HttpClientException}, as the failures of the bodies of the
+     *                       streams of the Netty client, instead of as it is
+     * @param onEnd          Called once when the body ends: with {@code null} when it is
+     *                       complete, or when its consumer let the rest go, and with the failure
+     *                       of the JDK client when it failed
      */
-    public ByteBodySubscriber(BodySizeLimits limits, @Nullable Consumer<@Nullable Throwable> onEnd) {
+    public ByteBodySubscriber(BodySizeLimits limits, boolean clientFailures, @Nullable Consumer<@Nullable Throwable> onEnd) {
         this.mapped = BODY_FACTORY.adapt(defer, limits, null, null);
+        this.clientFailures = clientFailures;
         this.onEnd = onEnd;
     }
 
@@ -143,7 +152,24 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
             throwable = new ResponseClosedException("Connection closed before the response body was received completely", true);
         }
         end(throwable);
+        if (clientFailures) {
+            throwable = clientFailure(throwable);
+        }
         defer.onError(throwable);
+    }
+
+    /**
+     * @param failure A failure of the body
+     * @return The failure as a client exception
+     */
+    private static Throwable clientFailure(Throwable failure) {
+        if (failure instanceof HttpTimeoutException) {
+            return new ReadTimeoutException(true);
+        }
+        if (failure instanceof IOException) {
+            return new HttpClientException("Error occurred reading HTTP response: " + failure.getMessage(), failure);
+        }
+        return failure;
     }
 
     /**

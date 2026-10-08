@@ -16,18 +16,16 @@
 package io.micronaut.http.client.jdk;
 
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
+import io.micronaut.http.client.AbstractHttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
@@ -35,15 +33,12 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
-import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.cookie.Cookie;
-import io.micronaut.http.filter.HttpClientFilterResolver;
-import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.util.HttpHeadersUtil;
@@ -67,7 +62,6 @@ import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpTimeoutException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -77,6 +71,8 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletableFuture;
 import java.util.Objects;
 import java.nio.ByteBuffer;
+
+import static io.micronaut.http.client.AbstractHttpClient.report;
 
 /**
  * Abstract implementation of {@link DefaultJdkHttpClient} that provides common functionality.
@@ -100,29 +96,28 @@ abstract class AbstractJdkHttpClient {
      * Request attribute with the {@link UploadListener} of the body of a raw request.
      */
     static final String UPLOAD_LISTENER_ATTRIBUTE = "micronaut.http.client.jdk.raw.upload-listener";
-    @Nullable
-    protected final LoadBalancer loadBalancer;
-    @Nullable
-    protected final HttpVersionSelection httpVersion;
     protected final HttpClientConfiguration configuration;
-    @Nullable
-    protected final String contextPath;
     protected final HttpClient client;
     protected final CookieManager cookieManager;
-    protected final RequestBinderRegistry requestBinderRegistry;
     @Nullable
     protected final String clientId;
     protected final ConversionService conversionService;
     protected final JdkClientSslBuilder sslBuilder;
     protected final Logger log;
-    @Nullable
-    protected final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
-    protected final List<HttpFilterResolver.FilterEntry> clientFilterEntries;
     protected final CookieDecoder cookieDecoder;
     @Nullable
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     @Nullable
     protected MessageBodyHandlerRegistry messageBodyHandlerRegistry;
+    /**
+     * The size limits of the streamed response bodies.
+     */
+    final BodySizeLimits sizeLimits;
+    /**
+     * Whether the redirects are followed by the client pipeline, see
+     * {@link HttpClientConfiguration#isJdkMicronautRedirects()}, else by the JDK client.
+     */
+    final boolean micronautRedirects;
     /**
      * The client for raw exchanges and for proxying: it follows redirects as configured, and
      * keeps no cookies, because the exchanges a raw client relays belong to different users.
@@ -142,21 +137,17 @@ abstract class AbstractJdkHttpClient {
     DefaultJdkHttpClient http;
 
     protected AbstractJdkHttpClient(AbstractJdkHttpClient prototype) {
-        this.loadBalancer = prototype.loadBalancer;
-        this.httpVersion = prototype.httpVersion;
         this.configuration = prototype.configuration;
-        this.contextPath = prototype.contextPath;
         this.client = prototype.client;
+        this.sizeLimits = prototype.sizeLimits;
+        this.micronautRedirects = prototype.micronautRedirects;
         this.rawClient = prototype.rawClient;
         this.rawNoRedirectClient = prototype.rawNoRedirectClient;
         this.cookieManager = prototype.cookieManager;
-        this.requestBinderRegistry = prototype.requestBinderRegistry;
         this.clientId = prototype.clientId;
         this.conversionService = prototype.conversionService;
         this.sslBuilder = prototype.sslBuilder;
         this.log = prototype.log;
-        this.filterResolver = prototype.filterResolver;
-        this.clientFilterEntries = prototype.clientFilterEntries;
         this.cookieDecoder = prototype.cookieDecoder;
         this.mediaTypeCodecRegistry = prototype.mediaTypeCodecRegistry;
         this.messageBodyHandlerRegistry = prototype.messageBodyHandlerRegistry;
@@ -165,32 +156,21 @@ abstract class AbstractJdkHttpClient {
 
     /**
      * @param log                        the logger to use
-     * @param loadBalancer               The {@link LoadBalancer} to use for selecting servers
-     * @param httpVersion                The {@link HttpVersionSelection} to prefer
      * @param configuration              The {@link HttpClientConfiguration} to use
-     * @param contextPath                The base URI to prepend to request uris
      * @param mediaTypeCodecRegistry     The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      * @param messageBodyHandlerRegistry The {@link MessageBodyHandlerRegistry} to use for encoding and decoding objects
-     * @param requestBinderRegistry      The request binder registry
      * @param clientId                   The client id
      * @param conversionService          The {@link ConversionService}
      * @param sslBuilder                 The {@link JdkClientSslBuilder} for creating an {@link javax.net.ssl.SSLContext}
+     * @param cookieDecoder              The cookie decoder
      */
-    @SuppressWarnings({"java:S107", "checkstyle:parameternumber"}) // too many parameters
     protected AbstractJdkHttpClient(
         Logger log,
-        @Nullable LoadBalancer loadBalancer,
-        @Nullable HttpVersionSelection httpVersion,
         HttpClientConfiguration configuration,
-        @Nullable
-        String contextPath,
-        @Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
-        @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries,
         @Nullable
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
         @Nullable
         MessageBodyHandlerRegistry messageBodyHandlerRegistry,
-        RequestBinderRegistry requestBinderRegistry,
         @Nullable
         String clientId,
         ConversionService conversionService,
@@ -199,39 +179,28 @@ abstract class AbstractJdkHttpClient {
     ) {
         this.cookieDecoder = cookieDecoder;
         this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(log);
-        this.loadBalancer = loadBalancer;
-        this.httpVersion = httpVersion;
         this.configuration = configuration;
+        this.sizeLimits = new BodySizeLimits(Long.MAX_VALUE, configuration.getMaxContentLength());
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
-        this.requestBinderRegistry = requestBinderRegistry;
         this.clientId = clientId;
         this.conversionService = conversionService;
         this.cookieManager = new CookieManager();
         this.sslBuilder = sslBuilder;
 
-        this.filterResolver = filterResolver;
-        this.clientFilterEntries = clientFilterEntries(filterResolver, clientFilterEntries);
-
         if (System.getProperty("jdk.internal.httpclient.disableHostnameVerification") != null && log.isWarnEnabled()) {
             log.warn("The jdk.internal.httpclient.disableHostnameVerification system property is set. This is not recommended for production use as it prevents proper certificate validation and may allow man-in-the-middle attacks.");
         }
 
-        if (StringUtils.isNotEmpty(contextPath)) {
-            if (contextPath.charAt(0) != '/') {
-                contextPath = '/' + contextPath;
-            }
-            this.contextPath = contextPath;
-        } else {
-            this.contextPath = null;
-        }
-
-        // the redirects are followed by the client pipeline, see AbstractHttpClient, with the
-        // configuration and the options of an exchange
-        this.client = buildClient(HttpClient.Redirect.NEVER, true);
-        Supplier<HttpClient> raw = SupplierUtil.memoized(() -> buildClient(HttpClient.Redirect.NEVER, false));
-        this.rawClient = raw;
-        this.rawNoRedirectClient = raw;
+        // the redirects are followed by the JDK client, as they always were, unless the client
+        // pipeline follows them, see AbstractHttpClient, with the configuration and the options
+        // of an exchange
+        this.micronautRedirects = configuration.isJdkMicronautRedirects();
+        HttpClient.Redirect redirect = configuration.isFollowRedirects() && !micronautRedirects ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER;
+        this.client = buildClient(redirect, true);
+        Supplier<HttpClient> rawNoRedirect = SupplierUtil.memoized(() -> buildClient(HttpClient.Redirect.NEVER, false));
+        this.rawClient = redirect == HttpClient.Redirect.NORMAL ? SupplierUtil.memoized(() -> buildClient(redirect, false)) : rawNoRedirect;
+        this.rawNoRedirectClient = rawNoRedirect;
     }
 
     private HttpClient buildClient(HttpClient.Redirect redirect, boolean cookies) {
@@ -279,19 +248,6 @@ abstract class AbstractJdkHttpClient {
         }
 
         return builder.build();
-    }
-
-    private static List<HttpFilterResolver.FilterEntry> clientFilterEntries(@Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
-                                                                            @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries) {
-        if (clientFilterEntries != null) {
-            return clientFilterEntries;
-        }
-        if (filterResolver == null) {
-            return Collections.emptyList();
-        }
-        return filterResolver.resolveFilterEntries(
-                new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA)
-        );
     }
 
     private static HttpCookie toJdkCookie(Cookie cookie,
@@ -397,23 +353,6 @@ abstract class AbstractJdkHttpClient {
     }
 
     /**
-     * @return Whether both URIs name the same server: scheme and host ignoring case, and port,
-     * the default port of the scheme when there is none
-     */
-    static boolean sameServer(URI a, URI b) {
-        return a.getScheme().equalsIgnoreCase(b.getScheme())
-            && a.getHost() != null && a.getHost().equalsIgnoreCase(b.getHost())
-            && effectivePort(a) == effectivePort(b);
-    }
-
-    private static int effectivePort(URI uri) {
-        if (uri.getPort() != -1) {
-            return uri.getPort();
-        }
-        return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
-    }
-
-    /**
      * Map an I/O failure of {@link HttpClient#sendAsync}: a request that was not sent, because the
      * connection could not be opened, is an {@link UnprocessedRequestException}, so that the caller
      * can send it again; a connection closed before the response arrived is a
@@ -464,18 +403,6 @@ abstract class AbstractJdkHttpClient {
             unprocessed.setTarget(uri, selection == null ? null : selection.instance());
         }
         return result;
-    }
-
-    /**
-     * Report the outcome of an exchange to the load balancer that selected its instance, if any.
-     *
-     * @param selection The selection of the load balancer, or {@code null}
-     * @param outcome   The outcome
-     */
-    static void report(@Nullable LoadBalancerSelection selection, LoadBalancer.Outcome outcome) {
-        if (selection != null) {
-            selection.report(outcome);
-        }
     }
 
     /**
@@ -550,11 +477,16 @@ abstract class AbstractJdkHttpClient {
         }
         // a raw client relays exchanges of different users, so it must not keep the cookies an upstream sets
         boolean raw = request.getAttribute(RAW_ATTRIBUTE).isPresent();
-        HttpClient httpClient = raw ? rawClient.get() : client;
+        HttpClient httpClient;
+        if (raw) {
+            // the JDK client follows the redirects of a raw exchange unless its options disable them
+            httpClient = request.getAttribute(AbstractHttpClient.NO_FOLLOW_REDIRECTS).isPresent() ? rawNoRedirectClient.get() : rawClient.get();
+        } else {
+            httpClient = client;
+        }
         if (!raw && bufferedHeaders != null) {
             return sendBuffered(httpClient, httpRequest, selection, bufferedHeaders);
         }
-        BodySizeLimits limits = new BodySizeLimits(Long.MAX_VALUE, configuration.getMaxContentLength());
         // whether the headers arrived, so that a failure of the body is told from one before
         AtomicBoolean headersReceived = new AtomicBoolean();
         DelayedExecutionFlow<JdkByteBodyResponse> result = DelayedExecutionFlow.create();
@@ -566,7 +498,9 @@ abstract class AbstractJdkHttpClient {
                 if (selection != null) {
                     selection.claim();
                 }
-                return new ByteBodySubscriber(limits, failure -> reportBodyEnd(selection, responseInfo.statusCode(), failure));
+                // the body of a stream fails with a client exception; the body of a raw exchange
+                // fails with the failure of the JDK client, as it always did
+                return new ByteBodySubscriber(sizeLimits, !raw, failure -> reportBodyEnd(selection, responseInfo.statusCode(), failure));
             });
         } catch (RuntimeException e) {
             return ExecutionFlow.error(e);
