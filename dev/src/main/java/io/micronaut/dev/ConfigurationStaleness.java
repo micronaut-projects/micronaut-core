@@ -279,7 +279,7 @@ final class ConfigurationStaleness {
                 // a reference whose type cannot load is never resolved
             }
         }
-        Optional<io.micronaut.context.BeanDependencyGraph> graph = current.findDependencyGraph();
+        Optional<io.micronaut.context.BeanDependencyGraph> graph = current instanceof ConfigurableBeanContext configurable ? configurable.findDependencyGraph() : Optional.empty();
         for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(io.micronaut.inject.qualifiers.Qualifiers.any())) {
             BeanDefinition<?> definition = registration.getBeanDefinition();
             resolved.add(definition.getClass().getName());
