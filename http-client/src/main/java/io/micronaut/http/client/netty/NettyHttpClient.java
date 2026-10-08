@@ -97,6 +97,7 @@ import io.micronaut.http.client.multipart.MultipartDataFactory;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.AsyncStreamingHttpClient;
+import io.micronaut.http.client.ElementsStages;
 import io.micronaut.http.client.ByteBodyElements;
 import io.micronaut.http.client.ElementsResponse;
 import io.micronaut.http.client.SubscriberBodyElements;
@@ -957,6 +958,8 @@ final class NettyHttpClient implements
         if (acceptEvents) {
             EventStreams.acceptEvents(mutableRequest);
         }
+        // the last response with elements, closed if a filter replaces it
+        AtomicReference<@Nullable HttpResponse<BodyElements<T>>> created = new AtomicReference<>();
         return resolveRequestURI(mutableRequest).flatMap(target -> sendRequestWithRedirects(
             propagatedContext,
             null,
@@ -970,7 +973,9 @@ final class NettyHttpClient implements
                         .flatMap(av -> handleExchangeResponse(null, errorType, resp, av));
                 }
                 try {
-                    return ExecutionFlow.just(elements.apply(resp));
+                    HttpResponse<BodyElements<T>> withElements = elements.apply(resp);
+                    created.set(withElements);
+                    return ExecutionFlow.just(withElements);
                 } catch (RuntimeException e) {
                     resp.close();
                     return ExecutionFlow.error(e);
@@ -978,6 +983,11 @@ final class NettyHttpClient implements
             }
         )).flatMap(response -> {
             if (!(response.getBody().orElse(null) instanceof BodyElements<?>)) {
+                HttpResponse<BodyElements<T>> replaced = created.getAndSet(null);
+                if (replaced != null) {
+                    // nobody reads them: the connection is released
+                    ElementsStages.closeElements(replaced);
+                }
                 return ExecutionFlow.error(new IllegalStateException("Response has been replaced by a response without elements. Do not replace the response in client filters for streaming requests"));
             }
             @SuppressWarnings("unchecked")

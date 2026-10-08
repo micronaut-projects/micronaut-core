@@ -97,6 +97,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
@@ -356,9 +357,19 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 future.complete(binderResult.errorResult());
             } else {
                 MutableHttpRequest<?> request = Objects.requireNonNull(binderResult.request());
-                CompletionStage<?> responseStage = isBodyElements(valueType)
+                boolean bodyElements = isBodyElements(valueType);
+                CompletionStage<?> responseStage = bodyElements
                     ? httpClientElementsStage(httpClient, request, valueType, errorType)
                     : httpClientResponseStage(httpClient.toAsync(), request, returnType, errorType, valueType);
+                if (bodyElements) {
+                    // cancelling the future of the method, e.g. a cancelled coroutine, cancels the
+                    // exchange, and the elements of a response that arrives anyway are closed
+                    future.whenComplete((result, throwable) -> {
+                        if (throwable instanceof CancellationException) {
+                            cancel(responseStage);
+                        }
+                    });
+                }
                 responseStage.whenComplete((result, throwable) -> {
                     if (throwable != null) {
                         Throwable cause = (throwable instanceof CompletionException completionException && completionException.getCause() != null)
@@ -368,7 +379,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             LOG.debug(HTTP_ERROR_RESPONSE_LOG_MESSAGE, declaringType.getName(), cause.getMessage(), cause);
                         }
                         if (cause instanceof HttpClientResponseException e && e.code() == HttpStatus.NOT_FOUND.getCode()) {
-                            if (reactiveValueType == Optional.class) {
+                            if (bodyElements) {
+                                // no element, as a streaming publisher emits none
+                                BodyElements<Object> none = BodyElements.of(() -> CompletableFuture.completedStage(Optional.empty()));
+                                future.complete(HttpResponse.class.isAssignableFrom(reactiveValueType) ? ElementsResponse.of(e.getResponse(), none) : none);
+                                return;
+                            } else if (reactiveValueType == Optional.class) {
                                 future.complete(Optional.empty());
                                 return;
                             } else if (HttpResponse.class.isAssignableFrom(reactiveValueType)) {
@@ -380,8 +396,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             }
                         }
                         future.completeExceptionally(cause);
-                    } else {
-                        future.complete(result);
+                    } else if (!future.complete(result) && result != null && bodyElements) {
+                        // cancelled meanwhile: nobody reads the elements
+                        closeElements(result);
                     }
                 });
             }
@@ -682,6 +699,22 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return Flux.error(new ConfigurationException("Cannot create the generated HTTP client's " +
             "required return type, since no TypeConverter from ByteBuffer to " +
             reactiveValueType + " is registered"));
+    }
+
+    private static void cancel(CompletionStage<?> stage) {
+        try {
+            stage.toCompletableFuture().cancel(false);
+        } catch (UnsupportedOperationException ignored) {
+            // a stage that cannot be cancelled: its elements are closed when they arrive
+        }
+    }
+
+    private static void closeElements(Object result) {
+        if (result instanceof BodyElements<?> elements) {
+            elements.close();
+        } else if (result instanceof HttpResponse<?> response) {
+            ElementsStages.closeElements(response);
+        }
     }
 
     /**
