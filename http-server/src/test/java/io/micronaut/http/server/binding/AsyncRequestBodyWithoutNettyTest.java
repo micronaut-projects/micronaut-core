@@ -60,7 +60,7 @@ class AsyncRequestBodyWithoutNettyTest {
     @Test
     void sharedRegistryIsTheDefaultWithoutANettyServer() {
         try (ApplicationContext ctx = ApplicationContext.run()) {
-            assertInstanceOf(DefaultServerRequestBinderRegistry.class, ctx.getBean(RequestBinderRegistry.class));
+            assertInstanceOf(DefaultServerRequestBinderRegistry.class, ctx.getBean(io.micronaut.http.bind.ServerRequestBinderRegistry.class));
             assertInstanceOf(DefaultServerRequestBinderRegistry.class, ctx.getBean(RequestArgumentSatisfier.class).getBinderRegistry());
         }
     }
