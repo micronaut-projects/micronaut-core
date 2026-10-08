@@ -122,7 +122,9 @@ public interface BeanDependencyGraph {
      *                  (an {@code @EachBean} member) a delegate carrying that qualifier, so that the member is told apart
      * @param dependency The definition of the received bean
      * @param kind How the dependency was injected
-     * @param lazy Whether the injection point is a provider, so the dependency is resolved on each use rather than held
+     * @param lazy Whether the dependent received a provider of the dependency rather than the dependency itself. The edge
+     *             names each definition the provider's type argument and qualifier select, as the provider resolves one
+     *             of them on each call and holds none
      * @param collection Whether the injection point is a collection or array of a type the dependency implements
      */
     record BeanDependency(BeanDefinition<?> dependent, BeanDefinition<?> dependency, InjectionKind kind, boolean lazy, boolean collection) {

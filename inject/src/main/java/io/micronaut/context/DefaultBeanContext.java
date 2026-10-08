@@ -3576,9 +3576,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (beanRegistration == null) {
                 beanRegistration = singletonScope.getOrCreate(this, resolutionContext, definition, beanType, qualifier);
             }
-            if (dependencyGraph != null) {
-                dependencyGraph.record(resolutionContext, beanRegistration.beanDefinition);
-            }
+            recordDependency(resolutionContext, beanRegistration.beanDefinition, qualifier);
             return beanRegistration;
         }
 
@@ -3597,10 +3595,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     ((Qualified<T>) bean).$withBeanQualifier(q);
                 }
             }
-            if (dependencyGraph != null) {
-                // the receiving bean holds the scoped proxy, which is what a reload must know
-                dependencyGraph.record(resolutionContext, registration.beanDefinition);
-            }
+            // the receiving bean holds the scoped proxy, which is what a reload must know
+            recordDependency(resolutionContext, registration.beanDefinition, q);
             return registration;
         }
 
@@ -3610,18 +3606,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 definition = getProxyTargetBeanDefinition(beanType, qualifier);
             }
             BeanRegistration<T> scoped = getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, beanType, definition, heldRegistration);
-            if (dependencyGraph != null) {
-                dependencyGraph.record(resolutionContext, scoped.beanDefinition);
-            }
+            recordDependency(resolutionContext, scoped.beanDefinition, qualifier);
             return scoped;
         }
         // Unknown scope, prototype scope etc
         BeanRegistration<T> prototype = createRegistration(resolutionContext, beanType, qualifier, definition, true);
-        if (dependencyGraph != null) {
-            // a prototype belongs to the bean that received it, and what the prototype received is recorded
-            // under the prototype's definition, so a path through it is not lost
-            dependencyGraph.record(resolutionContext, prototype.beanDefinition);
-        }
+        // a prototype belongs to the bean that received it, and what the prototype received is recorded
+        // under the prototype's definition, so a path through it is not lost
+        recordDependency(resolutionContext, prototype.beanDefinition, qualifier);
         return prototype;
     }
 
@@ -3790,6 +3782,42 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (dependencyGraph != null && owner != null) {
             dependencyGraph.recordOwned(owner, registration.getBeanDefinition());
         }
+    }
+
+    /**
+     * Whether the context records a {@link BeanDependencyGraph}.
+     *
+     * @return True when bean dependencies are tracked
+     */
+    final boolean isTrackingBeanDependencies() {
+        return dependencyGraph != null;
+    }
+
+    /**
+     * Records, when the graph is recorded, that the bean being created received the given bean at the current
+     * injection point. A provider is recorded as what it resolves: an edge, marked lazy, to each definition its type
+     * argument and qualifier select, since every provider of a kind shares one definition that names no target.
+     *
+     * @param resolutionContext The resolution context of the receiving bean
+     * @param received The definition of the received bean
+     * @param qualifier The qualifier the bean was resolved with
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void recordDependency(@Nullable BeanResolutionContext resolutionContext, BeanDefinition<?> received, @Nullable Qualifier<?> qualifier) {
+        DefaultBeanDependencyGraph graph = dependencyGraph;
+        if (graph == null || resolutionContext == null) {
+            return;
+        }
+        BeanDefinition<?> target = received instanceof BeanDefinitionDelegate<?> delegate ? delegate.getDelegate() : received;
+        if (target instanceof AbstractProviderDefinition<?>) {
+            Argument provided = DefaultBeanDependencyGraph.providedArgument(resolutionContext);
+            // a provider of Object names no target: every bean would be a candidate
+            if (provided != null && provided.getType() != Object.class) {
+                graph.recordProvided(resolutionContext, getBeanDefinitions(provided, (Qualifier) qualifier));
+            }
+            return;
+        }
+        graph.record(resolutionContext, received);
     }
 
     @SuppressWarnings({"unchecked", "NullAway"}) // Nullable factory definitions may produce a registration without an instance.

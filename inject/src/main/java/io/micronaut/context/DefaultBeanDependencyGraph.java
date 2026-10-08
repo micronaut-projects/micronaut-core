@@ -80,25 +80,62 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
      * @param dependency The received bean's definition
      */
     void record(@Nullable BeanResolutionContext resolutionContext, BeanDefinition<?> dependency) {
-        if (resolutionContext == null) {
-            return;
-        }
-        BeanResolutionContext.Segment<?, ?> segment = resolutionContext.getPath().currentSegment().orElse(null);
+        BeanResolutionContext.Segment<?, ?> segment = currentSegment(resolutionContext);
         if (segment == null) {
             return;
         }
-        BeanDefinition<?> dependent = receiver(segment);
-        if (dependent == null || dependent == dependency) {
+        Argument<?> argument = segment.getArgument();
+        add(segment, dependency, false, argument != null && (argument.isContainerType() || argument.getType().isArray()));
+    }
+
+    /**
+     * The type a provider being injected at the context's current injection point resolves, such as {@code Repo}
+     * for a {@code BeanProvider<Repo>} or an {@code Optional<Provider<Repo>>}.
+     *
+     * @param resolutionContext The resolution context of the receiving bean, or null outside a resolution
+     * @return The provided type, or null when the injection point is not a provider of a known type
+     */
+    @Nullable
+    static Argument<?> providedArgument(@Nullable BeanResolutionContext resolutionContext) {
+        BeanResolutionContext.Segment<?, ?> segment = currentSegment(resolutionContext);
+        Argument<?> argument = segment == null ? null : segment.getArgument();
+        if (argument != null && argument.isOptional()) {
+            argument = argument.getFirstTypeVariable().orElse(null);
+        }
+        if (argument == null || !argument.isProvider()) {
+            return null;
+        }
+        return argument.getFirstTypeVariable().orElse(null);
+    }
+
+    /**
+     * Records that the bean the given resolution context is creating received, at the context's current injection
+     * point, a provider that resolves one of the given beans on each call: an edge to each candidate, marked
+     * {@link BeanDependency#lazy() lazy}, since the receiving bean holds the provider, not the bean.
+     *
+     * @param resolutionContext The resolution context of the receiving bean, or null outside a resolution
+     * @param candidates The definitions the provider may resolve
+     */
+    void recordProvided(@Nullable BeanResolutionContext resolutionContext, Collection<? extends BeanDefinition<?>> candidates) {
+        BeanResolutionContext.Segment<?, ?> segment = currentSegment(resolutionContext);
+        if (segment == null) {
             return;
         }
-        Argument<?> argument = segment.getArgument();
-        add(new BeanDependency(
-            dependent,
-            dependency,
-            kindOf(segment),
-            argument != null && argument.isProvider(),
-            argument != null && (argument.isContainerType() || argument.getType().isArray())
-        ));
+        for (BeanDefinition<?> candidate : candidates) {
+            add(segment, candidate, true, false);
+        }
+    }
+
+    private static BeanResolutionContext.@Nullable Segment<?, ?> currentSegment(@Nullable BeanResolutionContext resolutionContext) {
+        return resolutionContext == null ? null : resolutionContext.getPath().currentSegment().orElse(null);
+    }
+
+    private void add(BeanResolutionContext.Segment<?, ?> segment, BeanDefinition<?> dependency, boolean lazy, boolean collection) {
+        BeanDefinition<?> dependent = receiver(segment);
+        if (dependent == null || dependent == dependency || Key.of(dependent).equals(Key.of(dependency))) {
+            return;
+        }
+        add(new BeanDependency(dependent, dependency, kindOf(segment), lazy, collection));
     }
 
     /**
@@ -110,10 +147,7 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
      */
     @Nullable
     Owner ownerOf(@Nullable BeanResolutionContext resolutionContext) {
-        if (resolutionContext == null) {
-            return null;
-        }
-        BeanResolutionContext.Segment<?, ?> segment = resolutionContext.getPath().currentSegment().orElse(null);
+        BeanResolutionContext.Segment<?, ?> segment = currentSegment(resolutionContext);
         if (segment == null) {
             return null;
         }

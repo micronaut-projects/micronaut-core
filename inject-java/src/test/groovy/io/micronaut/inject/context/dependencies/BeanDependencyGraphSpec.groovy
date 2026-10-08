@@ -18,6 +18,9 @@ package io.micronaut.inject.context.dependencies
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanDependencyGraph
 import io.micronaut.context.BeanDependencyGraph.InjectionKind
+import io.micronaut.context.BeanProvider
+import io.micronaut.inject.provider.BeanProviderDefinition
+import jakarta.inject.Provider
 import spock.lang.Specification
 
 class BeanDependencyGraphSpec extends Specification {
@@ -92,8 +95,24 @@ class BeanDependencyGraphSpec extends Specification {
         edge(dependents, SetterService).kind() == InjectionKind.METHOD
         edge(dependents, SetterService).reinjectable()
 
-        and: "a bean that resolves the repository through a provider holds nothing and is not recorded"
-        !dependents.any { it.dependent().beanType == ProviderService }
+        and: "a bean that resolves the repository through a provider is recorded against the repository, lazily"
+        edge(dependents, ProviderService).lazy()
+        edge(dependents, ProviderService).kind() == InjectionKind.CONSTRUCTOR
+        !edge(dependents, ProviderService).reinjectable()
+
+        and: "a provider is recorded as each candidate its type argument and qualifier select"
+        def providerEdges = graph.dependenciesOf(context.getBeanDefinition(ProviderService))
+        providerEdges.every { it.lazy() }
+        providerEdges.findAll { it.kind() == InjectionKind.FIELD }*.dependency()*.beanType.toSet() == [AHandler, BHandler] as Set
+        providerEdges.findAll { it.kind() == InjectionKind.METHOD }*.dependency()*.beanType == [AHandler]
+        providerEdges*.dependency()*.beanType.toSet() == [Repo, AHandler, BHandler] as Set
+
+        and: "the shared provider definition is not a node every holder of a provider points at"
+        graph.dependentsOf(new BeanProviderDefinition()).isEmpty()
+        !graph.dependencies().any { BeanProvider.isAssignableFrom(it.dependency().beanType) || Provider.isAssignableFrom(it.dependency().beanType) }
+
+        and: "a lazy edge is not followed by the transitive walks"
+        !graph.transitiveDependenciesOf(context.getBeanDefinition(ProviderService))*.beanType.contains(Repo)
 
         and: "a collection injection is recorded once per member and marked as such"
         def listEdges = graph.dependenciesOf(context.getBeanDefinition(ListService))
