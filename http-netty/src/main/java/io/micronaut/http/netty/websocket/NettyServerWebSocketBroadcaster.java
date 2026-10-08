@@ -25,17 +25,13 @@ import io.netty.channel.Channel;
 import io.netty.channel.group.ChannelGroupException;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.Attribute;
-import io.netty.util.internal.ThreadExecutorMap;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Predicate;
 
 /**
@@ -47,8 +43,6 @@ import java.util.function.Predicate;
 @Singleton
 @Requires(beans = WebSocketSessionRepository.class)
 public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
-
-    private static final Logger LOG = LoggerFactory.getLogger(NettyServerWebSocketBroadcaster.class);
 
     private final WebSocketMessageEncoder webSocketMessageEncoder;
     private final WebSocketSessionRepository webSocketSessionRepository;
@@ -65,10 +59,11 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
     }
 
     /**
-     * Broadcast and wait until the message is written to the matching sessions, like
-     * {@link #broadcastAsync(Object, MediaType, Predicate)}. On an event loop thread it does not
-     * wait, since the writes it would wait for may have to run on that thread: it fails if the
-     * broadcast already failed, and a later failure is logged.
+     * Broadcast and wait until the message is written to the matching sessions.
+     *
+     * <p>Do not call it on an event loop thread, e.g. in a handler that runs on the event loop:
+     * the writes it waits for may have to run on that thread, which then blocks for good. Use
+     * {@link #broadcastAsync(Object, MediaType, Predicate)} there.</p>
      *
      * @param message   The message
      * @param mediaType The media type of the message
@@ -77,26 +72,16 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
      */
     @Override
     public <T> void broadcastSync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
-        CompletableFuture<T> broadcast = broadcastAsync(message, mediaType, filter);
-        if (ThreadExecutorMap.currentExecutor() != null && !broadcast.isDone()) {
-            broadcast.whenComplete((ignored, error) -> {
-                if (error != null && LOG.isErrorEnabled()) {
-                    LOG.error("WebSocket broadcast failed: {}", error.getMessage(), error);
-                }
-            });
-            return;
-        }
+        WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
         try {
-            broadcast.get();
+            webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, ch -> {
+                Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
+                NettyWebSocketSession s = attr.get();
+                return s != null && s.isOpen() && filter.test(s);
+            }).sync();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new WebSocketSessionException("Broadcast Interrupted");
-        } catch (ExecutionException e) {
-            Throwable cause = e.getCause() == null ? e : e.getCause();
-            if (cause instanceof WebSocketSessionException sessionException) {
-                throw sessionException;
-            }
-            throw new WebSocketSessionException("Broadcast Failure: " + cause.getMessage(), cause);
         }
     }
 

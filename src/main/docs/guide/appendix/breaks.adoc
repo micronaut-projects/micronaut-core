@@ -15,13 +15,7 @@ A ann:websocket.annotation.ClientWebSocket[] method annotated with ann:websocket
 
 === The Netty WebSocket broadcaster broadcasts through `broadcastAsync` (5.3)
 
-`NettyServerWebSocketBroadcaster`, the api:websocket.WebSocketBroadcaster[] of the Netty server, implements `broadcastAsync` natively, and its `broadcast` and `broadcastSync` methods call it. Previously `broadcastAsync` was the interface default that subscribed to `broadcast`. A subclass that overrides `broadcast` to change how messages are broadcast should override `broadcastAsync(Object, MediaType, Predicate)` instead; a subclass that overrides `broadcastAsync` must not call `super.broadcast`, which calls `broadcastAsync` again.
-
-`broadcastSync` now fails like `broadcastAsync`: with a api:websocket.exceptions.WebSocketSessionException[], and not for a session that closed during the broadcast.
-
-=== The blocking WebSocket sends do not wait on an event loop thread (5.3)
-
-`WebSocketSession.sendSync` and `WebSocketBroadcaster.broadcastSync` of the Netty server and client no longer wait for the write when they are called on an event loop thread, for example in an `@OnMessage` method or a WebSocket route handler that runs on the event loop. Waiting there could fail with a `BlockingOperationException`, or, for `broadcastSync`, block the event loop for good, since the writes it waits for may have to run on that thread. They still fail when the write has already failed, and a later failure is logged. Use `sendAsync` and `broadcastAsync` to act on the outcome of the write, or run the handler on another executor, for example with `@ExecuteOn(TaskExecutors.BLOCKING)`.
+`NettyServerWebSocketBroadcaster`, the api:websocket.WebSocketBroadcaster[] of the Netty server, implements `broadcastAsync` natively, and its `broadcast` method calls it. Previously `broadcastAsync` was the interface default that subscribed to `broadcast`. A subclass that overrides `broadcast` to change how messages are broadcast should override `broadcastAsync(Object, MediaType, Predicate)` instead; a subclass that overrides `broadcastAsync` must not call `super.broadcast`, which calls `broadcastAsync` again.
 
 === Refreshing the Logback configuration follows Logback's own lookup (5.3)
 
