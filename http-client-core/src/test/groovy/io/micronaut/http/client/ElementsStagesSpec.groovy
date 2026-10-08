@@ -1,5 +1,8 @@
 package io.micronaut.http.client
 
+import io.micronaut.http.client.internal.ElementsStages
+import io.micronaut.http.client.internal.ElementsResponse
+
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest

@@ -15,6 +15,9 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.http.client.internal.ElementsResponse;
+import io.micronaut.http.client.internal.ElementsStages;
+
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.propagation.ReactivePropagation;

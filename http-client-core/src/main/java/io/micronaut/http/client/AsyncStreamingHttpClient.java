@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.http.client.internal.ElementsStages;
+
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReadBuffer;

@@ -29,7 +29,7 @@ import io.micronaut.http.client.ProxyRequestOptions;
 import io.micronaut.http.client.RawHttpClientSupport;
 import io.micronaut.http.client.RawHttpRequestWrapper;
 import io.micronaut.http.client.RawRequestOptions;
-import io.micronaut.http.client.RawResponseFuture;
+import io.micronaut.http.client.internal.RawResponseFuture;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequest;

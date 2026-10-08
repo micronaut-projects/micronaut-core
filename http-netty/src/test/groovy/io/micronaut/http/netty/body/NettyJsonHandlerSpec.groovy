@@ -4,6 +4,7 @@ import io.micronaut.context.BeanContext
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.http.annotation.Consumes
 import io.micronaut.http.annotation.Produces
+import io.micronaut.http.body.MessageBodyReader
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.json.body.JsonMessageHandler
 import io.micronaut.json.codec.JsonMediaTypeCodec
@@ -23,7 +24,7 @@ class NettyJsonHandlerSpec extends Specification {
     void 'compatibility bean replaces rather than duplicates the generic handler'() {
         expect:
         beanContext.getBeansOfType(NettyJsonHandler).size() == 1
-        beanContext.getBeansOfType(JsonMessageHandler).isEmpty()
+        beanContext.getBeansOfType(MessageBodyReader).findAll { it instanceof JsonMessageHandler }.isEmpty()
     }
 
     void "JsonMessageHandler @Produces value matches JsonMediaTypeCode constant"() {
