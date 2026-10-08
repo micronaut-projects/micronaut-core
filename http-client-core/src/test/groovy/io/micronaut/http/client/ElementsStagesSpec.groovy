@@ -123,7 +123,7 @@ class ElementsStagesSpec extends Specification {
         }
 
         @Override
-        def <I, O> CompletionStage<BodyElements<O>> jsonStream(HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
+        def <I, O> CompletionStage<HttpResponse<BodyElements<O>>> exchangeJsonStream(HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
             throw new UnsupportedOperationException()
         }
 

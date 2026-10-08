@@ -25,7 +25,9 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.body.BodyElements;
+import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.HttpClientRegistry;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.sse.Event;
@@ -80,7 +82,7 @@ class SseErrorServiceIdTest {
 
     @Test
     void asyncEventDecodeFailureHasServiceId() throws Exception {
-        AsyncSseClient client = ((SseClient) httpClient).toAsyncSse();
+        AsyncStreamingHttpClient client = ((StreamingHttpClient) httpClient).toAsyncStreaming();
         HttpResponse<BodyElements<Event<Map>>> response = client.exchangeEventStream(HttpRequest.GET("/sse-error/not-json"), Map.class)
             .toCompletableFuture().get(TIMEOUT.toSeconds(), TimeUnit.SECONDS);
         try (BodyElements<Event<Map>> events = response.body()) {
@@ -92,7 +94,7 @@ class SseErrorServiceIdTest {
 
     @Test
     void asyncLongLineFailureHasServiceId() throws Exception {
-        AsyncSseClient client = ((SseClient) httpClient).toAsyncSse();
+        AsyncStreamingHttpClient client = ((StreamingHttpClient) httpClient).toAsyncStreaming();
         HttpResponse<BodyElements<Event<Map>>> response = client.exchangeEventStream(HttpRequest.GET("/sse-error/long-line"), Map.class)
             .toCompletableFuture().get(TIMEOUT.toSeconds(), TimeUnit.SECONDS);
         try (BodyElements<Event<Map>> events = response.body()) {

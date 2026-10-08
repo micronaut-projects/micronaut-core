@@ -25,7 +25,7 @@ import io.micronaut.http.sse.Event;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
-@Requires(property = "spec.name", value = "AsyncSseClientSpec")
+@Requires(property = "spec.name", value = "AsyncEventStreamSpec")
 @Controller("/mcp")
 public class McpController {
 

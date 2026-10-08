@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Decodes the bytes of an event stream into events, as they arrive in pieces of any size,
@@ -75,9 +76,26 @@ final class EventStreamDecoder {
      * @throws ContentLengthExceededException if a line or the data of an event exceeds the limit
      */
     List<Event<byte[]>> decode(byte[] bytes) {
-        List<Event<byte[]>> events = null;
-        int start = 0;
-        for (int i = 0; i < bytes.length; i++) {
+        List<Event<byte[]>> events = new ArrayList<>(2);
+        decode(bytes, 0, bytes.length, events::add);
+        return events;
+    }
+
+    /**
+     * Decode the next piece of the stream. Each event is handed to the consumer as soon as its
+     * blank line is read, so the events before a line that exceeds the limit are handed out
+     * before the failure.
+     *
+     * @param bytes  The array of the piece
+     * @param offset The offset of the piece in the array
+     * @param length The length of the piece
+     * @param out    Takes the events the piece completes
+     * @throws ContentLengthExceededException if a line or the data of an event exceeds the limit
+     */
+    void decode(byte[] bytes, int offset, int length, Consumer<? super Event<byte[]>> out) {
+        int end = offset + length;
+        int start = offset;
+        for (int i = offset; i < end; i++) {
             byte b = bytes[i];
             if (b != CR && b != LF) {
                 continue;
@@ -91,13 +109,10 @@ final class EventStreamDecoder {
             append(bytes, start, i - start);
             Event<byte[]> event = endLine();
             if (event != null) {
-                if (events == null) {
-                    events = new ArrayList<>(2);
-                }
-                events.add(event);
+                out.accept(event);
             }
             if (b == CR) {
-                if (i + 1 < bytes.length) {
+                if (i + 1 < end) {
                     if (bytes[i + 1] == LF) {
                         i++;
                     }
@@ -107,11 +122,10 @@ final class EventStreamDecoder {
             }
             start = i + 1;
         }
-        if (start < bytes.length) {
+        if (start < end) {
             skipLineFeed = false;
-            append(bytes, start, bytes.length - start);
+            append(bytes, start, end - start);
         }
-        return events == null ? List.of() : events;
     }
 
     private void append(byte[] bytes, int offset, int length) {

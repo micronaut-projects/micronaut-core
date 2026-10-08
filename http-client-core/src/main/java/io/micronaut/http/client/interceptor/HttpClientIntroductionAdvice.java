@@ -71,7 +71,6 @@ import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
 import io.micronaut.http.client.bind.HttpClientBinderRegistry;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.http.client.sse.AsyncSseClient;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
@@ -721,28 +720,27 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         Argument<?> elementArgument = elementsArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
         Collection<MediaType> acceptTypes = request.accept();
 
-        if (httpClient instanceof SseClient sseClient && acceptTypes.contains(MediaType.TEXT_EVENT_STREAM_TYPE)) {
-            AsyncSseClient asyncSseClient = sseClient.toAsyncSse();
-            boolean events = elementArgument.getType() == Event.class;
-            Argument<Object> dataArgument = (Argument<Object>) (events ? elementArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) : elementArgument);
-            Function<BodyElements<Event<Object>>, BodyElements<?>> elements = events ? e -> e : e -> MappedBodyElements.map(e, Event::getData);
-            if (exchange) {
-                return ElementsStages.mapResponse(asyncSseClient.exchangeEventStream(request, dataArgument, errorType),
-                    response -> ElementsResponse.of(response, elements.apply(Objects.requireNonNull(response.body()))));
-            }
-            return ElementsStages.mapElements(asyncSseClient.eventStream(request, dataArgument, errorType), elements);
-        }
         if (!(httpClient instanceof StreamingHttpClient streamingHttpClient)) {
             return CompletableFuture.failedStage(new ConfigurationException("The HTTP client " + httpClient.getClass().getName()
                 + " does not stream response bodies, which the return type BodyElements needs"));
         }
-        AsyncStreamingHttpClient asyncStreamingHttpClient = streamingHttpClient.toAsync();
-        if (isJsonParsedMediaType(acceptTypes)) {
+        AsyncStreamingHttpClient asyncStreamingHttpClient = streamingHttpClient.toAsyncStreaming();
+        if (acceptTypes.contains(MediaType.TEXT_EVENT_STREAM_TYPE)) {
+            boolean events = elementArgument.getType() == Event.class;
+            Argument<Object> dataArgument = (Argument<Object>) (events ? elementArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) : elementArgument);
+            Function<BodyElements<Event<Object>>, BodyElements<?>> elements = events ? e -> e : e -> MappedBodyElements.map(e, Event::getData);
             if (exchange) {
-                return CompletableFuture.failedStage(new ConfigurationException("The response of a JSON stream is not available:"
-                    + " declare the return type CompletionStage<BodyElements<T>> instead of CompletionStage<HttpResponse<BodyElements<T>>>"));
+                return ElementsStages.mapResponse(asyncStreamingHttpClient.exchangeEventStream(request, dataArgument, errorType),
+                    response -> ElementsResponse.of(response, elements.apply(Objects.requireNonNull(response.body()))));
             }
-            return asyncStreamingHttpClient.jsonStream(request, elementArgument, errorType);
+            return ElementsStages.mapElements(asyncStreamingHttpClient.eventStream(request, dataArgument, errorType), elements);
+        }
+        if (isJsonParsedMediaType(acceptTypes)) {
+            Argument<Object> jsonArgument = (Argument<Object>) elementArgument;
+            if (exchange) {
+                return ElementsStages.mapResponse(asyncStreamingHttpClient.exchangeJsonStream(request, jsonArgument, errorType), Function.identity());
+            }
+            return ElementsStages.mapElements(asyncStreamingHttpClient.jsonStream(request, jsonArgument, errorType), Function.identity());
         }
         Class<?> elementType = elementArgument.getType();
         Function<BodyElements<ByteBuffer<?>>, BodyElements<?>> elements;

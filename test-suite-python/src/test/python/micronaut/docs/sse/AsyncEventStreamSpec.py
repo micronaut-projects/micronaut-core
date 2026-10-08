@@ -5,7 +5,7 @@ from jakarta.inject import Inject
 from micronaut.context.annotation import Property
 from micronaut.http import HttpRequest, MediaType
 from micronaut.http.client.annotation import Client
-from micronaut.http.client.sse import SseClient
+from micronaut.http.client import StreamingHttpClient
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from org.junit.jupiter.api import Test
 
@@ -15,15 +15,15 @@ String = java.type("java.lang.String")
 TimeUnit = java.type("java.util.concurrent.TimeUnit")
 
 
-@Property(name="spec.name", value="AsyncSseClientSpec")
+@Property(name="spec.name", value="AsyncEventStreamSpec")
 @MicronautTest
-class AsyncSseClientSpec:
-    sseClient: Annotated[SseClient, Inject, Client("/")]
+class AsyncEventStreamSpec:
+    httpClient: Annotated[StreamingHttpClient, Inject, Client("/")]
 
     @Test
     def readEventsAsTheyArrive(self):
         # tag::async[]
-        client = self.sseClient.toAsyncSse()  # <1>
+        client = self.httpClient.toAsyncStreaming()  # <1>
         request = HttpRequest.POST("/mcp", '{"method":"ping"}') \
             .contentType(MediaType.APPLICATION_JSON_TYPE) \
             .accept(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_EVENT_STREAM_TYPE)

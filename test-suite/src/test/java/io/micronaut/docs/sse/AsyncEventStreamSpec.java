@@ -19,9 +19,9 @@ import io.micronaut.context.annotation.Property;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.client.AsyncStreamingHttpClient;
+import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
-import io.micronaut.http.client.sse.AsyncSseClient;
-import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -34,18 +34,18 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@Property(name = "spec.name", value = "AsyncSseClientSpec")
+@Property(name = "spec.name", value = "AsyncEventStreamSpec")
 @MicronautTest
-class AsyncSseClientSpec {
+class AsyncEventStreamSpec {
 
     @Inject
     @Client("/")
-    SseClient sseClient;
+    StreamingHttpClient httpClient;
 
     @Test
     void readEventsAsTheyArrive() throws Exception {
         // tag::async[]
-        AsyncSseClient client = sseClient.toAsyncSse(); // <1>
+        AsyncStreamingHttpClient client = httpClient.toAsyncStreaming(); // <1>
         MutableHttpRequest<String> request = HttpRequest.POST("/mcp", "{\"method\":\"ping\"}")
             .contentType(MediaType.APPLICATION_JSON_TYPE)
             .accept(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_EVENT_STREAM_TYPE);

@@ -10,7 +10,7 @@ from micronaut.http.sse import Event
 Flux = java.type("reactor.core.publisher.Flux")
 
 
-@Requires(property="spec.name", value="AsyncSseClientSpec")
+@Requires(property="spec.name", value="AsyncEventStreamSpec")
 @Controller("/mcp")
 class McpController:
 

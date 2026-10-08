@@ -20,8 +20,8 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.client.sse.AsyncSseClient
-import io.micronaut.http.client.sse.SseClient
+import io.micronaut.http.client.AsyncStreamingHttpClient
+import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import spock.lang.Specification
@@ -31,18 +31,18 @@ import java.util.concurrent.CompletionStage
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 
-@Property(name = "spec.name", value = "AsyncSseClientSpec")
+@Property(name = "spec.name", value = "AsyncEventStreamSpec")
 @MicronautTest
-class AsyncSseClientSpec extends Specification {
+class AsyncEventStreamSpec extends Specification {
 
     @Inject
     @Client("/")
-    SseClient sseClient
+    StreamingHttpClient httpClient
 
     void "read events as they arrive"() {
         when:
         // tag::async[]
-        AsyncSseClient client = sseClient.toAsyncSse() // <1>
+        AsyncStreamingHttpClient client = httpClient.toAsyncStreaming() // <1>
         MutableHttpRequest<String> request = HttpRequest.POST("/mcp", '{"method":"ping"}')
             .contentType(MediaType.APPLICATION_JSON_TYPE)
             .accept(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_EVENT_STREAM_TYPE)

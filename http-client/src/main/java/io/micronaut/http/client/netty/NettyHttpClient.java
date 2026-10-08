@@ -95,11 +95,11 @@ import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.multipart.MultipartDataFactory;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
+import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.ByteBodyElements;
 import io.micronaut.http.client.ElementsResponse;
 import io.micronaut.http.client.SubscriberBodyElements;
-import io.micronaut.http.client.sse.AsyncSseClient;
 import io.micronaut.http.client.sse.EventStreams;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.CodecException;
@@ -858,17 +858,17 @@ final class NettyHttpClient implements
     }
 
     @Override
-    public AsyncSseClient toAsyncSse() {
-        return new DefaultAsyncSseClient(this);
+    public AsyncHttpClient toAsync() {
+        return new DefaultAsyncHttpClient(this);
     }
 
     @Override
-    public AsyncStreamingHttpClient toAsync() {
+    public AsyncStreamingHttpClient toAsyncStreaming() {
         return new DefaultAsyncHttpClient(this);
     }
 
     /**
-     * The exchange of {@link DefaultAsyncSseClient}: {@link #exchangeEventStream} without Reactor.
+     * The {@link #exchangeEventStream} of {@link DefaultAsyncHttpClient}, without Reactor.
      * The flow completes with the status and the headers of the response, and its events are read
      * from the response body as they are pulled.
      *
@@ -954,9 +954,8 @@ final class NettyHttpClient implements
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         MutableHttpRequest<?> mutableRequest = toMutableRequest(request);
-        if (acceptEvents && !acceptsEvents(mutableRequest)) {
-            // keep what the caller accepts, such as application/json, and accept an event stream too
-            mutableRequest.getHeaders().add(io.micronaut.http.HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
+        if (acceptEvents) {
+            EventStreams.acceptEvents(mutableRequest);
         }
         return resolveRequestURI(mutableRequest).flatMap(target -> sendRequestWithRedirects(
             propagatedContext,

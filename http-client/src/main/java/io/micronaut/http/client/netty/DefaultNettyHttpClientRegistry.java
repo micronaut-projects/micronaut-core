@@ -55,7 +55,6 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.client.netty.ssl.NettyClientSslFactory;
-import io.micronaut.http.client.sse.AsyncSseClient;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.sse.SseClientRegistry;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -369,28 +368,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             @Parameter @Nullable LoadBalancer loadBalancer,
             @Parameter @Nullable HttpClientConfiguration configuration,
             BeanContext beanContext) {
-        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsync();
-    }
-
-    /**
-     * Creates a new {@link AsyncSseClient} for the given injection point.
-     *
-     * @param injectionPoint The injection point
-     * @param loadBalancer   The load balancer to use (Optional)
-     * @param configuration  The configuration (Optional)
-     * @param beanContext    The bean context to use
-     * @return The client
-     * @since 5.3.0
-     */
-    @Bean
-    @BootstrapContextCompatible
-    @Primary
-    protected AsyncSseClient asyncSseClient(
-            @Nullable InjectionPoint<?> injectionPoint,
-            @Parameter @Nullable LoadBalancer loadBalancer,
-            @Parameter @Nullable HttpClientConfiguration configuration,
-            BeanContext beanContext) {
-        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsyncSse();
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsyncStreaming();
     }
 
     @Override

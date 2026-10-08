@@ -27,7 +27,6 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.http.client.sse.AsyncSseClient;
 import io.micronaut.http.sse.Event;
 import io.micronaut.runtime.server.EmbeddedServer;
 import jakarta.inject.Inject;
@@ -104,7 +103,7 @@ class AsyncClientsTest {
         InjectedClients clients = server.getApplicationContext().getBean(InjectedClients.class);
 
         assertEquals("pong", await(clients.asyncHttpClient.retrieve(HttpRequest.GET("/async-clients/ping"))));
-        List<Event<Message>> events = readAll(await(clients.asyncSseClient.eventStream(HttpRequest.GET("/async-clients/events"), Message.class)));
+        List<Event<Message>> events = readAll(await(clients.asyncStreamingHttpClient.eventStream(HttpRequest.GET("/async-clients/events"), Message.class)));
         assertEquals(List.of(new Message("one"), new Message("two")), events.stream().map(Event::getData).toList());
         assertEquals("abc", text(readAll(await(clients.asyncStreamingHttpClient.dataStream(HttpRequest.GET("/async-clients/bytes"))))));
     }
@@ -134,6 +133,15 @@ class AsyncClientsTest {
         AsyncElementsClient client = server.getApplicationContext().getBean(AsyncElementsClient.class);
 
         assertEquals(List.of(new Message("one"), new Message("two")), readAll(await(client.messages())));
+    }
+
+    @Test
+    void declarativeJsonStreamWithTheResponse() throws Exception {
+        AsyncElementsClient client = server.getApplicationContext().getBean(AsyncElementsClient.class);
+
+        HttpResponse<BodyElements<Message>> response = await(client.exchangeMessages());
+        assertEquals(HttpStatus.OK, response.getStatus());
+        assertEquals(List.of(new Message("one"), new Message("two")), readAll(response.body()));
     }
 
     @Test
@@ -168,10 +176,6 @@ class AsyncClientsTest {
 
         @Inject
         @Client("/")
-        AsyncSseClient asyncSseClient;
-
-        @Inject
-        @Client("/")
         AsyncStreamingHttpClient asyncStreamingHttpClient;
     }
 
@@ -190,6 +194,9 @@ class AsyncClientsTest {
 
         @Get(value = "/messages", processes = MediaType.APPLICATION_JSON_STREAM)
         CompletionStage<BodyElements<Message>> messages();
+
+        @Get(value = "/messages", processes = MediaType.APPLICATION_JSON_STREAM)
+        CompletionStage<HttpResponse<BodyElements<Message>>> exchangeMessages();
 
         @Get(value = "/bytes", processes = MediaType.APPLICATION_OCTET_STREAM)
         CompletionStage<BodyElements<ByteBuffer<?>>> bytes();

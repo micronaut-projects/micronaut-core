@@ -29,7 +29,10 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Header;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.body.BodyElements;
+import io.micronaut.http.client.AsyncStreamingHttpClient;
+import io.micronaut.http.client.DefaultAsyncOverReactiveStreamingHttpClient;
 import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.sse.Event;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -66,12 +69,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link AsyncSseClient}: the Netty implementation without Reactor, and the adapter of the
- * reactive {@link SseClient#exchangeEventStream}, against a server that answers like the MCP
+ * The server-sent events of {@link AsyncStreamingHttpClient}: the Netty implementation without
+ * Reactor, the adapter of the reactive {@link SseClient#exchangeEventStream}, and the default
+ * implementation over the pieces of the body, against a server that answers like the MCP
  * Streamable HTTP transport.
  */
-class AsyncSseClientTest {
-    private static final String SPEC = "AsyncSseClientTest";
+class AsyncEventStreamTest {
+    private static final String SPEC = "AsyncEventStreamTest";
     private static final String ACCEPT = MediaType.APPLICATION_JSON + ", " + MediaType.TEXT_EVENT_STREAM;
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
 
@@ -90,11 +94,13 @@ class AsyncSseClientTest {
         server.close();
     }
 
-    static Stream<Named<AsyncSseClient>> clients() {
-        SseClient sseClient = (SseClient) httpClient;
+    static Stream<Named<AsyncStreamingHttpClient>> clients() {
+        StreamingHttpClient streamingClient = (StreamingHttpClient) httpClient;
+        AsyncStreamingHttpClient netty = streamingClient.toAsyncStreaming();
         return Stream.of(
-            Named.of("netty", sseClient.toAsyncSse()),
-            Named.of("reactive adapter", new DefaultAsyncOverReactiveSseClient(sseClient))
+            Named.of("netty", netty),
+            Named.of("reactive adapter", new DefaultAsyncOverReactiveStreamingHttpClient(streamingClient)),
+            Named.of("default over pieces", new PiecesOnly(netty))
         );
     }
 
@@ -124,12 +130,12 @@ class AsyncSseClientTest {
     @Test
     void nettyClientIsNotTheAdapter() {
         assertInstanceOf(io.micronaut.http.client.netty.DefaultHttpClient.class, httpClient);
-        assertFalse(((SseClient) httpClient).toAsyncSse() instanceof DefaultAsyncOverReactiveSseClient);
+        assertFalse(((StreamingHttpClient) httpClient).toAsyncStreaming() instanceof DefaultAsyncOverReactiveStreamingHttpClient);
     }
 
     @ParameterizedTest(autoCloseArguments = false) // closing the view closes the shared client
     @MethodSource("clients")
-    void jsonResponseIsOneEvent(AsyncSseClient client) throws Exception {
+    void jsonResponseIsOneEvent(AsyncStreamingHttpClient client) throws Exception {
         HttpResponse<BodyElements<Event<Message>>> response = await(client.exchangeEventStream(post("/async-mcp/json"), Message.class));
 
         assertEquals(HttpStatus.OK, response.getStatus());
@@ -144,7 +150,7 @@ class AsyncSseClientTest {
 
     @ParameterizedTest(autoCloseArguments = false) // closing the view closes the shared client
     @MethodSource("clients")
-    void jsonResponseAsString(AsyncSseClient client) throws Exception {
+    void jsonResponseAsString(AsyncStreamingHttpClient client) throws Exception {
         HttpResponse<BodyElements<Event<String>>> response = await(client.exchangeEventStream(post("/async-mcp/json"), Argument.STRING));
 
         assertEquals("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"pong\"}", nextEvent(response.body()).getData());
@@ -152,7 +158,7 @@ class AsyncSseClientTest {
 
     @ParameterizedTest(autoCloseArguments = false) // closing the view closes the shared client
     @MethodSource("clients")
-    void eventsArriveAsTheyAreSent(AsyncSseClient client) throws Exception {
+    void eventsArriveAsTheyAreSent(AsyncStreamingHttpClient client) throws Exception {
         CompletionStage<HttpResponse<BodyElements<Event<Message>>>> exchange = client.exchangeEventStream(post("/async-mcp/events"), Message.class);
         Sinks.Many<Event<Message>> sink = AsyncMcpController.awaitSink();
         sink.tryEmitNext(Event.of(new Message("2.0", 1, "progress")).id("1").name("message"));
@@ -182,7 +188,7 @@ class AsyncSseClientTest {
 
     @ParameterizedTest(autoCloseArguments = false) // closing the view closes the shared client
     @MethodSource("clients")
-    void customHeaderOfResponseWithoutBody(AsyncSseClient client) throws Exception {
+    void customHeaderOfResponseWithoutBody(AsyncStreamingHttpClient client) throws Exception {
         HttpResponse<BodyElements<Event<Message>>> response = await(client.exchangeEventStream(post("/async-mcp/accepted"), Message.class));
 
         assertEquals(HttpStatus.ACCEPTED, response.getStatus());
@@ -192,7 +198,7 @@ class AsyncSseClientTest {
 
     @ParameterizedTest(autoCloseArguments = false) // closing the view closes the shared client
     @MethodSource("clients")
-    void errorStatusCarriesTheBody(AsyncSseClient client) {
+    void errorStatusCarriesTheBody(AsyncStreamingHttpClient client) {
         CompletionStage<HttpResponse<BodyElements<Event<Message>>>> exchange = client.exchangeEventStream(post("/async-mcp/error"), Argument.of(Message.class), Argument.of(ErrorMessage.class));
         HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () -> await(exchange));
 
@@ -204,7 +210,7 @@ class AsyncSseClientTest {
 
     @ParameterizedTest(autoCloseArguments = false) // closing the view closes the shared client
     @MethodSource("clients")
-    void errorStatusCarriesTheBodyWithDefaultErrorType(AsyncSseClient client) {
+    void errorStatusCarriesTheBodyWithDefaultErrorType(AsyncStreamingHttpClient client) {
         CompletionStage<HttpResponse<BodyElements<Event<Message>>>> exchange = client.exchangeEventStream(post("/async-mcp/error"), Message.class);
         HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () -> await(exchange));
 
@@ -215,7 +221,7 @@ class AsyncSseClientTest {
 
     @ParameterizedTest(autoCloseArguments = false) // closing the view closes the shared client
     @MethodSource("clients")
-    void notAcceptableIsAnError(AsyncSseClient client) {
+    void notAcceptableIsAnError(AsyncStreamingHttpClient client) {
         // the route only produces JSON, and the client only accepts an event stream
         MutableHttpRequest<String> request = HttpRequest.POST("/async-mcp/json", "{}")
             .contentType(MediaType.APPLICATION_JSON_TYPE)
@@ -229,7 +235,7 @@ class AsyncSseClientTest {
 
     @ParameterizedTest(autoCloseArguments = false) // closing the view closes the shared client
     @MethodSource("clients")
-    void eventStreamReplacesTheAcceptHeader(AsyncSseClient client) {
+    void eventStreamReplacesTheAcceptHeader(AsyncStreamingHttpClient client) {
         // eventStream sets Accept: text/event-stream, so the JSON only route answers 406
         MutableHttpRequest<String> request = HttpRequest.POST("/async-mcp/json", "{}")
             .contentType(MediaType.APPLICATION_JSON_TYPE)
@@ -243,7 +249,7 @@ class AsyncSseClientTest {
 
     @ParameterizedTest(autoCloseArguments = false) // closing the view closes the shared client
     @MethodSource("clients")
-    void eventStreamJoinsMultilineData(AsyncSseClient client) throws Exception {
+    void eventStreamJoinsMultilineData(AsyncStreamingHttpClient client) throws Exception {
         MutableHttpRequest<String> request = HttpRequest.POST("/async-mcp/multiline", "{}").contentType(MediaType.APPLICATION_JSON_TYPE);
         BodyElements<Event<String>> events = await(client.eventStream(request, String.class));
 
@@ -253,7 +259,7 @@ class AsyncSseClientTest {
 
     @ParameterizedTest(autoCloseArguments = false) // closing the view closes the shared client
     @MethodSource("clients")
-    void acceptIsAddedWhenMissing(AsyncSseClient client) throws Exception {
+    void acceptIsAddedWhenMissing(AsyncStreamingHttpClient client) throws Exception {
         HttpRequest<String> request = HttpRequest.POST("/async-mcp/events-accept", "{}").contentType(MediaType.APPLICATION_JSON_TYPE);
         HttpResponse<BodyElements<Event<String>>> response = await(client.exchangeEventStream(request, Argument.STRING));
 
@@ -262,7 +268,7 @@ class AsyncSseClientTest {
 
     @ParameterizedTest(autoCloseArguments = false) // closing the view closes the shared client
     @MethodSource("clients")
-    void forEachReadsEveryEvent(AsyncSseClient client) throws Exception {
+    void forEachReadsEveryEvent(AsyncStreamingHttpClient client) throws Exception {
         // many events arrive in few pieces, and are consumed in a loop rather than recursively
         MutableHttpRequest<String> request = HttpRequest.POST("/async-mcp/many", "{}").contentType(MediaType.APPLICATION_JSON_TYPE);
         BodyElements<Event<Integer>> events = await(client.eventStream(request, Integer.class));
@@ -277,7 +283,7 @@ class AsyncSseClientTest {
 
     @ParameterizedTest(autoCloseArguments = false) // closing the view closes the shared client
     @MethodSource("clients")
-    void oneOperationAtATime(AsyncSseClient client) throws Exception {
+    void oneOperationAtATime(AsyncStreamingHttpClient client) throws Exception {
         CompletionStage<HttpResponse<BodyElements<Event<Message>>>> exchange = client.exchangeEventStream(post("/async-mcp/events"), Message.class);
         Sinks.Many<Event<Message>> sink = AsyncMcpController.awaitSink();
         sink.tryEmitNext(Event.of(new Message("2.0", 1, "progress")));
@@ -361,6 +367,47 @@ class AsyncSseClientTest {
                 .body("{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32600,\"message\":\"Invalid request\"}}")
                 .contentType(MediaType.APPLICATION_JSON_TYPE)
                 .header("Mcp-Session-Id", "abc-123");
+        }
+    }
+
+    /**
+     * An async client that only streams pieces: its server-sent events are the defaults of
+     * {@link AsyncStreamingHttpClient}.
+     */
+    private record PiecesOnly(AsyncStreamingHttpClient delegate) implements AsyncStreamingHttpClient {
+        @Override
+        public <I, O, E> CompletionStage<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+            return delegate.exchange(request, bodyType, errorType);
+        }
+
+        @Override
+        public <I> CompletionStage<HttpResponse<BodyElements<io.micronaut.core.io.buffer.ByteBuffer<?>>>> exchangeStream(HttpRequest<I> request, Argument<?> errorType) {
+            return delegate.exchangeStream(request, errorType);
+        }
+
+        @Override
+        public <I, O> CompletionStage<HttpResponse<BodyElements<O>>> exchangeJsonStream(HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
+            return delegate.exchangeJsonStream(request, type, errorType);
+        }
+
+        @Override
+        public PiecesOnly start() {
+            return this;
+        }
+
+        @Override
+        public PiecesOnly stop() {
+            return this;
+        }
+
+        @Override
+        public boolean isRunning() {
+            return true;
+        }
+
+        @Override
+        public void close() {
+            // shares the client
         }
     }
 }
