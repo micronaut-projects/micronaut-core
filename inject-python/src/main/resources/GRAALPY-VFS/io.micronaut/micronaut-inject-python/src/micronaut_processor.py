@@ -724,10 +724,6 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         simple_decorator = DecoratorDef(decorator_name, decorator_name, None, {}, [])
                         decorators.append(simple_decorator)
 
-            if (any(d.annotationName() == "dataclasses.dataclass" for d in decorators)
-                    and not self._has_introspection(decorators)):
-                decorators.append(DecoratorDef("Introspected", "io.micronaut.core.annotation.Introspected", None, {}, []))
-
             # Extract base classes
             bases = []
             for base in node.bases:
@@ -760,6 +756,24 @@ class MicronautAstVisitor(ast.NodeVisitor):
             finally:
                 # Check if this is a dataclass and generate constructor if needed
                 is_dataclass = any(self._is_dataclass_decorator(dec) for dec in node.decorator_list)
+
+                if is_dataclass:
+                    # Data's MappedEntity mapper supplies identity indexes; do not shadow it
+                    # with the default introspection inferred for an ordinary dataclass.
+                    decorators = list(self.current_class.decorators())
+                    mapped_entity = "io.micronaut.data.annotation.MappedEntity"
+                    if (any(self._has_stereotype(attr.decorators(), marker)
+                            for attr in self.current_class_attributes
+                            for marker in ("io.micronaut.data.annotation.Id", "io.micronaut.data.annotation.GeneratedValue"))
+                            and not self._has_stereotype(decorators, mapped_entity)):
+                        decorators.append(DecoratorDef("MappedEntity", mapped_entity, None, {}, []))
+                    if not self._has_introspection(decorators) and not self._has_stereotype(decorators, mapped_entity):
+                        decorators.append(DecoratorDef("Introspected", "io.micronaut.core.annotation.Introspected", None, {}, []))
+                    current = self.current_class
+                    self.current_class = JavaClassDef(current.name(), current.packageName(), current.bases(), decorators,
+                        current.typeParams(), current.functions(), current.attributes(), current.properties(),
+                        current.nestedClasses(), current.constructor(), current.frozenDataclass(), current.isEnum(),
+                        current.values(), current.documentation())
 
                 if is_dataclass and self.current_class.constructor() is None:
                     # Generate constructor from dataclass attributes
@@ -833,12 +847,15 @@ class MicronautAstVisitor(ast.NodeVisitor):
             self.last_attribute = previous_last_attribute
 
     def _has_introspection(self, decorators):
+        return self._has_stereotype(decorators, "io.micronaut.core.annotation.Introspected")
+
+    def _has_stereotype(self, decorators, annotation_name):
         for decorator in decorators:
-            if (decorator.annotationName() == "io.micronaut.core.annotation.Introspected"
-                    or self._has_introspection(decorator.stereotypes())):
+            if (decorator.annotationName() == annotation_name
+                    or self._has_stereotype(decorator.stereotypes(), annotation_name)):
                 return True
             annotation_type = _java_class_element(self.visitor_context, decorator.annotationName())
-            if annotation_type is not None and annotation_type.getAnnotationMetadata().hasStereotype("io.micronaut.core.annotation.Introspected"):
+            if annotation_type is not None and annotation_type.getAnnotationMetadata().hasStereotype(annotation_name):
                 return True
         return False
 

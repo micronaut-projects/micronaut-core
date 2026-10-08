@@ -44,6 +44,35 @@ Constraint options also include `message`, `groups`, and `payload`. Regular expr
 
 Use `Annotated[Address, validation.Valid]` for cascaded validation of an introspected nested object. Annotation members are read from source and supported compile-time constants, not arbitrary evaluated expressions.
 
+== Dataclass Persistence
+
+With Micronaut Data configured, a dataclass declares its identity using the existing typed Pyronaut annotations in `Annotated[...]`:
+
+[source,python]
+----
+from dataclasses import dataclass
+from typing import Annotated
+from pyronaut import data
+
+@dataclass
+class Fruit:
+    name: str
+    id: Annotated[int | None, data.Id, data.GeneratedValue] = None
+----
+
+An explicit `data.Id` or `data.GeneratedValue` field annotation opts the dataclass into Micronaut Data entity mapping. The existing Data processors provide identity indexes and repository behavior. A field named `id` alone, validation annotations, and unrelated dataclass field metadata do not opt a class into persistence.
+
+Use `data.GeneratedValue` for Data's default `AUTO` strategy, or call the annotation to supply its existing `value`, `definition`, and `ref` members. For example:
+
+[source,python]
+----
+id: Annotated[int | None, data.Id, data.GeneratedValue(data.GeneratedValue.Type.IDENTITY)] = None
+----
+
+Generation strategy, property type and database support must agree. A generated value does not implicitly mark a field as the identity. Bare and called annotations, import aliases, and existing composed stereotypes use the same annotation parser. Explicit `@data.MappedEntity(...)` and introspection configuration retain their customization.
+
+Defaults, nullable identities, and `field(default_factory=...)` retain their Python meaning. Persistence annotations do not enable JSON serialization of ordinary dataclasses; serialization remains an explicit, separate choice.
+
 == Custom Annotations
 
 A custom annotation is a function returning a decorator, itself decorated with the annotations that make up its stereotype. Its parameters are the annotation members and their defaults the member defaults. It is applied like a generated decorator, bare or called, in the module that defines it and in modules that import it:
