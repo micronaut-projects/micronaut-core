@@ -27,6 +27,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
@@ -58,6 +59,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -98,6 +100,15 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     private final Duration handshakeTimeout;
     @Nullable
     private ScheduledFuture<?> handshakeTimeoutTask;
+    /**
+     * What the handshake says about the instance, see {@link #getHandshakeOutcome()}: empty when
+     * it says nothing, {@code null} until it is known. The first outcome wins.
+     */
+    private final AtomicReference<Optional<LoadBalancer.Outcome>> handshakeOutcome = new AtomicReference<>();
+    /**
+     * Whether the channel was connected: a close before that is a failure to connect. Event loop only.
+     */
+    private boolean channelConnected;
 
     /**
      * Default constructor.
@@ -214,11 +225,15 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             ctx.close();
             return;
         }
+        channelConnected = true;
         if (handshakeTimeout != null && !handshakeTimeout.isNegative() && !handshakeTimeout.isZero() && handshakeTimeoutTask == null) {
             handshakeTimeoutTask = ctx.executor().schedule(() -> {
-                if (!handshaker.isHandshakeComplete()
-                    && completion.tryCompleteExceptionally(new ReadTimeoutException())) {
-                    ctx.close();
+                if (!handshaker.isHandshakeComplete()) {
+                    // before the completion, which reports the outcome
+                    settleHandshakeOutcome(LoadBalancer.Outcome.TIMEOUT);
+                    if (completion.tryCompleteExceptionally(new ReadTimeoutException())) {
+                        ctx.close();
+                    }
                 }
             }, handshakeTimeout.toNanos(), TimeUnit.NANOSECONDS);
         }
@@ -244,6 +259,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             // web socket client connected
             FullHttpResponse res = (FullHttpResponse) msg;
             this.handshakeResponse = res;
+            // the instance responded, like the response of an HTTP exchange
+            settleHandshakeOutcome(res.status().code() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
             try {
                 handshaker.finishHandshake(ch, res);
             } catch (Exception e) {
@@ -359,6 +376,10 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     @Override
     public void exceptionCaught(final ChannelHandlerContext ctx, final Throwable cause) {
+        if (!handshaker.isHandshakeComplete()) {
+            // e.g. a TLS failure: it says nothing about the instance
+            settleHandshakeOutcome(null);
+        }
         completion.tryCompleteExceptionally(cause);
         super.exceptionCaught(ctx, cause);
     }
@@ -407,9 +428,46 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     @Override
     protected void handleCloseReason(ChannelHandlerContext ctx, CloseReason cr, boolean writeCloseReason) {
         if (!handshaker.isHandshakeComplete()) {
+            // closed by the instance before it responded, or not connected at all
+            settleHandshakeOutcome(channelConnected ? LoadBalancer.Outcome.RESET : LoadBalancer.Outcome.CONNECT_FAILURE);
             completion.tryCompleteExceptionally(new WebSocketClientException("Error opening WebSocket client session: " + cr.getReason()));
             return;
         }
         super.handleCloseReason(ctx, cr, writeCloseReason);
+    }
+
+    /**
+     * The connect of the channel of this handler failed: the instance could not be reached, unless
+     * the failure is local, e.g. of the setup of the pipeline.
+     *
+     * @param failure The failure of the connect
+     * @since 5.3.0
+     */
+    public final void connectFailed(Throwable failure) {
+        settleHandshakeOutcome(failure instanceof WebSocketSessionException ? null : LoadBalancer.Outcome.CONNECT_FAILURE);
+    }
+
+    /**
+     * What the handshake says about the instance, to report to the load balancer that selected it,
+     * like the outcome of an HTTP exchange: {@link LoadBalancer.Outcome#SUCCESS} or
+     * {@link LoadBalancer.Outcome#SERVER_ERROR} once the instance responded to the upgrade,
+     * {@link LoadBalancer.Outcome#CONNECT_FAILURE} when it could not be reached,
+     * {@link LoadBalancer.Outcome#TIMEOUT} when it did not respond within the handshake timeout,
+     * {@link LoadBalancer.Outcome#RESET} when it closed the connection before it responded.
+     *
+     * @return The outcome, or {@code null} if the handshake says nothing about the instance (yet),
+     * or the connect was cancelled
+     * @since 5.3.0
+     */
+    public final LoadBalancer.@Nullable Outcome getHandshakeOutcome() {
+        if (connectCancelled) {
+            return null;
+        }
+        Optional<LoadBalancer.Outcome> outcome = handshakeOutcome.get();
+        return outcome == null ? null : outcome.orElse(null);
+    }
+
+    private void settleHandshakeOutcome(LoadBalancer.@Nullable Outcome outcome) {
+        handshakeOutcome.compareAndSet(null, Optional.ofNullable(outcome));
     }
 }

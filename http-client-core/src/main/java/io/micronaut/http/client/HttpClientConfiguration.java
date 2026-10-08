@@ -188,8 +188,6 @@ public abstract class HttpClientConfiguration {
     @Nullable
     private Duration handshakeTimeout;
 
-    private boolean reportHandshakeOutcome;
-
     @Nullable
     private Duration requestTimeout = null;
 
@@ -340,7 +338,6 @@ public abstract class HttpClientConfiguration {
             this.readTimeout = copy.readTimeout;
             this.expectContinueTimeout = copy.expectContinueTimeout;
             this.handshakeTimeout = copy.handshakeTimeout;
-            this.reportHandshakeOutcome = copy.reportHandshakeOutcome;
             this.shutdownTimeout = copy.shutdownTimeout;
             this.shutdownQuietPeriod = copy.shutdownQuietPeriod;
             this.sslConfiguration = copy.sslConfiguration;
@@ -827,33 +824,6 @@ public abstract class HttpClientConfiguration {
     @Experimental
     public void setHandshakeTimeout(@Nullable Duration handshakeTimeout) {
         this.handshakeTimeout = handshakeTimeout;
-    }
-
-    /**
-     * Whether the outcome of a WebSocket handshake is reported to the load balancer that selected
-     * the instance, see {@link LoadBalancer#report}: a success, or a timeout of the
-     * {@link #getHandshakeTimeout() handshake timeout}. By default, the selection is only released
-     * once the handshake is done, as {@link LoadBalancer.Outcome#CANCELLED}.
-     * [available in the Netty HTTP client]
-     *
-     * @return Whether to report the outcome of a WebSocket handshake. Defaults to {@code false}
-     * @since 5.3.0
-     */
-    @Experimental
-    public boolean isReportHandshakeOutcome() {
-        return reportHandshakeOutcome;
-    }
-
-    /**
-     * Sets whether the outcome of a WebSocket handshake is reported to the load balancer. Defaults
-     * to {@code false}.
-     *
-     * @param reportHandshakeOutcome Whether to report the outcome of a WebSocket handshake
-     * @since 5.3.0
-     */
-    @Experimental
-    public void setReportHandshakeOutcome(boolean reportHandshakeOutcome) {
-        this.reportHandshakeOutcome = reportHandshakeOutcome;
     }
 
     /**
