@@ -15,6 +15,7 @@ import reactor.core.publisher.Sinks
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.CancellationException
 
 class ResponsePiecesSpec extends Specification {
 
@@ -107,6 +108,44 @@ class ResponsePiecesSpec extends Specification {
         then:
         bodyCancelled
         flowCancelled
+        ends == 1
+    }
+
+    def 'the pieces of a response abandoned after the first piece fail a later subscriber and close the piece'() {
+        given:
+        def first = new TrackedBody("v0")
+        def bodyCancelled = false
+        def result = ResponsePieces.write(Flux.range(0, 3).doOnCancel { bodyCancelled = true }, { it == 0 ? ExecutionFlow.just(first) : ExecutionFlow.just(piece("v" + it)) }, {})
+        def pieces = result.tryCompleteValue()
+
+        when:
+        result.cancel()
+        def subscriber = new RecordingSubscriber()
+        pieces.subscribe(subscriber)
+
+        then:
+        bodyCancelled
+        first.closed
+        subscriber.error instanceof CancellationException
+        subscriber.items == []
+    }
+
+    def 'a request for no pieces fails the pieces, closes the waiting piece and cancels the body'() {
+        given:
+        def first = new TrackedBody("v0")
+        def bodyCancelled = false
+        def ends = 0
+        def result = ResponsePieces.write(Flux.range(0, 3).doOnCancel { bodyCancelled = true }, { it == 0 ? ExecutionFlow.just(first) : ExecutionFlow.just(piece("v" + it)) }, { ends++ })
+        def subscriber = subscribe(result)
+
+        when:
+        subscriber.request(0)
+
+        then:
+        subscriber.error instanceof IllegalArgumentException
+        subscriber.items == []
+        first.closed
+        bodyCancelled
         ends == 1
     }
 

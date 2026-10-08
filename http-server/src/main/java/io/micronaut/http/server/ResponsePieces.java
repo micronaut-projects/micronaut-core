@@ -21,15 +21,15 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.stream.BodyPublishers;
+import io.micronaut.http.body.stream.ReactorInterop;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-import reactor.core.CoreSubscriber;
-import reactor.core.publisher.Operators;
-import reactor.util.context.Context;
 
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.function.Function;
 
 /**
@@ -51,26 +51,20 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Internal
-final class ResponsePieces<T> implements CoreSubscriber<T>, Publisher<ByteBody>, Subscription {
-    private static final Context DISCARD_BODIES = Operators.enableOnDiscard(Context.empty(), ResponsePieces::discard);
-    private static final Subscription REJECTED = new Subscription() {
-        @Override
-        public void request(long n) {
-            // a rejected subscriber is only failed
-        }
-
-        @Override
-        public void cancel() {
-            // a rejected subscriber is only failed
-        }
-    };
-
+final class ResponsePieces<T> implements Subscriber<T>, Publisher<ByteBody>, Subscription {
     private final Function<? super T, ? extends ExecutionFlow<? extends CloseableByteBody>> writer;
     private final Runnable onEnd;
     private final DelayedExecutionFlow<Publisher<ByteBody>> result = DelayedExecutionFlow.create();
 
     // all of the following are guarded by this
     private @Nullable Subscription upstream;
+    /**
+     * A subscriber subscribed to the pieces; a later one is rejected.
+     */
+    private boolean claimed;
+    /**
+     * The subscriber of the pieces, until it cancels or receives its terminal signal (rule 3.13).
+     */
     private @Nullable Subscriber<? super ByteBody> downstream;
     /**
      * The subscriber of the pieces has its subscription, so signals may be delivered.
@@ -112,6 +106,14 @@ final class ResponsePieces<T> implements CoreSubscriber<T>, Publisher<ByteBody>,
     private boolean resultDone;
     private boolean cancelled;
     /**
+     * The flow was cancelled before anyone subscribed to the pieces: a later subscriber fails.
+     */
+    private boolean abandoned;
+    /**
+     * The failure of a request for no pieces, delivered instead of anything else.
+     */
+    private @Nullable Throwable badRequest;
+    /**
      * The subscriber of the pieces received its terminal signal, or the flow failed.
      */
     private boolean terminated;
@@ -142,7 +144,7 @@ final class ResponsePieces<T> implements CoreSubscriber<T>, Publisher<ByteBody>,
                                                         Runnable onEnd) {
         ResponsePieces<T> pieces = new ResponsePieces<>(writer, onEnd);
         pieces.result.onCancel(pieces::abandon);
-        body.subscribe(pieces);
+        ReactorInterop.subscribe(body, pieces, null, ResponsePieces::discard);
         return pieces.result;
     }
 
@@ -153,9 +155,10 @@ final class ResponsePieces<T> implements CoreSubscriber<T>, Publisher<ByteBody>,
      */
     private void abandon() {
         synchronized (this) {
-            if (downstream != null) {
+            if (claimed) {
                 return;
             }
+            abandoned = true;
         }
         cancel();
     }
@@ -164,11 +167,6 @@ final class ResponsePieces<T> implements CoreSubscriber<T>, Publisher<ByteBody>,
         if (item instanceof CloseableByteBody body) {
             body.close();
         }
-    }
-
-    @Override
-    public Context currentContext() {
-        return DISCARD_BODIES;
     }
 
     @Override
@@ -296,32 +294,36 @@ final class ResponsePieces<T> implements CoreSubscriber<T>, Publisher<ByteBody>,
     public void subscribe(Subscriber<? super ByteBody> s) {
         boolean accepted;
         synchronized (this) {
-            accepted = downstream == null;
+            accepted = !claimed;
             if (accepted) {
+                claimed = true;
                 downstream = s;
             }
         }
         if (!accepted) {
-            s.onSubscribe(REJECTED);
-            s.onError(new IllegalStateException("The pieces of a response are published to a single subscriber"));
+            BodyPublishers.reject(s, "The pieces of a response are published to a single subscriber");
             return;
         }
         s.onSubscribe(this);
         synchronized (this) {
             subscribed = true;
         }
-        // the end of a body without items needs no demand
+        // the end of a body without items needs no demand, and the pieces of an abandoned response
+        // fail
         drain();
     }
 
     @Override
     public void request(long n) {
-        if (n <= 0) {
-            return;
-        }
         boolean drain;
         synchronized (this) {
-            demand = Long.MAX_VALUE - demand < n ? Long.MAX_VALUE : demand + n;
+            if (n <= 0) {
+                if (badRequest == null) {
+                    badRequest = BodyPublishers.nonPositiveRequest(n);
+                }
+            } else {
+                demand = BodyPublishers.addCap(demand, n);
+            }
             drain = enterDrain();
         }
         if (drain) {
@@ -339,6 +341,7 @@ final class ResponsePieces<T> implements CoreSubscriber<T>, Publisher<ByteBody>,
                 return;
             }
             cancelled = true;
+            downstream = null;
             piece = ready;
             ready = null;
             flow = pendingFlow;
@@ -399,10 +402,14 @@ final class ResponsePieces<T> implements CoreSubscriber<T>, Publisher<ByteBody>,
             Throwable error = null;
             Subscriber<? super ByteBody> s;
             Subscription up;
+            ExecutionFlow<? extends CloseableByteBody> pending = null;
             synchronized (this) {
                 s = downstream;
                 up = upstream;
                 action = next();
+                if (action == Action.FAIL || action == Action.COMPLETE || action == Action.ABANDONED || action == Action.BAD_REQUEST) {
+                    downstream = null;
+                }
                 if (action == Action.EMIT) {
                     piece = ready;
                     ready = null;
@@ -411,6 +418,12 @@ final class ResponsePieces<T> implements CoreSubscriber<T>, Publisher<ByteBody>,
                     }
                 } else if (action == Action.FAIL || action == Action.FAIL_RESULT) {
                     error = failure;
+                } else if (action == Action.BAD_REQUEST) {
+                    error = badRequest;
+                    piece = ready;
+                    ready = null;
+                    pending = pendingFlow;
+                    pendingFlow = null;
                 } else if (action == Action.REQUEST) {
                     // the only action: nothing is in flight, and what arrives later drains again
                     draining = false;
@@ -445,6 +458,18 @@ final class ResponsePieces<T> implements CoreSubscriber<T>, Publisher<ByteBody>,
                     end();
                     Objects.requireNonNull(s).onComplete();
                 }
+                case ABANDONED -> Objects.requireNonNull(s).onError(new CancellationException("The response was abandoned before its pieces were subscribed to"));
+                case BAD_REQUEST -> {
+                    if (piece != null) {
+                        piece.close();
+                    }
+                    if (pending != null) {
+                        pending.cancel();
+                    }
+                    cancelBody(up);
+                    end();
+                    Objects.requireNonNull(s).onError(Objects.requireNonNull(error));
+                }
                 default -> throw new IllegalStateException("Unexpected action " + action);
             }
         }
@@ -456,6 +481,10 @@ final class ResponsePieces<T> implements CoreSubscriber<T>, Publisher<ByteBody>,
      * @return The next action, with the state updated for it
      */
     private Action next() {
+        if (abandoned && subscribed && !terminated) {
+            terminated = true;
+            return Action.ABANDONED;
+        }
         if (cancelled || terminated) {
             return Action.IDLE;
         }
@@ -479,6 +508,10 @@ final class ResponsePieces<T> implements CoreSubscriber<T>, Publisher<ByteBody>,
         }
         if (!subscribed) {
             return Action.IDLE;
+        }
+        if (badRequest != null) {
+            terminated = true;
+            return Action.BAD_REQUEST;
         }
         if (ready != null) {
             return demand > 0 ? Action.EMIT : Action.IDLE;
@@ -531,6 +564,8 @@ final class ResponsePieces<T> implements CoreSubscriber<T>, Publisher<ByteBody>,
         FAIL_RESULT,
         EMIT,
         FAIL,
-        COMPLETE
+        COMPLETE,
+        ABANDONED,
+        BAD_REQUEST
     }
 }
