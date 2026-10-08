@@ -3813,11 +3813,28 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             Argument provided = DefaultBeanDependencyGraph.providedArgument(resolutionContext);
             // a provider of Object names no target: every bean would be a candidate
             if (provided != null && provided.getType() != Object.class) {
-                graph.recordProvided(resolutionContext, getBeanDefinitions(provided, (Qualifier) qualifier));
+                graph.recordProvided(resolutionContext, getBeanDefinitions(provided, (Qualifier) providerQualifier(resolutionContext, qualifier)));
             }
             return;
         }
         graph.record(resolutionContext, received);
+    }
+
+    /**
+     * The qualifier a provider resolves under, as {@link AbstractProviderDefinition} decides it: the qualifier it was
+     * looked up with, or for a provider injected into an iterable bean without one, the name the resolution carries.
+     *
+     * @param resolutionContext The resolution context injecting the provider
+     * @param qualifier The qualifier the provider was looked up with
+     * @return The qualifier the provider resolves under
+     */
+    private static @Nullable Qualifier<?> providerQualifier(BeanResolutionContext resolutionContext, @Nullable Qualifier<?> qualifier) {
+        if (qualifier != null) {
+            return qualifier;
+        }
+        BeanResolutionContext.Segment<?, ?> segment = resolutionContext.getPath().currentSegment().orElse(null);
+        Object name = resolutionContext.getAttribute(Named.class.getName());
+        return name != null && segment != null && segment.getDeclaringType().isIterable() ? Qualifiers.byName(name.toString()) : null;
     }
 
     @SuppressWarnings({"unchecked", "NullAway"}) // Nullable factory definitions may produce a registration without an instance.

@@ -188,6 +188,36 @@ class BeanDependencyGraphSpec extends Specification {
         context.close()
     }
 
+    void "a provider held by an @EachBean member is recorded against what it resolves, with the qualifier it resolves under"() {
+        given:
+        ApplicationContext context = ApplicationContext.builder()
+            .properties('spec.name': 'BeanDependencyGraphSpec')
+            .beanDependencyTrackingEnabled(true)
+            .start()
+        BeanDependencyGraph graph = context.findDependencyGraph().get()
+        def a = io.micronaut.inject.qualifiers.Qualifiers.byName("a")
+        def b = io.micronaut.inject.qualifiers.Qualifiers.byName("b")
+
+        when:
+        def consumerA = context.getBean(ConnProviderConsumer, a)
+        context.getBean(ConnProviderConsumer, b)
+        def holdersOfA = graph.dependentsOf(context.getBeanRegistration(Conn, a)).findAll { it.dependent().beanType == ConnProviderConsumer }
+
+        then: "an unqualified provider does not inherit the member's qualifier, so both members may resolve either conn"
+        holdersOfA.size() == 2
+        holdersOfA.every { it.lazy() }
+        holdersOfA*.dependent()*.declaredQualifier.toSet() == [a, b] as Set
+
+        when:
+        consumerA.conn.get()
+
+        then:
+        thrown(io.micronaut.context.exceptions.NonUniqueBeanException)
+
+        cleanup:
+        context.close()
+    }
+
     private static BeanDependencyGraph.BeanDependency edge(Collection<BeanDependencyGraph.BeanDependency> edges, Class<?> dependent) {
         def edge = edges.find { it.dependent().beanType == dependent }
         assert edge != null : "no dependency recorded for $dependent in $edges"
