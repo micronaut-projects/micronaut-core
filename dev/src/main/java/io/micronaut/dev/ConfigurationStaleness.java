@@ -17,6 +17,7 @@ package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.ConfigurableBeanContext;
 import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.inject.BeanDefinition;
 import org.jspecify.annotations.NullMarked;
@@ -54,7 +55,7 @@ final class ConfigurationStaleness {
         // the singletons, and through the graph what they hold: a prototype a singleton received and keeps
         // is as stale as the singleton would be
         Set<BeanDefinition<?>> definitions = new LinkedHashSet<>();
-        Optional<io.micronaut.context.BeanDependencyGraph> graph = current.findDependencyGraph();
+        Optional<io.micronaut.context.BeanDependencyGraph> graph = current instanceof ConfigurableBeanContext configurable ? configurable.findDependencyGraph() : Optional.empty();
         for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(io.micronaut.inject.qualifiers.Qualifiers.any())) {
             BeanDefinition<?> definition = registration.getBeanDefinition();
             definitions.add(definition);

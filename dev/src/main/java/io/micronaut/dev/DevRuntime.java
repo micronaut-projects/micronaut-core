@@ -17,7 +17,6 @@ package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanRegistration;
-import io.micronaut.context.ConfigurableBeanContext;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.reload.AnnotatedBeanRetentionPolicy;
 import io.micronaut.context.reload.BeanRetentionPolicy;
