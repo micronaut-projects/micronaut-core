@@ -39,6 +39,19 @@ import java.util.function.Supplier;
  */
 @Internal
 public final class ReactorInterop {
+    private static final boolean REACTOR_PRESENT;
+
+    static {
+        boolean present;
+        try {
+            // A class literal uses normal linkage, not reflective class loading. Keep the
+            // optional dependency out of native publisher paths when linkage fails.
+            present = !CorePublisher.class.getName().isEmpty();
+        } catch (NoClassDefFoundError e) {
+            present = false;
+        }
+        REACTOR_PRESENT = present;
+    }
 
     private ReactorInterop() {
     }
@@ -57,7 +70,9 @@ public final class ReactorInterop {
                                      Subscriber<? super T> subscriber,
                                      @Nullable Supplier<? extends @Nullable Subscriber<?>> downstream,
                                      @Nullable Consumer<Object> discard) {
-        if (source instanceof CorePublisher<?>) {
+        // Resolve Reactor types only when the optional library is available. A native
+        // publisher used by an async form decoder must also work without Reactor.
+        if (REACTOR_PRESENT && source instanceof CorePublisher<?>) {
             source.subscribe(new ContextSubscriber<>(subscriber, downstream, discard));
         } else {
             source.subscribe(subscriber);

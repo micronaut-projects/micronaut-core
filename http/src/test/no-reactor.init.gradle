@@ -1,0 +1,12 @@
+// Local validation only: compile normally, then remove Reactor from the probe runtime.
+gradle.projectsEvaluated {
+    def target = gradle.rootProject.findProject(':micronaut-http')
+    if (target == null) return
+    target.tasks.register('reactorAbsentInteropProbe', JavaExec) {
+        dependsOn target.tasks.named('testClasses')
+        classpath = target.sourceSets.test.runtimeClasspath.filter {
+            !it.name.startsWith('reactor-core-') && !it.name.startsWith('micronaut-reactor-')
+        }
+        mainClass = 'io.micronaut.http.body.stream.ReactorAbsentInteropProbe'
+    }
+}
