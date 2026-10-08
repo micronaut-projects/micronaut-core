@@ -33,7 +33,7 @@ class JsonChunkedProcessorElementLimitTest {
         List<String> received = new ArrayList<>();
         JsonChunkedProcessor processor = new JsonChunkedProcessor(10);
         processor.counter.unwrapTopLevelArray();
-        Flux<String> values = processor.process(Flux.just(input)).map(buffer -> {
+        Flux<String> values = JsonChunkedFlux.process(processor, Flux.just(input)).map(buffer -> {
             ByteBuf buf = (ByteBuf) buffer.asNativeBuffer();
             try {
                 return buf.toString(StandardCharsets.UTF_8);
@@ -54,7 +54,7 @@ class JsonChunkedProcessorElementLimitTest {
         JsonChunkedProcessor processor = new JsonChunkedProcessor(16);
         processor.counter.unwrapTopLevelArray();
         Flux<ByteBuf> input = Flux.just(first, second, third).doOnDiscard(ByteBuf.class, ByteBuf::release);
-        assertThrows(ContentLengthExceededException.class, () -> processor.process(input).blockLast());
+        assertThrows(ContentLengthExceededException.class, () -> JsonChunkedFlux.process(processor, input).blockLast());
         assertEquals(0, first.refCnt());
         assertEquals(0, second.refCnt());
         if (third.refCnt() > 0) {
@@ -66,7 +66,7 @@ class JsonChunkedProcessorElementLimitTest {
     private static List<String> collect(JsonChunkedProcessor processor, Flux<ByteBuf> input) {
         processor.counter.unwrapTopLevelArray();
         List<String> received = new ArrayList<>();
-        processor.process(input).doOnNext(buffer -> {
+        JsonChunkedFlux.process(processor, input).doOnNext(buffer -> {
             ByteBuf buf = (ByteBuf) buffer.asNativeBuffer();
             received.add(buf.toString(StandardCharsets.UTF_8));
             buf.release();

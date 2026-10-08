@@ -72,7 +72,6 @@ import io.netty.util.Attribute;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 
 import java.io.EOFException;
 import java.util.ArrayDeque;
@@ -843,7 +842,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * Handler that exposes incoming content as a {@link Flux}.
+     * Handler that exposes incoming content as a {@link org.reactivestreams.Publisher}.
      */
     private final class StreamingInboundHandler extends InboundHandler implements BufferConsumer.Upstream {
         final StreamingNettyByteBody.SharedBuffer dest;

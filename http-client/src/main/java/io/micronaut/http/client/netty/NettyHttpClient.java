@@ -64,6 +64,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.body.stream.BodyElementsPublisher;
+import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.ByteBodyElements;
 import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.body.WritableBodyWriter;
@@ -1362,10 +1363,10 @@ final class NettyHttpClient implements
                             parts.get(parts.size() - 1).release();
                             body = Flux.fromIterable(parts.subList(0, parts.size() - 1)).map(DefaultHttpContent::new);
                         } else {
-                            body = SseSplitter.split(NettyByteBodyFactory.toByteBufs(bb), sizeLimits()).map(DefaultHttpContent::new);
+                            body = SseSplitter.split(Flux.from(NettyByteBodyFactory.toByteBufs(bb)), sizeLimits()).map(DefaultHttpContent::new);
                         }
                     } else {
-                        body = NettyByteBodyFactory.toByteBufs(bb).map(DefaultHttpContent::new);
+                        body = BodyPublishers.map(NettyByteBodyFactory.toByteBufs(bb), DefaultHttpContent::new);
                     }
                 }
 
@@ -1579,7 +1580,7 @@ final class NettyHttpClient implements
                             new IllegalArgumentException("Unconvertible reactive type: " + bodyValue)
                         );
 
-                        Flux<HttpContent> requestBodyPublisher = Flux.from(publisher).map(value -> {
+                        Publisher<HttpContent> requestBodyPublisher = BodyPublishers.map(publisher, value -> {
                             Argument<Object> type = Argument.ofInstance(value);
                             ByteBuffer<?> buffer = handlerRegistry.getWriter(type, List.of(requestContentType))
                                 .writeTo(type, requestContentType, value, request.getHeaders(), byteBufferFactory);
@@ -1590,7 +1591,7 @@ final class NettyHttpClient implements
                             requestBodyPublisher = JsonSubscriber.lift(requestBodyPublisher);
                         }
 
-                        return byteBodyFactory.adapt(requestBodyPublisher.map(ByteBufHolder::content), outgoingHeaders, null);
+                        return byteBodyFactory.adapt(BodyPublishers.map(requestBodyPublisher, ByteBufHolder::content), outgoingHeaders, null);
                     } else if (bodyValue instanceof CharSequence sequence) {
                         bodyContent = charSequenceToByteBuf(sequence, requestContentType);
                     } else {

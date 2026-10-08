@@ -22,13 +22,13 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -79,7 +79,7 @@ public final class StringBodyReader implements TypedMessageBodyReader<String>, C
 
     @Override
     public Publisher<String> readChunked(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        return Flux.from(input).map(byteBuffer -> read0(byteBuffer, getCharset(mediaType, httpHeaders)));
+        return BodyPublishers.map(input, byteBuffer -> read0(byteBuffer, getCharset(mediaType, httpHeaders)));
     }
 
     @Override

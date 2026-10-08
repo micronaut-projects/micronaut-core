@@ -46,7 +46,7 @@ class JsonChunkedElementsTest {
         NettyJsonStreamHandler<List<Integer>> handler = new NettyJsonStreamHandler<>(MAPPER);
         ByteBuf input = buffer("[1,2]\n[3,4]\n");
 
-        List<List<Integer>> lists = handler.readChunked(NUMBERS, MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>just(wrap(input)), 1024)
+        List<List<Integer>> lists = Flux.from(handler.readChunked(NUMBERS, MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>just(wrap(input)), 1024))
             .collectList()
             .block();
 
@@ -85,7 +85,7 @@ class JsonChunkedElementsTest {
         NettyJsonStreamHandler<Map> handler = new NettyJsonStreamHandler<>(MAPPER);
         ByteBuf input = buffer("{\"a\":1}\n[1]\n{\"b\":2}\n");
 
-        assertThrows(RuntimeException.class, () -> handler.readChunked(Argument.of(Map.class), MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>just(wrap(input)), 1024)
+        assertThrows(RuntimeException.class, () -> Flux.from(handler.readChunked(Argument.of(Map.class), MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>just(wrap(input)), 1024))
             .collectList()
             .block());
 

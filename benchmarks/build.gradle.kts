@@ -32,6 +32,8 @@ dependencies {
     api(projects.micronautRouter)
     api(projects.micronautRuntime)
     api(projects.micronautCoreReactive)
+    // FormDemuxerBenchmark decodes forms like the server does
+    api(libs.managed.netty.contrib.multipart.core)
 
     api(platform(libs.test.boms.micronaut.validation))
     api(libs.managed.reactor)
