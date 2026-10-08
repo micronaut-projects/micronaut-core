@@ -20,6 +20,7 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.reload.AnnotatedBeanRetentionPolicy;
 import io.micronaut.context.reload.BeanRetentionPolicy;
+import io.micronaut.context.reload.PolicyRetentionCriteria;
 import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.context.reload.InPlaceResourceReloader;
 import io.micronaut.context.reload.ReloadCompletedEvent;
@@ -1687,10 +1688,10 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
-     * What a restart retains: what a policy retains, unless a change touched a prefix one of them declares for it, or a
-     * bean it holds or received is of a class of a generation, which the restart replaces and the bean would keep
-     * running. The prefixes the policies declare for a bean are also those under which a configuration bean it received
-     * is not retained with it, but bound again by the next generation.
+     * What a restart retains: what a policy retains and none refuses, unless a change touched a prefix one of those that
+     * retain it declares for it, or a bean it holds or received is of a class of a generation, which the restart
+     * replaces and the bean would keep running. The prefixes the policies declare for a bean are also those under which
+     * a configuration bean it received is not retained with it, but bound again by the next generation.
      */
     private DefaultBeanContext.RetentionCriteria retentionCriteria(ApplicationContext old, @Nullable ConfigurationChange configurationChange) {
         List<BeanRetentionPolicy> policies = new ArrayList<>(old.getBeansOfType(BeanRetentionPolicy.class));
@@ -1698,46 +1699,29 @@ public final class DevRuntime implements Closeable {
             // what the modules declare with @Retain, read from the definitions
             policies.add(AnnotatedBeanRetentionPolicy.INSTANCE);
         }
-        OrderUtil.sort(policies);
+        PolicyRetentionCriteria criteria = new PolicyRetentionCriteria(policies,
+            prefix -> configurationChange != null && configurationChange.touches(prefix),
+            type -> type.getClassLoader() instanceof GenerationClassLoader);
         return new DefaultBeanContext.RetentionCriteria() {
             @Override
             public boolean retain(BeanRegistration<?> registration) {
-                if (isStale(registration)) {
-                    return false;
-                }
-                // every policy that retains the bean has a say: a pool kept across a changed URL would be the old pool,
-                // so a touched prefix any of them declares for the bean drops it, and none declaring one keeps it
-                boolean retained = false;
-                for (BeanRetentionPolicy policy : policies) {
-                    if (!policy.retain(registration)) {
-                        continue;
-                    }
-                    retained = true;
-                    if (configurationChange != null) {
-                        for (String prefix : policy.observedConfigurationPrefixes(registration)) {
-                            if (configurationChange.touches(prefix)) {
-                                return false;
-                            }
-                        }
-                    }
-                }
-                return retained;
+                // a bean of the application is never retained, whatever a policy says, and needs no word in the log
+                return !isStale(registration) && criteria.retain(registration);
             }
 
             @Override
             public Set<String> invalidatedBy(BeanRegistration<?> registration) {
-                Set<String> prefixes = new LinkedHashSet<>();
-                for (BeanRetentionPolicy policy : policies) {
-                    if (policy.retain(registration)) {
-                        prefixes.addAll(policy.observedConfigurationPrefixes(registration));
-                    }
-                }
-                return prefixes;
+                return criteria.invalidatedBy(registration);
             }
 
             @Override
             public boolean isReplaced(Class<?> type) {
-                return type.getClassLoader() instanceof GenerationClassLoader;
+                return criteria.isReplaced(type);
+            }
+
+            @Override
+            public @Nullable Object refusedBy(BeanRegistration<?> registration) {
+                return criteria.refusedBy(registration);
             }
         };
     }

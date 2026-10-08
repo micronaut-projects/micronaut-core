@@ -34,6 +34,7 @@ import java.util.List;
  * Retains across a restart the beans whose type the manifest names under
  * {@code micronaut.dev.retain}: a connection pool, a client, an engine the application's classes do
  * not define. A module declares its own with {@link io.micronaut.context.annotation.Retain} instead.
+ * Another policy can still {@link Decision#REFUSE refuse} what it names.
  *
  * @author graemerocher
  * @since 5.3.0
@@ -63,13 +64,13 @@ final class ManifestRetentionPolicy implements BeanRetentionPolicy {
     }
 
     @Override
-    public boolean retain(BeanRegistration<?> registration) {
+    public Decision decide(BeanRegistration<?> registration) {
         Object bean = registration.getBean();
         for (Class<?> type : retainedTypes) {
             if (type.isAssignableFrom(registration.getBeanType()) || type.isInstance(bean)) {
-                return true;
+                return Decision.RETAIN;
             }
         }
-        return false;
+        return Decision.ABSTAIN;
     }
 }
