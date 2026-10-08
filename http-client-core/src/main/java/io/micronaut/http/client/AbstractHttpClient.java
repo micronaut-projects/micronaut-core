@@ -348,7 +348,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @param request The request
      * @return Whether the request accepts only {@code text/event-stream}
      */
-    public static boolean isAcceptEvents(HttpRequest<?> request) {
+    private static boolean isAcceptEvents(HttpRequest<?> request) {
         String acceptHeader = request.getHeaders().get(HttpHeaders.ACCEPT);
         return acceptHeader != null && acceptHeader.equalsIgnoreCase(MediaType.TEXT_EVENT_STREAM);
     }
@@ -579,24 +579,19 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             FilterRunner.sortReverse(filters);
         }
 
-        FilterRunner runner = new FilterRunner(filters) {
-            @Override
-            protected ExecutionFlow<HttpResponse<?>> provideResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
-                try {
-                    return propagatedContext.propagate(() -> sendRequestWithRedirectsNoFilter(
-                        propagatedContext,
-                        preferredScheduler,
-                        blockedThread,
-                        MutableHttpRequestWrapper.wrapIfNecessary(conversionService, request),
-                        selection,
-                        readResponse
-                    ));
-                } catch (Throwable e) {
-                    return ExecutionFlow.error(e);
+        ExecutionFlow<HttpResponse<?>> flow;
+        if (filters.isEmpty()) {
+            // what the filter runner does without a filter
+            flow = sendFiltered(propagatedContext, preferredScheduler, blockedThread, request, selection, readResponse);
+        } else {
+            FilterRunner runner = new FilterRunner(filters) {
+                @Override
+                protected ExecutionFlow<HttpResponse<?>> provideResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
+                    return sendFiltered(propagatedContext, preferredScheduler, blockedThread, request, selection, readResponse);
                 }
-            }
-        };
-        ExecutionFlow<HttpResponse<?>> flow = runner.run(request, propagatedContext);
+            };
+            flow = runner.run(request, propagatedContext);
+        }
         if (selection == null) {
             return flow;
         }
@@ -616,6 +611,28 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             selection.releaseUnclaimed();
         });
         return released;
+    }
+
+    private ExecutionFlow<HttpResponse<?>> sendFiltered(
+        PropagatedContext propagatedContext,
+        AtomicReference<ScheduledExecutorService> preferredScheduler,
+        @Nullable Thread blockedThread,
+        HttpRequest<?> request,
+        @Nullable LoadBalancerSelection selection,
+        BiFunction<MutableHttpRequest<?>, R, ? extends ExecutionFlow<? extends HttpResponse<?>>> readResponse
+    ) {
+        try {
+            return propagatedContext.propagate(() -> sendRequestWithRedirectsNoFilter(
+                propagatedContext,
+                preferredScheduler,
+                blockedThread,
+                MutableHttpRequestWrapper.wrapIfNecessary(conversionService, request),
+                selection,
+                readResponse
+            ));
+        } catch (Throwable e) {
+            return ExecutionFlow.error(e);
+        }
     }
 
     private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirectsNoFilter(
@@ -950,7 +967,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @param <B>       The event data type
      * @return The flow of the response, whose body is the events
      */
-    public <I, B> ExecutionFlow<HttpResponse<BodyElements<Event<B>>>> exchangeEventStreamFlow(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
+    <I, B> ExecutionFlow<HttpResponse<BodyElements<Event<B>>>> exchangeEventStreamFlow(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
         setupConversionService(request);
         return exchangeEventStreamFlow(PropagatedContext.getOrEmpty(), toMutableRequest(request), eventType, errorType);
     }
@@ -970,7 +987,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @param <I>       The request body type
      * @return The flow of the response, whose body is the pieces of the response body
      */
-    public <I> ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> exchangeStreamFlow(HttpRequest<I> request, Argument<?> errorType) {
+    <I> ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> exchangeStreamFlow(HttpRequest<I> request, Argument<?> errorType) {
         setupConversionService(request);
         return exchangeElementsFlow(PropagatedContext.getOrEmpty(), toMutableRequest(request), errorType, true,
             (req, response) -> ElementsResponse.of(response, BodyPieces.elements(response.byteBody().move())));
@@ -1026,7 +1043,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @param <O>       The type of an element
      * @return The flow of the response, whose body is the elements
      */
-    public <I, O> ExecutionFlow<HttpResponse<BodyElements<O>>> jsonStreamFlow(HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
+    <I, O> ExecutionFlow<HttpResponse<BodyElements<O>>> jsonStreamFlow(HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
         setupConversionService(request);
         return jsonStreamFlow(PropagatedContext.getOrEmpty(), toMutableRequest(request), type, errorType, true);
     }
