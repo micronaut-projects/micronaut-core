@@ -543,4 +543,34 @@ class Foo {
 
 """)
     }
+
+    def 'a continuation of another completion stage type is rejected'() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.filter.FilterContinuation;
+
+class MyFuture<T> extends CompletableFuture<T> {
+}
+
+@ServerFilter
+class Foo {
+    @RequestFilter
+    public CompletionStage<HttpResponse<?>> stage(HttpRequest<?> request, FilterContinuation<MyFuture<HttpResponse<?>>> continuation) {
+        return continuation.proceed();
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("Unsupported continuation type: test.MyFuture, declare it as CompletionStage or CompletableFuture")
+    }
 }

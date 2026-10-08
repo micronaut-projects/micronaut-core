@@ -61,6 +61,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -220,6 +221,14 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
                         return;
                     }
                     continuationCreator = parameter;
+                    ClassElement continuationWrapper = parameterType.getFirstTypeArgument().orElse(null);
+                    if (continuationWrapper != null && continuationWrapper.isAssignable(CompletionStage.class)
+                        && !continuationWrapper.getName().equals(CompletionStage.class.getName())
+                        && !continuationWrapper.getName().equals(CompletableFuture.class.getName())) {
+                        // the continuation yields a CompletableFuture
+                        context.fail("Unsupported continuation type: " + continuationWrapper.getName() + ", declare it as CompletionStage or CompletableFuture", parameter);
+                        return;
+                    }
                     ClassElement continuationReturnType = resolveType(parameterType.getFirstTypeArgument().orElse(ClassElement.of(Object.class)));
                     if (!continuationReturnType.isAssignable(HttpResponse.class) && !continuationReturnType.isAssignable(MutableHttpResponse.class)) {
                         context.fail("Unsupported continuation type: " + continuationReturnType.getName(), parameter);
