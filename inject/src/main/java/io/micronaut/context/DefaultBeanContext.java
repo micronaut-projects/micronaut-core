@@ -3714,7 +3714,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                       BeanDefinition<T> definition,
                                                       boolean dependent,
                                                       boolean customizeNull,
-                                                      boolean ownedByCaller) {
+                                                      boolean ownLifecycle) {
         if (resolutionContext instanceof AbstractBeanResolutionContext abstractContext && abstractContext.isLazyProxyTarget()) {
             // The context is retained by a lazy proxy, which resolves its target through it on every call. Create
             // the bean in a copy, so that the created bean is not recorded as a dependent of the retained context
@@ -3776,7 +3776,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
                         List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
                         beanRegistration = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
-                            dependentBeans, interceptorCandidates, creation.dependencies, ownedByCaller);
+                            dependentBeans, interceptorCandidates, creation.dependencies, ownLifecycle);
                     } catch (RuntimeException | Error e) {
                         destroyDependentsOfFailedBean(context, e);
                         destroyCreatedBeans(creation.dependencies.takeDependents(), e);

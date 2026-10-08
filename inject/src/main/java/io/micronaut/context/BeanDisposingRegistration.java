@@ -59,8 +59,8 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
                               @Nullable List<BeanRegistration<?>> dependents,
                               InterceptorCandidates interceptorCandidates,
                               DefaultBeanDependencies dependencies,
-                              boolean ownedByCaller) {
-        super(identifier, beanDefinition, createdBean, dependencies, ownedByCaller);
+                              boolean ownLifecycle) {
+        super(identifier, beanDefinition, createdBean, dependencies, ownLifecycle);
         this.beanContext = beanContext;
         // A reconstructed proxy wrapper already has its complete owner. Reattaching its retained advice would
         // duplicate registrations or add them back to an owner that was already destroyed.

@@ -25,7 +25,7 @@ import io.micronaut.inject.BeanDefinition
  * A registration tells whether it holds an instance created for the lookup that returned it, which closing it
  * destroys without touching an instance anyone else holds.
  */
-class BeanRegistrationOwnedByCallerSpec extends AbstractTypeElementSpec {
+class BeanRegistrationOwnLifecycleSpec extends AbstractTypeElementSpec {
 
     private static final String SOURCE = '''
 package test;
@@ -79,26 +79,26 @@ class ThreadLocalBean {
 }
 '''
 
-    void "a registration is owned by the caller only when the lookup created its instance for the caller"() {
+    void "a registration has its own lifecycle only when the lookup created its instance for the caller"() {
         given:
         ApplicationContext context = buildContext('test.SingletonBean', SOURCE, true)
 
         expect:
-        !registration(context, 'test.SingletonBean').isOwnedByCaller()
-        registration(context, 'test.PrototypeBean').isOwnedByCaller()
-        registration(context, 'test.UnscopedBean').isOwnedByCaller()
-        !registration(context, 'test.RefreshableBean').isOwnedByCaller()
-        !registration(context, 'test.ThreadLocalBean').isOwnedByCaller()
+        !registration(context, 'test.SingletonBean').hasOwnLifecycle()
+        registration(context, 'test.PrototypeBean').hasOwnLifecycle()
+        registration(context, 'test.UnscopedBean').hasOwnLifecycle()
+        !registration(context, 'test.RefreshableBean').hasOwnLifecycle()
+        !registration(context, 'test.ThreadLocalBean').hasOwnLifecycle()
 
         and: 'a registration built by hand is not'
         BeanRegistration<?> registration = registration(context, 'test.SingletonBean')
-        !new BeanRegistration(registration.identifier, registration.beanDefinition, registration.bean).isOwnedByCaller()
+        !new BeanRegistration(registration.identifier, registration.beanDefinition, registration.bean).hasOwnLifecycle()
 
         cleanup:
         context.close()
     }
 
-    void "an instance created for the caller is owned by the caller, whatever the scope of its definition"() {
+    void "an instance created for the caller has its own lifecycle, whatever the scope of its definition"() {
         given:
         ApplicationContext context = buildContext('test.SingletonBean', SOURCE, true)
         BeanDefinition<?> definition = context.getBeanDefinition(context.classLoader.loadClass('test.SingletonBean'))
@@ -108,7 +108,7 @@ class ThreadLocalBean {
 
         then:
         created instanceof BeanRegistration
-        ((BeanRegistration<?>) created).isOwnedByCaller()
+        ((BeanRegistration<?>) created).hasOwnLifecycle()
         !created.bean().is(context.getBean(definition.beanType))
 
         cleanup:
@@ -116,7 +116,7 @@ class ThreadLocalBean {
         context.close()
     }
 
-    void "closing only the registrations owned by the caller a lookup returned leaves the shared beans alive"() {
+    void "closing only the registrations with their own lifecycle a lookup returned leaves the shared beans alive"() {
         given:
         ApplicationContext context = buildContext('test.SingletonBean', SOURCE, true)
         Class<?> singletonType = context.classLoader.loadClass('test.SingletonBean')
@@ -129,7 +129,7 @@ class ThreadLocalBean {
         List<BeanRegistration<?>> registrations = [context.getBeanRegistration(singletonType, null),
                                                    context.getBeanRegistration(prototypeType, null),
                                                    context.getBeanRegistration(refreshableType, null)]
-        registrations.findAll { it.isOwnedByCaller() }*.close()
+        registrations.findAll { it.hasOwnLifecycle() }*.close()
 
         then: 'the prototype was destroyed and the shared beans are the ones every holder still uses'
         prototypeType.destroyed == 1
@@ -149,7 +149,7 @@ class ThreadLocalBean {
         context.close()
     }
 
-    void "a registration owned by the caller destroys its instance once however often it is closed"() {
+    void "a registration with its own lifecycle destroys its instance once however often it is closed"() {
         given:
         ApplicationContext context = buildContext('test.SingletonBean', SOURCE, true)
         Class<?> prototypeType = context.classLoader.loadClass('test.PrototypeBean')
@@ -161,7 +161,7 @@ class ThreadLocalBean {
         registration.close()
 
         then:
-        registration.isOwnedByCaller()
+        registration.hasOwnLifecycle()
         prototypeType.destroyed == before + 1
 
         cleanup:
