@@ -69,6 +69,33 @@ import org.junit.jupiter.api.Test;
 class SharedFormBindersTest {
     private static final ByteBodyFactory BODIES = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
 
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void immediateFormTransformationReturnsAnImperativeFlow() {
+        try (ApplicationContext context = ApplicationContext.run();
+             FormRequest request = new FormRequest("message", null, "hello")) {
+            ServerBodyAnnotationBinder<Map> binder = context.getBean(ServerBodyAnnotationBinder.class);
+            var result = binder.transform(request, request, ConversionContext.of(Map.class),
+                BODIES.copyOf("form", StandardCharsets.UTF_8));
+            org.junit.jupiter.api.Assertions.assertInstanceOf(io.micronaut.core.execution.ImperativeExecutionFlow.class, result);
+            assertEquals(Map.of("message", "hello"), result.tryCompleteValue().orElseThrow());
+        }
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void decoderCreationFailureClosesTheBufferedBodyBeforeHandoff() {
+        try (ApplicationContext context = ApplicationContext.run();
+             FormRequest request = new FormRequest("message", null, "hello");
+             var bytes = BODIES.copyOf("form", StandardCharsets.UTF_8)) {
+            request.failDecoderCreation = true;
+            ServerBodyAnnotationBinder<Map> binder = context.getBean(ServerBodyAnnotationBinder.class);
+            assertThrows(UnsupportedOperationException.class, () -> binder.transform(request, request,
+                ConversionContext.of(Map.class), bytes));
+            assertThrows(IllegalStateException.class, bytes::move);
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -352,6 +379,7 @@ class SharedFormBindersTest {
         private final RawFormField field;
         private final List<Runnable> disposal = new ArrayList<>();
         private Sinks.Many<RawFormField> delayed;
+        private boolean failDecoderCreation;
 
         FormRequest(String name, @Nullable String filename, String value) {
             super(HttpRequest.POST("/form", null).contentType(MediaType.MULTIPART_FORM_DATA_TYPE));
@@ -365,6 +393,9 @@ class SharedFormBindersTest {
 
         @Override
         public Publisher<RawFormField> getRawFormFields(ByteBody bytes) {
+            if (failDecoderCreation) {
+                throw new UnsupportedOperationException("decoder creation");
+            }
             ((CloseableByteBody) bytes).close();
             return delayed == null ? Flux.just(field) : delayed.asFlux();
         }

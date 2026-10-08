@@ -213,6 +213,31 @@ public class ServerBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T
         FormCapableHttpRequest<?> formRequest = formRequest(server);
         MediaType mediaType = request.getContentType().orElse(null);
         if (reader == null && formRequest != null && formRequest.hasFormBody()) {
+            return transformForm(request, server, formRequest, context, imm);
+        }
+        if (reader != null) {
+            T result = read(context, reader, request.getHeaders(), mediaType, imm.toByteBuffer());
+            cacheDecodedBody(request, server, result);
+            return ExecutionFlow.just(Optional.ofNullable(result));
+        }
+        Optional<T> converted = convertNative(context, imm);
+        cacheDecodedBody(request, server, converted.orElse(null));
+        return ExecutionFlow.just(converted);
+    }
+
+    /**
+     * Complete a buffered form in order under the bound request context.
+     *
+     * @param request The bound request
+     * @param server The byte source
+     * @param formRequest The decoder
+     * @param context Conversion context
+     * @param imm Buffered bytes transferred to the decoder
+     * @return The converted form
+     */
+    ExecutionFlow<Optional<T>> transformForm(HttpRequest<?> request, ServerHttpRequest<?> server,
+                                           FormCapableHttpRequest<?> formRequest, ArgumentConversionContext<T> context,
+                                           AvailableByteBody imm) {
             Map<@Nullable String, Object> values = new LinkedHashMap<>();
             // Read one field at a time without waiting on the decoding or buffering thread.
             // The map is only touched by the serialized completion chain.
@@ -235,28 +260,29 @@ public class ServerBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T
             collected.onCancel(collector::cancel);
             // Buffered fields can still come from a foreign Reactor publisher. Supply the
             // discard hook so fields queued by that publisher are released on cancellation.
-            ReactorInterop.subscribe(formRequest.getRawFormFields(imm), collector, null,
+            org.reactivestreams.Publisher<RawFormField> fields;
+            try {
+                fields = formRequest.getRawFormFields(imm);
+            } catch (RuntimeException | Error e) {
+                // Decoder creation failed before handoff; the binder still owns the bytes.
+                ((CloseableAvailableByteBody) imm).close();
+                throw e;
+            }
+            ReactorInterop.subscribe(fields, collector, null,
                 item -> {
                     if (item instanceof RawFormField field) {
                         field.close();
                     }
                 });
             PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-            return collected.map(ignored ->
+            var immediate = collected.tryComplete();
+            ExecutionFlow<Void> completion = immediate == null ? collected : immediate;
+            return completion.map(ignored ->
                 ServerHttpRequestContext.withRequest(propagatedContext, request).propagate(() -> {
                     Optional<T> converted = conversionService.convert(values, context);
                     cacheDecodedBody(request, server, converted.orElse(null));
                     return converted;
                 }));
-        }
-        if (reader != null) {
-            T result = read(context, reader, request.getHeaders(), mediaType, imm.toByteBuffer());
-            cacheDecodedBody(request, server, result);
-            return ExecutionFlow.just(Optional.ofNullable(result));
-        }
-        Optional<T> converted = convertNative(context, imm);
-        cacheDecodedBody(request, server, converted.orElse(null));
-        return ExecutionFlow.just(converted);
     }
 
     @SuppressWarnings("unchecked")

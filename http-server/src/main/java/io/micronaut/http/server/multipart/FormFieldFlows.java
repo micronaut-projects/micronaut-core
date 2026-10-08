@@ -56,8 +56,7 @@ public final class FormFieldFlows {
      * @return The result
      */
     public static <T, R> CompletableFuture<@Nullable R> first(Publisher<T> source, Function<? super T, ? extends R> map) {
-        FirstFuture<@Nullable R> result = new FirstFuture<>();
-        subscribe(source, result, new FirstSubscriber<T>(result) {
+        FirstFuture<T, @Nullable R> result = new FirstFuture<>() {
             @Override
             void onFirst(T item) {
                 R mapped;
@@ -66,18 +65,14 @@ public final class FormFieldFlows {
                 } catch (Throwable e) {
                     // nobody took the item
                     close(item, e);
-                    result.completeExceptionally(e);
+                    completeExceptionally(e);
                     return;
                 }
-                result.complete(mapped);
+                complete(mapped);
             }
-        });
+        };
+        source.subscribe(result);
         return result;
-    }
-
-    private static <T> void subscribe(Publisher<T> source, FirstFuture<?> result, FirstSubscriber<T> subscriber) {
-        result.subscriber.set(subscriber);
-        source.subscribe(subscriber);
     }
 
     /**
@@ -114,8 +109,7 @@ public final class FormFieldFlows {
     public static <T, V, R> CompletableFuture<@Nullable R> firstFlatMap(Publisher<T> source,
                                                                        Function<? super T, ? extends ExecutionFlow<? extends V>> complete,
                                                                        Function<? super V, ? extends R> map) {
-        FirstFuture<@Nullable R> result = new FirstFuture<>();
-        subscribe(source, result, new FirstSubscriber<T>(result) {
+        FirstFuture<T, @Nullable R> result = new FirstFuture<>() {
             @Override
             void onFirst(T item) {
                 ExecutionFlow<? extends V> flow;
@@ -124,29 +118,37 @@ public final class FormFieldFlows {
                 } catch (Throwable e) {
                     // nobody took the item
                     close(item, e);
-                    result.completeExceptionally(e);
+                    completeExceptionally(e);
                     return;
                 }
-                flow.onComplete((value, error) -> {
-                    if (error != null) {
-                        result.completeExceptionally(error);
-                    } else if (value == null) {
-                        result.complete(null);
-                    } else {
-                        R mapped;
-                        try {
-                            mapped = Objects.requireNonNull(map.apply(value), "The mapper returned a null value.");
-                        } catch (Throwable e) {
-                            result.completeExceptionally(e);
-                            return;
-                        }
-                        result.complete(mapped);
-                    }
-                });
-                // observed first: a delayed flow refuses to be observed once it was cancelled
+                var immediate = flow.tryComplete();
+                if (immediate != null) {
+                    finish(immediate.getValue(), immediate.getError());
+                    return;
+                }
+                flow.onComplete(this::finish);
+                // Observe first: a delayed flow refuses observation after cancellation.
                 running(flow);
             }
-        });
+
+            private void finish(@Nullable V value, @Nullable Throwable error) {
+                if (error != null) {
+                    completeExceptionally(error);
+                } else if (value == null) {
+                    complete(null);
+                } else {
+                    R mapped;
+                    try {
+                        mapped = Objects.requireNonNull(map.apply(value), "The mapper returned a null value.");
+                    } catch (Throwable e) {
+                        completeExceptionally(e);
+                        return;
+                    }
+                    complete(mapped);
+                }
+            }
+        };
+        source.subscribe(result);
         return result;
     }
 
@@ -172,40 +174,42 @@ public final class FormFieldFlows {
      * the first one arrived.
      *
      * @param <T> The type of the item
+     * @param <R> The result type
      */
-    private abstract static class FirstSubscriber<T> implements Subscriber<T> {
-        private final CompletableFuture<?> result;
+    @Internal
+    private abstract static class FirstFuture<T, R extends @Nullable Object> extends CompletableFuture<R> implements Subscriber<T> {
         private final AtomicBoolean done = new AtomicBoolean();
-        private final AtomicReference<@Nullable Subscription> subscription = new AtomicReference<>();
-        private final AtomicReference<@Nullable ExecutionFlow<?>> running = new AtomicReference<>();
+        private volatile @Nullable Subscription subscription;
+        private volatile @Nullable ExecutionFlow<?> running;
         private volatile boolean cancelled;
-
-        FirstSubscriber(CompletableFuture<?> result) {
-            this.result = result;
-        }
 
         /**
          * The result was cancelled: the publisher, or the flow of the item, is cancelled. An item
          * that arrives afterwards is closed.
          */
-        final void cancelled() {
+        @Override
+        public final boolean cancel(boolean mayInterruptIfRunning) {
+            if (!super.cancel(mayInterruptIfRunning)) {
+                return false;
+            }
             cancelled = true;
             done.set(true);
-            Subscription s = subscription.get();
+            Subscription s = subscription;
             if (s != null) {
                 s.cancel();
             }
-            ExecutionFlow<?> flow = running.get();
+            ExecutionFlow<?> flow = running;
             if (flow != null) {
                 flow.cancel();
             }
+            return true;
         }
 
         /**
          * @param flow The flow of the item, cancelled with the result
          */
         final void running(ExecutionFlow<?> flow) {
-            running.set(flow);
+            running = flow;
             if (cancelled) {
                 flow.cancel();
             }
@@ -220,7 +224,7 @@ public final class FormFieldFlows {
 
         @Override
         public final void onSubscribe(Subscription s) {
-            subscription.set(s);
+            subscription = s;
             if (cancelled) {
                 s.cancel();
                 return;
@@ -237,41 +241,22 @@ public final class FormFieldFlows {
                 }
                 return;
             }
-            Objects.requireNonNull(subscription.get()).cancel();
+            Objects.requireNonNull(subscription).cancel();
             onFirst(item);
         }
 
         @Override
         public final void onError(Throwable t) {
             if (done.compareAndSet(false, true)) {
-                result.completeExceptionally(t);
+                completeExceptionally(t);
             }
         }
 
         @Override
         public final void onComplete() {
             if (done.compareAndSet(false, true)) {
-                result.complete(null);
+                complete(null);
             }
-        }
-    }
-
-    /**
-     * The result of {@link #first} and {@link #firstFlatMap}: cancelling it cancels the reading.
-     *
-     * @param <R> The type of the result
-     */
-    private static final class FirstFuture<R> extends CompletableFuture<R> {
-        private final AtomicReference<@Nullable FirstSubscriber<?>> subscriber = new AtomicReference<>();
-
-        @Override
-        public boolean cancel(boolean mayInterruptIfRunning) {
-            boolean cancelled = super.cancel(mayInterruptIfRunning);
-            FirstSubscriber<?> s = subscriber.get();
-            if (cancelled && s != null) {
-                s.cancelled();
-            }
-            return cancelled;
         }
     }
 
@@ -291,8 +276,9 @@ public final class FormFieldFlows {
         private final Consumer<? super T> discard;
         private final Consumer<? super R> onValue;
         private final Consumer<@Nullable Throwable> onDone;
-        private final AtomicReference<@Nullable Subscription> upstream = new AtomicReference<>();
-        private final AtomicReference<@Nullable RunningFlow> running = new AtomicReference<>();
+        // Publication only: compound atomic transitions are confined to state and error.
+        private volatile @Nullable Subscription upstream;
+        private volatile @Nullable RunningFlow running;
 
         /**
          * @param complete Completes an item
@@ -315,11 +301,11 @@ public final class FormFieldFlows {
 
         @Override
         public void onSubscribe(Subscription s) {
-            if (upstream.get() != null) {
+            if (upstream != null) {
                 s.cancel();
                 return;
             }
-            upstream.set(s);
+            upstream = s;
             if (state.compareAndSet(State.INITIAL, State.REQUESTED)) {
                 s.request(1);
             } else if (state.get() == State.CANCELLED) {
@@ -340,33 +326,32 @@ public final class FormFieldFlows {
                 flow = Objects.requireNonNull(complete.apply(item), "The mapper returned a null flow");
             } catch (Throwable e) {
                 discard.accept(item);
-                stopWithError(e, Objects.requireNonNull(upstream.get())::cancel);
+                stopWithError(e, Objects.requireNonNull(upstream)::cancel);
                 return;
             }
-            RunningFlow runningFlow = null;
-            if (flow.tryComplete() == null) {
-                // cancelled with the reading while it runs. Known before the completion is
-                // observed, which requests the next item, so a later item does not replace it
-                runningFlow = new RunningFlow(flow);
-                running.set(runningFlow);
+            var immediate = flow.tryComplete();
+            if (immediate != null) {
+                innerFinished(immediate.getValue(), immediate.getError());
+                return;
             }
-            flow.onComplete((value, e) -> {
-                if (e != null) {
-                    stopWithError(e, Objects.requireNonNull(upstream.get())::cancel);
-                } else {
-                    if (value != null) {
-                        innerNext(value);
-                    }
-                    innerComplete();
+            // Publish before observing completion, which may request another item reentrantly.
+            RunningFlow runningFlow = new RunningFlow(flow);
+            running = runningFlow;
+            flow.onComplete(this::innerFinished);
+            State current = state.get();
+            if (!runningFlow.observed() || current == State.CANCELLED || current == State.TERMINATED) {
+                flow.cancel();
+            }
+        }
+
+        private void innerFinished(@Nullable R value, @Nullable Throwable failure) {
+            if (failure != null) {
+                stopWithError(failure, Objects.requireNonNull(upstream)::cancel);
+            } else {
+                if (value != null) {
+                    innerNext(value);
                 }
-            });
-            if (runningFlow != null) {
-                State current = state.get();
-                if (!runningFlow.observed() || current == State.CANCELLED || current == State.TERMINATED) {
-                    // cancelled, or failed by the publisher, before the flow was known or
-                    // observed: the cancellation did not reach it
-                    flow.cancel();
-                }
+                innerComplete();
             }
         }
 
@@ -409,7 +394,7 @@ public final class FormFieldFlows {
                 case TERMINATED -> cancelRunning();
                 default -> {
                     cancelRunning();
-                    Subscription s = upstream.get();
+                    Subscription s = upstream;
                     if (s != null) {
                         s.cancel();
                     }
@@ -418,7 +403,7 @@ public final class FormFieldFlows {
         }
 
         private void cancelRunning() {
-            RunningFlow flow = running.get();
+            RunningFlow flow = running;
             if (flow != null) {
                 flow.cancel();
             }
@@ -432,13 +417,13 @@ public final class FormFieldFlows {
         }
 
         private void innerComplete() {
-            running.set(null);
+            running = null;
             while (true) {
                 State previous = Objects.requireNonNull(state.get());
                 switch (previous) {
                     case ACTIVE -> {
                         if (state.compareAndSet(previous, State.REQUESTED)) {
-                            Objects.requireNonNull(upstream.get()).request(1);
+                            Objects.requireNonNull(upstream).request(1);
                             return;
                         }
                     }
