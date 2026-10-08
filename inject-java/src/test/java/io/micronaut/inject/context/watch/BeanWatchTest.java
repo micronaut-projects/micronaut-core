@@ -2,6 +2,7 @@ package io.micronaut.inject.context.watch;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.ConfigurableBeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.RuntimeBeanDefinition;
@@ -58,9 +59,9 @@ class BeanWatchTest {
         return RuntimeBeanDefinition.builder(Rule.class, () -> (Rule) () -> name).named(name).singleton(true).build();
     }
 
-    private static ClassChangeEvent classChange(int generation) {
-        return new ClassChangeEvent(BeanWatchTest.class, generation, Set.of(), BeanWatchTest.class.getClassLoader(),
-            List.of(new ClassChange("app.Greeter", ClassChange.Kind.MODIFIED)), ReloadStrategy.RELOAD);
+    private static ClassChangeEvent classChange() {
+        return new ClassChangeEvent(BeanWatchTest.class, Set.of(), BeanWatchTest.class.getClassLoader(),
+            List.of(new ClassChange("app.Greeter", ClassChange.Kind.MODIFIED)), ReloadStrategy.RESTART);
     }
 
     private static Set<Class<?>> beanTypes(List<BeanDefinition<Rule>> definitions) {
@@ -197,7 +198,7 @@ class BeanWatchTest {
     @Test
     void aConfigurationWatchRegisteredWhileItsBeanIsCreatedCanRecreateTheBeanAndClosesWithIt() {
         Pool.CREATED.set(0);
-        try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).trackBeanDependencies(true).start()) {
+        try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).beanDependencyTrackingEnabled(true).start()) {
             DefaultBeanContext beanContext = (DefaultBeanContext) context;
             PoolUser user = context.getBean(PoolUser.class);
             Pool pool = user.pool;
@@ -234,7 +235,7 @@ class BeanWatchTest {
     @Test
     void aModuleRecreatesABeanAndItsDependentsThroughThePublicApi() {
         Pool.CREATED.set(0);
-        try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).trackBeanDependencies(true).start()) {
+        try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).beanDependencyTrackingEnabled(true).start()) {
             WatchableBeanContext beanContext = (WatchableBeanContext) context;
             // a singleton not created yet is left alone
             assertFalse(beanContext.recreate(Pool.class, null));
@@ -274,7 +275,7 @@ class BeanWatchTest {
     @Test
     void aContextThatDoesNotTrackDependenciesRecreatesNothing() {
         Pool.CREATED.set(0);
-        try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).trackBeanDependencies(false).start()) {
+        try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).beanDependencyTrackingEnabled(false).start()) {
             WatchableBeanContext beanContext = (WatchableBeanContext) context;
             PoolUser user = context.getBean(PoolUser.class);
             // its dependents unknown, the pool is kept rather than leave the user holding a destroyed instance
@@ -292,7 +293,7 @@ class BeanWatchTest {
         // development mode only in the properties of the context: no system property, no builder switch
         try (ApplicationContext context = ApplicationContext.builder(DEVELOPMENT).start()) {
             WatchableBeanContext beanContext = (WatchableBeanContext) context;
-            assertTrue(context.findDependencyGraph().isPresent());
+            assertTrue(((ConfigurableBeanContext) context).findDependencyGraph().isPresent());
             PoolUser user = context.getBean(PoolUser.class);
             Pool pool = user.pool;
             assertTrue(beanContext.recreate(pool));
@@ -306,7 +307,7 @@ class BeanWatchTest {
 
     @Test
     void aRecreatedProcessorIsGivenTheStartupMethodsOnceAndTheDestroyedOneNothingMore() {
-        try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).trackBeanDependencies(true).start()) {
+        try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).beanDependencyTrackingEnabled(true).start()) {
             DefaultBeanContext beanContext = (DefaultBeanContext) context;
             LegacyTickProcessor processor = context.getBean(LegacyTickProcessor.class);
             assertEquals(List.of("tick", "tock"), processor.processed.stream().sorted().toList());
@@ -331,7 +332,7 @@ class BeanWatchTest {
     @Test
     void aProcessorRecreatedAsADependentIsCreatedAgainAndGivenTheStartupMethodsOnce() {
         Map<String, Object> properties = Map.of("spec.name", "BeanWatchTest", "pool-tick-processor.enabled", true);
-        try (ApplicationContext context = ApplicationContext.builder(properties).trackBeanDependencies(true).start()) {
+        try (ApplicationContext context = ApplicationContext.builder(properties).beanDependencyTrackingEnabled(true).start()) {
             WatchableBeanContext beanContext = (WatchableBeanContext) context;
             // created and fed by the startup pass, with the pool it received
             PoolTickProcessor processor = context.getBean(PoolTickProcessor.class);
@@ -357,7 +358,7 @@ class BeanWatchTest {
     @Test
     void aRecreatedDeprecatedProcessorIsGivenTheMethodsTheLegacyListenerDoesNotGiveItOnce() {
         Map<String, Object> properties = Map.of("spec.name", "BeanWatchTest", "buzz-processor.enabled", true);
-        try (ApplicationContext context = ApplicationContext.builder(properties).trackBeanDependencies(true).start()) {
+        try (ApplicationContext context = ApplicationContext.builder(properties).beanDependencyTrackingEnabled(true).start()) {
             WatchableBeanContext beanContext = (WatchableBeanContext) context;
             // its annotation is not processed on startup, so the legacy listener feeds it too, by the class only
             assertTrue(context.getBeanDefinition(BuzzProcessor.class).hasAnnotation(Deprecated.class));
@@ -377,7 +378,7 @@ class BeanWatchTest {
     @Test
     void aDeprecatedProcessorRecreatedAsADependentIsGivenEachMethodOnce() {
         Map<String, Object> properties = Map.of("spec.name", "BeanWatchTest", "buzz-processor.enabled", true);
-        try (ApplicationContext context = ApplicationContext.builder(properties).trackBeanDependencies(true).start()) {
+        try (ApplicationContext context = ApplicationContext.builder(properties).beanDependencyTrackingEnabled(true).start()) {
             WatchableBeanContext beanContext = (WatchableBeanContext) context;
             BuzzProcessor processor = context.getBean(BuzzProcessor.class);
             int startup = processor.processed.size();
@@ -508,21 +509,21 @@ class BeanWatchTest {
 
             // each class change the launcher publishes reaches the watch, ahead of the listeners of the event
             ((WatchableBeanContext) context).watchClassChanges(change -> ClassChangeOrder.SEEN.add("watch"));
-            ClassChangeEvent first = classChange(1);
+            ClassChangeEvent first = classChange();
             context.publishEvent(first);
             assertEquals(List.of(first), cache.evicted);
             assertEquals(List.of("watch", "listener"), ClassChangeOrder.SEEN);
             // published through the typed publisher a launcher may inject, rather than through the context
             ApplicationEventPublisher<ClassChangeEvent> publisher = context.getBean(Argument.of(ApplicationEventPublisher.class, ClassChangeEvent.class));
             assertFalse(publisher.isEmpty(), "a publisher with class change watches to call is not empty");
-            ClassChangeEvent second = classChange(2);
+            ClassChangeEvent second = classChange();
             publisher.publishEvent(second);
             assertEquals(List.of(first, second), cache.evicted);
 
             // the cache is destroyed: the watch it registered while it was created goes with it
             context.destroyBean(cache);
             assertFalse(cache.watch.isActive());
-            context.publishEvent(classChange(3));
+            context.publishEvent(classChange());
             assertEquals(List.of(first, second), cache.evicted);
         } finally {
             ClassChangeOrder.SEEN.clear();
@@ -538,7 +539,7 @@ class BeanWatchTest {
             // classes never change outside development mode: the watch is inactive from the start
             assertFalse(watch.isActive());
             assertFalse(((DefaultBeanContext) context).hasClassChangeWatches());
-            context.publishEvent(classChange(1));
+            context.publishEvent(classChange());
             assertTrue(seen.isEmpty());
             assertFalse(context.getBean(ClassCache.class).watch.isActive());
             watch.close();

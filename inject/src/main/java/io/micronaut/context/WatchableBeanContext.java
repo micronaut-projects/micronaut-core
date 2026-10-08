@@ -181,7 +181,7 @@ public sealed interface WatchableBeanContext extends BeanContext permits Default
 
     /**
      * Watches the class changes of a development reload: the watch for a cache keyed by class, which
-     * evicts what {@link io.micronaut.context.reload.ClassChangeEvent#isStale(Class)} says belongs to a
+     * evicts what {@link io.micronaut.context.reload.ClassChangeEvent#isStaleType(Class)} says belongs to a
      * retired generation. The watcher is called with each {@link io.micronaut.context.reload.ClassChangeEvent}
      * the launcher publishes, before the listeners of the event, and has no startup batch.
      *
@@ -202,7 +202,7 @@ public sealed interface WatchableBeanContext extends BeanContext permits Default
      * serializers or validators built from classes that a development reload replaced.
      *
      * <p>Meant for development-time watches. The dependents are known only when the context
-     * {@link BeanContextConfiguration#isTrackBeanDependencies() tracks bean dependencies}, which by default only a
+     * {@link BeanContextConfiguration#beanDependencyTrackingEnabled() tracks bean dependencies}, which by default only a
      * context in {@link io.micronaut.context.env.DevelopmentMode development mode} does; any other context recreates
      * nothing and returns false, rather than leave dependents holding the instance it destroyed.</p>
      *
