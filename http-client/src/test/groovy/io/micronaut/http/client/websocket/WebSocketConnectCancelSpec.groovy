@@ -348,6 +348,7 @@ class WebSocketConnectCancelSpec extends Specification {
 
         @OnMessage
         void onMessage(String text) {
+            // Incoming frames are irrelevant to connection cancellation.
         }
 
         @Override
@@ -373,6 +374,7 @@ class WebSocketConnectCancelSpec extends Specification {
 
         @OnMessage
         void onMessage(String text) {
+            // Incoming frames are irrelevant while the open callback is pending.
         }
 
         @Override
@@ -392,6 +394,11 @@ class WebSocketConnectCancelSpec extends Specification {
 
         RawWebSocketServer(boolean answerUpgrade) {
             Thread.startDaemon('raw-websocket-server') {
+                serve(answerUpgrade)
+            }
+        }
+
+        private void serve(boolean answerUpgrade) {
                 try {
                     Socket socket = serverSocket.accept()
                     accepted.complete(socket)
@@ -424,7 +431,6 @@ class WebSocketConnectCancelSpec extends Specification {
                 } catch (IOException e) {
                     closed.complete(true)
                 }
-            }
         }
 
         URI getUri() {

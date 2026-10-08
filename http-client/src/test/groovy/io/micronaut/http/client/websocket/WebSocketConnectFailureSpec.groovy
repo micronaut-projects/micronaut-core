@@ -190,6 +190,11 @@ class WebSocketConnectFailureSpec extends Specification {
 
         RawServer(String response) {
             Thread.startDaemon('raw-websocket-failure-server') {
+                serve(response)
+            }
+        }
+
+        private void serve(String response) {
                 try {
                     Socket socket = serverSocket.accept()
                     accepted.complete(socket)
@@ -218,7 +223,6 @@ class WebSocketConnectFailureSpec extends Specification {
                 } catch (IOException e) {
                     closed.complete(true)
                 }
-            }
         }
 
         URI getUri() {

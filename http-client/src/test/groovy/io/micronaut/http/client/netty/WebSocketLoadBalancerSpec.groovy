@@ -12,7 +12,9 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
+import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutionException
@@ -20,9 +22,12 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * A websocket connect and the load balancer that selects its instance.
+ * A websocket connect reports the outcome of its handshake to the load balancer that selected its
+ * instance, like an HTTP exchange.
  */
 class WebSocketLoadBalancerSpec extends Specification {
+
+    PollingConditions conditions = new PollingConditions(timeout: 10)
 
     void 'the reactive connect selects the instance when it is called, as before'() {
         given:
@@ -41,35 +46,12 @@ class WebSocketLoadBalancerSpec extends Specification {
         ctx?.close()
     }
 
-    void 'by default a handshake that succeeds only releases the selection'() {
+    void 'a handshake that succeeds is reported as a success'() {
         given:
         def server = new WebSocketConnectCancelSpec.RawWebSocketServer(true)
         def ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
         def balancer = new RecordingLoadBalancer(server.uri)
         def client = client(ctx, balancer, new DefaultHttpClientConfiguration())
-
-        when:
-        def endpoint = Mono.from(client.connect(WebSocketConnectCancelSpec.CancelClient, '/ws')).block(Duration.ofSeconds(10))
-
-        then:
-        endpoint != null
-        balancer.outcomes == [LoadBalancer.Outcome.CANCELLED]
-
-        cleanup:
-        endpoint?.close()
-        client?.close()
-        ctx?.close()
-        server?.close()
-    }
-
-    void 'with report-handshake-outcome a handshake that succeeds is reported as a success'() {
-        given:
-        def server = new WebSocketConnectCancelSpec.RawWebSocketServer(true)
-        def ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
-        def balancer = new RecordingLoadBalancer(server.uri)
-        def configuration = new DefaultHttpClientConfiguration()
-        configuration.reportHandshakeOutcome = true
-        def client = client(ctx, balancer, configuration)
 
         when:
         def endpoint = Mono.from(client.connect(WebSocketConnectCancelSpec.CancelClient, '/ws')).block(Duration.ofSeconds(10))
@@ -85,14 +67,13 @@ class WebSocketLoadBalancerSpec extends Specification {
         server?.close()
     }
 
-    void 'a handshake timeout carries the service id, and is reported as a timeout with report-handshake-outcome #report'() {
+    void 'a handshake timeout is reported as a timeout and carries the service id'() {
         given:
         def server = new WebSocketConnectCancelSpec.RawWebSocketServer(false)
         def ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
         def balancer = new RecordingLoadBalancer(server.uri)
         def configuration = new DefaultHttpClientConfiguration()
         configuration.handshakeTimeout = Duration.ofSeconds(1)
-        configuration.reportHandshakeOutcome = report
         def client = client(ctx, balancer, configuration)
 
         when:
@@ -102,6 +83,47 @@ class WebSocketLoadBalancerSpec extends Specification {
         ExecutionException e = thrown()
         e.cause instanceof ReadTimeoutException
         ((ReadTimeoutException) e.cause).serviceId == 'raw'
+        balancer.outcomes == [LoadBalancer.Outcome.TIMEOUT]
+
+        cleanup:
+        client?.close()
+        ctx?.close()
+        server?.close()
+    }
+
+    void 'a refused connection is reported as a connect failure'() {
+        given:
+        ServerSocket closed = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())
+        int port = closed.localPort
+        closed.close()
+        def ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
+        def balancer = new RecordingLoadBalancer(URI.create("http://127.0.0.1:$port"))
+        def client = client(ctx, balancer, new DefaultHttpClientConfiguration())
+
+        when:
+        Mono.from(client.connect(WebSocketConnectCancelSpec.CancelClient, '/ws')).toFuture().get(10, TimeUnit.SECONDS)
+
+        then:
+        thrown(ExecutionException)
+        balancer.outcomes == [LoadBalancer.Outcome.CONNECT_FAILURE]
+
+        cleanup:
+        client?.close()
+        ctx?.close()
+    }
+
+    void 'a response to the upgrade with status #status is reported as #outcome'() {
+        given:
+        def server = new RawResponseServer("HTTP/1.1 $status Nope\r\nContent-Length: 0\r\n\r\n")
+        def ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
+        def balancer = new RecordingLoadBalancer(server.uri)
+        def client = client(ctx, balancer, new DefaultHttpClientConfiguration())
+
+        when:
+        Mono.from(client.connect(WebSocketConnectCancelSpec.CancelClient, '/ws')).toFuture().get(10, TimeUnit.SECONDS)
+
+        then:
+        thrown(ExecutionException)
         balancer.outcomes == [outcome]
 
         cleanup:
@@ -110,9 +132,29 @@ class WebSocketLoadBalancerSpec extends Specification {
         server?.close()
 
         where:
-        report | outcome
-        false  | LoadBalancer.Outcome.CANCELLED
-        true   | LoadBalancer.Outcome.TIMEOUT
+        status | outcome
+        400    | LoadBalancer.Outcome.SUCCESS
+        503    | LoadBalancer.Outcome.SERVER_ERROR
+    }
+
+    void 'a connection the instance closes before it responds is reported as a reset'() {
+        given:
+        def server = new RawResponseServer(null)
+        def ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
+        def balancer = new RecordingLoadBalancer(server.uri)
+        def client = client(ctx, balancer, new DefaultHttpClientConfiguration())
+
+        when:
+        Mono.from(client.connect(WebSocketConnectCancelSpec.CancelClient, '/ws')).toFuture().get(10, TimeUnit.SECONDS)
+
+        then:
+        thrown(ExecutionException)
+        balancer.outcomes == [LoadBalancer.Outcome.RESET]
+
+        cleanup:
+        client?.close()
+        ctx?.close()
+        server?.close()
     }
 
     void 'a cancelled connect releases the selection'() {
@@ -129,7 +171,9 @@ class WebSocketLoadBalancerSpec extends Specification {
 
         then:
         server.awaitClosed()
-        balancer.outcomes == [LoadBalancer.Outcome.CANCELLED]
+        conditions.eventually {
+            balancer.outcomes == [LoadBalancer.Outcome.CANCELLED]
+        }
 
         cleanup:
         client?.close()
@@ -166,6 +210,48 @@ class WebSocketLoadBalancerSpec extends Specification {
         @Override
         void report(ServiceInstance serviceInstance, LoadBalancer.Outcome outcome) {
             outcomes.add(outcome)
+        }
+    }
+
+    /**
+     * Reads the upgrade request, writes the given response, or nothing, and closes the connection.
+     */
+    static class RawResponseServer implements AutoCloseable {
+        private final ServerSocket serverSocket = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())
+
+        RawResponseServer(@Nullable String response) {
+            Thread.startDaemon('raw-response-server') {
+                serve(response)
+            }
+        }
+
+        private void serve(@Nullable String response) {
+                try (Socket socket = serverSocket.accept()) {
+                    InputStream input = socket.inputStream
+                    StringBuilder request = new StringBuilder()
+                    while (!request.toString().endsWith('\r\n\r\n')) {
+                        int b = input.read()
+                        if (b < 0) {
+                            return
+                        }
+                        request.append((char) b)
+                    }
+                    if (response != null) {
+                        socket.outputStream.write(response.getBytes(StandardCharsets.US_ASCII))
+                        socket.outputStream.flush()
+                    }
+                } catch (IOException ignored) {
+                    // Closing the fixture aborts an accept or read that is still pending.
+                }
+        }
+
+        URI getUri() {
+            return URI.create("http://127.0.0.1:${serverSocket.localPort}")
+        }
+
+        @Override
+        void close() {
+            serverSocket.close()
         }
     }
 }

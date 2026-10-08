@@ -1204,10 +1204,11 @@ final class NettyHttpClient implements
     }
 
     /**
-     * Connect a websocket to the target the load balancer selected: the selection is released once
-     * the handshake is done, and its outcome reported with
-     * {@link HttpClientConfiguration#isReportHandshakeOutcome()}. A handshake timeout carries the
-     * service id like any other read timeout.
+     * Connect a websocket to the target the load balancer selected. The outcome of the handshake is
+     * reported to the load balancer like the outcome of an HTTP exchange, see
+     * {@link NettyWebSocketClientHandler#getHandshakeOutcome()}; a cancel, or a failure that says
+     * nothing about the instance, releases the selection. A handshake timeout carries the service
+     * id like any other read timeout.
      */
     private <T> ExecutionFlow<NettyWebSocketClientHandler<T>> connectWebSocket(URI uri,
                                                                              @Nullable LoadBalancerSelection selection,
@@ -1217,40 +1218,27 @@ final class NettyHttpClient implements
                                                                              boolean awaitCompletionStages) {
         ExecutionFlow<NettyWebSocketClientHandler<T>> flow;
         try {
-            flow = connectWebSocket(uri, request, clientEndpointType, webSocketBean, awaitCompletionStages);
+            flow = openWebSocket(uri, selection, request, clientEndpointType, webSocketBean, awaitCompletionStages);
         } catch (RuntimeException e) {
             releaseSelection(selection);
             throw e;
         }
-        boolean reportOutcome = configuration.isReportHandshakeOutcome();
-        if (selection != null) {
-            if (flow instanceof DelayedExecutionFlow<?> delayed) {
-                delayed.onCancel(selection::release);
-            }
-            flow = flow.map(handler -> {
-                if (reportOutcome) {
-                    selection.report(LoadBalancer.Outcome.SUCCESS);
-                } else {
-                    selection.release();
-                }
-                return handler;
-            });
+        if (selection != null && flow instanceof DelayedExecutionFlow<?> delayed) {
+            delayed.onCancel(selection::release);
         }
         return flow.onErrorResume(error -> {
-            if (error instanceof ReadTimeoutException timeout) {
-                if (reportOutcome) {
-                    report(selection, LoadBalancer.Outcome.TIMEOUT);
-                } else {
-                    releaseSelection(selection);
-                }
-                return ExecutionFlow.error(decorate(timeout));
-            }
+            // unless the handshake reported an outcome already
             releaseSelection(selection);
-            return ExecutionFlow.error(error);
+            return ExecutionFlow.error(error instanceof ReadTimeoutException timeout ? decorate(timeout) : error);
         });
     }
 
-    private <T> ExecutionFlow<NettyWebSocketClientHandler<T>> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, @Nullable WebSocketBean<T> webSocketBean, boolean awaitCompletionStages) {
+    private <T> ExecutionFlow<NettyWebSocketClientHandler<T>> openWebSocket(URI uri,
+                                                                           @Nullable LoadBalancerSelection selection,
+                                                                           MutableHttpRequest<?> request,
+                                                                           Class<T> clientEndpointType,
+                                                                           @Nullable WebSocketBean<T> webSocketBean,
+                                                                           boolean awaitCompletionStages) {
         RequestKey requestKey;
         try {
             requestKey = new RequestKey(this, uri);
@@ -1303,8 +1291,27 @@ final class NettyHttpClient implements
             return ExecutionFlow.error(decorate(new HttpClientException("The client is closed, unable to connect for websocket.")));
         }
 
-        return connectionManager.connectForWebsocket(requestKey, handler)
+        ExecutionFlow<NettyWebSocketClientHandler<T>> flow = connectionManager.connectForWebsocket(requestKey, handler)
+            .onErrorResume(error -> {
+                handler.connectFailed(error);
+                return ExecutionFlow.error(error);
+            })
             .then(() -> handler.getHandshakeCompletedFlow().map(endpoint -> handler));
+        if (selection == null) {
+            return flow;
+        }
+        return flow
+            .map(connected -> {
+                selection.report(LoadBalancer.Outcome.SUCCESS);
+                return connected;
+            })
+            .onErrorResume(error -> {
+                LoadBalancer.Outcome outcome = handler.getHandshakeOutcome();
+                if (outcome != null) {
+                    selection.report(outcome);
+                }
+                return ExecutionFlow.error(error);
+            });
     }
 
     private <I> Flux<HttpResponse<ByteBuffer<?>>> exchangeStreamImpl(PropagatedContext propagatedContext, MutableHttpRequest<I> request, Argument<?> errorType, ResolvedTarget target) {
