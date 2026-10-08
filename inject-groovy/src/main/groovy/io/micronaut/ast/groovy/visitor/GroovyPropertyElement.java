@@ -59,6 +59,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     private final boolean constructorWriteAccess;
     private final PropertyElementAnnotationMetadata annotationMetadata;
 
+    @SuppressWarnings("checkstyle:ParameterNumber")
     GroovyPropertyElement(GroovyVisitorContext visitorContext,
                           ClassElement owningElement,
                           ClassElement type,
