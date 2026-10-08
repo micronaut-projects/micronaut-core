@@ -23,6 +23,8 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.AsyncStreamingHttpClient;
+import io.micronaut.http.client.ElementsStages;
+import io.micronaut.http.sse.Event;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletionStage;
@@ -30,7 +32,9 @@ import java.util.concurrent.CompletionStage;
 /**
  * Default implementation of {@link AsyncHttpClient} and {@link AsyncStreamingHttpClient} backed by
  * {@link NettyHttpClient}. The exchanges run without Reactor; the elements of a JSON stream are
- * decoded by the chunked JSON reader.
+ * decoded by the chunked JSON reader, and server-sent events by the event stream decoder.
+ * Cancelling the future of a streaming exchange before the response arrived cancels the
+ * exchange, and closes the elements of a response that arrives anyway.
  *
  * @author Denis Stepanov
  * @since 5.0
@@ -58,12 +62,22 @@ final class DefaultAsyncHttpClient implements AsyncStreamingHttpClient {
 
     @Override
     public <I> CompletionStage<HttpResponse<BodyElements<ByteBuffer<?>>>> exchangeStream(HttpRequest<I> request, Argument<?> errorType) {
-        return ElementsFutures.response(nettyHttpClient.exchangeStreamFlow(request, errorType));
+        return ElementsStages.response(nettyHttpClient.exchangeStreamFlow(request, errorType));
     }
 
     @Override
     public <I, O> CompletionStage<BodyElements<O>> jsonStream(HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
-        return ElementsFutures.elements(nettyHttpClient.jsonStreamFlow(request, type, errorType));
+        return ElementsStages.elements(nettyHttpClient.jsonStreamFlow(request, type, errorType));
+    }
+
+    @Override
+    public <I, O> CompletionStage<HttpResponse<BodyElements<O>>> exchangeJsonStream(HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
+        return ElementsStages.response(nettyHttpClient.jsonStreamFlow(request, type, errorType));
+    }
+
+    @Override
+    public <I, B> CompletionStage<HttpResponse<BodyElements<Event<B>>>> exchangeEventStream(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
+        return ElementsStages.response(nettyHttpClient.exchangeEventStreamFlow(request, eventType, errorType));
     }
 
     @Override

@@ -87,7 +87,7 @@ class AsyncStreamingHttpClientTest {
     static Stream<Named<AsyncStreamingHttpClient>> clients() {
         StreamingHttpClient streamingHttpClient = (StreamingHttpClient) httpClient;
         return Stream.of(
-            Named.of("netty", streamingHttpClient.toAsync()),
+            Named.of("netty", streamingHttpClient.toAsyncStreaming()),
             Named.of("reactive adapter", new DefaultAsyncOverReactiveStreamingHttpClient(streamingHttpClient))
         );
     }
@@ -115,8 +115,8 @@ class AsyncStreamingHttpClientTest {
 
     @Test
     void nettyClientIsNotTheAdapter() {
-        assertFalse(((StreamingHttpClient) httpClient).toAsync() instanceof DefaultAsyncOverReactiveStreamingHttpClient);
-        assertInstanceOf(AsyncStreamingHttpClient.class, httpClient.toAsync());
+        assertFalse(((StreamingHttpClient) httpClient).toAsyncStreaming() instanceof DefaultAsyncOverReactiveStreamingHttpClient);
+        assertInstanceOf(AsyncStreamingHttpClient.class, ((StreamingHttpClient) httpClient).toAsyncStreaming());
     }
 
     @ParameterizedTest(autoCloseArguments = false) // closing the view closes the shared client
@@ -159,7 +159,7 @@ class AsyncStreamingHttpClientTest {
     @Test
     void exchangeStreamOfAnEmptyBody() throws Exception {
         // the reactive exchangeStream emits no response for an empty body, the Netty client has it
-        AsyncStreamingHttpClient client = ((StreamingHttpClient) httpClient).toAsync();
+        AsyncStreamingHttpClient client = ((StreamingHttpClient) httpClient).toAsyncStreaming();
         HttpResponse<BodyElements<ByteBuffer<?>>> response = await(client.exchangeStream(HttpRequest.GET("/async-stream/empty")));
 
         assertEquals("empty", response.getHeaders().get("X-Stream"));
@@ -180,6 +180,23 @@ class AsyncStreamingHttpClientTest {
         assertEquals(new Book("The Stand", 1153), await(books.next()).orElseThrow());
         assertEquals(new Book("It", 1138), await(books.next()).orElseThrow());
         assertTrue(await(books.next()).isEmpty());
+    }
+
+    @Test
+    void exchangeJsonStreamHasTheResponse() throws Exception {
+        AsyncStreamingHttpClient client = ((StreamingHttpClient) httpClient).toAsyncStreaming();
+        HttpResponse<BodyElements<Book>> response = await(client.exchangeJsonStream(HttpRequest.GET("/async-stream/books"), Argument.of(Book.class)));
+
+        assertEquals(HttpStatus.OK, response.getStatus());
+        assertEquals(new Book("The Stand", 1153), await(response.body().next()).orElseThrow());
+        assertEquals(new Book("It", 1138), await(response.body().next()).orElseThrow());
+        assertTrue(await(response.body().next()).isEmpty());
+    }
+
+    @Test
+    void theReactiveAdapterHasNoExchangeOfAJsonStream() {
+        AsyncStreamingHttpClient client = new DefaultAsyncOverReactiveStreamingHttpClient((StreamingHttpClient) httpClient);
+        assertThrows(UnsupportedOperationException.class, () -> await(client.exchangeJsonStream(HttpRequest.GET("/async-stream/books"), Argument.of(Book.class))));
     }
 
     @ParameterizedTest(autoCloseArguments = false)
@@ -230,7 +247,7 @@ class AsyncStreamingHttpClientTest {
     @Test
     void errorStatusCarriesTheBodyWithTheDefaultErrorType() {
         // the reactive streaming methods discard the error body with the default error type
-        CompletionStage<BodyElements<ByteBuffer<?>>> pieces = ((StreamingHttpClient) httpClient).toAsync().dataStream(HttpRequest.GET("/async-stream/error"));
+        CompletionStage<BodyElements<ByteBuffer<?>>> pieces = ((StreamingHttpClient) httpClient).toAsyncStreaming().dataStream(HttpRequest.GET("/async-stream/error"));
         HttpClientResponseException e = assertThrows(HttpClientResponseException.class, () -> await(pieces));
 
         assertEquals(HttpStatus.BAD_REQUEST, e.getStatus());

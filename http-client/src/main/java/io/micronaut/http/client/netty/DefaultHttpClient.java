@@ -38,9 +38,9 @@ import io.micronaut.http.client.ProxyRequestOptions;
 import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.StreamingHttpClient;
+import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.AsyncRawHttpClient;
-import io.micronaut.http.client.sse.AsyncSseClient;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
@@ -86,7 +86,6 @@ public class DefaultHttpClient implements
 
     private final NettyHttpClient nettyHttpClient;
     private final AsyncStreamingHttpClient asyncHttpClient;
-    private final AsyncSseClient asyncSseClient;
 
     DefaultHttpClient(DefaultHttpClientBuilder builder) {
         this(builder.nettyBuilder().build());
@@ -101,7 +100,6 @@ public class DefaultHttpClient implements
     DefaultHttpClient(NettyHttpClient nettyHttpClient) {
         this.nettyHttpClient = Objects.requireNonNull(nettyHttpClient, "nettyHttpClient");
         this.asyncHttpClient = new DefaultAsyncHttpClient(nettyHttpClient);
-        this.asyncSseClient = new DefaultAsyncSseClient(nettyHttpClient);
     }
 
     /**
@@ -478,18 +476,18 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public AsyncStreamingHttpClient toAsync() {
+    public AsyncHttpClient toAsync() {
+        return asyncHttpClient;
+    }
+
+    @Override
+    public AsyncStreamingHttpClient toAsyncStreaming() {
         return asyncHttpClient;
     }
 
     @Override
     public AsyncRawHttpClient toAsyncRaw() {
         return nettyHttpClient.toAsyncRaw();
-    }
-
-    @Override
-    public AsyncSseClient toAsyncSse() {
-        return asyncSseClient;
     }
 
     @Override

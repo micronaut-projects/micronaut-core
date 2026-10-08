@@ -16,9 +16,11 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.BodyElements;
 
+import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -52,12 +54,7 @@ public final class ElementsStages {
      */
     public static <T, R> CompletionStage<R> mapResponse(CompletionStage<HttpResponse<BodyElements<T>>> stage,
                                                         Function<? super HttpResponse<BodyElements<T>>, ? extends R> mapper) {
-        return map(stage, mapper, response -> {
-            BodyElements<T> elements = response.getBody().orElse(null);
-            if (elements != null) {
-                elements.close();
-            }
-        });
+        return map(stage, mapper, ElementsStages::closeElements);
     }
 
     /**
@@ -72,6 +69,60 @@ public final class ElementsStages {
     public static <T, R> CompletionStage<R> mapElements(CompletionStage<BodyElements<T>> stage,
                                                         Function<? super BodyElements<T>, ? extends R> mapper) {
         return map(stage, mapper, BodyElements::close);
+    }
+
+    /**
+     * The future of the response of a streaming exchange that runs as a flow: cancelling it
+     * before the response arrived cancels the exchange, and a response that arrives anyway is
+     * closed.
+     *
+     * @param flow The flow of the response
+     * @param <T>  The type of an element
+     * @return The future of the response, whose body is the elements
+     */
+    public static <T> CompletableFuture<HttpResponse<BodyElements<T>>> response(ExecutionFlow<HttpResponse<BodyElements<T>>> flow) {
+        return toFuture(flow, ElementsStages::closeElements);
+    }
+
+    /**
+     * The future of the elements of a streaming exchange that runs as a flow, like
+     * {@link #response(ExecutionFlow)}.
+     *
+     * @param flow The flow of the response
+     * @param <T>  The type of an element
+     * @return The future of the elements of the response
+     */
+    public static <T> CompletableFuture<BodyElements<T>> elements(ExecutionFlow<HttpResponse<BodyElements<T>>> flow) {
+        return toFuture(flow.map(response -> Objects.requireNonNull(response.body(), "The response has no elements")), BodyElements::close);
+    }
+
+    /**
+     * Close the elements of the response of a streaming exchange, if it has them.
+     *
+     * @param response The response
+     */
+    public static void closeElements(HttpResponse<?> response) {
+        if (response.getBody().orElse(null) instanceof BodyElements<?> elements) {
+            elements.close();
+        }
+    }
+
+    private static <R> CompletableFuture<R> toFuture(ExecutionFlow<R> flow, Consumer<R> discard) {
+        CompletableFuture<R> future = new CompletableFuture<>();
+        future.whenComplete((result, error) -> {
+            if (error instanceof CancellationException) {
+                flow.cancel();
+            }
+        });
+        flow.onComplete((result, error) -> {
+            if (error != null) {
+                future.completeExceptionally(error);
+            } else if (!future.complete(result)) {
+                // cancelled before the result arrived: nobody reads the elements
+                discard.accept(result);
+            }
+        });
+        return future;
     }
 
     private static <S, R> CompletionStage<R> map(CompletionStage<S> stage,

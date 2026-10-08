@@ -19,8 +19,8 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.client.sse.AsyncSseClient
-import io.micronaut.http.client.sse.SseClient
+import io.micronaut.http.client.AsyncStreamingHttpClient
+import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
 import jakarta.inject.Inject
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -30,18 +30,18 @@ import java.util.concurrent.CompletionStage
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 
-@Property(name = "spec.name", value = "AsyncSseClientSpec")
+@Property(name = "spec.name", value = "AsyncEventStreamSpec")
 @MicronautTest
-class AsyncSseClientSpec {
+class AsyncEventStreamSpec {
 
     @Inject
     @field:Client("/")
-    lateinit var sseClient: SseClient
+    lateinit var httpClient: StreamingHttpClient
 
     @Test
     fun readEventsAsTheyArrive() {
         // tag::async[]
-        val client: AsyncSseClient = sseClient.toAsyncSse() // <1>
+        val client: AsyncStreamingHttpClient = httpClient.toAsyncStreaming() // <1>
         val request = HttpRequest.POST("/mcp", """{"method":"ping"}""")
             .contentType(MediaType.APPLICATION_JSON_TYPE)
             .accept(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_EVENT_STREAM_TYPE)

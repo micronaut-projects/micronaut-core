@@ -107,6 +107,20 @@ class EventStreamDecoderSpec extends Specification {
         thrown(ContentLengthExceededException)
     }
 
+    void "the events before a line larger than the limit are handed out before the failure"() {
+        given:
+        EventStreamDecoder decoder = new EventStreamDecoder(16)
+        List<Event<byte[]>> events = []
+        byte[] piece = "data: a\n\ndata: b\n\ndata: 0123456789abcdef\n".getBytes(StandardCharsets.UTF_8)
+
+        when:
+        decoder.decode(piece, 0, piece.length, events::add)
+
+        then:
+        thrown(ContentLengthExceededException)
+        data(events) == ["a", "b"]
+    }
+
     private static List<Event<byte[]>> decode(String... pieces) {
         return decode(pieces.collect { it.getBytes(StandardCharsets.UTF_8) } as byte[][])
     }
