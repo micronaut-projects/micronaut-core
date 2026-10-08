@@ -16,7 +16,7 @@
 package io.micronaut.dev;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.beans.BeanIntrospector;
+import io.micronaut.core.beans.ReloadableBeanIntrospector;
 import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.dev.loader.DevClassLoader;
@@ -150,8 +150,8 @@ final class GenerationMemory {
      * @param retired The retired generation
      */
     static void forgetRetired(GenerationClassLoader retired) {
-        MicronautMetaServiceLoaderUtils.invalidate(retired);
-        BeanIntrospector.SHARED.invalidate();
+        MicronautMetaServiceLoaderUtils.invalidate();
+        ReloadableBeanIntrospector.invalidateShared(retired);
     }
 
     /**

@@ -80,7 +80,7 @@ class IntrospectionGenerationMemoryTest {
                         if (io.micronaut.core.beans.BeanIntrospector.SHARED.findIntrospection(Book.class).isEmpty()) {
                             throw new IllegalStateException("no introspection of Book");
                         }
-                        System.out.println("read the introspection of generation " + event.generation());
+                        System.out.println("read the introspection of " + event.changes().size() + " changed class(es)");
                     }
                 }
                 """);
