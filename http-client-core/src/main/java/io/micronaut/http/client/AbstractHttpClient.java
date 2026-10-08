@@ -1064,12 +1064,12 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             if (!(handlerRegistry.getReader(type, List.of(mediaType)) instanceof ChunkedMessageBodyReader<O> reader)) {
                 throw new CodecException("No reader of the elements of a [" + mediaType + "] body");
             }
-            CloseableByteBody body = response.byteBody().move();
             HttpHeaders headers = response.getHeaders();
             // an element is decoded in memory: it is limited like buffered content
             long maxElementSize = sizeLimits().maxBufferSize();
             // without Reactor: the pieces are split into elements as they are pulled
             PieceReader<O> pieceReader = PieceReaders.open(reader, type, mediaType, headers, maxElementSize);
+            CloseableByteBody body = response.byteBody().move();
             return ElementsResponse.of(response, new ByteBodyElements<>(body, pieceReader, Function.identity()));
         });
     }
@@ -1093,9 +1093,25 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                                                                                 MutableHttpRequest<?> mutableRequest,
                                                                                 Argument<?> errorType,
                                                                                 boolean bufferErrorBody,
-                                                                                BiFunction<HttpRequest<?>, R, HttpResponse<BodyElements<T>>> elements) {
+                                                                                 BiFunction<HttpRequest<?>, R, HttpResponse<BodyElements<T>>> elements) {
+        return exchangeStreamingFlow(propagatedContext, mutableRequest, errorType, bufferErrorBody, elements,
+            BodyElements.class, () -> {
+                @SuppressWarnings("unchecked")
+                BodyElements<T> none = (BodyElements<T>) (BodyElements<?>) BodyPieces.elements(AvailableByteArrayBody.create(ByteArrayBufferFactory.INSTANCE, new byte[0]));
+                return none;
+            }, ElementsStages::closeElements);
+    }
+
+    private <T> ExecutionFlow<HttpResponse<T>> exchangeStreamingFlow(PropagatedContext propagatedContext,
+                                                                    MutableHttpRequest<?> mutableRequest,
+                                                                    Argument<?> errorType,
+                                                                    boolean bufferErrorBody,
+                                                                    BiFunction<HttpRequest<?>, R, HttpResponse<T>> elements,
+                                                                    Class<?> bodyType,
+                                                                    java.util.function.Supplier<T> empty,
+                                                                    java.util.function.Consumer<HttpResponse<T>> close) {
         // the last response with elements, closed if a filter replaces it
-        AtomicReference<@Nullable HttpResponse<BodyElements<T>>> created = new AtomicReference<>();
+        AtomicReference<@Nullable HttpResponse<T>> created = new AtomicReference<>();
         return resolveRequestURI(mutableRequest).flatMap(target -> sendRequestWithRedirects(
             propagatedContext,
             null,
@@ -1117,12 +1133,10 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 if (!hasBody(resp)) {
                     // no element
                     resp.close();
-                    @SuppressWarnings("unchecked")
-                    BodyElements<T> none = (BodyElements<T>) (BodyElements<?>) BodyPieces.elements(AvailableByteArrayBody.create(ByteArrayBufferFactory.INSTANCE, new byte[0]));
-                    return ExecutionFlow.just(ElementsResponse.of(resp, none));
+                    return ExecutionFlow.just(new ElementResponse<>(resp, empty.get()));
                 }
                 try {
-                    HttpResponse<BodyElements<T>> withElements = elements.apply(req, resp);
+                    HttpResponse<T> withElements = elements.apply(req, resp);
                     created.set(withElements);
                     return ExecutionFlow.just(withElements);
                 } catch (RuntimeException e) {
@@ -1131,16 +1145,16 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 }
             }
         )).flatMap(response -> {
-            if (!(response.getBody().orElse(null) instanceof BodyElements<?>)) {
-                HttpResponse<BodyElements<T>> replaced = created.getAndSet(null);
+            if (!bodyType.isInstance(response.getBody().orElse(null))) {
+                HttpResponse<T> replaced = created.getAndSet(null);
                 if (replaced != null) {
                     // nobody reads them: the connection is released
-                    ElementsStages.closeElements(replaced);
+                    close.accept(replaced);
                 }
                 return ExecutionFlow.error(new IllegalStateException("Response has been replaced by a response without elements. Do not replace the response in client filters for streaming requests"));
             }
             @SuppressWarnings("unchecked")
-            HttpResponse<BodyElements<T>> result = (HttpResponse<BodyElements<T>>) response;
+            HttpResponse<T> result = (HttpResponse<T>) response;
             return ExecutionFlow.just(result);
         });
     }
@@ -1250,8 +1264,21 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         // the request is sent with the context of the caller, as it always was
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return Flux.defer(() -> toMono(jsonStreamFlow(propagatedContext, toMutableRequest(request), type, errorType, shouldBufferErrorBody(errorType)), propagatedContext)
-            .flatMapMany(AbstractHttpClient::elements));
+        return Flux.defer(() -> toMono(this.<Publisher<? extends O>>exchangeStreamingFlow(propagatedContext, toMutableRequest(request), errorType,
+            shouldBufferErrorBody(errorType), (req, response) -> {
+                MediaType mediaType = response.getContentType().orElse(MediaType.APPLICATION_JSON_STREAM_TYPE);
+                if (!(handlerRegistry.getReader(type, List.of(mediaType)) instanceof ChunkedMessageBodyReader<O> reader)) {
+                    throw new CodecException("No reader of the elements of a [" + mediaType + "] body");
+                }
+                Publisher<? extends O> decoded = reader.readChunked(type, mediaType, response.getHeaders(),
+                    response.byteBody().toByteBufferPublisher());
+                return new ElementResponse<>(response, decoded);
+            }, Publisher.class, Flux::empty, response -> Flux.from(Objects.requireNonNull(response.body())).subscribe(new reactor.core.publisher.BaseSubscriber<O>() {
+                @Override
+                protected void hookOnSubscribe(org.reactivestreams.Subscription subscription) {
+                    cancel();
+                }
+            })), propagatedContext).flatMapMany(response -> Flux.from(Objects.requireNonNull(response.body()))));
     }
 
     /**
