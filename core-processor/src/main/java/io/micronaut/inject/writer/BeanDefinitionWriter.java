@@ -2453,8 +2453,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         );
 
         ExpressionDef beanResolutionContxt = parameters.getFirst();
-        // the lookup is attributed to the produced definition, and the factory marked as its dependent factory,
-        // so the dependency graph records the factory as a dependency of the bean it produces
+        // the factory is marked as the dependent factory; a context recording the dependency graph also attributes
+        // the lookup to the produced definition, so the graph records the factory as a dependency of the bean it produces
         StatementDef.DefineAndAssign defineAndAssign = beanResolutionContxt
             .invoke(METHOD_BEAN_RESOLUTION_CONTEXT_GET_FACTORY_BEAN,
                 // the definition of the produced bean

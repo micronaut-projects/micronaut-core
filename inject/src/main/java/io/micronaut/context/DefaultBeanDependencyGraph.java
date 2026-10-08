@@ -316,6 +316,10 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
 
     private static InjectionKind kindOf(BeanResolutionContext.Segment<?, ?> segment) {
         // the segments are their own injection points; the constructor segment covers factory methods too
+        if (segment instanceof AbstractBeanResolutionContext.FactorySegment) {
+            // the factory a bean is produced by is held as a constructor argument is: replacing it recreates the bean
+            return InjectionKind.CONSTRUCTOR;
+        }
         if (segment instanceof AbstractBeanResolutionContext.ConstructorSegment) {
             return InjectionKind.CONSTRUCTOR;
         }
