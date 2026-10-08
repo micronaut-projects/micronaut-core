@@ -19,14 +19,19 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.memo.AbstractMemoizer;
+import io.micronaut.core.util.memo.MemoizerNamespace;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import java.lang.annotation.Annotation;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static io.micronaut.core.annotation.AnnotationUtil.ZERO_ANNOTATIONS;
@@ -38,7 +43,7 @@ import static io.micronaut.core.annotation.AnnotationUtil.ZERO_ANNOTATIONS;
  * @since 1.0
  */
 @Internal
-abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
+abstract class AbstractAnnotationMetadata extends AbstractMemoizer<AnnotationMetadata> implements AnnotationMetadata {
 
     private volatile Map<String, Annotation> annotationMap;
     private volatile Map<String, Annotation> declaredAnnotationMap;
@@ -49,6 +54,11 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
      * Constructs a default metadata.
      */
     protected AbstractAnnotationMetadata() {
+    }
+
+    @Override
+    protected final MemoizerNamespace<AnnotationMetadata> getMemoizerNamespace() {
+        return MEMOIZER_NAMESPACE;
     }
 
     private Map<String, Annotation> getAnnotationMap() {

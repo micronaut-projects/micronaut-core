@@ -18,10 +18,10 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 
@@ -293,6 +293,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             }
         }
         putValues(annotation, values, annotationDefaults);
+        clearMemoized();
     }
 
     /**
@@ -580,6 +581,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         if (retentionPolicy == RetentionPolicy.SOURCE || retentionPolicy == RetentionPolicy.CLASS) {
             addSourceRetentionAnnotation(annotation);
         }
+        clearMemoized();
     }
 
     private void addSourceRetentionAnnotation(String annotation) {
@@ -700,6 +702,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             newValues.add(annotationValue);
             values.put(AnnotationMetadata.VALUE_MEMBER, newValues);
         }
+        clearMemoized();
     }
 
     /**
@@ -797,6 +800,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 }
             }
         }
+        clearMemoized();
     }
 
     /**
@@ -840,6 +844,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 annotationRepeatableContainer.putAll(annotationMetadata.annotationRepeatableContainer);
             }
         }
+        clearMemoized();
     }
 
     /**
@@ -962,6 +967,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     public <A extends Annotation> void removeAnnotationIf(@NonNull Predicate<AnnotationValue<A>> predicate) {
         removeAnnotationsIf(predicate, this.declaredAnnotations);
         removeAnnotationsIf(predicate, this.allAnnotations);
+        clearMemoized();
     }
 
     private <A extends Annotation> void removeAnnotationsIf(@NonNull Predicate<AnnotationValue<A>> predicate, Map<String, Map<CharSequence, Object>> annotations) {
@@ -1001,6 +1007,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         if (annotationRepeatableContainer != null) {
             annotationRepeatableContainer.remove(annotationType);
         }
+        clearMemoized();
     }
 
     /**
@@ -1030,6 +1037,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 i.remove();
             }
         }
+        clearMemoized();
     }
 
     private void removeFromStereotypes(String annotationType) {
