@@ -297,7 +297,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             };
             routeEndpoint.connected(serverSession, executor, error -> {
                 ChannelHandlerContext handlerCtx = channel.pipeline().context(this);
-                exceptionCaught(handlerCtx == null ? ctx : handlerCtx, error);
+                handlerFailed(handlerCtx == null ? ctx : handlerCtx, error);
             }, NettyServerWebSocketHandler::releaseDiscarded);
         }
         callOpenMethod(ctx).onComplete((v, t) -> {
@@ -579,7 +579,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error Processing WebSocket Ping Message [{}]: {}", webSocketBean, t.getMessage(), t);
                     }
-                    exceptionCaught(ctx, t);
+                    handlerFailed(ctx, t);
                 }
             });
         } catch (Throwable e) {
@@ -587,7 +587,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error Processing WebSocket Ping Message [{}]: {}", webSocketBean, e.getMessage(), e);
             }
-            exceptionCaught(ctx, e);
+            handlerFailed(ctx, e);
         }
     }
 
