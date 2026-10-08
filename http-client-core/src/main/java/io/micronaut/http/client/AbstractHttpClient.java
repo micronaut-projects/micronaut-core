@@ -104,7 +104,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * The part of an HTTP client that does not depend on its transport: the state of the client, the
@@ -962,7 +961,13 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @return The flow of the response, whose body is the events
      */
     public <I, B> ExecutionFlow<HttpResponse<BodyElements<Event<B>>>> exchangeEventStreamFlow(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
-        return exchangeElementsFlow(request, errorType, AcceptEvents.ADD, true,
+        setupConversionService(request);
+        return exchangeEventStreamFlow(PropagatedContext.getOrEmpty(), toMutableRequest(request), eventType, errorType);
+    }
+
+    private <B> ExecutionFlow<HttpResponse<BodyElements<Event<B>>>> exchangeEventStreamFlow(PropagatedContext propagatedContext, MutableHttpRequest<?> request, Argument<B> eventType, Argument<?> errorType) {
+        EventStreams.acceptEvents(request);
+        return exchangeElementsFlow(propagatedContext, request, errorType, true,
             (req, response) -> EventStreams.response(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate));
     }
 
@@ -976,7 +981,8 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @return The flow of the response, whose body is the pieces of the response body
      */
     public <I> ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> exchangeStreamFlow(HttpRequest<I> request, Argument<?> errorType) {
-        return exchangeElementsFlow(request, errorType, AcceptEvents.AS_IS, true,
+        setupConversionService(request);
+        return exchangeElementsFlow(PropagatedContext.getOrEmpty(), toMutableRequest(request), errorType, true,
             (req, response) -> ElementsResponse.of(response, BodyPieces.elements(response.byteBody().move())));
     }
 
@@ -985,13 +991,13 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * that the request accepts is split into lines, and the error body is read per the
      * configuration.
      *
-     * @param request   The request
-     * @param errorType The error type
-     * @param <I>       The request body type
+     * @param propagatedContext The context the request is sent with
+     * @param request           The request
+     * @param errorType         The error type
      * @return The flow of the response, whose body is the pieces of the response body
      */
-    private <I> ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> dataStreamFlow(HttpRequest<I> request, Argument<?> errorType) {
-        return exchangeElementsFlow(request, errorType, AcceptEvents.AS_IS, shouldBufferErrorBody(errorType),
+    private ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> dataStreamFlow(PropagatedContext propagatedContext, MutableHttpRequest<?> request, Argument<?> errorType) {
+        return exchangeElementsFlow(propagatedContext, request, errorType, shouldBufferErrorBody(errorType),
             (req, response) -> ElementsResponse.of(response, streamPieces(response.byteBody().move(), isAcceptEvents(req))));
     }
 
@@ -1031,20 +1037,21 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @return The flow of the response, whose body is the elements
      */
     public <I, O> ExecutionFlow<HttpResponse<BodyElements<O>>> jsonStreamFlow(HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
-        return jsonStreamFlow(request, type, errorType, true);
+        setupConversionService(request);
+        return jsonStreamFlow(PropagatedContext.getOrEmpty(), toMutableRequest(request), type, errorType, true);
     }
 
     /**
-     * @param request         The request
-     * @param type            The type of an element
-     * @param errorType       The error type
-     * @param bufferErrorBody Whether the error body is read, to be decoded into the error type
-     * @param <I>             The request body type
-     * @param <O>             The type of an element
+     * @param propagatedContext The context the request is sent with
+     * @param request           The request
+     * @param type              The type of an element
+     * @param errorType         The error type
+     * @param bufferErrorBody   Whether the error body is read, to be decoded into the error type
+     * @param <O>               The type of an element
      * @return The flow of the response, whose body is the elements
      */
-    private <I, O> ExecutionFlow<HttpResponse<BodyElements<O>>> jsonStreamFlow(HttpRequest<I> request, Argument<O> type, Argument<?> errorType, boolean bufferErrorBody) {
-        return exchangeElementsFlow(request, errorType, AcceptEvents.AS_IS, bufferErrorBody, (req, response) -> {
+    private <O> ExecutionFlow<HttpResponse<BodyElements<O>>> jsonStreamFlow(PropagatedContext propagatedContext, MutableHttpRequest<?> request, Argument<O> type, Argument<?> errorType, boolean bufferErrorBody) {
+        return exchangeElementsFlow(propagatedContext, request, errorType, bufferErrorBody, (req, response) -> {
             // could also be application/json, in which case the elements of an array are read
             MediaType mediaType = response.getContentType().orElse(MediaType.APPLICATION_JSON_STREAM_TYPE);
             if (!(handlerRegistry.getReader(type, List.of(mediaType)) instanceof ChunkedMessageBodyReader<O> reader)) {
@@ -1065,31 +1072,21 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * The flow completes with the status and the headers of the response. An error status fails
      * it with the error body decoded into the error type, as for {@link #exchange}.
      *
-     * @param request      The request
-     * @param errorType    The error type
-     * @param acceptEvents Whether the request accepts an event stream
-     * @param bufferErrorBody Whether the error body is read, to be decoded into the error type,
-     *                     else the error has the status and the headers only
-     * @param elements     The response with the elements of the body, taking over the body
-     * @param <I>          The request body type
-     * @param <T>          The type of an element
+     * @param propagatedContext The context the request is sent with, which the filters see: the
+     *                          context of the caller of the client
+     * @param mutableRequest    The request, with its conversion service and Accept header set up
+     * @param errorType         The error type
+     * @param bufferErrorBody   Whether the error body is read, to be decoded into the error type,
+     *                          else the error has the status and the headers only
+     * @param elements          The response with the elements of the body, taking over the body
+     * @param <T>               The type of an element
      * @return The flow of the response, whose body is the elements
      */
-    private <I, T> ExecutionFlow<HttpResponse<BodyElements<T>>> exchangeElementsFlow(HttpRequest<I> request,
-                                                                                   Argument<?> errorType,
-                                                                                   AcceptEvents acceptEvents,
-                                                                                   boolean bufferErrorBody,
-                                                                                   BiFunction<HttpRequest<?>, R, HttpResponse<BodyElements<T>>> elements) {
-        setupConversionService(request);
-        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        MutableHttpRequest<?> mutableRequest = toMutableRequest(request);
-        if (acceptEvents == AcceptEvents.ADD) {
-            EventStreams.acceptEvents(mutableRequest);
-        } else if (acceptEvents == AcceptEvents.ONLY) {
-            // replace, rather than add to, what the caller accepts: a server that may answer with another type, such
-            // as JSON, would otherwise do so, and the body would yield no event
-            mutableRequest.getHeaders().set(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
-        }
+    private <T> ExecutionFlow<HttpResponse<BodyElements<T>>> exchangeElementsFlow(PropagatedContext propagatedContext,
+                                                                                MutableHttpRequest<?> mutableRequest,
+                                                                                Argument<?> errorType,
+                                                                                boolean bufferErrorBody,
+                                                                                BiFunction<HttpRequest<?>, R, HttpResponse<BodyElements<T>>> elements) {
         // the last response with elements, closed if a filter replaces it
         AtomicReference<@Nullable HttpResponse<BodyElements<T>>> created = new AtomicReference<>();
         return resolveRequestURI(mutableRequest).flatMap(target -> sendRequestWithRedirects(
@@ -1146,9 +1143,11 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     @Override
     public <I, B> Publisher<HttpResponse<Event<B>>> exchangeEventStream(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
         // the exchange of the async client: the events are decoded by its piece reader as they are
-        // requested, and each one is wrapped in the response
+        // requested, and each one is wrapped in the response. The request is sent with the
+        // context of the caller
+        setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return Flux.defer(() -> toMono(exchangeEventStreamFlow(request, eventType, errorType), propagatedContext)
+        return Flux.defer(() -> toMono(exchangeEventStreamFlow(propagatedContext, toMutableRequest(request), eventType, errorType), propagatedContext)
             .flatMapMany(response -> {
                 BodyElements<Event<B>> events = Objects.requireNonNull(response.body(), "The response has no events");
                 return Flux.from(publisher(events))
@@ -1186,8 +1185,19 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @return The events
      */
     private <I, B> Publisher<Event<B>> eventStreamOrError(HttpRequest<I> request, Argument<B> eventType, @Nullable Argument<?> errorType) {
-        return elements(() -> exchangeElementsFlow(request, errorType == null ? DEFAULT_ERROR_TYPE : errorType, AcceptEvents.ONLY, shouldBufferErrorBody(errorType),
-            (req, response) -> EventStreams.eventStreamResponse(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate)));
+        setupConversionService(request);
+        if (request instanceof MutableHttpRequest<?> httpRequest) {
+            // replace, rather than add to, what the caller accepts: a server that may answer with another type, such
+            // as JSON, would otherwise do so, and the body would yield no event
+            httpRequest.getHeaders().set(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
+        }
+        // as it always did, the event stream sends the request with the context of the subscriber
+        return Flux.defer(() -> {
+            PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+            return toMono(exchangeElementsFlow(propagatedContext, toMutableRequest(request), errorType == null ? DEFAULT_ERROR_TYPE : errorType, shouldBufferErrorBody(errorType),
+                (req, response) -> EventStreams.eventStreamResponse(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate)), propagatedContext)
+                .flatMapMany(AbstractHttpClient::elements);
+        });
     }
 
     // ---- streams
@@ -1199,8 +1209,10 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
 
     @Override
     public <I> Publisher<ByteBuffer<?>> dataStream(HttpRequest<I> request, @Nullable Argument<?> errorType) {
+        // the request is sent with the context of the caller, as it always was
+        setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return Flux.defer(() -> toMono(dataStreamFlow(request, errorType == null ? DEFAULT_ERROR_TYPE : errorType), propagatedContext)
+        return Flux.defer(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType == null ? DEFAULT_ERROR_TYPE : errorType), propagatedContext)
             .flatMapMany(response -> streamPiecesPublisher(Objects.requireNonNull(response.body(), "The response has no body"))));
     }
 
@@ -1211,8 +1223,9 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
 
     @Override
     public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(HttpRequest<I> request, Argument<?> errorType) {
+        setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return Flux.defer(() -> toMono(dataStreamFlow(request, errorType), propagatedContext)
+        return Flux.defer(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType), propagatedContext)
             .flatMapMany(response -> {
                 BodyElements<ByteBuffer<?>> pieces = Objects.requireNonNull(response.body(), "The response has no body");
                 return Flux.from(streamPiecesPublisher(pieces))
@@ -1227,21 +1240,22 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
 
     @Override
     public <I, O> Publisher<O> jsonStream(HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
-        return elements(() -> jsonStreamFlow(request, type, errorType, shouldBufferErrorBody(errorType)));
+        // the request is sent with the context of the caller, as it always was
+        setupConversionService(request);
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        return Flux.defer(() -> toMono(jsonStreamFlow(propagatedContext, toMutableRequest(request), type, errorType, shouldBufferErrorBody(errorType)), propagatedContext)
+            .flatMapMany(AbstractHttpClient::elements));
     }
 
     /**
-     * The elements of the body of a response, as a publisher: the exchange starts when the
-     * publisher is subscribed to.
+     * The elements of the body of a response, as a publisher.
      *
-     * @param exchange Starts the exchange
+     * @param response The response
      * @param <T>      The type of an element
      * @return The elements
      */
-    private static <T> Publisher<T> elements(Supplier<ExecutionFlow<HttpResponse<BodyElements<T>>>> exchange) {
-        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return Flux.defer(() -> toMono(exchange.get(), propagatedContext)
-            .flatMapMany(response -> Flux.from(publisher(Objects.requireNonNull(response.body(), "The response has no elements")))));
+    private static <T> Publisher<T> elements(HttpResponse<BodyElements<T>> response) {
+        return publisher(Objects.requireNonNull(response.body(), "The response has no elements"));
     }
 
     /**
@@ -1358,24 +1372,5 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             this.error = error;
             countDown();
         }
-    }
-
-
-    /**
-     * Whether a streaming request accepts an event stream.
-     */
-    private enum AcceptEvents {
-        /**
-         * As the caller accepts.
-         */
-        AS_IS,
-        /**
-         * Besides what the caller accepts.
-         */
-        ADD,
-        /**
-         * Only an event stream.
-         */
-        ONLY
     }
 }
