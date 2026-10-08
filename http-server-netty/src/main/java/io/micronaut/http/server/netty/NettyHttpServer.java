@@ -467,7 +467,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             try {
                 applicationContext.findBean(GracefulShutdownListener.class)
                     .ifPresent(GracefulShutdownListener::shutdownGracefully);
-            } catch (Throwable e) {
+            } catch (RuntimeException e) {
                 LOG.warn("Error in graceful shutdown before stopping the server: {}", e.getMessage(), e);
             }
         }
