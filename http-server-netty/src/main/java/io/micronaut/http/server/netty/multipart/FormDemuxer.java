@@ -47,14 +47,14 @@ import io.netty.contrib.multipart.PostBodyDecoder;
 import io.netty.contrib.multipart.TooManyFormFieldsException;
 import io.netty.contrib.multipart.UndecodedDataLimitExceededException;
 import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.util.ByteProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -90,24 +90,21 @@ public final class FormDemuxer implements BufferConsumer {
     private long unacknowledged = 0;
     private boolean decodeFailure = false;
 
-    public FormDemuxer(PostBodyDecoder decoder, Channel channel, BodySizeLimits fieldLimits, BodySizeLimits totalLimits, ByteBody byteBody) {
-        this(decoder, null, channel, fieldLimits, totalLimits, byteBody);
-    }
-
     /**
      * @param decoder           The decoder
      * @param multipartBoundary The boundary of a multipart body, whose close delimiter must end
      *                          the body: a body that ends before it, e.g. a truncated upload, fails
      *                          like a malformed body. {@code null} for a body without one, e.g.
      *                          URL-encoded data
+     * @param charset           The charset of the decoder, which it encodes the boundary with
      * @param channel           The channel
      * @param fieldLimits       The limits of a field
      * @param totalLimits       The limits of the form
      * @param byteBody          The body
      */
-    public FormDemuxer(PostBodyDecoder decoder, @Nullable String multipartBoundary, Channel channel, BodySizeLimits fieldLimits, BodySizeLimits totalLimits, ByteBody byteBody) {
+    public FormDemuxer(PostBodyDecoder decoder, @Nullable String multipartBoundary, Charset charset, Channel channel, BodySizeLimits fieldLimits, BodySizeLimits totalLimits, ByteBody byteBody) {
         this.decoder = decoder;
-        this.closeDelimiter = multipartBoundary == null ? null : new CloseDelimiter(multipartBoundary);
+        this.closeDelimiter = multipartBoundary == null ? null : CloseDelimiter.of(multipartBoundary, charset);
         this.fieldLimits = fieldLimits;
         if (byteBody instanceof AvailableByteBody abb) {
             // NettyBodyAnnotationBinder triggers this branch from outside the EventLoop sometimes,
@@ -326,38 +323,48 @@ public final class FormDemuxer implements BufferConsumer {
     }
 
     /**
-     * Finds the close delimiter of a multipart body ({@code CRLF--boundary--}) in the bytes of
-     * the body as they arrive, see RFC 2046, section 5.1.1. The boundary does not occur in the
-     * content of a part, so its first occurrence ends the body; the epilogue that may follow is
-     * ignored.
+     * Finds the close delimiter of a multipart body ({@code --boundary--} at the start of a line)
+     * in the bytes of the body as they arrive, see RFC 2046, section 5.1.1. The boundary does not
+     * occur in the content of a part, so its first occurrence ends the body; the epilogue that
+     * may follow is ignored. Like the decoder, a line may end with CRLF or with a bare LF, and the
+     * boundary is encoded with the charset of the decoder.
      */
-    private static final class CloseDelimiter implements ByteProcessor {
-        private final byte[] pattern;
+    private static final class CloseDelimiter {
         /**
-         * For each length of a match, the length of the longest proper prefix of the pattern
-         * that is also a suffix of the match (Knuth-Morris-Pratt).
+         * The delimiter that follows the LF, {@code --boundary--}.
          */
-        private final int[] fallback;
+        private final byte[] delimiter;
         /**
-         * The length of the current match. The first delimiter of a body that has no preamble is
-         * not preceded by a line break: the body starts as if it followed one.
+         * The number of bytes of {@code LF--boundary--} matched so far, at the end of the bytes
+         * that were scanned. The boundary contains no LF, so a match can only start at an LF. The
+         * first delimiter of a body that has no preamble is not preceded by a line break: the
+         * body starts as if it followed one.
          */
-        private int matched = 2;
+        private int matched = 1;
         private boolean found;
 
-        CloseDelimiter(String boundary) {
-            pattern = ("\r\n--" + boundary + "--").getBytes(StandardCharsets.ISO_8859_1);
-            fallback = new int[pattern.length];
-            int k = 0;
-            for (int i = 1; i < pattern.length; i++) {
-                while (k > 0 && pattern[i] != pattern[k]) {
-                    k = fallback[k - 1];
+        private CloseDelimiter(byte[] delimiter) {
+            this.delimiter = delimiter;
+        }
+
+        /**
+         * @param boundary The boundary of the body
+         * @param charset  The charset the decoder encodes the boundary with
+         * @return The matcher, or {@code null} if the boundary is not usable, i.e. it contains a
+         * line break, which the decoder could never match either
+         */
+        @Nullable
+        static CloseDelimiter of(String boundary, Charset charset) {
+            byte[] encoded = ("--" + boundary).getBytes(charset);
+            for (byte b : encoded) {
+                if (b == '\n' || b == '\r') {
+                    return null;
                 }
-                if (pattern[i] == pattern[k]) {
-                    k++;
-                }
-                fallback[i] = k;
             }
+            byte[] delimiter = Arrays.copyOf(encoded, encoded.length + 2);
+            delimiter[encoded.length] = '-';
+            delimiter[encoded.length + 1] = '-';
+            return new CloseDelimiter(delimiter);
         }
 
         boolean found() {
@@ -365,26 +372,34 @@ public final class FormDemuxer implements BufferConsumer {
         }
 
         void scan(ByteBuf buf) {
-            if (!found) {
-                buf.forEachByte(this);
+            if (found) {
+                return;
             }
-        }
-
-        @Override
-        public boolean process(byte value) {
+            int i = buf.readerIndex();
+            int end = buf.writerIndex();
             int m = matched;
-            while (m > 0 && pattern[m] != value) {
-                m = fallback[m - 1];
-            }
-            if (pattern[m] == value) {
-                m++;
-            }
-            if (m == pattern.length) {
-                found = true;
-                return false;
+            while (i < end) {
+                if (m == 0) {
+                    // jump to the next line
+                    int lf = buf.indexOf(i, end, (byte) '\n');
+                    if (lf == -1) {
+                        break;
+                    }
+                    m = 1;
+                    i = lf + 1;
+                    continue;
+                }
+                byte b = buf.getByte(i++);
+                if (b == delimiter[m - 1]) {
+                    if (++m > delimiter.length) {
+                        found = true;
+                        return;
+                    }
+                } else {
+                    m = b == '\n' ? 1 : 0;
+                }
             }
             matched = m;
-            return true;
         }
     }
 

@@ -118,6 +118,41 @@ class TruncatedMultipartBodyTest {
         assertOk(path.endsWith("form") ? "a,b" : "1,22", post(path, FIRST + SECOND_HEAD, "22\r\n--" + BOUNDARY + "--\r\n"));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"/truncated-multipart/text", "/truncated-multipart/file", "/truncated-multipart/form"})
+    void aBodyWithBareLineFeedsIsRead(String path) throws IOException {
+        // the decoder accepts lines that end with a bare LF, in the delimiters too
+        String body = (FIRST + SECOND_HEAD + "22\r\n--" + BOUNDARY + "--\r\n").replace("\r\n", "\n");
+        assertOk(path.endsWith("form") ? "a,b" : "1,22", post(path, body));
+        assertBadRequest(post(path, (FIRST + SECOND_HEAD + "22\r\n--other--\r\n").replace("\r\n", "\n")));
+    }
+
+    @Test
+    void aBodyWithAPreambleOrAQuotedBoundaryIsRead() throws IOException {
+        String body = FIRST + SECOND_HEAD + "22\r\n--" + BOUNDARY + "--\r\n";
+        assertOk("a,b", post("/truncated-multipart/form", "This is the preamble.\r\n" + body));
+        assertOk("a,b", send(request("/truncated-multipart/form", "multipart/form-data; boundary=\"" + BOUNDARY + "\"", body, false, true)));
+    }
+
+    @Test
+    void aChunkedBodyThatEndsBeforeItsClosingBoundaryIsABadRequest() throws IOException {
+        String ct = "multipart/form-data; boundary=" + BOUNDARY;
+        assertBadRequest(send(request("/truncated-multipart/form", ct, FIRST + SECOND_HEAD + "22\r\n", true, true)));
+        assertOk("a,b", send(request("/truncated-multipart/form", ct, FIRST + SECOND_HEAD + "22\r\n--" + BOUNDARY + "--\r\n", true, true)));
+    }
+
+    @Test
+    void theNextRequestOnTheConnectionIsAnsweredAfterTheBadRequest() throws IOException {
+        // the truncated body was read whole, so the connection stays usable
+        String ct = "multipart/form-data; boundary=" + BOUNDARY;
+        String response = send(request("/truncated-multipart/form", ct, FIRST + SECOND_HEAD + "22\r\n", false, false)
+            + request("/truncated-multipart/form", ct, FIRST + SECOND_HEAD + "22\r\n--" + BOUNDARY + "--\r\n", false, true));
+        assertBadRequest(response);
+        int second = response.indexOf("HTTP/1.1 ", 1);
+        assertTrue(second > 0, response);
+        assertOk("a,b", response.substring(second));
+    }
+
     @Test
     void aBodyThatEndsInTheHeadersOfAPartIsABadRequest() throws IOException {
         assertBadRequest(post("/truncated-multipart/text", FIRST + "--" + BOUNDARY + "\r\nContent-Disposition: form-data; name=\"b\""));
@@ -131,6 +166,30 @@ class TruncatedMultipartBodyTest {
 
     private static void assertBadRequest(String response) {
         assertTrue(response.startsWith("HTTP/1.1 400 "), response);
+    }
+
+    private static String request(String path, String contentType, String body, boolean chunked, boolean close) {
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        return "POST " + path + " HTTP/1.1\r\n"
+            + "Host: " + server.getHost() + "\r\n"
+            + "Content-Type: " + contentType + "\r\n"
+            + (chunked ? "Transfer-Encoding: chunked\r\n" : "Content-Length: " + bytes.length + "\r\n")
+            + (close ? "Connection: close\r\n" : "")
+            + "\r\n"
+            + (chunked ? Integer.toHexString(bytes.length) + "\r\n" + body + "\r\n0\r\n\r\n" : body);
+    }
+
+    /**
+     * Send the requests, and read the responses until the server closes the connection.
+     */
+    private static String send(String requests) throws IOException {
+        try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+            socket.setSoTimeout(30_000);
+            OutputStream out = socket.getOutputStream();
+            out.write(requests.getBytes(StandardCharsets.UTF_8));
+            out.flush();
+            return new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     /**
