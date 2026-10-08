@@ -36,7 +36,6 @@ ElementQuery = java.type("io.micronaut.inject.ast.ElementQuery")
 _JAVA_INT_MIN = -2 ** 31
 _JAVA_INT_MAX = 2 ** 31 - 1
 
-
 class UnresolvedAnnotationMemberError(ValueError):
     """
     A decorator member value references a Java class member (Outer.NAME) that the class does not declare.
@@ -709,6 +708,10 @@ class MicronautAstVisitor(ast.NodeVisitor):
             # This allows us to detect @dataclass and other non-Micronaut decorators
             decorators = []
             for d in node.decorator_list:
+                if self._is_dataclass_decorator(d):
+                    # Keep the marker spelling understood by the Java element model, including aliases.
+                    decorators.append(DecoratorDef("dataclass", "dataclasses.dataclass", None, {}, []))
+                    continue
                 # First try to get it as a Micronaut decorator
                 micronaut_decorator = decorator_to_function(self, d)
                 if micronaut_decorator is not None:
@@ -720,6 +723,10 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         # Create a DecoratorDef for non-Micronaut decorators
                         simple_decorator = DecoratorDef(decorator_name, decorator_name, None, {}, [])
                         decorators.append(simple_decorator)
+
+            if (any(d.annotationName() == "dataclasses.dataclass" for d in decorators)
+                    and not self._has_introspection(decorators)):
+                decorators.append(DecoratorDef("Introspected", "io.micronaut.core.annotation.Introspected", None, {}, []))
 
             # Extract base classes
             bases = []
@@ -825,12 +832,19 @@ class MicronautAstVisitor(ast.NodeVisitor):
             self.current_class_nested_types = previous_nested_types
             self.last_attribute = previous_last_attribute
 
+    def _has_introspection(self, decorators):
+        for decorator in decorators:
+            if (decorator.annotationName() == "io.micronaut.core.annotation.Introspected"
+                    or self._has_introspection(decorator.stereotypes())):
+                return True
+            annotation_type = _java_class_element(self.visitor_context, decorator.annotationName())
+            if annotation_type is not None and annotation_type.getAnnotationMetadata().hasStereotype("io.micronaut.core.annotation.Introspected"):
+                return True
+        return False
+
     def _is_dataclass_decorator(self, decorator):
         target = decorator.func if isinstance(decorator, ast.Call) else decorator
-        return (
-            (isinstance(target, ast.Name) and target.id == "dataclass") or
-            (isinstance(target, ast.Attribute) and target.attr == "dataclass")
-        )
+        return self._resolved_callable_name(target) == "dataclasses.dataclass"
 
     def _is_frozen_dataclass_decorator(self, decorator):
         if not isinstance(decorator, ast.Call) or not self._is_dataclass_decorator(decorator):
@@ -907,8 +921,27 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
                 if node.value:
                     self._track_current_class_constant(attr_name, node.value)
-                default_factory_name = self._dataclass_default_factory_name(node.value)
-                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, node.value is not None, decorators, None, is_static, None, default_factory_name)
+                has_default = node.value is not None
+                default_factory_name = None
+                if (any(d.annotationName() == "dataclasses.dataclass" for d in self.current_class.decorators())
+                        and isinstance(node.value, ast.Call)
+                        and self._resolved_callable_name(node.value.func) == "dataclasses.field"):
+                    keywords = {}
+                    for keyword in node.value.keywords:
+                        if keyword.arg is not None:
+                            keywords[keyword.arg] = keyword.value
+                        else:
+                            for key, keyword_value in self._literal_dict_entries(keyword.value):
+                                if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                                    keywords[key.value] = keyword_value
+                                else:
+                                    keywords[None] = keyword_value
+                    default = keywords.get("default")
+                    factory = keywords.get("default_factory")
+                    has_default = default is not None or factory is not None or None in keywords
+                    value = literal_attribute_value(default) if default is not None else None
+                    default_factory_name = self._callable_name(factory) if factory is not None else None
+                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, has_default, decorators, None, is_static, None, default_factory_name)
                 self.current_class_attributes.append(attr_def)
                 self.last_attribute = attr_def
 
@@ -939,17 +972,24 @@ class MicronautAstVisitor(ast.NodeVisitor):
             return TypeRef("set")
         return TypeRef("object")
 
-    def _dataclass_default_factory_name(self, value_node):
-        if not isinstance(value_node, ast.Call):
-            return None
-        function_name = self._callable_name(value_node.func)
-        if function_name not in ("field", "dataclasses.field"):
-            return None
-        for keyword in value_node.keywords:
-            if keyword.arg != "default_factory":
-                continue
-            return self._callable_name(keyword.value)
-        return None
+    def _literal_dict_entries(self, node):
+        # Resolve literal **field_options without evaluating user expressions.
+        if isinstance(node, (ast.Name, ast.Attribute)):
+            value = convert_ast_value(node, self)
+            if isinstance(value, dict):
+                node = ast.parse(repr(value), mode="eval").body
+        if not isinstance(node, ast.Dict):
+            yield None, node
+            return
+        for key, value in zip(node.keys, node.values):
+            if key is None:
+                yield from self._literal_dict_entries(value)
+            else:
+                yield key, value
+
+    def _resolved_callable_name(self, node):
+        name = self._callable_name(node)
+        return self._resolve_dotted_name(name.split(".")) if name else None
 
     def _callable_name(self, node):
         if isinstance(node, ast.Name):

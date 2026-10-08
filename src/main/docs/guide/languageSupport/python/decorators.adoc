@@ -15,6 +15,35 @@ class OrderedTest:
 <1> The class `MethodOrderer.OrderAnnotation` is the `value` of the annotation, as `@TestMethodOrder(MethodOrderer.OrderAnnotation.class)` is in Java
 <2> A bare decorator is the annotation without members
 
+== Dataclass Field Validation
+
+The compiler generates introspection for every Python dataclass automatically. An explicit `@Introspected(...)` is only needed to customize its configuration; introspection alone does not enable serialization or database mapping.
+
+Declare validation constraints with standard `typing.Annotated` and the existing typed markers exported by `pyronaut.validation`:
+
+[source,python]
+----
+from dataclasses import dataclass
+from typing import Annotated
+from pyronaut import validation
+
+@dataclass
+class Contact:
+    name: Annotated[str,
+        validation.NotBlank,
+        validation.Size(min=1, max=80, message="Use 1 to 80 characters")]
+----
+
+Bare markers and calls without options have the same annotation meaning. Marker calls expose their supported members through the generated Python type stubs, instead of introducing a separate string-key dictionary schema. The same `Annotated[...]` syntax works for fields and method parameters, and constraints can be reused through annotated type aliases.
+
+Use Micronaut Validation to enforce constraints at validation boundaries; ordinary Python construction such as `Contact("")` does not run validation automatically. An annotated field without a default remains a required constructor argument. Explicit `default` and `default_factory` values keep their dataclass meaning. Standard-library `field(metadata=...)` remains available to other Python libraries and is not interpreted as a Micronaut validation DSL.
+
+The markers use the existing Jakarta validation constraints and their members. For example, `validation.Min(0)` supplies an inclusive minimum of zero, `validation.DecimalMin("0.01", inclusive=False)` sets an exclusive decimal bound, and `validation.AssertFalse` requires a false value. Omit a marker when no constraint is wanted.
+
+Constraint options also include `message`, `groups`, and `payload`. Regular expressions and flags retain Jakarta/Java semantics, not Python `re` semantics; use enum members such as `validation.Pattern.Flag.CASE_INSENSITIVE`. Temporal, null, and whitespace checks likewise use the existing validators, without coercing or stripping Python values.
+
+Use `Annotated[Address, validation.Valid]` for cascaded validation of an introspected nested object. Annotation members are read from source and supported compile-time constants, not arbitrary evaluated expressions.
+
 == Custom Annotations
 
 A custom annotation is a function returning a decorator, itself decorated with the annotations that make up its stereotype. Its parameters are the annotation members and their defaults the member defaults. It is applied like a generated decorator, bare or called, in the module that defines it and in modules that import it:
