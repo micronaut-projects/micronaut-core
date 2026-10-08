@@ -34,12 +34,12 @@ import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormFieldFlows;
+import io.micronaut.http.server.multipart.ReleasingFieldPublisher;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.CorePublisher;
 import reactor.core.publisher.Flux;
 
 import java.nio.charset.Charset;
@@ -178,16 +178,17 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
                 }
                 result.complete(form);
             });
-        if (source instanceof CorePublisher<RawFormField>) {
-            // the fields of a request of another implementation may come from a Reactor publisher
-            // that releases the fields it holds when the subscriber cancels, with the discard hook
-            // of the subscriber: the fields waiting behind the one being read when the reading stops
+        if (source instanceof ReleasingFieldPublisher<RawFormField>) {
+            // e.g. the fields of the Netty server: it releases the fields it holds itself
+            source.subscribe(subscription);
+        } else {
+            // the fields of a request of another implementation may come from a Reactor publisher,
+            // also through a delegating one, that releases the fields it holds when the subscriber
+            // cancels with the discard hook of the subscriber: the fields waiting behind the one
+            // being read when the reading stops
             Flux.from(source)
                 .doOnDiscard(RawFormField.class, RawFormField::close)
                 .subscribe(subscription);
-        } else {
-            // another publisher, e.g. the fields of the Netty server, releases them itself
-            source.subscribe(subscription);
         }
         owned.reading(subscription);
         return new Collection(result, subscription);

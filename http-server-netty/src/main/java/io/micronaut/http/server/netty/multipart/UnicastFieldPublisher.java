@@ -16,8 +16,8 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.server.multipart.ReleasingFieldPublisher;
 import org.jspecify.annotations.Nullable;
-import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -43,7 +43,7 @@ import java.util.function.Consumer;
  * @since 5.3.0
  */
 @Internal
-final class UnicastFieldPublisher<T> implements Publisher<T>, Subscription {
+final class UnicastFieldPublisher<T> implements ReleasingFieldPublisher<T>, Subscription {
     private final Queue<T> queue = new ConcurrentLinkedQueue<>();
     private final AtomicInteger wip = new AtomicInteger();
     private final AtomicLong requested = new AtomicLong();
