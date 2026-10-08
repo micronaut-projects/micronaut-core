@@ -40,6 +40,12 @@ public class RequestArgumentSatisfier {
         this.binderRegistry = requestBinderRegistry;
     }
 
+    /** @param requestBinderRegistry The registry selected for server routes */
+    @jakarta.inject.Inject
+    public RequestArgumentSatisfier(io.micronaut.http.bind.ServerRequestBinderRegistry requestBinderRegistry) {
+        this((RequestBinderRegistry) requestBinderRegistry);
+    }
+
     /**
      * @return The request binder registry
      */
