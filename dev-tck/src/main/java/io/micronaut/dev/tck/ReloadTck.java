@@ -125,7 +125,7 @@ public final class ReloadTck {
         List<Integer> live = retiredGenerations(loader);
         if (!live.isEmpty()) {
             throw new AssertionError("Retired generation(s) " + live + " are still reachable after the reload to generation " + loader.generation()
-                + ": a static cache, a thread that was not stopped, or a registry entry keeps a class of the old generation alive; caches keyed by class must evict with ClassChangeEvent.isStale");
+                + ": a static cache, a thread that was not stopped, or a registry entry keeps a class of the old generation alive; caches keyed by class must evict with ClassChangeEvent.isStaleType");
         }
     }
 
