@@ -45,14 +45,15 @@ class WriteFallbackResponseTest {
     }
 
     @Test
-    void aRefusedFallbackIsKeptAsSuppressedByTheWriteFailure() {
+    void aRefusedFallbackAbortsTheResponseAndIsKeptAsSuppressedByTheWriteFailure() {
         IllegalStateException refused = new IllegalStateException("Response already written");
         RecordingAccess access = new RecordingAccess(refused);
         Throwable failure = new OutOfMemoryError("write");
 
         RoutingInBoundHandler.writeFallbackResponse(access, failure);
 
-        assertEquals(List.of("closeAfterWrite", "write 500"), access.calls);
+        // the failed write may have left a part of its response on the connection
+        assertEquals(List.of("closeAfterWrite", "write 500", "abort"), access.calls);
         assertArrayEquals(new Throwable[]{refused}, failure.getSuppressed());
         assertSame(refused, failure.getSuppressed()[0]);
     }
@@ -82,6 +83,11 @@ class WriteFallbackResponseTest {
             if (writeFailure != null) {
                 throw writeFailure;
             }
+        }
+
+        @Override
+        public void abort() {
+            calls.add("abort");
         }
 
         @Override

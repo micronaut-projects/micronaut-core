@@ -1510,6 +1510,81 @@ class PipeliningServerHandlerSpec extends Specification {
         }
     }
 
+    def 'a second response is refused and released, and abort closes the connection'() {
+        given:
+        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def sink = Sinks.many().unicast().<ByteBuf>onBackpressureBuffer()
+        OutboundAccess access = null
+        int responsesWritten = 0
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                access = outboundAccess
+                // a response that is being written, e.g. one whose write failed half way
+                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adaptNetty(sink.asFlux()))
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                responsesWritten++
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        def second = Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)
+        access.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR), new NettyByteBodyFactory(ch).adapt(second))
+        then:
+        thrown IllegalStateException
+        second.refCnt() == 0
+        ch.isOpen()
+
+        when:
+        access.abort()
+        then:
+        !ch.isOpen()
+        responsesWritten == 1
+        sink.currentSubscriberCount() == 0
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
+    def 'abort does nothing after the response was written'() {
+        given:
+        OutboundAccess access = null
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                access = outboundAccess
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        access.abort()
+        then:
+        ch.isOpen()
+        ((FullHttpResponse) ch.readOutbound()).status() == HttpResponseStatus.NO_CONTENT
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
     static class MonitorHandler extends ChannelOutboundHandlerAdapter {
         int flush = 0
         int read = 0

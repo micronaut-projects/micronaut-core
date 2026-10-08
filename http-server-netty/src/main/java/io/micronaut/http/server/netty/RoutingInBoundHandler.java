@@ -380,12 +380,15 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     /**
      * Answer with an empty {@code 500} response and close the connection, after writing the
-     * response failed, e.g. with an {@link Error} of a buffer allocation. If the response was
-     * already handed to the connection, this write is refused, and the response goes on as it
-     * was.
+     * response failed, e.g. with an {@link Error} of a buffer allocation. This covers a failure
+     * that is thrown to the caller of {@link OutboundAccess#write}: the work that the connection
+     * does later on its event loop, e.g. when the response is written from another thread, fails
+     * there and is not seen here. If the response was already handed to the connection, so that
+     * a part of it may have been written, this write is refused, and the response is aborted
+     * instead: the connection is closed, or the HTTP/2 stream reset.
      *
      * @param outboundAccess The access to the connection
-     * @param failure        The failure of the write, which keeps the failure of this one
+     * @param failure        The failure of the write, which keeps the failures of this one
      */
     static void writeFallbackResponse(OutboundAccess outboundAccess, Throwable failure) {
         try {
@@ -393,6 +396,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
             outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR), NettyByteBodyFactory.empty());
         } catch (Throwable e) {
             failure.addSuppressed(e);
+            try {
+                outboundAccess.abort();
+            } catch (Throwable g) {
+                failure.addSuppressed(g);
+            }
         }
     }
 
