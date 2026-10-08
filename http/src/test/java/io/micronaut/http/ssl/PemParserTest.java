@@ -13,6 +13,21 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class PemParserTest {
+    private static final String CERTIFICATE = """
+        -----BEGIN CERTIFICATE-----
+        MIIBfjCCASWgAwIBAgIUFdB184Ztg40/v/06MuvsGKMZaNswCgYIKoZIzj0EAwIw
+        FDESMBAGA1UEAwwJVGVzdCBDQSAxMCAXDTI2MTAwNzE5NDIxN1oYDzIxMjYwOTEz
+        MTk0MjE3WjAUMRIwEAYDVQQDDAlUZXN0IENBIDEwWTATBgcqhkjOPQIBBggqhkjO
+        PQMBBwNCAAQGkMO2cQwf353bDifnOjreHmePPi52TiY7z0tIiQdwVFD7l+SYqj/S
+        Un/uFpO/lICnhbFW08TOd1kfjaxBTWzco1MwUTAdBgNVHQ4EFgQU4aYhRYUV73xa
+        KajswY+Dyh7V8D4wHwYDVR0jBBgwFoAU4aYhRYUV73xaKajswY+Dyh7V8D4wDwYD
+        VR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNHADBEAiAptCeuJIQSQesiW3XMxMvV
+        s7Da7Zo73JwobtxQcnHC1gIgRzCC+iNC2DlE+knc1DJILlNzNQxwFZhbT1SeHy7d
+        X2E=
+        -----END CERTIFICATE-----
+        """;
+    private static final String RFC_7468_WHITESPACE = " \t\u000B\f";
+
     @Test
     public void pkcs8Rsa() throws Exception {
         List<Object> items = new PemParser(null, null).loadPem("""
@@ -271,5 +286,66 @@ class PemParserTest {
             -----END CERTIFICATE-----
             """;
         assertThrows(IllegalArgumentException.class, () -> new PemParser(null, null).loadPem(pem));
+    }
+
+    @Test
+    public void commentedOutBlockIsIgnored() throws Exception {
+        List<Object> items = new PemParser(null, null).loadPem("""
+            # -----BEGIN CERTIFICATE-----
+            # MIIBfzCCASWgAwIBAgIUT2B1JURk8RDtUn5ruoypAH7sobYwCgYIKoZIzj0EAwIw
+            # -----END CERTIFICATE-----
+            """ + CERTIFICATE);
+        assertEquals(1, items.size());
+        assertEquals("CN=Test CA 1", subjectOf(items.get(0)));
+    }
+
+    @Test
+    public void markerMentionedInSentenceIsIgnored() throws Exception {
+        List<Object> items = new PemParser(null, null).loadPem(
+            "Each certificate starts with -----BEGIN CERTIFICATE----- and ends with -----END CERTIFICATE-----.\n" + CERTIFICATE);
+        assertEquals(1, items.size());
+        assertEquals("CN=Test CA 1", subjectOf(items.get(0)));
+    }
+
+    @Test
+    public void markerOnlyMentionedInSentenceIsNotPem() {
+        PemParser.NotPemException e = assertThrows(PemParser.NotPemException.class, () -> new PemParser(null, null).loadPem(
+            "Each certificate starts with -----BEGIN CERTIFICATE----- and ends with -----END CERTIFICATE-----.\n"));
+        assertEquals("Missing start tag", e.getMessage());
+    }
+
+    @Test
+    public void blockAfterCarriageReturnLineEndingIsFound() throws Exception {
+        List<Object> items = new PemParser(null, null).loadPem("First CA\r\n" + CERTIFICATE.replace("\n", "\r\n"));
+        assertEquals(1, items.size());
+        assertEquals("CN=Test CA 1", subjectOf(items.get(0)));
+    }
+
+    @Test
+    public void trailingWhitespaceAfterBeginLineIsIgnored() throws Exception {
+        List<Object> items = new PemParser(null, null).loadPem(
+            CERTIFICATE.replace("-----BEGIN CERTIFICATE-----", "-----BEGIN CERTIFICATE-----" + RFC_7468_WHITESPACE));
+        assertEquals(1, items.size());
+        assertEquals("CN=Test CA 1", subjectOf(items.get(0)));
+    }
+
+    @Test
+    public void whitespaceInsideBase64IsIgnored() throws Exception {
+        List<Object> items = new PemParser(null, null).loadPem(CERTIFICATE.replace("\n", "\n" + RFC_7468_WHITESPACE));
+        assertEquals(1, items.size());
+        assertEquals("CN=Test CA 1", subjectOf(items.get(0)));
+    }
+
+    @Test
+    public void emptyBlockIsEmptyPem() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> new PemParser(null, null).loadPem("""
+            -----BEGIN CERTIFICATE-----
+            -----END CERTIFICATE-----
+            """));
+        assertEquals("PEM file empty", e.getMessage());
+    }
+
+    private static String subjectOf(Object certificate) {
+        return assertInstanceOf(X509Certificate.class, certificate).getSubjectX500Principal().getName();
     }
 }
