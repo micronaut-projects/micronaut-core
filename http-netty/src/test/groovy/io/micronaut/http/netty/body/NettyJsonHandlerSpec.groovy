@@ -20,6 +20,12 @@ class NettyJsonHandlerSpec extends Specification {
     @Inject
     JsonMediaTypeCodec jsonMediaTypeCodec
 
+    void 'compatibility bean replaces rather than duplicates the generic handler'() {
+        expect:
+        beanContext.getBeansOfType(NettyJsonHandler).size() == 1
+        beanContext.getBeansOfType(JsonMessageHandler).isEmpty()
+    }
+
     void "JsonMessageHandler @Produces value matches JsonMediaTypeCode constant"() {
         when:
         BeanDefinition<NettyJsonHandler> nettyJsonHandlerBeanDefinition = beanContext.getBeanDefinition(NettyJsonHandler.class)
