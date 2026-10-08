@@ -32,8 +32,12 @@ import java.util.function.Function;
 /**
  * The elements of a body, read through a {@link PieceReader} as they are asked for, without
  * Reactor: a read polls the next element of the pieces read so far, and requests the next piece
- * of the body only when they complete no other element. An element is decoded when it is
- * polled, so nothing is decoded ahead of the caller.
+ * of the body when they complete no other element. An element is decoded when it is polled, so
+ * nothing is decoded ahead of the caller. An element that the pieces read so far complete is
+ * handed out at once ({@link #poll()}, a completed {@link #next()}).
+ *
+ * <p>To hide the latency of the connection, one piece is requested ahead once a requested piece
+ * answered a read: the bytes of at most one piece are received before they are asked for.</p>
  *
  * @param <T> The type of an element
  * @author Denis Stepanov
@@ -57,6 +61,11 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
      */
     private @Nullable Throwable inputFailure;
     private boolean done;
+    /**
+     * A piece arrived while no read waited for it: no other piece is requested ahead until a
+     * read finds no element in the pieces read so far.
+     */
+    private boolean aheadReceived;
 
     /**
      * @param body   The body, which the elements take over
@@ -74,6 +83,37 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
         drain();
     }
 
+    @Override
+    protected @Nullable T pollSource() {
+        // under the lock of these elements, which guards the reader too, while no read waits
+        if (done) {
+            return null;
+        }
+        T element;
+        try {
+            element = reader.poll();
+        } catch (Throwable e) {
+            Subscription s = inputEnded ? null : subscription;
+            done = true;
+            reader.close();
+            if (s != null) {
+                s.cancel();
+            }
+            fail(wrap.apply(e));
+            return null;
+        }
+        if (element == null && inputEnded) {
+            done = true;
+            reader.close();
+            if (inputFailure != null) {
+                fail(wrap.apply(inputFailure));
+            } else {
+                end();
+            }
+        }
+        return element;
+    }
+
     /**
      * Answer a waiting read: with the next element of the pieces read so far, with the end of
      * the elements, or by requesting the next piece.
@@ -85,6 +125,7 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
         boolean end = false;
         boolean subscribe = false;
         Subscription s = null;
+        Subscription ahead = null;
         synchronized (this) {
             if (done || !isWaiting()) {
                 return;
@@ -101,6 +142,11 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
                 // taken with the element: a completion that arrives before the element is
                 // handed over finds no read to end
                 read = takeWaiting();
+                if (!requested && !inputEnded && !aheadReceived && subscription != null) {
+                    // the next piece is on its way while the caller handles this element
+                    requested = true;
+                    ahead = subscription;
+                }
             } else if (failure == null) {
                 if (inputEnded) {
                     done = true;
@@ -114,6 +160,7 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
                     // a piece is on its way
                     return;
                 } else {
+                    aheadReceived = false;
                     requested = true;
                     if (subscribed) {
                         // null until onSubscribe, which requests the first piece
@@ -132,6 +179,9 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
             fail(wrap.apply(failure));
         } else if (element != null) {
             Objects.requireNonNull(read).complete(Optional.of(element));
+            if (ahead != null) {
+                ahead.request(1);
+            }
         } else if (end) {
             end();
         } else if (subscribe) {
@@ -184,6 +234,9 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
             if (done || inputEnded) {
                 piece.close();
                 return;
+            }
+            if (!isWaiting()) {
+                aheadReceived = true;
             }
             try {
                 reader.read(piece);
