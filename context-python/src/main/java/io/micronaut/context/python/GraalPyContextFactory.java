@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -292,9 +293,30 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     public static Context bootstrapReusableContext(ClassLoader classLoader,
                                                    Map<String, String> options,
                                                    String applicationMain) throws IOException {
-        GraalPyContextConfiguration contextConfiguration = new GraalPyContextConfiguration();
-        contextConfiguration.setOptions(options);
+        if (PythonContextRuntime.isInitialized() && PythonContextRuntime.isReuseContext()) {
+            return PythonContextRuntime.getContext();
+        }
+        // Bind application policy before Python modules load; caller options override the bound options.
+        GraalPyContextConfiguration contextConfiguration = bindContextConfiguration(classLoader);
+        Map<String, String> mergedOptions = new LinkedHashMap<>(contextConfiguration.getOptions());
+        mergedOptions.putAll(options);
+        contextConfiguration.setOptions(mergedOptions);
         return bootstrapReusableContext(classLoader, contextConfiguration, applicationMain);
+    }
+
+    private static GraalPyContextConfiguration bindContextConfiguration(ClassLoader classLoader) {
+        Thread thread = Thread.currentThread();
+        ClassLoader previousClassLoader = thread.getContextClassLoader();
+        thread.setContextClassLoader(classLoader);
+        try (ApplicationContext applicationContext = ApplicationContext.builder(classLoader)
+            .beansPredicate(bean -> bean.getBeanType() == GraalPyContextConfiguration.class)
+            .eagerBeansEnabled(false)
+            .eventsEnabled(false)
+            .start()) {
+            return applicationContext.getBean(GraalPyContextConfiguration.class);
+        } finally {
+            thread.setContextClassLoader(previousClassLoader);
+        }
     }
 
     /**

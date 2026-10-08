@@ -20,6 +20,8 @@ import io.micronaut.context.ApplicationContextConfigurer;
 import io.micronaut.context.BootstrapContextAccess;
 import io.micronaut.context.annotation.ContextConfigurer;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.qualifiers.Qualifiers;
+import org.graalvm.polyglot.Context;
 
 /**
  * Records the application context that is starting, so generated Python code that runs before the
@@ -36,6 +38,7 @@ import io.micronaut.core.annotation.Internal;
  * too but is never recorded: it only holds {@code BootstrapContextCompatible} beans, so it cannot
  * provide the GraalPy context bean, and it publishes no {@code ShutdownEvent} that would clear the
  * record again, which matters when a refresh recreates it while the application is running.
+ * Configuration-only contexts that cannot provide the named Python context are not recorded either.
  *
  * @author Micronaut Team
  * @since 5.3.0
@@ -46,7 +49,8 @@ public final class PythonRuntimeBootstrapConfigurer implements ApplicationContex
 
     @Override
     public void configure(ApplicationContext applicationContext) {
-        if (applicationContext.containsBean(BootstrapContextAccess.class)) {
+        if (applicationContext.containsBean(BootstrapContextAccess.class)
+            || !applicationContext.containsBean(Context.class, Qualifiers.byName(PythonContextRuntime.PYTHON))) {
             return;
         }
         PythonApplicationRuntime.bootstrapFrom(applicationContext);
