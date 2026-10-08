@@ -1597,6 +1597,15 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.isOpen()
         ((FullHttpResponse) ch.readOutbound()).status() == HttpResponseStatus.NO_CONTENT
 
+        when:
+        // Once the connection was removed, a repeated abort must also be harmless.
+        ch.close()
+        access.abort()
+
+        then:
+        !ch.isOpen()
+        ch.checkException()
+
         cleanup:
         ch.finishAndReleaseAll()
     }

@@ -250,6 +250,7 @@ class Http2ServerHandlerSpec extends Specification {
 
         when:
         // the stream is finished: a late response is dropped
+        access.abort()
         access.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyByteBodyFactory.empty())
         EmbeddedTestUtil.advance(server, client)
         then:
