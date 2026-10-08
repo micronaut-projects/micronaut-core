@@ -27,6 +27,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -70,9 +71,13 @@ public final class GraalPyContextConfiguration {
     );
     private Map<String, String> options = Map.of();
     private List<String> hostClassLookup = List.of();
+    private @Nullable Path resourceDirectory;
     private String polyglotLogLevel = GraalPySlf4jLogHandler.polyglotRootLevel();
 
-    GraalPyContextConfiguration() {
+    /**
+     * Create a context configuration with the default permission policy.
+     */
+    public GraalPyContextConfiguration() {
         // we use experimental features by default so don't warn about them
         builder.option("python.WarnExperimentalFeatures", "false")
             // Avoid creating records that the SLF4J backend will discard.
@@ -84,6 +89,30 @@ public final class GraalPyContextConfiguration {
      */
     public Context.Builder getBuilder() {
         return builder;
+    }
+
+    /**
+     * The caller-owned directory containing physical {@code src} and {@code venv} resources.
+     * When unset, resources remain in the virtual filesystem with the Java POSIX backend.
+     * Native POSIX requires this directory and explicit native-access permission; it bypasses
+     * the virtual filesystem and its IO restrictions. The factory never deletes this directory.
+     *
+     * @return The external resource directory, or null for the virtual filesystem
+     */
+    public @Nullable Path getResourceDirectory() {
+        return resourceDirectory;
+    }
+
+    /**
+     * Select already prepared external resources. Embedded application resources can be staged
+     * with {@link org.graalvm.python.embedding.GraalPyResources#extractVirtualFileSystemResources}
+     * before any context uses the directory. Staging replaces matching files and must not run
+     * while contexts are using the directory.
+     *
+     * @param resourceDirectory The caller-owned resource directory
+     */
+    public void setResourceDirectory(@Nullable Path resourceDirectory) {
+        this.resourceDirectory = resourceDirectory == null ? null : resourceDirectory.toAbsolutePath().normalize();
     }
 
     @Inject
@@ -112,7 +141,7 @@ public final class GraalPyContextConfiguration {
      *
      * @param options The options.
      */
-    void setOptions(@MapFormat(keyFormat = StringConvention.RAW, transformation = MapFormat.MapTransformation.FLAT) @Nullable Map<String, String> options) {
+    public void setOptions(@MapFormat(keyFormat = StringConvention.RAW, transformation = MapFormat.MapTransformation.FLAT) @Nullable Map<String, String> options) {
         if (options != null) {
             if (CollectionUtils.isNotEmpty(options)) {
                 LOG.debug("Using GraalPy context options {}", options);
