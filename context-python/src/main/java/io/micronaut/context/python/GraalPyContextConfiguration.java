@@ -94,6 +94,8 @@ public final class GraalPyContextConfiguration {
     /**
      * The caller-owned directory containing physical {@code src} and {@code venv} resources.
      * When unset, resources remain in the virtual filesystem with the Java POSIX backend.
+     * Selecting external resources enables host-file access even with the Java backend;
+     * filesystem access is not confined to this directory.
      * Native POSIX requires this directory and explicit native-access permission; it bypasses
      * the virtual filesystem and its IO restrictions. The factory never deletes this directory.
      *
