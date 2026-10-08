@@ -20,7 +20,7 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.env.DevelopmentMode;
+import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
 import io.micronaut.context.Qualifier;
@@ -115,7 +115,7 @@ import java.util.stream.Stream;
 @Primary
 @Singleton
 @Requires(classes = Router.class)
-@Requires(condition = DevelopmentMode.Active.class)
+@DevelopmentActive
 @Requires(condition = DevRouter.NoPrimaryApplicationRouter.class)
 public final class DevRouter implements Router {
 
@@ -605,7 +605,7 @@ public final class DevRouter implements Router {
     @Internal
     @Singleton
     @Requires(classes = Router.class)
-    @Requires(condition = DevelopmentMode.Active.class)
+    @DevelopmentActive
     @Requires(condition = DevRouter.NoPrimaryApplicationRouter.class)
     static final class RouteBeanDestroyedListener implements BeanDestroyedEventListener<Object> {
 
