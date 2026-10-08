@@ -15,6 +15,7 @@
  */
 package io.micronaut.websocket;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteBuffer;
 
 import java.util.Objects;
@@ -28,6 +29,7 @@ import java.util.Objects;
  * @author Denis Stepanov
  * @since 5.3.0
  */
+@Experimental
 public final class WebSocketPingMessage {
     private final ByteBuffer<?> content;
 

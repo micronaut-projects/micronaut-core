@@ -15,6 +15,7 @@
  */
 package io.micronaut.websocket.context;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.websocket.annotation.ServerWebSocket;
@@ -50,6 +51,7 @@ public interface WebSocketBean<T> {
      * @return The subprotocols, in the order of preference, or an empty list if the WebSocket supports none
      * @since 5.3.0
      */
+    @Experimental
     default List<String> getSubprotocols() {
         String subprotocols = getBeanDefinition().stringValue(ServerWebSocket.class, "subprotocols").orElse("");
         List<String> supported = new ArrayList<>();
