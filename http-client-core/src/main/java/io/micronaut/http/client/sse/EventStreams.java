@@ -393,7 +393,9 @@ public final class EventStreams {
         @Override
         public void read(ReadBuffer piece) {
             try (piece) {
-                events.addAll(decoder.decode(piece.toArray()));
+                byte[] bytes = piece.toArray();
+                // the events before a line that exceeds the limit are delivered before the failure
+                decoder.decode(bytes, 0, bytes.length, events::add);
             }
         }
 
