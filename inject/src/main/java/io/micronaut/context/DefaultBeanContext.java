@@ -4618,6 +4618,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
 
         @Override
+        public Method getTargetMethod() {
+            return method.getTargetMethod();
+        }
+
+        @Override
+        public boolean hasTargetMethod() {
+            return method.hasTargetMethod();
+        }
+
+        @Override
         public String toString() {
             return method.toString();
         }
@@ -4683,16 +4693,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
 
         @Override
-        public Method getTargetMethod() {
-            return method.getTargetMethod();
-        }
-
-        @Override
-        public boolean hasTargetMethod() {
-            return method.hasTargetMethod();
-        }
-
-        @Override
         public Class getDeclaringType() {
             return target.getClass();
         }
@@ -4744,16 +4744,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 }
             }
             return target;
-        }
-
-        @Override
-        public Method getTargetMethod() {
-            return method.getTargetMethod();
-        }
-
-        @Override
-        public boolean hasTargetMethod() {
-            return method.hasTargetMethod();
         }
 
         @Override
