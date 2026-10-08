@@ -41,6 +41,9 @@ import java.util.function.Supplier;
 public final class ReactorInterop {
     private static final boolean REACTOR_PRESENT = reactorType() != null;
 
+    private ReactorInterop() {
+    }
+
     private static @Nullable Class<?> reactorType() {
         try {
             // A class literal uses normal linkage, not reflective class loading. Keep the
@@ -49,9 +52,6 @@ public final class ReactorInterop {
         } catch (NoClassDefFoundError e) {
             return null;
         }
-    }
-
-    private ReactorInterop() {
     }
 
     /**
