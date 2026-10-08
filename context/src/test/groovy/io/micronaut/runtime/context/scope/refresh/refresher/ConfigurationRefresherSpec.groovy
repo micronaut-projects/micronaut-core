@@ -23,7 +23,7 @@ class ConfigurationRefresherSpec extends Specification {
             @Override
             Iterator<String> iterator() { values.keySet().iterator() }
         }
-        def context = ApplicationContext.builder().trackBeanDependencies(true).propertySources(source).start()
+        def context = ApplicationContext.builder().beanDependencyTrackingEnabled(true).propertySources(source).start()
         def refresher = context.getBean(ConfigurationRefresher)
         def configuration = context.getBean(PoolConfiguration)
         def bound = context.getBean(BoundConfiguration)
@@ -130,7 +130,7 @@ class ConfigurationRefresherSpec extends Specification {
             @Override
             Iterator<String> iterator() { values.keySet().iterator() }
         }
-        def context = ApplicationContext.builder().trackBeanDependencies(true).propertySources(source).start()
+        def context = ApplicationContext.builder().beanDependencyTrackingEnabled(true).propertySources(source).start()
         def refresher = context.getBean(ConfigurationRefresher)
         def configuration = context.getBean(PoolConfiguration)
 
@@ -226,7 +226,7 @@ class ConfigurationRefresherSpec extends Specification {
             @Override
             Iterator<String> iterator() { values.keySet().iterator() }
         }
-        def context = ApplicationContext.builder().trackBeanDependencies(graph).propertySources(source).start()
+        def context = ApplicationContext.builder().beanDependencyTrackingEnabled(graph).propertySources(source).start()
         def refresher = context.getBean(ConfigurationRefresher)
         def user = context.getBean(EndpointUser)
         def users = context.getBean(EndpointsUser)
