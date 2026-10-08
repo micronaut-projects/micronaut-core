@@ -17,6 +17,7 @@ package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -61,6 +62,11 @@ final class DefaultAsyncHttpClient implements AsyncStreamingHttpClient {
     @Override
     public <I> CompletionStage<HttpResponse<BodyElements<ByteBuffer<?>>>> exchangeStream(HttpRequest<I> request, Argument<?> errorType) {
         return ElementsStages.response(client.exchangeStreamFlow(request, errorType));
+    }
+
+    @Override
+    public <I> CompletionStage<HttpResponse<BodyElements<ReadBuffer>>> exchangeReadBuffers(HttpRequest<I> request, Argument<?> errorType) {
+        return ElementsStages.response(client.exchangeReadBuffersFlow(request, errorType));
     }
 
     @Override

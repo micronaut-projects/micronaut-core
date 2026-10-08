@@ -35,14 +35,14 @@ class DefaultHandlerSpec extends Specification {
 
         then:
             writer.isPresent()
-            writer.get() instanceof JsonMessageHandler
+            writer.get() instanceof NettyJsonHandler
 
         when:
             def reader = bodyHandlerRegistry.findReader(Argument.listOf(SomeBean), MediaType.ALL_TYPE)
 
         then:
             reader.isPresent()
-            reader.get() instanceof JsonMessageHandler
+            reader.get() instanceof NettyJsonHandler
     }
 
     void "test default writer / reader for missing type"() {

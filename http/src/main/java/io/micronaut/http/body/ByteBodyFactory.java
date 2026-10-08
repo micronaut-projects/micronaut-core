@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.body;
 
+import io.micronaut.http.body.stream.ByteBodyElements;
+
 import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
@@ -300,6 +302,12 @@ public class ByteBodyFactory {
      */
     @Experimental
     public CloseableByteBody adapt(BodyElements<ReadBuffer> elements) {
+        if (elements instanceof ByteBodyElements<ReadBuffer> raw) {
+            CloseableByteBody available = raw.takeUnreadAvailableBody();
+            if (available != null) {
+                return available;
+            }
+        }
         // an element read while the body is discarded is closed
         return adapt(new BodyElementsPublisher<>(elements, ReadBuffer::close));
     }

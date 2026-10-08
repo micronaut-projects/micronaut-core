@@ -17,6 +17,7 @@ package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -31,6 +32,7 @@ import io.micronaut.json.JsonMapper;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * The {@link StreamingHttpClient} with {@link CompletionStage} results and the body pulled one
@@ -61,6 +63,37 @@ import java.util.concurrent.CompletionStage;
  */
 @Experimental
 public interface AsyncStreamingHttpClient extends AsyncHttpClient {
+
+    /**
+     * Read response pieces without copying the transport buffers. The caller owns every
+     * returned {@link ReadBuffer} and must close it, even when processing fails. Closing the
+     * elements releases unread pieces, not pieces already handed to the caller.
+     *
+     * <p>This optional operation is supported by the native Netty and JDK clients. The default
+     * implementation fails with {@link UnsupportedOperationException}. Unlike
+     * {@link #exchangeStream(HttpRequest, Argument)}, elements may be reference counted.</p>
+     *
+     * @param request The request
+     * @param errorType The error body type
+     * @param <I> The request body type
+     * @return The response with caller-owned pieces
+     * @since 5.3.0
+     */
+    default <I> CompletionStage<HttpResponse<BodyElements<ReadBuffer>>> exchangeReadBuffers(HttpRequest<I> request, Argument<?> errorType) {
+        return CompletableFuture.failedStage(new UnsupportedOperationException("This client does not expose owned response buffers"));
+    }
+
+    /**
+     * Read caller-owned response pieces using the default error type.
+     *
+     * @param request The request
+     * @param <I> The request body type
+     * @return The response with pieces that the caller must close
+     * @since 5.3.0
+     */
+    default <I> CompletionStage<HttpResponse<BodyElements<ReadBuffer>>> exchangeReadBuffers(HttpRequest<I> request) {
+        return exchangeReadBuffers(request, HttpClient.DEFAULT_ERROR_TYPE);
+    }
 
     /**
      * Perform an HTTP request and read the response body as its bytes arrive, see

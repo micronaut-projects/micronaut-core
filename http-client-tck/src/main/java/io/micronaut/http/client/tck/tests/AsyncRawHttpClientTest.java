@@ -29,6 +29,9 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.client.AsyncRawHttpClient;
+import io.micronaut.http.client.AsyncStreamingHttpClient;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.RawHttpClientRegistry;
 import io.micronaut.http.client.RawRequestOptions;
@@ -39,6 +42,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
@@ -49,6 +53,30 @@ import java.util.concurrent.TimeUnit;
 })
 class AsyncRawHttpClientTest {
     static final String SPEC_NAME = "AsyncRawHttpClientTest";
+
+    @Test
+    void streamingClientExposesCallerOwnedResponsePieces() throws Exception {
+        try (ServerUnderTest server = server()) {
+            AsyncStreamingHttpClient client = server.getApplicationContext().getBean(AsyncStreamingHttpClient.class);
+            HttpResponse<BodyElements<ReadBuffer>> response = client.exchangeReadBuffers(
+                    HttpRequest.POST(server.getURL().get() + "/async-raw/echo", "hello é 😀").contentType(MediaType.TEXT_PLAIN_TYPE))
+                .toCompletableFuture().get(10, TimeUnit.SECONDS);
+            Assertions.assertEquals(200, response.code());
+            try (BodyElements<ReadBuffer> pieces = response.body()) {
+                ByteArrayOutputStream output = new ByteArrayOutputStream();
+                while (true) {
+                    var piece = pieces.next().toCompletableFuture().get(10, TimeUnit.SECONDS);
+                    if (piece.isEmpty()) {
+                        break;
+                    }
+                    try (ReadBuffer buffer = piece.get()) {
+                        output.write(buffer.toArray());
+                    }
+                }
+                Assertions.assertEquals("hello é 😀", output.toString(StandardCharsets.UTF_8));
+            }
+        }
+    }
 
     @Test
     void injectedClientExchangesRawBytes() throws Exception {

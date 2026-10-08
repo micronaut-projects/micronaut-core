@@ -26,6 +26,7 @@ import io.micronaut.core.execution.ImperativeExecutionFlow;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
@@ -1246,6 +1247,13 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         setupConversionService(request);
         return exchangeElementsFlow(PropagatedContext.getOrEmpty(), toMutableRequest(request), errorType, true,
             (req, response) -> ElementsResponse.of(response, BodyPieces.elements(response.byteBody().move())));
+    }
+
+    /** Native response pieces: ownership passes to the caller, without copying. */
+    final <I> ExecutionFlow<HttpResponse<BodyElements<ReadBuffer>>> exchangeReadBuffersFlow(HttpRequest<I> request, Argument<?> errorType) {
+        setupConversionService(request);
+        return exchangeElementsFlow(PropagatedContext.getOrEmpty(), toMutableRequest(request), errorType, true,
+            (req, response) -> ElementsResponse.of(response, response.byteBody().move().toReadBufferElements()));
     }
 
     /**

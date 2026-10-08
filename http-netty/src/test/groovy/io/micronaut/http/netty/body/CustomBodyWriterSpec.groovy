@@ -58,7 +58,7 @@ class CustomBodyWriterSpec extends Specification {
         then:
         writer.isPresent()
         // JsonMessageHandler allows any type, since the argument is generic, so it is chosen in this case
-        writer.get() instanceof JsonMessageHandler
+        writer.get() instanceof NettyJsonHandler
     }
 
     static class A {

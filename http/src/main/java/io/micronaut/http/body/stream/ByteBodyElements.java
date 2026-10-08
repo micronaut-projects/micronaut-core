@@ -18,6 +18,7 @@ package io.micronaut.http.body.stream;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.PieceReader;
 import org.jspecify.annotations.Nullable;
@@ -90,6 +91,25 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
     @SuppressWarnings("java:S2095") // the elements own the piece reader, and close it
     public static ByteBodyElements<ReadBuffer> readBuffers(CloseableByteBody body) {
         return new ByteBodyElements<>(body, new ReadBufferPieces(), Function.identity());
+    }
+
+    /**
+     * Transfer an untouched, already-buffered raw body without another buffer or subscription.
+     * Streaming bodies cannot use this shortcut: reusing their shared buffer would change the
+     * buffering limits of the adapted body. On success these elements are closed and the caller
+     * owns the returned body.
+     *
+     * @return The body, or {@code null} when the shortcut is not applicable
+     */
+    public synchronized @Nullable CloseableByteBody takeUnreadAvailableBody() {
+        if (subscribed || done || !(reader instanceof ReadBufferPieces) || !(body instanceof AvailableByteBody)) {
+            return null;
+        }
+        CloseableByteBody moved = body.move();
+        subscribed = true;
+        done = true;
+        close();
+        return moved;
     }
 
     /**

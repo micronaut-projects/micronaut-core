@@ -22,7 +22,7 @@ class NettyJsonHandlerSpec extends Specification {
 
     void "JsonMessageHandler @Produces value matches JsonMediaTypeCode constant"() {
         when:
-        BeanDefinition<JsonMessageHandler> nettyJsonHandlerBeanDefinition = beanContext.getBeanDefinition(JsonMessageHandler.class)
+        BeanDefinition<NettyJsonHandler> nettyJsonHandlerBeanDefinition = beanContext.getBeanDefinition(NettyJsonHandler.class)
         AnnotationValue<Produces> annotation = nettyJsonHandlerBeanDefinition.getAnnotation(Produces.class)
 
         then:
@@ -31,7 +31,7 @@ class NettyJsonHandlerSpec extends Specification {
 
     void "JsonMessageHandler @Consumes value matches JsonMediaTypeCode constant"() {
         when:
-        BeanDefinition<JsonMessageHandler> nettyJsonHandlerBeanDefinition = beanContext.getBeanDefinition(JsonMessageHandler.class)
+        BeanDefinition<NettyJsonHandler> nettyJsonHandlerBeanDefinition = beanContext.getBeanDefinition(NettyJsonHandler.class)
         AnnotationValue<Consumes> annotation = nettyJsonHandlerBeanDefinition.getAnnotation(Consumes.class)
 
         then:
