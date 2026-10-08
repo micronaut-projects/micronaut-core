@@ -42,6 +42,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoop;
 import io.netty.contrib.multipart.ContentDisposition;
+import io.netty.contrib.multipart.FormDecoderException;
 import io.netty.contrib.multipart.ParsedHeaderValue;
 import io.netty.contrib.multipart.PostBodyDecoder;
 import io.netty.contrib.multipart.TooManyFormFieldsException;
@@ -170,6 +171,11 @@ public final class FormDemuxer implements BufferConsumer {
             e = new ContentLengthExceededException("Number of form fields exceeds configured limit");
         } else if (e instanceof UndecodedDataLimitExceededException) {
             e = new ContentLengthExceededException("Length of buffered form field exceeds configured limit");
+        } else if (e instanceof FormDecoderException) {
+            // a malformed body. The message of the decoder stays in the cause, out of the response
+            HttpStatusException badRequest = new HttpStatusException(HttpStatus.BAD_REQUEST, "Malformed form body");
+            badRequest.initCause(e);
+            e = badRequest;
         }
 
         if (state instanceof StreamingContent sc) {

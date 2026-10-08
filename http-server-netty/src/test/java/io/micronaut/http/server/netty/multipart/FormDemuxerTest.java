@@ -66,6 +66,12 @@ public class FormDemuxerTest {
         dst.add(byteBodyFactory.readBufferFactory().copyOf(msg, StandardCharsets.UTF_8));
     }
 
+    private static void assertBadRequest(Throwable error) {
+        HttpStatusException e = assertInstanceOf(HttpStatusException.class, error);
+        assertEquals(HttpStatus.BAD_REQUEST, e.getStatus());
+        assertInstanceOf(FormDecoderException.class, e.getCause());
+    }
+
     private static QueueSubscriber<String> content(ByteBody body) {
         QueueSubscriber<String> subscriber = new QueueSubscriber<>();
         Flux.from(body.toByteArrayPublisher())
@@ -386,7 +392,7 @@ public class FormDemuxerTest {
         assertEquals("ba", data.queue.poll());
 
         assertTrue(data.complete);
-        assertInstanceOf(FormDecoderException.class, fields.error);
+        assertBadRequest(fields.error);
     }
 
     @Test
@@ -407,8 +413,8 @@ public class FormDemuxerTest {
 
         write(streamingBody.sharedBuffer(), "%rr");
 
-        assertInstanceOf(FormDecoderException.class, data.error);
-        assertInstanceOf(FormDecoderException.class, fields.error);
+        assertBadRequest(data.error);
+        assertBadRequest(fields.error);
     }
 
     @Test

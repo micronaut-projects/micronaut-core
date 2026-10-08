@@ -39,6 +39,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -151,6 +152,19 @@ class TruncatedMultipartBodyTest {
         int second = response.indexOf("HTTP/1.1 ", 1);
         assertTrue(second > 0, response);
         assertOk("a,b", response.substring(second));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/truncated-multipart/text", "/truncated-multipart/form"})
+    void aMalformedBodyIsABadRequest(String path) throws IOException {
+        // the decoder refuses the part: the form is malformed, like a truncated one
+        String response = post(path, FIRST + "--" + BOUNDARY + "\r\n"
+            + "Content-Disposition: form-data; name=\"b\"\r\n"
+            + "Content-Transfer-Encoding: bogus\r\n"
+            + "\r\n"
+            + "22\r\n--" + BOUNDARY + "--\r\n");
+        assertBadRequest(response);
+        assertFalse(response.contains("bogus"), response);
     }
 
     @Test

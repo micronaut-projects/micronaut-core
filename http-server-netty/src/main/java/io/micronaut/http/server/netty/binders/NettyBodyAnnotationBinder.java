@@ -41,7 +41,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
-import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.http.exceptions.HttpException;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
@@ -232,9 +232,9 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                 field.close();
             }
         }
-        if (sub.error instanceof HttpStatusException e) {
-            // a malformed form, e.g. a multipart body without its closing boundary: answered
-            // with its status
+        if (sub.error instanceof HttpException e) {
+            // a malformed form, e.g. a multipart body without its closing boundary, or a form
+            // over a limit: answered with its status
             throw e;
         }
         if (sub.error != null) {
