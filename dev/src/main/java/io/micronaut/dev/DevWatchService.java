@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,13 +35,13 @@ import java.nio.file.WatchService;
  *
  * @param service The service
  * @param registrar How directories are registered with it
- * @param closeAction What closing the watcher does with the service, or null for closing it
+ * @param closeOnClose Whether closing the watcher closes the service
  * @author graemerocher
  * @since 5.3.0
  */
 @Internal
 @NullMarked
-record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar registrar, @Nullable Runnable closeAction) {
+record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar registrar, boolean closeOnClose) {
 
     private static final Logger LOG = LoggerFactory.getLogger(DevWatchService.class);
     private static final String MAC_SERVICE = "io.methvin.watchservice.MacOSXListeningWatchService";
@@ -63,7 +62,7 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
         }
         WatchService service = FileSystems.getDefault().newWatchService();
         DirectoryWatcher.WatchKeyRegistrar registrar = ClassUtils.isPresent(SENSITIVITY_MODIFIER, loader) ? HighSensitivity.registrar() : DirectoryWatcher.defaultRegistrar();
-        return new DevWatchService(service, registrar, null);
+        return new DevWatchService(service, registrar, true);
     }
 
     /**
@@ -75,7 +74,7 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
             DirectoryWatcher.WatchKeyRegistrar registrar = (directory, watchService) -> new io.methvin.watchservice.WatchablePath(directory).register(
                 watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY);
             // closing the native service has crashed the JVM; micronaut-runtime-osx leaves it open as well
-            return new DevWatchService(service, registrar, () -> LOG.debug("The native macOS watch service is left open"));
+            return new DevWatchService(service, registrar, false);
         }
     }
 
