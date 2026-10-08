@@ -44,8 +44,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     final T bean;
     private final int order;
     private final @Nullable DefaultBeanDependencies dependencies;
-    // written once by the context before the registration is handed out, in the thread that created it
-    private boolean dependent;
+    private final boolean ownedByCaller;
 
     /**
      * @param identifier     The bean identifier
@@ -69,6 +68,22 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      */
     BeanRegistration(BeanIdentifier identifier, BeanDefinition<T> beanDefinition, T bean,
                      @Nullable DefaultBeanDependencies dependencies) {
+        this(identifier, beanDefinition, bean, dependencies, false);
+    }
+
+    /**
+     * Creates a registration that holds the given dependency owner.
+     *
+     * @param identifier The bean identifier
+     * @param beanDefinition The bean definition
+     * @param bean The bean instance
+     * @param dependencies The owner created with the bean, or null for a registration the container does not own
+     * @param ownedByCaller Whether the instance was created for the lookup that returns the registration
+     * @see #isOwnedByCaller()
+     */
+    BeanRegistration(BeanIdentifier identifier, BeanDefinition<T> beanDefinition, T bean,
+                     @Nullable DefaultBeanDependencies dependencies, boolean ownedByCaller) {
+        this.ownedByCaller = ownedByCaller;
         // A wrapper around a retained proxy or resolver shares its original owner, including closure state.
         if (bean instanceof DefaultBeanDependencyResolver resolver) {
             this.dependencies = resolver.dependencies;
@@ -182,31 +197,27 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     /**
      * Whether the instance of this registration was created for the lookup that returned it and is held by no one
      * else: an instance of a bean that is neither a singleton nor held by a scope, or an instance created by
-     * {@link BeanContext#createBeanRegistration(BeanDefinition)}. Such a registration belongs to the caller, or to
-     * the bean it was injected into, and {@link #close()} destroys an instance nobody else uses.
+     * {@link BeanContext#createBeanRegistration(BeanDefinition)}. Such a registration belongs to the caller, and
+     * {@link #close()} destroys an instance nobody else uses.
+     *
+     * <p>This is unrelated to the dependent beans of a registration, the beans destroyed together with it. A
+     * registration owned by the caller that was resolved while another bean was created is also a dependent of that
+     * bean; closing it early is safe, since a registration destroys its bean only once.</p>
      *
      * <p>A registration of a singleton, of a bean a scope holds or of a scoped proxy answers {@code false}, and so
-     * does one built by hand. Closing it does not release something the caller holds: it destroys the singleton for
-     * every holder, removes the bean from its scope, or does nothing for a registration that does not dispose its
-     * bean. Code that closes registrations it looked up, to release what a lookup created, closes only those that
-     * answer {@code true}.</p>
+     * do one built by hand, an element of a container bean and a replacement the
+     * {@link BeanResolutionCustomizer#resolveNullBean(io.micronaut.core.type.Argument, io.micronaut.core.type.Argument, BeanDefinition)
+     * customizer} supplies for a bean that produced {@code null}. Closing it does not release something the caller
+     * holds: it destroys the singleton for every holder, removes the bean from its scope, or does nothing for a
+     * registration that does not dispose its bean. Code that closes registrations it looked up, to release what a
+     * lookup created, closes only those that answer {@code true}.</p>
      *
      * @return Whether the registration holds an instance created for the caller alone
      * @since 5.3.0
      */
     @Experimental
-    public boolean isDependent() {
-        return dependent;
-    }
-
-    /**
-     * Marks the registration as holding an instance created for the lookup that returns it.
-     *
-     * @return This registration
-     */
-    BeanRegistration<T> markDependent() {
-        dependent = true;
-        return this;
+    public boolean isOwnedByCaller() {
+        return ownedByCaller;
     }
 
     @Override
@@ -275,7 +286,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
 
     /**
      * Does nothing for a registration that does not dispose its bean. The registration the context hands out
-     * disposes it instead, and then destroys the bean whether or not it is shared: see {@link #isDependent()}.
+     * disposes it instead, and then destroys the bean whether or not it is shared: see {@link #isOwnedByCaller()}.
      */
     @Override
     public void close() {

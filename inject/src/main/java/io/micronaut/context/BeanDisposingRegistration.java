@@ -48,7 +48,8 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
                               @Nullable List<?> interceptorRegistrations) {
         this(beanContext, identifier, beanDefinition, createdBean, dependents,
             interceptorRegistrations == null ? InterceptorCandidates.Unresolved.INSTANCE
-                : new InterceptorCandidates.Resolved((List<BeanRegistration<?>>) interceptorRegistrations), new DefaultBeanDependencies());
+                : new InterceptorCandidates.Resolved((List<BeanRegistration<?>>) interceptorRegistrations), new DefaultBeanDependencies(),
+            false);
     }
 
     BeanDisposingRegistration(BeanContext beanContext,
@@ -57,8 +58,9 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
                               BT createdBean,
                               @Nullable List<BeanRegistration<?>> dependents,
                               InterceptorCandidates interceptorCandidates,
-                              DefaultBeanDependencies dependencies) {
-        super(identifier, beanDefinition, createdBean, dependencies);
+                              DefaultBeanDependencies dependencies,
+                              boolean ownedByCaller) {
+        super(identifier, beanDefinition, createdBean, dependencies, ownedByCaller);
         this.beanContext = beanContext;
         // A reconstructed proxy wrapper already has its complete owner. Reattaching its retained advice would
         // duplicate registrations or add them back to an owner that was already destroyed.
