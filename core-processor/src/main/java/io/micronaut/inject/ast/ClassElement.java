@@ -241,6 +241,32 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Why this type cannot be extended or implemented by a build time generated proxy, if it cannot.
+     *
+     * @return The restriction, or empty if a proxy can extend or implement this type
+     * @since 5.3.0
+     */
+    @Experimental
+    default Optional<ProxyRestriction> findProxyRestriction() {
+        if (isPrimitive()) {
+            return Optional.of(ProxyRestriction.PRIMITIVE);
+        }
+        if (isArray()) {
+            return Optional.of(ProxyRestriction.ARRAY);
+        }
+        if (isEnum()) {
+            return Optional.of(ProxyRestriction.ENUM);
+        }
+        if (isFinal()) {
+            return Optional.of(ProxyRestriction.FINAL);
+        }
+        if (isSealed()) {
+            return Optional.of(ProxyRestriction.SEALED);
+        }
+        return Optional.empty();
+    }
+
+    /**
      * @return True if the class represents a proxy
      */
     default boolean isProxy() {
