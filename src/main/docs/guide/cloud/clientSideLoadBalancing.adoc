@@ -13,3 +13,85 @@ For example, you may wish to load balance between services in a particular zone,
 To replace the api:http.client.LoadBalancer[], define a bean that <<replaces, replaces>> the api:http.client.loadbalance.DiscoveryClientLoadBalancerFactory[].
 
 In fact that is exactly what the Netflix Ribbon support does, described in the next section.
+
+=== Load Balancer Strategies
+
+Without replacing the load balancer, you can change how it picks among the available instances of a service with the `load-balancer-strategy` setting of the service. This applies to every `@Client` of the service id, whether its instances come from `micronaut.http.services.<id>.urls` or from a discovery client:
+
+[configuration]
+----
+micronaut:
+  http:
+    services:
+      foo:
+        urls:
+          - http://foo1
+          - http://foo2
+        load-balancer-strategy: p2c
+----
+
+The built-in strategies are:
+
+|===
+|Name |Selection
+
+|`round-robin`
+|Each instance in turn. The default: without the setting, the selection is unchanged.
+
+|`random`
+|A random instance.
+
+|`p2c`
+|Power of two choices: of two random instances, the one with fewer exchanges in flight. An exchange counts from its selection until the client reports its outcome.
+
+|`weighted`
+|Smooth weighted round robin by the `weight` metadata of the instances. An instance without a valid `weight` has a weight of `1`, and an instance of weight `0` is selected only when every instance has weight `0`.
+
+|`sticky`
+|The same instance for the same key, with rendezvous hashing: when an instance goes away only its keys move to another one. Without a key, round robin.
+|===
+
+The weight is the `weight` entry of the api:discovery.ServiceInstance#getMetadata--[metadata] of the instance, as registered with the discovery server, for example the service metadata in Consul or Eureka.
+
+The key of the `sticky` strategy, such as a session or user id, is the load balancer key of the request: the request attribute named by `LoadBalancerKey.ATTRIBUTE`, which `LoadBalancerKey.set(request, key)` sets, see api:http.client.loadbalance.LoadBalancerKey[]. Its string form is hashed, so it should be stable, for example a `String` or a `Long`. The request itself is never hashed: a request without a key is load balanced round robin. A load balancer asked directly with api:http.client.LoadBalancer#select-java.lang.Object-[LoadBalancer.select(Object)] uses its argument as the key.
+
+The key can also come from a request header, named with the `load-balancer-key-header` setting of the service; the attribute takes precedence over the header:
+
+[configuration]
+----
+micronaut:
+  http:
+    services:
+      foo:
+        urls:
+          - http://foo1
+          - http://foo2
+        load-balancer-strategy: sticky
+        load-balancer-key-header: X-Session-Id
+----
+
+With a strategy configured, an instance whose `backup` metadata is `true` is a backup, like the backup servers of nginx: it is selected only when no other instance is available, whatever the strategy. Without the `load-balancer-strategy` setting, the `backup` metadata is ignored and a backup instance is selected in turn like any other.
+
+Every strategy picks among the instances that are up and that the <<serviceDiscoveryManual, outlier detection>> has not ejected: an ejected instance is never selected, whatever the strategy. The instances are those of each selection, so instances added or removed by a refresh of the discovery client are taken into account on the next selection.
+
+To pick the instance in another way, implement api:http.client.loadbalance.LoadBalancerStrategy[] and register it as a bean named after the strategy:
+
+snippet::io.micronaut.docs.http.client.loadbalance.PrimaryStrategy[tags="imports,class", indent=0, title="A strategy that prefers the first instance"]
+
+<1> The strategy may keep state per service: a prototype bean gives each service its own instance.
+<2> The name of the bean is the value of the `load-balancer-strategy` setting.
+<3> Selects among the available instances; the default `report` method receives the outcome of each exchange.
+
+[configuration]
+----
+micronaut:
+  http:
+    services:
+      foo:
+        urls:
+          - http://foo1
+          - http://foo2
+        load-balancer-strategy: primary
+----
+
+A bean takes precedence over a built-in strategy of the same name. A strategy applies to the round-robin load balancers that the framework creates; a custom api:http.client.LoadBalancer[] keeps controlling its own selection.

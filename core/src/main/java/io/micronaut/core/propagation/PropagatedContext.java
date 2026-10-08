@@ -16,9 +16,12 @@
 package io.micronaut.core.propagation;
 
 import io.micronaut.core.annotation.Experimental;
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -186,6 +189,34 @@ public interface PropagatedContext {
     <T extends PropagatedContextElement> Optional<T> find(Class<T> elementType);
 
     /**
+     * Finds the last added element of the given type, like {@link #find(Class)}, but without
+     * wrapping it in an {@link Optional}.
+     *
+     * @param elementType The element type
+     * @param <T> The element's type
+     * @return the element or {@code null} if there is none
+     * @since 5.3
+     */
+    default <T extends PropagatedContextElement> @Nullable T findOrNull(Class<T> elementType) {
+        return find(elementType).orElse(null);
+    }
+
+    /**
+     * Finds the last added element of the given type that matches the given filter. Elements are tested from the
+     * last added to the first one, so this is equivalent to
+     * {@code findAll(elementType).filter(filter).findFirst().orElse(null)} without creating a stream.
+     *
+     * @param elementType The element type
+     * @param filter      The filter the element must match
+     * @param <T>         The element's type
+     * @return the most recently added matching element or {@code null} if there is none
+     * @since 5.3.0
+     */
+    default <T extends PropagatedContextElement> @Nullable T findOrNull(Class<T> elementType, Predicate<? super T> filter) {
+        return findAll(elementType).filter(filter).findFirst().orElse(null);
+    }
+
+    /**
      * Find all elements of the given type. The first element in the stream will be the last element added.
      *
      * @param elementType The element type
@@ -205,7 +236,7 @@ public interface PropagatedContext {
     <T extends PropagatedContextElement> T get(Class<T> elementType);
 
     /**
-     * Gets all elements.
+     * Gets all elements in the order they were added. The returned list is unmodifiable.
      *
      * @return all elements.
      */

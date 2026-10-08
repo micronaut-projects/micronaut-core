@@ -30,10 +30,12 @@ import io.micronaut.inject.writer.OriginatingElements
 import io.micronaut.sourcegen.model.ObjectDef
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
+import org.codehaus.groovy.ast.CompileUnit
 import org.codehaus.groovy.ast.InnerClassNode
 import org.codehaus.groovy.ast.ModuleNode
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
+import org.codehaus.groovy.control.Phases
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
@@ -46,14 +48,47 @@ import java.lang.reflect.Modifier
  * @since 1.0
  */
 @CompileStatic
-// IMPORTANT NOTE: This transform runs in phase CANONICALIZATION so it runs after TypeElementVisitorTransform
+// IMPORTANT NOTE: This transform runs in phase CANONICALIZATION; the bean definitions are written at the end of
+// that phase, after Groovy's own local transforms and after the deferred TypeElementVisitorTransform (see visit),
+// by the operation TypeElementVisitorTransform registers
 @GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
 class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
     CompilationUnit unit
 
+    /**
+     * Groovy runs the global transforms of a phase before the local ones, so the bean definitions written here would
+     * miss the constructors of a record or of a {@code @TupleConstructor} class, which
+     * {@code TupleConstructorASTTransformation} adds in this phase. The work is therefore deferred to a phase
+     * operation for CANONICALIZATION, which {@link TypeElementVisitorTransform} registers from SEMANTIC_ANALYSIS
+     * after its own (see {@link #registerInjection(CompilationUnit)}): the compiler runs it after every operation of
+     * the phase, the local transforms included.
+     */
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
+        if (unit == null) {
+            inject(source)
+            return
+        }
+        registerInjection(unit)
+    }
+
+    /**
+     * Registers the phase operation writing the bean definitions at the end of CANONICALIZATION. It is registered
+     * once per compilation unit and processes every source unit of the compilation, the ones queued later included.
+     *
+     * @param unit The compilation unit
+     */
+    static void registerInjection(CompilationUnit unit) {
+        CompileUnit ast = unit.getAST()
+        if (ast.getNodeMetaData(InjectTransform) == null) {
+            ast.putNodeMetaData(InjectTransform, Boolean.TRUE)
+            InjectTransform transform = new InjectTransform(unit: unit)
+            unit.addNewPhaseOperation({ SourceUnit sourceUnit -> transform.inject(sourceUnit) } as CompilationUnit.ISourceUnitOperation, Phases.CANONICALIZATION)
+        }
+    }
+
+    private void inject(SourceUnit source) {
         ModuleNode moduleNode = source.getAST()
         List<ClassNode> classes = moduleNode.getClasses()
 
@@ -86,7 +121,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             Class<?> serviceClass = outputObjectDef.serviceClass();
             OriginatingElements originatingElements = outputObjectDef.originatingElements();
             if (serviceClass != null) {
-                visitorContext.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
+                visitorContext.visitServiceDescriptor(serviceClass.getName(), objectDef.getName(), originatingElements.getOriginatingElements()[0], outputObjectDef.serviceContent());
             }
             try (OutputStream outputStream = visitorContext.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
                 outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));

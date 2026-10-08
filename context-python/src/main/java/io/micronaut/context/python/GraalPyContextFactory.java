@@ -102,6 +102,9 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * object instance and its {@code __getattr__} runs only after the regular foreign member lookup has
      * failed, retrying with the underscore stripped (the rule the compiler applies, {@code keyword.iskeyword},
      * so the same spelling works everywhere) and then asking the runtime for an inherited member.
+     * <p>
+     * It also makes every {@link java.util.concurrent.CompletionStage} and Reactive Streams publisher
+     * awaitable, whichever Java call returned it (see {@link PythonAsyncioRuntime#awaitJava}).
      */
     private static final Source JAVA_OBJECT_MEMBERS_SOURCE = Source.newBuilder(PYTHON, """
         def __micronaut_register_java_object_members():
@@ -126,6 +129,22 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                     raise AttributeError(f"foreign object has no attribute '{name}'")
 
             register_interop_type(java.type('java.lang.Object'), MicronautJavaObject)
+
+            # a CompletionStage or Publisher any Java call returned (Mono.toFuture(), a static factory) is
+            # awaitable like the value of an injected client
+            asyncio_runtime = java.type('io.micronaut.context.python.PythonAsyncioRuntime')
+
+            class MicronautJavaAwaitable:
+                __slots__ = ()
+
+                def __await__(self):
+                    return asyncio_runtime.awaitJava(self).__await__()
+
+            for awaitable_type in ('java.util.concurrent.CompletionStage', 'org.reactivestreams.Publisher'):
+                try:
+                    register_interop_type(java.type(awaitable_type), MicronautJavaAwaitable)
+                except (KeyError, ImportError, TypeError):
+                    pass  # absent, or excluded by graalpy.context.host-class-lookup
 
         __micronaut_register_java_object_members()
         del __micronaut_register_java_object_members
@@ -183,6 +202,16 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
     public GraalPyContextFactory(ApplicationContext applicationContext) {
         this.applicationContext = applicationContext;
+    }
+
+    /**
+     * Complete the members of the Java objects of a context: keyword-safe aliases, inherited public
+     * methods, and {@code await} on stages and publishers.
+     *
+     * @param context The context
+     */
+    static void registerJavaObjectMembers(Context context) {
+        context.eval(JAVA_OBJECT_MEMBERS_SOURCE);
     }
 
     /**
@@ -376,7 +405,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             // Before any application code runs: Java objects answer to keyword-safe member aliases and to
             // the public methods GraalPy does not expose because a non-public superclass declares them
             now = System.currentTimeMillis();
-            context.eval(JAVA_OBJECT_MEMBERS_SOURCE);
+            registerJavaObjectMembers(context);
             LOG.debug("GraalPy Java object members registered in {}ms", System.currentTimeMillis() - now);
             // Before the application modules import: the Java packages, types and annotations they import
             // are served by the finder of the runtime module, from the manifests the compiler wrote

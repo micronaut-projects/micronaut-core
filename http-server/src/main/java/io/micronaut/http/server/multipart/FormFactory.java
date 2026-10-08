@@ -35,6 +35,7 @@ import io.micronaut.http.multipart.FormFieldMetadata;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.binding.FormBinding;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -84,6 +85,14 @@ public final class FormFactory {
     }
 
     /**
+     * @return The server configuration, for the limits of form content
+     * @since 5.3.0
+     */
+    public HttpServerConfiguration getConfiguration() {
+        return configuration;
+    }
+
+    /**
      * Get the completer for the given request, if it has been created by
      * {@link #getOrCreateCompleter(HttpRequest)}.
      *
@@ -92,7 +101,9 @@ public final class FormFactory {
      */
     @Nullable
     public static FormRouteCompleter getCompleterOrNull(HttpRequest<?> request) {
-        return request.getAttribute(COMPLETER, FormRouteCompleter.class).orElse(null);
+        // getAttribute(name) without a type: the typed lookup allocates a conversion context even
+        // when the attribute is absent, which it is for every non-form request
+        return request.getAttribute(COMPLETER).orElse(null) instanceof FormRouteCompleter completer ? completer : null;
     }
 
     /**
@@ -112,6 +123,8 @@ public final class FormFactory {
         if (completer != null) {
             return completer;
         }
+        // the fields cannot be read by name when a FormData or FormParts argument reads the form
+        FormBinding.checkFieldsCanBeRead(fchr);
         completer = new FormRouteCompleter(fchr);
         request.setAttribute(COMPLETER, completer);
         return completer;

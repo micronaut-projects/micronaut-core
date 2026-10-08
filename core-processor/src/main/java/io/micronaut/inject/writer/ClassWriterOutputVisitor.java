@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.Element;
 
@@ -93,6 +94,25 @@ public interface ClassWriterOutputVisitor {
     void visitServiceDescriptor(String type, String classname, Element originatingElement);
 
     /**
+     * Adds the {@code META-INF/micronaut/<type>/<classname>} entry of a service, with content. The entry names the
+     * class; the content is what the service keeps about it, and an empty entry is always valid. A visitor that does
+     * not write content leaves the entry empty.
+     *
+     * <p>Internal: the Micronaut processors call it to write the descriptor of a bean definition. It is not for type
+     * element visitors, which use {@link #visitServiceDescriptor(String, String, Element)}.</p>
+     *
+     * @param type               the fully qualified service name
+     * @param classname          the fully qualified classname
+     * @param originatingElement The originating element
+     * @param content            The content of the entry, or {@code null} to leave it empty
+     * @since 5.3.0
+     */
+    @Internal
+    default void visitServiceDescriptor(String type, String classname, Element originatingElement, byte @Nullable [] content) {
+        visitServiceDescriptor(type, classname, originatingElement);
+    }
+
+    /**
      * Visit a file within the META-INF directory of the 'classes' directory.
      *
      * @param path The path to the file
@@ -136,6 +156,10 @@ public interface ClassWriterOutputVisitor {
 
     /**
      * Visit a source file that will be generated within the generated 'sources' directory.
+     *
+     * <p>The file is compiled as part of the same compilation: javac and KSP process it in their next round,
+     * and the Groovy compiler queues it into the running compilation. The content must therefore be source in
+     * the language being compiled (see {@link io.micronaut.inject.visitor.VisitorContext#getLanguage()}).</p>
      *
      * @param packageName The package for the source file
      * @param fileNameWithoutExtension the name of the source file, without extension (determined automatically)

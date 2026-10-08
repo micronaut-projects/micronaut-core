@@ -64,12 +64,20 @@ class RawHttpClientSpec extends Specification {
                 ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt("foo".getBytes(StandardCharsets.UTF_8)),
                 null
         )).block()
+        def withOptions = Mono.from(client.exchange(
+                HttpRequest.POST("/raw/echo", null),
+                ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt("bar".getBytes(StandardCharsets.UTF_8)),
+                null,
+                RawRequestOptions.proxy()
+        )).block()
 
         then:
         resp.byteBody().buffer().get().toString(StandardCharsets.UTF_8) == "foo"
+        withOptions.byteBody().buffer().get().toString(StandardCharsets.UTF_8) == "bar"
 
         cleanup:
         resp?.close()
+        withOptions?.close()
         client.close()
         server.close()
         ctx.close()

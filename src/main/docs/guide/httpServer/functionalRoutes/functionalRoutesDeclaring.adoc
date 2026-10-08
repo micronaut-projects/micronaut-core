@@ -1,0 +1,38 @@
+A route is declared in four steps, in this order:
+
+. a *creator* of the api:web.router.builder.HttpRouteBuilder[], e.g. `POST("/items")`, starts the route and returns an api:web.router.builder.HttpRouteSpec[];
+. *settings*, e.g. the media types or the executor;
+. optionally, a *body stage*, e.g. `.body(Item.class)`, declares the body the handler receives;
+. a *terminal*, e.g. `.handle(...)`, gives the handler or the response, and adds the route.
+
+* The creators: `GET(uri)`, `POST(uri)`, `PUT(uri)`, `PATCH(uri)` and `DELETE(uri)`, `route(HttpMethod, uri)` for any standard method, `route(Set<HttpMethod>, uri)` for several methods, `route(String, uri)` for a method by its name, custom methods included, and `any(uri)` for every method.
+* The body stages: `body(Class)` or `body(Argument)` for the decoded body, `form()` for a submitted form and `body()` for the body the handler reads itself.
+* The terminals: `handle(...)` for a handler that returns the response, `handleAsync(...)` for one that completes it later, and `respond(...)` for a response without a handler, see <<functionalRoutesRespond, Responses Without a Handler>>.
+
+A route without settings has a shortcut per method, `GET(uri, handler)`, `POST(uri, handler)`, `PUT(uri, handler)`, `PATCH(uri, handler)`, `DELETE(uri, handler)` and `any(uri, handler)`, the same as `GET(uri).handle(handler)`:
+
+snippet::io.micronaut.docs.server.functional.ItemRoutes[tags="imports,clazz", indent=0, title="Declaring handler routes"]
+
+<1> An `HttpRoutes` bean, here returned as a lambda by a factory method, which can inject the beans the handlers use.
+<2> A shortcut: a api:web.router.builder.RequestHandler[] receives the request and the api:http.PathVariables[] of the matched route. Their typed accessors (`getString`, `getInt`, `getLong`, `get(name, UUID.class)`, ... with a default value overload, and `findInt`, `findString`, ..., and the list accessors `getStrings`, `getList(name, Integer.class)` and `findList`, which split an exploded or comma separated value like a `List` controller argument) convert the values like controller arguments: a missing or unconvertible value is answered with `400`. An api:http.exceptions.HttpStatusException[] thrown by the handler sets the status, here `404` for an unknown item.
+<3> A creator declares the method and the URI template of a route, and returns the pending route.
+<4> `body(Item.class)` declares the body the handler receives, decoded like a `@Body` argument of a controller method: with the message body readers of the content type, a `400` for an invalid body and a `415` for an unsupported content type. The route becomes an api:web.router.builder.HttpBodyRouteSpec[], whose `handle` takes a api:web.router.builder.BodyRequestHandler[], `(request, pathVariables, item) -> ...`. A generic type is given as an `Argument`, e.g. `body(Argument.listOf(Item.class))`.
+<5> `produces` and `consumes` declare the media types of the route, like `@Produces` and `@Consumes`. `consumesAll()` accepts any content type. A route consumes and produces JSON by default.
+<6> `executeOn` runs the handler on a named executor, like `@ExecuteOn`; `nonBlocking()` keeps it on the event loop, like `@NonBlocking`. Without either, the thread is selected like for a controller method.
+<7> `route(Set<HttpMethod>, uri)` declares the route for several methods at once. Its settings apply to all of them.
+<8> `route(String, uri)` routes a custom HTTP method by its name, like `@CustomHttpMethod`.
+<9> `handleAsync` takes an api:web.router.builder.AsyncRequestHandler[], which returns a `CompletionStage` of the response, like a controller method returning a `CompletableFuture`. It does not read the body.
+<10> After a body stage, `handleAsync` takes an api:web.router.builder.AsyncBodyRequestHandler[] of the body: here the decoded body, read before the handler runs. With `body()`, the handler receives the body as an api:http.body.AsyncRequestBody[] and reads it itself, see <<functionalRoutesBody, Reading the Request Body>>.
+<11> A body type made with `HttpRouteBuilder.nullableBody(...)` is `null` when the request has no body, instead of a `400`.
+
+The settings of a route come before its terminal, which returns nothing: a route is declared by one statement, and a setting cannot follow the handler. A route whose declaration is not ended with a terminal is an error: the application fails to start with an `IllegalStateException` naming the route and its `HttpRoutes` bean, e.g. `The route GET /items/{id} declared by ItemRoutes has no handler: end it with handle, handleAsync or respond`. A route declared in a group is checked when the lambda of the group returns. A pending route ends with one terminal: a second one, or a setting after it, fails.
+
+A `GET` route gets an implicit `HEAD` route, and a request with another method is answered with `405` and an `Allow` header listing the methods of the path, as for a controller. `OPTIONS` requests and CORS preflight requests are answered for handler routes as for controllers, see <<cors, Configuring CORS>>.
+
+`any(uri)` routes every HTTP method, standard or custom, to one handler, with the same stages and terminals as the other creators, e.g. `any(uri).body(Item.class).handle(...)`, and the shortcut `any(uri, handler)`. A route of a specific method on the same path answers its method instead, and so does the implicit `HEAD` route of a `GET` route; the CORS filter still answers a preflight request, so `any` answers the other `OPTIONS` and `HEAD` requests. A path with an `any` route is never answered with `405`. The route of a specific method wins only when it matches as closely: a more specific `any` route, e.g. `/files/special`, answers before `GET /files/{name}`.
+
+A handler that throws, a checked exception included, is answered by the error routes, see <<functionalRoutesErrors, Error and Status Routes>>. A synchronous handler that returns `null` is answered like a controller method returning `null`.
+
+A handler returns an `HttpResponse` whose body is written in the runtime class of the body. The setting `responseType(Argument)` declares the type of the body, like the return type `HttpResponse<R>` of a controller method, so that the message body writer is selected for the declared type with its type arguments and annotations, e.g. `GET("/items").responseType(Argument.listOf(Item.class)).handle(...)`, or `responseType(Class)` for a type without type arguments.
+
+A handler can also answer with a `Publisher` body, e.g. a stream of server-sent events with `.produces(MediaType.TEXT_EVENT_STREAM_TYPE)`, or of JSON objects written as a JSON array. The elements are written as they are emitted, as for a controller returning a `Publisher`. To stream without a `Publisher`, see <<functionalRoutesStreaming, Server-Sent Events and Streamed Responses>>.

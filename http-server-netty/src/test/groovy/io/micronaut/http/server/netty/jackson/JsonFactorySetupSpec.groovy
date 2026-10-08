@@ -18,8 +18,10 @@ package io.micronaut.http.server.netty.jackson
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
+import io.micronaut.jackson.core.util.EventLoopBufferRecyclerPool
 import spock.lang.Specification
 import tools.jackson.core.json.JsonFactory
+import tools.jackson.core.util.JsonRecyclerPools
 import tools.jackson.databind.ObjectMapper
 
 /**
@@ -57,5 +59,29 @@ class JsonFactorySetupSpec extends Specification {
         then:
         !objectMapper.tokenStreamFactory().isEnabled(JsonFactory.Feature.FAIL_ON_SYMBOL_HASH_OVERFLOW)
 
+    }
+
+    void "the JsonFactory keeps a buffer recycler per event loop thread"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run()
+
+        expect:
+        applicationContext.getBean(JsonFactory)._getRecyclerPool() instanceof EventLoopBufferRecyclerPool
+        applicationContext.getBean(ObjectMapper).tokenStreamFactory()._getRecyclerPool() instanceof EventLoopBufferRecyclerPool
+
+        cleanup:
+        applicationContext?.close()
+    }
+
+    void "the buffer recycler per event loop thread can be disabled"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run('jackson.event-loop-recycler-pool': false)
+
+        expect:
+        !(applicationContext.getBean(JsonFactory)._getRecyclerPool() instanceof EventLoopBufferRecyclerPool)
+        applicationContext.getBean(JsonFactory)._getRecyclerPool().class == JsonRecyclerPools.defaultPool().class
+
+        cleanup:
+        applicationContext?.close()
     }
 }

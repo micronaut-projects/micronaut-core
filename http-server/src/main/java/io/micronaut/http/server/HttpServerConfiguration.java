@@ -17,6 +17,7 @@ package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Property;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
@@ -165,6 +166,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     private Duration idleTimeout = Duration.ofMinutes(DEFAULT_IDLE_TIME_MINUTES);
     private MultipartConfiguration multipart = new MultipartConfiguration();
     private CorsConfiguration cors = new CorsConfiguration();
+    private ResponseStreamConfiguration responseStream = new ResponseStreamConfiguration();
     @Nullable
     private String serverHeader;
     private boolean dateHeader = DEFAULT_DATEHEADER;
@@ -193,6 +195,8 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     private boolean escapeHtmlUrl = false;
     private boolean notFoundOnMissingBody = true;
     private boolean semicolonIsNormalChar = DEFAULT_SEMICOLON_IS_NORMAL_CHAR;
+    private boolean http10KeepAlive;
+    private boolean rejectUnsupportedHttpVersions;
     private int maxParams = DEFAULT_MAX_PARAMS;
 
     /**
@@ -332,6 +336,15 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
      */
     public CorsConfiguration getCors() {
         return cors;
+    }
+
+    /**
+     * @return Configuration for the streamed response bodies written without Reactive Streams
+     * @since 5.3.0
+     */
+    @Experimental
+    public ResponseStreamConfiguration getResponseStream() {
+        return responseStream;
     }
 
     /**
@@ -576,6 +589,17 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     }
 
     /**
+     * Sets the configuration of the streamed response bodies written without Reactive Streams.
+     *
+     * @param responseStream The configuration
+     * @since 5.3.0
+     */
+    @Experimental
+    public void setResponseStream(ResponseStreamConfiguration responseStream) {
+        this.responseStream = responseStream;
+    }
+
+    /**
      * Sets whether a date header should be sent back. Default value ({@value #DEFAULT_DATEHEADER}).
      *
      * @param dateHeader True if a date header should be sent.
@@ -596,7 +620,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
 
     /**
      * Sets when unhandled exception messages should be included in error responses.
-     * Default value ({@value #DEFAULT_ERROR_RESPONSE_INCLUDE_MESSAGE}).
+     * Default value ({@link #DEFAULT_ERROR_RESPONSE_INCLUDE_MESSAGE}).
      *
      * @param errorResponseIncludeMessage When unhandled exception messages should be included
      * @since 5.1.11
@@ -745,6 +769,59 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
      */
     public void setSemicolonIsNormalChar(boolean semicolonIsNormalChar) {
         this.semicolonIsNormalChar = semicolonIsNormalChar;
+    }
+
+    /**
+     * Whether the server keeps the connection of an HTTP/1.0 client that sends
+     * {@code Connection: keep-alive} after a response of known length, answering with
+     * {@code Connection: keep-alive}. A response has a known length when it has a
+     * {@code Content-Length} or has no body, e.g. a {@code 204} or {@code 304} response or the
+     * response to a {@code HEAD} request. A
+     * response of unknown length still ends with the connection. Supported by the Netty server.
+     *
+     * @return {@code true} to keep such a connection; {@code false}, the default, to end the
+     * connection of an HTTP/1.0 client after each response
+     * @since 5.3.0
+     */
+    @Experimental
+    public boolean isHttp10KeepAlive() {
+        return http10KeepAlive;
+    }
+
+    /**
+     * @param http10KeepAlive Whether to keep the connection of an HTTP/1.0 keep-alive client
+     * @see #isHttp10KeepAlive()
+     * @since 5.3.0
+     */
+    @Experimental
+    public void setHttp10KeepAlive(boolean http10KeepAlive) {
+        this.http10KeepAlive = http10KeepAlive;
+    }
+
+    /**
+     * Whether the server answers a request of an HTTP major version other than 1, e.g.
+     * {@code HTTP/9.9} or {@code HTTP/2.0} on an HTTP/1 connection, which the request decoder
+     * accepts, with {@code 505} over HTTP/1.1 and closes the connection. A later minor version of
+     * HTTP/1, e.g. {@code HTTP/1.2}, is served as HTTP/1.1 (RFC 9112 section 2.3). Supported by
+     * the Netty server.
+     *
+     * @return {@code true} to reject such a request; {@code false}, the default, to serve it and
+     * answer with its version
+     * @since 5.3.0
+     */
+    @Experimental
+    public boolean isRejectUnsupportedHttpVersions() {
+        return rejectUnsupportedHttpVersions;
+    }
+
+    /**
+     * @param rejectUnsupportedHttpVersions Whether to reject a request of an unsupported HTTP version
+     * @see #isRejectUnsupportedHttpVersions()
+     * @since 5.3.0
+     */
+    @Experimental
+    public void setRejectUnsupportedHttpVersions(boolean rejectUnsupportedHttpVersions) {
+        this.rejectUnsupportedHttpVersions = rejectUnsupportedHttpVersions;
     }
 
     /**
@@ -1279,7 +1356,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     }
 
     /**
-     * Allows configuration of properties for the {@link io.micronaut.http.server.netty.body.AbstractFileBodyWriter}.
+     * Allows configuration of properties for the {@link io.micronaut.http.server.body.AbstractFileBodyWriter}.
      *
      * @author James Kleeh
      * @author graemerocher
@@ -1386,6 +1463,72 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
             public boolean getPublic() {
                 return publicCache;
             }
+        }
+    }
+
+    /**
+     * Configuration of the streamed response bodies written without Reactive Streams: the events
+     * of an {@link io.micronaut.http.sse.SseEmitter}, and the elements of a
+     * {@link io.micronaut.http.body.BodyElements} body.
+     *
+     * @since 5.3.0
+     */
+    @Experimental
+    @ConfigurationProperties("responses.stream")
+    public static class ResponseStreamConfiguration {
+
+        /**
+         * The default high-water mark, in bytes.
+         */
+        public static final int DEFAULT_HIGH_WATER_MARK = 64 * 1024;
+
+        private int highWaterMark = DEFAULT_HIGH_WATER_MARK;
+        @Nullable
+        private Duration sseHeartbeat;
+
+        /**
+         * @return The high-water mark, in bytes
+         */
+        public int getHighWaterMark() {
+            return highWaterMark;
+        }
+
+        /**
+         * The bytes of a streamed response the connection may not have taken yet before the
+         * stream waits: the send of an event completes, and the next element is pulled, only
+         * below it. An event stream fails when sixteen times as many are queued. Default value
+         * ({@value #DEFAULT_HIGH_WATER_MARK}).
+         *
+         * @param highWaterMark The high-water mark, in bytes, positive
+         */
+        public void setHighWaterMark(@ReadableBytes int highWaterMark) {
+            if (highWaterMark <= 0) {
+                throw new IllegalArgumentException("The high-water mark must be positive: " + highWaterMark);
+            }
+            this.highWaterMark = highWaterMark;
+        }
+
+        /**
+         * @return The heartbeat period of a server-sent events stream, or {@code null} for none
+         */
+        @Nullable
+        public Duration getSseHeartbeat() {
+            return sseHeartbeat;
+        }
+
+        /**
+         * The period of the heartbeat of a server-sent events stream: a comment sent when no event
+         * was sent for the period, see {@link io.micronaut.http.sse.SseEmitter#heartbeat}. It
+         * starts once the response of the stream is sent, and a stream can change it. Default
+         * value: none.
+         *
+         * @param sseHeartbeat The period, or {@code null} for no heartbeat
+         */
+        public void setSseHeartbeat(@Nullable Duration sseHeartbeat) {
+            if (sseHeartbeat != null && sseHeartbeat.isNegative()) {
+                throw new IllegalArgumentException("The heartbeat period must not be negative: " + sseHeartbeat);
+            }
+            this.sseHeartbeat = sseHeartbeat == null || sseHeartbeat.isZero() ? null : sseHeartbeat;
         }
     }
 }

@@ -21,6 +21,7 @@ import io.micronaut.core.async.subscriber.LazySendingSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.http.ByteBodyHttpResponse;
@@ -32,7 +33,9 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
@@ -40,12 +43,13 @@ import io.micronaut.http.body.ConcatenatingSubscriber;
 import io.micronaut.http.body.MediaTypeProvider;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.HttpStatusException;
-import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.exceptions.response.Error;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.server.stream.ResponseStreams;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.web.router.DefaultUrlRouteInfo;
@@ -64,6 +68,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 
 /**
  * This class handles encoding of the HTTP response in a server-agnostic way. Note that while this
@@ -134,10 +139,50 @@ public abstract class ResponseLifecycle {
         }
     }
 
+    /**
+     * Encode the response. If writing the body fails before anything was sent, the given handler
+     * gives the error response for the failure, e.g. from the exception handlers and the error and
+     * status routes, and that response is encoded instead. The handler runs at most once: if the
+     * error response fails to encode too, this falls back like
+     * {@link #encodeHttpResponseSafe(HttpRequest, HttpResponse)}.
+     *
+     * @param httpRequest       The request that triggered this response
+     * @param response          The unencoded response
+     * @param writeErrorHandler Gives the error response for a failure to write the body
+     * @return The encoded response
+     * @since 5.3.0
+     */
+    @SuppressWarnings("unchecked")
+    public final ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeHttpResponseSafe(HttpRequest<?> httpRequest,
+                                                                                        HttpResponse<?> response,
+                                                                                        Function<Throwable, ExecutionFlow<HttpResponse<?>>> writeErrorHandler) {
+        ExecutionFlow<ByteBodyHttpResponse<?>> flow;
+        try {
+            flow = (ExecutionFlow<ByteBodyHttpResponse<?>>) encodeHttpResponse(httpRequest, response);
+        } catch (Throwable e) {
+            flow = ExecutionFlow.error(e);
+        }
+        // a failure after the first byte was sent does not complete this flow, it fails the body
+        return flow.onErrorResume(e -> {
+            ExecutionFlow<HttpResponse<?>> errorResponse;
+            try {
+                errorResponse = writeErrorHandler.apply(e);
+            } catch (Throwable f) {
+                f.addSuppressed(e);
+                return ExecutionFlow.error(f);
+            }
+            return errorResponse.flatMap(r -> encodeHttpResponseSafe(httpRequest, r));
+        });
+    }
+
     @SuppressWarnings("unchecked")
     private ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeHttpResponse(
         HttpRequest<?> nettyRequest,
         HttpResponse<?> httpResponse) {
+        ExecutionFlow<? extends ByteBodyHttpResponse<?>> byteBodyResponse = encodeByteBodyResponse(nettyRequest, httpResponse);
+        if (byteBodyResponse != null) {
+            return byteBodyResponse;
+        }
         Object body = httpResponse.body();
         MutableHttpResponse<?> response = httpResponse.toMutableResponse();
         if (nettyRequest.getMethod() == HttpMethod.HEAD) {
@@ -149,6 +194,15 @@ public abstract class ResponseLifecycle {
                 // so write it and discard the content
                 ((MutableHttpResponse<Object>) response).body(headBody);
                 return encodeBody(nettyRequest, response, headBody).map(this::discardContent);
+            }
+            if (body instanceof BodyElements<?> elements) {
+                // the response of a HEAD request: the elements are not written; the route
+                // executor discarded the body it moved aside already
+                ResponseStreams.discard(elements, byteBodyFactory, ioExecutor());
+            }
+            if (headBody instanceof BodyElements<?>) {
+                // the headers of a GET request: the media type the elements are written with
+                bodyElementsMediaType(nettyRequest, response, routeInfo(response));
             }
             return encodeNoBody(response);
         } else if (body != null) {
@@ -185,13 +239,16 @@ public abstract class ResponseLifecycle {
     private ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeBody(HttpRequest<?> nettyRequest,
                                                                        MutableHttpResponse<?> response,
                                                                        Object body) {
-        Object routeInfoO = RouteAttributes.getRouteInfo(response).orElse(null);
-        // usually this is a UriRouteInfo, avoid scalability issues here
-        @SuppressWarnings("unchecked") final RouteInfo<Object> routeInfo = (RouteInfo<Object>) (routeInfoO instanceof DefaultUrlRouteInfo<?, ?> uri ? uri : (RouteInfo<?>) routeInfoO);
+        final RouteInfo<Object> routeInfo = routeInfo(response);
 
         if (isImplicitlyEmptyBody(body)) {
             response.body(null);
             return encodeNoBody(response);
+        }
+
+        if (body instanceof BodyElements<?> elements) {
+            response.body(null);
+            return encodeBodyElements(nettyRequest, response, elements, routeInfo);
         }
 
         if (Publishers.isConvertibleToPublisher(body)) {
@@ -235,6 +292,221 @@ public abstract class ResponseLifecycle {
     }
 
     /**
+     * The media type the elements of a {@link BodyElements} body are written with: the content
+     * type of the response, else the default of the route, else JSON. The response gets it as its
+     * content type, also the response to a HEAD request, which has the headers of a GET request.
+     *
+     * @param request   The request
+     * @param response  The response
+     * @param routeInfo The route, if any
+     * @return The media type
+     */
+    private MediaType bodyElementsMediaType(HttpRequest<?> request, MutableHttpResponse<?> response, @Nullable RouteInfo<Object> routeInfo) {
+        MediaType mediaType = response.getContentType().orElse(null);
+        if (mediaType == null) {
+            mediaType = routeInfo != null ? routeExecutor.resolveDefaultResponseContentType(request, routeInfo) : MediaType.APPLICATION_JSON_TYPE;
+            response.contentType(mediaType);
+        }
+        return mediaType;
+    }
+
+    /**
+     * @param response The response
+     * @return The route that produced it, if any
+     */
+    @SuppressWarnings("unchecked")
+    private static @Nullable RouteInfo<Object> routeInfo(HttpResponse<?> response) {
+        Object routeInfoO = RouteAttributes.getRouteInfo(response).orElse(null);
+        // usually this is a UriRouteInfo, avoid scalability issues here
+        return (RouteInfo<Object>) (routeInfoO instanceof DefaultUrlRouteInfo<?, ?> uri ? uri : (RouteInfo<?>) routeInfoO);
+    }
+
+    /**
+     * Stream the elements of a {@link BodyElements} body without Reactive Streams: like the
+     * elements of a publisher body ({@link #mapToHttpContent}), each written with the writer of
+     * its type for the media type of the response, and framed as a JSON array for a JSON media
+     * type, through the piece writers of the publisher body: a blocking writer runs on the I/O
+     * executor, and a {@code ByteBody} element is written as it is. The elements are pulled one at
+     * a time while the connection keeps up. The response is sent once the first element (or the
+     * end) is available: a failure of the first element fails the flow, so the error handling of
+     * the route answers it, like a failure of a writer.
+     *
+     * @param request   The request
+     * @param response  The response
+     * @param elements  The elements
+     * @param routeInfo The route, if any
+     * @return The encoded response
+     */
+    private ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeBodyElements(HttpRequest<?> request,
+                                                                                   MutableHttpResponse<?> response,
+                                                                                   BodyElements<?> elements,
+                                                                                   @Nullable RouteInfo<Object> routeInfo) {
+        try {
+            ResponseStreams.ElementEncoder encoder = elementEncoder(request, response, routeInfo);
+            int highWaterMark = routeExecutor.serverConfiguration.getResponseStream().getHighWaterMark();
+            // closing the elements may block, e.g. a database cursor: not on the event loop
+            return ResponseStreams.stream(byteBodyFactory, elements, encoder, highWaterMark, ioExecutor())
+                .map(body -> ByteBodyHttpResponseWrapper.wrap(response, body));
+        } catch (RuntimeException e) {
+            // nothing streams the elements. The encoder holds nothing before its first element
+            ResponseStreams.discard(elements, byteBodyFactory, ioExecutor());
+            return ExecutionFlow.error(e);
+        }
+    }
+
+    /**
+     * The encoder of the elements of a {@link BodyElements} body, see {@link #encodeBodyElements}.
+     *
+     * @param request   The request
+     * @param response  The response
+     * @param routeInfo The route, if any
+     * @return The encoder
+     */
+    private ResponseStreams.ElementEncoder elementEncoder(HttpRequest<?> request,
+                                                          MutableHttpResponse<?> response,
+                                                          @Nullable RouteInfo<Object> routeInfo) {
+        MediaType mediaType = bodyElementsMediaType(request, response, routeInfo);
+        MediaType finalMediaType = mediaType;
+        boolean jsonMediaType = MediaType.EXTENSION_JSON.equals(mediaType.getExtension());
+        if (MediaType.TEXT_EVENT_STREAM_TYPE.matches(mediaType)) {
+            // the events must reach the client as they are sent
+            response.setAttribute(ServerResponseAttributes.SKIP_COMPRESSION, Boolean.TRUE);
+        }
+        List<MediaType> mediaTypes = List.of(mediaType);
+        // like a publisher body: with a route, a JSON array if the declared type of the elements
+        // can be one, and the writer of the route; else decided on the first element
+        boolean routeJson = routeInfo != null && jsonMediaType && routeInfo.isResponseBodyJsonFormattable();
+        AtomicBoolean jsonFormattable = new AtomicBoolean(true);
+        BooleanSupplier isJson = routeInfo != null ? () -> routeJson : () -> jsonMediaType && jsonFormattable.get();
+        PieceStream pieces = new PieceStream(request, response, isJson);
+        return new ResponseStreams.ElementEncoder() {
+            /**
+             * Only touched by the encoding of one element at a time.
+             */
+            private boolean first = true;
+            /**
+             * The class of the last element, with the type and the writer chosen for it: the
+             * elements of a body are mostly of one class, and the choice only depends on the
+             * class. Only touched by the encoding of one element at a time.
+             */
+            private @Nullable Class<?> lastClass;
+            private @Nullable Argument<Object> lastType;
+            private @Nullable MessageBodyWriter<Object> lastWriter;
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public ExecutionFlow<CloseableByteBody> encode(Object element) {
+                MessageBodyWriter<Object> writer = lastWriter;
+                Argument<Object> type = lastType;
+                if (writer != null && type != null && element.getClass() == lastClass) {
+                    return pieces.write(writer, type, finalMediaType, element);
+                }
+                if (routeInfo != null) {
+                    // like mapToHttpContent: the writer of the route, for the declared type
+                    writer = routeInfo.getMessageBodyWriter();
+                    type = (Argument<Object>) routeInfo.getResponseBodyType();
+                    if (writer == null || !type.isInstance(element) || !writer.isWriteable(type, finalMediaType)) {
+                        type = Argument.ofInstance(element);
+                        writer = wrap(messageBodyHandlerRegistry.getWriter(type, mediaTypes));
+                    }
+                } else {
+                    type = Argument.ofInstance(element);
+                    if (first) {
+                        first = false;
+                        if (jsonMediaType && !isJsonFormattable(type)) {
+                            jsonFormattable.set(false);
+                        }
+                    }
+                    writer = messageBodyHandlerRegistry.getWriter(type, mediaTypes);
+                }
+                lastClass = element.getClass();
+                lastType = type;
+                lastWriter = writer;
+                return pieces.write(writer, type, finalMediaType, element);
+            }
+
+            @Override
+            public @Nullable ReadBuffer end(boolean none) {
+                if (!isJson.getAsBoolean()) {
+                    return null;
+                }
+                ConcatenatingSubscriber.Separators separators = jsonSeparators();
+                ReadBuffer end = none ? separators.empty() : separators.afterLast();
+                return end == null ? null : end.duplicate();
+            }
+
+            @Override
+            public void close() {
+                pieces.close();
+            }
+        };
+    }
+
+    /**
+     * Pass through a response that already carries its body bytes, e.g. a response of the raw HTTP
+     * client returned by a route. The response may be wrapped in {@link HttpResponseWrapper}s, in
+     * which case the outermost wrapper provides the status and headers.
+     *
+     * @param request  The request
+     * @param response The response
+     * @return The encoded response, or {@code null} if the response does not carry body bytes
+     */
+    private @Nullable ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeByteBodyResponse(HttpRequest<?> request, HttpResponse<?> response) {
+        ByteBodyHttpResponse<?> byteBodyResponse;
+        if (response instanceof ByteBodyHttpResponse<?> direct) {
+            byteBodyResponse = direct;
+        } else if (response instanceof HttpResponseWrapper<?> wrapper) {
+            byteBodyResponse = HttpResponseWrapper.wrappedByteBodyResponse(wrapper);
+            if (byteBodyResponse == null) {
+                return null;
+            }
+            if (!objectBodyOfWrappers(response).isEmpty()) {
+                // the object body of a wrapper replaces the bytes of the wrapped response
+                byteBodyResponse.close();
+                return null;
+            }
+        } else {
+            return null;
+        }
+        if (!byteBodyResponse.hasByteBody()) {
+            // an object body replaced the bytes, see MutableByteBodyHttpResponse
+            return null;
+        }
+        if (response.getHeaders() instanceof MutableHttpHeaders headers) {
+            // the transfer coding of the connection the bytes were received on (e.g. from an
+            // upstream server) does not apply to this one, whose framing the server decides
+            headers.remove(HttpHeaders.TRANSFER_ENCODING);
+        }
+        if (request.getMethod() == HttpMethod.HEAD) {
+            byteBodyResponse.close();
+            return ExecutionFlow.just(ByteBodyHttpResponseWrapper.wrap(response, byteBodyFactory.createEmpty()));
+        }
+        if (byteBodyResponse == response) {
+            return ExecutionFlow.just(byteBodyResponse);
+        }
+        return ExecutionFlow.just(ByteBodyHttpResponseWrapper.wrap(response, byteBodyResponse.byteBody().move()));
+    }
+
+    /**
+     * The object body of the outermost wrapper that has one, above the wrapped
+     * {@link ByteBodyHttpResponse}.
+     *
+     * @param response The response
+     * @return The body, or empty
+     */
+    private static Optional<?> objectBodyOfWrappers(HttpResponse<?> response) {
+        HttpResponse<?> current = response;
+        while (current instanceof HttpResponseWrapper<?> wrapper) {
+            Optional<?> body = wrapper.getBody();
+            if (body.isPresent()) {
+                return body;
+            }
+            current = wrapper.getDelegate();
+        }
+        return Optional.empty();
+    }
+
+    /**
      * Encode the given response without body, either because it has none or because this is a HEAD
      * response.
      *
@@ -257,6 +529,7 @@ public abstract class ResponseLifecycle {
         Flux<Object> bodyPublisher = Flux.from(Publishers.convertToPublisher(conversionService, body));
         Flux<ByteBody> httpContentPublisher;
         BooleanSupplier isJson;
+        PieceStream pieces;
         if (routeInfo != null) {
             if (mediaType == null) {
                 mediaType = routeExecutor.resolveDefaultResponseContentType(request, routeInfo);
@@ -267,7 +540,8 @@ public abstract class ResponseLifecycle {
             boolean isJsonRoute = mediaType.getExtension().equals(MediaType.EXTENSION_JSON) && routeInfo.isResponseBodyJsonFormattable();
             isJson = () -> isJsonRoute;
             MediaType finalMediaType = mediaType;
-            httpContentPublisher = bodyPublisher.concatMap(message -> {
+            pieces = new PieceStream(request, response, isJson);
+            httpContentPublisher = new FlowConcatMap<>(bodyPublisher, message -> {
                 MessageBodyWriter<Object> messageBodyWriter = routeInfo.getMessageBodyWriter();
                 @SuppressWarnings("unchecked")
                 Argument<Object> responseBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
@@ -276,14 +550,7 @@ public abstract class ResponseLifecycle {
                     responseBodyType = Argument.ofInstance(message);
                     messageBodyWriter = wrap(messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(finalMediaType)));
                 }
-                ExecutionFlow<CloseableByteBody> flow = writePieceAsync(
-                    messageBodyWriter,
-                    request,
-                    response,
-                    responseBodyType,
-                    finalMediaType,
-                    message);
-                return ReactiveExecutionFlow.toPublisher(() -> flow);
+                return pieces.write(messageBodyWriter, responseBodyType, finalMediaType, message);
             });
         } else {
             MediaType finalMediaType = mediaType;
@@ -300,19 +567,20 @@ public abstract class ResponseLifecycle {
             AtomicBoolean jsonFormattable = new AtomicBoolean(true);
             AtomicBoolean first = new AtomicBoolean(true);
             isJson = () -> isJsonMediaType && jsonFormattable.get();
-            httpContentPublisher = bodyPublisher
-                .concatMap(message -> {
-                    Argument<Object> type = Argument.ofInstance(message);
-                    if (isJsonMediaType && first.compareAndSet(true, false) && !isJsonFormattable(type)) {
-                        jsonFormattable.set(false);
-                    }
-                    MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.getWriter(type, finalMediaType == null ? List.of() : List.of(finalMediaType));
-                    ExecutionFlow<CloseableByteBody> flow = writePieceAsync(messageBodyWriter, request, response, type, finalMediaType == null ? MediaType.ALL_TYPE : finalMediaType, message);
-                    return ReactiveExecutionFlow.toPublisher(() -> flow);
-                });
+            pieces = new PieceStream(request, response, isJson);
+            httpContentPublisher = new FlowConcatMap<>(bodyPublisher, message -> {
+                Argument<Object> type = Argument.ofInstance(message);
+                if (isJsonMediaType && first.compareAndSet(true, false) && !isJsonFormattable(type)) {
+                    jsonFormattable.set(false);
+                }
+                MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.getWriter(type, finalMediaType == null ? List.of() : List.of(finalMediaType));
+                return pieces.write(messageBodyWriter, type, finalMediaType == null ? MediaType.ALL_TYPE : finalMediaType, message);
+            });
         }
 
-        httpContentPublisher = httpContentPublisher.doOnDiscard(CloseableByteBody.class, CloseableByteBody::close);
+        httpContentPublisher = httpContentPublisher
+            .doOnDiscard(CloseableByteBody.class, CloseableByteBody::close)
+            .doFinally(signal -> pieces.close());
 
         return LazySendingSubscriber.create(httpContentPublisher).map(items -> {
             CloseableByteBody byteBody = isJson.getAsBoolean() ? concatenateJson(items) : concatenate(items);
@@ -346,12 +614,27 @@ public abstract class ResponseLifecycle {
     }
 
     /**
+     * The separators that frame the pieces of a JSON array response. Those in front of the pieces
+     * are written by the {@link PieceWriter}s, those that go with the completion by
+     * {@link #concatenateJson}.
+     *
+     * @return The separators
+     * @since 5.3.0
+     */
+    protected ConcatenatingSubscriber.Separators jsonSeparators() {
+        return ConcatenatingSubscriber.Separators.JDK_JSON;
+    }
+
+    /**
+     * Concatenate the pieces of a JSON array response. The pieces already carry the separators in
+     * front of them, see {@link #jsonSeparators()}, so only the trailing ones are added here.
+     *
      * @see ConcatenatingSubscriber#concatenate
      * @param items The items
      * @return The concatenated body
      */
     protected CloseableByteBody concatenateJson(Publisher<ByteBody> items) {
-        return ConcatenatingSubscriber.concatenate(byteBodyFactory, items, ConcatenatingSubscriber.Separators.JDK_JSON);
+        return ConcatenatingSubscriber.concatenate(byteBodyFactory, items, jsonSeparators().trailingOnly());
     }
 
     /**
@@ -416,28 +699,6 @@ public abstract class ResponseLifecycle {
         return response;
     }
 
-    private <T> ExecutionFlow<CloseableByteBody> writePieceAsync(MessageBodyWriter<T> messageBodyWriter,
-                                                                 HttpRequest<?> request,
-                                                                 HttpResponse<?> response,
-                                                                 Argument<T> type,
-                                                                 MediaType mediaType,
-                                                                 T object) {
-        if (messageBodyWriter.isBlocking()) {
-            return ExecutionFlow.async(ioExecutor(), () -> ExecutionFlow.just(writePieceSync(messageBodyWriter, request, response, type, mediaType, object)));
-        } else {
-            return ExecutionFlow.just(writePieceSync(messageBodyWriter, request, response, type, mediaType, object));
-        }
-    }
-
-    private <T> CloseableByteBody writePieceSync(MessageBodyWriter<T> messageBodyWriter,
-                                                 HttpRequest<?> request,
-                                                 HttpResponse<?> response,
-                                                 Argument<T> type,
-                                                 MediaType mediaType,
-                                                 T object) {
-        return wrap(messageBodyWriter).writePiece(byteBodyFactory, request, response, type, mediaType, object);
-    }
-
     private <T> ExecutionFlow<ByteBodyHttpResponse<?>> buildFinalResponse(HttpRequest<?> nettyRequest,
                                                                            MutableHttpResponse<T> response,
                                                                            Argument<T> responseBodyType,
@@ -470,6 +731,131 @@ public abstract class ResponseLifecycle {
 
     private static boolean isImplicitlyEmptyBody(Object body) {
         return body instanceof byte[] bytes && bytes.length == 0;
+    }
+
+    /**
+     * The pieces of one streamed response. Opens a {@link PieceWriter} for the writer and type of
+     * the pieces and keeps it for as long as the pieces are written with the same writer and type,
+     * so that the writer can keep its state, e.g. the generator of the JSON mapper, across the
+     * pieces. Also puts the separators of the JSON array framing in front of the pieces.
+     */
+    private final class PieceStream {
+        private final HttpRequest<?> request;
+        private final HttpResponse<?> response;
+        private final BooleanSupplier isJson;
+
+        private boolean first = true;
+        private ConcatenatingSubscriber.@Nullable Separators separators;
+        private @Nullable MessageBodyWriter<Object> writer;
+        private @Nullable Argument<Object> type;
+        private @Nullable PieceWriter<Object> pieceWriter;
+        private boolean closed;
+        /**
+         * Whether a piece is being written. The piece writer is then only touched by that write.
+         */
+        private boolean writing;
+
+        PieceStream(HttpRequest<?> request, HttpResponse<?> response, BooleanSupplier isJson) {
+            this.request = request;
+            this.response = response;
+            this.isJson = isJson;
+        }
+
+        ExecutionFlow<CloseableByteBody> write(MessageBodyWriter<Object> writer, Argument<Object> type, MediaType mediaType, Object object) {
+            if (writer.isBlocking()) {
+                return ExecutionFlow.async(ioExecutor(), () -> ExecutionFlow.just(writeSync(writer, type, mediaType, object)));
+            } else {
+                return ExecutionFlow.just(writeSync(writer, type, mediaType, object));
+            }
+        }
+
+        /**
+         * The pieces are written one after the other, but a response can be discarded while a
+         * piece is being written, on another thread if the writer is blocking. The state is
+         * guarded by this monitor, but the piece writer is opened, written and closed outside of
+         * it, so that {@link #close()} never waits for a write: a piece writer that is in use when
+         * the stream is closed is closed by the write once it is done.
+         */
+        private CloseableByteBody writeSync(MessageBodyWriter<Object> writer, Argument<Object> type, MediaType mediaType, Object object) {
+            PieceWriter<Object> replaced = null;
+            ReadBuffer separator = null;
+            CloseableByteBody piece;
+            boolean discard;
+            synchronized (this) {
+                if (closed) {
+                    // the response was discarded while this piece was on its way. The piece is
+                    // dropped, so there is no point in writing it
+                    return byteBodyFactory.createEmpty();
+                }
+                writing = true;
+                Argument<Object> currentType = this.type;
+                if (pieceWriter == null || this.writer != writer || currentType == null || !(currentType == type || currentType.equalsType(type))) {
+                    replaced = pieceWriter;
+                    pieceWriter = null;
+                }
+                if (first) {
+                    first = false;
+                    // whether the pieces are framed as a JSON array is settled by the time the first
+                    // piece is written, see mapToHttpContent
+                    separators = isJson.getAsBoolean() ? jsonSeparators() : null;
+                    if (separators != null) {
+                        separator = separators.beforeFirst();
+                    }
+                } else if (separators != null) {
+                    separator = separators.between();
+                }
+            }
+            try {
+                if (replaced != null) {
+                    replaced.close();
+                }
+                // only this write touches the piece writer until writing is reset
+                PieceWriter<Object> current = pieceWriter;
+                if (current == null) {
+                    current = wrap(writer).openPieceWriter(byteBodyFactory, request, response, type, mediaType);
+                    pieceWriter = current;
+                    this.writer = writer;
+                    this.type = type;
+                }
+                piece = current.writePiece(separator, object);
+            } finally {
+                PieceWriter<Object> discarded = null;
+                synchronized (this) {
+                    writing = false;
+                    discard = closed;
+                    if (closed) {
+                        discarded = pieceWriter;
+                        pieceWriter = null;
+                    }
+                }
+                if (discarded != null) {
+                    discarded.close();
+                }
+            }
+            if (discard) {
+                // the response was discarded while this piece was written, nobody reads it
+                piece.close();
+                return byteBodyFactory.createEmpty();
+            }
+            return piece;
+        }
+
+        void close() {
+            PieceWriter<Object> discarded = null;
+            synchronized (this) {
+                if (closed) {
+                    return;
+                }
+                closed = true;
+                if (!writing) {
+                    discarded = pieceWriter;
+                    pieceWriter = null;
+                }
+            }
+            if (discarded != null) {
+                discarded.close();
+            }
+        }
     }
 
 }

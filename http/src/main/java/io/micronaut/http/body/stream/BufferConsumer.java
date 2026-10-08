@@ -71,6 +71,20 @@ public interface BufferConsumer {
     void error(Throwable e);
 
     /**
+     * Whether this consumer streams the bytes without holding them, e.g. to decode them piece by
+     * piece with limits of its own: only the backpressure of the upstream bounds the bytes it has
+     * not consumed yet. A body does not hold such a consumer to its buffer limit for the bytes
+     * that arrived before the consumer subscribed, see
+     * {@link BaseSharedBuffer#setKeepInitialBytes()}.
+     *
+     * @return Whether this consumer streams the bytes without holding them
+     * @since 5.3.0
+     */
+    default boolean isUnbuffered() {
+        return false;
+    }
+
+    /**
      * This interface manages the backpressure for data consumptions. It is highly concurrent:
      * Calls to {@link #onBytesConsumed(long)} may happen at the same time on different threads.
      */

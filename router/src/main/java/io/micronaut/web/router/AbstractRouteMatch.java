@@ -33,6 +33,8 @@ import io.micronaut.http.bind.binders.UnmatchedRequestArgumentBinder;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.UnsafeExecutionHandle;
+import io.micronaut.web.router.builder.DefaultPathVariables;
+import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.jspecify.annotations.Nullable;
 
@@ -53,6 +55,11 @@ import java.util.Optional;
  * @since 1.0
  */
 abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
+
+    private static final @Nullable Object[] EMPTY_VALUES = new Object[0];
+    private static final boolean[] EMPTY_FULFILLED = new boolean[0];
+    private static final PostponedRequestArgumentBinder<?>[] EMPTY_POSTPONED = new PostponedRequestArgumentBinder[0];
+    private static final PendingRequestBindingResult<?>[] EMPTY_PENDING = new PendingRequestBindingResult[0];
 
     protected final ConversionService conversionService;
     protected final MethodBasedRouteInfo<T, R> routeInfo;
@@ -84,10 +91,18 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         this.arguments = executableMethod.getArguments();
         this.argumentNames = routeInfo.getArgumentNames();
         int length = arguments.length;
-        this.argumentValues = new Object[length];
-        this.fulfilledArguments = new boolean[length];
-        this.postponedArgumentBinders = new PostponedRequestArgumentBinder[length];
-        this.pendingRequestBindingResults = new PendingRequestBindingResult[length];
+        if (length == 0) {
+            // empty arrays cannot be written to, so a route without arguments shares them
+            this.argumentValues = EMPTY_VALUES;
+            this.fulfilledArguments = EMPTY_FULFILLED;
+            this.postponedArgumentBinders = (PostponedRequestArgumentBinder<Object>[]) EMPTY_POSTPONED;
+            this.pendingRequestBindingResults = EMPTY_PENDING;
+        } else {
+            this.argumentValues = new Object[length];
+            this.fulfilledArguments = new boolean[length];
+            this.postponedArgumentBinders = new PostponedRequestArgumentBinder[length];
+            this.pendingRequestBindingResults = new PendingRequestBindingResult[length];
+        }
         if (methodExecutionHandle instanceof UnsafeExecutionHandle<?, ?>) {
             unsafeMethodExecutionHandle = (UnsafeExecutionHandle<T, R>) methodExecutionHandle;
         } else {
@@ -285,6 +300,13 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         checkIfFulfilled();
     }
 
+    /**
+     * @return The target a {@link DynamicRouteTarget} resolved for the route, or {@code null}
+     */
+    @Nullable Object resolvedTarget() {
+        return null;
+    }
+
     @Override
     public void fulfillBeforeFilters(RequestBinderRegistry requestBinderRegistry, HttpRequest<?> request) {
         if (fulfilled) {
@@ -299,6 +321,11 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 continue;
             }
             Argument<Object> argument = (Argument<Object>) arguments[i];
+            if (arguments[i].getType() == PathVariables.class) {
+                // a handler function's path variables come from the match, not a binder
+                setValue(i, argument, new DefaultPathVariables(getVariableValues(), conversionService, resolvedTarget()));
+                continue;
+            }
             Object value = getVariableValues().get(argumentNames[i]);
             if (value != null) {
                 setValue(i, argument, value);
@@ -431,6 +458,12 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             value = null;
         } else {
             return false;
+        }
+        if (value != null && bindingResult.isConvertedToArgumentType() && argument.getType().isInstance(value)) {
+            // The binder already produced the value for the complete argument, including its type arguments
+            argumentValues[index] = value;
+            fulfilledArguments[index] = true;
+            return true;
         }
         setValue(index, argument, value);
         return true;

@@ -165,4 +165,10 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     default Collection<String> getTypeArgumentKeys() {
         return getTarget().getTypeArgumentKeys();
     }
+
+    @Override
+    default Argument<T> getDeclaredBeanType() {
+        // the declaration is the target's: a raw type or a variable is only known to it
+        return getTarget().getDeclaredBeanType();
+    }
 }

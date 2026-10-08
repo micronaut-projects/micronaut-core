@@ -3,6 +3,7 @@ package io.micronaut.core.io.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -12,6 +13,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.management.ManagementFactory;
+import java.lang.ref.Reference;
+import java.lang.ref.WeakReference;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -35,6 +38,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
@@ -52,9 +60,87 @@ class MicronautMetaServiceLoaderUtilsTest {
     private static final String INTROSPECTIONS = "META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/";
     private static final byte[] SERVICES_PREFIX = SERVICES.getBytes(StandardCharsets.US_ASCII);
     private static final byte[] ALL_NAMES = new byte[0];
+    // an entry names a class, and what it contains is not read to find the services
+    private static final byte[] CONTENT = {'M', 'N', 'B', 'D', 0, 1, 0, 0, 0, 2, 0, 0};
 
     @TempDir
     Path tempDir;
+
+    @Test
+    void latestCachedLoaderCanBeCollectedWhileServiceNamesRemainReachable() throws Exception {
+        Path jar = jar("disposable.jar", List.of("META-INF/micronaut/", BEANS, BEANS + "test.Bean"));
+        CachedServices cached = cacheDisposableLoader(jar);
+        try {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while (!cached.loader().refersTo(null) && System.nanoTime() < deadline) {
+                System.gc();
+                Thread.sleep(50);
+            }
+            assertNull(cached.loader().get(), "The latest service-index lookup must not retain its loader");
+            assertEquals(Set.of("test.Bean"), cached.services());
+        } finally {
+            Reference.reachabilityFence(cached.services());
+        }
+    }
+
+    @Test
+    void repeatedLookupsReuseTheIndexAndDifferentLoadersDiscoverTheirOwnServices() throws IOException {
+        Path first = jar("first.jar", List.of("META-INF/micronaut/", BEANS, BEANS + "test.First"));
+        Path second = jar("second.jar", List.of("META-INF/micronaut/", BEANS, BEANS + "test.Second"));
+        AtomicInteger scans = new AtomicInteger();
+        try (URLClassLoader firstLoader = new URLClassLoader(new URL[]{first.toUri().toURL()}, null) {
+            @Override
+            public Enumeration<URL> getResources(String name) throws IOException {
+                if (name.equals("META-INF/micronaut/")) {
+                    scans.incrementAndGet();
+                }
+                return super.getResources(name);
+            }
+        }; URLClassLoader secondLoader = new URLClassLoader(new URL[]{second.toUri().toURL()}, null)) {
+            Set<String> entries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(firstLoader, "io.micronaut.inject.BeanDefinitionReference");
+            assertEquals(Set.of("test.First"), entries);
+            assertSame(entries, MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(firstLoader, "io.micronaut.inject.BeanDefinitionReference"));
+            assertEquals(Set.of(), MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(firstLoader, "missing.Service"));
+            assertEquals(1, scans.get());
+            assertEquals(Set.of("test.Second"), MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(secondLoader, "io.micronaut.inject.BeanDefinitionReference"));
+            assertEquals(Set.of("test.First"), MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(firstLoader, "io.micronaut.inject.BeanDefinitionReference"));
+        }
+    }
+
+    private static CachedServices cacheDisposableLoader(Path jar) throws IOException {
+        try (URLClassLoader loader = new URLClassLoader(new URL[]{jar.toUri().toURL()}, null)) {
+            Set<String> services = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(loader, "io.micronaut.inject.BeanDefinitionReference");
+            assertEquals(Set.of("test.Bean"), services);
+            return new CachedServices(new WeakReference<>(loader), services);
+        }
+    }
+
+    @Test
+    void concurrentLookupsKeepTheServicesOfEachLoaderSeparate() throws Exception {
+        Path first = jar("concurrent first.jar", List.of("META-INF/micronaut/", BEANS, BEANS + "test.First"));
+        Path second = jar("concurrent second.jar", List.of("META-INF/micronaut/", BEANS, BEANS + "test.Second"));
+        try (URLClassLoader firstLoader = new URLClassLoader(new URL[]{first.toUri().toURL()}, null);
+             URLClassLoader secondLoader = new URLClassLoader(new URL[]{second.toUri().toURL()}, null);
+             var executor = Executors.newFixedThreadPool(2)) {
+            var firstLookup = executor.submit(() -> {
+                for (int i = 0; i < 50; i++) {
+                    assertEquals(Set.of("test.First"), MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(firstLoader, "io.micronaut.inject.BeanDefinitionReference"));
+                }
+                return null;
+            });
+            var secondLookup = executor.submit(() -> {
+                for (int i = 0; i < 50; i++) {
+                    assertEquals(Set.of("test.Second"), MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(secondLoader, "io.micronaut.inject.BeanDefinitionReference"));
+                }
+                return null;
+            });
+            firstLookup.get(10, TimeUnit.SECONDS);
+            secondLookup.get(10, TimeUnit.SECONDS);
+        }
+    }
+
+    private record CachedServices(WeakReference<ClassLoader> loader, Set<String> services) {
+    }
 
     @Test
     void listsTheServicesOfAJarInTheOrderOfItsZipFileSystem() throws IOException {
@@ -86,6 +172,55 @@ class MicronautMetaServiceLoaderUtilsTest {
             BEANS + "nested/deeper/entry",
             "META-INF/micronaut/stray-file"
         )));
+    }
+
+    @Test
+    void listsTheSameServicesOfAJarWhenItsEntriesCarryContent() throws IOException {
+        List<String> entries = List.of(
+            "META-INF/",
+            "META-INF/micronaut/",
+            BEANS,
+            BEANS + "a.$A$Definition",
+            BEANS + "b.$B$Definition",
+            INTROSPECTIONS,
+            INTROSPECTIONS + "a.$A$Introspection",
+            "a/A.class"
+        );
+
+        Map<String, Set<String>> empty = findAll(jar("empty.jar", entries, new byte[0]));
+        Map<String, Set<String>> withContent = findAll(jar("with content.jar", entries, CONTENT));
+
+        assertEquals(Set.of("a.$A$Definition", "b.$B$Definition"), empty.get("io.micronaut.inject.BeanDefinitionReference"));
+        assertEquals(asLists(empty), asLists(withContent));
+    }
+
+    @Test
+    void listsTheSameServicesOfADirectoryWhenItsEntriesCarryContent() throws IOException {
+        List<String> entries = List.of(
+            BEANS + "a.$A$Definition",
+            BEANS + "b.$B$Definition",
+            INTROSPECTIONS + "a.$A$Introspection",
+            "a/A.class"
+        );
+
+        Map<String, Set<String>> empty = findAll(directory("empty", entries, new byte[0]));
+        Map<String, Set<String>> withContent = findAll(directory("with content", entries, CONTENT));
+
+        assertEquals(Set.of("a.$A$Definition", "b.$B$Definition"), empty.get("io.micronaut.inject.BeanDefinitionReference"));
+        assertEquals(asSets(empty), asSets(withContent));
+    }
+
+    private static Map<String, Set<String>> findAll(Path classPathEntry) throws IOException {
+        try (URLClassLoader classLoader = new URLClassLoader(new URL[]{classPathEntry.toUri().toURL()}, null)) {
+            return MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(classLoader);
+        }
+    }
+
+    // the order a directory is listed in is the one of the file system
+    private static Map<String, Set<String>> asSets(Map<String, Set<String>> services) {
+        Map<String, Set<String>> sets = new TreeMap<>();
+        services.forEach((service, entries) -> sets.put(service, new TreeSet<>(entries)));
+        return sets;
     }
 
     @Test
@@ -360,12 +495,6 @@ class MicronautMetaServiceLoaderUtilsTest {
         assertEquals(asLists(walkZipFileSystem(expectedJar)), asLists(findAll(jar)), jar.toString());
     }
 
-    private static Map<String, Set<String>> findAll(Path jar) throws IOException {
-        try (URLClassLoader classLoader = new URLClassLoader(new URL[]{jar.toUri().toURL()}, null)) {
-            return MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(classLoader);
-        }
-    }
-
     /**
      * Finds the services through a class loader that returns the {@code jar:file:} URL of a jar without opening it.
      */
@@ -428,6 +557,28 @@ class MicronautMetaServiceLoaderUtilsTest {
                 put(zip, entry);
             }
         });
+    }
+
+    private Path jar(String name, List<String> entries, byte[] content) throws IOException {
+        return zip(name, zip -> {
+            for (String entry : entries) {
+                zip.putNextEntry(new ZipEntry(entry));
+                if (!entry.endsWith("/")) {
+                    zip.write(content);
+                }
+                zip.closeEntry();
+            }
+        });
+    }
+
+    private Path directory(String name, List<String> entries, byte[] content) throws IOException {
+        Path dir = Files.createDirectories(tempDir.resolve(name));
+        for (String entry : entries) {
+            Path file = dir.resolve(entry);
+            Files.createDirectories(file.getParent());
+            Files.write(file, content);
+        }
+        return dir;
     }
 
     private Path zip(String name, ZipContent content) throws IOException {

@@ -18,12 +18,14 @@ package io.micronaut.http.body.stream;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import org.reactivestreams.Publisher;
 
 import java.io.InputStream;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Implementation of streaming {@link io.micronaut.http.body.ByteBody}s based on a
@@ -48,6 +50,11 @@ public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends
         return sharedBuffer.getExpectedLength();
     }
 
+    @Override
+    public final CompletionStage<HttpHeaders> trailers() {
+        return sharedBuffer.getTrailers();
+    }
+
     /**
      * Consume this buffer.
      *
@@ -68,8 +75,21 @@ public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends
     @Override
     public final Publisher<ReadBuffer> toReadBufferPublisher() {
         BaseSharedBuffer.AsFlux asFlux = new BaseSharedBuffer.AsFlux(sharedBuffer);
-        BufferConsumer.Upstream upstream = primary(asFlux);
-        return asFlux.asFlux(upstream);
+        BufferConsumer.Upstream primary = primary(asFlux);
+        return asFlux.asFlux(primary);
+    }
+
+    /**
+     * The reader is not held to the buffer limit of the body, and receives the bytes kept past
+     * it before it subscribed, see {@link BaseSharedBuffer.AsFlux#AsFlux(BaseSharedBuffer, boolean)}.
+     *
+     * @return The publisher
+     */
+    @Override
+    public final Publisher<ReadBuffer> toUnbufferedReadBufferPublisher() {
+        BaseSharedBuffer.AsFlux asFlux = new BaseSharedBuffer.AsFlux(sharedBuffer, true);
+        BufferConsumer.Upstream primary = primary(asFlux);
+        return asFlux.asFlux(primary);
     }
 
     @Override

@@ -226,6 +226,18 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
+    @SuppressWarnings("unchecked")
+    public Argument<T> getDeclaredBeanType() {
+        Argument<?> declared = precalculatedInfo.declaredBeanType;
+        if (declared != null) {
+            // written by the compiler where the type arguments cannot say it: a raw type, whose arguments are the
+            // ones its type declares, or a type variable, which erases to its bound
+            return (Argument<T>) declared.withAnnotationMetadata(getAnnotationMetadata());
+        }
+        return InstantiatableBeanDefinition.super.getDeclaredBeanType();
+    }
+
+    @Override
     public final List<Argument<?>> getTypeArguments(@Nullable String type) {
         if (type == null || typeArgumentsMap == null) {
             return Collections.emptyList();
@@ -1469,6 +1481,107 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
      * @param qualifier         The qualifier
      * @return The resolved bean
      */
+    /**
+     * Obtains the value of a constructor argument from its {@link io.micronaut.context.annotation.ResolveWith} provider.
+     * <p>
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The context
+     * @param argIndex          The argument index
+     * @param providerType      The provider type
+     * @param qualifier         The qualifier
+     * @return The resolved value
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    @Nullable
+    protected final Object getBeanFromProviderForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex, Class<? extends BeanInjectionProvider> providerType, @Nullable Qualifier qualifier) {
+        MethodReference constructorMethodRef = (MethodReference) Objects.requireNonNull(constructor);
+        Argument<?> argument = resolveArgument(context, argIndex, constructorMethodRef.arguments);
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                .pushConstructorResolve(this, argument)) {
+            return resolveBeanFromProvider(resolutionContext, argument, providerType, qualifier, false);
+        }
+    }
+
+    /**
+     * Obtains the value of a method argument from its {@link io.micronaut.context.annotation.ResolveWith} provider.
+     * <p>
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The context
+     * @param methodIndex       The method index
+     * @param argIndex          The argument index
+     * @param providerType      The provider type
+     * @param qualifier         The qualifier
+     * @return The resolved value
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    @Nullable
+    protected final Object getBeanFromProviderForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex, Class<? extends BeanInjectionProvider> providerType, @Nullable Qualifier qualifier) {
+        MethodReference methodRef = Objects.requireNonNull(methodInjection)[methodIndex];
+        Argument<?> argument = resolveArgument(context, argIndex, methodRef.arguments);
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments)) {
+            return resolveBeanFromProvider(resolutionContext, argument, providerType, qualifier,
+                !InjectionPoint.isInjectionRequired(methodRef.annotationMetadata));
+        }
+    }
+
+    /**
+     * Obtains the value of a setter argument from its {@link io.micronaut.context.annotation.ResolveWith} provider.
+     * <p>
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The context
+     * @param setterName        The setter name
+     * @param argument          The argument
+     * @param providerType      The provider type
+     * @param qualifier         The qualifier
+     * @return The resolved value
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    @Nullable
+    protected final Object getBeanFromProviderForSetter(BeanResolutionContext resolutionContext, BeanContext context, String setterName, Argument argument, Class<? extends BeanInjectionProvider> providerType, @Nullable Qualifier qualifier) {
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                .pushMethodArgumentResolve(this, setterName, argument, new Argument[]{argument})) {
+            return resolveBeanFromProvider(resolutionContext, argument, providerType, qualifier,
+                !InjectionPoint.isInjectionRequired(argument.getAnnotationMetadata()));
+        }
+    }
+
+    /**
+     * Obtains the value of a field from its {@link io.micronaut.context.annotation.ResolveWith} provider.
+     * <p>
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The context
+     * @param fieldIndex        The field index
+     * @param providerType      The provider type
+     * @param qualifier         The qualifier
+     * @return The resolved value
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    @Nullable
+    protected final Object getBeanFromProviderForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, Class<? extends BeanInjectionProvider> providerType, @Nullable Qualifier qualifier) {
+        Argument<?> argument = resolveArgument(context, Objects.requireNonNull(fieldInjection)[fieldIndex].argument);
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushFieldResolve(this, argument)) {
+            return resolveBeanFromProvider(resolutionContext, argument, providerType, qualifier,
+                !InjectionPoint.isInjectionRequired(argument.getAnnotationMetadata()));
+        }
+    }
+
     @Internal
     @UsedByGeneratedCode
     @Nullable
@@ -2411,14 +2524,53 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                 }
             }
         } catch (DisabledBeanException e) {
-            if (ConditionLog.LOG.isDebugEnabled()) {
-                ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", argument.getTypeName(), e.getMessage());
+            throw disabledDependency(resolutionContext, argument, e);
+        } catch (NoSuchBeanException e) {
+            throw new DependencyInjectionException(resolutionContext, e);
+        }
+    }
+
+    private RuntimeException disabledDependency(BeanResolutionContext resolutionContext, Argument<?> argument, DisabledBeanException e) {
+        if (ConditionLog.LOG.isDebugEnabled()) {
+            ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", argument.getTypeName(), e.getMessage());
+        }
+        if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
+            return new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
+        }
+        return new DependencyInjectionException(resolutionContext, e);
+    }
+
+    private <K> @Nullable K resolveBeanFromProvider(
+        BeanResolutionContext resolutionContext,
+        Argument<K> argument,
+        Class<? extends BeanInjectionProvider> providerType,
+        @Nullable Qualifier<K> qualifier,
+        boolean isOptional) {
+        qualifier = qualifier == null ? resolveQualifier(resolutionContext, argument, argument) : qualifier;
+        try {
+            boolean isNotInnerConfiguration = !precalculatedInfo.isConfigurationProperties || !isInnerConfiguration(argument);
+            ConfigurationPath previousPath = isNotInnerConfiguration ? resolutionContext.setConfigurationPath(null) : null;
+            try {
+                BeanInjectionProvider provider = resolutionContext.getBean(Argument.of(providerType), null);
+                boolean nullable = argument.isDeclaredNullable() || isOptional;
+                K value = provider.get(resolutionContext, argument, qualifier, nullable);
+                if (value == null && !nullable) {
+                    throw new DependencyInjectionException(resolutionContext,
+                        "The injection provider " + providerType.getName() + " returned null for required " + argument);
+                }
+                if (value != null && !argument.getWrapperType().isInstance(value)) {
+                    throw new DependencyInjectionException(resolutionContext,
+                        "The injection provider " + providerType.getName() + " returned " + value.getClass().getName()
+                            + " for " + argument);
+                }
+                return value;
+            } finally {
+                if (previousPath != null) {
+                    resolutionContext.setConfigurationPath(previousPath);
+                }
             }
-            if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
-                throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
-            } else {
-                throw new DependencyInjectionException(resolutionContext, e);
-            }
+        } catch (DisabledBeanException e) {
+            throw disabledDependency(resolutionContext, argument, e);
         } catch (NoSuchBeanException e) {
             throw new DependencyInjectionException(resolutionContext, e);
         }
@@ -2536,6 +2688,22 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         return resolutionContext.streamOfType(beanType, qualifier);
     }
 
+    /**
+     * Resolves a map of the beans of a type, collected by the name each is registered under.
+     *
+     * <p>A key type a {@code String} can be assigned to is the bean name itself. Any other key type is
+     * converted from the name by {@link #keyByType}, and because the processor routes an injection point
+     * here on the shape of its type alone, a map supplied directly takes precedence over collecting the
+     * beans at all.</p>
+     *
+     * @param resolutionContext The resolution context
+     * @param returnType        The injection point type
+     * @param beanType          The type of the beans to collect
+     * @param qualifier         The qualifier of the injection point, or {@code null} to resolve one
+     * @param <V>               The bean type
+     * @return The resolved map
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private <V> Object resolveMapOfType(
         BeanResolutionContext resolutionContext,
         Argument<?> returnType,
@@ -2544,12 +2712,85 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         if (beanType == null) {
             throw noGenericsError(resolutionContext, returnType);
         }
+        Argument<?> keyType = keyToConvertBeanNameTo(returnType);
+        if (keyType != null) {
+            // Whether a bean of the map type exists is not something the processor can answer, so a map
+            // supplied directly - by a @Factory, for instance - keeps the precedence it has when the key
+            // type is not one beans can be collected under at all. That bean belongs to the injection
+            // point and is qualified by it: the qualifier resolved below selects the beans collected into
+            // the map, which for an inner configuration is a name prefix, and the two are not the same.
+            Optional<?> suppliedMap = resolutionContext.findBean((Argument) returnType, (Qualifier) qualifier);
+            if (suppliedMap.isPresent()) {
+                return suppliedMap.get();
+            }
+        }
         qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
-        Map<String, V> map = resolutionContext.mapOfType(beanType, qualifier);
+        Map<String, V> beansByName = resolutionContext.mapOfType(beanType, qualifier);
+        Map<?, V> map = beansByName;
+        if (keyType != null) {
+            map = keyByType(resolutionContext, beansByName, keyType);
+        }
         if (returnType.isInstance(map)) {
             return map;
         }
         return resolutionContext.getContext().getConversionService().convertRequired(map, returnType);
+    }
+
+    /**
+     * The type the name a bean is collected under has to be converted to, or {@code null} when the name is
+     * the key.
+     *
+     * <p>A key type a {@code String} can be assigned to - {@code String}, {@code CharSequence},
+     * {@code Object} - is the name itself. Anything else is only reached because the processor decided the
+     * map can be collected by bean name at all, which for a key that is not a {@code CharSequence} it only
+     * does for an enum naming the beans of an iterable type: see
+     * {@code BeanInjectionUtils#isKeyedByBeanName}.</p>
+     *
+     * @param returnType The injection point type
+     * @return The key type to convert bean names to, or {@code null} when the names are the keys
+     */
+    @Nullable
+    private static Argument<?> keyToConvertBeanNameTo(Argument<?> returnType) {
+        Argument<?> keyType = returnType.getTypeVariable("K").orElse(null);
+        if (keyType == null || keyType.getType().isAssignableFrom(String.class)) {
+            return null;
+        }
+        return keyType;
+    }
+
+    /**
+     * Keys the collected beans by the declared key type, converting the name each was collected under.
+     *
+     * <p>Only the names are converted. The beans are the values as they are, rather than passed through the
+     * general {@code Map} to {@code Map} conversion, which drops an entry whose key does not convert and
+     * rebuilds a value that is itself a {@code Map} or a {@code Collection}. A name that does not convert,
+     * or that collides with one already converted, fails the injection rather than leaving a bean out of
+     * the map.</p>
+     *
+     * @param resolutionContext The resolution context
+     * @param beansByName       The beans, by the name each was collected under
+     * @param keyType           The declared key type
+     * @param <V>               The bean type
+     * @return The beans, by the key converted from the name
+     */
+    @SuppressWarnings("unchecked")
+    private static <V> Map<Object, V> keyByType(BeanResolutionContext resolutionContext,
+                                                Map<String, V> beansByName,
+                                                Argument<?> keyType) {
+        ConversionService conversionService = resolutionContext.getContext().getConversionService();
+        Map<Object, V> beansByKey = CollectionUtils.newLinkedHashMap(beansByName.size());
+        for (Map.Entry<String, V> entry : beansByName.entrySet()) {
+            String name = entry.getKey();
+            Object key = conversionService.convert(name, (Argument<Object>) keyType)
+                .orElseThrow(() -> new DependencyInjectionException(resolutionContext,
+                    "Cannot convert the name of bean [" + name + "] to the key type ["
+                        + keyType.getType().getName() + "] of the injected map"));
+            if (beansByKey.put(key, entry.getValue()) != null) {
+                throw new DependencyInjectionException(resolutionContext,
+                    "More than one bean is named for the key [" + key + "] of the injected map");
+            }
+        }
+        return beansByKey;
     }
 
     private <K> Object resolveOptionalBean(BeanResolutionContext resolutionContext, Argument<K> returnType, @Nullable Argument<K> beanType, @Nullable Qualifier<K> qualifier) {
@@ -2685,10 +2926,28 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         boolean isConfigurationProperties,
         boolean isContainerType,
         boolean requiresMethodProcessing,
-        boolean hasEvaluatedExpressions
+        boolean hasEvaluatedExpressions,
+        @Nullable Argument<?> declaredBeanType
     ) {
         public PrecalculatedInfo(Optional<String> scope, boolean isAbstract, boolean isIterable, boolean isSingleton, boolean isPrimary, boolean isConfigurationProperties, boolean isContainerType, boolean requiresMethodProcessing) {
             this(scope, isAbstract, isIterable, isSingleton, isPrimary, isConfigurationProperties, isContainerType, requiresMethodProcessing, false);
+        }
+
+        /**
+         * The info of a definition compiled before the declaration of its bean type was recorded.
+         *
+         * @param scope                     The scope
+         * @param isAbstract                Whether the bean is abstract
+         * @param isIterable                Whether the bean is iterable
+         * @param isSingleton               Whether the bean is a singleton
+         * @param isPrimary                 Whether the bean is primary
+         * @param isConfigurationProperties Whether the bean is configuration properties
+         * @param isContainerType           Whether the bean type is a container
+         * @param requiresMethodProcessing  Whether the bean requires method processing
+         * @param hasEvaluatedExpressions   Whether the bean has evaluated expressions
+         */
+        public PrecalculatedInfo(Optional<String> scope, boolean isAbstract, boolean isIterable, boolean isSingleton, boolean isPrimary, boolean isConfigurationProperties, boolean isContainerType, boolean requiresMethodProcessing, boolean hasEvaluatedExpressions) {
+            this(scope, isAbstract, isIterable, isSingleton, isPrimary, isConfigurationProperties, isContainerType, requiresMethodProcessing, hasEvaluatedExpressions, null);
         }
     }
 

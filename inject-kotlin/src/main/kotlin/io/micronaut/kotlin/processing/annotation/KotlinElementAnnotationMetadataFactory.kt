@@ -118,6 +118,25 @@ internal class KotlinElementAnnotationMetadataFactory(
         if (kotlinPlaceholderElement.genericNativeType.owner == null) {
             throw ProcessingException(placeholderElement, "Type annotations an a generic placeholder require the owner element to be specified!")
         }
+        val typeArgument = kotlinPlaceholderElement.typeArgument
+        if (typeArgument != null) {
+            // The same variable may occur with different annotations under one owner. Key its metadata
+            // by the occurrence too, while keeping the variable's native identity for bounds and recursion.
+            return metadataBuilder.lookupOrBuild(
+                Key2(kotlinPlaceholderElement.genericNativeType, typeArgument),
+                KotlinAnnotations(
+                    typeArgument.annotations + (typeArgument.type?.resolve()?.annotations ?: emptySequence())
+                )
+            )
+        }
+        val useType = kotlinPlaceholderElement.useType
+        if (useType != null) {
+            // Only the type parameter declaration reports the type parameter's annotations
+            return metadataBuilder.lookupOrBuild(
+                Key2(kotlinPlaceholderElement.genericNativeType, useType),
+                KotlinAnnotations(useType.annotations)
+            )
+        }
         return metadataBuilder.lookupOrBuild(
             kotlinPlaceholderElement.genericNativeType,
             kotlinPlaceholderElement.genericNativeType.declaration

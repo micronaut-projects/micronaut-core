@@ -77,6 +77,35 @@ class FinalModifierMyBean2 {
         e.message.contains 'Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.'
     }
 
+    void "test final modifier on a dollar prefixed method with AOP advice doesn't compile"() {
+        when:"a method the user declared with a leading dollar inherits class level advice"
+        buildBeanDefinition('test.$FinalModifierMyBeanDollar' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
+package test;
+
+import io.micronaut.aop.proxytarget.*;
+import io.micronaut.context.annotation.*;
+
+@Mutating("someVal")
+@jakarta.inject.Singleton
+class FinalModifierMyBeanDollar {
+
+    private String myValue;
+
+    FinalModifierMyBeanDollar(String val) {
+        this.myValue = val;
+    }
+
+    public final String $someMethod() {
+        return myValue;
+    }
+
+}
+''')
+        then:"the same error is reported as for any other final method"
+        def e = thrown(RuntimeException)
+        e.message.contains 'Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.'
+    }
+
     void "test final modifier on method with explicit AOP advice doesn't compile"() {
         when:
         buildBeanDefinition('test.$FinalModifierMyBean2' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''

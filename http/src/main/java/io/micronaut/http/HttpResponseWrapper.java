@@ -15,6 +15,9 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
+
 /**
  * A wrapper around a {@link HttpResponse}.
  *
@@ -38,6 +41,57 @@ public class HttpResponseWrapper<B> extends HttpMessageWrapper<B> implements Htt
     @Override
     public String reason() {
         return getDelegate().reason();
+    }
+
+    /**
+     * Returns a mutable response with the status and headers of this response. If this response is,
+     * or wraps, a {@link ByteBodyHttpResponse} whose bytes were not replaced by an object body, the
+     * mutable response is a {@link MutableByteBodyHttpResponse} that takes over those bytes. If
+     * this wrapper has an object body, it replaces the bytes of a wrapped response, which are
+     * closed.
+     *
+     * @return The mutable response
+     */
+    @Override
+    public MutableHttpResponse<?> toMutableResponse() {
+        if (this instanceof MutableHttpResponse<?> mutable) {
+            return mutable;
+        }
+        if (this instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+            return MutableByteBodyHttpResponse.of(byteBodyResponse);
+        }
+        ByteBodyHttpResponse<?> wrapped = wrappedByteBodyResponse(this);
+        if (wrapped != null) {
+            if (getBody().isPresent()) {
+                // the object body of this wrapper replaces the bytes
+                wrapped.close();
+            } else if (wrapped.hasByteBody()) {
+                // the status and headers of this wrapper, the bytes of the wrapped response
+                return MutableByteBodyHttpResponse.of(this, wrapped.byteBody().move());
+            }
+        }
+        return HttpResponse.super.toMutableResponse();
+    }
+
+    /**
+     * The {@link ByteBodyHttpResponse} a wrapper wraps, directly or through other wrappers.
+     *
+     * @param wrapper The wrapper
+     * @return The wrapped response, or {@code null}
+     */
+    @Internal
+    public static @Nullable ByteBodyHttpResponse<?> wrappedByteBodyResponse(HttpResponseWrapper<?> wrapper) {
+        HttpResponse<?> current = wrapper.getDelegate();
+        while (true) {
+            if (current instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                return byteBodyResponse;
+            }
+            if (current instanceof HttpResponseWrapper<?> next) {
+                current = next.getDelegate();
+            } else {
+                return null;
+            }
+        }
     }
 
     @Override

@@ -28,7 +28,7 @@ import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.runtime.server.event.ServerStartupEvent;
+import io.micronaut.context.event.StartupEvent;
 import io.micronaut.scheduling.TaskScheduler;
 import reactor.core.publisher.Flux;
 
@@ -81,8 +81,8 @@ public class ServiceHttpClientFactory {
     }
 
     /**
-     * Creates a {@link ApplicationEventListener} that listens to {@link ServerStartupEvent} for each configured HTTP client
-     * in order to register a health check if necessary.
+     * Creates a {@link ApplicationEventListener} that listens to {@link StartupEvent} for each configured HTTP client
+     * in order to register a health check if necessary, whether or not the application runs a server.
      *
      * @param configuration The configuration
      * @param instanceList  The instance list
@@ -90,7 +90,7 @@ public class ServiceHttpClientFactory {
      */
     @EachBean(ServiceHttpClientConfiguration.class)
     @Requires(condition = ServiceHttpClientCondition.class)
-    ApplicationEventListener<ServerStartupEvent> healthCheckStarter(@Parameter ServiceHttpClientConfiguration configuration,
+    ApplicationEventListener<StartupEvent> healthCheckStarter(@Parameter ServiceHttpClientConfiguration configuration,
                                                                     @Parameter StaticServiceInstanceList instanceList) {
         if (configuration.isHealthCheck()) {
             return event -> {

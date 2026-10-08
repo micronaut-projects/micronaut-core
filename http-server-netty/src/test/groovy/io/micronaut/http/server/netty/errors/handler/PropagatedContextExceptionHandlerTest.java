@@ -6,6 +6,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -18,6 +19,12 @@ class PropagatedContextExceptionHandlerTest {
     );
 
     HttpClient httpClient = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
+
+    @AfterEach
+    void cleanup() {
+        httpClient.close();
+        embeddedServer.close();
+    }
 
     @Test
     void testNonBlockingPropagatingTrace() {

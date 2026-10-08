@@ -60,6 +60,8 @@ tasks {
         }
     }
     test {
+        forkEvery = 1
+        jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
         filter {
             excludeTestsMatching("io.micronaut.http.netty.allocator.DefaultAllocatorSpec")
         }
@@ -67,4 +69,11 @@ tasks {
     check {
         dependsOn(allocatorTest)
     }
+}
+
+noReflection {
+    allowIn("io.micronaut.http.netty.channel.converters.DefaultChannelOptionFactory", "GENERIC_SIGNATURES", "REFLECTION_UTILS")
+    allowIn("io.micronaut.http.netty.channel.loom.LoomBranchSupport", "CLASS_LOADING", "HANDLES")
+    allowIn("io.micronaut.http.netty.channel.loom.PrivateLoomSupport", "CLASS_LOADING", "CLASS_MEMBERS", "HANDLES", "REFLECTIVE_ACCESS")
+    allowIn("io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler", "CLASS_NAMES")
 }

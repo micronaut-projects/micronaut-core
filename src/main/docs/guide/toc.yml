@@ -120,6 +120,7 @@ httpServer:
   runningServer: Running the Embedded Server
   runningSpecificPort: Running Server on a Specific Port
   routing: HTTP Routing
+  pathVariables: Path Variables
   binding: Simple Request Binding
   customArgumentBinding: Custom Argument Binding
   hostResolution: Host Resolution
@@ -127,12 +128,14 @@ httpServer:
   clientIpAddress: Client IP Address
   requestResponse: The HttpRequest and HttpResponse
   statusAnnotation: Response Status
+  contentDispositionAnnotation: Response Content-Disposition
   producesAnnotation: Response Content-Type
   consumesAnnotation: Accepted Request Content-Type
   reactiveServer:
     title: Reactive HTTP Request Processing
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
+  asyncRequestBody: Reading the Body Asynchronously
   jsonBinding:
     title: JSON Binding
     serializeUsingMicronautSerialization: Serialize using Micronaut Serialization
@@ -172,6 +175,7 @@ httpServer:
     formCapable: Detailed Form API
   serverIO: Writing Response Data
   uploads: File Uploads
+  formUploads: Form Data and File Uploads
   transfers: File Transfers
   filters:
     title: HTTP Filters
@@ -192,7 +196,23 @@ httpServer:
     title: Advanced body access
     byteBodyPrimary: Primary operations
     byteBodySplitting: Splitting
+    byteBodyTrailers: Trailers
+    byteBodyLimitReplay: Limiting and replaying
     byteBodyExample: Example
+  functionalRoutes:
+    title: Functional Routes (Experimental)
+    functionalRoutesDeclaring: Declaring Routes
+    functionalRoutesRespond: Responses Without a Handler
+    functionalRoutesBody: Reading the Request Body
+    functionalRoutesForms: Forms and File Uploads
+    functionalRoutesStreaming: Server-Sent Events and Streamed Responses
+    functionalRoutesGroups: Route Groups and Path Prefixes
+    functionalRoutesFilters: Route, Group and Server Filters
+    functionalRoutesConditions: Conditions, Order, Ports and Attributes
+    functionalRoutesAnnotations: Annotations on Handler Routes
+    functionalRoutesErrors: Error and Status Routes
+    functionalRoutesLocators: Locator Routes
+    functionalRoutesLimitations: Limitations
   sessions: HTTP Sessions
   sse: Server Sent Events
   websocket:
@@ -202,6 +222,7 @@ httpServer:
   http2Server: HTTP/2 Support
   http3Server: HTTP/3 Support
   serverEvents: Server Events
+  trainingRun: Training Runs
   serverConfiguration:
     title: Configuring the HTTP Server
     threadPools:
@@ -252,6 +273,7 @@ httpClient:
     lowLevelClientError: Error Responses
     bindErrors: Bind Errors
   proxyClient: Proxying Requests with ProxyHttpClient
+  rawClient: Raw Exchanges with RawHttpClient
   clientAnnotation:
     title: Declarative HTTP Clients with @Client
     clientParameters: Customizing Parameter Binding

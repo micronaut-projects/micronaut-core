@@ -529,6 +529,8 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                     returnTypeAnnotationMetadata = annotationMetadata;
                 }
                 if (returnTypeArgument.getAnnotationMetadata() != returnTypeAnnotationMetadata) {
+                    // An array keeps the component it was written with, and the annotations of it
+                    Argument<?> componentType = returnTypeArgument.componentType();
                     returnTypeArgument = returnTypeArgument.isRawType() ? Argument.ofRawType(
                             returnTypeArgument.getType(),
                             null,
@@ -539,6 +541,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                             returnTypeAnnotationMetadata,
                             returnTypeArgument.getTypeParameters()
                     );
+                    if (componentType != null) {
+                        returnTypeArgument = returnTypeArgument.withComponentType(componentType);
+                    }
                 }
                 returnType = new DefaultReturnType<>(
                         returnTypeArgument,
@@ -608,8 +613,10 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                     arguments[i] = argument;
                 } else {
                     foundExpressions = true;
-                    if (argument instanceof GenericPlaceholder<?> genericPlaceholder) {
-                        arguments[i] = Argument.ofTypeVariable(argument.getType(), argument.getName(), genericPlaceholder.getVariableName(), wrappedArgumentAnnotationMetadata, argument.getTypeParameters());
+                    if (argument instanceof GenericPlaceholder<?>) {
+                        // the placeholder keeps what it is: the bounds of its variable, and whether it stands for a
+                        // type resolved in place of the variable
+                        arguments[i] = argument.withAnnotationMetadata(wrappedArgumentAnnotationMetadata);
                     } else {
                         arguments[i] = Argument.of(argument.getType(), argument.getName(), wrappedArgumentAnnotationMetadata, argument.getTypeParameters());
                     }

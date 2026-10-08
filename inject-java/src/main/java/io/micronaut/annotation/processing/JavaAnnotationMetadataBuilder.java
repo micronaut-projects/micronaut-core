@@ -42,6 +42,7 @@ import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.PrimitiveType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.AbstractAnnotationValueVisitor8;
 import javax.lang.model.util.Elements;
@@ -140,7 +141,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Nullable
     @Override
-    protected String getRepeatableContainerNameForType(Element annotationType) {
+    public String getRepeatableContainerNameForType(Element annotationType) {
         List<? extends AnnotationMirror> mirrors = annotationType.getAnnotationMirrors();
         for (AnnotationMirror mirror : mirrors) {
             String name = mirror.getAnnotationType().toString();
@@ -177,7 +178,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected RetentionPolicy getRetentionPolicy(Element annotation) {
+    public RetentionPolicy getRetentionPolicy(Element annotation) {
         final List<? extends AnnotationMirror> annotationMirrors = annotation.getAnnotationMirrors();
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             final String annotationTypeName = getAnnotationTypeName(annotationMirror);
@@ -200,6 +201,21 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected Element getTypeForAnnotation(AnnotationMirror annotationMirror) {
         return annotationMirror.getAnnotationType().asElement();
+    }
+
+    /**
+     * Lookup or build the metadata of the type annotations written on the given type mirror, such as those on
+     * a primitive type use, keyed by the mirror instance. javac compares array types by their component
+     * type, ignoring the annotations of the dimension, so every {@code String[]} use would otherwise share one
+     * entry: the annotations of the first use, and any mutation of a use, such as the non-null inferred for a
+     * {@code @NullMarked} declaration, would leak to every other.
+     *
+     * @param typeMirror The type mirror
+     * @return The metadata
+     * @since 5.3.0
+     */
+    public CachedAnnotationMetadata lookupOrBuildForTypeMirror(TypeMirror typeMirror) {
+        return lookupOrBuild(new TypeMirrorKey(typeMirror), new AnnotationsElement(typeMirror));
     }
 
     @Override
@@ -601,6 +617,56 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     /**
      * Meta annotation value visitor class.
      */
+    /**
+     * The name recorded for a class literal member value: the binary name of a class, the keyword of a
+     * primitive, and for an array such as {@code String[].class} or {@code int[][].class} the name
+     * {@link Class#getName()} gives it.
+     *
+     * @param type The type of the literal
+     * @return The name, or null when the type is not one a class literal can denote
+     */
+    @Nullable
+    private static String classLiteralName(TypeMirror type) {
+        if (type instanceof DeclaredType declaredType) {
+            if (declaredType.asElement() instanceof TypeElement element) {
+                return JavaModelUtils.getClassName(element);
+            }
+            return null;
+        }
+        if (type instanceof PrimitiveType primitiveType) {
+            return primitiveType.getKind().name().toLowerCase(Locale.ENGLISH);
+        }
+        if (type instanceof ArrayType arrayType) {
+            TypeMirror componentType = arrayType.getComponentType();
+            if (componentType instanceof DeclaredType declaredType) {
+                if (declaredType.asElement() instanceof TypeElement element) {
+                    return JavaModelUtils.getClassArrayName(element);
+                }
+                return null;
+            }
+            if (componentType instanceof PrimitiveType primitiveType) {
+                return "[" + primitiveDescriptor(primitiveType.getKind());
+            }
+            String componentName = classLiteralName(componentType);
+            return componentName == null ? null : "[" + componentName;
+        }
+        return null;
+    }
+
+    private static String primitiveDescriptor(TypeKind kind) {
+        return switch (kind) {
+            case BOOLEAN -> "Z";
+            case BYTE -> "B";
+            case SHORT -> "S";
+            case INT -> "I";
+            case LONG -> "J";
+            case CHAR -> "C";
+            case FLOAT -> "F";
+            case DOUBLE -> "D";
+            default -> throw new IllegalArgumentException("Not a primitive: " + kind);
+        };
+    }
+
     private class MetadataAnnotationValueVisitor extends AbstractAnnotationValueVisitor8<Object, Object> {
         private final Element originatingElement;
         private final ExecutableElement member;
@@ -674,14 +740,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
         @Override
         public Object visitType(TypeMirror t, Object o) {
-            if (t instanceof DeclaredType type) {
-                Element typeElement = type.asElement();
-                if (typeElement instanceof TypeElement element) {
-                    String className = JavaModelUtils.getClassName(element);
-                    resolvedValue = new AnnotationClassValue<>(className);
-                }
-            } else if (t instanceof PrimitiveType primitiveType) {
-                resolvedValue = new AnnotationClassValue<>(primitiveType.getKind().name().toLowerCase(Locale.ENGLISH));
+            String className = classLiteralName(t);
+            if (className != null) {
+                resolvedValue = new AnnotationClassValue<>(className);
             }
             return null;
         }
@@ -823,23 +884,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
             @Override
             public Object visitType(TypeMirror t, Object o) {
-                if (t instanceof DeclaredType type) {
-                    Element typeElement = type.asElement();
-                    if (typeElement instanceof TypeElement element) {
-                        final String className = JavaModelUtils.getClassName(element);
-                        values.add(new AnnotationClassValue<>(className));
-                    }
-                } else if (t instanceof PrimitiveType primitiveType) {
-                    values.add(new AnnotationClassValue<>(primitiveType.getKind().name().toLowerCase(Locale.ENGLISH)));
-                } else if (t instanceof ArrayType arrayType) {
-                    TypeMirror componentType = arrayType.getComponentType();
-                    if (componentType instanceof DeclaredType declaredType) {
-                        Element typeElement = declaredType.asElement();
-                        if (typeElement instanceof TypeElement element) {
-                            final String className = JavaModelUtils.getClassArrayName(element);
-                            values.add(new AnnotationClassValue<>(className));
-                        }
-                    }
+                String className = classLiteralName(t);
+                if (className != null) {
+                    values.add(new AnnotationClassValue<>(className));
                 }
                 return null;
             }
@@ -861,6 +908,24 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             public Object visitArray(List<? extends javax.lang.model.element.AnnotationValue> vals, Object o) {
                 return null;
             }
+        }
+    }
+
+    /**
+     * A cache key comparing the type mirror by identity.
+     *
+     * @param typeMirror The type mirror
+     */
+    record TypeMirrorKey(TypeMirror typeMirror) {
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof TypeMirrorKey that && typeMirror == that.typeMirror;
+        }
+
+        @Override
+        public int hashCode() {
+            return System.identityHashCode(typeMirror);
         }
     }
 }

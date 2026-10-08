@@ -55,6 +55,7 @@ import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
+import org.codehaus.groovy.classgen.asm.BytecodeHelper;
 import org.codehaus.groovy.control.ClassNodeResolver;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
@@ -181,7 +182,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected @NonNull RetentionPolicy getRetentionPolicy(@NonNull AnnotatedNode annotation) {
+    public @NonNull RetentionPolicy getRetentionPolicy(@NonNull AnnotatedNode annotation) {
         List<AnnotationNode> annotations = annotation.getAnnotations();
         for (AnnotationNode ann : annotations) {
             if (ann.getClassNode().getName().equals(Retention.class.getName())) {
@@ -253,7 +254,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected String getRepeatableContainerNameForType(AnnotatedNode annotationType) {
+    public String getRepeatableContainerNameForType(AnnotatedNode annotationType) {
         List<AnnotationNode> annotationNodes = annotationType.getAnnotations(ClassHelper.makeCached(Repeatable.class));
         if (CollectionUtils.isNotEmpty(annotationNodes)) {
             Expression expression = annotationNodes.get(0).getMember("value");
@@ -306,6 +307,24 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             return node.getName();
         }
         throw new IllegalArgumentException("Cannot establish name for node type: " + element.getClass().getName());
+    }
+
+    /**
+     * Lookup or build the metadata of the type annotations written on the given class node, such as those on a
+     * primitive type use, keyed by the node.
+     *
+     * @param classNode The class node
+     * @return The metadata
+     * @since 5.3.0
+     */
+    public CachedAnnotationMetadata lookupOrBuildForTypeAnnotations(ClassNode classNode) {
+        var annotatedNode = new AnnotatedNode();
+        List<AnnotationNode> typeAnnotations = classNode.getTypeAnnotations();
+        if (CollectionUtils.isNotEmpty(typeAnnotations)) {
+            annotatedNode.addAnnotations(typeAnnotations);
+        }
+        // ClassNode equality is by name; the annotations belong to this use of the type
+        return lookupOrBuild(new TypeUseKey(classNode), annotatedNode);
     }
 
     @Override
@@ -518,7 +537,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                 }
             }
         } else if (annotationValue instanceof ClassExpression classExpression) {
-            return new AnnotationClassValue<>(classExpression.getType().getName());
+            return new AnnotationClassValue<>(classLiteralName(classExpression.getType()));
         } else if (annotationValue instanceof ListExpression listExpression) {
             List<Expression> expressions = listExpression.getExpressions();
             var converted = new ArrayList<>(expressions.size());
@@ -545,13 +564,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                         converted.add(value);
                     }
                 } else if (exp instanceof ClassExpression classExpression) {
-                    String typeName;
-                    if (classExpression.getType().isArray()) {
-                        typeName = "[L" + classExpression.getType().getComponentType().getName() + ";";
-                    } else {
-                        typeName = classExpression.getType().getName();
-                    }
-                    converted.add(new AnnotationClassValue<>(typeName));
+                    converted.add(new AnnotationClassValue<>(classLiteralName(classExpression.getType())));
                 }
             }
             Object array = toArray(member, converted);
@@ -570,6 +583,22 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             }
         }
         return null;
+    }
+
+    /**
+     * The name a class literal of the given type is recorded under: the name
+     * {@link Class#getName()} gives that class. An array is named by its JVM descriptor with dots,
+     * because {@link ClassNode#getName()} keeps the source form, {@code test.Foo[]}, for any array
+     * whose component type was still unresolved when the node was made.
+     *
+     * @param type The type of the class literal
+     * @return The name of the class
+     */
+    private static String classLiteralName(ClassNode type) {
+        if (type.isArray()) {
+            return BytecodeHelper.getTypeDescription(type).replace('/', '.');
+        }
+        return type.getName();
     }
 
     private static Object toArray(AnnotatedNode member, Collection<?> collection) {
@@ -652,7 +681,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @SuppressWarnings("java:S1872")
     private Object convertConstantValue(Object value) {
         if (value instanceof ClassNode classNode) {
-            return new AnnotationClassValue<>(classNode.getName());
+            return new AnnotationClassValue<>(classLiteralName(classNode));
         }
         Class<?> valueClass = value.getClass();
         // Groovy 4.0.6 will return EnumConstantWrapper as a default value
@@ -664,14 +693,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             if (desc == null) {
                 return null;
             }
-            // Desc will return "Ljava/lang/String;"
-            var arraySuffix = new StringBuilder();
-            while (desc.startsWith("[")) {
-                desc = desc.substring(1);
-                arraySuffix.append("[]");
-            }
-            String className = desc.substring(1, desc.length() - 1).replace("/", ".") + arraySuffix;
-            return new AnnotationClassValue<>(className);
+            // Desc will return a JVM descriptor, such as "Ljava/lang/String;" or "[I"
+            return new AnnotationClassValue<>(BytecodeHelper.formatNameForClassLoading(desc));
         }
         if (value instanceof CharSequence) {
             value = value.toString();
@@ -730,4 +753,24 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         return ((MethodNode) member).getName();
     }
 
+    /**
+     * A cache key for the type annotations of one use of a type, compared by the identity of the node.
+     */
+    private static final class TypeUseKey {
+        private final ClassNode classNode;
+
+        TypeUseKey(ClassNode classNode) {
+            this.classNode = classNode;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof TypeUseKey that && that.classNode == classNode;
+        }
+
+        @Override
+        public int hashCode() {
+            return System.identityHashCode(classNode);
+        }
+    }
 }

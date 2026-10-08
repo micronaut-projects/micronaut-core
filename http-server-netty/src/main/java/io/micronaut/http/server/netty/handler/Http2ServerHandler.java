@@ -16,18 +16,23 @@
 package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogConnectionEncoder;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListener;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
+import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.AbstractHttp2ConnectionHandlerBuilder;
 import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
@@ -43,15 +48,16 @@ import io.netty.handler.codec.http2.Http2Flags;
 import io.netty.handler.codec.http2.Http2FrameListener;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2Headers;
+import io.netty.handler.codec.http2.Http2RemoteFlowController;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.Attribute;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -64,13 +70,23 @@ import java.util.Objects;
  */
 @Internal
 public final class Http2ServerHandler extends MultiplexedServerHandler implements Http2FrameListener {
-    private static final Map<Http2Error, Exception> HTTP2_ERRORS = new EnumMap<>(Http2Error.class);
+    private static final Map<Http2Error, Exception> HTTP2_ERRORS;
 
     @Nullable
     private Http2ConnectionHandler connectionHandler;
     private Http2Connection. @Nullable PropertyKey streamKey;
     private boolean reading = false;
     private boolean upgradedFromHttp1 = false;
+    /**
+     * Whether to expose the stream attachment in {@link HttpAccessLogHandler#RESPONSE_REQUEST}
+     * while response headers are written. Set when the access log is enabled.
+     */
+    private boolean exposeResponseRequest = false;
+    /**
+     * Flushes requested outside a read are coalesced into one per event loop turn.
+     */
+    @Nullable
+    private FlushCoalescer flushCoalescer;
     /**
      * Streams whose request headers were read since the last read complete, without the end of
      * the stream. These are the only streams that can still need {@link MultiplexedStream#devolveToStreaming()}
@@ -79,7 +95,9 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     private final List<Http2Stream> pendingStreams = new ArrayList<>();
 
     static {
-        for (Http2Error value : Http2Error.values()) {
+        Http2Error[] errors = Http2Error.values();
+        HTTP2_ERRORS = CollectionUtils.newEnumMap(errors);
+        for (Http2Error value : errors) {
             Exception e;
             if (value == Http2Error.CANCEL) {
                 e = StacklessStreamClosedChannelException.INSTANCE;
@@ -108,7 +126,15 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 Http2Stream stream = s.getProperty(key);
                 if (stream != null) {
                     stream.discardBufferedContent();
+                    stream.onStreamClosed();
                 }
+            }
+        });
+        Http2RemoteFlowController remoteFlowController = connectionHandler.encoder().flowController();
+        remoteFlowController.listener(s -> {
+            Http2Stream stream = s.getProperty(key);
+            if (stream != null && remoteFlowController.isWritable(s)) {
+                stream.onOutboundWritable();
             }
         });
     }
@@ -122,8 +148,16 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         // while reading, hold back flushes for efficiency.
         // Http2ConnectionHandler.readComplete does a flush.
         if (!reading) {
-            requiredConnectionHandler().flush(requiredCtx());
+            Objects.requireNonNull(flushCoalescer, "flushCoalescer").schedule();
         }
+    }
+
+    /**
+     * Perform a flush that was scheduled by the {@link #flushCoalescer}.
+     */
+    private void flushNow() {
+        endTurn();
+        requiredConnectionHandler().flush(requiredCtx());
     }
 
     @Override
@@ -146,8 +180,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         Http2Stream stream = new Http2Stream(str);
         Http2Stream existing = str.setProperty(streamKey, stream);
         if (existing != null) {
-            // ignore trailer and revert the setProperty. should not be hot path
+            // the trailers of the request. revert the setProperty. should not be hot path
             str.setProperty(streamKey, existing);
+            HttpHeaders trailers = new DefaultHttpHeaders(false);
+            HttpConversionUtil.addHttp2ToHttpHeaders(streamId, headers, trailers, HttpVersion.HTTP_1_1, true, true);
+            existing.onTrailersRead(trailers, endOfStream);
             return;
         }
         stream.onHeadersRead(HttpConversionUtil.toHttpRequest(streamId, headers, true), endOfStream);
@@ -262,6 +299,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
             handler.ctx = ctx;
+            handler.flushCoalescer = new FlushCoalescer(ctx.executor(), handler::flushNow);
             super.handlerAdded(ctx);
             // the preface has been sent if the channel is active, the WINDOW_UPDATE must come after it
             raiseConnectionWindow(ctx);
@@ -289,7 +327,10 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
             handler.devolvePendingStreams();
+            handler.endTurn();
             handler.reading = false;
+            // the superclass flushes now, which also covers a flush scheduled before this read
+            Objects.requireNonNull(handler.flushCoalescer, "flushCoalescer").cancel();
             super.channelReadComplete(ctx);
         }
 
@@ -391,9 +432,17 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         }
 
         public ConnectionHandlerBuilder compressor(HttpCompressionStrategy compressionStrategy) {
-            if (compressionStrategy.isEnabled()) {
-                frameListener.compressor(new Compressor(compressionStrategy));
-            }
+            return compressor(Compressor.create(compressionStrategy));
+        }
+
+        /**
+         * Set the response compressor. The server shares one instance between its connections.
+         *
+         * @param compressor The compressor, or {@code null} to disable compression
+         * @return This builder
+         */
+        public ConnectionHandlerBuilder compressor(@Nullable Compressor compressor) {
+            frameListener.compressor(compressor);
             return this;
         }
 
@@ -427,6 +476,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             if (accessLogManagerFactory != null) {
                 accessLogManager = new Http2AccessLogManager(accessLogManagerFactory, connection());
                 fl = new Http2AccessLogFrameListener(fl, accessLogManager);
+                frameListener.exposeResponseRequest = true;
             }
             frameListener(fl);
             return super.build();
@@ -480,6 +530,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         }
 
         @Override
+        boolean isOutboundWritable() {
+            return requiredConnectionHandler().encoder().flowController().isWritable(stream);
+        }
+
+        @Override
         void closeInput() {
             closeInput = true;
             if (stream.state() == io.netty.handler.codec.http2.Http2Stream.State.HALF_CLOSED_LOCAL) {
@@ -498,7 +553,18 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 promise = promise.unvoid();
                 promise.addListener(future -> closeInput());
             }
-            requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), HttpConversionUtil.toHttp2Headers(headers, true), 0, endStream, promise);
+            Http2Headers http2Headers = HttpConversionUtil.toHttp2Headers(headers, true);
+            if (exposeResponseRequest) {
+                Attribute<Object> attribute = requiredCtx().channel().attr(HttpAccessLogHandler.RESPONSE_REQUEST);
+                attribute.set(attachment());
+                try {
+                    requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), http2Headers, 0, endStream, promise);
+                } finally {
+                    attribute.set(null);
+                }
+            } else {
+                requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), http2Headers, 0, endStream, promise);
+            }
         }
 
         @Override
@@ -508,6 +574,15 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 promise.addListener(future -> closeInput());
             }
             requiredConnectionHandler().encoder().writeData(requiredCtx(), stream.id(), data, 0, endStream, promise);
+        }
+
+        @Override
+        void writeTrailers(HttpHeaders trailers, ChannelPromise promise) {
+            if (closeInput) {
+                promise = promise.unvoid();
+                promise.addListener(future -> closeInput());
+            }
+            requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), HttpConversionUtil.toHttp2Headers(trailers, true), 0, true, promise);
         }
     }
 

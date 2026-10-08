@@ -134,6 +134,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final VariableDef.StaticField CLASS_OBJECT = ClassTypeDef.of(Object.class).getStaticField(CLASS_FIELD, TypeDef.CLASS);
     public static final String AS_POLYGLOT_VALUE = "asPolyglotValue";
     private static final String SYNC_SNAPSHOT_FIELD_PREFIX = "graalpyInternalSynced_";
+    private static final String STATE_CLASS_SUFFIX = "$$GraalPyInternalState";
     private static final String MEMBER_LOCAL_PREFIX = "pythonMember_";
     private static final String BOOLEAN_TYPE = "boolean";
     private static final String SHORT_TYPE = "short";
@@ -275,6 +276,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private final Map<String, PythonReflectionGate.Copy> copiedRuntimeAnnotations = new HashMap<>();
     private PythonReflectionGate reflectionGate;
     private final Map<String, StubEntry> classBuilders = new LinkedHashMap<>();
+    private final Map<String, StateEntry> stateDefs = new LinkedHashMap<>();
     private final Map<String, EnumEntry> enumDefs = new LinkedHashMap<>();
     private final Map<String, InterfaceEntry> interfaceDefs = new LinkedHashMap<>();
     private final Map<String, AnnotationEntry> annotationDefs = new LinkedHashMap<>();
@@ -328,6 +330,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     ClassDef.ClassDefBuilder builder = entry.builder;
                     sourceGenerator.write(builder.build(), visitorContext, entry.originatingElement);
                 }
+                for (StateEntry entry : stateDefs.values()) {
+                    sourceGenerator.write(entry.stateDef, visitorContext, entry.originatingElement);
+                }
                 for (EnumEntry entry : enumDefs.values()) {
                     sourceGenerator.write(entry.enumDef, visitorContext, entry.originatingElement);
                     sourceGenerator.write(entry.converterDef, visitorContext, entry.originatingElement);
@@ -345,6 +350,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         } finally {
             classBuilders.clear();
+            stateDefs.clear();
             enumDefs.clear();
             interfaceDefs.clear();
             annotationDefs.clear();
@@ -597,7 +603,21 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         // DefaultValidator can inspect constrained configuration properties.
                         builder.addAnnotation(Introspected.class);
                     }
-                    StateFields state = addStateFields(builder, element, beanProperties, isIntrospectedBean, extendsPythonClass, extendsHostClass, isJunit5Test, hasDynamicBeanProperties, context);
+                    ClassDef.ClassDefBuilder stateBuilder = builder;
+                    if (declaresStateInSuperclass(classElement, isIntrospectedBean, extendsPythonClass, extendsHostClass, isJunit5Test)) {
+                        // The bridge state of a data class is declared by a generated superclass:
+                        // tools that take the declared instance fields of a class for its properties
+                        // (LangChain4j's structured-output schemas and format instructions, which
+                        // honour neither transient nor synthetic) then see only the properties.
+                        String stateClassName = stateClassName(classElement.getName());
+                        stateBuilder = ClassDef.builder(stateClassName)
+                            .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT);
+                        builder.superclass(ClassTypeDef.of(stateClassName));
+                    }
+                    StateFields state = addStateFields(builder, stateBuilder, element, beanProperties, isIntrospectedBean, extendsPythonClass, extendsHostClass, isJunit5Test, hasDynamicBeanProperties, context);
+                    if (stateBuilder != builder) {
+                        stateDefs.put(classElement.getName(), new StateEntry(stateBuilder.build(), classElement));
+                    }
                     Map<String, FieldDef> propertyFields = state.propertyFields();
                     Map<String, FieldDef> syncSnapshotFields = state.syncSnapshotFields();
                     FieldDef pythonValue = state.pythonValue();
@@ -797,16 +817,48 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
-     * Emits the property, snapshot and Python value fields of a class stub.
+     * Whether the bridge state of a class stub (the Python value, the sync snapshots and flags) is declared
+     * by a generated abstract superclass instead of the stub: for an introspected class without a Java or
+     * Python base, so that the stub declares the instance fields of its properties only.
+     */
+    private static boolean declaresStateInSuperclass(AbstractPythonClassElement classElement, boolean isIntrospectedBean, boolean extendsPythonClass, boolean extendsHostClass, boolean isJunit5Test) {
+        return isIntrospectedBean
+            && !extendsPythonClass
+            && !extendsHostClass
+            && !isJunit5Test
+            && classElement.getDeclaredGenericPlaceholders().isEmpty();
+    }
+
+    /**
+     * The name of the generated superclass declaring the bridge state of a class stub: a top-level
+     * {@code Name$$GraalPyInternalState} next to the class, {@code Outer$Inner$$GraalPyInternalState} for a
+     * member class. A Python class name has no {@code $} and nesting adds a single one, so the name is
+     * that of no Python class; it starts with the class name, as the source generator takes a simple name
+     * starting with a lower-case letter for a package.
+     *
+     * @param className The binary name of the class stub
+     * @return The name of its state superclass
+     */
+    static String stateClassName(String className) {
+        return className + STATE_CLASS_SUFFIX;
+    }
+
+    /**
+     * Emits the property, snapshot and Python value fields of a class stub. The property fields go to
+     * the stub; the bridge state goes to {@code stateBuilder}, which is either the stub or its generated
+     * superclass, whose fields the stub reaches with package access.
      */
     @SuppressWarnings("java:S107") // the flags describe generated state; a state record would obscure the call sites
-    private StateFields addStateFields(ClassDef.ClassDefBuilder builder, ClassElement element, List<PropertyElement> beanProperties, boolean isIntrospectedBean, boolean extendsPythonClass, boolean extendsHostClass, boolean isJunit5Test, boolean hasDynamicBeanProperties, VisitorContext context) {
+    private StateFields addStateFields(ClassDef.ClassDefBuilder builder, ClassDef.ClassDefBuilder stateBuilder, ClassElement element, List<PropertyElement> beanProperties, boolean isIntrospectedBean, boolean extendsPythonClass, boolean extendsHostClass, boolean isJunit5Test, boolean hasDynamicBeanProperties, VisitorContext context) {
         Map<String, FieldDef> propertyFields = new LinkedHashMap<>();
         // Last value written to the Python object for every property. The generated
         // asPolyglotValue() only re-syncs when one of these differs from the field, so a bridge
         // call on an unchanged dataclass costs no guest writes. Only classes whose properties are
         // all immutable-typed can be tracked: a collection or nested wrapper may change in place.
         Map<String, FieldDef> syncSnapshotFields = new LinkedHashMap<>();
+        Modifier[] stateAccess = stateBuilder == builder
+            ? new Modifier[] {Modifier.PRIVATE, Modifier.TRANSIENT}
+            : new Modifier[] {Modifier.TRANSIENT};
         if (isIntrospectedBean) {
             boolean trackSyncState = !isFrozenPythonDataclass(element)
                 && !hasDynamicBeanProperties
@@ -824,9 +876,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 if (trackSyncState) {
                     FieldDef snapshot = FieldDef.builder(SYNC_SNAPSHOT_FIELD_PREFIX + beanProperty.getName())
                         .ofType(propertySourceType(beanProperty))
-                        .addModifiers(Modifier.PRIVATE, Modifier.TRANSIENT)
+                        .addModifiers(stateAccess)
                         .build();
-                    builder.addField(snapshot);
+                    stateBuilder.addField(snapshot);
                     syncSnapshotFields.put(beanProperty.getName(), snapshot);
                 }
             }
@@ -846,7 +898,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 pythonValueBuilder.addModifiers(extendsHostClass ? Modifier.FINAL : Modifier.VOLATILE);
             }
             pythonValue = pythonValueBuilder.build();
-            builder.addField(pythonValue);
+            stateBuilder.addField(pythonValue);
             if (!isIntrospectedBean && !isJunit5Test && !extendsHostClass) {
                 // The Python class of an object the stub owns: an instance created through the
                 // no-argument constructor of the stub, not one wrapping an existing Python object. The
@@ -865,9 +917,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (isIntrospectedBean) {
             pythonValueSyncing = FieldDef.builder("graalpyInternalValueSyncing")
                 .ofType(TypeDef.Primitive.BOOLEAN)
-                .addModifiers(Modifier.PRIVATE, Modifier.TRANSIENT)
+                .addModifiers(stateAccess)
                 .build();
-            builder.addField(pythonValueSyncing);
+            stateBuilder.addField(pythonValueSyncing);
             if (pythonValue != null && !hasDynamicBeanProperties && ownershipMatters(beanProperties)) {
                 // Set when the Python object is created from the Java fields (the wrapper was
                 // constructed from Java or loaded from storage): the fields own the state, and
@@ -876,9 +928,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 // Java-owned again as soon as its Python object is rebuilt.
                 javaOwned = FieldDef.builder("graalpyInternalJavaOwned")
                     .ofType(TypeDef.Primitive.BOOLEAN)
-                    .addModifiers(Modifier.PRIVATE, Modifier.TRANSIENT)
+                    .addModifiers(stateAccess)
                     .build();
-                builder.addField(javaOwned);
+                stateBuilder.addField(javaOwned);
             }
         }
 
@@ -4509,6 +4561,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         ));
                     } else {
                         arguments.addAll(methodParameters);
+                        if (methodElement instanceof PythonMethodElement pythonMethod) {
+                            // a parameter injected with a bean: the bean injected into the module attribute the
+                            // processor declares, read from the module
+                            ExpressionDef classReference = arguments.getFirst();
+                            for (PythonMethodElement.InjectedArgument injected : pythonMethod.injectedArguments()) {
+                                int index = Math.min(2 + injected.position(), arguments.size());
+                                arguments.add(index, PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                                    "getStaticAttribute", POLYGLOT_VALUE, classReference, ExpressionDef.constant(injected.attribute())));
+                            }
+                        }
                     }
                     invokedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                         "invokeStaticMethod",
@@ -4516,17 +4578,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         arguments
                     );
                 } else {
-                    ExpressionDef targetValueExpression = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
-                    ClassElement declaringType = methodElement.getDeclaringType();
-                    if (isAsyncMethod && !declaringType.isAbstract()) {
-                        targetValueExpression = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                            "asyncInstance",
-                            POLYGLOT_VALUE,
-                            targetValueExpression,
-                            pythonClassReference(bridgeOwner, declaringType)
-                        );
-                    }
-                    var targetValue = targetValueExpression;
+                    // an async method runs on the bean's own object, in its own context, like any other method
+                    var targetValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
                     var targetContext = targetValue.invoke("getContext", POLYGLOT_CONTEXT);
                     if (receiverOffset == 1) {
                         parameterExpressions.add(aThis);
@@ -4542,6 +4595,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             variadicArguments = variadic.getFirst();
                         } else {
                             coerceParameterToPolyglotValue(parameter, parameterExpressions, methodParameter, targetContext);
+                        }
+                    }
+                    if (methodElement instanceof PythonMethodElement pythonMethod) {
+                        // a parameter injected with a bean (ctx: ApplicationContext = Inject()) is not an argument of
+                        // the Java method: the bean is the one injected into the attribute the processor declares
+                        int argumentsStart = receiverOffset == 1 ? 1 : 0;
+                        for (PythonMethodElement.InjectedArgument injected : pythonMethod.injectedArguments()) {
+                            int index = Math.min(argumentsStart + injected.position(), parameterExpressions.size());
+                            parameterExpressions.add(index, targetValue.invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(injected.attribute())));
                         }
                     }
                     ExpressionDef pythonArguments = TypeDef.OBJECT.array().instantiate(parameterExpressions);
@@ -5327,7 +5389,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return "is" + NameUtils.capitalize(name);
     }
 
-    private static String beanSetterName(String name) {
+    static String beanSetterName(String name) {
         return "set" + NameUtils.capitalize(name);
     }
 
@@ -5665,24 +5727,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     methodParameters.getFirst().cast(TypeDef.OBJECT)
                 );
             }
-            return StatementDef.multi(
+            return PYTHON_COERCION.invokeStatic(
+                PUT_MEMBER,
+                TypeDef.VOID,
+                targetValue,
+                ExpressionDef.constant(beanProperty.getName()),
                 PYTHON_COERCION.invokeStatic(
-                    PUT_MEMBER,
-                    TypeDef.VOID,
+                    "asyncMemberValue",
+                    TypeDef.OBJECT,
                     targetValue,
-                    ExpressionDef.constant(beanProperty.getName()),
-                    PYTHON_COERCION.invokeStatic(
-                        "asyncMemberValue",
-                        TypeDef.OBJECT,
-                        targetValue,
-                        methodParameters.getFirst().cast(TypeDef.OBJECT)
-                    )
-                ),
-                PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                    "rememberAsyncMember",
-                    TypeDef.VOID,
-                    targetValue,
-                    ExpressionDef.constant(beanProperty.getName()),
                     methodParameters.getFirst().cast(TypeDef.OBJECT)
                 )
             );
@@ -5711,24 +5764,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     methodParameters.getFirst().cast(TypeDef.OBJECT)
                 );
             }
-            return StatementDef.multi(
+            return PYTHON_COERCION.invokeStatic(
+                PUT_MEMBER,
+                TypeDef.VOID,
+                targetValue,
+                ExpressionDef.constant(beanProperty.getName()),
                 PYTHON_COERCION.invokeStatic(
-                    PUT_MEMBER,
-                    TypeDef.VOID,
+                    "asyncMemberValue",
+                    TypeDef.OBJECT,
                     targetValue,
-                    ExpressionDef.constant(beanProperty.getName()),
-                    PYTHON_COERCION.invokeStatic(
-                        "asyncMemberValue",
-                        TypeDef.OBJECT,
-                        targetValue,
-                        methodParameters.getFirst().cast(TypeDef.OBJECT)
-                    )
-                ),
-                PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                    "rememberAsyncMember",
-                    TypeDef.VOID,
-                    targetValue,
-                    ExpressionDef.constant(beanProperty.getName()),
                     methodParameters.getFirst().cast(TypeDef.OBJECT)
                 )
             );
@@ -6654,6 +6698,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     record InterfaceEntry(
         InterfaceDef interfaceDef,
+        Element originatingElement) {
+    }
+
+    /**
+     * The generated superclass declaring the bridge state of a class stub.
+     *
+     * @param stateDef           The superclass
+     * @param originatingElement The Python class
+     */
+    record StateEntry(
+        ClassDef stateDef,
         Element originatingElement) {
     }
 

@@ -16,9 +16,9 @@
 package io.micronaut.aop.runtime;
 
 import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.InterceptorRegistry;
-import io.micronaut.aop.chain.InterceptorChain;
-import io.micronaut.aop.beandefinition.SharedInterceptorRegistrations;
+import io.micronaut.aop.InterceptorKind;
+import io.micronaut.aop.chain.InterceptorCandidateResolver;
+import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -27,8 +27,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.NullMarked;
 
 import java.util.ArrayList;
@@ -83,17 +81,11 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         } else {
             executableMethods = proxyBeanDefinition.getExecutableMethods();
         }
-        InterceptorRegistry interceptorRegistry = resolutionContext.getBean(InterceptorRegistry.ARGUMENT);
-        Qualifier<Object> binding = Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(executableMethods.toArray(new ExecutableMethod[0])));
-
-        List<BeanRegistration<Interceptor<T, ?>>> interceptors = new ArrayList<>(resolutionContext.getBeanRegistrations(
-            (Argument) Argument.of(Interceptor.class),
-            binding
-        ));
-        SharedInterceptorRegistrations.store(resolutionContext, proxyBeanDefinition, interceptors);
+        InterceptorCandidateResolver candidateResolver = resolutionContext.getBean(InterceptorChainFactory.ARGUMENT).candidateResolver();
+        List<BeanRegistration<Interceptor<T, ?>>> interceptors = candidateResolver.captureProxyCandidates(resolutionContext, proxyBeanDefinition, executableMethods);
         List<InterceptedMethod<T>> interceptedMethods = new ArrayList<>(executableMethods.size());
         for (ExecutableMethod<T, ?> executableMethod : executableMethods) {
-            Interceptor<T, ?>[] methodInterceptors = InterceptorChain.resolveAroundInterceptors(interceptorRegistry, executableMethod, interceptors);
+            Interceptor<T, ?>[] methodInterceptors = candidateResolver.selectMethodInterceptors(executableMethod, interceptors, InterceptorKind.AROUND);
             if (methodInterceptors.length > 0) {
                 interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) executableMethod, (Interceptor[]) methodInterceptors));
             }
@@ -128,21 +120,15 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                                                                     Object[] constructorValues) {
 
         Collection<ExecutableMethod<T, ?>> executableMethods = proxyBeanDefinition.getExecutableMethods();
-        InterceptorRegistry interceptorRegistry = resolutionContext.getBean(InterceptorRegistry.ARGUMENT);
-        Qualifier<Object> binding = Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(executableMethods.toArray(new ExecutableMethod[0])));
-
-        List<BeanRegistration<Interceptor<T, ?>>> interceptors = new ArrayList<>(resolutionContext.getBeanRegistrations(
-            (Argument) Argument.of(Interceptor.class),
-            binding
-        ));
-        SharedInterceptorRegistrations.store(resolutionContext, proxyBeanDefinition, interceptors);
+        InterceptorCandidateResolver candidateResolver = resolutionContext.getBean(InterceptorChainFactory.ARGUMENT).candidateResolver();
+        List<BeanRegistration<Interceptor<T, ?>>> interceptors = candidateResolver.captureProxyCandidates(resolutionContext, proxyBeanDefinition, executableMethods);
         List<InterceptedMethod<T>> interceptedMethods = new ArrayList<>(executableMethods.size());
         for (ExecutableMethod<T, ?> executableMethod : executableMethods) {
             // Only the abstract methods are implemented by the introduction advice,
             // the concrete ones are intercepted and proceed to the actual implementation
             Interceptor<T, ?>[] methodInterceptors = executableMethod.isAbstract()
-                ? InterceptorChain.resolveIntroductionInterceptors(interceptorRegistry, executableMethod, interceptors)
-                : InterceptorChain.resolveAroundInterceptors(interceptorRegistry, executableMethod, interceptors);
+                ? candidateResolver.selectMethodInterceptors(executableMethod, interceptors, InterceptorKind.INTRODUCTION)
+                : candidateResolver.selectMethodInterceptors(executableMethod, interceptors, InterceptorKind.AROUND);
             if (methodInterceptors.length > 0) {
                 interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) executableMethod, (Interceptor[]) methodInterceptors));
             }

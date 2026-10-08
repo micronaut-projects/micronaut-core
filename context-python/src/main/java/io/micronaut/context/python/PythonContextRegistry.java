@@ -775,15 +775,6 @@ final class PythonContextRegistry {
     /**
      * The runtime state of one GraalPy context.
      */
-    /**
-     * The event-loop instance of a startup-context object.
-     *
-     * @param target The event-loop instance
-     * @param constructorMembers The members its own {@code __init__} set
-     */
-    record AsyncInstance(Value target, Set<String> constructorMembers) {
-    }
-
     static final class ContextState {
         final Object lock = new Object();
         /** The enterable creator instance of this context, when known. */
@@ -792,20 +783,17 @@ final class PythonContextRegistry {
         volatile boolean registered;
         /** Whether entering was probed on an instance that cannot be entered. */
         volatile boolean enterUnsupported;
-        /** Host members assigned to startup-context objects, mirrored into event-loop contexts. */
-        final IdentityHashMap<Value, Map<String, Object>> asyncMembers = new IdentityHashMap<>();
-        /**
-         * Host constructor arguments of startup-context objects, replayed into event-loop contexts. Weak: an object
-         * created per request is forgotten with its wrapper, which holds the key.
-         */
-        final WeakHashMap<Value, Object[]> asyncConstructorArguments = new WeakHashMap<>();
-        /**
-         * Event-loop instances of startup-context objects, in an event-loop context. Weak: the startup object's
-         * wrapper holds the key.
-         */
-        final Map<Value, AsyncInstance> asyncInstances = Collections.synchronizedMap(new WeakHashMap<>());
         /** Whether a Python class declares coroutine methods, keyed by its class cache key. */
         final Map<String, Boolean> coroutineClasses = new ConcurrentHashMap<>();
+        /** Class-bound allocators, keyed by the precomputed class reference cache key. */
+        final Map<String, Value> uninitializedInstanceFactories = new ConcurrentHashMap<>();
+        /** Successfully prepared introduction classes, keyed by the precomputed class reference cache key. */
+        final Set<String> preparedIntroductionClasses = ConcurrentHashMap.newKeySet();
+        /**
+         * Whether a member of a Python class is an async function, by class and member name: read for every call
+         * a caller in another context makes through a wrapper.
+         */
+        final Map<Value, Map<String, String>> asyncFunctionKinds = new ConcurrentHashMap<>();
         /**
          * The pooled beans that have an instance in this context, so that closing it can tell them to
          * drop it. The instances themselves live on the bean, which is what makes a collected bean take
@@ -849,10 +837,10 @@ final class PythonContextRegistry {
                 holder.forget(owner);
             }
             pooledHolders.clear();
-            asyncMembers.clear();
-            asyncConstructorArguments.clear();
-            asyncInstances.clear();
             coroutineClasses.clear();
+            uninitializedInstanceFactories.clear();
+            preparedIntroductionClasses.clear();
+            asyncFunctionKinds.clear();
             helpers.clear();
             classes.clear();
             scopedProxies.clear();

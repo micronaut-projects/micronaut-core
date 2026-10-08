@@ -34,6 +34,31 @@ class BeanIntrospectionSpec extends AbstractBeanDefinitionSpec {
         System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, IntrospectedTypeElementVisitor.name)
     }
 
+    void "test a method declared with a leading dollar is introspected the same way as in Java"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.DollarNamed', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class DollarNamed {
+
+    String name
+
+    String $work() { "w" }
+}
+''')
+        expect: "the declared property is introspected"
+        introspection.getProperty("name").isPresent()
+
+        and: 'the dollar prefixed method is read as a property, exactly as it already is for the ' +
+             'equivalent Java class: NameUtils.isReaderName accepts a name whose first character ' +
+             'is a dollar, an underscore or upper case even when it carries no read prefix'
+        introspection.getProperty('$work').isPresent()
+        introspection.getProperty('$work').get().isReadOnly()
+    }
+
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/12727")
     void "test json property on groovy property is not treated as inaccessible field"() {
         given:

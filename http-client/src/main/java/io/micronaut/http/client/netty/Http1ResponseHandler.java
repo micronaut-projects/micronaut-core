@@ -18,10 +18,13 @@ package io.micronaut.http.client.netty;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.netty.buffer.ByteBuf;
@@ -34,8 +37,6 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.ReferenceCountUtil;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -45,13 +46,18 @@ import java.util.concurrent.TimeUnit;
 /**
  * Inbound message handler for the HTTP/1.1 client. Also used for HTTP/2 and /3 through message
  * translators.
+ * <p>
+ * The handler is installed once per connection (or per HTTP/2 stream) and stays in the pipeline.
+ * Each request is started with {@link #startRequest(ResponseListener)}, which sets the listener
+ * for the response. Once the response is fully received (or failed), the handler returns to the
+ * {@link Idle} state, in which it behaves like an absent handler: inbound messages, exceptions
+ * and the inactive event are passed on to the next handler in the pipeline.
  *
  * @author Jonas Konrad
  * @since 4.7.0
  */
 @Internal
 final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented<HttpObject> {
-    private static final Logger LOG = LoggerFactory.getLogger(Http1ResponseHandler.class);
     /**
      * A response body that is abandoned before it ended is drained so that the connection can be
      * reused. Beyond this many bytes, the rest of the body is not drained.
@@ -63,19 +69,85 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
     private static final long DISCARD_TIME_LIMIT_MILLIS = 5000;
 
     private ReaderState<?> state;
+    @Nullable
+    private ChannelHandlerContext ctx;
+    /**
+     * The listener of the request in progress, {@code null} while {@link Idle}.
+     */
+    @Nullable
+    private ResponseListener listener;
 
+    /**
+     * Create a handler that is installed once and serves any number of sequential requests, each
+     * started with {@link #startRequest(ResponseListener)}.
+     */
+    public Http1ResponseHandler() {
+        super(false);
+        state = Idle.INSTANCE;
+    }
+
+    /**
+     * Create a handler that immediately expects the response for one request.
+     *
+     * @param listener The listener for that response
+     */
     public Http1ResponseHandler(ResponseListener listener) {
         super(false);
+        this.listener = listener;
         state = new BeforeResponse(listener);
     }
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) {
-        ctx.read();
+        this.ctx = ctx;
+        if (state != Idle.INSTANCE) {
+            ctx.read();
+        }
+    }
+
+    @Override
+    public void handlerRemoved(ChannelHandlerContext ctx) {
+        this.ctx = null;
+    }
+
+    /**
+     * Start expecting the response of a request. Must be called on the event loop, while no
+     * other request is in progress. The {@link PropagatedContext} bound on the calling thread is
+     * used for all inbound messages of the response.
+     *
+     * @param listener The listener for the response
+     */
+    void startRequest(ResponseListener listener) {
+        ChannelHandlerContext context = this.ctx;
+        if (context == null) {
+            throw new IllegalStateException("Not added to a channel");
+        }
+        if (!context.executor().inEventLoop()) {
+            throw new IllegalStateException("Not on event loop");
+        }
+        if (state != Idle.INSTANCE) {
+            throw new IllegalStateException("A request is already in progress");
+        }
+        setPropagatedContext(PropagatedContext.getOrEmpty());
+        this.listener = listener;
+        state = new BeforeResponse(listener);
+        context.read();
+    }
+
+    /**
+     * @return {@code true} iff no request is in progress
+     */
+    boolean isIdle() {
+        return state == Idle.INSTANCE;
     }
 
     @Override
     protected void channelReadInstrumented(ChannelHandlerContext ctx, HttpObject msg) throws Exception {
+        if (state == Idle.INSTANCE) {
+            // behave like an absent handler
+            ctx.fireChannelRead(msg);
+            return;
+        }
         if (msg.decoderResult().isFailure()) {
             ReferenceCountUtil.release(msg);
             exceptionCaught(ctx, msg.decoderResult().cause());
@@ -101,6 +173,42 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         state.exceptionCaught(ctx, cause);
     }
 
+    @Override
+    public void channelWritabilityChanged(ChannelHandlerContext ctx) {
+        ResponseListener current = this.listener;
+        if (current != null) {
+            current.writabilityChanged(ctx);
+        }
+        ctx.fireChannelWritabilityChanged();
+    }
+
+    /**
+     * The failure of a body whose response arrived: a read timeout says so, so that it is not
+     * taken for a timeout while the response was awaited, and a stream reset that claims the
+     * request was not processed (HTTP/2 {@code REFUSED_STREAM}, HTTP/3
+     * {@code H3_REQUEST_REJECTED}) is a body cut off, since the server did respond.
+     *
+     * @param cause The failure while the body was read
+     * @return The failure of the body
+     */
+    private static Throwable bodyFailure(Throwable cause) {
+        if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
+            return ReadTimeoutException.BODY_TIMEOUT_EXCEPTION;
+        }
+        if (cause instanceof UnprocessedRequestException) {
+            return new ResponseClosedException("Stream reset by the server after the response headers", true).initCause(cause);
+        }
+        return cause;
+    }
+
+    /**
+     * @return The failure of a response whose headers were received, but whose body was cut off
+     * by the connection closing
+     */
+    private static ResponseClosedException closedDuringBody() {
+        return new ResponseClosedException("Connection closed before the response body was received completely", true);
+    }
+
     private void transitionToState(ChannelHandlerContext ctx, ReaderState<?> fromState, ReaderState<?> nextState) {
         if (!ctx.executor().inEventLoop()) {
             throw new IllegalStateException("Not on event loop");
@@ -110,6 +218,12 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         }
         fromState.leave(ctx);
         state = nextState;
+        if (nextState == Idle.INSTANCE) {
+            // the request is done. The listener is notified by the caller, after which the next
+            // request may start on this handler
+            this.listener = null;
+            setPropagatedContext(PropagatedContext.empty());
+        }
     }
 
     private abstract static sealed class ReaderState<M extends HttpObject> {
@@ -142,9 +256,21 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         @Override
         void read(ChannelHandlerContext ctx, HttpResponse msg) {
             ReaderState<HttpContent> nextState;
-            if (msg.status().code() == HttpResponseStatus.CONTINUE.code()) {
+            int code = msg.status().code();
+            if (code == HttpResponseStatus.CONTINUE.code()) {
                 listener.continueReceived(ctx);
-                nextState = new DiscardingContinueContent(this);
+                nextState = new DiscardingInterimContent(this);
+            } else if (code >= 100 && code < 200 && code != HttpResponseStatus.SWITCHING_PROTOCOLS.code()) {
+                // an interim response, e.g. 103 Early Hints: the final response follows
+                listener.interimResponseReceived(ctx, msg);
+                nextState = new DiscardingInterimContent(this);
+            } else if (code == HttpResponseStatus.SWITCHING_PROTOCOLS.code() && listener.upgrade(ctx, msg)) {
+                // the connection now carries another protocol, and the listener took it over
+                transitionToState(ctx, this, Idle.INSTANCE);
+                if (msg instanceof HttpContent c) {
+                    c.release();
+                }
+                return;
             } else {
                 nextState = new BufferedContent(listener, msg);
             }
@@ -157,7 +283,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         @Override
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            transitionToState(ctx, this, AfterContent.INSTANCE);
+            transitionToState(ctx, this, Idle.INSTANCE);
             listener.fail(ctx, cause);
             listener.finish(ctx);
         }
@@ -190,20 +316,23 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             } else {
                 msg.release();
             }
-            if (msg instanceof LastHttpContent) {
+            if (msg instanceof LastHttpContent last) {
                 List<ByteBuf> buffered = this.buffered;
                 this.buffered = null;
-                transitionToState(ctx, this, AfterContent.INSTANCE);
+                transitionToState(ctx, this, Idle.INSTANCE);
                 BodySizeLimits limits = listener.sizeLimits();
+                NettyByteBodyFactory factory = new NettyByteBodyFactory(ctx.channel());
+                CloseableByteBody body;
                 if (buffered == null) {
-                    complete(NettyByteBodyFactory.empty());
+                    body = NettyByteBodyFactory.empty();
                 } else if (buffered.size() == 1) {
-                    complete(new NettyByteBodyFactory(ctx.channel()).createChecked(limits, buffered.get(0)));
+                    body = factory.createChecked(limits, buffered.get(0));
                 } else {
                     CompositeByteBuf composite = ctx.alloc().compositeBuffer();
                     composite.addComponents(true, buffered);
-                    complete(new NettyByteBodyFactory(ctx.channel()).createChecked(limits, composite));
+                    body = factory.createChecked(limits, composite);
                 }
+                complete(factory.withTrailers(body, last.trailingHeaders()));
                 listener.finish(ctx);
             }
         }
@@ -218,6 +347,11 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             devolveToStreaming(ctx);
             state.exceptionCaught(ctx, cause);
+        }
+
+        @Override
+        void channelInactive(ChannelHandlerContext ctx) {
+            exceptionCaught(ctx, closedDuringBody());
         }
 
         private void devolveToStreaming(ChannelHandlerContext ctx) {
@@ -280,9 +414,9 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         @Override
         void read(ChannelHandlerContext ctx, HttpContent msg) {
             add(NettyReadBufferFactory.of(ctx.alloc()).adapt(msg.content()));
-            if (msg instanceof LastHttpContent) {
-                transitionToState(ctx, this, AfterContent.INSTANCE);
-                streaming.complete();
+            if (msg instanceof LastHttpContent last) {
+                transitionToState(ctx, this, Idle.INSTANCE);
+                streaming.completeWithTrailers(last.trailingHeaders());
                 listener.finish(ctx);
             }
         }
@@ -296,9 +430,16 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         @Override
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            transitionToState(ctx, this, AfterContent.INSTANCE);
-            streaming.error(cause);
+            transitionToState(ctx, this, Idle.INSTANCE);
+            Throwable failure = bodyFailure(cause);
+            listener.bodyFailed(ctx, failure);
+            streaming.error(failure);
             listener.finish(ctx);
+        }
+
+        @Override
+        void channelInactive(ChannelHandlerContext ctx) {
+            exceptionCaught(ctx, closedDuringBody());
         }
 
         @Override
@@ -408,7 +549,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             discarded += msg.content().readableBytes();
             msg.release();
             if (msg instanceof LastHttpContent) {
-                transitionToState(ctx, this, AfterContent.INSTANCE);
+                transitionToState(ctx, this, Idle.INSTANCE);
                 listener.finish(ctx);
             } else if (discarded > DISCARD_BYTE_LIMIT) {
                 discardLimitReached();
@@ -417,8 +558,10 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         @Override
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            transitionToState(ctx, this, AfterContent.INSTANCE);
-            streaming.error(cause);
+            transitionToState(ctx, this, Idle.INSTANCE);
+            Throwable failure = bodyFailure(cause);
+            listener.bodyFailed(ctx, failure);
+            streaming.error(failure);
             listener.finish(ctx);
         }
 
@@ -440,12 +583,13 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
     }
 
     /**
-     * Short-circuiting handler that discards incoming content of a CONTINUE response.
+     * Short-circuiting handler that discards the (empty) content of an interim (1xx) response,
+     * and waits for the next response.
      */
-    private final class DiscardingContinueContent extends ReaderState<HttpContent> {
+    private final class DiscardingInterimContent extends ReaderState<HttpContent> {
         private final BeforeResponse beforeResponse;
 
-        DiscardingContinueContent(BeforeResponse beforeResponse) {
+        DiscardingInterimContent(BeforeResponse beforeResponse) {
             this.beforeResponse = beforeResponse;
         }
 
@@ -464,18 +608,21 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
     }
 
     /**
-     * Special handler that is used after the {@link LastHttpContent}. There should be no more
-     * incoming messages at this point.
+     * State between requests, i.e. before {@link #startRequest} and after the
+     * {@link LastHttpContent} (or the failure) of the previous response. Everything is passed on
+     * to the next handler, as if this handler were not in the pipeline.
      */
-    private static final class AfterContent extends ReaderState<HttpContent> {
-        static final AfterContent INSTANCE = new AfterContent();
+    private static final class Idle extends ReaderState<HttpObject> {
+        static final Idle INSTANCE = new Idle();
 
         @Override
-        void read(ChannelHandlerContext ctx, HttpContent msg) {
-            if (LOG.isWarnEnabled()) {
-                LOG.warn("Discarding unexpected message {}", msg);
-            }
-            ReferenceCountUtil.release(msg);
+        void read(ChannelHandlerContext ctx, HttpObject msg) {
+            ctx.fireChannelRead(msg);
+        }
+
+        @Override
+        void channelReadComplete(ChannelHandlerContext ctx) {
+            ctx.fireChannelReadComplete();
         }
 
         @Override
@@ -513,6 +660,32 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         }
 
         /**
+         * Called when the handler receives a {@code 101 Switching Protocols} response. A listener
+         * that takes the connection over for the new protocol removes this handler and the HTTP
+         * codec from the pipeline and returns {@code true}; the raw bytes that follow then reach
+         * the handlers it added. Returns {@code false} by default: the response is then read like
+         * any other.
+         *
+         * @param ctx      The handler context
+         * @param response The response
+         * @return Whether the listener took the connection over
+         */
+        default boolean upgrade(ChannelHandlerContext ctx, HttpResponse response) {
+            return false;
+        }
+
+        /**
+         * Called when the handler receives an interim (1xx) response other than
+         * {@code CONTINUE}, e.g. {@code 103 Early Hints}. The final response follows. Ignored by
+         * default.
+         *
+         * @param ctx      The handler context
+         * @param response The interim response
+         */
+        default void interimResponseReceived(ChannelHandlerContext ctx, HttpResponse response) {
+        }
+
+        /**
          * Called when the handler receives a {@code CONTINUE} response, so the listener should
          * proceed with sending the request body.
          *
@@ -540,12 +713,33 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         void complete(HttpResponse response, CloseableByteBody body);
 
         /**
-         * Called when the last piece of the body is received. This handler can be removed and the
-         * connection can be returned to the connection pool.
+         * Called when the body passed to {@link #complete(HttpResponse, CloseableByteBody)}
+         * fails before its last piece, e.g. the connection closed or the read timed out. The
+         * failure is then passed to the body, and {@link #finish} is called.
+         *
+         * @param ctx   The handler context
+         * @param cause The failure
+         */
+        default void bodyFailed(ChannelHandlerContext ctx, Throwable cause) {
+        }
+
+        /**
+         * Called when the last piece of the body is received, or the response or its body
+         * failed. The handler is idle again and the connection can be returned to the connection
+         * pool. The next request may be started on this handler from within this method.
          *
          * @param ctx The handler context
          */
         void finish(ChannelHandlerContext ctx);
+
+        /**
+         * Called when the writability of the channel changed, e.g. so that a streaming request
+         * body can resume writing.
+         *
+         * @param ctx The handler context
+         */
+        default void writabilityChanged(ChannelHandlerContext ctx) {
+        }
 
         /**
          * Called when the body passed to {@link #complete(HttpResponse, CloseableByteBody)} has

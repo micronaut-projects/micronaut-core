@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler;
 
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.server.netty.DefaultHttpCompressionStrategy;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
@@ -49,7 +50,15 @@ import java.util.Iterator;
 import java.util.Objects;
 import java.util.Set;
 
-final class Compressor {
+/**
+ * Response compressor for the HTTP server. It holds no per-connection state, so the server
+ * creates one instance with {@link #create(HttpCompressionStrategy)} and shares it between all
+ * of its connections.
+ *
+ * @since 5.3.0
+ */
+@Internal
+public final class Compressor {
     private final HttpCompressionStrategy strategy;
     @Nullable
     private final BrotliOptions brotliOptions;
@@ -88,6 +97,18 @@ final class Compressor {
         this.available = Collections.unmodifiableSet(algorithms);
     }
 
+    /**
+     * Create a compressor for the given strategy. The result holds no per-connection state and
+     * can be shared by all connections of a server.
+     *
+     * @param strategy The compression strategy
+     * @return The compressor, or {@code null} if compression is disabled
+     */
+    @Nullable
+    public static Compressor create(HttpCompressionStrategy strategy) {
+        return strategy.isEnabled() ? new Compressor(strategy) : null;
+    }
+
     @Nullable
     Session prepare(ChannelHandlerContext ctx, HttpRequest request, HttpResponse response, long contentLength) {
         // from HttpContentEncoder: isPassthru
@@ -97,15 +118,20 @@ final class Compressor {
             response.protocolVersion() == HttpVersion.HTTP_1_0) {
             return null;
         }
-        if (strategy instanceof DefaultHttpCompressionStrategy def ? !def.shouldCompress(response, contentLength) : !strategy.shouldCompress(response)) {
-            return null;
-        }
         if (response.headers().contains(HttpHeaderNames.CONTENT_ENCODING)) {
             // already encoded
             return null;
         }
+        // check the request accepts a compression we can do before inspecting the content type
+        if (!request.headers().contains(HttpHeaderNames.ACCEPT_ENCODING)) {
+            // without the header there is nothing to iterate
+            return null;
+        }
         Algorithm encoding = determineEncoding(request.headers().valueStringIterator(HttpHeaderNames.ACCEPT_ENCODING));
         if (encoding == null) {
+            return null;
+        }
+        if (strategy instanceof DefaultHttpCompressionStrategy def ? !def.shouldCompress(response, contentLength) : !strategy.shouldCompress(response)) {
             return null;
         }
         response.headers().add(HttpHeaderNames.CONTENT_ENCODING, encoding.contentEncoding);
@@ -287,7 +313,7 @@ final class Compressor {
                 for (Object outboundMessage : compressionChannel.outboundMessages()) {
                     newContentLength += ((ByteBuf) outboundMessage).readableBytes();
                 }
-                hr.headers().set(HttpHeaderNames.CONTENT_LENGTH, newContentLength);
+                ContentLengthValues.set(hr.headers(), newContentLength);
             }
         }
 

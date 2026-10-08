@@ -30,6 +30,7 @@ import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.body.stream.TrailingByteBody;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -39,6 +40,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 
 /**
  * Factory methods for {@link ByteBody}s.
@@ -210,6 +213,33 @@ public class ByteBodyFactory {
     }
 
     /**
+     * The executor the {@link StreamingBody#sharedBuffer() buffer} of a
+     * {@link #createStreamingBody streaming body} of this factory must be fed on, in the order the
+     * tasks were submitted. <b>Internal API.</b>
+     *
+     * @return The executor: the event loop of a runtime with one, or an executor that runs the
+     * task on the calling thread, since the default buffer serializes concurrent calls itself
+     * @since 5.3.0
+     */
+    @Internal
+    public Executor streamingBodyExecutor() {
+        return Runnable::run;
+    }
+
+    /**
+     * Whether the current thread is an event loop thread of the runtime of this factory, which
+     * must not block: the thread of the {@link #streamingBodyExecutor()}, or the thread of
+     * another event loop. <b>Internal API.</b>
+     *
+     * @return {@code true} if blocking the current thread would block an event loop
+     * @since 5.3.0
+     */
+    @Internal
+    public boolean isEventLoopThread() {
+        return false;
+    }
+
+    /**
      * Create a new body adapter for transforming a publisher into a {@link ByteBody}. <b>Internal
      * API.</b>
      *
@@ -225,7 +255,9 @@ public class ByteBodyFactory {
     /**
      * Create a new {@link ByteBody} that wraps the given buffer, but also check the buffer size
      * against the given size limits. If the buffer is too large, this will return a streaming body
-     * with an error. If that is not the case, this will return a normal available body.
+     * with an error. If that is not the case, this will return a normal available body. A buffer
+     * that is only larger than the buffer limit can still be streamed by a reader that does not
+     * hold it, see {@link BaseSharedBuffer#setKeepInitialBytes()}.
      *
      * @param bodySizeLimits The size limits
      * @param buf            The buffer
@@ -240,7 +272,15 @@ public class ByteBodyFactory {
             BufferConsumer.Upstream upstream = bytesConsumed -> {
             };
             StreamingBody streamingBody = createStreamingBody(bodySizeLimits, upstream);
-            streamingBody.sharedBuffer.add(buf); // this will trigger the exception for exceeded body or buffer size
+            if (readable > bodySizeLimits.maxBodySize()) {
+                streamingBody.sharedBuffer.add(buf); // this will trigger the exception for exceeded body size
+            } else {
+                // the bytes are all there: a reader that streams them without holding them gets
+                // them, any other reader fails with the buffer limit
+                streamingBody.sharedBuffer.setKeepInitialBytes();
+                streamingBody.sharedBuffer.add(buf);
+                streamingBody.sharedBuffer.complete();
+            }
             return streamingBody.rootBody;
         } else {
             return adapt(buf);
@@ -294,6 +334,99 @@ public class ByteBodyFactory {
     }
 
     /**
+     * Create a body with the bytes of the given body and the given trailers, see
+     * {@link ByteBody#trailers()}. The given body is claimed. The trailers are sent after the
+     * last bytes, once the stage completes, so a message with this body uses the chunked
+     * transfer coding on HTTP/1 whatever the length of the bytes. When the stage fails, the
+     * body fails.
+     *
+     * @param body     The bytes
+     * @param trailers The trailers to send after the bytes, empty headers for none
+     * @return The body with the trailers
+     * @since 5.3.0
+     */
+    @NonNull
+    public final CloseableByteBody withTrailers(@NonNull CloseableByteBody body, @NonNull CompletionStage<? extends HttpHeaders> trailers) {
+        @SuppressWarnings("unchecked")
+        CompletionStage<HttpHeaders> stage = (CompletionStage<HttpHeaders>) trailers;
+        return new TrailingByteBody(body.move(), stage);
+    }
+
+    /**
+     * A body with the bytes of the given body that fails with a
+     * {@link io.micronaut.http.exceptions.ContentLengthExceededException} once more than the given
+     * number of bytes arrive, e.g. to bound the body of a request a proxy relays. A body whose
+     * known length is over the limit fails right away. The given body is claimed; its trailers
+     * and its known length are kept.
+     *
+     * @param body        The body
+     * @param maxBodySize The maximum number of bytes
+     * @return The limited body
+     * @since 5.3.0
+     */
+    @NonNull
+    public final CloseableByteBody limit(@NonNull CloseableByteBody body, long maxBodySize) {
+        if (maxBodySize < 0) {
+            throw new IllegalArgumentException("The maximum body size is negative");
+        }
+        long expected = body.expectedLength().orElse(-1);
+        if (expected >= 0 && expected <= maxBodySize) {
+            return body.move();
+        }
+        if (expected > maxBodySize) {
+            // over the limit by its known length: the bytes are never read, so they are released now
+            body.close();
+            StreamingBody failed = createStreamingBody(new BodySizeLimits(maxBodySize, Integer.MAX_VALUE), bytesConsumed -> {
+            });
+            failed.sharedBuffer.setExpectedLengthFrom(Long.toString(expected));
+            return failed.rootBody;
+        }
+        AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
+        StreamingBody sb = createStreamingBody(new BodySizeLimits(maxBodySize, Integer.MAX_VALUE), adapter);
+        adapter.setSharedBuffer(sb.sharedBuffer);
+        adapter.setTrailers(body.trailers());
+        return sb.rootBody;
+    }
+
+    /**
+     * A body that can be read more than once while its bytes arrive, keeping up to the given
+     * number of bytes, e.g. to send a request again after a failed attempt, see
+     * {@link ReplayableByteBody}. The given body is claimed. A body whose bytes are all there is
+     * replayable whatever its size, and a body whose known length is over the limit is read
+     * once.
+     *
+     * @param body          The body
+     * @param maxBufferSize The maximum number of bytes to keep for the next readers
+     * @return The replayable body
+     * @since 5.3.0
+     */
+    @NonNull
+    public final ReplayableByteBody replayable(@NonNull CloseableByteBody body, long maxBufferSize) {
+        if (maxBufferSize < 0) {
+            throw new IllegalArgumentException("The maximum buffer size is negative");
+        }
+        if (body instanceof AvailableByteBody) {
+            // the bytes are all there: a split is a reference, not a copy
+            return new ReplayableByteBody(body.move(), null, maxBufferSize);
+        }
+        long expected = body.expectedLength().orElse(-1);
+        if (expected > maxBufferSize) {
+            // the bytes cannot all be kept: the body is read once, and nothing is kept
+            return new ReplayableByteBody(body.move(), expected, maxBufferSize);
+        }
+        AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
+        StreamingBody sb = createStreamingBody(new BodySizeLimits(Long.MAX_VALUE, maxBufferSize), adapter);
+        // the buffered size counts what the body keeps, each reader is charged on its own
+        sb.sharedBuffer.setReaderBufferLimit(maxBufferSize);
+        adapter.setSharedBuffer(sb.sharedBuffer);
+        adapter.setTrailers(body.trailers());
+        if (expected >= 0) {
+            sb.sharedBuffer.setExpectedLength(expected);
+        }
+        return new ReplayableByteBody(sb.rootBody, sb.sharedBuffer, maxBufferSize);
+    }
+
+    /**
      * Convert a {@link ByteBody} into a {@link BaseStreamingByteBody} with the same content.
      * <b>Internal API.</b>
      *
@@ -308,6 +441,7 @@ public class ByteBodyFactory {
         AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
         StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb.sharedBuffer);
+        adapter.setTrailers(body.trailers());
         body.expectedLength().ifPresent(sb.sharedBuffer::setExpectedLength);
         return sb.rootBody;
     }

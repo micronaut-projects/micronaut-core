@@ -41,6 +41,11 @@ final class DefaultGenericPlaceholder<T>
     @Nullable
     private final List<Argument<?>> bounds;
     /**
+     * Whether the placeholder stands for a type resolved in place of the variable, see
+     * {@link GenericPlaceholder#isResolved()}.
+     */
+    private final boolean resolved;
+    /**
      * The type the variable erases to, answered when no bounds were recorded, computed once.
      */
     @Nullable
@@ -59,7 +64,7 @@ final class DefaultGenericPlaceholder<T>
             @Nullable String name,
             @Nullable AnnotationMetadata annotationMetadata,
             Argument<?> @Nullable ... genericTypes) {
-        this(type, name, name, annotationMetadata, genericTypes, (List<Argument<?>>) null);
+        this(type, name, name, annotationMetadata, genericTypes, (List<Argument<?>>) null, false);
     }
 
     /**
@@ -77,7 +82,7 @@ final class DefaultGenericPlaceholder<T>
             String variableName,
             @Nullable AnnotationMetadata annotationMetadata,
             Argument<?>... genericTypes) {
-        this(type, name, variableName, annotationMetadata, genericTypes, (List<Argument<?>>) null);
+        this(type, name, variableName, annotationMetadata, genericTypes, (List<Argument<?>>) null, false);
     }
 
     /**
@@ -98,8 +103,32 @@ final class DefaultGenericPlaceholder<T>
             @Nullable AnnotationMetadata annotationMetadata,
             Argument<?> @Nullable [] genericTypes,
             Argument<?> @Nullable [] bounds) {
+        this(type, name, variableName, annotationMetadata, genericTypes, bounds, false);
+    }
+
+    /**
+     * Constructor for a placeholder that keeps the bounds declared for its type variable and says whether it
+     * stands for a type resolved in place of the variable.
+     *
+     * @param type               The type, the one the variable was resolved to when {@code resolved}
+     * @param name               The name
+     * @param variableName       The variable name, {@code null} when it is the argument name
+     * @param annotationMetadata The annotation metadata
+     * @param genericTypes       The generic types
+     * @param bounds             The declared bounds, {@code null} or empty when they were not recorded
+     * @param resolved           Whether the placeholder stands for a type resolved in place of the variable
+     * @since 5.3.0
+     */
+    DefaultGenericPlaceholder(
+            Class<T> type,
+            @Nullable String name,
+            @Nullable String variableName,
+            @Nullable AnnotationMetadata annotationMetadata,
+            Argument<?> @Nullable [] genericTypes,
+            Argument<?> @Nullable [] bounds,
+            boolean resolved) {
         this(type, name, variableName, annotationMetadata, genericTypes,
-            bounds == null || bounds.length == 0 ? null : List.of(bounds));
+            bounds == null || bounds.length == 0 ? null : List.of(bounds), resolved);
     }
 
     private DefaultGenericPlaceholder(
@@ -108,11 +137,21 @@ final class DefaultGenericPlaceholder<T>
             @Nullable String variableName,
             @Nullable AnnotationMetadata annotationMetadata,
             Argument<?> @Nullable [] genericTypes,
-            @Nullable List<Argument<?>> bounds) {
+            @Nullable List<Argument<?>> bounds,
+            boolean resolved) {
         super(type, name, annotationMetadata, genericTypes);
         this.name = name;
         this.variableName = variableName;
         this.bounds = bounds;
+        this.resolved = resolved;
+    }
+
+    private DefaultGenericPlaceholder(DefaultGenericPlaceholder<T> placeholder, @Nullable Argument<?> componentType) {
+        super(placeholder, componentType);
+        this.name = placeholder.name;
+        this.variableName = placeholder.variableName;
+        this.bounds = placeholder.bounds;
+        this.resolved = placeholder.resolved;
     }
 
     @Override
@@ -139,14 +178,24 @@ final class DefaultGenericPlaceholder<T>
     }
 
     @Override
+    public boolean isResolved() {
+        return resolved;
+    }
+
+    @Override
     public Argument<T> withName(@Nullable String name) {
         // Renaming the argument does not rename the variable it stands for, so an implicit variable name,
         // the name this argument was given, is resolved before the new one replaces it
-        return new DefaultGenericPlaceholder<>(getType(), name, getVariableName(), getAnnotationMetadata(), getTypeParameters(), bounds);
+        return keepComponentType(new DefaultGenericPlaceholder<>(getType(), name, getVariableName(), getAnnotationMetadata(), getTypeParameters(), bounds, resolved));
     }
 
     @Override
     public Argument<T> withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        return new DefaultGenericPlaceholder<>(getType(), name, variableName, annotationMetadata, getTypeParameters(), bounds);
+        return keepComponentType(new DefaultGenericPlaceholder<>(getType(), name, variableName, annotationMetadata, getTypeParameters(), bounds, resolved));
+    }
+
+    @Override
+    protected DefaultArgument<T> copyWithComponentType(@Nullable Argument<?> componentType) {
+        return new DefaultGenericPlaceholder<>(this, componentType);
     }
 }

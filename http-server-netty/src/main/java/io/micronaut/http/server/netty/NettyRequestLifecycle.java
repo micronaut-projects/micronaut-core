@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.propagation.PropagatedContext;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
@@ -29,6 +30,7 @@ import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
@@ -41,9 +43,11 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
 
 @Internal
-final class NettyRequestLifecycle extends RequestLifecycle {
+final class NettyRequestLifecycle extends RequestLifecycle implements Function<Throwable, ExecutionFlow<HttpResponse<?>>> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyRequestLifecycle.class);
 
     private final RoutingInBoundHandler rib;
@@ -55,6 +59,12 @@ final class NettyRequestLifecycle extends RequestLifecycle {
      */
     @Nullable
     private NettyHttpRequest<?> nettyRequest;
+
+    /**
+     * The context that {@link #handleNormal} ran in, for handling write errors.
+     */
+    @Nullable
+    private PropagatedContext writeErrorContext;
 
     NettyRequestLifecycle(RoutingInBoundHandler rib, OutboundAccess outboundAccess) {
         super(rib.routeExecutor);
@@ -95,15 +105,48 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             }
         }
 
+        writeErrorContext = PropagatedContext.getOrEmpty();
+        // this lifecycle is the write error handler (see apply), so nothing is allocated for it
+        Function<Throwable, ExecutionFlow<HttpResponse<?>>> writeErrorHandler = this;
         ImperativeExecutionFlow<HttpResponse<?>> imperativeFlow = result.tryComplete();
         if (imperativeFlow != null) {
             Object value = ((ImperativeExecutionFlow<?>) imperativeFlow).getValue();
             // usually this is a MutableHttpResponse, avoid scalability issues here
             HttpResponse<?> response = value instanceof NettyMutableHttpResponse<?> mut ? mut : (HttpResponse<?>) value;
-            rib.writeResponse(outboundAccess, request, response, imperativeFlow.getError());
+            rib.writeResponse(outboundAccess, request, response, imperativeFlow.getError(), writeErrorHandler);
         } else {
-            result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, request, response, throwable));
+            // a request that waits for an asynchronous route locator before it is matched, e.g. a
+            // CORS preflight request, stops waiting when it is abandoned, like one being matched
+            CompletionStage<?> located = RouteLocator.whenLocated(request);
+            if (located != null) {
+                onPendingLocation(request, located);
+            }
+            result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, request, response, throwable, writeErrorHandler));
         }
+    }
+
+    /**
+     * Gives the error response when writing the body of the response fails, with the context of
+     * {@link #handleNormal} in scope.
+     *
+     * @param throwable The write error
+     * @return The error response
+     */
+    @Override
+    public ExecutionFlow<HttpResponse<?>> apply(Throwable throwable) {
+        NettyHttpRequest<?> request = Objects.requireNonNull(nettyRequest);
+        return Objects.requireNonNull(writeErrorContext).propagate(() -> onWriteError(request, throwable));
+    }
+
+    @Override
+    protected void onPendingLocation(HttpRequest<?> request, CompletionStage<?> located) {
+        if (this.nettyRequest == null) {
+            return;
+        }
+        // the client abandons the request, closing the HTTP/1.1 connection or resetting the
+        // HTTP/2 stream: no one waits for the target any more
+        Runnable remove = outboundAccess.whenAbandoned(() -> RouteLocator.abandonPendingLocations(request));
+        located.whenComplete((ignored, error) -> remove.run());
     }
 
     @Nullable
@@ -137,7 +180,16 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         return super.fulfillArguments(routeMatch, request);
     }
 
+    @Override
+    protected void onFilteredRequest(HttpRequest<?> filteredRequest) {
+        NettyHttpRequest<?> request = nettyRequest;
+        if (request != null) {
+            request.setFilteredRequest(filteredRequest);
+        }
+    }
+
     void handleException(NettyHttpRequest<?> nettyRequest, Throwable cause) {
+        this.nettyRequest = nettyRequest;
         onError(nettyRequest, cause).onComplete((response, throwable) -> rib.writeResponse(outboundAccess, nettyRequest, response, throwable));
     }
 

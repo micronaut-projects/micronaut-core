@@ -25,14 +25,16 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
-import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
+import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -70,40 +72,43 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
 
     @Override
     public BindingResult<Publisher<?>> bind(ArgumentConversionContext<Publisher<?>> context, HttpRequest<?> source) {
-        // the request itself, or e.g. the mutable view of the request that a filter continued with
-        NettyHttpRequest<?> nhr = NettyHttpRequest.findBodyRequest(source);
-        if (nhr != null) {
-            ByteBody rootBody = nhr.byteBody();
+        ServerHttpRequest<?> server = NettyBodyAnnotationBinder.bodyOf(source);
+        if (server != null) {
+            ByteBody rootBody = server.byteBody();
             if (rootBody.expectedLength().orElse(-1) == 0) {
                 return BindingResult.empty();
             }
             @SuppressWarnings("unchecked")
             Argument<Object> targetType = (Argument<Object>) context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            MediaType mediaType = nhr.getContentType().orElse(null);
+            MediaType mediaType = source.getContentType().orElse(null);
             if (!Publishers.isSingle(context.getArgument().getType()) && !context.getArgument().isSpecifiedSingle() && mediaType != null) {
-                Optional<MessageBodyReader<Object>> reader = nettyBodyAnnotationBinder.bodyHandlerRegistry.findReader(targetType, List.of(mediaType));
-                if (reader.isPresent() && reader.get() instanceof ChunkedMessageBodyReader<Object> piecewise) {
-                    Publisher<?> pub = piecewise.readChunked(targetType, mediaType, nhr.getHeaders(), rootBody.toByteBufferPublisher());
+                // the route reads the elements of its body argument with a reader specialized for them
+                Optional<ChunkedMessageBodyReader<Object>> reader = RouteAttributes.getRouteInfo(source)
+                    .map(RouteInfo::getMessageBodyReader)
+                    .flatMap(NettyPublisherBodyBinder::chunked)
+                    .filter(r -> r.isReadable(targetType, mediaType))
+                    .or(() -> nettyBodyAnnotationBinder.bodyHandlerRegistry.findReader(targetType, List.of(mediaType))
+                        .flatMap(NettyPublisherBodyBinder::chunked));
+                if (reader.isPresent()) {
+                    Publisher<?> pub = reader.get().readChunked(targetType, mediaType, source.getHeaders(), rootBody.toByteBufferPublisher());
                     return () -> Optional.of(pub);
                 }
             }
             // bind a single result
             ExecutionFlow<Object> flow = InternalByteBody.bufferFlow(rootBody)
                 .map(bytes -> {
-                    Optional<Object> value;
-                    try {
-                        value = nettyBodyAnnotationBinder.transform(nhr, context.with(targetType), bytes);
-                    } catch (RuntimeException e) {
-                        throw e;
-                    } catch (Throwable e) {
-                        throw new RuntimeException(e);
-                    }
+                    Optional<Object> value = nettyBodyAnnotationBinder.transform(source, server, context.with(targetType), bytes);
                     return value.orElseThrow(() -> NettyPublisherBodyBinder.extractError(null, context));
                 });
             Publisher<Object> future = ReactiveExecutionFlow.toPublisher(flow);
             return () -> Optional.of(future);
         }
         return BindingResult.empty();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Optional<ChunkedMessageBodyReader<Object>> chunked(MessageBodyReader<?> reader) {
+        return reader instanceof ChunkedMessageBodyReader<?> chunked ? Optional.of((ChunkedMessageBodyReader<Object>) chunked) : Optional.empty();
     }
 
     static RuntimeException extractError(@Nullable Object message, ArgumentConversionContext<?> conversionContext) {

@@ -86,13 +86,14 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
     private static final String SCOPED_PROXY_FACTORY = "__micronaut_create_scoped_proxy";
     private static final String SCOPED_PROXY_BIND_JAVA_PROXY_METHOD = "_micronaut_bind_java_proxy";
     private static final String RAW_INSTANCE_FACTORY = "__micronaut_create_raw_instance";
-    private static final String PREPARE_INTRODUCTION = "__micronaut_prepare_introduction";
     private static final String SCOPED_PROXY_OVERRIDE_METHOD = "_micronaut_put_override";
     private static final String SCOPED_PROXY_SETTER_OVERRIDE_METHOD = "_micronaut_put_setter_override";
     private static final String SCOPED_PROXY_REGISTER_MEMBER_METHOD = "_micronaut_register_member";
     private static final String BIND_SELF_INVOCATIONS = "__micronaut_bind_self_invocations";
     private static final String IS_COROUTINE_FUNCTION = "__micronaut_is_coroutine_function";
+    private static final String IS_ASYNC_GENERATOR_FUNCTION = "__micronaut_is_async_generator_function";
     private static final String AWAIT_STAGE = "__micronaut_await_stage";
+    private static final String INTERCEPTED_CALL = "__micronaut_intercepted_call";
 
     private final Collection<TargetTypeMapping<?>> targetTypeMappings;
 
@@ -118,7 +119,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
     }
 
     private <T> T createIntroductionProxyInFrame(RuntimeProxyDefinition<T> proxyDefinition) {
-        Value value = PythonContextRuntime.findClass(resolvePythonClassReference(proxyDefinition));
+        PythonContextRuntime.PythonClassReference classReference = resolvePythonClassReference(proxyDefinition);
+        Value value = PythonContextRuntime.findClass(classReference);
         AtomicReference<@Nullable Object> targetBeanRef = new AtomicReference<>();
         Map<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> interceptedMethodsByName = new LinkedHashMap<>();
         for (RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod : proxyDefinition.interceptedMethods()) {
@@ -127,7 +129,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 ignored -> new ArrayList<>()
             ).add(interceptedMethod);
         }
-        Map<String, ProxyExecutable> introductionFunctions = new LinkedHashMap<>();
+        Value interceptedCall = PythonContextRuntime.helper(value.getContext(), INTERCEPTED_CALL);
+        Map<String, Value> introductionFunctions = new LinkedHashMap<>();
         for (Map.Entry<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> entry : interceptedMethodsByName.entrySet()) {
             String methodName = entry.getKey();
             List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods = entry.getValue()
@@ -145,10 +148,10 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 methodSelector(methodName, interceptedMethods),
                 originalFunction
             );
-            introductionFunctions.put(methodName, proxiedFunction);
+            // bound through the signature the class declares, before the abstract methods are stubbed
+            introductionFunctions.put(methodName, interceptedCall.execute(originalFunction, proxiedFunction));
         }
-        // stubs the abstract methods once per class and context, as newIntroduction does
-        PythonContextRuntime.helper(value.getContext(), PREPARE_INTRODUCTION).execute(value);
+        PythonContextRuntime.prepareIntroductionClass(classReference, value);
         Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
         Value targetValue = newIntroductionTarget(proxyDefinition, value);
         T target = box(type, targetValue);
@@ -156,7 +159,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             throw new IllegalStateException("Introduction proxy target cannot be null");
         }
         targetBeanRef.set(target);
-        for (Map.Entry<String, ProxyExecutable> entry : introductionFunctions.entrySet()) {
+        for (Map.Entry<String, Value> entry : introductionFunctions.entrySet()) {
             targetValue.putMember(entry.getKey(), entry.getValue());
         }
         return target;
@@ -331,6 +334,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             } else {
                 MethodSelector<T> methodSelector = methodSelector(methodName, interceptedMethods);
                 boolean coroutineFunction = isCoroutineFunction(pythonClass, originalFunction);
+                boolean asyncGeneratorFunction = isAsyncGeneratorFunction(pythonClass, originalFunction);
                 proxiedFunction = proxiedFunction(
                     false,
                     true,
@@ -340,10 +344,11 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                     null,
                     methodSelector,
                     originalFunction,
-                    coroutineFunction
+                    coroutineFunction,
+                    asyncGeneratorFunction
                 );
                 if (originalFunction != null) {
-                    targetSupplier.interceptedMethodAdded(methodName, methodSelector, originalFunction, coroutineFunction);
+                    targetSupplier.interceptedMethodAdded(methodName, methodSelector, originalFunction, coroutineFunction, asyncGeneratorFunction);
                 }
             }
             proxyValue.getMember(SCOPED_PROXY_OVERRIDE_METHOD).execute(methodName, proxiedFunction);
@@ -537,13 +542,19 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             targetBeanRef,
             methodSelector,
             originalFunction,
-            isCoroutineFunction(owner, originalFunction)
+            isCoroutineFunction(owner, originalFunction),
+            isAsyncGeneratorFunction(owner, originalFunction)
         );
     }
 
     private static boolean isCoroutineFunction(Value owner, @Nullable Value originalFunction) {
         return originalFunction != null
             && PythonContextRuntime.helper(owner.getContext(), IS_COROUTINE_FUNCTION).execute(originalFunction).asBoolean();
+    }
+
+    private static boolean isAsyncGeneratorFunction(Value owner, @Nullable Value originalFunction) {
+        return originalFunction != null
+            && PythonContextRuntime.helper(owner.getContext(), IS_ASYNC_GENERATOR_FUNCTION).execute(originalFunction).asBoolean();
     }
 
     @SuppressWarnings("java:S107") // these parameters describe the complete proxy invocation context
@@ -556,7 +567,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         @Nullable AtomicReference<Object> targetBeanRef,
         MethodSelector<T> methodSelector,
         @Nullable Value originalFunction,
-        boolean coroutineFunction
+        boolean coroutineFunction,
+        boolean asyncGeneratorFunction
     ) {
         return args -> {
             RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = methodSelector.find(args);
@@ -605,6 +617,10 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                         && Publisher.class.isAssignableFrom(executableMethod.getReturnType().getType())) {
                         return PythonAsyncioRuntime.toPublisher(result);
                     }
+                    if (asyncGeneratorFunction
+                        && Publisher.class.isAssignableFrom(executableMethod.getReturnType().getType())) {
+                        return PythonAsyncioRuntime.generatorToPublisher(result);
+                    }
                     return box(executableMethod.getReturnType().asArgument(), result);
                 };
             }
@@ -613,6 +629,9 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 // the caller may run in another context than the one the proxy was created in (an
                 // event-loop context receives copies of the overrides): the awaitable belongs to the caller
                 return awaitable(Context.getCurrent(), stage);
+            }
+            if (asyncGeneratorFunction && result instanceof Publisher<?> publisher) {
+                return PythonAsyncioRuntime.asyncioHelper(Context.getCurrent(), "as_async_iterable").execute(publisher);
             }
             return unbox(owner.getContext(), result);
         };
@@ -982,8 +1001,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             this.resolvedTarget = resolvedTarget;
         }
 
-        void interceptedMethodAdded(String methodName, MethodSelector<T> methodSelector, Value originalFunction, boolean coroutineFunction) {
-            interceptedFunctions.add(new InterceptedFunction<>(methodName, methodSelector, originalFunction, coroutineFunction));
+        void interceptedMethodAdded(String methodName, MethodSelector<T> methodSelector, Value originalFunction, boolean coroutineFunction, boolean asyncGeneratorFunction) {
+            interceptedFunctions.add(new InterceptedFunction<>(methodName, methodSelector, originalFunction, coroutineFunction, asyncGeneratorFunction));
         }
 
         @Override
@@ -1020,7 +1039,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                     null,
                     function.methodSelector(),
                     function.originalFunction(),
-                    function.coroutineFunction()
+                    function.coroutineFunction(),
+                    function.asyncGeneratorFunction()
                 );
             }
             Value targetValue = asValue(target);
@@ -1032,7 +1052,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         String methodName,
         MethodSelector<T> methodSelector,
         Value originalFunction,
-        boolean coroutineFunction
+        boolean coroutineFunction,
+        boolean asyncGeneratorFunction
     ) {
     }
 

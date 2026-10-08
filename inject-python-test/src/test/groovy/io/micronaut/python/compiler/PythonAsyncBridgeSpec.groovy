@@ -166,6 +166,31 @@ PythonPooledRuntime.invokePooledScriptPublisher(
 ''')
     }
 
+    void "explicitly scoped module script bridges async routes on the module itself"() {
+        expect: "the generated Java compiles: a module script has no Python class reference"
+        assertGeneratedSourceContains('''
+from typing import Annotated, AsyncIterator
+from jakarta.inject import Inject, Singleton
+from micronaut.http.annotation import Controller, Get
+from micronaut.core.convert import ConversionService
+
+Controller("/scoped")
+Singleton()
+
+conversion_service: Annotated[ConversionService, Inject]
+
+@Get("/message")
+async def message() -> str:
+    return "ok"
+
+@Get("/numbers")
+async def numbers() -> AsyncIterator[str]:
+    yield "one"
+''', '''
+Value pythonCoroutine = PythonInvocation.invokePythonMethod(this.asPolyglotValue(), "message", new Object[]{});
+''')
+    }
+
     void "a coroutine returning an async iterator is not bridged as a publisher"() {
         expect:
         // the AsyncIterator mapping is confined to async generators: nothing converts a returned iterator

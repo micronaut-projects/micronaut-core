@@ -35,4 +35,24 @@ public interface OutboundAccess extends NettyWriteContext {
      * unrecoverable error that may corrupt future requests. This method has no effect on HTTP/2.
      */
     void closeAfterWrite();
+
+    /**
+     * Write the next response as it is, never compressed, see
+     * {@link io.micronaut.http.server.ServerResponseAttributes#SKIP_COMPRESSION}.
+     *
+     * @since 5.3.0
+     */
+    default void skipCompression() {
+    }
+
+    /**
+     * Run a callback when the request is abandoned before its response is written: the client
+     * closed the HTTP/1.1 connection, or reset the HTTP/2 stream of the request, or the HTTP/2
+     * stream closed with its connection. The callback runs once, on the event loop.
+     *
+     * @param callback The callback
+     * @return Removes the callback, e.g. when it is not needed any more; may be called from any thread
+     * @since 5.3.0
+     */
+    Runnable whenAbandoned(Runnable callback);
 }

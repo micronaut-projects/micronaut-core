@@ -36,6 +36,8 @@ import java.util.Optional;
 @Internal
 public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutputVisitor {
 
+    private static final byte[] EMPTY_CONTENT = new byte[0];
+
     private final File targetDir;
 
     /**
@@ -60,15 +62,22 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
     }
 
     @Override
-    @SuppressWarnings("java:S1075")
     public void visitServiceDescriptor(String type, String classname, Element originatingElement) {
+        visitServiceDescriptor(type, classname, originatingElement, null);
+    }
+
+    @Override
+    @SuppressWarnings("java:S1075")
+    public void visitServiceDescriptor(String type, String classname, Element originatingElement, byte @Nullable [] content) {
         final String path = "META-INF/micronaut/" + type + "/" + classname;
         try {
             final Path filePath = targetDir.toPath().resolve(path);
             makeParent(filePath);
-            Files.writeString(filePath, "",
+            // truncated: a recompilation may write less than the entry it replaces has
+            Files.write(filePath, content == null ? EMPTY_CONTENT : content,
                         StandardOpenOption.WRITE,
-                        StandardOpenOption.CREATE
+                        StandardOpenOption.CREATE,
+                        StandardOpenOption.TRUNCATE_EXISTING
             );
         } catch (IOException e) {
             throw new ClassGenerationException("Unable to generate Bean entry at path: " + path, e);

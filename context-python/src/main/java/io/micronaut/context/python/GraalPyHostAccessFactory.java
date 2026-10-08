@@ -27,6 +27,7 @@ import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyObject;
 import org.jspecify.annotations.Nullable;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -87,6 +88,7 @@ final class GraalPyHostAccessFactory {
      * the conversion back. Registered both for their own Java type and for an {@code Object} parameter.
      */
     private static final List<StandardLibraryType<?>> STANDARD_LIBRARY_TYPES = List.of(
+        new StandardLibraryType<>("decimal", "Decimal", BigDecimal.class, PythonConversion::convertBigDecimal, value -> true),
         new StandardLibraryType<>(DATETIME, "date", LocalDate.class, PythonConversion::convertLocalDate, value -> true),
         new StandardLibraryType<>(DATETIME, "time", LocalTime.class, PythonConversion::convertLocalTime, GraalPyHostAccessFactory::isNaive),
         new StandardLibraryType<>(DATETIME, DATETIME, LocalDateTime.class, PythonConversion::convertLocalDateTime, GraalPyHostAccessFactory::isNaive),
@@ -367,7 +369,7 @@ final class GraalPyHostAccessFactory {
     /**
      * The same conversions for a parameter whose type is {@code Object}.
      * <p>
-     * {@link PythonCoercion} materialises these six Java types as their Python counterparts on the way
+     * {@link PythonCoercion} materialises these Java types as their Python counterparts on the way
      * out, so a value read back off a Java object is a native Python value: the {@code java.util.UUID}
      * identifier of a Micronaut Data entity is a {@code uuid.UUID} once Python holds it. Handing it
      * straight back only worked while the parameter type named the Java type, because a target type
@@ -380,6 +382,8 @@ final class GraalPyHostAccessFactory {
      * A value the conversion refuses (an aware {@code datetime}, a sub-second {@code timezone} offset)
      * stays the Python object it was: {@code Object} is the catch-all parameter type, so a value that
      * has no Java counterpart must still be passable rather than fail the call.
+     * Non-finite {@code decimal.Decimal} values are rejected explicitly for both declared and erased
+     * parameters: {@code BigDecimal} cannot represent them.
      */
     private static void registerErasedStandardLibraryMapping(HostAccess.Builder builder) {
         builder.targetTypeMapping(
