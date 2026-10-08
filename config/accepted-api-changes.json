@@ -1366,5 +1366,10 @@
     "type": "io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor",
     "member": "Implemented interface io.micronaut.core.util.Toggleable",
     "reason": "Compiler writer internals changed by the sourcegen-backed bean definition writer refactor"
+  },
+  {
+    "type": "io.micronaut.http.netty.channel.loom.LoomCarrierConfiguration",
+    "member": "Constructor io.micronaut.http.netty.channel.loom.LoomCarrierConfiguration(java.time.Duration,java.time.Duration,java.time.Duration,java.time.Duration,java.time.Duration,int,int,int)",
+    "reason": "Experimental configuration record, added the workSpillMinQueueAge component"
   }
 ]

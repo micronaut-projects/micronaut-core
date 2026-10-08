@@ -271,7 +271,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * <p>The comparison reads what the arguments carry. The annotation processors write a variable the same way
      * wherever it is used as a parameter, a return type, a field or a type argument, so those compare the same.
      * A recursively bounded variable read out of the bounds of another variable, the {@code U} that
-     * {@code getBounds()} answers for {@code T extends U} where {@code U extends Comparable<U>}, is not always
+     * {@code getBounds()} answers for {@code T extends U} where <code>U extends Comparable&lt;U&gt;</code>, is not always
      * written the way a {@code U} argument is, and may compare different from it.</p>
      *
      * @param other The other argument
