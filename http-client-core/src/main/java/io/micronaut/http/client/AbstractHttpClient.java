@@ -738,7 +738,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     public HttpClientException handleResponseError(HttpRequest<?> finalRequest, @Nullable ServiceInstance instance, Throwable cause) {
         String message = cause.getMessage();
         if (message == null) {
-            message = simpleName(cause);
+            message = cause.getClass().getSimpleName();
         }
         if (log.isTraceEnabled()) {
             log.trace("HTTP Client exception ({}) occurred for request : {} {}",
@@ -768,16 +768,6 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             }
         }
         return result;
-    }
-
-    /**
-     * @param error A failure without a message
-     * @return The simple name of its class, which its string is the qualified name of
-     */
-    private static String simpleName(Throwable error) {
-        String name = error.toString();
-        int start = Math.max(name.lastIndexOf('.'), name.lastIndexOf('$')) + 1;
-        return name.substring(start);
     }
 
     /**

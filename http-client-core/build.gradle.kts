@@ -28,6 +28,7 @@ dependencies {
 //
 
 noReflection {
+    allowIn("io.micronaut.http.client.AbstractHttpClient", "CLASS_NAMES")
     allowIn("io.micronaut.http.client.HttpClientFactoryResolver", "SERVICE_LOADING")
     allowIn("io.micronaut.http.client.ProxyHttpClientFactoryResolver", "SERVICE_LOADING")
     allowIn("io.micronaut.http.client.RawHttpClientFactoryResolver", "SERVICE_LOADING")
