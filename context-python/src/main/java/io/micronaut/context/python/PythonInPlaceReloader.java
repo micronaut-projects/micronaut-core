@@ -16,8 +16,7 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.BeanProvider;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.env.DevelopmentMode;
+import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.context.reload.InPlaceResourceReloader;
 import io.micronaut.core.annotation.Internal;
 import jakarta.inject.Singleton;
@@ -64,7 +63,7 @@ import java.util.concurrent.TimeoutException;
 @Internal
 @NullMarked
 @Singleton
-@Requires(condition = DevelopmentMode.Active.class)
+@DevelopmentActive
 final class PythonInPlaceReloader implements InPlaceResourceReloader {
 
     private static final Logger LOG = LoggerFactory.getLogger(PythonInPlaceReloader.class);

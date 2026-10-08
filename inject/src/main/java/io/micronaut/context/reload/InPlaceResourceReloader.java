@@ -35,7 +35,7 @@ import java.util.Set;
  * applied before it failed, which is why a reloader need not undo a partial change.</p>
  *
  * <p>Implementations are beans that exist only while development mode is active
- * ({@code @Requires(condition = DevelopmentMode.Active.class)}). The Python runtime's reloader
+ * ({@link io.micronaut.context.env.DevelopmentActive @DevelopmentActive}). The Python runtime's reloader
  * patches the changed modules into every running interpreter, keeping their module, class and
  * function objects, which the generated classes and the caches built on them still refer to.</p>
  *

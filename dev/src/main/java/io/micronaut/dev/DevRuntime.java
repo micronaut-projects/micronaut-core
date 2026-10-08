@@ -1489,7 +1489,7 @@ public final class DevRuntime implements Closeable {
         }
         inPlacePatches++;
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
-        ClassChangeEvent event = new ClassChangeEvent(this, generation.generation(), Set.of(), generation, List.of(), ReloadStrategy.RELOAD);
+        ClassChangeEvent event = new ClassChangeEvent(this, Set.of(), generation, List.of(), ReloadStrategy.RELOAD);
         try {
             current.publishEvent(event);
             current.publishEvent(new ReloadCompletedEvent(this, event, List.of(), List.of(), elapsed));
