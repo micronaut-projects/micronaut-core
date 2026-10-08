@@ -16,7 +16,6 @@
 package io.micronaut.scheduling.io.watch;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.scheduling.io.watch.event.WatchEventType;
 import org.jspecify.annotations.NullMarked;
@@ -254,8 +253,7 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
      *
      * @return The directories
      */
-    @Internal
-    public synchronized List<Path> watchedDirectories() {
+    synchronized List<Path> watchedDirectories() {
         return List.copyOf(directories.keySet());
     }
 

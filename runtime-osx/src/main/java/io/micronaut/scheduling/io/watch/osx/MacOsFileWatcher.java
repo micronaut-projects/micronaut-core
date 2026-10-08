@@ -54,20 +54,18 @@ public class MacOsFileWatcher extends DefaultFileWatcher {
     }
 
     @Override
-    protected DirectoryWatcher.Builder configure(DirectoryWatcher.Builder builder) {
+    protected DirectoryWatcher.Builder configure(DirectoryWatcher.Builder builder, WatchService watchService) {
+        if (!(watchService instanceof MacOSXListeningWatchService)) {
+            // the factory fell back to the JDK's service, which is registered and closed as usual
+            return builder;
+        }
         return builder
-            .registrar((directory, service) -> {
-                if (!(service instanceof MacOSXListeningWatchService)) {
-                    // the factory fell back to the JDK's service
-                    return DirectoryWatcher.defaultRegistrar().register(directory, service);
-                }
-                return new WatchablePath(directory).register(
-                    service,
-                    StandardWatchEventKinds.ENTRY_CREATE,
-                    StandardWatchEventKinds.ENTRY_DELETE,
-                    StandardWatchEventKinds.ENTRY_MODIFY
-                );
-            })
+            .registrar((directory, service) -> new WatchablePath(directory).register(
+                service,
+                StandardWatchEventKinds.ENTRY_CREATE,
+                StandardWatchEventKinds.ENTRY_DELETE,
+                StandardWatchEventKinds.ENTRY_MODIFY
+            ))
             .closeWatchServiceOnClose(false);
     }
 }

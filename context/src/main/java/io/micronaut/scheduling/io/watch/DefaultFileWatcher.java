@@ -86,9 +86,10 @@ public class DefaultFileWatcher implements FileWatcher, Closeable {
      * service needs, and whether it may be closed.
      *
      * @param builder The builder over the context's watch service
+     * @param watchService The context's watch service
      * @return The builder
      */
-    protected DirectoryWatcher.Builder configure(DirectoryWatcher.Builder builder) {
+    protected DirectoryWatcher.Builder configure(DirectoryWatcher.Builder builder, WatchService watchService) {
         return builder;
     }
 
@@ -112,11 +113,12 @@ public class DefaultFileWatcher implements FileWatcher, Closeable {
         }
         DirectoryWatcher current = watcher;
         if (current == null) {
-            DirectoryWatcher.Builder builder = DirectoryWatcher.builder(watchServices.get());
+            WatchService watchService = watchServices.get();
+            DirectoryWatcher.Builder builder = DirectoryWatcher.builder(watchService);
             if (configuration != null) {
                 builder.checkInterval(configuration.getCheckInterval()).quietPeriod(configuration.getQuietPeriod());
             }
-            current = configure(builder).build().start();
+            current = configure(builder, watchService).build().start();
             watcher = current;
         }
         return current;
