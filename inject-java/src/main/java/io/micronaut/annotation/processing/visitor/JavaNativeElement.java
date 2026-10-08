@@ -63,15 +63,20 @@ public sealed interface JavaNativeElement extends ElementProvider {
     }
 
     /**
-     * The class native element.
+     * The placeholder native element.
      *
-     * @param element The element
+     * @param element The type parameter element
      * @param typeVariable The type variable
      * @param owner The owner
+     * @param declaration Whether the placeholder is the type parameter itself rather than a use of it
+     * @param use The field, method or parameter declared with this type variable as its type,
+     *            whose declaration annotations applicable to type uses apply to it
      */
     record Placeholder(Element element,
                        TypeVariable typeVariable,
-                       JavaNativeElement owner) implements JavaNativeElement {
+                       JavaNativeElement owner,
+                       boolean declaration,
+                       @Nullable Element use) implements JavaNativeElement {
     }
 
     /**

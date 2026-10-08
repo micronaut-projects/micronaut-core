@@ -33,7 +33,7 @@ class DefaultWatchThreadSpec extends Specification {
     @TempDir
     Path root
 
-    void "the watch thread publishes absolute paths and is the FileWatcher of the context"() {
+    void "the watch thread publishes absolute paths through the FileWatcher of the context"() {
         given:
         ApplicationContext context = ApplicationContext.run(
             (FileWatchConfiguration.PATHS): root.toString(),
@@ -47,13 +47,14 @@ class DefaultWatchThreadSpec extends Specification {
 
         expect:
         context.getBean(FileWatchConfiguration).quietPeriod.toMillis() == 100
-        context.getBean(FileWatcher) instanceof DefaultWatchThread
+        context.getBean(FileWatcher) instanceof DefaultFileWatcher
+        context.getBean(DefaultWatchThread).running
         context.getBean(FileWatcher).isWatching(root)
         !context.getBean(FileWatcher).isWatching(other)
 
         when: "a component registers a directory of its own"
         List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
-        def registration = context.getBean(FileWatcher).watch(other, batches::add)
+        def registration = context.getBean(FileWatcher).directory(other).watch(batches::add)
         Files.writeString(root.resolve("changed.txt"), "x")
         Files.writeString(other.resolve("mine.txt"), "x")
         Listener listener = context.getBean(Listener)
@@ -70,6 +71,52 @@ class DefaultWatchThreadSpec extends Specification {
         registration.close()
         context.close()
         other.toFile().deleteDir()
+    }
+
+    void "the FileWatcher is a bean without the watch paths, and starts its thread on the first registration"() {
+        given:
+        ApplicationContext context = ApplicationContext.run('spec.name': 'DefaultWatchThreadSpec')
+
+        expect:
+        !context.containsBean(DefaultWatchThread)
+        context.containsBean(FileWatcher)
+
+        when:
+        FileWatcher fileWatcher = context.getBean(FileWatcher)
+
+        then: "no watcher, so no thread, before a registration"
+        ((DefaultFileWatcher) fileWatcher).@watcher == null
+        !fileWatcher.isWatching(root)
+
+        when:
+        List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
+        def registration = fileWatcher.directory(root).watch(batches::add)
+        Files.writeString(root.resolve("lazy.txt"), "x")
+
+        then:
+        ((DefaultFileWatcher) fileWatcher).@watcher.running
+        fileWatcher.isWatching(root)
+        new PollingConditions(timeout: 30, delay: 0.1).eventually {
+            assert batches.any { it.paths().contains(root.resolve("lazy.txt").toAbsolutePath().normalize()) }
+        }
+
+        when:
+        context.close()
+
+        then: "the context closes the watcher"
+        !registration.active
+        ((DefaultFileWatcher) fileWatcher).@watcher == null
+    }
+
+    void "switching the watch off removes the FileWatcher"() {
+        given:
+        ApplicationContext context = ApplicationContext.run((FileWatchConfiguration.ENABLED): false)
+
+        expect:
+        !context.containsBean(FileWatcher)
+
+        cleanup:
+        context.close()
     }
 
     @Singleton

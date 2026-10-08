@@ -41,6 +41,7 @@ import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 
 /**
  * Factory methods for {@link ByteBody}s.
@@ -209,6 +210,33 @@ public class ByteBodyFactory {
     public StreamingBody createStreamingBody(BodySizeLimits limits, BufferConsumer. Upstream upstream) {
         ReactiveByteBufferByteBody.SharedBuffer sb = new ReactiveByteBufferByteBody.SharedBuffer(this.readBufferFactory(), limits, upstream);
         return new StreamingBody(sb, new ReactiveByteBufferByteBody(sb));
+    }
+
+    /**
+     * The executor the {@link StreamingBody#sharedBuffer() buffer} of a
+     * {@link #createStreamingBody streaming body} of this factory must be fed on, in the order the
+     * tasks were submitted. <b>Internal API.</b>
+     *
+     * @return The executor: the event loop of a runtime with one, or an executor that runs the
+     * task on the calling thread, since the default buffer serializes concurrent calls itself
+     * @since 5.3.0
+     */
+    @Internal
+    public Executor streamingBodyExecutor() {
+        return Runnable::run;
+    }
+
+    /**
+     * Whether the current thread is an event loop thread of the runtime of this factory, which
+     * must not block: the thread of the {@link #streamingBodyExecutor()}, or the thread of
+     * another event loop. <b>Internal API.</b>
+     *
+     * @return {@code true} if blocking the current thread would block an event loop
+     * @since 5.3.0
+     */
+    @Internal
+    public boolean isEventLoopThread() {
+        return false;
     }
 
     /**

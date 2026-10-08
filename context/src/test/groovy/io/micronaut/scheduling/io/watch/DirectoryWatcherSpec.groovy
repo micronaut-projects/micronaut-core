@@ -15,7 +15,12 @@
  */
 package io.micronaut.scheduling.io.watch
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import io.micronaut.scheduling.io.watch.event.WatchEventType
+import org.slf4j.LoggerFactory
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 import spock.lang.TempDir
@@ -27,8 +32,14 @@ import java.nio.file.Path
 import java.nio.file.StandardWatchEventKinds
 import java.nio.file.WatchEvent
 import java.time.Duration
+import java.nio.file.ClosedWatchServiceException
+import java.nio.file.WatchService
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 class DirectoryWatcherSpec extends Specification {
 
@@ -52,7 +63,7 @@ class DirectoryWatcherSpec extends Specification {
     void "a change is reported with an absolute path in one batch"() {
         given:
         List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
-        def registration = watcher.watch(root, batches::add)
+        def registration = watcher.directory(root).watch(batches::add)
 
         when:
         Files.writeString(root.resolve("a.txt"), "hello")
@@ -77,7 +88,7 @@ class DirectoryWatcherSpec extends Specification {
     void "events of one save are coalesced into one change"() {
         given:
         List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
-        watcher.watch(root, batches::add)
+        watcher.directory(root).watch(batches::add)
 
         when: "a file is created and written several times within the quiet period"
         Path file = root.resolve("b.txt")
@@ -97,7 +108,7 @@ class DirectoryWatcherSpec extends Specification {
         given:
         Files.createDirectories(root.resolve("src"))
         List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
-        watcher.watch(root, WatchOptions.DEFAULT.excluding("**/*.log"), batches::add)
+        watcher.directory(root).exclude("**/*.log").watch(batches::add)
         Path log = root.resolve("src/noise.log")
         Path source = root.resolve("src/Main.java")
         AtomicBoolean writing = new AtomicBoolean(true)
@@ -128,7 +139,7 @@ class DirectoryWatcherSpec extends Specification {
     void "a directory created after the registration is watched too"() {
         given:
         List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
-        watcher.watch(root, batches::add)
+        watcher.directory(root).watch(batches::add)
 
         when:
         Path sub = Files.createDirectories(root.resolve("nested/deeper"))
@@ -151,7 +162,7 @@ class DirectoryWatcherSpec extends Specification {
     void "hidden and excluded directories created later are not watched"() {
         given:
         List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
-        watcher.watch(root, WatchOptions.DEFAULT.excluding("build"), batches::add)
+        watcher.directory(root).exclude("build/**").watch(batches::add)
 
         when:
         Path hidden = Files.createDirectories(root.resolve(".git"))
@@ -183,7 +194,7 @@ class DirectoryWatcherSpec extends Specification {
         Files.createDirectories(root.resolve("build"))
         Files.createDirectories(root.resolve("src"))
         List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
-        watcher.watch(root, WatchOptions.DEFAULT.excluding("build/**", "**/*.tmp"), batches::add)
+        watcher.directory(root).exclude("build/**").exclude("**/*.tmp").watch(batches::add)
 
         expect:
         !watcher.watchedDirectories().contains(root.resolve("build").toAbsolutePath().normalize())
@@ -203,7 +214,7 @@ class DirectoryWatcherSpec extends Specification {
     void "include patterns only report matching files"() {
         given:
         List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
-        watcher.watch(root, WatchOptions.DEFAULT.including("**/*.html", "*.html"), batches::add)
+        watcher.directory(root).include("{**/,}*.html").watch(batches::add)
 
         when:
         Files.writeString(root.resolve("ignored.txt"), "x")
@@ -220,8 +231,8 @@ class DirectoryWatcherSpec extends Specification {
         given:
         List<FileChangeBatch> first = new CopyOnWriteArrayList<>()
         List<FileChangeBatch> second = new CopyOnWriteArrayList<>()
-        def r1 = watcher.watch(root, first::add)
-        def r2 = watcher.watch(root, WatchOptions.nonRecursive(), second::add)
+        def r1 = watcher.directory(root).watch(first::add)
+        def r2 = watcher.directory(root).recursive(false).watch(second::add)
 
         expect:
         watcher.watchedDirectories().count { it == root.toAbsolutePath().normalize() } == 1
@@ -257,8 +268,8 @@ class DirectoryWatcherSpec extends Specification {
         Files.createDirectories(root.resolve("src"))
         List<FileChangeBatch> strict = new CopyOnWriteArrayList<>()
         List<FileChangeBatch> loose = new CopyOnWriteArrayList<>()
-        watcher.watch(root, WatchOptions.DEFAULT.excluding("build"), strict::add)
-        watcher.watch(root, loose::add)
+        watcher.directory(root).exclude("build/**").watch(strict::add)
+        watcher.directory(root).watch(loose::add)
 
         when:
         Files.writeString(root.resolve("build/out.class"), "x")
@@ -275,8 +286,8 @@ class DirectoryWatcherSpec extends Specification {
     void "a failing listener does not stop the watcher or other listeners"() {
         given:
         List<FileChangeBatch> good = new CopyOnWriteArrayList<>()
-        watcher.watch(root) { throw new IllegalStateException("boom") }
-        watcher.watch(root, good::add)
+        watcher.directory(root).watch { throw new IllegalStateException("boom") }
+        watcher.directory(root).watch(good::add)
 
         when:
         Files.writeString(root.resolve("first.txt"), "x")
@@ -297,9 +308,264 @@ class DirectoryWatcherSpec extends Specification {
         watcher.running
     }
 
-    void "watching a missing directory is rejected"() {
+    void "an exclude of the direct children of a directory leaves the directories below them watched"() {
+        given:
+        Path sub = Files.createDirectories(root.resolve("build/sub"))
+        List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
+        watcher.directory(root).exclude("build/*").watch(batches::add)
+
+        expect:
+        watcher.watchedDirectories().contains(root.resolve("build").toAbsolutePath().normalize())
+        watcher.watchedDirectories().contains(sub.toAbsolutePath().normalize())
+
         when:
-        watcher.watch(root.resolve("missing"), {})
+        Files.writeString(root.resolve("build/direct.txt"), "x")
+        Files.writeString(sub.resolve("deep.txt"), "x")
+
+        then:
+        conditions.eventually {
+            assert batches.any { it.paths().contains(sub.resolve("deep.txt").toAbsolutePath().normalize()) }
+        }
+        !batches.any { batch -> batch.paths().any { it.fileName.toString() == "direct.txt" } }
+    }
+
+    void "a file created and deleted within one quiet period is not reported"() {
+        given:
+        List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
+        watcher.directory(root).watch(batches::add)
+
+        when:
+        Path ephemeral = root.resolve("transient.txt")
+        Files.writeString(ephemeral, "x")
+        Files.delete(ephemeral)
+        Files.writeString(root.resolve("marker.txt"), "x")
+
+        then:
+        conditions.eventually {
+            assert batches.any { it.paths().contains(root.resolve("marker.txt").toAbsolutePath().normalize()) }
+        }
+        !batches.any { batch -> batch.paths().contains(ephemeral.toAbsolutePath().normalize()) }
+    }
+
+    void "the merge rules of a change"() {
+        given:
+        Path path = root.resolve("x").toAbsolutePath()
+
+        expect:
+        new FileChange(path, first).merge(later)?.type() == merged
+
+        where:
+        first                  | later                  | merged
+        WatchEventType.CREATE  | WatchEventType.MODIFY  | WatchEventType.CREATE
+        WatchEventType.CREATE  | WatchEventType.DELETE  | null
+        WatchEventType.MODIFY  | WatchEventType.DELETE  | WatchEventType.DELETE
+        WatchEventType.MODIFY  | WatchEventType.MODIFY  | WatchEventType.MODIFY
+        WatchEventType.DELETE  | WatchEventType.CREATE  | WatchEventType.MODIFY
+        WatchEventType.DELETE  | WatchEventType.DELETE  | WatchEventType.DELETE
+    }
+
+    void "a request is snapshotted by each registration and may be reused"() {
+        given:
+        List<FileChangeBatch> all = new CopyOnWriteArrayList<>()
+        List<FileChangeBatch> html = new CopyOnWriteArrayList<>()
+        def request = watcher.directory(root)
+        def r1 = request.watch(all::add)
+        def r2 = request.include("*.html").watch(html::add)
+
+        when:
+        Files.writeString(root.resolve("a.txt"), "x")
+        Files.writeString(root.resolve("b.html"), "x")
+
+        then:
+        conditions.eventually {
+            assert all.any { it.paths().contains(root.resolve("a.txt").toAbsolutePath().normalize()) }
+            assert all.any { it.paths().contains(root.resolve("b.html").toAbsolutePath().normalize()) }
+            assert html.any { it.paths().contains(root.resolve("b.html").toAbsolutePath().normalize()) }
+        }
+        !html.any { batch -> batch.paths().any { it.fileName.toString() == "a.txt" } }
+
+        cleanup:
+        r1.close()
+        r2.close()
+    }
+
+    void "while a listener's stage is pending its batches are held back and merged, and other registrations are delivered"() {
+        given:
+        List<FileChangeBatch> slow = new CopyOnWriteArrayList<>()
+        List<FileChangeBatch> fast = new CopyOnWriteArrayList<>()
+        List<CompletableFuture<Void>> stages = new CopyOnWriteArrayList<>()
+        watcher.directory(root).watchAsync({ FileChangeBatch batch ->
+            slow.add(batch)
+            CompletableFuture<Void> stage = new CompletableFuture<>()
+            stages.add(stage)
+            stage
+        })
+        watcher.directory(root).watch(fast::add)
+
+        when: "a first change starts the slow listener's work"
+        Files.writeString(root.resolve("first.txt"), "x")
+
+        then:
+        conditions.eventually {
+            assert slow.size() == 1
+        }
+
+        when: "more changes arrive, in separate quiet periods, while the work is under way"
+        for (name in ["second.txt", "third.txt", "fourth.txt"]) {
+            Files.writeString(root.resolve(name), "x")
+            Path expected = root.resolve(name).toAbsolutePath().normalize()
+            conditions.eventually {
+                assert fast.any { it.paths().contains(expected) }
+            }
+        }
+        Files.writeString(root.resolve("second.txt"), "changed again")
+        Thread.sleep(500)
+
+        then: "the slow listener received nothing more"
+        slow.size() == 1
+
+        when: "its work completes"
+        stages[0].complete(null)
+
+        then: "the held changes arrive merged in one batch"
+        conditions.eventually {
+            assert slow.size() == 2
+        }
+        def merged = slow[1]
+        merged.paths().containsAll(["second.txt", "third.txt", "fourth.txt"].collect { root.resolve(it).toAbsolutePath().normalize() })
+        merged.changes().find { it.path().fileName.toString() == "second.txt" }.type() == WatchEventType.CREATE
+
+        cleanup:
+        stages.each { it.complete(null) }
+    }
+
+    void "a stage that completes exceptionally is logged and the next batch is delivered"() {
+        given:
+        Logger logger = (Logger) LoggerFactory.getLogger(DirectoryWatcher)
+        ListAppender<ILoggingEvent> appender = new ListAppender<>()
+        appender.start()
+        logger.addAppender(appender)
+        List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
+        watcher.directory(root).watchAsync({ FileChangeBatch batch ->
+            batches.add(batch)
+            CompletableFuture.supplyAsync { throw new IllegalStateException("async boom") }
+        })
+
+        when:
+        Files.writeString(root.resolve("one.txt"), "x")
+
+        then:
+        conditions.eventually {
+            assert appender.list.any { it.level == Level.ERROR && it.throwableProxy?.message == "async boom" }
+        }
+
+        when:
+        Files.writeString(root.resolve("two.txt"), "x")
+
+        then:
+        conditions.eventually {
+            assert batches.any { it.paths().contains(root.resolve("two.txt").toAbsolutePath().normalize()) }
+        }
+
+        cleanup:
+        logger.detachAppender(appender)
+    }
+
+    void "no listener is called once its registration is closed, and close waits for a call under way"() {
+        given:
+        CountDownLatch entered = new CountDownLatch(1)
+        CountDownLatch release = new CountDownLatch(1)
+        AtomicInteger calls = new AtomicInteger()
+        def blocking = watcher.directory(root).watch {
+            calls.incrementAndGet()
+            entered.countDown()
+            release.await(30, TimeUnit.SECONDS)
+        }
+        CompletableFuture<Void> pending = new CompletableFuture<>()
+        AtomicInteger asyncCalls = new AtomicInteger()
+        def async = watcher.directory(root).watchAsync({ FileChangeBatch batch ->
+            asyncCalls.incrementAndGet()
+            pending
+        })
+
+        when: "a change reaches the blocking listener"
+        Files.writeString(root.resolve("a.txt"), "x")
+
+        then:
+        entered.await(30, TimeUnit.SECONDS)
+
+        when: "the registration is closed from another thread while the listener runs"
+        Thread closer = new Thread({ blocking.close() })
+        closer.start()
+        Thread.sleep(300)
+
+        then: "close waits for the call to return"
+        closer.alive
+
+        when:
+        release.countDown()
+        closer.join(30_000)
+
+        then:
+        !closer.alive
+        !blocking.active
+
+        when: "the asynchronous registration is closed while its stage is pending and changes are held for it"
+        conditions.eventually {
+            assert asyncCalls.get() == 1
+        }
+        Files.writeString(root.resolve("b.txt"), "x")
+        Thread.sleep(500)
+        async.close()
+        pending.complete(null)
+        Files.writeString(root.resolve("c.txt"), "x")
+        Thread.sleep(800)
+
+        then: "neither listener is called again"
+        calls.get() == 1
+        asyncCalls.get() == 1
+    }
+
+    void "a builder without a service creates and closes one of the default file system"() {
+        given:
+        DirectoryWatcher own = DirectoryWatcher.builder().build()
+
+        expect:
+        own.watchService != null
+
+        when:
+        own.close()
+        own.watchService.poll()
+
+        then:
+        thrown(ClosedWatchServiceException)
+    }
+
+    void "a watch service the caller keeps is left open"() {
+        given:
+        WatchService service = FileSystems.default.newWatchService()
+        DirectoryWatcher own = DirectoryWatcher.builder(service).closeWatchServiceOnClose(false).build()
+
+        when:
+        own.close()
+        service.poll()
+
+        then:
+        notThrown(ClosedWatchServiceException)
+
+        cleanup:
+        service.close()
+    }
+
+    void "watching a missing directory is rejected"() {
+        when: "the request is made: nothing is checked yet"
+        def request = watcher.directory(root.resolve("missing"))
+
+        then:
+        notThrown(Exception)
+
+        when: "its terminal operation registers"
+        request.watch({})
 
         then:
         thrown(IllegalArgumentException)
@@ -307,7 +573,7 @@ class DirectoryWatcherSpec extends Specification {
 
     void "closing the watcher deactivates registrations and stops the thread"() {
         given:
-        def registration = watcher.watch(root, {})
+        def registration = watcher.directory(root).watch({})
 
         when:
         watcher.close()
@@ -318,7 +584,7 @@ class DirectoryWatcherSpec extends Specification {
         watcher.watchedDirectories().isEmpty()
 
         when:
-        watcher.watch(root, {})
+        watcher.directory(root).watch({})
 
         then:
         thrown(IllegalStateException)

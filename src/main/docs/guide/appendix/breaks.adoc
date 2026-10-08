@@ -9,6 +9,16 @@ This section documents breaking changes between Micronaut versions
 
 The introspections that the shared api:core.beans.BeanIntrospector[] finds through a class loader other than its own, the thread context loader when `micronaut.introspections.use.context.classloader` is set or the loader of a bean type, are now indexed once per loader instead of on every lookup. An introspection that a class loader only makes visible after the first lookup through it, for example in a jar added to a `URLClassLoader` later, is not found until that loader is invalidated, which only a development launcher does.
 
+=== `FileChangedEvent` paths are absolute, and changes are coalesced and delayed (5.3)
+
+The api:scheduling.io.watch.DefaultWatchThread[] that publishes a api:scheduling.io.watch.event.FileChangedEvent[] for the directories of `micronaut.io.watch.paths` now registers them with the api:scheduling.io.watch.FileWatcher[] of the context, which changes the events it publishes:
+
+* The path of an event is absolute and normalized. Previously it was the path the watch service reports, relative to the directory the file is in, for example `application.yml` rather than `/home/me/app/src/main/resources/application.yml`. A listener that compares the path with a relative one should resolve that one first, for example with `Path.toAbsolutePath().normalize()`.
+* Events are coalesced. Several events for the same path in quick succession are published as one: a file created and then modified as `CREATE`, a file modified and then deleted as `DELETE`, a file deleted and created again as `MODIFY`, and a file created and deleted again is not published at all.
+* Events are published once no further change was seen for the quiet period, `micronaut.io.watch.quiet-period` (120 milliseconds by default), instead of as soon as the watch service reports them, so that the events of one save are published together.
+
+The api:scheduling.io.watch.FileWatcher[] is a bean whenever a watch service is, that is unless `micronaut.io.watch.enabled` is `false`, and no longer requires `micronaut.io.watch.paths`. The watch service bean, created by api:scheduling.io.watch.WatchServiceFactory[] (or the factory of `micronaut-runtime-osx`), no longer requires the paths either; it is only created when it is injected, and the file watcher only obtains it, and starts its thread, when a component first registers a directory. The constructors of `DefaultWatchThread` and `MacOsWatchThread` that take a `WatchService`, and the methods `getWatchService()`, `registerPath(Path)` and `closeWatchService()` they use, are deprecated: the thread registers with the file watcher instead.
+
 === Refreshing the Logback configuration follows Logback's own lookup (5.3)
 
 When any `logger.*` property is set, the Micronaut framework resets Logback and configures it again. Previously that refresh used the first `Configurator` service regardless of its rank and of the status it returned, and otherwise the file set with `logback.configurationFile` or `logger.config`, or `logback.xml`. Now, unless a Logback XML configuration file is set in Micronaut configuration, the refresh configures Logback the same way Logback configures itself at startup:

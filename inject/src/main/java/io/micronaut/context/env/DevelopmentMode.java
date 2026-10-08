@@ -15,10 +15,7 @@
  */
 package io.micronaut.context.env;
 
-import io.micronaut.context.condition.Condition;
-import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 
@@ -33,7 +30,10 @@ import io.micronaut.core.value.PropertyResolver;
  *
  * <p>Development mode is not the same as the {@link Environment#DEVELOPMENT} environment. The environment
  * is a configuration profile any run may activate; development mode is only active when a launcher
- * sets the {@link #PROPERTY} property.</p>
+ * sets the {@link #PROPERTY} property to {@code true}, in any case.</p>
+ *
+ * <p>Beans that only run in development mode, or only outside it, are annotated with {@link DevelopmentActive} or
+ * {@link DevelopmentInactive}.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -56,51 +56,7 @@ public final class DevelopmentMode {
      * @return True if development mode is active
      */
     public static boolean isEnabled(PropertyResolver propertyResolver) {
-        return propertyResolver.getProperty(PROPERTY, Boolean.class).orElse(false);
-    }
-
-    /**
-     * Whether development mode is active according to the system properties.
-     *
-     * <p>A launcher sets the system property before the application context exists, so components that
-     * run before the environment is available can consult it.</p>
-     *
-     * @return True if the system property is set to {@code true}
-     */
-    public static boolean isEnabledBySystemProperty() {
-        return StringUtils.TRUE.equalsIgnoreCase(System.getProperty(PROPERTY));
-    }
-
-    /**
-     * A bean condition that holds while development mode is active. Use with
-     * {@code @Requires(condition = DevelopmentMode.Active.class)}.
-     */
-    @Introspected
-    public static final class Active implements Condition {
-        @Override
-        public boolean matches(ConditionContext context) {
-            if (isEnabled(context)) {
-                return true;
-            }
-            context.fail("Development mode is not active (" + PROPERTY + " is not true)");
-            return false;
-        }
-    }
-
-    /**
-     * A bean condition that holds while development mode is not active. Use with
-     * {@code @Requires(condition = DevelopmentMode.Inactive.class)} on beans that must not run under a
-     * development launcher, such as ones that exit the JVM.
-     */
-    @Introspected
-    public static final class Inactive implements Condition {
-        @Override
-        public boolean matches(ConditionContext context) {
-            if (!isEnabled(context)) {
-                return true;
-            }
-            context.fail("Development mode is active (" + PROPERTY + " is true)");
-            return false;
-        }
+        // the same test as the @Requires of DevelopmentActive and DevelopmentInactive
+        return propertyResolver.getProperty(PROPERTY, String.class).map(StringUtils.TRUE::equalsIgnoreCase).orElse(false);
     }
 }

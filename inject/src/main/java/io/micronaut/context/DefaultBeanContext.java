@@ -193,6 +193,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     protected final AtomicBoolean configured = new AtomicBoolean(false);
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
     protected final AtomicBoolean terminating = new AtomicBoolean(false);
+    /**
+     * The thread running {@link #stop()} until the singletons are destroyed. Lookups made on it are made on behalf
+     * of a shutdown event listener or a destruction callback, and may resolve through existing dependency groups.
+     */
+    @SuppressWarnings("java:S3077") // only the reference is published and compared with the current thread
+    private volatile @Nullable Thread shutdownThread;
+    /** The thread publishing the {@link ShutdownEvent}, whose listeners may open new dependency groups. */
+    @SuppressWarnings("java:S3077") // only the reference is published and compared with the current thread
+    private volatile @Nullable Thread shutdownEventThread;
+    /** What dependency groups created during shutdown, destroyed before it completes. Confined to the shutdown thread. */
+    private final List<ShutdownDependent> shutdownDependents = new ArrayList<>();
 
     final BeanResolutionTraceMode traceMode;
     final Set<String> tracePatterns;
@@ -459,36 +470,50 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Stopping BeanContext");
             }
-            publishEvent(new ShutdownEvent(this));
-            attributes.clear();
-
-            // wait for parallel bean startup to finish so that the singletons it creates are
-            // included in the destruction pass below instead of being registered behind it
-            awaitParallelStartupTermination();
-
-            // dedup by identity: identity hash codes are not unique across live objects
-            Set<Object> processed = Collections.newSetFromMap(new IdentityHashMap<>());
-            destroySingletons(singletonScope.getBeanRegistrations(), processed);
-
-            // a @PreDestroy hook is free to resolve beans, which may create brand-new singletons
-            // registered after the snapshot above was taken. Destroy those stragglers too, with a
-            // bound so a pathological hook that always creates a bean cannot spin forever
-            for (int pass = 0; ; pass++) {
-                List<BeanRegistration> stragglers = singletonScope.getBeanRegistrations()
-                    .stream()
-                    .filter(br -> !processed.contains(br.bean))
-                    .toList();
-                if (stragglers.isEmpty()) {
-                    break;
+            shutdownThread = Thread.currentThread();
+            try {
+                shutdownEventThread = Thread.currentThread();
+                try {
+                    publishEvent(new ShutdownEvent(this));
+                } finally {
+                    shutdownEventThread = null;
                 }
-                if (pass == MAX_SHUTDOWN_PASSES) {
-                    if (LOG.isWarnEnabled()) {
-                        LOG.warn("Singletons are still being created during shutdown after {} destruction passes. "
-                            + "Giving up, {} bean(s) will not be destroyed.", MAX_SHUTDOWN_PASSES, stragglers.size());
+                attributes.clear();
+
+                // wait for parallel bean startup to finish so that the singletons it creates are
+                // included in the destruction pass below instead of being registered behind it
+                awaitParallelStartupTermination();
+
+                // dedup by identity: identity hash codes are not unique across live objects
+                Set<Object> processed = Collections.newSetFromMap(new IdentityHashMap<>());
+                destroySingletons(singletonScope.getBeanRegistrations(), processed);
+
+                // a @PreDestroy hook is free to resolve beans, which may create brand-new singletons
+                // registered after the snapshot above was taken, or dependents of a group that outlives
+                // the context. Destroy those stragglers too, with a bound so a pathological hook that
+                // always creates a bean cannot spin forever
+                for (int pass = 0; ; pass++) {
+                    destroyShutdownDependents();
+                    List<BeanRegistration> stragglers = singletonScope.getBeanRegistrations()
+                        .stream()
+                        .filter(br -> !processed.contains(br.bean))
+                        .toList();
+                    if (stragglers.isEmpty() && shutdownDependents.isEmpty()) {
+                        break;
                     }
-                    break;
+                    if (pass == MAX_SHUTDOWN_PASSES) {
+                        if (LOG.isWarnEnabled()) {
+                            LOG.warn("Beans are still being created during shutdown after {} destruction passes. "
+                                + "Giving up, {} bean(s) will not be destroyed.", MAX_SHUTDOWN_PASSES,
+                                stragglers.size() + shutdownDependents.size());
+                        }
+                        shutdownDependents.clear();
+                        break;
+                    }
+                    destroySingletons(stragglers, processed);
                 }
-                destroySingletons(stragglers, processed);
+            } finally {
+                shutdownThread = null;
             }
 
             if (checkEnabledBeans != null) {
@@ -1315,7 +1340,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     @SuppressWarnings("java:S1181") // Release dependents even when destruction fails with an Error, then rethrow it.
     private <T> void destroyRegistration(DefaultBeanResolutionContext resolutionContext,
                                          BeanRegistration<T> registration, boolean dependent) {
-        stopDependencyResolution(registration, Collections.newSetFromMap(new IdentityHashMap<>()));
+        stopDependencyResolution(resolutionContext, registration, Collections.newSetFromMap(new IdentityHashMap<>()));
         if (LOG_LIFECYCLE.isDebugEnabled()) {
             LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", registration.bean, registration.identifier);
         }
@@ -4462,16 +4487,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     @Override
     public <T> CreatedBean<T> createBeanRegistration(BeanDefinition<T> definition) {
         ArgumentUtils.requireNonNull(ARGUMENT_DEFINITION, definition);
-        if (isDependencyResolutionClosed()) {
-            throw new IllegalStateException("Cannot create a bean after context shutdown has begun");
+        if (isDependencyCreationClosed()) {
+            throw new IllegalStateException("Cannot create a bean before the context is configured or after its shutdown has begun");
         }
-        return createFreshRegistration(null, definition);
+        BeanRegistration<T> registration = createFreshRegistration(null, definition);
+        trackShutdownDependents(null, List.<BeanRegistration<?>>of(registration));
+        return registration;
     }
 
     @Override
     public BeanDependencyGroup createDependencyGroup() {
-        if (isDependencyResolutionClosed()) {
-            throw new IllegalStateException("Cannot create a dependency group after context shutdown has begun");
+        if (isDependencyCreationClosed()) {
+            throw new IllegalStateException("Cannot create a dependency group before the context is configured or after its shutdown has begun");
         }
         return new DefaultBeanDependencyResolver(this);
     }
@@ -4485,30 +4512,99 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return configured.get();
     }
 
+    /**
+     * Whether lookups through an existing dependency group or resolver are rejected: before the context is configured,
+     * after it stopped, and during shutdown on any thread but the one running it. On that thread every lookup is made
+     * on behalf of a shutdown event listener or a destruction callback, and what it creates is destroyed before the
+     * shutdown completes.
+     *
+     * @return Whether the lookups are rejected
+     */
     boolean isDependencyResolutionClosed() {
-        return terminating.get() || !configured.get();
+        return !configured.get() || terminating.get() && shutdownThread != Thread.currentThread();
     }
 
-    private void stopDependencyResolution(BeanRegistration<?> registration, Set<BeanRegistration<?>> visited) {
+    /**
+     * Whether new top-level ownership, an independent group or a fresh registration, is rejected. During shutdown only
+     * a listener of the {@link ShutdownEvent} may start it; a destruction callback uses the dependencies of its own
+     * invocation instead.
+     *
+     * @return Whether new top-level ownership is rejected
+     */
+    private boolean isDependencyCreationClosed() {
+        return !configured.get() || terminating.get() && shutdownEventThread != Thread.currentThread();
+    }
+
+    /**
+     * Records the registrations a lookup created during shutdown, so they are destroyed before it completes.
+     *
+     * @param owner The dependencies that own the registrations, or null when the caller of the context owns them
+     * @param created The registrations
+     */
+    void trackShutdownDependents(@Nullable DefaultBeanDependencies owner, List<BeanRegistration<?>> created) {
+        if (!created.isEmpty() && shutdownThread == Thread.currentThread()) {
+            for (BeanRegistration<?> registration : created) {
+                shutdownDependents.add(new ShutdownDependent(owner, registration));
+            }
+        }
+    }
+
+    /**
+     * Destroys what was created during shutdown and is still held, in reverse creation order. A dependent already
+     * destroyed with its owner, or released by it, is skipped.
+     */
+    private void destroyShutdownDependents() {
+        while (!shutdownDependents.isEmpty()) {
+            List<ShutdownDependent> taken = List.copyOf(shutdownDependents);
+            shutdownDependents.clear();
+            for (int i = taken.size() - 1; i >= 0; i--) {
+                ShutdownDependent dependent = taken.get(i);
+                try {
+                    if (dependent.owner() == null) {
+                        // Destruction is claimed once, so a registration the caller closed is not destroyed again
+                        dependent.registration().close();
+                    } else if (dependent.owner().remove(dependent.registration())) {
+                        destroyDependentBean(dependent.registration());
+                    }
+                } catch (RuntimeException e) {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Error destroying bean [{}] created during shutdown: {}", dependent.registration().bean, e.getMessage(), e);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Stops resolution through a registration being destroyed and through everything it owns. The destruction callbacks
+     * may still resolve through the bean itself, its proxy target and the resolvers and groups injected into them, but
+     * not through the other beans they own.
+     *
+     * @param invocation The destruction invocation whose callbacks may still resolve, or null
+     * @param registration The registration
+     * @param visited The registrations already stopped
+     */
+    private void stopDependencyResolution(@Nullable DefaultBeanResolutionContext invocation, BeanRegistration<?> registration,
+                                          Set<BeanRegistration<?>> visited) {
         if (!visited.add(registration)) {
             return;
         }
         DefaultBeanDependencies dependencies = registration.getDependencies();
         if (dependencies != null) {
-            dependencies.stopResolving();
+            dependencies.stopResolving(invocation);
         }
         for (BeanRegistration<?> owned : registration.dependentBeans()) {
-            stopDependencyResolution(owned, visited);
+            stopDependencyResolution(owned.getBean() instanceof DefaultBeanDependencyResolver ? invocation : null, owned, visited);
         }
         if (registration.getBean() instanceof InterceptedBeanProxy<?> proxy && proxy.hasCachedInterceptedTarget()
             && findProxyTargetBeanDefinition(registration.getBeanDefinition()).map(this::isUnscoped).orElse(false)) {
             BeanRegistration<?> target = proxy.interceptedTargetRegistration();
             if (target != null) {
-                stopDependencyResolution(target, visited);
+                stopDependencyResolution(invocation, target, visited);
             }
             if (registration instanceof BeanDisposingRegistration<?> disposing && disposing.getProxyTargetContext() != null) {
                 for (BeanRegistration<?> owned : disposing.getProxyTargetContext().getCachedProxyTargetDependents()) {
-                    stopDependencyResolution(owned, visited);
+                    stopDependencyResolution(owned.getBean() instanceof DefaultBeanDependencyResolver ? invocation : null, owned, visited);
                 }
             }
         }
@@ -4592,6 +4688,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             // an index exhaustiveness computed before the bean definitions were read does not hold for them
             beanDefinitionsEpoch.incrementAndGet();
         }
+    }
+
+    /**
+     * A registration created during shutdown.
+     *
+     * @param owner The dependencies that own it, or null when the caller of the context does
+     * @param registration The registration
+     */
+    private record ShutdownDependent(@Nullable DefaultBeanDependencies owner, BeanRegistration<?> registration) {
     }
 
     private static void configurationFailure(String message) {

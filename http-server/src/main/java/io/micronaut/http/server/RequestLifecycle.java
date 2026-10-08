@@ -32,6 +32,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.FilterRunner;
@@ -381,7 +382,7 @@ public class RequestLifecycle {
     protected final ExecutionFlow<HttpResponse<?>> runWithFilters(HttpRequest<?> request, BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
         try {
             List<GenericHttpFilter> httpFilters = routeExecutor.router.findFilters(request);
-            FilterRunner filterRunner = new FilterRunner(httpFilters, (filteredRequest, propagatedContext) -> {
+            FilterRunner filterRunner = new LifecycleFilterRunner(null, httpFilters, (filteredRequest, propagatedContext) -> {
                 onFilteredRequest(filteredRequest);
                 return responseProvider.apply(filteredRequest, propagatedContext);
             }) {
@@ -419,7 +420,7 @@ public class RequestLifecycle {
                                                               @Nullable RouteMatch<?> routeMatch,
                                                               HttpResponse<?> response,
                                                               PropagatedContext propagatedContext) {
-        FilterRunner filterRunner = new FilterRunner(
+        FilterRunner filterRunner = new LifecycleFilterRunner(
             routeExecutor.router.findPreMatchingFilters(request),
             // the filters of the route too, like the filters that ran for the request
             routeExecutor.router.findFilters(request, routeMatch),
@@ -445,7 +446,7 @@ public class RequestLifecycle {
         try {
             PropagatedContext propagatedContext = PropagatedContext.get();
             List<GenericHttpFilter> preMatchingFilters = routeExecutor.router.findPreMatchingFilters(request);
-            FilterRunner filterRunner = new FilterRunner(preMatchingFilters, null, new BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>>() {
+            FilterRunner filterRunner = new LifecycleFilterRunner(preMatchingFilters, null, new BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>>() {
                 @Override
                 public ExecutionFlow<HttpResponse<?>> apply(HttpRequest<?> httpRequest, PropagatedContext propagatedContext) {
                     throw new IllegalStateException("Should not be called");
@@ -794,5 +795,23 @@ public class RequestLifecycle {
         return routeExecutor.router.findStatusRoute(status, request)
                 .map(routeMatch -> executeRoute(request, propagatedContext, routeMatch))
                 .orElse(null);
+    }
+
+    /**
+     * The filter runner of the lifecycle: it closes the elements of a response body that a filter
+     * dropped off the event loop, since closing them may block.
+     */
+    private abstract class LifecycleFilterRunner extends FilterRunner {
+
+        LifecycleFilterRunner(@Nullable List<GenericHttpFilter> preMatchingFilters,
+                              @Nullable List<GenericHttpFilter> filters,
+                              BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
+            super(preMatchingFilters, filters, responseProvider);
+        }
+
+        @Override
+        protected void closeElements(HttpRequest<?> request, BodyElements<?> elements) {
+            routeExecutor.discardElements(request, elements);
+        }
     }
 }
