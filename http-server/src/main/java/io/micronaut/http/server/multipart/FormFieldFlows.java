@@ -24,6 +24,7 @@ import org.reactivestreams.Subscription;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -60,6 +61,8 @@ public final class FormFieldFlows {
                 try {
                     mapped = Objects.requireNonNull(map.apply(item), "The mapper returned a null value.");
                 } catch (Throwable e) {
+                    // nobody took the item
+                    close(item, e);
                     result.completeExceptionally(e);
                     return;
                 }
@@ -110,6 +113,8 @@ public final class FormFieldFlows {
                 try {
                     flow = Objects.requireNonNull(complete.apply(item), "The mapper returned a null flow");
                 } catch (Throwable e) {
+                    // nobody took the item
+                    close(item, e);
                     result.completeExceptionally(e);
                     return;
                 }
@@ -132,6 +137,23 @@ public final class FormFieldFlows {
             }
         });
         return result;
+    }
+
+    /**
+     * Close an item that a mapper failed to take, e.g. a {@link io.micronaut.http.multipart.RawFormField},
+     * if it holds resources.
+     *
+     * @param item    The item
+     * @param failure The failure of the mapper, which gets the failure to close as suppressed
+     */
+    private static void close(Object item, Throwable failure) {
+        if (item instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception e) {
+                failure.addSuppressed(e);
+            }
+        }
     }
 
     /**
@@ -209,7 +231,7 @@ public final class FormFieldFlows {
         private final Consumer<? super R> onValue;
         private final Consumer<@Nullable Throwable> onDone;
         private final AtomicReference<@Nullable Subscription> upstream = new AtomicReference<>();
-        private final AtomicReference<@Nullable ExecutionFlow<? extends R>> running = new AtomicReference<>();
+        private final AtomicReference<@Nullable RunningFlow> running = new AtomicReference<>();
 
         /**
          * @param complete Completes an item
@@ -260,9 +282,12 @@ public final class FormFieldFlows {
                 stopWithError(e, Objects.requireNonNull(upstream.get())::cancel);
                 return;
             }
+            RunningFlow runningFlow = null;
             if (flow.tryComplete() == null) {
-                // cancelled with the reading while it runs
-                running.set(flow);
+                // cancelled with the reading while it runs. Known before the completion is
+                // observed, which requests the next item, so a later item does not replace it
+                runningFlow = new RunningFlow(flow);
+                running.set(runningFlow);
             }
             flow.onComplete((value, e) -> {
                 if (e != null) {
@@ -274,6 +299,14 @@ public final class FormFieldFlows {
                     innerComplete();
                 }
             });
+            if (runningFlow != null) {
+                State current = state.get();
+                if (!runningFlow.observed() || current == State.CANCELLED || current == State.TERMINATED) {
+                    // cancelled, or failed by the publisher, before the flow was known or
+                    // observed: the cancellation did not reach it
+                    flow.cancel();
+                }
+            }
         }
 
         @Override
@@ -324,7 +357,7 @@ public final class FormFieldFlows {
         }
 
         private void cancelRunning() {
-            ExecutionFlow<? extends R> flow = running.get();
+            RunningFlow flow = running.get();
             if (flow != null) {
                 flow.cancel();
             }
@@ -380,6 +413,38 @@ public final class FormFieldFlows {
                         onDone.accept(error.get());
                     }
                     return;
+                }
+            }
+        }
+
+        /**
+         * The flow of an item that is being completed. A cancellation before its completion is
+         * observed is left to {@link #onNext}: a delayed flow refuses to be observed once it was
+         * cancelled.
+         */
+        private static final class RunningFlow {
+            private static final int NEW = 0;
+            private static final int OBSERVED = 1;
+            private static final int CANCELLED = 2;
+
+            private final ExecutionFlow<?> flow;
+            private final AtomicInteger state = new AtomicInteger(NEW);
+
+            RunningFlow(ExecutionFlow<?> flow) {
+                this.flow = flow;
+            }
+
+            /**
+             * @return Whether the flow is observed, and not cancelled before: else
+             * {@link #onNext} cancels it
+             */
+            boolean observed() {
+                return state.compareAndSet(NEW, OBSERVED);
+            }
+
+            void cancel() {
+                if (!state.compareAndSet(NEW, CANCELLED)) {
+                    flow.cancel();
                 }
             }
         }

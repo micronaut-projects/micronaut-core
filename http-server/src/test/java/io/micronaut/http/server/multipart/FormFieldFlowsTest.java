@@ -71,6 +71,61 @@ class FormFieldFlowsTest {
     }
 
     @Test
+    void firstClosesTheItemWhenTheMapperFails() {
+        Source<Item> source = new Source<>();
+        CompletableFuture<Integer> result = FormFieldFlows.first(source, s -> {
+            throw new RuntimeException("test");
+        });
+        Item item = new Item();
+        source.next(item);
+        assertTrue(result.isCompletedExceptionally());
+        assertTrue(item.closed, "nobody took the item");
+    }
+
+    @Test
+    void firstFlatMapClosesTheItemWhenTheMapperFails() {
+        Source<Item> source = new Source<>();
+        CompletableFuture<Integer> result = FormFieldFlows.firstFlatMap(source, s -> {
+            throw new RuntimeException("test");
+        });
+        Item item = new Item();
+        source.next(item);
+        assertTrue(result.isCompletedExceptionally());
+        assertTrue(item.closed, "nobody took the item");
+    }
+
+    @Test
+    void concatCancelledWhileAFlowStartsCancelsTheFlow() {
+        Source<String> source = new Source<>();
+        DelayedExecutionFlow<Integer> flow = DelayedExecutionFlow.create();
+        AtomicBoolean flowCancelled = new AtomicBoolean();
+        flow.onCancel(() -> flowCancelled.set(true));
+        AtomicReference<FormFieldFlows.Concat<String, Integer>> reading = new AtomicReference<>();
+        FormFieldFlows.Concat<String, Integer> concat = new FormFieldFlows.Concat<>(s -> {
+            // the reading is cancelled after the item was taken, before its flow is known
+            reading.get().cancel();
+            return flow;
+        }, s -> {
+        }, v -> {
+        }, e -> {
+        });
+        reading.set(concat);
+        source.subscribe(concat);
+        source.next("a");
+        assertTrue(source.cancelled);
+        assertTrue(flowCancelled.get(), "the flow that started is cancelled");
+    }
+
+    private static final class Item implements AutoCloseable {
+        boolean closed;
+
+        @Override
+        public void close() {
+            closed = true;
+        }
+    }
+
+    @Test
     void firstFlatMapCompletesWithTheFlow() throws Exception {
         Source<String> source = new Source<>();
         DelayedExecutionFlow<Integer> flow = DelayedExecutionFlow.create();
