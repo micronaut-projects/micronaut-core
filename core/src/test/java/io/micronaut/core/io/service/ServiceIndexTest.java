@@ -803,6 +803,28 @@ public class ServiceIndexTest {
     }
 
     @Test
+    void doesNotRunTheLoadersForALookupThatComesBeforeThem() throws Exception {
+        // an application of its own, whose optimizations are yet to be initialized, with a loader that registers the
+        // index. A lookup that comes first scans: running the loaders there would use the context class loader of
+        // whichever thread looks up first, such as a thread of the pool
+        ClassLoader previous = Thread.currentThread().getContextClassLoader();
+        try (RecordingClassLoader application = new RecordingClassLoader(applicationWithLoaders(TestServiceIndexLoader.class))) {
+            Thread.currentThread().setContextClassLoader(application);
+            Method find = application.loadClass(StaticOptimizations.SetOnce.class.getName()).getMethod("find", String.class);
+            application.loadClass(MicronautMetaServiceLoaderUtils.class.getName())
+                .getMethod("findMicronautMetaServiceEntries", ClassLoader.class, String.class)
+                .invoke(null, application, Greeter.class.getName());
+            assertNull(find.invoke(null, ServiceIndex.class.getName()));
+
+            // the initialization runs the loaders, which see the loader of the index
+            Class.forName(StaticOptimizations.class.getName(), true, application);
+            assertNotNull(find.invoke(null, ServiceIndex.class.getName()));
+        } finally {
+            Thread.currentThread().setContextClassLoader(previous);
+        }
+    }
+
+    @Test
     void isNotLoadedByAnApplicationWithoutAnIndex() throws Exception {
         // the classes of core, loaded again by a class loader that does not see the loaders the tests register
         URL[] classPath = {

@@ -49,8 +49,6 @@ public abstract class StaticOptimizations {
     private static boolean cacheEnvironment = false;
 
     static {
-        // from here on SetOnce.find reads what the loaders have set so far, and does not wait for them
-        SetOnceValues.loadersStarted = true;
         reset();
     }
 
@@ -93,15 +91,6 @@ public abstract class StaticOptimizations {
             return new Exception().getStackTrace();
         }
         return EMPTY_STACK_TRACE_ELEMENT_ARRAY;
-    }
-
-    /**
-     * Does nothing. Calling it initializes this class, which runs the loaders, as calling any of its static methods
-     * does.
-     */
-    @SuppressWarnings("java:S3398") // in SetOnce, calling it would not initialize this class
-    private static void runLoaders() {
-        // the loaders run in the static initializer
     }
 
     /**
@@ -177,21 +166,17 @@ public abstract class StaticOptimizations {
          * the value is set, for example from a {@link Loader} that runs before the loader of the value, finds
          * nothing, and a later read finds the value.</p>
          *
-         * <p>The first call runs the loaders, if nothing has run them yet. A call that is made once a thread has
-         * started to run them does not wait for that thread: it returns what is set so far. Any static method of
-         * {@link StaticOptimizations} would wait, and a caller that the thread of the loaders waits for in turn
-         * would then never return. That is the case of a loader that looks services up with fork-join tasks, when
-         * one of those services looks a service up from the thread of the pool that instantiates it. It is why
-         * this method is not a static method of {@link StaticOptimizations}.</p>
+         * <p>It neither runs the loaders nor waits for them: it returns what is set so far, which is nothing before
+         * the loaders run. Any static method of {@link StaticOptimizations} would run them on the calling thread,
+         * whose context class loader may not see them, such as a thread of the fork-join pool. Or it would wait for
+         * the thread that runs them, which may wait for the caller in turn: a loader that looks services up with
+         * fork-join tasks, when one of those services looks a service up from the thread of the pool that
+         * instantiates it. It is why this method is not a static method of {@link StaticOptimizations}.</p>
          *
          * @param optimizationClassName the name of the optimization class
          * @return the optimization, or null if it is not set
          */
         static @Nullable SetOnce find(String optimizationClassName) {
-            if (!SetOnceValues.loadersStarted) {
-                // no thread has started to run the loaders: this one runs them, or waits for the one that does
-                runLoaders();
-            }
             return SetOnceValues.BY_CLASS_NAME.get(optimizationClassName);
         }
     }
@@ -207,14 +192,11 @@ public abstract class StaticOptimizations {
     }
 
     /**
-     * The {@link SetOnce} optimizations, and whether the loaders have started to run. They are in a class of their
-     * own so that {@link SetOnce#find(String)} can read them without initializing {@link StaticOptimizations}, which
-     * would wait for the thread that runs the loaders.
+     * The {@link SetOnce} optimizations. They are in a class of their own so that {@link SetOnce#find(String)} can
+     * read them without initializing {@link StaticOptimizations}, which would run the loaders or wait for them.
      */
     private static final class SetOnceValues {
         static final Map<String, SetOnce> BY_CLASS_NAME = new ConcurrentHashMap<>();
-        // set when the initialization of StaticOptimizations starts, and never reset
-        static volatile boolean loadersStarted;
 
         private SetOnceValues() {
         }

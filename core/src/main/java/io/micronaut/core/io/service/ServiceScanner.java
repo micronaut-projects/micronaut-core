@@ -107,10 +107,10 @@ final class ServiceScanner<S> {
      * application without an index does not load {@link ServiceIndex}, and the read does not make the registration
      * that follows fail.</p>
      *
-     * <p>The read does not wait for the loaders once a thread has started to run them: see
-     * {@link StaticOptimizations.SetOnce#find(String)}. A lookup can therefore start on a thread of the fork-join
-     * pool while a loader waits for that thread, as it does when a loader looks up a service whose constructor looks
-     * a service up.</p>
+     * <p>The read neither runs the loaders nor waits for them: see {@link StaticOptimizations.SetOnce#find(String)}.
+     * A lookup that comes before the loaders run scans the class path, and a lookup can start on a thread of the
+     * fork-join pool while a loader waits for that thread, as it does when a loader looks up a service whose
+     * constructor looks a service up.</p>
      *
      * <p>A lookup calls this method once, on the thread that starts it, and hands the answer to its fork-join tasks,
      * so that the whole lookup uses one answer: see
