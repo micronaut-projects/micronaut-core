@@ -77,6 +77,10 @@ public final class PythonConversion {
     private static final String GETITEM = "__getitem__";
 
     private static final String ISOFORMAT = "isoformat";
+    /** The Python datetime module, and its datetime type. */
+    private static final String DATETIME = "datetime";
+    /** The time zone attribute of a Python time or datetime. */
+    private static final String TZINFO = "tzinfo";
 
     private static final String FROM_POLYGLOT_VALUE = "fromPolyglotValue";
 
@@ -180,7 +184,7 @@ public final class PythonConversion {
      * @return The local date-time
      */
     static LocalDateTime convertLocalDateTime(Value value) {
-        rejectAware(value, "datetime");
+        rejectAware(value, DATETIME);
         return LocalDateTime.parse(value.invokeMember(ISOFORMAT).asString());
     }
 
@@ -242,13 +246,15 @@ public final class PythonConversion {
     }
 
     /**
+     * Whether a Python {@code datetime.datetime} is aware, that is whether its {@code tzinfo} gives it
+     * an offset. A {@code tzinfo} whose {@code utcoffset} answers {@code None} leaves the value naive, as
+     * Python itself defines it.
+     *
      * @param value A Python {@code datetime.datetime}
-     * @return whether it is aware, that is whether its {@code tzinfo} gives it an offset. A
-     * {@code tzinfo} whose {@code utcoffset} answers {@code None} leaves the value naive, as Python
-     * itself defines it
+     * @return whether it is aware
      */
     static boolean isAware(Value value) {
-        Value tzinfo = value.getMember("tzinfo");
+        Value tzinfo = value.getMember(TZINFO);
         if (tzinfo == null || isNone(tzinfo)) {
             return false;
         }
@@ -262,7 +268,7 @@ public final class PythonConversion {
      * region Java knows
      */
     private static @Nullable ZoneId regionOf(Value value) {
-        Value tzinfo = value.getMember("tzinfo");
+        Value tzinfo = value.getMember(TZINFO);
         if (tzinfo == null || isNone(tzinfo)) {
             return null;
         }
@@ -319,7 +325,7 @@ public final class PythonConversion {
      * @return The zone offset
      */
     static ZoneOffset convertZoneOffset(Value value) {
-        if (!PythonCoercion.isPythonType(value, "datetime", "timezone")) {
+        if (!PythonCoercion.isPythonType(value, DATETIME, "timezone")) {
             throw new IllegalArgumentException("Only fixed-offset datetime.timezone values can be converted to ZoneOffset");
         }
         Value offsetValue = PythonContextRuntime.helper(value.getContext(), UTC_OFFSET).execute(value);
@@ -347,10 +353,10 @@ public final class PythonConversion {
      * @param typeName The Python type name for the message
      */
     private static void rejectAware(Value value, String typeName) {
-        Value tzinfo = value.getMember("tzinfo");
+        Value tzinfo = value.getMember(TZINFO);
         if (tzinfo != null && !isNone(tzinfo)) {
             throw new IllegalArgumentException("Aware datetime." + typeName + " values cannot be converted to a naive Java type"
-                + ("datetime".equals(typeName)
+                + (DATETIME.equals(typeName)
                     ? ": declare the type as java.time.Instant, OffsetDateTime or ZonedDateTime, for example Annotated[datetime, Instant]"
                     : ""));
         }
