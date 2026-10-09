@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.dev.DevRuntime;
 import io.micronaut.dev.MicronautDevMain;
 import io.micronaut.dev.manifest.DevManifest;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.File;
@@ -67,7 +66,6 @@ import java.util.stream.Stream;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class ReloadHarness implements AutoCloseable {
 
     /**
