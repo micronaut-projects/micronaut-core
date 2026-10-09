@@ -284,28 +284,27 @@ public interface PropagatedContext {
      * temporarily replacing the previous context (if any). The returned scope must be closed, on the same thread, to
      * undo the propagation.
      *
-     * <p>Unlike {@link #propagate()} this method doesn't fail with scoped-value propagation: it returns {@code null}
-     * and nothing is brought into scope. It is intended for integrations that cannot use a callback, because the
-     * context must stay in scope across separate calls into user code, and that would rather skip the propagation
-     * than fail when it isn't possible:</p>
+     * <p>Unlike {@link #propagate()} this method doesn't fail with scoped-value propagation: it returns a scope that
+     * does nothing when closed, and nothing is brought into scope. It is intended for integrations that cannot use a
+     * callback, because the context must stay in scope across separate calls into user code, and that would rather
+     * skip the propagation than fail when it isn't possible:</p>
      *
      * <pre>{@code
      * PropagatedContext.Scope scope = context.propagateIfSupported();
      * // ... later, possibly from another method
-     * if (scope != null) {
-     *     scope.close();
-     * }
+     * scope.close();
      * }</pre>
      *
      * <p>Prefer the callback forms such as {@link #propagate(Supplier)} whenever possible, they work in both
      * propagation modes.</p>
      *
-     * @return the scope to close, or {@code null} if the current propagation mode doesn't support scopes
+     * @return the scope to close, a no-op scope if the current propagation mode doesn't {@link #supportsScopes()
+     * support scopes}
      * @since 5.3.0
      */
     @SuppressWarnings("deprecation")
-    default @Nullable Scope propagateIfSupported() {
-        return supportsScopes() ? propagate() : null;
+    default Scope propagateIfSupported() {
+        return supportsScopes() ? propagate() : PropagatedContextImpl.NOOP_SCOPE;
     }
 
     /**

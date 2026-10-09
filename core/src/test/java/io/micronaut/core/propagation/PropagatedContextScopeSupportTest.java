@@ -68,9 +68,12 @@ class PropagatedContextScopeSupportTest {
         assertFalse(PropagatedContext.supportsScopes());
 
         PropagatedContext context = PropagatedContext.getOrEmpty().plus(new Element("a"));
-        assertNull(context.propagateIfSupported());
+        try (PropagatedContext.Scope scope = context.propagateIfSupported()) {
+            assertNotNull(scope);
+            assertFalse(PropagatedContext.exists());
+            assertNull(THREAD_STATE.get());
+        }
         assertFalse(PropagatedContext.exists());
-        assertNull(THREAD_STATE.get());
 
         // The deprecated method keeps failing
         @SuppressWarnings("deprecation")
@@ -84,7 +87,10 @@ class PropagatedContextScopeSupportTest {
         PropagatedContext outer = PropagatedContext.getOrEmpty().plus(new Element("outer"));
 
         outer.propagate(() -> {
-            assertNull(outer.plus(new Element("inner")).propagateIfSupported());
+            PropagatedContext.Scope scope = outer.plus(new Element("inner")).propagateIfSupported();
+            assertSame(outer, PropagatedContext.get());
+            assertEquals("outer", THREAD_STATE.get());
+            scope.close();
             assertSame(outer, PropagatedContext.get());
             assertEquals("outer", THREAD_STATE.get());
         });

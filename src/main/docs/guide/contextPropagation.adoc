@@ -182,15 +182,13 @@ The try-with-resources pattern exists primarily for legacy integrations that req
 
 A scoped value is only bound for the duration of a single callback invocation: it cannot be bound by one method and unbound by a later one. As a result there is no equivalent of an open/close scope in `scoped-value` mode. Some integrations nonetheless cannot use a callback because the context must stay in scope across separate calls into user code, for example an `Iterator` that brings the context of a record into scope when `next()` is called and takes it out of scope on the following `next()` or `close()`.
 
-Such integrations can call `PropagatedContext.supportsScopes()` to check whether the current mode supports scopes, or use `propagateIfSupported()`, which behaves like `propagate()` in `thread-local` mode and returns `null` (without propagating anything) in `scoped-value` mode instead of throwing:
+Such integrations can call `PropagatedContext.supportsScopes()` to check whether the current mode supports scopes, or use `propagateIfSupported()`, which behaves like `propagate()` in `thread-local` mode and returns a no-op scope (without propagating anything) in `scoped-value` mode instead of throwing:
 
 [source,java]
 ----
-PropagatedContext.Scope scope = context.propagateIfSupported(); // null in scoped-value mode
+PropagatedContext.Scope scope = context.propagateIfSupported(); // no-op in scoped-value mode
 // ... later, for example on the next call to Iterator.next()
-if (scope != null) {
-    scope.close();
-}
+scope.close();
 ----
 
 To opt into scoped-value mode globally (default: `thread-local`), set `micronaut.propagation`:

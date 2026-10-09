@@ -46,6 +46,9 @@ final class PropagatedContextImpl implements PropagatedContext {
 
     static final PropagatedContextImpl EMPTY = new PropagatedContextImpl(new PropagatedContextElement[0], false, false);
 
+    static final Scope NOOP_SCOPE = () -> {
+    };
+
     final PropagatedContextElement[] elements;
     final boolean containsThreadElements;
     final boolean containsScopedValueElements;
