@@ -395,8 +395,15 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         MessageBodyReader<?> reader = messageBodyHandlerRegistry.findReader(bodyArgument, mediaType)
                             .orElse(null);
                         if (reader != null) {
-                            ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content().retain());
-                            data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
+                            ByteBuf payload = msg.content().retain();
+                            ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(payload);
+                            try {
+                                data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
+                            } catch (Throwable t) {
+                                // readers release the buffer on success only
+                                payload.release();
+                                throw t;
+                            }
                         }
                     }
                 }
