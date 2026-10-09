@@ -21,13 +21,10 @@ import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.context.watch.BeanDefinitionChange;
 import io.micronaut.context.watch.BeanDefinitionWatcher;
 import io.micronaut.context.watch.BeanWatch;
-import io.micronaut.context.watch.ConfigurationWatcher;
-import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Sensitive;
 import jakarta.annotation.PreDestroy;
@@ -107,7 +104,7 @@ public class EndpointSensitivityProcessor implements BeanDefinitionProcessor<End
         this.beanContext = beanContext;
         if (beanContext instanceof WatchableBeanContext watchableContext) {
             this.watchable = watchableContext;
-            this.watch = watchableContext.watchDefinitions(Argument.OBJECT_ARGUMENT, Qualifiers.byStereotype(Endpoint.class), this);
+            this.watch = watchableContext.definitions().stereotype(Endpoint.class).watch(this);
         } else {
             this.watchable = null;
             this.watch = null;
@@ -129,12 +126,11 @@ public class EndpointSensitivityProcessor implements BeanDefinitionProcessor<End
         if (watchable == null) {
             return;
         }
-        prefixWatches.computeIfAbsent(prefix, p -> watchable.watchConfiguration(p, change -> {
+        prefixWatches.computeIfAbsent(prefix, p -> watchable.configuration(p).watch(change -> {
             // the entries bound again by the refresh, and a sensitivity read from the resolver
             for (BeanDefinition<?> endpoint : endpoints) {
                 record(endpoint);
             }
-            return ConfigurationWatcher.Outcome.APPLIED;
         }));
     }
 

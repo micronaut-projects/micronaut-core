@@ -2,7 +2,7 @@ package io.micronaut.management.endpoint
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.watch.ConfigurationWatcher
+import io.micronaut.context.watch.ReloadingConfigurationWatcher
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher
 import spock.lang.Specification
@@ -25,7 +25,7 @@ class EndpointSensitivityWatchSpec extends Specification {
         def result = context.getBean(ConfigurationRefresher).refresh()
 
         then:
-        result.outcomes().contains(ConfigurationWatcher.Outcome.APPLIED)
+        result.outcomes().contains(ReloadingConfigurationWatcher.Outcome.APPLIED)
         !processor.endpointMethods.get(method)
 
         when: "the setting goes again"
@@ -65,7 +65,7 @@ class EndpointSensitivityWatchSpec extends Specification {
         def result = context.getBean(ConfigurationRefresher).refresh()
 
         then:
-        result.outcomes().contains(ConfigurationWatcher.Outcome.APPLIED)
+        result.outcomes().contains(ReloadingConfigurationWatcher.Outcome.APPLIED)
         !processor.endpointMethods.get(method)
 
         cleanup:

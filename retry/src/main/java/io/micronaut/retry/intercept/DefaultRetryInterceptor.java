@@ -22,7 +22,7 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.event.ApplicationEventPublisher;
-import io.micronaut.context.watch.ExecutableMethodChange;
+import io.micronaut.context.watch.BeanExecutableMethod;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.AnnotationValue;
 import org.jspecify.annotations.Nullable;
@@ -151,10 +151,10 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         this.retryRunner = new DefaultRetryRunner(this.executorService, this::sleep);
         this.namedCircuits = namedCircuits == null ? new NamedCircuits() : namedCircuits;
         if (beanContext instanceof WatchableBeanContext watchable) {
-            watchable.watchMethods(CircuitBreaker.class, change -> {
+            watchable.methods(CircuitBreaker.class).watch(change -> {
                 // a circuit belongs to the method it guards: a method that went, or came back changed, starts closed;
                 // a named circuit is shared by name and outlives any one method
-                for (ExecutableMethodChange.Entry<CircuitBreaker> gone : change.removed()) {
+                for (BeanExecutableMethod<CircuitBreaker> gone : change.removed()) {
                     circuitContexts.keySet().removeIf(key -> key.method().equals(gone.method()));
                 }
             });

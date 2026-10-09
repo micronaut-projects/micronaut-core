@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.annotation.Mapper;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.context.watch.BeanExecutableMethod;
 import io.micronaut.context.watch.BeanWatch;
 import io.micronaut.context.watch.ExecutableMethodChange;
 import io.micronaut.context.watch.ExecutableMethodWatcher;
@@ -66,7 +67,7 @@ final class MapperMethodProcessor implements ExecutableMethodProcessor<Mapper>, 
         this.mutableConversionService = mutableConversionService;
         this.applicationContext = applicationContext;
         this.watch = applicationContext instanceof WatchableBeanContext watchable
-            ? watchable.watchMethods(Mapper.class, this)
+            ? watchable.methods(Mapper.class).watch(this)
             : null;
     }
 
@@ -80,7 +81,7 @@ final class MapperMethodProcessor implements ExecutableMethodProcessor<Mapper>, 
     @Override
     public void onChange(ExecutableMethodChange<Mapper> change) {
         Set<Mapping> retired = new LinkedHashSet<>();
-        for (ExecutableMethodChange.Entry<Mapper> gone : change.removed()) {
+        for (BeanExecutableMethod<Mapper> gone : change.removed()) {
             // a replacement is paired by name and parameters: one that maps to another type leaves the retired
             // pair behind unless it is removed, and one that maps the same registers over it
             Optional<Mapping> mapping = mapping(gone.method());
@@ -94,13 +95,13 @@ final class MapperMethodProcessor implements ExecutableMethodProcessor<Mapper>, 
                 }
             }
         }
-        for (ExecutableMethodChange.Entry<Mapper> entry : change.added()) {
+        for (BeanExecutableMethod<Mapper> entry : change.added()) {
             // converts through the new generation's bean
             mapping(entry.method()).ifPresent(retired::remove);
             register(entry.definition(), entry.method());
         }
         // a pair another mapper still maps is registered again for that mapper
-        for (ExecutableMethodChange.Entry<Mapper> entry : change.current()) {
+        for (BeanExecutableMethod<Mapper> entry : change.current()) {
             if (change.removed().contains(entry)) {
                 continue;
             }

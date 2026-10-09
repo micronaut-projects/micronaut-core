@@ -20,7 +20,6 @@ import java.util.List;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.watch.ConfigurationWatcher;
 import jakarta.inject.Singleton;
 
 /**
@@ -65,9 +64,8 @@ public class StaticResourceResolverFactory {
             // what an override of the older method builds is kept and updated in place; the empty constant cannot
             // follow a mapping added later, so a live resolver stands in for it
             StaticResourceResolver resolver = built == StaticResourceResolver.EMPTY ? new StaticResourceResolver(configurations) : built;
-            watchable.watchConfiguration(StaticResourceConfiguration.PREFIX, change -> {
+            watchable.configuration(StaticResourceConfiguration.PREFIX).watch(change -> {
                 resolver.update(beanContext.getBeansOfType(StaticResourceConfiguration.class).stream().toList());
-                return ConfigurationWatcher.Outcome.APPLIED;
             });
             return resolver;
         }
