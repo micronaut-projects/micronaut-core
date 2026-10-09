@@ -177,7 +177,6 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     RawHttpClient,
     Closeable,
     AutoCloseable {
-    private static final String OPTIONS_PARAMETER = "options";
 
     /**
      * Request attribute of a request that may switch the connection to another protocol, see
@@ -199,6 +198,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     /**
      * Default logger, use {@link #log} where possible.
      */
+    private static final String OPTIONS_PARAMETER = "options";
     private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(NettyHttpClient.class);
     /**
      * Set on a connection once a request was sent on it, to tell reused connections from new ones.
