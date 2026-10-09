@@ -19,7 +19,7 @@ public class GreeterRegistry {
     GreeterRegistry(BeanContext beanContext) {
         this.beanContext = beanContext;
         if (beanContext instanceof WatchableBeanContext watchable) {
-            watchable.watchDefinitions(Argument.of(Greeter.class), null, change -> {
+            watchable.definitions(Argument.of(Greeter.class)).watch(change -> {
                 for (BeanDefinition<Greeter> definition : change.current()) {
                     latest = definition;
                 }

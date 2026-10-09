@@ -21,7 +21,6 @@ import io.micronaut.dev.loader.DevClassLoader;
 import io.micronaut.dev.loader.GenerationClassLoader;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
@@ -37,7 +36,6 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class ReloadTck {
 
     private static final Duration COLLECTION_TIMEOUT = Duration.ofSeconds(10);
@@ -73,7 +71,7 @@ public final class ReloadTck {
         // generation, kept by a static registry across harnesses, is as wrong
         if (generation != loader.current()) {
             throw new AssertionError("The module still holds " + type.getName() + " of generation " + generation.generation() + " after the reload to generation " + loader.generation()
-                + ": a registry built once must watch the definitions it holds (WatchableBeanContext.watchDefinitions or watchBeans) or resolve through the context on use");
+                + ": a registry built once must watch the definitions it holds (WatchableBeanContext.definitions(..).watch or .instances().watch) or resolve through the context on use");
         }
     }
 
