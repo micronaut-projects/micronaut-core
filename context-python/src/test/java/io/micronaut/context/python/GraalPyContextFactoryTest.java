@@ -33,11 +33,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -144,6 +146,39 @@ final class GraalPyContextFactoryTest {
             PolyglotException blocked = assertThrows(PolyglotException.class,
                 () -> context.eval(PYTHON, "java.type('org.slf4j.LoggerFactory')"));
             assertTrue(blocked.getMessage().contains("org.slf4j.LoggerFactory"), blocked.getMessage());
+        }
+    }
+
+    @Test
+    void restrictedHostClassLookupAllowsArraysOfVisibleComponentTypes() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "graalpy.context.host-class-lookup", List.of("com.example", "org.slf4j.Logger")
+        ))) {
+            Context context = applicationContext.getBean(Context.class);
+            // primitive arrays are always visible, for example as a body type token for the HTTP client
+            assertEquals(byte[].class, context.eval(PYTHON, "import java\njava.type('byte[]')").asHostObject());
+            assertEquals(int[][].class, context.eval(PYTHON, "java.type('int[][]')").asHostObject());
+            assertEquals(3, context.eval(PYTHON, "java.type('byte[]')(3)").getArraySize());
+            // an array is visible when its component type is
+            assertEquals(String[].class, context.eval(PYTHON, "java.type('java.lang.String[]')").asHostObject());
+            assertEquals(org.slf4j.Logger[][].class, context.eval(PYTHON, "java.type('org.slf4j.Logger[][]')").asHostObject());
+            PolyglotException blocked = assertThrows(PolyglotException.class,
+                () -> context.eval(PYTHON, "java.type('org.slf4j.LoggerFactory[]')"));
+            assertTrue(blocked.getMessage().contains("org.slf4j.LoggerFactory"), blocked.getMessage());
+        }
+    }
+
+    @Test
+    void hostClassFilterMatchesArrayNames() {
+        GraalPyContextConfiguration configuration = new GraalPyContextConfiguration();
+        configuration.setHostClassLookup(List.of("com.example"));
+        Predicate<String> filter = configuration.hostClassFilter();
+        // Truffle checks "byte[]" and then its component "byte"; JVM descriptors match the same way
+        for (String allowed : List.of("byte", "byte[]", "boolean[][]", "[B", "[[I", "com.example.Foo[]", "[Lcom.example.Foo;", "[Ljava.lang.String;", "java.lang.String[]")) {
+            assertTrue(filter.test(allowed), allowed);
+        }
+        for (String denied : List.of("org.other.Foo[]", "[Lorg.other.Foo;", "bytes", "byte[", "[", "[X", "[L;", "[Lcom.example.Foo", "com.examples.Foo[]")) {
+            assertFalse(filter.test(denied), denied);
         }
     }
 
