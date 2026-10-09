@@ -1094,6 +1094,139 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.checkException()
     }
 
+    def 'a request the request handler rejects is answered and the connection closed'(String kind) {
+        given:
+        def errors = []
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                throw new IllegalArgumentException("accept failed")
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                errors << cause
+            }
+        }))
+
+        when:
+        HttpRequest req
+        switch (kind) {
+            case 'full':
+                req = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER)
+                break
+            case 'bodyless':
+                req = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/")
+                break
+            default:
+                // a body that has not fully arrived by read complete is passed on as a stream
+                req = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+                req.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        }
+        ch.writeInbound(req)
+
+        then:
+        // the request can never be handled, so it is answered and the connection closed rather
+        // than left open waiting for a response that never comes
+        errors.size() == 1
+        errors[0].message == "accept failed"
+        HttpResponse response = ch.readOutbound()
+        response.status() == HttpResponseStatus.INTERNAL_SERVER_ERROR
+        response.headers().get(HttpHeaderNames.CONNECTION) == 'close'
+        !ch.open
+
+        cleanup:
+        ch.finishAndReleaseAll()
+
+        where:
+        kind << ['full', 'bodyless', 'streaming']
+    }
+
+    def 'a request handler that fails after starting a response'(boolean expectContinue, boolean respond) {
+        given:
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                // demanding the body sends the 100 Continue, if one is expected
+                Flux.from(body.toByteArrayPublisher()).subscribe()
+                if (respond) {
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
+                }
+                throw new IllegalArgumentException("accept failed")
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+            }
+        }))
+
+        when:
+        def req = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        if (expectContinue) {
+            req.headers().add(HttpHeaderNames.EXPECT, HttpHeaderValues.CONTINUE)
+        }
+        req.headers().add(HttpHeaderNames.CONTENT_LENGTH, 3)
+        ch.writeInbound(req)
+
+        then:
+        if (expectContinue) {
+            assert ((HttpResponse) ch.readOutbound()).status() == HttpResponseStatus.CONTINUE
+        }
+        // the response the handler wrote is kept, otherwise the request is answered with a 500
+        ((HttpResponse) ch.readOutbound()).status() == (respond ? HttpResponseStatus.NO_CONTENT : HttpResponseStatus.INTERNAL_SERVER_ERROR)
+        !ch.outboundMessages().any { it instanceof HttpResponse }
+        !ch.open
+
+        cleanup:
+        ch.finishAndReleaseAll()
+
+        where:
+        expectContinue | respond
+        true           | true
+        true           | false
+        false          | true
+    }
+
+    def 'the responses of earlier pipelined requests are written before a rejected request closes the connection'() {
+        given:
+        OutboundAccess first = null
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                if (request.uri() == "/first") {
+                    first = outboundAccess
+                } else {
+                    throw new IllegalArgumentException("accept failed")
+                }
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+            }
+        }))
+
+        when:
+        ch.writeInbound(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/first", Unpooled.EMPTY_BUFFER),
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/second", Unpooled.EMPTY_BUFFER)
+        )
+        then:
+        ch.open
+        ch.readOutbound() == null
+
+        when:
+        first.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
+        ch.runPendingTasks()
+        then:
+        ((HttpResponse) ch.readOutbound()).status() == HttpResponseStatus.NO_CONTENT
+        ((HttpResponse) ch.readOutbound()).status() == HttpResponseStatus.INTERNAL_SERVER_ERROR
+        !ch.open
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
     static class MonitorHandler extends ChannelOutboundHandlerAdapter {
         int flush = 0
         int read = 0
