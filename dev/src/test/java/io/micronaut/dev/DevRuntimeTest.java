@@ -234,7 +234,7 @@ class DevRuntimeTest {
             public class Application {
                 public static void main(String[] args) {
                     io.micronaut.runtime.Micronaut.build(args)
-                        .properties(java.util.Map.of("spec.name", "DevRuntimeTest"))
+                        .properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1"))
                         .mainClass(Application.class)
                         .start();
                 }
