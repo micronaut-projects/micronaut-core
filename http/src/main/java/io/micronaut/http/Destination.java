@@ -40,7 +40,7 @@ public enum Destination {
     /**
      * The fetch of a {@code <link rel="compression-dictionary">} resource.
      *
-     * @see <a href="https://github.com/whatwg/html/pull/11620">HTML: link rel=compression-dictionary</a>
+     * @see <a href="https://html.spec.whatwg.org/multipage/links.html#link-type-compression-dictionary">HTML: link type "compression-dictionary"</a>
      * @since 5.2.16
      */
     COMPRESSION_DICTIONARY("compression-dictionary"),
