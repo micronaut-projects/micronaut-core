@@ -3,7 +3,7 @@ package io.micronaut.http.server.netty
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.watch.ConfigurationChange
-import io.micronaut.context.watch.ConfigurationWatcher
+import io.micronaut.context.watch.ReloadingConfigurationWatcher
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
@@ -21,32 +21,32 @@ class NettyServerConfigurationWatchSpec extends Specification {
         def outcomes = context.notifyConfigurationChange(ConfigurationChange.ofKeys(["micronaut.server.read-timeout"] as Set))
 
         then:
-        outcomes == [ConfigurationWatcher.Outcome.APPLIED]
+        outcomes == [ReloadingConfigurationWatcher.Outcome.APPLIED]
         server.running
 
         when: "the port changes"
         outcomes = context.notifyConfigurationChange(ConfigurationChange.ofKeys(["micronaut.server.port"] as Set))
 
         then:
-        outcomes == [ConfigurationWatcher.Outcome.REQUIRES_RESTART]
+        outcomes == [ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART]
 
         when: "an explicit listener changes"
         outcomes = context.notifyConfigurationChange(ConfigurationChange.ofKeys(["micronaut.server.netty.listeners.main.port"] as Set))
 
         then:
-        outcomes == [ConfigurationWatcher.Outcome.REQUIRES_RESTART]
+        outcomes == [ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART]
 
         when: "a bootstrap option changes"
         outcomes = context.notifyConfigurationChange(ConfigurationChange.ofKeys(["micronaut.server.netty.child-options.SO_KEEPALIVE"] as Set))
 
         then:
-        outcomes == [ConfigurationWatcher.Outcome.REQUIRES_RESTART]
+        outcomes == [ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART]
 
         when: "an ssl setting changes"
         outcomes = context.notifyConfigurationChange(ConfigurationChange.ofKeys(["micronaut.ssl.key-store.path"] as Set))
 
         then:
-        outcomes == [ConfigurationWatcher.Outcome.APPLIED]
+        outcomes == [ReloadingConfigurationWatcher.Outcome.APPLIED]
 
         when: "the server stops"
         server.stop()

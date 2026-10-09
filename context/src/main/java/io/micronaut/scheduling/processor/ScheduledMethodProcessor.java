@@ -23,6 +23,7 @@ import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.context.watch.BeanExecutableMethod;
 import io.micronaut.context.watch.BeanWatch;
 import io.micronaut.context.watch.ExecutableMethodChange;
 import io.micronaut.context.watch.ExecutableMethodWatcher;
@@ -90,7 +91,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
      * The futures of each scheduled method, so that a method that comes back in a new generation with the
      * same schedule keeps its running timers, and one that goes has its timers cancelled.
      */
-    private final Map<ExecutableMethodChange.Entry<Scheduled>, ScheduledMethod> scheduledTasks = new ConcurrentHashMap<>();
+    private final Map<BeanExecutableMethod<Scheduled>, ScheduledMethod> scheduledTasks = new ConcurrentHashMap<>();
     private volatile @Nullable BeanWatch watch;
     /**
      * What scheduling the startup batch threw, if anything: the watch isolates a watcher's failure, and a
@@ -117,7 +118,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
      * @param method The executable method
      * @param <B> The bean type
      * @deprecated The processor watches the {@link Scheduled} methods through
-     * {@link io.micronaut.context.WatchableBeanContext#watchMethods(Class, ExecutableMethodWatcher)} since 5.3.0
+     * {@link io.micronaut.context.WatchableBeanContext#methods(Class)} since 5.3.0
      */
     @Override
     @Deprecated(since = "5.3.0", forRemoval = true)
@@ -134,7 +135,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     @EventListener
     void scheduleTasks(StartupEvent ignore) {
         if (beanContext instanceof WatchableBeanContext watchable) {
-            watch = watchable.watchMethods(Scheduled.class, this);
+            watch = watchable.methods(Scheduled.class).watch(this);
             RuntimeException failure = startupFailure;
             if (failure != null) {
                 startupFailure = null;
@@ -145,12 +146,12 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
     @Override
     public void onChange(ExecutableMethodChange<Scheduled> change) {
-        for (ExecutableMethodChange.Entry<Scheduled> gone : change.removed()) {
+        for (BeanExecutableMethod<Scheduled> gone : change.removed()) {
             ScheduledMethod scheduled = scheduledTasks.remove(gone);
             if (scheduled == null) {
                 continue;
             }
-            Optional<ExecutableMethodChange.Entry<Scheduled>> back = change.replacementOf(gone);
+            Optional<BeanExecutableMethod<Scheduled>> back = change.replacementOf(gone);
             if (back.isPresent() && sameSchedule(gone, back.get())) {
                 // the same schedule in the new generation: the running timers stay, and from now on invoke the
                 // replacement method on the new generation's bean
@@ -174,11 +175,11 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
         }
     }
 
-    private static boolean sameSchedule(ExecutableMethodChange.Entry<Scheduled> before, ExecutableMethodChange.Entry<Scheduled> after) {
+    private static boolean sameSchedule(BeanExecutableMethod<Scheduled> before, BeanExecutableMethod<Scheduled> after) {
         return before.method().getAnnotationValuesByType(Scheduled.class).equals(after.method().getAnnotationValuesByType(Scheduled.class));
     }
 
-    private void scheduleTask(ExecutableMethodChange.Entry<Scheduled> entry) {
+    private void scheduleTask(BeanExecutableMethod<Scheduled> entry) {
         ScheduledMethod scheduled = new ScheduledMethod(entry);
         // registered first, so that a close while the timers are being created cancels them
         scheduledTasks.put(entry, scheduled);
@@ -194,7 +195,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     }
 
     @SuppressWarnings("unchecked")
-    private <B> void scheduleTimers(ExecutableMethodChange.Entry<Scheduled> entry, ScheduledMethod scheduled) {
+    private <B> void scheduleTimers(BeanExecutableMethod<Scheduled> entry, ScheduledMethod scheduled) {
         List<ScheduledFuture<?>> futures = scheduled.futures;
         ExecutableMethod<B, ?> method = (ExecutableMethod<B, ?>) entry.method();
         BeanDefinition<B> beanDefinition = (BeanDefinition<B>) entry.definition();
@@ -223,7 +224,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             TaskScheduler taskScheduler = optionalTaskScheduler.orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduler));
             Runnable task = () -> {
                 // the method and the definition of the moment: a timer kept across a generation invokes the replacement
-                ExecutableMethodChange.Entry<Scheduled> current = scheduled.target();
+                BeanExecutableMethod<Scheduled> current = scheduled.target();
                 ExecutableMethod<B, ?> currentMethod = (ExecutableMethod<B, ?>) current.method();
                 BeanDefinition<B> currentDefinition = (BeanDefinition<B>) current.definition();
                 try {
@@ -430,17 +431,17 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
      */
     private static final class ScheduledMethod {
         final List<ScheduledFuture<?>> futures = new ArrayList<>(1);
-        private final AtomicReference<ExecutableMethodChange.Entry<Scheduled>> target;
+        private final AtomicReference<BeanExecutableMethod<Scheduled>> target;
 
-        ScheduledMethod(ExecutableMethodChange.Entry<Scheduled> entry) {
+        ScheduledMethod(BeanExecutableMethod<Scheduled> entry) {
             this.target = new AtomicReference<>(entry);
         }
 
-        ExecutableMethodChange.Entry<Scheduled> target() {
+        BeanExecutableMethod<Scheduled> target() {
             return Objects.requireNonNull(target.get());
         }
 
-        void retarget(ExecutableMethodChange.Entry<Scheduled> entry) {
+        void retarget(BeanExecutableMethod<Scheduled> entry) {
             target.set(entry);
         }
 

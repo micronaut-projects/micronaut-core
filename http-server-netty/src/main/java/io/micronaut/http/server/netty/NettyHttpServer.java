@@ -52,7 +52,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.watch.BeanWatch;
-import io.micronaut.context.watch.ConfigurationWatcher;
+import io.micronaut.context.watch.ReloadingConfigurationWatcher;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.micronaut.runtime.server.event.ServerShutdownEvent;
@@ -1073,10 +1073,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         if (!(applicationContext instanceof WatchableBeanContext watchable)) {
             return;
         }
-        ConfigurationWatcher watcher = change -> {
+        ReloadingConfigurationWatcher watcher = change -> {
             if (!change.all() && change.touchesAny(BOUND_ADDRESS_PROPERTIES)) {
                 // a refresh of everything names no key: it rebuilds the pipelines, as the refresh endpoint always has
-                return ConfigurationWatcher.Outcome.REQUIRES_RESTART;
+                return ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART;
             }
             ServerSslBuilder sslBuilder = nettyEmbeddedServices.getServerSslBuilder();
             if (sslBuilder != null && (change.all() || change.touches(SslConfiguration.PREFIX) || change.touches(ServerSslConfiguration.PREFIX))) {
@@ -1085,10 +1085,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 sslBuilder.reload();
             }
             refreshListeners();
-            return ConfigurationWatcher.Outcome.APPLIED;
+            return ReloadingConfigurationWatcher.Outcome.APPLIED;
         };
-        BeanWatch serverWatch = watchable.watchConfiguration(HttpServerConfiguration.PREFIX, watcher);
-        BeanWatch sslWatch = watchable.watchConfiguration(SslConfiguration.PREFIX, watcher);
+        BeanWatch serverWatch = watchable.configuration(HttpServerConfiguration.PREFIX).watchReloading(watcher);
+        BeanWatch sslWatch = watchable.configuration(SslConfiguration.PREFIX).watchReloading(watcher);
         configurationWatch = new BeanWatch() {
             @Override
             public void close() {
