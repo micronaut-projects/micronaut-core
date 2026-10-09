@@ -5,7 +5,6 @@ import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.watch.ResourceChange;
-import io.micronaut.context.watch.ResourceSelector;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.manifest.DevManifest;
 import org.junit.jupiter.api.Test;
@@ -88,7 +87,7 @@ class DevRuntimeTest {
 
             // a resource watch of the running context starts from the static files the launcher reported
             List<ResourceChange> css = new CopyOnWriteArrayList<>();
-            ((DefaultBeanContext) first).watchResources(ResourceSelector.of(ResourceKind.STATIC, "**/*.css"), css::add);
+            ((DefaultBeanContext) first).resources(ResourceKind.STATIC).include("**/*.css").watch(css::add);
             assertEquals(1, css.size());
             assertTrue(css.get(0).initial());
             assertEquals(List.of(staticRoot.resolve("app.css").toAbsolutePath()), css.get(0).changed());

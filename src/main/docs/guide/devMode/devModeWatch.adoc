@@ -1,4 +1,4 @@
-A bean that derives state from other beans, from configuration or from files registers a watch for the specific things it needs, on api:context.WatchableBeanContext[], and receives one batched change whenever they change. The state at startup is the first batch, so a watcher has no separate startup path, and a watch registered while a bean is being created belongs to that bean and closes with it.
+A bean that derives state from other beans, from configuration or from files registers a watch for the specific things it needs, on api:context.WatchableBeanContext[], and receives one batch whenever they change. A watch is described with a fluent request, in the style of the file watcher: the request selects what is watched, and a terminal operation registers the watch. The state when the watch is registered is the first batch, so a watcher has no separate startup path, and a watch registered while a bean is being created belongs to that bean and closes with it.
 
 NOTE: api:context.WatchableBeanContext[] and the types of the `io.micronaut.context.watch` package are public API for modules, marked `@Experimental`: a module that derives state from the context watches it here rather than listening for events, and the API may still change in a minor release. The default context is the only implementation; a module tests for it with `instanceof` and watches nothing when given another context.
 
@@ -8,7 +8,7 @@ NOTE: api:context.WatchableBeanContext[] and the types of the `io.micronaut.cont
 final class RouteTable implements BeanDefinitionWatcher<RouteBuilder> {
 
     RouteTable(WatchableBeanContext context) {
-        context.watchDefinitions(RouteBuilder.class, null, this);
+        context.definitions(RouteBuilder.class).watch(this);
     }
 
     @Override
@@ -18,9 +18,27 @@ final class RouteTable implements BeanDefinitionWatcher<RouteBuilder> {
 }
 ----
 
-`watchDefinitions` and `watchBeans` watch a type, `watchMethods` the executable methods carrying an annotation, `watchConfiguration` a configuration prefix and `watchResources` the files of a resource kind by glob. A definition or method that comes back in a new generation is paired with the one it replaces, and the pair says whether only bodies changed.
+The requests:
 
-A configuration watcher runs after the configuration beans under its prefix were rebound and says what it did: `APPLIED` when it changed the live bean, `RECREATE` when the bean that registered the watch must be replaced, in which case the context replaces it and the beans that received it, `REQUIRES_RESTART` when nothing short of a restart applies the change.
+* `definitions(Type.class)`, or `definitions()` for every bean, selects bean definitions, narrowed with `qualifier(..)` and `stereotype(..)`. Its terminal operations watch the definitions themselves; `instances()` continues it as a watch of the beans of those definitions, which it creates, and `methods(Annotation.class)` as a watch of their executable methods carrying an annotation. `@EachProperty` and `@EachBean` beans are selected one per entry, as the context resolves them.
+* `methods(Annotation.class)` watches the executable methods of every bean carrying an annotation: the reload-aware form of an `ExecutableMethodProcessor`.
+* `configuration(prefix)` watches a configuration prefix, and `configuration()` every change.
+* `resources(ResourceKind.VIEWS).include("**/*.html")` watches the files of a resource kind, by glob.
+* `classChanges()` watches the class changes of a reload.
+
+A definition or method that comes back in a new generation is paired with the one it replaces, and the pair says whether only bodies changed.
+
+The batch is the unit of delivery: a reload retires one generation's definitions and adds the next one's in a single batch, so a watcher that aggregates what it selects, like the route table above, never sees a half-applied reload. A watcher that handles one change at a time adds per-change handlers to the request instead, called for each change once its batch is applied: `onAdded`, `onRemoved`, and `onReplaced` for a new generation of the same bean or method, which is otherwise a removal followed by an addition.
+
+[source,java]
+----
+context.definitions(Codec.class)
+    .onAdded(definition -> codecs.register(definition))
+    .onRemoved(definition -> codecs.unregister(definition))
+    .watch();
+----
+
+A configuration watcher runs after the configuration beans under its prefix were bound again. A plain `ConfigurationWatcher`, registered with `watch(..)`, applies the change. A watcher that cannot always apply it is a `ReloadingConfigurationWatcher`, registered with `watchReloading(..)`, and says what it did: `APPLIED` when it changed the live bean, `RECREATE` when the bean that registered the watch must be replaced, in which case the context replaces it and the beans that received it, `REQUIRES_RESTART` when nothing short of a restart applies the change, and `IGNORED`.
 
 [source,java]
 ----
@@ -28,22 +46,22 @@ A configuration watcher runs after the configuration beans under its prefix were
 HikariDataSource dataSource(DatasourceConfiguration configuration, WatchableBeanContext context) {
     HikariDataSource dataSource = new HikariDataSource(configuration);
     String prefix = "datasources." + configuration.getName();
-    context.watchConfiguration(prefix, change -> {
+    context.configuration(prefix).watchReloading(change -> {
         if (change.touches(prefix + ".url")) {
-            return ConfigurationWatcher.Outcome.RECREATE;         // this pool only
+            return ReloadingConfigurationWatcher.Outcome.RECREATE;         // this pool only
         }
         if (change.touchesAny(prefix + ".username", prefix + ".password")) {
             dataSource.getHikariConfigMXBean().setPassword(configuration.getPassword());
             dataSource.getHikariPoolMXBean().softEvictConnections();
-            return ConfigurationWatcher.Outcome.APPLIED;
+            return ReloadingConfigurationWatcher.Outcome.APPLIED;
         }
-        return ConfigurationWatcher.Outcome.IGNORED;
+        return ReloadingConfigurationWatcher.Outcome.IGNORED;
     });
     return dataSource;
 }
 ----
 
-A configuration watch has no first batch unless it asks for one: `watchConfiguration(prefix, watcher, true)` calls the watcher once with a change whose `initial()` holds, so that the bean reads its configuration inside the watch: at once when the context is running, or when it starts for a watch registered before, as every first batch is delivered. What it answers to that call is not acted on.
+A configuration watch has no first batch unless it asks for one: `configuration(prefix).withFirstBatch()` calls the watcher once with a change whose `initial()` holds, so that the bean reads its configuration inside the watch: at once when the context is running, or when it starts for a watch registered before, as every first batch is delivered. What a reloading watcher answers to that call is not acted on.
 
 A bean that reads the definitions or configuration it derives state from, and only then registers a watch, can miss a change made in between. The first batch closes that gap: it is read after the watch is registered, so a bean that builds its state from the first batch, instead of from a read of its own, misses nothing.
 
@@ -60,29 +78,29 @@ final class SerializerRegistry {
 
     SerializerRegistry(WatchableBeanContext context) {
         // no read of its own: the first batch is the read, and every change after it follows
-        context.watchDefinitions(Serializer.class, null, change -> serializers = sort(change.current()));
+        context.definitions(Serializer.class).watch(change -> serializers = sort(change.current()));
     }
 }
 ----
 
-A cache keyed by class is not a set of beans: it forgets what a reload retires. `watchClassChanges` gives the watcher every api:context.reload.ClassChangeEvent[] the launcher publishes, ahead of the listeners of the event, with the same ownership as the other watches. Classes only change in development mode, so outside it the call registers nothing and returns an inactive watch, and the module needs no listener bean gated on development mode.
+A cache keyed by class is not a set of beans: it forgets what a reload retires. `classChanges()` gives the watcher every api:context.reload.ClassChangeEvent[] the launcher publishes, ahead of the listeners of the event, with the same ownership as the other watches. Classes only change in development mode, so outside it the watch registers nothing and is returned inactive, and the module needs no listener bean gated on development mode.
 
 [source,java]
 ----
-context.watchClassChanges(change -> cache.keySet().removeIf(change::isStaleType));
+context.classChanges().watch(change -> cache.keySet().removeIf(change::isStaleType));
 ----
 
-When a change cannot be applied to a bean in place, the watcher asks the context to recreate it: `recreate(bean)`, or `recreate(Type.class, qualifier)` for the singleton of a type, destroys the beans that received it, as the dependency graph records them, destroys the bean and creates it again, and the dependents are created again when next requested, on top of the new instance. Both return whether anything was recreated, which a prototype, a bean of a custom scope or a singleton registered at runtime never is. They are meant for development-time watches: the dependents are known only when the context tracks bean dependencies, which by default only a context in development mode does (`ApplicationContextBuilder.beanDependencyTrackingEnabled(true)` turns it on elsewhere), and a context that does not recreates nothing and returns false, rather than leave dependents holding the destroyed instance.
+When a change cannot be applied to a bean in place, the watcher asks the context to recreate it: `recreate(bean)`, or `recreate(Type.class, qualifier)` for the singleton of a type, destroys the beans that received it, as the dependency graph records them, destroys the bean and creates it again, and the dependents are created again when next requested, on top of the new instance; an `ExecutableMethodProcessor` among them is created again at once and given the methods it was given at startup. This is more than destroying the bean and getting it again, which would leave its dependents holding the destroyed instance. Both return whether anything was recreated, which a prototype, a bean of a custom scope or a singleton registered at runtime never is. They are meant for development-time watches: the dependents are known only when the context tracks bean dependencies, which by default only a context in development mode does (`ApplicationContextBuilder.beanDependencyTrackingEnabled(true)` turns it on elsewhere), and a context that does not recreates nothing and returns false.
 
 [source,java]
 ----
-context.watchClassChanges(change -> {
+context.classChanges().watch(change -> {
     if (serializers.stream().anyMatch(change::isStaleType)) {
         context.recreate(SerializerRegistry.class, null);
     }
 });
 ----
 
-Resources are watched the same way: a template engine registers `watchResources(ResourceSelector.of(ResourceKind.VIEWS, "**/*.html"), change -> ...)` and clears what the change affects, rather than filtering an event every engine receives.
+Resources are watched the same way: a template engine registers `resources(ResourceKind.VIEWS).include("**/*.html").watch(change -> ...)` and clears what the change affects, rather than filtering an event every engine receives.
 
 NOTE: Existing api:context.processor.ExecutableMethodProcessor[] and api:context.processor.BeanDefinitionProcessor[] beans keep working. The context feeds them what is added after startup, through an adapter that sees additions only, which is also how the launcher tells that such a processor cannot follow a reload.
