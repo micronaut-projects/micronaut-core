@@ -25,12 +25,11 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.context.watch.ConfigurationChange;
-import io.micronaut.context.watch.ConfigurationWatcher;
+import io.micronaut.context.watch.ReloadingConfigurationWatcher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import jakarta.inject.Singleton;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +49,6 @@ import java.util.Set;
  */
 @Internal
 @Singleton
-@NullMarked
 final class DefaultConfigurationRefresher implements ConfigurationRefresher {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultConfigurationRefresher.class);
@@ -211,7 +209,7 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
             List<BeanDefinition<?>> recreated = new ArrayList<>();
             rebind(change, rebound, recreated);
             int disposed = context.findBean(RefreshScope.class).map(scope -> scope.disposeAffected(change)).orElse(0);
-            List<ConfigurationWatcher.Outcome> outcomes = context instanceof DefaultBeanContext defaultBeanContext
+            List<ReloadingConfigurationWatcher.Outcome> outcomes = context instanceof DefaultBeanContext defaultBeanContext
                 ? defaultBeanContext.notifyConfigurationChange(change)
                 : List.of();
             RefreshResult result = new RefreshResult(change, rebound, recreated, disposed, outcomes);
