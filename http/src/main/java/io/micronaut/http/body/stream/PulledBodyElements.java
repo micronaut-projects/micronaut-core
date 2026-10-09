@@ -275,11 +275,11 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
             w = walking;
             walking = null;
         }
-        if (w != null && cancelled != null) {
-            w.completeExceptionally(cancelled);
+        if (w != null) {
+            w.completeExceptionally(Objects.requireNonNull(cancelled));
         }
-        if (p != null && cancelled != null) {
-            p.completeExceptionally(cancelled);
+        if (p != null) {
+            p.completeExceptionally(Objects.requireNonNull(cancelled));
         }
         // nobody takes them
         queued.forEach(BodyElementsLoop::discard);
@@ -334,7 +334,7 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
     private void demandSafely() {
         try {
             demand();
-        } catch (Throwable e) {
+        } catch (Exception | Error e) {
             fail(e);
         }
     }
@@ -412,7 +412,7 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
         CompletionStage<?> stage;
         try {
             stage = Objects.requireNonNull(consumer.apply(element), "The consumer returned no stage");
-        } catch (Throwable e) {
+        } catch (Exception | Error e) {
             finish(result, e);
             return false;
         }
