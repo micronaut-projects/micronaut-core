@@ -218,6 +218,60 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         HttpUtil.setKeepAlive(message, false);
     }
 
+    /**
+     * Pass a request to the {@link RequestHandler}. If the handler fails to accept it, the request
+     * would never be answered, and any requests pipelined after it would wait for it forever, so
+     * it is answered with an empty 500 response and the connection is closed after that.
+     *
+     * @param request        The request
+     * @param body           The request body
+     * @param outboundAccess The outbound access for the request
+     */
+    private void accept(HttpRequest request, CloseableByteBody body, OutboundAccessImpl outboundAccess) {
+        try {
+            requestHandler.accept(requiredCtx(), request, body, outboundAccess);
+        } catch (Exception e) {
+            try {
+                body.close();
+            } catch (RuntimeException closeError) {
+                e.addSuppressed(closeError);
+            }
+            try {
+                requestHandler.handleUnboundError(e);
+            } catch (RuntimeException handlerError) {
+                LOG.debug("Failed to handle an error from the request handler", handlerError);
+            }
+            rejectUnaccepted(outboundAccess);
+        }
+    }
+
+    /**
+     * Answer a request that the {@link RequestHandler} failed to accept and close the connection
+     * once the responses of this and any earlier pipelined requests have been written.
+     *
+     * @param outboundAccess The outbound access of the failed request
+     */
+    private void rejectUnaccepted(OutboundAccessImpl outboundAccess) {
+        if (outboundAccess.responseStarted()) {
+            // the handler already wrote a response before failing
+            if (outboundQueue.contains(outboundAccess) || (outboundHandler != null && outboundHandler.outboundAccess == outboundAccess)) {
+                // it is still queued or being written, close once it is done
+                outboundAccess.closeAfterWriteInEventLoop();
+            } else {
+                // it has been written completely already, close once it is flushed
+                requiredCtx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+            }
+            return;
+        }
+        try {
+            outboundAccess.closeAfterWrite();
+            outboundAccess.write(new DefaultHttpResponse(outboundAccess.request.protocolVersion(), HttpResponseStatus.INTERNAL_SERVER_ERROR), NettyByteBodyFactory.empty());
+        } catch (RuntimeException e) {
+            LOG.debug("Failed to write the error response for a request that was not accepted", e);
+            requiredCtx().close();
+        }
+    }
+
     private static boolean hasBody(HttpRequest request) {
         // if there's a decoder failure (e.g. invalid header), don't expect the body to come in
         if (request.decoderResult().isFailure()) {
@@ -595,7 +649,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // getClass for performance
             boolean full = request.getClass() != DefaultHttpRequest.class && request instanceof FullHttpRequest;
             if (full && decompressionChannel == null) {
-                requestHandler.accept(requiredCtx(), request, byteBodyFactory().createChecked(bodySizeLimits, ((FullHttpRequest) request).content()), outboundAccess);
+                accept(request, byteBodyFactory().createChecked(bodySizeLimits, ((FullHttpRequest) request).content()), outboundAccess);
             } else if (!hasBody(request)) {
                 inboundHandler = droppingInboundHandler;
                 if (full) {
@@ -604,7 +658,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 if (decompressionChannel != null) {
                     decompressionChannel.finish();
                 }
-                requestHandler.accept(requiredCtx(), request, NettyByteBodyFactory.empty(), outboundAccess);
+                accept(request, NettyByteBodyFactory.empty(), outboundAccess);
             } else {
                 optimisticBufferingInboundHandler.init(request, outboundAccess);
                 if (decompressionChannel == null) {
@@ -741,7 +795,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 receivedLength = 0;
                 HttpRequest request = this.request;
                 this.request = null;
-                OutboundAccess outboundAccess = this.outboundAccess;
+                OutboundAccessImpl outboundAccess = this.outboundAccess;
                 this.outboundAccess = null;
                 assert ctx != null;
                 assert request != null;
@@ -750,13 +804,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 // reset the inbound state before the request is handed off, so that the next
                 // request on this connection is processed correctly even if the handoff fails
                 inboundHandler = baseInboundHandler;
-                try {
-                    requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), body, Objects.requireNonNull(outboundAccess));
-                } catch (Exception e) {
-                    body.close();
-                    requestHandler.handleUnboundError(e);
-                    requiredCtx().close();
-                }
+                accept(Objects.requireNonNull(request), body, Objects.requireNonNull(outboundAccess));
             }
         }
 
@@ -794,7 +842,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             receivedLength = 0;
             failed = false;
 
-            requestHandler.accept(Objects.requireNonNull(ctx), request, new StreamingNettyByteBody(streamingInboundHandler.dest), outboundAccess);
+            accept(request, new StreamingNettyByteBody(streamingInboundHandler.dest), outboundAccess);
         }
 
         @Override
@@ -1154,12 +1202,20 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         /**
+         * Whether a response (other than a {@code 100 Continue}) has been submitted for this
+         * request.
+         */
+        private boolean responseStarted() {
+            OutboundHandler current = handler;
+            return current != null && !(current instanceof ContinueOutboundHandler cont && cont.next == null);
+        }
+
+        /**
          * Write a response using the given outbound handler, when ready.
          */
         private void write(OutboundHandler handler) {
             // technically handler should be volatile for this check, but this is only for sanity anyway
-            OutboundHandler current = this.handler;
-            if (current != null && (!(current instanceof ContinueOutboundHandler cont) || cont.next != null)) {
+            if (responseStarted()) {
                 // the refused response is not written: release what it holds
                 handler.discardRefused();
                 throw new IllegalStateException("Only one response per request");
