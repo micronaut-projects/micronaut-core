@@ -138,6 +138,50 @@ class BodyElementsTest {
     }
 
     @Test
+    void asynchronousCleanupStartsOnceAndCannotBeCancelledByAnObserver() {
+        AtomicInteger calls = new AtomicInteger();
+        CompletableFuture<Void> cleanup = new CompletableFuture<>();
+        BodyElements<String> elements = BodyElements.ofAsync(CompletableFuture::new, () -> {
+            calls.incrementAndGet();
+            return opaque(cleanup);
+        });
+        CompletableFuture<Optional<String>> read = elements.next().toCompletableFuture();
+        elements.close();
+        assertThrows(CancellationException.class, read::join);
+        CompletionStage<Void> closed = elements.closeAsync();
+        assertSame(closed, elements.closeAsync());
+        assertTrue(!closed.toCompletableFuture().isDone());
+        closed.toCompletableFuture().cancel(false);
+        assertTrue(!cleanup.isDone());
+        assertTrue(!elements.closeAsync().toCompletableFuture().isDone());
+        cleanup.complete(null);
+        elements.closeAsync().toCompletableFuture().join();
+        assertEquals(1, calls.get());
+    }
+
+    @Test
+    void asynchronousCleanupReportsDelayedFailure() {
+        CompletableFuture<Void> cleanup = new CompletableFuture<>();
+        BodyElements<String> elements = BodyElements.ofAsync(CompletableFuture::new, () -> cleanup);
+        CompletionStage<Void> closed = elements.closeAsync();
+        IllegalStateException failure = new IllegalStateException("cleanup failed");
+        cleanup.completeExceptionally(failure);
+        assertSame(failure, assertThrows(CompletionException.class, () -> closed.toCompletableFuture().join()).getCause());
+        assertSame(failure, assertThrows(IllegalStateException.class, elements::close));
+    }
+
+    @Test
+    void asynchronousCleanupReportsSupplierFailureAndMissingStage() {
+        IllegalStateException failure = new IllegalStateException("cleanup failed");
+        BodyElements<String> elements = BodyElements.ofAsync(CompletableFuture::new, () -> {
+            throw failure;
+        });
+        assertSame(failure, assertThrows(CompletionException.class, () -> elements.closeAsync().toCompletableFuture().join()).getCause());
+        BodyElements<String> invalid = BodyElements.ofAsync(CompletableFuture::new, () -> null);
+        assertTrue(assertThrows(CompletionException.class, () -> invalid.closeAsync().toCompletableFuture().join()).getCause() instanceof NullPointerException);
+    }
+
+    @Test
     void ofClosesAnElementProducedAfterClosing() {
         CompletableFuture<Optional<AutoCloseable>> pending = new CompletableFuture<>();
         BodyElements<AutoCloseable> elements = BodyElements.of(() -> pending);

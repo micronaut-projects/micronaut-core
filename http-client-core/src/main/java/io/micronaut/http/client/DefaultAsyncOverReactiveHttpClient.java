@@ -24,6 +24,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.Objects;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
 
 /**
  * Default {@link AsyncHttpClient} implementation that adapts a reactive {@link HttpClient}.
@@ -47,7 +48,7 @@ public class DefaultAsyncOverReactiveHttpClient implements AsyncHttpClient {
     public <I, O, E> CompletionStage<HttpResponse<O>> exchange(HttpRequest<I> request,
                                                                @Nullable Argument<O> bodyType,
                                                                Argument<E> errorType) {
-        return Mono.from(httpClient.exchange(request, bodyType, errorType)).toFuture();
+        return AsyncClientFuture.map(Mono.from(httpClient.exchange(request, bodyType, errorType)).toFuture(), Function.identity());
     }
 
     @Override

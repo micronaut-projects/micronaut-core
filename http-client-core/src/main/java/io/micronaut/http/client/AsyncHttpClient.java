@@ -31,6 +31,13 @@ import java.util.concurrent.CompletionStage;
 /**
  * An HTTP client API that exposes asynchronous operations backed by the Java {@link java.util.concurrent.Future}
  * contract instead of Reactive Streams.
+ * <p>The futures returned by Micronaut clients own their request operation. Cancelling the
+ * original future, or completing it exceptionally (including {@code orTimeout}), aborts
+ * outstanding work. This also applies to the future returned by {@code retrieve}.
+ * Cancelling or timing out a dependent stage created with {@code thenApply}, for example,
+ * does not abort the original request. Cancellation is a best-effort hint and cannot undo
+ * work already performed by the remote server. Do not block client event loop threads
+ * while waiting for a result.
  *
  * @author Denis Stepanov
  * @since 5.0
@@ -127,7 +134,7 @@ public interface AsyncHttpClient extends Closeable, LifeCycle<AsyncHttpClient> {
      * @return A {@link CompletionStage} that completes with the converted response body
      */
     default <I, O, E> CompletionStage<@Nullable O> retrieve(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
-        return exchange(request, bodyType, errorType).thenApply(response -> extractBody(response, bodyType));
+        return AsyncClientFuture.map(exchange(request, bodyType, errorType), response -> extractBody(response, bodyType));
     }
 
     /**
