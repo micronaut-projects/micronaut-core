@@ -36,6 +36,11 @@ import java.util.concurrent.atomic.AtomicReference;
 @Internal
 final class SseSplitter {
     /**
+     * Marker for {@code last} once the stream has terminated or was cancelled.
+     */
+    private static final Object CLOSED = new Object();
+
+    /**
      * Split a single buffer.
      *
      * @param buf The buffer
@@ -72,16 +77,24 @@ final class SseSplitter {
      */
     @NonNull
     static Flux<ByteBuf> split(@NonNull Flux<ByteBuf> buf, @NonNull BodySizeLimits limits) {
-        AtomicReference<CompositeByteBuf> last = new AtomicReference<>();
+        // the partial last line, null if there is none, or CLOSED
+        AtomicReference<Object> last = new AtomicReference<>();
         return buf.concatMapIterable(bb -> {
-                CompositeByteBuf joined = last.getAndSet(null);
+                Object previous = last.get();
+                if (previous == CLOSED || !last.compareAndSet(previous, null)) {
+                    // stream was closed concurrently, previous is released by doFinally
+                    bb.release();
+                    return List.of();
+                }
+                CompositeByteBuf joined = (CompositeByteBuf) previous;
                 ByteBuf here;
                 if (joined == null) {
                     here = bb;
                 } else {
                     long combinedLength = (long) joined.readableBytes() + bb.readableBytes();
                     if (combinedLength > limits.maxBufferSize()) {
-                        bb.release();
+                        // bb is released by the doOnDiscard hook
+                        joined.release();
                         throw new ContentLengthExceededException(limits.maxBufferSize(), combinedLength);
                     }
                     joined.addComponent(true, bb);
@@ -97,19 +110,22 @@ final class SseSplitter {
                         joined = l.alloc().compositeBuffer();
                         joined.addComponent(true, l);
                     }
-                    last.set(joined);
+                    if (!last.compareAndSet(null, joined)) {
+                        // closed concurrently
+                        joined.release();
+                    }
                 } else {
                     l.release();
                 }
                 return split.subList(0, split.size() - 1);
             })
             .doOnDiscard(ByteBuf.class, ByteBuf::release)
-            .doOnTerminate(() -> {
+            .doFinally(signal -> {
                 // Last line is *not* emitted, same as LineBasedFrameDecoder. This line is normally
-                // empty anyway
-                ByteBuf l = last.getAndSet(null);
-                if (l != null) {
-                    l.release();
+                // empty anyway. doFinally also covers cancellation.
+                Object l = last.getAndSet(CLOSED);
+                if (l instanceof ByteBuf b) {
+                    b.release();
                 }
             });
     }
