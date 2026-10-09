@@ -84,7 +84,6 @@ import static io.micronaut.http.client.AbstractHttpClient.report;
 @Internal
 @Experimental
 abstract class AbstractJdkHttpClient {
-    private static final String ERROR_SENDING_REQUEST = "Error sending request: ";
 
     public static final String H2C_ERROR_MESSAGE = "H2C is not supported by the JDK HTTP client";
     public static final String H3_ERROR_MESSAGE = "HTTP/3 is not supported by the JDK HTTP client";
@@ -97,6 +96,7 @@ abstract class AbstractJdkHttpClient {
      * Request attribute with the {@link UploadListener} of the body of a raw request.
      */
     static final String UPLOAD_LISTENER_ATTRIBUTE = "micronaut.http.client.jdk.raw.upload-listener";
+    private static final String ERROR_SENDING_REQUEST = "Error sending request: ";
     protected final HttpClientConfiguration configuration;
     protected final HttpClient client;
     protected final CookieManager cookieManager;
