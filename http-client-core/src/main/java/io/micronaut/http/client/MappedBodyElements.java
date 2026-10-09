@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 /**
@@ -37,6 +38,8 @@ public final class MappedBodyElements<S, T> implements BodyElements<T> {
 
     private final BodyElements<S> source;
     private final Function<? super S, ? extends T> mapper;
+    private volatile @Nullable Throwable mappingFailure;
+    private volatile boolean closed;
 
     private MappedBodyElements(BodyElements<S> source, Function<? super S, ? extends T> mapper) {
         this.source = source;
@@ -56,38 +59,72 @@ public final class MappedBodyElements<S, T> implements BodyElements<T> {
 
     @Override
     public CompletionStage<Optional<T>> next() {
-        return source.next().thenApply(element -> element.map(mapper));
+        checkClosed();
+        Throwable error = mappingFailure;
+        return error == null ? source.next().thenApply(element -> element.map(this::mapElement)) : CompletableFuture.failedStage(error);
     }
 
     @Override
     public @Nullable T poll() {
+        checkClosed();
+        if (mappingFailure != null) {
+            return null;
+        }
         S element = source.poll();
-        return element == null ? null : mapper.apply(element);
+        return element == null ? null : mapElement(element);
     }
 
     @Override
     public State state() {
-        return source.state();
+        return mappingFailure == null ? source.state() : State.FAILED;
     }
 
     @Override
     public @Nullable Throwable failure() {
-        return source.failure();
+        Throwable error = mappingFailure;
+        return error == null ? source.failure() : error;
     }
 
     @Override
     public CompletionStage<Void> forEach(Function<? super T, ? extends CompletionStage<?>> consumer) {
         Objects.requireNonNull(consumer, "consumer");
-        return source.forEach(element -> consumer.apply(mapper.apply(element)));
+        checkClosed();
+        Throwable error = mappingFailure;
+        if (error != null) {
+            close();
+            return CompletableFuture.failedStage(error);
+        }
+        return source.forEach(element -> consumer.apply(mapElement(element))).whenComplete((ignored, failure) -> {
+            if (failure != null) {
+                closed = true;
+            }
+        });
+    }
+
+    private T mapElement(S element) {
+        try {
+            return mapper.apply(element);
+        } catch (Throwable e) {
+            mappingFailure = e;
+            throw e;
+        }
+    }
+
+    private void checkClosed() {
+        if (closed) {
+            throw new IllegalStateException("The elements of the body were closed");
+        }
     }
 
     @Override
     public CompletionStage<Void> closeAsync() {
+        closed = true;
         return source.closeAsync();
     }
 
     @Override
     public void close() {
+        closed = true;
         source.close();
     }
 }
