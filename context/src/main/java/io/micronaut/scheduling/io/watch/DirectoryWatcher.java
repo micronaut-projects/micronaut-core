@@ -745,7 +745,8 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         }
 
         /**
-         * Stops deliveries and waits for a call of the listener under way, unless that call is the caller.
+         * Stops deliveries and waits for a call of the listener under way, unless that call is the caller or the
+         * caller is interrupted, which stops the wait and keeps the interrupt flag set.
          *
          * @return Whether this call deactivated the registration
          */
@@ -755,16 +756,13 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
                 deactivated = registrationActive;
                 registrationActive = false;
                 held.clear();
-                boolean interrupted = false;
                 while (delivering != null && delivering != Thread.currentThread()) {
                     try {
                         wait();
                     } catch (InterruptedException e) {
-                        interrupted = true;
+                        Thread.currentThread().interrupt();
+                        break;
                     }
-                }
-                if (interrupted) {
-                    Thread.currentThread().interrupt();
                 }
             }
             return deactivated;
