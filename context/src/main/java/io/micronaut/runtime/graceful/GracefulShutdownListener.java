@@ -102,17 +102,22 @@ public final class GracefulShutdownListener implements ApplicationEventListener<
         if (LOG.isDebugEnabled()) {
             LOG.debug("Starting graceful shutdown...");
         }
-        manager.shutdownGracefully().whenComplete((result, error) -> {
-            if (error != null) {
-                LOG.warn("Error in graceful shutdown. This is against the GracefulShutdownCapable contract!", error);
-                future.completeExceptionally(error);
-            } else {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Graceful shutdown complete in {}ms", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start));
+        try {
+            manager.shutdownGracefully().whenComplete((result, error) -> {
+                if (error != null) {
+                    LOG.warn("Error in graceful shutdown. This is against the GracefulShutdownCapable contract!", error);
+                    future.completeExceptionally(error);
+                } else {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Graceful shutdown complete in {}ms", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start));
+                    }
+                    future.complete(result);
                 }
-                future.complete(result);
-            }
-        });
+            });
+        } catch (RuntimeException e) {
+            LOG.warn("Error in graceful shutdown. This is against the GracefulShutdownCapable contract!", e);
+            future.completeExceptionally(e);
+        }
     }
 
     @Override

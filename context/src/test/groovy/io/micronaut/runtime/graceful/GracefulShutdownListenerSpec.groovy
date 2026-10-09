@@ -2,9 +2,11 @@ package io.micronaut.runtime.graceful
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.event.ShutdownEvent
 import jakarta.inject.Singleton
 import spock.lang.Specification
 
+import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.TimeUnit
@@ -57,6 +59,33 @@ class GracefulShutdownListenerSpec extends Specification {
 
         cleanup:
         ctx?.close()
+    }
+
+    def "a synchronous initiation failure completes the shared shutdown"() {
+        given:
+        def stage = new CompletableFuture<Object>() {
+            @Override
+            CompletableFuture<Object> toCompletableFuture() {
+                throw new UnsupportedOperationException('cannot convert stage')
+            }
+        }
+        def capable = Mock(GracefulShutdownCapable)
+        def config = new GracefulShutdownConfiguration()
+        config.gracePeriod = Duration.ofSeconds(10)
+        def listener = new GracefulShutdownListener(new GracefulShutdownManager([capable]), config)
+        def event = new ShutdownEvent(Stub(ApplicationContext))
+
+        when:
+        def calls = CompletableFuture.runAsync {
+            listener.shutdownGracefully()
+            listener.shutdownGracefully()
+            listener.onApplicationEvent(event)
+        }
+        calls.get(1, TimeUnit.SECONDS)
+
+        then: 'the failure is swallowed and reused without waiting for the grace period'
+        noExceptionThrown()
+        1 * capable.shutdownGracefully() >> stage
     }
 
     def "the grace period is measured from the start of the shutdown"() {
