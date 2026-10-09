@@ -1,5 +1,7 @@
 package io.micronaut.context.python;
 
+import io.micronaut.scheduling.ScheduledExecutorTaskScheduler;
+import io.micronaut.scheduling.TaskScheduler;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
@@ -7,8 +9,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
@@ -214,6 +222,64 @@ class PythonCallablesTest {
     }
 
     @Test
+    void selectsValueReturningOverloadsNextToFurtherArguments() {
+        // the other argument converts strictly, where the host interop does not rank mapping precedences
+        Value overloads = context.asValue(new Overloads());
+        Value python = context.eval("python", """
+            import java
+            Duration = java.type('java.time.Duration')
+            def calls(overloads):
+                seen = []
+                def task():
+                    seen.append('ran')
+                return [
+                    overloads.schedule(Duration.ofSeconds(1), lambda: 42),
+                    overloads.schedule(Duration.ofSeconds(1), task),
+                    overloads.schedule('0 30 4 * * ?', lambda: 'cron'),
+                    # a void interface keeps its precedence over Object and the loose Map conversion
+                    overloads.execute('name', lambda: None),
+                    overloads.execute('name', 'value'),
+                    overloads.accept('name', lambda value: seen.append(value)),
+                    overloads.accept('name', {'a': 'b'}),
+                    seen,
+                ]
+            calls
+            """);
+        assertEquals(
+            List.of("callable:42", "callable:null", "cron-callable:cron", "runnable", "object", "consumer", "map:1", List.of("ran", "name")),
+            python.execute(overloads).as(List.class)
+        );
+    }
+
+    @Test
+    void schedulesPythonCallablesWithTheTaskScheduler() throws Exception {
+        ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+        try {
+            TaskScheduler scheduler = new ScheduledExecutorTaskScheduler(executor);
+            Value python = context.eval("python", """
+                import java
+                Duration = java.type('java.time.Duration')
+                TimeUnit = java.type('java.util.concurrent.TimeUnit')
+                def schedule(scheduler, executor):
+                    seen = []
+                    def follow_up():
+                        seen.append('follow-up')
+                    return [
+                        scheduler.schedule(Duration.ofMillis(1), follow_up).get(),
+                        scheduler.schedule(Duration.ofMillis(1), lambda: 'value').get(),
+                        executor.schedule(lambda: 'executor', 1, TimeUnit.MILLISECONDS).get(),
+                        seen,
+                    ]
+                schedule
+                """);
+            List<?> result = python.execute(scheduler, executor).as(List.class);
+            assertEquals(Arrays.asList(null, "value", "executor", List.of("follow-up")), result);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     void providersAreLoadedAsServicesOfTheClassLoader() {
         // TestFunctionalInterfaceProvider registers OtherCallback, and an absent interface, the way a generated provider does
         try (Context custom = Context.newBuilder("python")
@@ -292,6 +358,42 @@ class PythonCallablesTest {
 
         public String run(Supplier<String> supplier) {
             return "supplier:" + supplier.get();
+        }
+
+        public String schedule(Duration delay, Runnable runnable) {
+            runnable.run();
+            return "runnable";
+        }
+
+        public <V> String schedule(Duration delay, Callable<V> callable) throws Exception {
+            return "callable:" + callable.call();
+        }
+
+        public String schedule(String cron, Runnable runnable) {
+            runnable.run();
+            return "cron-runnable";
+        }
+
+        public <V> String schedule(String cron, Callable<V> callable) throws Exception {
+            return "cron-callable:" + callable.call();
+        }
+
+        public String execute(String name, Runnable runnable) {
+            runnable.run();
+            return "runnable";
+        }
+
+        public String execute(String name, Object value) {
+            return "object";
+        }
+
+        public String accept(String name, Consumer<String> consumer) {
+            consumer.accept(name);
+            return "consumer";
+        }
+
+        public String accept(String name, Map<String, String> attributes) {
+            return "map:" + attributes.size();
         }
 
         public void register(Consumer<String> consumer) {
