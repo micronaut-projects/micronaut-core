@@ -17,6 +17,7 @@ package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.reload.RequestAdmission;
 import io.micronaut.dev.http.DevServerSockets;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
@@ -32,6 +33,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -43,18 +45,22 @@ import java.util.function.BooleanSupplier;
  * generation to the next, so that a connection made during a restart waits for the next generation instead of being
  * refused.
  *
- * <p>Only the runtime's reload thread starts, finishes and restarts batches; any thread may wait for admission.
+ * <p>Only the runtime's reload thread starts, finishes and restarts batches; any thread may wait for admission. The
+ * runtime installs it as the process's {@link RequestAdmission} while it runs the application, so that a server
+ * runtime holding requests at its own level, below the gate filter, holds them for the same batches: it holds nothing
+ * of a generation, and a server kept across restarts may keep it.
  *
  * @author graemerocher
  * @since 5.3.0
  */
 @NullMarked
-final class RestartRequests {
+final class RestartRequests implements RequestAdmission {
 
     // the runtime's logger: these are the runtime's messages
     private static final Logger LOG = LoggerFactory.getLogger(DevRuntime.class);
     private static final Duration SERVER_START_WAIT = Duration.ofSeconds(10);
 
+    private final Duration holdTimeout;
     private final Duration drainTimeout;
     private final @Nullable DevServerSockets serverSockets;
     /**
@@ -68,6 +74,7 @@ final class RestartRequests {
      * @param retainSockets Whether the listening sockets are kept bound across generations
      */
     RestartRequests(DevManifest manifest, boolean retainSockets) {
+        this.holdTimeout = manifest.requestHoldTimeout();
         this.drainTimeout = manifest.requestDrainTimeout();
         this.serverSockets = retainSockets ? new DevServerSockets() : null;
     }
@@ -75,8 +82,29 @@ final class RestartRequests {
     /**
      * @return The future that completes when a request that arrived during a batch may proceed
      */
-    CompletableFuture<Void> whenAdmitted() {
+    CompletableFuture<Void> admission() {
         return admitted;
+    }
+
+    @Override
+    public boolean isAdmitted() {
+        return admitted.isDone();
+    }
+
+    @Override
+    public CompletionStage<Void> whenAdmitted() {
+        // a stage a caller cannot complete: completing it would let requests through in the middle of a batch
+        return admitted.minimalCompletionStage();
+    }
+
+    @Override
+    public Duration holdTimeout() {
+        return holdTimeout;
+    }
+
+    @Override
+    public Duration drainTimeout() {
+        return drainTimeout;
     }
 
     /**

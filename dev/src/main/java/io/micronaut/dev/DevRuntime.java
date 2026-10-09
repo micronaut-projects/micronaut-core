@@ -25,6 +25,8 @@ import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.context.reload.InPlaceResourceReloader;
 import io.micronaut.context.reload.ReloadCompletedEvent;
 import io.micronaut.context.reload.ReloadStrategy;
+import io.micronaut.context.reload.RequestAdmission;
+import io.micronaut.context.reload.RequestAdmissionHolder;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.context.watch.ResourceChange;
@@ -275,6 +277,10 @@ public final class DevRuntime implements Closeable {
         if (!CURRENT.compareAndSet(null, this)) {
             throw new IllegalStateException("A development runtime already runs this process");
         }
+        // servers that hold requests at their own level follow the gate filter; never in test mode (tests run in a batch)
+        if (!RequestAdmissionHolder.install(requests)) {
+            LOG.warn("Another launcher's request admission is installed: servers that hold requests at their own level follow it");
+        }
         // only the application thread needs the generation loader; the caller's thread keeps its own
         arguments = args.clone();
         ApplicationContext first;
@@ -479,7 +485,17 @@ public final class DevRuntime implements Closeable {
      * @return The future
      */
     public CompletableFuture<Void> whenAdmitted() {
-        return requests.whenAdmitted();
+        return requests.admission();
+    }
+
+    /**
+     * The admission of requests across batches and restarts, with the manifest's hold and drain timeouts: the one
+     * {@link RequestAdmission#current()} gives a server runtime while this runtime runs the application.
+     *
+     * @return The admission
+     */
+    public RequestAdmission requestAdmission() {
+        return requests;
     }
 
     /**
@@ -887,6 +903,7 @@ public final class DevRuntime implements Closeable {
             // keeps this runtime's loader no longer
             memory.releaseReactorThreads();
             // whatever failed to stop, whoever waits for the runtime to close is released
+            RequestAdmissionHolder.uninstall(requests);
             CURRENT.compareAndSet(this, null);
             closedLatch.countDown();
         }
