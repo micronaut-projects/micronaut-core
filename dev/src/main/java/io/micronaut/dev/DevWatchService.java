@@ -18,7 +18,6 @@ package io.micronaut.dev;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
-import org.jspecify.annotations.NullMarked;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,7 +39,6 @@ import java.nio.file.WatchService;
  * @since 5.3.0
  */
 @Internal
-@NullMarked
 record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar registrar, boolean closeOnClose) {
 
     private static final Logger LOG = LoggerFactory.getLogger(DevWatchService.class);
