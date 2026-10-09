@@ -57,7 +57,7 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
     private volatile boolean cancelled;
     private volatile boolean reading;
     private volatile boolean done;
-    private volatile @Nullable Throwable badRequest;
+    private final AtomicReference<@Nullable Throwable> badRequest = new AtomicReference<>();
     private final AtomicReference<@Nullable Arrival<T>> arrived = new AtomicReference<>();
     // only accessed by the drain
     private boolean closed;
@@ -104,7 +104,7 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
     public void request(long n) {
         if (n <= 0) {
             // signalled by the drain, never concurrently with an element
-            badRequest = new IllegalArgumentException("§3.9: the number of requested elements must be positive: " + n);
+            badRequest.compareAndSet(null, new IllegalArgumentException("§3.9: the number of requested elements must be positive: " + n));
             cancel();
             return;
         }
@@ -142,14 +142,14 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
                 if (!closed) {
                     closed = true;
                     elements.close();
-                    Throwable failure = badRequest;
+                    Throwable failure = badRequest.get();
                     if (failure != null && !done && subscriber != null) {
                         done = true;
                         subscriber.onError(failure);
                     }
                 }
                 Arrival<T> late = arrived.getAndSet(null);
-                if (late != null && late.element != null) {
+                if (late != null) {
                     // read while the subscription was cancelled: e.g. a reference counted buffer
                     late.element.ifPresent(this::discard);
                 }
@@ -173,7 +173,7 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
                 subscriber.onError(error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
                 return;
             }
-            Optional<T> element = Objects.requireNonNullElse(arrival.element, Optional.empty());
+            Optional<T> element = arrival.element;
             if (element.isEmpty()) {
                 done = true;
                 subscriber.onComplete();
@@ -205,7 +205,7 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
             }
             // a read that completes at once is emitted by the loop of the drain
             read.whenComplete((element, error) -> {
-                arrived.set(new Arrival<>(element, error));
+                arrived.set(new Arrival<>(Objects.requireNonNullElse(element, Optional.empty()), error));
                 drain();
             });
         }
@@ -233,6 +233,6 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
      * @param error   The failure
      * @param <T>     The type of an element
      */
-    private record Arrival<T>(@Nullable Optional<T> element, @Nullable Throwable error) {
+    private record Arrival<T>(Optional<T> element, @Nullable Throwable error) {
     }
 }

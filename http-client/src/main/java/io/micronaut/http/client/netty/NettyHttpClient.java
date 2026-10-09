@@ -176,6 +176,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     RawHttpClient,
     Closeable,
     AutoCloseable {
+    private static final String OPTIONS_PARAMETER = "options";
 
     /**
      * Request attribute of a request that may switch the connection to another protocol, see
@@ -609,7 +610,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
 
     @Override
     public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http.HttpRequest<?> request, ProxyRequestOptions options) {
-        Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(options, OPTIONS_PARAMETER);
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return Mono.defer(() -> {
@@ -637,7 +638,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      * @return The future of the response
      */
     CompletionStage<MutableHttpResponse<?>> proxyAsync(io.micronaut.http.HttpRequest<?> request, ProxyRequestOptions options) {
-        Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(options, OPTIONS_PARAMETER);
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         MutableHttpRequest<?> httpRequest;
@@ -795,7 +796,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
 
     @Override
     public Publisher<? extends HttpResponse<?>> exchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread, RawRequestOptions options) {
-        Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(options, OPTIONS_PARAMETER);
         return rawExchange(request, requestBody, blockedThread, options);
     }
 

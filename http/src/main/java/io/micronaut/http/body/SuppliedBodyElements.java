@@ -66,7 +66,7 @@ final class SuppliedBodyElements<T> implements BodyElements<T> {
         CompletionStage<Optional<T>> element;
         try {
             element = read();
-        } catch (Throwable e) {
+        } catch (Exception | Error e) {
             end(result);
             result.completeExceptionally(e);
             return result;
@@ -112,13 +112,13 @@ final class SuppliedBodyElements<T> implements BodyElements<T> {
         CompletionStage<Optional<T>> element;
         try {
             element = Objects.requireNonNull(next.get(), "The elements returned no stage");
-        } catch (Throwable e) {
+        } catch (Exception | Error e) {
             return CompletableFuture.failedStage(recordFailure(e));
         }
         return element.whenComplete((value, error) -> {
             if (error != null) {
                 recordFailure(error);
-            } else if (value == null || value.isEmpty()) {
+            } else if (Objects.requireNonNullElse(value, Optional.empty()).isEmpty()) {
                 synchronized (this) {
                     completed = true;
                 }
@@ -141,7 +141,10 @@ final class SuppliedBodyElements<T> implements BodyElements<T> {
 
     @Override
     public synchronized State state() {
-        return closed != null || failure != null ? State.FAILED : completed ? State.COMPLETED : State.PENDING;
+        if (closed != null || failure != null) {
+            return State.FAILED;
+        }
+        return completed ? State.COMPLETED : State.PENDING;
     }
 
     @Override
@@ -176,7 +179,7 @@ final class SuppliedBodyElements<T> implements BodyElements<T> {
                 callback.run();
             }
             stage.complete(null);
-        } catch (Throwable e) {
+        } catch (Exception | Error e) {
             stage.completeExceptionally(e);
         }
         return stage;
