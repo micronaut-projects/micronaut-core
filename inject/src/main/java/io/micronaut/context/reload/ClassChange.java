@@ -16,7 +16,6 @@
 package io.micronaut.context.reload;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 import java.util.Objects;
 
@@ -29,7 +28,6 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public record ClassChange(String className, Kind kind) {
 
     /**

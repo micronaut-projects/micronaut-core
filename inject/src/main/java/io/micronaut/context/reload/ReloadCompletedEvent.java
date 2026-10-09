@@ -18,7 +18,6 @@ package io.micronaut.context.reload;
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.BeanDefinition;
-import org.jspecify.annotations.NullMarked;
 
 import java.time.Duration;
 import java.util.Collection;
@@ -38,7 +37,6 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class ReloadCompletedEvent extends ApplicationEvent {
 
     private final ClassChangeEvent change;

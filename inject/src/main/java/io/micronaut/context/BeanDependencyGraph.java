@@ -17,7 +17,6 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.BeanDefinition;
-import org.jspecify.annotations.NullMarked;
 
 import java.util.Collection;
 import java.util.Objects;
@@ -53,7 +52,6 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public interface BeanDependencyGraph {
 
     /**

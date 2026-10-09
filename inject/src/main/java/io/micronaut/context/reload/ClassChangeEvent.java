@@ -21,7 +21,6 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
@@ -48,7 +47,6 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class ClassChangeEvent extends ApplicationEvent {
 
     private final transient Set<ClassLoader> retiredLoaders;
