@@ -53,6 +53,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
@@ -134,7 +135,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     private volatile boolean closed;
     /** Set once the application stops: no context is pre-started after it; guarded by this. */
     private boolean prestartStopped;
-    private volatile @Nullable Thread prestartThread;
+    private final AtomicReference<@Nullable Thread> prestartThread = new AtomicReference<>();
 
     /**
      * Create the pool coordinator around the primary context and shared engine.
@@ -306,7 +307,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
             .daemon(true)
             .unstarted(this::prestartContexts);
         thread.setContextClassLoader(applicationContext.getClassLoader());
-        prestartThread = thread;
+        prestartThread.set(thread);
         thread.start();
     }
 
@@ -316,7 +317,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @return The thread, or {@code null} when nothing was pre-started
      */
     @Nullable Thread prestartThread() {
-        return prestartThread;
+        return prestartThread.get();
     }
 
     private void prestartContexts() {
