@@ -76,12 +76,13 @@ class BodyElementsTest {
         BodyElements<String> elements = BodyElements.of(() -> reads.getAndIncrement() == 0 ?
             CompletableFuture.failedFuture(failure) : CompletableFuture.completedFuture(Optional.of("unexpected")));
         for (int i = 0; i < 2; i++) {
-            assertSame(failure, assertThrows(CompletionException.class, () -> elements.next().toCompletableFuture().join()).getCause());
+            var read = elements.next().toCompletableFuture();
+            assertSame(failure, assertThrows(CompletionException.class, read::join).getCause());
             assertEquals(BodyElements.State.FAILED, elements.state());
             assertSame(failure, elements.failure());
         }
-        assertSame(failure, assertThrows(CompletionException.class, () ->
-            elements.forEach(value -> CompletableFuture.completedFuture(null)).toCompletableFuture().join()).getCause());
+        var iteration = elements.forEach(value -> CompletableFuture.completedFuture(null)).toCompletableFuture();
+        assertSame(failure, assertThrows(CompletionException.class, iteration::join).getCause());
         assertSame(failure, elements.failure());
         assertEquals(1, reads.get());
     }
@@ -94,8 +95,10 @@ class BodyElementsTest {
             reads.incrementAndGet();
             throw failure;
         });
-        assertSame(failure, assertThrows(CompletionException.class, () -> elements.next().toCompletableFuture().join()).getCause());
-        assertSame(failure, assertThrows(CompletionException.class, () -> elements.next().toCompletableFuture().join()).getCause());
+        var firstRead = elements.next().toCompletableFuture();
+        assertSame(failure, assertThrows(CompletionException.class, firstRead::join).getCause());
+        var repeatedRead = elements.next().toCompletableFuture();
+        assertSame(failure, assertThrows(CompletionException.class, repeatedRead::join).getCause());
         assertSame(failure, elements.failure());
         assertEquals(1, reads.get());
     }
