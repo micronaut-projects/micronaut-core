@@ -16,6 +16,7 @@
 package io.micronaut.inject.annotation
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.env.Environment
 import io.micronaut.core.annotation.AnnotationUtil
 import jakarta.inject.Named
 
@@ -49,6 +50,13 @@ class EnvironmentQualifierMetadataSpec extends AbstractTypeElementSpec {
         qualifiers[0].values['defaultValue'] == '${external.default}'
         named.getAnnotationValuesByStereotype(AnnotationUtil.QUALIFIER)[0].stringValue().get() == 'chosen'
         named.findAnnotation(Named).get().stringValue().get() == 'chosen'
+        def metadataWithoutEnvironment = new AbstractEnvironmentAnnotationMetadata(named.getAnnotationMetadata()) {
+            @Override
+            protected Environment getEnvironment() {
+                null
+            }
+        }
+        metadataWithoutEnvironment.getAnnotationValuesByStereotype(AnnotationUtil.QUALIFIER)[0].stringValue().get() == '${bean.name:chosen}'
 
         cleanup:
         context.close()
