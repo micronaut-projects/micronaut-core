@@ -16,12 +16,9 @@
 package io.micronaut.context.watch;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ExecutableMethod;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -38,9 +35,9 @@ import java.util.Optional;
 @Experimental
 public final class ExecutableMethodChange<A extends Annotation> {
 
-    private final List<Entry<A>> added;
-    private final List<Entry<A>> removed;
-    private final Collection<Entry<A>> current;
+    private final List<BeanExecutableMethod<A>> added;
+    private final List<BeanExecutableMethod<A>> removed;
+    private final Collection<BeanExecutableMethod<A>> current;
     private final boolean initial;
     private final List<Replacement<A>> replaced;
 
@@ -50,9 +47,9 @@ public final class ExecutableMethodChange<A extends Annotation> {
      * @param added The methods added
      * @param removed The methods removed
      * @param current The methods carrying the annotation after the batch
-     * @param initial Whether this is the startup batch
+     * @param initial Whether this is the first batch
      */
-    public ExecutableMethodChange(List<Entry<A>> added, List<Entry<A>> removed, Collection<Entry<A>> current, boolean initial) {
+    public ExecutableMethodChange(List<BeanExecutableMethod<A>> added, List<BeanExecutableMethod<A>> removed, Collection<BeanExecutableMethod<A>> current, boolean initial) {
         this.added = List.copyOf(Objects.requireNonNull(added, "added"));
         this.removed = List.copyOf(Objects.requireNonNull(removed, "removed"));
         this.current = List.copyOf(Objects.requireNonNull(current, "current"));
@@ -61,28 +58,28 @@ public final class ExecutableMethodChange<A extends Annotation> {
     }
 
     /**
-     * @return The methods added; for the startup batch, every method carrying the annotation
+     * @return The methods added; for the first batch, every method selected
      */
-    public List<Entry<A>> added() {
+    public List<BeanExecutableMethod<A>> added() {
         return added;
     }
 
     /**
-     * @return The methods removed, empty for the startup batch
+     * @return The methods removed, empty for the first batch
      */
-    public List<Entry<A>> removed() {
+    public List<BeanExecutableMethod<A>> removed() {
         return removed;
     }
 
     /**
      * @return The methods carrying the annotation after this batch is applied
      */
-    public Collection<Entry<A>> current() {
+    public Collection<BeanExecutableMethod<A>> current() {
         return current;
     }
 
     /**
-     * @return Whether this is the first batch, describing the startup state
+     * @return Whether this is the first batch, describing the state when the watch was registered
      */
     public boolean initial() {
         return initial;
@@ -92,12 +89,12 @@ public final class ExecutableMethodChange<A extends Annotation> {
      * The method that replaces a removed one: the same bean, name and parameter types in the new
      * generation.
      *
-     * @param removedEntry A removed method
+     * @param removedMethod A removed method
      * @return Its replacement among the added ones, if any
      */
-    public Optional<Entry<A>> replacementOf(Entry<A> removedEntry) {
+    public Optional<BeanExecutableMethod<A>> replacementOf(BeanExecutableMethod<A> removedMethod) {
         for (Replacement<A> replacement : replaced) {
-            if (replacement.before().equals(removedEntry)) {
+            if (replacement.before().equals(removedMethod)) {
                 return Optional.of(replacement.after());
             }
         }
@@ -116,13 +113,13 @@ public final class ExecutableMethodChange<A extends Annotation> {
         return "ExecutableMethodChange{added=" + added.size() + ", removed=" + removed.size() + ", current=" + current.size() + ", initial=" + initial + '}';
     }
 
-    private static <A extends Annotation> List<Replacement<A>> pair(List<Entry<A>> removed, List<Entry<A>> added) {
+    private static <A extends Annotation> List<Replacement<A>> pair(List<BeanExecutableMethod<A>> removed, List<BeanExecutableMethod<A>> added) {
         if (removed.isEmpty() || added.isEmpty()) {
             return List.of();
         }
         List<Replacement<A>> pairs = new ArrayList<>();
-        for (Entry<A> before : removed) {
-            for (Entry<A> after : added) {
+        for (BeanExecutableMethod<A> before : removed) {
+            for (BeanExecutableMethod<A> after : added) {
                 if (before.sameMethod(after)) {
                     pairs.add(new Replacement<>(before, after));
                     break;
@@ -133,55 +130,13 @@ public final class ExecutableMethodChange<A extends Annotation> {
     }
 
     /**
-     * A method of a bean.
-     *
-     * @param definition The bean's definition
-     * @param method The method
-     * @param <A> The annotation type
-     */
-    public record Entry<A extends Annotation>(BeanDefinition<?> definition, ExecutableMethod<?, ?> method) {
-
-        /**
-         * Validating constructor.
-         *
-         * @param definition The definition
-         * @param method The method
-         */
-        public Entry {
-            Objects.requireNonNull(definition, "definition");
-            Objects.requireNonNull(method, "method");
-        }
-
-        /**
-         * Whether another entry is a generation of the same method: same bean, name and parameter types.
-         *
-         * @param other The other entry
-         * @return True if it is
-         */
-        public boolean sameMethod(Entry<?> other) {
-            return BeanDefinitionChange.sameBean(definition, other.definition)
-                && method.getMethodName().equals(other.method.getMethodName())
-                && Arrays.equals(typeNames(method), typeNames(other.method));
-        }
-
-        private static String[] typeNames(ExecutableMethod<?, ?> method) {
-            Class<?>[] types = method.getArgumentTypes();
-            String[] names = new String[types.length];
-            for (int i = 0; i < types.length; i++) {
-                names[i] = types[i].getName();
-            }
-            return names;
-        }
-    }
-
-    /**
      * A removed method and the added one that replaces it.
      *
      * @param before The removed method
      * @param after Its replacement
      * @param <A> The annotation type
      */
-    public record Replacement<A extends Annotation>(Entry<A> before, Entry<A> after) {
+    public record Replacement<A extends Annotation>(BeanExecutableMethod<A> before, BeanExecutableMethod<A> after) {
 
         /**
          * Whether the annotations are the same in both generations: those of the method, of each of its

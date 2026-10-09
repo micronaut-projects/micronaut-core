@@ -20,16 +20,17 @@ import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.context.reload.ResourceKind;
-import io.micronaut.context.watch.BeanChange;
 import io.micronaut.context.watch.BeanDefinitionChange;
 import io.micronaut.context.watch.BeanDefinitionWatcher;
+import io.micronaut.context.watch.BeanExecutableMethod;
+import io.micronaut.context.watch.BeanInstanceChange;
+import io.micronaut.context.watch.BeanInstanceWatcher;
 import io.micronaut.context.watch.BeanWatch;
-import io.micronaut.context.watch.BeanWatcher;
 import io.micronaut.context.watch.ClassChangeWatcher;
 import io.micronaut.context.watch.ConfigurationChange;
-import io.micronaut.context.watch.ConfigurationWatcher;
 import io.micronaut.context.watch.ExecutableMethodChange;
 import io.micronaut.context.watch.ExecutableMethodWatcher;
+import io.micronaut.context.watch.ReloadingConfigurationWatcher;
 import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.context.watch.ResourceSelector;
 import io.micronaut.context.watch.ResourceWatcher;
@@ -62,6 +63,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
@@ -124,20 +126,30 @@ final class BeanWatchRegistry {
         this.context = context;
     }
 
-    <T> BeanWatch watchDefinitions(Argument<T> beanType, @Nullable Qualifier<T> qualifier, BeanDefinitionWatcher<T> watcher) {
-        return register(new DefinitionRegistration<>(beanType, qualifier, watcher, false));
+    <T> BeanWatch watchDefinitions(Argument<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable BeanDefinitionWatcher<T> watcher,
+                                   ChangeHandlers<BeanDefinition<T>, BeanDefinitionChange.Replacement<T>> handlers) {
+        return register(new DefinitionRegistration<>(beanType, qualifier, watcher, handlers, false));
     }
 
-    <T> BeanWatch watchBeans(Argument<T> beanType, @Nullable Qualifier<T> qualifier, BeanWatcher<T> watcher) {
-        return register(new BeanRegistrationWatch<>(beanType, qualifier, watcher));
+    <T> BeanWatch watchInstances(Argument<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable BeanInstanceWatcher<T> watcher,
+                                 ChangeHandlers<BeanRegistration<T>, BeanInstanceChange.Replacement<T>> handlers) {
+        return register(new InstanceRegistration<>(beanType, qualifier, watcher, handlers));
     }
 
-    <A extends Annotation> BeanWatch watchMethods(Class<A> annotationType, ExecutableMethodWatcher<A> watcher) {
-        return register(new MethodRegistration<>(annotationType, watcher, false));
+    <A extends Annotation> BeanWatch watchMethods(Class<A> annotationType, @Nullable Argument<?> beanType, @Nullable Qualifier<?> qualifier,
+                                                  @Nullable ExecutableMethodWatcher<A> watcher,
+                                                  ChangeHandlers<BeanExecutableMethod<A>, ExecutableMethodChange.Replacement<A>> handlers) {
+        return register(new MethodRegistration<>(annotationType, beanType, qualifier, watcher, handlers, false));
     }
 
-    BeanWatch watchConfiguration(String prefix, ConfigurationWatcher watcher, boolean initial) {
-        return register(new ConfigurationRegistration(prefix, watcher, initial));
+    /**
+     * @param prefix The prefix, or null for every change
+     * @param watcher The watcher as registered, which orders the watch
+     * @param reloading The watcher as called: the registered one, or one that answers what a plain watcher does
+     * @param firstBatch Whether the watcher is first called with the configuration as it is
+     */
+    BeanWatch watchConfiguration(@Nullable String prefix, Object watcher, ReloadingConfigurationWatcher reloading, boolean firstBatch) {
+        return register(new ConfigurationRegistration(prefix, watcher, reloading, firstBatch));
     }
 
     BeanWatch watchResources(ResourceSelector selector, ResourceWatcher watcher) {
@@ -157,7 +169,7 @@ final class BeanWatchRegistry {
         if (!markAdapted(processor)) {
             return;
         }
-        MethodRegistration<A> registration = new MethodRegistration<>(annotationType, change -> {
+        MethodRegistration<A> registration = new MethodRegistration<>(annotationType, null, null, change -> {
             if (change.initial() || change.added().isEmpty()) {
                 return;
             }
@@ -165,7 +177,7 @@ final class BeanWatchRegistry {
                 cycle.start();
             }
             try {
-                for (ExecutableMethodChange.Entry<A> entry : change.added()) {
+                for (BeanExecutableMethod<A> entry : change.added()) {
                     // the processor contract: methods marked for processing at startup, as the startup pass feeds it
                     if (entry.definition().requiresMethodProcessing()
                         && entry.method().booleanValue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP).orElse(false)) {
@@ -177,7 +189,7 @@ final class BeanWatchRegistry {
                     cycle.stop();
                 }
             }
-        }, true);
+        }, new ChangeHandlers<>(), true);
         registration.adaptedProcessor = processor;
         register(registration);
     }
@@ -206,7 +218,7 @@ final class BeanWatchRegistry {
                     cycle.stop();
                 }
             }
-        }, true);
+        }, new ChangeHandlers<>(), true);
         registration.adaptedProcessor = processor;
         register(registration);
     }
@@ -377,17 +389,17 @@ final class BeanWatchRegistry {
      *
      * @return The outcomes, one per watch delivered to
      */
-    List<ConfigurationWatcher.Outcome> configurationChanged(ConfigurationChange change) {
+    List<ReloadingConfigurationWatcher.Outcome> configurationChanged(ConfigurationChange change) {
         List<Delivery> deliveries = new ArrayList<>();
         synchronized (enqueue) {
             long sequence = epoch.incrementAndGet();
             for (Registration registration : ordered()) {
                 if (registration.closed.get() || !(registration instanceof ConfigurationRegistration configurationRegistration)
-                    || !change.touches(configurationRegistration.prefix)) {
+                    || !configurationRegistration.touchedBy(change)) {
                     continue;
                 }
                 Delivery delivery = new Delivery(registration, sequence, null);
-                delivery.action = () -> delivery.outcome = configurationRegistration.watcher.onChange(change);
+                delivery.action = () -> delivery.outcome = configurationRegistration.reloading.onChange(change);
                 // answered after the caller stopped waiting: the thread that delivered acts on the answer
                 delivery.afterHandOff = () -> recreate(List.of(delivery));
                 deliveries.add(registration.enqueue(delivery));
@@ -404,27 +416,27 @@ final class BeanWatchRegistry {
 
     /**
      * Collects the answers of delivered configuration batches, in order, and replaces the beans whose watch
-     * answered {@link ConfigurationWatcher.Outcome#RECREATE}.
+     * answered {@link ReloadingConfigurationWatcher.Outcome#RECREATE}.
      *
      * @return The outcomes, one per batch delivered
      */
-    private List<ConfigurationWatcher.Outcome> recreate(List<Delivery> deliveries) {
-        List<ConfigurationWatcher.Outcome> outcomes = new ArrayList<>();
+    private List<ReloadingConfigurationWatcher.Outcome> recreate(List<Delivery> deliveries) {
+        List<ReloadingConfigurationWatcher.Outcome> outcomes = new ArrayList<>();
         List<Owner> toRecreate = new ArrayList<>();
         // the owner each RECREATE outcome asked for, by the outcome's own index, taken as the outcome is added: a
         // second walk over the registrations would not line up with the outcomes once a watch failed or closed
         Map<Integer, Owner> recreateOutcomes = new LinkedHashMap<>();
         for (Delivery delivery : deliveries) {
-            ConfigurationWatcher.Outcome outcome = delivery.outcome;
+            ReloadingConfigurationWatcher.Outcome outcome = delivery.outcome;
             if (outcome == null) {
                 // skipped, or failed: no answer
                 continue;
             }
-            if (outcome == ConfigurationWatcher.Outcome.RECREATE) {
+            if (outcome == ReloadingConfigurationWatcher.Outcome.RECREATE) {
                 Owner owner = delivery.owner;
                 if (owner == null || owner.bean == null) {
-                    LOG.warn("A configuration watch on [{}] answered RECREATE but was not registered while its bean was created; nothing to recreate", ((ConfigurationRegistration) delivery.registration).prefix);
-                    outcome = ConfigurationWatcher.Outcome.IGNORED;
+                    LOG.warn("A configuration watch on [{}] answered RECREATE but was not registered while its bean was created; nothing to recreate", ((ConfigurationRegistration) delivery.registration).describe());
+                    outcome = ReloadingConfigurationWatcher.Outcome.IGNORED;
                 } else {
                     if (!toRecreate.contains(owner)) {
                         toRecreate.add(owner);
@@ -446,7 +458,7 @@ final class BeanWatchRegistry {
             // the outcome reported is what happened, not what the watcher asked for
             for (Map.Entry<Integer, Owner> entry : recreateOutcomes.entrySet()) {
                 if (notRecreated.contains(entry.getValue())) {
-                    outcomes.set(entry.getKey(), ConfigurationWatcher.Outcome.IGNORED);
+                    outcomes.set(entry.getKey(), ReloadingConfigurationWatcher.Outcome.IGNORED);
                 }
             }
         }
@@ -556,7 +568,7 @@ final class BeanWatchRegistry {
          */
         @Nullable
         Runnable afterHandOff;
-        volatile ConfigurationWatcher.@Nullable Outcome outcome;
+        volatile ReloadingConfigurationWatcher.@Nullable Outcome outcome;
         private boolean done;
         private boolean handedOff;
 
@@ -868,34 +880,76 @@ final class BeanWatchRegistry {
         private final Argument<T> beanType;
         @Nullable
         private final Qualifier<T> qualifier;
+        @Nullable
         private final BeanDefinitionWatcher<T> watcher;
+        private final ChangeHandlers<BeanDefinition<T>, BeanDefinitionChange.Replacement<T>> handlers;
+        /**
+         * The definitions delivered for a configuration definition, by the definition they were resolved from, such
+         * as one per entry of an {@code @EachProperty}: a removal of that definition removes them. Read and updated
+         * only by the delivery of a batch, which is one at a time.
+         */
+        private final Map<BeanDefinition<?>, List<BeanDefinition<T>>> resolved = new IdentityHashMap<>();
 
-        DefinitionRegistration(@Nullable Argument<T> beanType, @Nullable Qualifier<T> qualifier, BeanDefinitionWatcher<T> watcher, boolean adapted) {
+        DefinitionRegistration(@Nullable Argument<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable BeanDefinitionWatcher<T> watcher,
+                               ChangeHandlers<BeanDefinition<T>, BeanDefinitionChange.Replacement<T>> handlers, boolean adapted) {
             super(adapted);
             this.beanType = beanType;
             this.qualifier = qualifier;
             this.watcher = watcher;
+            this.handlers = handlers;
         }
 
         @Override
         Object watcher() {
-            return watcher;
+            return watcher != null ? watcher : handlers;
         }
 
         @Override
         void deliverInitial() {
             Collection<BeanDefinition<T>> current = current();
-            watcher.onChange(new BeanDefinitionChange<>(new ArrayList<>(current), List.of(), current, true));
+            resolved.clear();
+            for (BeanDefinition<T> definition : current) {
+                BeanDefinition<?> origin = origin(definition);
+                if (origin.isConfigurationProperties()) {
+                    resolved.computeIfAbsent(origin, o -> new ArrayList<>(2)).add(definition);
+                }
+            }
+            deliver(new BeanDefinitionChange<>(new ArrayList<>(current), List.of(), current, true));
         }
 
         @Override
         void deliverDefinitions(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
-            List<BeanDefinition<T>> removedHere = select(beanType, qualifier, removed, true);
-            List<BeanDefinition<T>> addedHere = select(beanType, qualifier, added, true);
+            List<BeanDefinition<T>> removedHere = select(beanType, qualifier, removed, true, definition -> {
+                if (definition.isConfigurationProperties()) {
+                    // the definitions it was resolved to when it was delivered: its configuration may be gone already
+                    List<BeanDefinition<T>> delivered = resolved.remove(definition);
+                    return delivered != null ? delivered : List.of();
+                }
+                return List.of(definition);
+            });
+            List<BeanDefinition<T>> addedHere = select(beanType, qualifier, added, true, definition -> resolveConfiguration(beanType, definition));
             if (removedHere.isEmpty() && addedHere.isEmpty()) {
                 return;
             }
-            watcher.onChange(new BeanDefinitionChange<>(addedHere, removedHere, current(), false));
+            for (BeanDefinition<T> definition : addedHere) {
+                BeanDefinition<?> origin = origin(definition);
+                if (origin.isConfigurationProperties()) {
+                    resolved.computeIfAbsent(origin, o -> new ArrayList<>(2)).add(definition);
+                }
+            }
+            deliver(new BeanDefinitionChange<>(addedHere, removedHere, current(), false));
+        }
+
+        private void deliver(BeanDefinitionChange<T> change) {
+            if (watcher != null) {
+                try {
+                    watcher.onChange(change);
+                } catch (RuntimeException e) {
+                    report(this, e);
+                }
+            }
+            handlers.dispatch(change.added(), change.removed(), change.replaced(), BeanDefinitionChange.Replacement::before,
+                BeanDefinitionChange.Replacement::after, e -> report(this, e));
         }
 
         @SuppressWarnings("unchecked")
@@ -907,11 +961,13 @@ final class BeanWatchRegistry {
         }
     }
 
-    private final class BeanRegistrationWatch<T> extends Registration {
+    private final class InstanceRegistration<T> extends Registration {
         private final Argument<T> beanType;
         @Nullable
         private final Qualifier<T> qualifier;
-        private final BeanWatcher<T> watcher;
+        @Nullable
+        private final BeanInstanceWatcher<T> watcher;
+        private final ChangeHandlers<BeanRegistration<T>, BeanInstanceChange.Replacement<T>> handlers;
         /**
          * The registrations delivered and not removed since; guarded by itself, since the watch may be closed by
          * a thread other than the one delivering to it.
@@ -923,16 +979,18 @@ final class BeanWatchRegistry {
          */
         private boolean delivering;
 
-        BeanRegistrationWatch(Argument<T> beanType, @Nullable Qualifier<T> qualifier, BeanWatcher<T> watcher) {
+        InstanceRegistration(Argument<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable BeanInstanceWatcher<T> watcher,
+                             ChangeHandlers<BeanRegistration<T>, BeanInstanceChange.Replacement<T>> handlers) {
             super(false);
             this.beanType = beanType;
             this.qualifier = qualifier;
             this.watcher = watcher;
+            this.handlers = handlers;
         }
 
         @Override
         Object watcher() {
-            return watcher;
+            return watcher != null ? watcher : handlers;
         }
 
         @Override
@@ -943,7 +1001,7 @@ final class BeanWatchRegistry {
                 for (BeanRegistration<T> registration : current) {
                     remember(registration.getBeanDefinition(), registration);
                 }
-                watcher.onChange(new BeanChange<>(new ArrayList<>(current), List.of(), current, true));
+                deliver(new BeanInstanceChange<>(new ArrayList<>(current), List.of(), current, true));
             } finally {
                 endDelivery(List.of());
             }
@@ -951,8 +1009,20 @@ final class BeanWatchRegistry {
 
         @Override
         void deliverDefinitions(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
-            List<BeanDefinition<T>> removedHere = select(beanType, qualifier, removed, false);
-            List<BeanDefinition<T>> addedHere = select(beanType, qualifier, added, false);
+            List<BeanDefinition<T>> removedHere = select(beanType, qualifier, removed, false, definition -> {
+                // the definitions whose beans were delivered: the definition itself, or those it was resolved to,
+                // such as one per entry of an @EachProperty
+                List<BeanDefinition<T>> delivered = new ArrayList<>(1);
+                synchronized (known) {
+                    for (BeanDefinition<T> key : known.keySet()) {
+                        if (origin(key) == definition) {
+                            delivered.add(key);
+                        }
+                    }
+                }
+                return delivered;
+            });
+            List<BeanDefinition<T>> addedHere = select(beanType, qualifier, added, false, definition -> resolveConfiguration(beanType, definition));
             if (removedHere.isEmpty() && addedHere.isEmpty()) {
                 return;
             }
@@ -988,11 +1058,23 @@ final class BeanWatchRegistry {
                 synchronized (known) {
                     current = new ArrayList<>(known.values());
                 }
-                watcher.onChange(new BeanChange<>(came, gone, current, false));
+                deliver(new BeanInstanceChange<>(came, gone, current, false));
             } finally {
                 // a removed instance the watch created is usable until the batch removing it was delivered
                 endDelivery(gone);
             }
+        }
+
+        private void deliver(BeanInstanceChange<T> change) {
+            if (watcher != null) {
+                try {
+                    watcher.onChange(change);
+                } catch (RuntimeException e) {
+                    report(this, e);
+                }
+            }
+            handlers.dispatch(change.added(), change.removed(), change.replaced(), BeanInstanceChange.Replacement::before,
+                BeanInstanceChange.Replacement::after, e -> report(this, e));
         }
 
         /**
@@ -1051,7 +1133,7 @@ final class BeanWatchRegistry {
                     try {
                         context.destroyBean(registration);
                     } catch (RuntimeException e) {
-                        LOG.error("Failed to destroy bean [{}] created for watcher [{}]: {}", registration.getBeanDefinition().getBeanType().getName(), watcher, e.getMessage(), e);
+                        LOG.error("Failed to destroy bean [{}] created for watcher [{}]: {}", registration.getBeanDefinition().getBeanType().getName(), watcher(), e.getMessage(), e);
                     }
                 }
             }
@@ -1060,39 +1142,65 @@ final class BeanWatchRegistry {
 
     private final class MethodRegistration<A extends Annotation> extends Registration {
         private final Class<A> annotationType;
+        /**
+         * The type of the beans whose methods are watched, or null for every bean.
+         */
+        @Nullable
+        private final Argument<?> beanType;
+        @Nullable
+        private final Qualifier<?> qualifier;
+        @Nullable
         private final ExecutableMethodWatcher<A> watcher;
+        private final ChangeHandlers<BeanExecutableMethod<A>, ExecutableMethodChange.Replacement<A>> handlers;
         private final boolean processedAtStartup;
 
-        MethodRegistration(Class<A> annotationType, ExecutableMethodWatcher<A> watcher, boolean adapted) {
+        MethodRegistration(Class<A> annotationType, @Nullable Argument<?> beanType, @Nullable Qualifier<?> qualifier,
+                           @Nullable ExecutableMethodWatcher<A> watcher,
+                           ChangeHandlers<BeanExecutableMethod<A>, ExecutableMethodChange.Replacement<A>> handlers, boolean adapted) {
             super(adapted);
             this.annotationType = annotationType;
+            this.beanType = beanType;
+            this.qualifier = qualifier;
             this.watcher = watcher;
+            this.handlers = handlers;
             this.processedAtStartup = context.resolveMetadata(annotationType)
                 .booleanValue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP).orElse(false);
         }
 
         @Override
         Object watcher() {
-            return watcher;
+            return watcher != null ? watcher : handlers;
         }
 
         @Override
         void deliverInitial() {
-            List<ExecutableMethodChange.Entry<A>> current = current();
-            watcher.onChange(new ExecutableMethodChange<>(current, List.of(), current, true));
+            List<BeanExecutableMethod<A>> current = current();
+            deliver(new ExecutableMethodChange<>(current, List.of(), current, true));
         }
 
         @Override
         void deliverDefinitions(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
-            List<ExecutableMethodChange.Entry<A>> removedHere = entries(removed);
-            List<ExecutableMethodChange.Entry<A>> addedHere = entries(added);
+            List<BeanExecutableMethod<A>> removedHere = entries(removed);
+            List<BeanExecutableMethod<A>> addedHere = entries(added);
             if (removedHere.isEmpty() && addedHere.isEmpty()) {
                 return;
             }
-            watcher.onChange(new ExecutableMethodChange<>(addedHere, removedHere, current(), false));
+            deliver(new ExecutableMethodChange<>(addedHere, removedHere, current(), false));
         }
 
-        private List<ExecutableMethodChange.Entry<A>> current() {
+        private void deliver(ExecutableMethodChange<A> change) {
+            if (watcher != null) {
+                try {
+                    watcher.onChange(change);
+                } catch (RuntimeException e) {
+                    report(this, e);
+                }
+            }
+            handlers.dispatch(change.added(), change.removed(), change.replaced(), ExecutableMethodChange.Replacement::before,
+                ExecutableMethodChange.Replacement::after, e -> report(this, e));
+        }
+
+        private List<BeanExecutableMethod<A>> current() {
             // an annotation processed at startup has every bean carrying it in the processed-beans index, which
             // costs nothing to read; any other annotation can sit on a method without marking its bean, and only
             // a scan of the definitions finds those
@@ -1106,30 +1214,62 @@ final class BeanWatchRegistry {
             return entries(candidates);
         }
 
-        private List<ExecutableMethodChange.Entry<A>> entries(Collection<? extends BeanDefinition<?>> definitions) {
-            List<ExecutableMethodChange.Entry<A>> entries = new ArrayList<>();
+        private List<BeanExecutableMethod<A>> entries(Collection<? extends BeanDefinition<?>> definitions) {
+            List<BeanExecutableMethod<A>> entries = new ArrayList<>();
             for (BeanDefinition<?> definition : definitions) {
+                if (!selects(definition)) {
+                    continue;
+                }
                 for (ExecutableMethod<?, ?> method : definition.getExecutableMethods()) {
                     if (method.getAnnotationMetadata().hasStereotype(annotationType)) {
-                        entries.add(new ExecutableMethodChange.Entry<>(definition, method));
+                        entries.add(new BeanExecutableMethod<>(definition, method));
                     }
                 }
             }
             return entries;
         }
+
+        /**
+         * Whether the methods of a definition are watched: those of every bean, or of the beans of the
+         * definitions the request selected.
+         */
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        private boolean selects(BeanDefinition<?> definition) {
+            if (beanType != null && !isCandidate(beanType, definition, true)) {
+                return false;
+            }
+            if (qualifier == null) {
+                return true;
+            }
+            Class type = beanType != null ? beanType.getType() : Object.class;
+            return ((Qualifier) qualifier).reduce(type, Stream.of(definition)).findAny().isPresent();
+        }
     }
 
     private final class ConfigurationRegistration extends Registration {
+        /**
+         * The prefix watched, or null for every change.
+         */
+        @Nullable
         private final String prefix;
-        private final ConfigurationWatcher watcher;
+        private final Object watcher;
+        private final ReloadingConfigurationWatcher reloading;
+        private final boolean firstBatch;
 
-        private final boolean initial;
-
-        ConfigurationRegistration(String prefix, ConfigurationWatcher watcher, boolean initial) {
-            super(false, initial);
+        ConfigurationRegistration(@Nullable String prefix, Object watcher, ReloadingConfigurationWatcher reloading, boolean firstBatch) {
+            super(false, firstBatch);
             this.prefix = prefix;
             this.watcher = watcher;
-            this.initial = initial;
+            this.reloading = reloading;
+            this.firstBatch = firstBatch;
+        }
+
+        boolean touchedBy(ConfigurationChange change) {
+            return prefix == null || change.touches(prefix);
+        }
+
+        String describe() {
+            return prefix != null ? prefix : "all configuration";
         }
 
         @Override
@@ -1139,10 +1279,10 @@ final class BeanWatchRegistry {
 
         @Override
         void deliverInitial() {
-            if (initial) {
+            if (firstBatch) {
                 // the watcher reads the configuration as it is now; what it answers is not acted on, since its
                 // bean, if it has one, is still being created
-                watcher.onChange(ConfigurationChange.ofInitial());
+                reloading.onChange(ConfigurationChange.ofInitial());
             }
         }
 
@@ -1225,15 +1365,20 @@ final class BeanWatchRegistry {
         }
     }
 
+    /**
+     * Selects the changed definitions a watch is given: those of its type, each resolved by the resolver, as the
+     * context resolves a configuration definition to one definition per entry, and then those its qualifier accepts.
+     */
     @SuppressWarnings("unchecked")
-    private <T> List<BeanDefinition<T>> select(@Nullable Argument<T> beanType, @Nullable Qualifier<T> qualifier, Collection<? extends BeanDefinition<?>> definitions, boolean indexed) {
+    private <T> List<BeanDefinition<T>> select(@Nullable Argument<T> beanType, @Nullable Qualifier<T> qualifier, Collection<? extends BeanDefinition<?>> definitions,
+                                               boolean indexed, Function<BeanDefinition<T>, Collection<BeanDefinition<T>>> resolver) {
         if (definitions.isEmpty()) {
             return List.of();
         }
         Set<BeanDefinition<T>> candidates = new LinkedHashSet<>();
         for (BeanDefinition<?> definition : definitions) {
             if (beanType == null || isCandidate(beanType, definition, indexed)) {
-                candidates.add((BeanDefinition<T>) definition);
+                candidates.addAll(resolver.apply((BeanDefinition<T>) definition));
             }
         }
         if (candidates.isEmpty()) {
@@ -1244,6 +1389,32 @@ final class BeanWatchRegistry {
             stream = qualifier.reduce(beanType != null ? beanType.getType() : (Class<T>) Object.class, stream);
         }
         return stream.toList();
+    }
+
+    /**
+     * Resolves an added definition as the context does when it looks up the definitions of a type: a configuration
+     * definition, such as an {@code @EachProperty} or an {@code @EachBean}, to one definition per entry of its
+     * configuration or per bean it is created for, and any other definition to itself.
+     */
+    @SuppressWarnings("unchecked")
+    private <T> Collection<BeanDefinition<T>> resolveConfiguration(@Nullable Argument<T> beanType, BeanDefinition<T> definition) {
+        if (!definition.isConfigurationProperties() || definition instanceof BeanDefinitionDelegate<?>) {
+            return List.of(definition);
+        }
+        Set<BeanDefinition<T>> resolved = new LinkedHashSet<>();
+        context.collectIterableBeans(null, definition, resolved, beanType != null ? beanType : (Argument<T>) Argument.OBJECT_ARGUMENT);
+        return resolved;
+    }
+
+    /**
+     * @return The definition a definition was resolved from, such as the {@code @EachProperty} of one of its entries
+     */
+    private static BeanDefinition<?> origin(BeanDefinition<?> definition) {
+        BeanDefinition<?> origin = definition;
+        while (origin instanceof BeanDefinitionDelegate<?> delegate) {
+            origin = delegate.getTarget();
+        }
+        return origin;
     }
 
     /**

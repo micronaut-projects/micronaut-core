@@ -2,6 +2,7 @@ package io.micronaut.inject.context.watch
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.watch.BeanDefinitionChange
+import io.micronaut.context.watch.BeanExecutableMethod
 import io.micronaut.context.watch.ExecutableMethodChange
 import io.micronaut.inject.BeanDefinition
 
@@ -57,8 +58,8 @@ class MetadataTarget {
     }
 
     private static ExecutableMethodChange.Replacement<?> replacement(BeanDefinition<?> before, BeanDefinition<?> after) {
-        def first = new ExecutableMethodChange.Entry(before, before.executableMethods.find { it.methodName == 'read' })
-        def second = new ExecutableMethodChange.Entry(after, after.executableMethods.find { it.methodName == 'read' })
+        def first = new BeanExecutableMethod(before, before.executableMethods.find { it.methodName == 'read' })
+        def second = new BeanExecutableMethod(after, after.executableMethods.find { it.methodName == 'read' })
         assert first.sameMethod(second)
         new ExecutableMethodChange.Replacement(first, second)
     }

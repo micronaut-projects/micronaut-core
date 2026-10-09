@@ -20,9 +20,8 @@ import io.micronaut.core.annotation.Experimental;
 import java.lang.annotation.Annotation;
 
 /**
- * Receives the changes to the executable methods carrying an annotation, registered with
- * {@link io.micronaut.context.WatchableBeanContext#watchMethods(Class, ExecutableMethodWatcher)}. The reload-aware
- * successor of {@link io.micronaut.context.processor.ExecutableMethodProcessor}: it sees what went as well
+ * Receives the batches of a method watch, registered with {@link MethodWatchRequest#watch(ExecutableMethodWatcher)}.
+ * The reload-aware successor of {@link io.micronaut.context.processor.ExecutableMethodProcessor}: it sees what went as well
  * as what came, paired where a method came back in a new generation.
  *
  * @param <A> The annotation type watched
@@ -34,8 +33,8 @@ import java.lang.annotation.Annotation;
 public interface ExecutableMethodWatcher<A extends Annotation> {
 
     /**
-     * Called once per batch: at startup with every method carrying the annotation, and afterwards whenever
-     * one is added or removed.
+     * Called once per batch: first with every method selected, and afterwards whenever one is
+     * added or removed.
      *
      * @param change The change
      */

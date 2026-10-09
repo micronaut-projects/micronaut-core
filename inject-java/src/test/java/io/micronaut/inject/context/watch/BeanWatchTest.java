@@ -13,12 +13,13 @@ import io.micronaut.context.reload.ClassChange;
 import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.reload.ReloadStrategy;
-import io.micronaut.context.watch.BeanChange;
+import io.micronaut.context.watch.BeanInstanceChange;
 import io.micronaut.context.watch.BeanDefinitionChange;
 import io.micronaut.context.watch.BeanDefinitionWatcher;
+import io.micronaut.context.watch.BeanExecutableMethod;
 import io.micronaut.context.watch.BeanWatch;
 import io.micronaut.context.watch.ConfigurationChange;
-import io.micronaut.context.watch.ConfigurationWatcher.Outcome;
+import io.micronaut.context.watch.ReloadingConfigurationWatcher.Outcome;
 import io.micronaut.context.watch.ExecutableMethodChange;
 import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.context.watch.ResourceSelector;
@@ -48,6 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BeanWatchTest {
@@ -73,7 +75,7 @@ class BeanWatchTest {
         List<BeanDefinitionChange<Rule>> changes = new ArrayList<>();
         try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).build()) {
             WatchableBeanContext watchable = (WatchableBeanContext) context;
-            BeanWatch watch = watchable.watchDefinitions(Rule.class, null, changes::add);
+            BeanWatch watch = watchable.definitions(Rule.class).watch(changes::add);
 
             context.start();
 
@@ -107,7 +109,7 @@ class BeanWatchTest {
     void aWatchRegisteredOnARunningContextGetsItsStartupBatchAtOnceFilteredByQualifier() {
         try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
             List<BeanDefinitionChange<Rule>> changes = new ArrayList<>();
-            ((WatchableBeanContext) context).watchDefinitions(Argument.of(Rule.class), Qualifiers.byName("a"), changes::add);
+            ((WatchableBeanContext) context).definitions(Argument.of(Rule.class)).qualifier(Qualifiers.byName("a")).watch(changes::add);
 
             assertEquals(1, changes.size());
             assertTrue(changes.get(0).initial());
@@ -122,8 +124,8 @@ class BeanWatchTest {
     @Test
     void aBeanWatchSeesInstancesAndCreatesThem() {
         try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
-            List<BeanChange<Rule>> changes = new ArrayList<>();
-            ((WatchableBeanContext) context).watchBeans(Rule.class, null, changes::add);
+            List<BeanInstanceChange<Rule>> changes = new ArrayList<>();
+            ((WatchableBeanContext) context).definitions(Rule.class).instances().watch(changes::add);
 
             assertEquals(1, changes.size());
             assertTrue(changes.get(0).initial());
@@ -147,8 +149,8 @@ class BeanWatchTest {
         DisposablePrototype.DESTROYED.set(0);
         DisposableSingleton.DESTROYED.set(0);
         try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
-            List<BeanChange<Disposable>> changes = new ArrayList<>();
-            BeanWatch watch = ((WatchableBeanContext) context).watchBeans(Disposable.class, null, changes::add);
+            List<BeanInstanceChange<Disposable>> changes = new ArrayList<>();
+            BeanWatch watch = ((WatchableBeanContext) context).definitions(Disposable.class).instances().watch(changes::add);
             assertEquals(Set.of(DisposablePrototype.class, DisposableSingleton.class),
                 changes.get(0).added().stream().map(r -> r.getBean().getClass()).collect(Collectors.toSet()));
 
@@ -167,7 +169,7 @@ class BeanWatchTest {
     void aBeanWatchLeftOpenHasThePrototypesItCreatedDestroyedOnceWhenTheContextCloses() {
         DisposablePrototype.DESTROYED.set(0);
         try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
-            ((WatchableBeanContext) context).watchBeans(DisposablePrototype.class, null, change -> { });
+            ((WatchableBeanContext) context).definitions(DisposablePrototype.class).instances().watch(change -> { });
             assertEquals(0, DisposablePrototype.DESTROYED.get());
         }
         assertEquals(1, DisposablePrototype.DESTROYED.get());
@@ -180,7 +182,7 @@ class BeanWatchTest {
             DefaultBeanContext beanContext = (DefaultBeanContext) context;
             AtomicReference<BeanWatch> handle = new AtomicReference<>();
             List<Integer> destroyedInBatch = new ArrayList<>();
-            handle.set(beanContext.watchBeans(Disposable.class, null, change -> {
+            handle.set(beanContext.definitions(Disposable.class).instances().watch(change -> {
                 if (!change.initial()) {
                     // the watcher closes its own watch, as another thread may, while it still uses the instances
                     handle.get().close();
@@ -203,7 +205,7 @@ class BeanWatchTest {
             DefaultBeanContext beanContext = (DefaultBeanContext) context;
             BeanDefinition<DisposablePrototype> definition = context.getBeanDefinition(DisposablePrototype.class);
             List<Integer> destroyedWhenDelivered = new ArrayList<>();
-            BeanWatch watch = beanContext.watchBeans(DisposablePrototype.class, null, change -> {
+            BeanWatch watch = beanContext.definitions(DisposablePrototype.class).instances().watch(change -> {
                 if (!change.removed().isEmpty()) {
                     destroyedWhenDelivered.add(DisposablePrototype.DESTROYED.get());
                 }
@@ -225,7 +227,7 @@ class BeanWatchTest {
     void aMethodWatchSeesTheAnnotatedMethodsPairsAMethodThatComesBackAndKnowsItsAnnotationsAreUnchanged() {
         try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
             List<ExecutableMethodChange<Tick>> changes = new ArrayList<>();
-            ((WatchableBeanContext) context).watchMethods(Tick.class, changes::add);
+            ((WatchableBeanContext) context).methods(Tick.class).watch(changes::add);
 
             // the startup batch holds the two annotated methods, not the plain one
             assertEquals(1, changes.size());
@@ -244,7 +246,7 @@ class BeanWatchTest {
             assertEquals(2, change.added().size());
             assertEquals(2, change.replaced().size());
             assertTrue(change.replaced().stream().allMatch(ExecutableMethodChange.Replacement::metadataUnchanged));
-            ExecutableMethodChange.Entry<Tick> gone = change.removed().get(0);
+            BeanExecutableMethod<Tick> gone = change.removed().get(0);
             assertTrue(change.replacementOf(gone).isPresent());
             assertEquals(gone.method().getMethodName(), change.replacementOf(gone).get().method().getMethodName());
         }
@@ -479,7 +481,7 @@ class BeanWatchTest {
             DefaultBeanContext beanContext = (DefaultBeanContext) context;
             Path root = Path.of("/app/static").toAbsolutePath();
             List<ResourceChange> seen = new ArrayList<>();
-            beanContext.watchResources(ResourceSelector.of(ResourceKind.STATIC), seen::add);
+            beanContext.resources(ResourceKind.STATIC).watch(seen::add);
 
             // the launcher reports the state, then the context starts: one initial batch, not one per path
             beanContext.notifyResourceChange(new ResourceChange(ResourceKind.STATIC, List.of(root), List.of(root.resolve("app.css")), List.of(), true));
@@ -491,7 +493,7 @@ class BeanWatchTest {
             Path other = Path.of("/app/public").toAbsolutePath();
             beanContext.notifyResourceChange(new ResourceChange(ResourceKind.STATIC, List.of(root, other), List.of(other.resolve("logo.png")), List.of(), false));
             List<ResourceChange> late = new ArrayList<>();
-            beanContext.watchResources(ResourceSelector.of(ResourceKind.STATIC, "*.png"), late::add);
+            beanContext.resources(ResourceKind.STATIC).include("*.png").watch(late::add);
             assertEquals(1, late.size());
             assertEquals(List.of(other.resolve("logo.png")), late.get(0).changed());
             assertEquals(List.of(root, other), late.get(0).roots());
@@ -505,8 +507,8 @@ class BeanWatchTest {
             Path root = Path.of("/app/views").toAbsolutePath();
             List<ResourceChange> html = new ArrayList<>();
             List<ResourceChange> all = new ArrayList<>();
-            beanContext.watchResources(ResourceSelector.of(ResourceKind.VIEWS, "**/*.html"), html::add);
-            beanContext.watchResources(ResourceSelector.of(ResourceKind.VIEWS), all::add);
+            beanContext.resources(ResourceKind.VIEWS).include("**/*.html").watch(html::add);
+            beanContext.resources(ResourceKind.VIEWS).watch(all::add);
 
             // the launcher reports the initial state
             beanContext.notifyResourceChange(new ResourceChange(ResourceKind.VIEWS, List.of(root), List.of(root.resolve("index.html"), root.resolve("mail/welcome.peb")), List.of(), true));
@@ -532,7 +534,7 @@ class BeanWatchTest {
             // a watch registered late, after the index was removed and a page added, starts from the state as the changes left it
             beanContext.notifyResourceChange(new ResourceChange(ResourceKind.VIEWS, List.of(root), List.of(root.resolve("page.html")), List.of(root.resolve("index.html")), false));
             List<ResourceChange> late = new ArrayList<>();
-            beanContext.watchResources(ResourceSelector.of(ResourceKind.VIEWS, "*.html"), late::add);
+            beanContext.resources(ResourceKind.VIEWS).include("*.html").watch(late::add);
             assertEquals(1, late.size());
             assertTrue(late.get(0).initial());
             assertEquals(List.of(root.resolve("page.html")), late.get(0).changed());
@@ -547,11 +549,11 @@ class BeanWatchTest {
         try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
             WatchableBeanContext watchable = (WatchableBeanContext) context;
             List<String> order = new ArrayList<>();
-            watchable.watchDefinitions(Rule.class, null, new OrderedWatcher(10, () -> order.add("second")));
-            watchable.watchDefinitions(Rule.class, null, change -> {
+            watchable.definitions(Rule.class).watch(new OrderedWatcher(10, () -> order.add("second")));
+            watchable.definitions(Rule.class).watch(change -> {
                 throw new IllegalStateException("boom");
             });
-            watchable.watchDefinitions(Rule.class, null, new OrderedWatcher(-10, () -> order.add("first")));
+            watchable.definitions(Rule.class).watch(new OrderedWatcher(-10, () -> order.add("first")));
             order.clear();
 
             context.registerBeanDefinition(rule("e"));
@@ -564,11 +566,11 @@ class BeanWatchTest {
         try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
             DefaultBeanContext beanContext = (DefaultBeanContext) context;
             // a watch ahead of it fails and reports no outcome
-            beanContext.watchConfiguration("protos", change -> {
+            beanContext.configuration("protos").watchReloading(change -> {
                 throw new IllegalStateException("boom");
             });
             // a watch that answers APPLIED, and the prototype's, which answers RECREATE
-            beanContext.watchConfiguration("protos.main", change -> Outcome.APPLIED);
+            beanContext.configuration("protos.main").watchReloading(change -> Outcome.APPLIED);
             context.getBean(RecreatingPrototype.class);
 
             assertEquals(List.of(Outcome.APPLIED, Outcome.IGNORED), beanContext.notifyConfigurationChange(ConfigurationChange.ofKeys(Set.of("protos.main.url"))));
@@ -587,7 +589,7 @@ class BeanWatchTest {
             assertTrue(cache.evicted.isEmpty());
 
             // each class change the launcher publishes reaches the watch, ahead of the listeners of the event
-            ((WatchableBeanContext) context).watchClassChanges(change -> ClassChangeOrder.SEEN.add("watch"));
+            ((WatchableBeanContext) context).classChanges().watch(change -> ClassChangeOrder.SEEN.add("watch"));
             ClassChangeEvent first = classChange();
             context.publishEvent(first);
             assertEquals(List.of(first), cache.evicted);
@@ -613,7 +615,7 @@ class BeanWatchTest {
     void aClassChangeWatchOutsideDevelopmentModeRegistersNothing() {
         try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
             List<ClassChangeEvent> seen = new ArrayList<>();
-            BeanWatch watch = ((WatchableBeanContext) context).watchClassChanges(seen::add);
+            BeanWatch watch = ((WatchableBeanContext) context).classChanges().watch(seen::add);
 
             // classes never change outside development mode: the watch is inactive from the start
             assertFalse(watch.isActive());
@@ -638,7 +640,7 @@ class BeanWatchTest {
             Thread registering = new Thread(() -> {
                 // the qualifier pauses this thread once, inside the read of the first batch: the watch is registered by then
                 PausingQualifier qualifier = new PausingQualifier(Thread.currentThread(), reading, proceed);
-                watch.set(watchable.watchDefinitions(Argument.of(Rule.class), qualifier, changes::add));
+                watch.set(watchable.definitions(Argument.of(Rule.class)).qualifier(qualifier).watch(changes::add));
             }, "registering");
             registering.start();
             assertTrue(reading.await(10, TimeUnit.SECONDS));
@@ -673,7 +675,7 @@ class BeanWatchTest {
             RuntimeBeanDefinition<Rule> early = rule("early");
             context.registerBeanDefinition(early);
             List<BeanDefinitionChange<Rule>> changes = new ArrayList<>();
-            ((WatchableBeanContext) context).watchDefinitions(Rule.class, null, changes::add);
+            ((WatchableBeanContext) context).definitions(Rule.class).watch(changes::add);
 
             assertEquals(1, changes.size());
             assertTrue(changes.get(0).added().contains(early));
@@ -688,7 +690,7 @@ class BeanWatchTest {
             List<String> seen = new CopyOnWriteArrayList<>();
             CountDownLatch reading = new CountDownLatch(1);
             CountDownLatch proceed = new CountDownLatch(1);
-            Thread registering = new Thread(() -> beanContext.watchConfiguration("pool", change -> {
+            Thread registering = new Thread(() -> beanContext.configuration("pool").withFirstBatch().watchReloading(change -> {
                 if (change.initial()) {
                     // the first batch reads the configuration, slowly
                     seen.add("initial " + size.get() + " all=" + change.all());
@@ -698,7 +700,7 @@ class BeanWatchTest {
                 }
                 seen.add("change " + size.get());
                 return Outcome.APPLIED;
-            }, true), "registering");
+            }), "registering");
             registering.start();
             assertTrue(reading.await(10, TimeUnit.SECONDS));
 
@@ -720,7 +722,7 @@ class BeanWatchTest {
 
             // a watch without a first batch is not called until a refresh touches it
             List<ConfigurationChange> plain = new ArrayList<>();
-            beanContext.watchConfiguration("pool", change -> {
+            beanContext.configuration("pool").watchReloading(change -> {
                 plain.add(change);
                 return Outcome.APPLIED;
             });
@@ -738,7 +740,7 @@ class BeanWatchTest {
             CountDownLatch release = new CountDownLatch(1);
             List<String> configurationCalls = new CopyOnWriteArrayList<>();
             // a configuration watcher that registers a definition, the first time slowly
-            beanContext.watchConfiguration("loop", change -> {
+            beanContext.configuration("loop").watchReloading(change -> {
                 configurationCalls.add(Thread.currentThread().getName());
                 if (configurationCalls.size() == 1) {
                     inConfigurationWatcher.countDown();
@@ -748,7 +750,7 @@ class BeanWatchTest {
                 return Outcome.APPLIED;
             });
             // a definition watcher that refreshes the configuration the other one watches
-            beanContext.watchDefinitions(Rule.class, null, change -> {
+            beanContext.definitions(Rule.class).watch(change -> {
                 if (!change.initial()) {
                     beanContext.notifyConfigurationChange(ConfigurationChange.ofKeys(Set.of("loop.key")));
                 }
@@ -775,10 +777,10 @@ class BeanWatchTest {
     void aConfigurationWatchWithAFirstBatchRegisteredBeforeStartupIsCalledOnceAtStartup() {
         try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).build()) {
             List<ConfigurationChange> seen = new ArrayList<>();
-            ((WatchableBeanContext) context).watchConfiguration("pool", change -> {
+            ((WatchableBeanContext) context).configuration("pool").withFirstBatch().watchReloading(change -> {
                 seen.add(change);
                 return Outcome.APPLIED;
-            }, true);
+            });
             assertTrue(seen.isEmpty());
             context.start();
             assertEquals(1, seen.size());
@@ -805,7 +807,7 @@ class BeanWatchTest {
             DefaultBeanContext beanContext = (DefaultBeanContext) context;
             BeanDefinition<StringCodec> codec = context.getBeanDefinition(StringCodec.class);
             List<BeanDefinitionChange<Object>> changes = new ArrayList<>();
-            BeanWatch watch = beanContext.watchDefinitions(Object.class, Qualifiers.byName("codec"), changes::add);
+            BeanWatch watch = beanContext.definitions(Object.class).qualifier(Qualifiers.byName("codec")).watch(changes::add);
 
             assertEquals(1, changes.size());
             assertEquals(List.of(codec), changes.get(0).added());
@@ -835,12 +837,12 @@ class BeanWatchTest {
             List<BeanDefinitionChange<Codec>> rawChanges = new ArrayList<>();
             List<BeanDefinitionChange<Codec>> typedChanges = new ArrayList<>();
             List<BeanDefinitionChange<IndexMarker>> indexedChanges = new ArrayList<>();
-            List<BeanChange<IndexMarker>> indexedBeanChanges = new ArrayList<>();
+            List<BeanInstanceChange<IndexMarker>> indexedBeanChanges = new ArrayList<>();
             List<BeanWatch> watches = List.of(
-                beanContext.watchDefinitions(Codec.class, null, rawChanges::add),
-                beanContext.watchDefinitions(Argument.of(Codec.class, String.class), null, typedChanges::add),
-                beanContext.watchDefinitions(IndexMarker.class, null, indexedChanges::add),
-                beanContext.watchBeans(IndexMarker.class, null, indexedBeanChanges::add));
+                beanContext.definitions(Codec.class).watch(rawChanges::add),
+                beanContext.definitions(Argument.of(Codec.class, String.class)).watch(typedChanges::add),
+                beanContext.definitions(IndexMarker.class).watch(indexedChanges::add),
+                beanContext.definitions(IndexMarker.class).instances().watch(indexedBeanChanges::add));
 
             assertEquals(List.of(codec), rawChanges.get(0).added());
             assertEquals(List.of(codec), typedChanges.get(0).added());
@@ -881,6 +883,173 @@ class BeanWatchTest {
             assertTrue(thread.isAlive(), thread.getName() + " finished without waiting");
             assertTrue(System.nanoTime() < deadline, thread.getName() + " never waited");
             Thread.sleep(5);
+        }
+    }
+
+    @Test
+    void perChangeHandlersAreCalledForEachChangeOfABatchAfterTheBatchWatcher() {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            List<String> calls = new ArrayList<>();
+            BeanWatch watch = beanContext.definitions(Rule.class)
+                .qualifier(Qualifiers.byName("a"))
+                .onAdded(definition -> calls.add("added " + definition.getBeanType().getSimpleName()))
+                .onRemoved(definition -> calls.add("removed " + definition.getBeanType().getSimpleName()))
+                .onReplaced(replacement -> calls.add("replaced " + replacement.before().getBeanType().getSimpleName()))
+                .watch(change -> calls.add("batch " + change.added().size() + "/" + change.removed().size()));
+
+            // the first batch: the batch watcher, then every definition as added
+            assertEquals(List.of("batch 1/0", "added ARule"), calls);
+
+            // a reload of the definition: one batch, given to the replacement handler as a whole
+            calls.clear();
+            BeanDefinition<ARule> definition = context.getBeanDefinition(ARule.class);
+            beanContext.notifyDefinitionChange(List.of(definition), List.of(definition));
+            assertEquals(List.of("batch 1/1", "replaced ARule"), calls);
+
+            // a removal, and an addition, the qualifier still applying
+            calls.clear();
+            beanContext.notifyDefinitionChange(List.of(definition), List.of());
+            beanContext.notifyDefinitionChange(List.of(), List.of(definition, context.getBeanDefinition(BRule.class)));
+            assertEquals(List.of("batch 0/1", "removed ARule", "batch 1/0", "added ARule"), calls);
+            watch.close();
+        }
+    }
+
+    @Test
+    void withoutAReplacementHandlerAReplacementIsARemovalThenAnAddition() {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            List<String> calls = new ArrayList<>();
+            beanContext.definitions(Rule.class).qualifier(Qualifiers.byName("a"))
+                .onAdded(definition -> calls.add("added"))
+                .onRemoved(definition -> calls.add("removed"))
+                .watch();
+            BeanDefinition<ARule> definition = context.getBeanDefinition(ARule.class);
+            beanContext.notifyDefinitionChange(List.of(definition), List.of(definition));
+            assertEquals(List.of("added", "removed", "added"), calls);
+
+            // a failing handler does not stop the others
+            List<String> seen = new ArrayList<>();
+            beanContext.definitions(Rule.class).qualifier(Qualifiers.byName("a"))
+                .onAdded(d -> {
+                    throw new IllegalStateException("handler failure");
+                })
+                .onAdded(d -> seen.add("second"))
+                .watch();
+            assertEquals(List.of("second"), seen);
+        }
+    }
+
+    @Test
+    void aRequestWithoutWatcherOrHandlerIsRefusedAndARequestIsASnapshotPerWatch() {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            WatchableBeanContext watchable = (WatchableBeanContext) context;
+            assertThrows(IllegalStateException.class, () -> watchable.definitions(Rule.class).watch());
+            assertThrows(IllegalStateException.class, () -> watchable.definitions(Rule.class).instances().watch());
+            assertThrows(IllegalStateException.class, () -> watchable.methods(Tick.class).watch());
+
+            List<String> first = new ArrayList<>();
+            List<String> second = new ArrayList<>();
+            var request = watchable.definitions(Rule.class).onAdded(d -> first.add(d.getBeanType().getSimpleName()));
+            request.watch();
+            // changing the request afterwards changes the next watch only
+            request.qualifier(Qualifiers.byName("b")).onAdded(d -> second.add(d.getBeanType().getSimpleName())).watch();
+            assertEquals(Set.of("ARule", "BRule"), Set.copyOf(first));
+            assertEquals(List.of("BRule"), second);
+        }
+    }
+
+    @Test
+    void anInstanceWatchCallsItsHandlersWithTheBeansAndReplacements() {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            List<String> calls = new ArrayList<>();
+            beanContext.definitions(Rule.class).stereotype(jakarta.inject.Named.class)
+                .instances()
+                .onAdded(registration -> calls.add("added " + registration.bean().name()))
+                .onRemoved(registration -> calls.add("removed " + registration.bean().name()))
+                .onReplaced(replacement -> calls.add("replaced " + replacement.before().bean().name() + " by " + replacement.after().bean().name()))
+                .watch();
+            assertEquals(Set.of("added a", "added b"), Set.copyOf(calls));
+
+            calls.clear();
+            BeanDefinition<ARule> definition = context.getBeanDefinition(ARule.class);
+            beanContext.notifyDefinitionChange(List.of(definition), List.of(definition));
+            assertEquals(List.of("replaced a by a"), calls);
+        }
+    }
+
+    @Test
+    void aMethodWatchFromADefinitionRequestSeesTheMethodsOfTheSelectedBeansOnly() {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            WatchableBeanContext watchable = (WatchableBeanContext) context;
+            List<ExecutableMethodChange<Tick>> ofTicker = new ArrayList<>();
+            List<ExecutableMethodChange<Tick>> ofRules = new ArrayList<>();
+            watchable.definitions(Ticker.class).methods(Tick.class).watch(ofTicker::add);
+            watchable.definitions(Rule.class).methods(Tick.class).watch(ofRules::add);
+            assertEquals(2, ofTicker.get(0).added().size());
+            assertTrue(ofRules.get(0).added().isEmpty());
+
+            List<String> replaced = new ArrayList<>();
+            watchable.methods(Tick.class).onReplaced(replacement -> replaced.add(replacement.after().method().getMethodName())).watch();
+            BeanDefinition<Ticker> definition = context.getBeanDefinition(Ticker.class);
+            ((DefaultBeanContext) context).notifyDefinitionChange(List.of(definition), List.of(definition));
+            assertEquals(Set.of("tick", "tock"), Set.copyOf(replaced));
+            assertEquals(2, ofTicker.size());
+            assertEquals(1, ofRules.size());
+        }
+    }
+
+    @Test
+    void aPlainConfigurationWatcherAppliesAndAWatchOfAllConfigurationSeesEveryChange() {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            List<ConfigurationChange> all = new ArrayList<>();
+            List<ConfigurationChange> pools = new ArrayList<>();
+            beanContext.configuration().watch(all::add);
+            beanContext.configuration("pools").withFirstBatch().watch(pools::add);
+
+            // the first batch, asked for, reads the configuration as it is
+            assertTrue(all.isEmpty());
+            assertEquals(1, pools.size());
+            assertTrue(pools.get(0).initial());
+
+            assertEquals(List.of(Outcome.APPLIED), beanContext.notifyConfigurationChange(ConfigurationChange.ofKeys(Set.of("other.key"))));
+            assertEquals(List.of(Outcome.APPLIED, Outcome.APPLIED), beanContext.notifyConfigurationChange(ConfigurationChange.ofKeys(Set.of("pools.main.size"))));
+            assertEquals(2, all.size());
+            assertEquals(2, pools.size());
+        }
+    }
+
+    @Test
+    void eachPropertyBeansAreWatchedOnePerEntryInEveryBatch() {
+        Map<String, Object> properties = Map.of("spec.name", "BeanWatchTest", "watched.pools.first.size", 1, "watched.pools.second.size", 2);
+        try (ApplicationContext context = ApplicationContext.run(properties)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            List<BeanDefinitionChange<WatchedPool>> definitions = new ArrayList<>();
+            List<BeanInstanceChange<WatchedPool>> instances = new ArrayList<>();
+            beanContext.definitions(WatchedPool.class).watch(definitions::add);
+            beanContext.definitions(WatchedPool.class).instances().watch(instances::add);
+            List<String> named = new ArrayList<>();
+            beanContext.definitions(WatchedPool.class).qualifier(Qualifiers.byName("second")).onAdded(d -> named.add("added")).onRemoved(d -> named.add("removed")).watch();
+            assertEquals(2, definitions.get(0).added().size());
+            assertEquals(Set.of(1, 2), instances.get(0).added().stream().map(r -> r.bean().getSize()).collect(Collectors.toSet()));
+            assertEquals(List.of("added"), named);
+
+            // the @EachProperty definition goes, as a reload retires it: both entries go
+            BeanDefinition<WatchedPool> template = definitions.get(0).added().get(0) instanceof io.micronaut.inject.DelegatingBeanDefinition<WatchedPool> delegating
+                ? delegating.getTarget() : definitions.get(0).added().get(0);
+            beanContext.notifyDefinitionChange(List.of(template), List.of());
+            assertEquals(2, definitions.get(1).removed().size());
+            assertEquals(2, instances.get(1).removed().size());
+            assertEquals(List.of("added", "removed"), named);
+
+            // and comes back: one definition, and one bean, per entry again
+            beanContext.notifyDefinitionChange(List.of(), List.of(template));
+            assertEquals(2, definitions.get(2).added().size());
+            assertEquals(Set.of(1, 2), instances.get(2).added().stream().map(r -> r.bean().getSize()).collect(Collectors.toSet()));
+            assertEquals(List.of("added", "removed", "added"), named);
         }
     }
 

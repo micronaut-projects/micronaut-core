@@ -20,6 +20,6 @@ public class ClassCache {
     public final BeanWatch watch;
 
     public ClassCache(WatchableBeanContext beanContext) {
-        watch = beanContext.watchClassChanges(evicted::add);
+        watch = beanContext.classChanges().watch(evicted::add);
     }
 }

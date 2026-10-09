@@ -15,14 +15,12 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.context.watch.BeanDefinitionWatcher;
-import io.micronaut.context.watch.BeanWatch;
-import io.micronaut.context.watch.BeanWatcher;
-import io.micronaut.context.watch.ClassChangeWatcher;
-import io.micronaut.context.watch.ConfigurationWatcher;
-import io.micronaut.context.watch.ExecutableMethodWatcher;
-import io.micronaut.context.watch.ResourceSelector;
-import io.micronaut.context.watch.ResourceWatcher;
+import io.micronaut.context.reload.ResourceKind;
+import io.micronaut.context.watch.ClassChangeWatchRequest;
+import io.micronaut.context.watch.ConfigurationWatchRequest;
+import io.micronaut.context.watch.DefinitionWatchRequest;
+import io.micronaut.context.watch.MethodWatchRequest;
+import io.micronaut.context.watch.ResourceWatchRequest;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
@@ -31,8 +29,27 @@ import java.lang.annotation.Annotation;
 
 /**
  * A bean context whose definitions, beans, methods, configuration, resources and classes can be watched: a
- * watcher registers for the specific things it derives state from and receives one batched change
- * whenever they change, the startup state being the first batch.
+ * watcher describes the specific things it derives state from with a fluent request, in the style of the
+ * {@code FileWatcher}, and receives one batch whenever they change, the state when it registered being the first
+ * batch:
+ *
+ * <pre>
+ * context.definitions(Codec.class).qualifier(qualifier).watch(change -&gt; rebuild(change.current()));
+ * context.definitions(Rule.class).instances().onAdded(rules::add).onRemoved(rules::remove).watch();
+ * context.methods(Scheduled.class).watch(this);
+ * context.configuration("datasources.default").withFirstBatch().watch(change -&gt; resize());
+ * context.resources(ResourceKind.VIEWS).include("**&#47;*.html").watch(change -&gt; evict(change));
+ * context.classChanges().watch(change -&gt; cache.keySet().removeIf(change::isStaleType));
+ * </pre>
+ *
+ * <h2>Batches and per-change handlers</h2>
+ * <p>The batch is the unit of delivery and consistency. A development reload retires one generation's
+ * definitions and adds the next one's in a single step, and a watch receives that step as one batch, applied
+ * against a context whose state is already consistent: a watcher that aggregates what it selects, such as a
+ * router built from every controller, never sees a half-applied reload, and a batch pairs a removed definition or
+ * method with its new generation, so that a watcher can tell an edit from a removal. A watcher that does not
+ * aggregate adds per-change handlers to its request instead, {@code onAdded}, {@code onRemoved} and
+ * {@code onReplaced}, which are called for each change of a batch once it is applied.</p>
  *
  * <p>Implemented by the default context, which is injectable as this type. A watch registered while a
  * bean is being created belongs to that bean and is closed when the bean is destroyed.</p>
@@ -61,10 +78,12 @@ import java.lang.annotation.Annotation;
  * after it; a watcher treats an addition it already has, or a removal of something it never had, as
  * nothing to do. Resource watches know their state exactly and never see such a repeat.</li>
  * </ul>
- * <p>Definition, bean, method and resource watches always have a first batch. A configuration watch has
- * one when registered with {@link #watchConfiguration(String, ConfigurationWatcher, boolean)}, which calls
- * the watcher once with {@link io.micronaut.context.watch.ConfigurationChange#ofInitial()} to read the
+ * <p>Definition, instance, method and resource watches always have a first batch. A configuration watch has
+ * one when its request asks for it with {@link ConfigurationWatchRequest#withFirstBatch()}, which calls the
+ * watcher once with {@link io.micronaut.context.watch.ConfigurationChange#ofInitial()} to read the
  * configuration as it is. A class change watch has none: nothing has changed when it is registered.</p>
+ * <p>Watches of the same kind are delivered to in {@link io.micronaut.core.order.Ordered} order of their
+ * watchers, and a failing watcher or handler does not stop the others.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -73,138 +92,87 @@ import java.lang.annotation.Annotation;
 public sealed interface WatchableBeanContext extends BeanContext permits DefaultBeanContext {
 
     /**
-     * Watches the bean definitions of a type. The watcher receives the definitions present as its first
-     * batch, at startup or at once when the context is already running, then one batch per change: a
-     * definition registered at runtime, or the definitions a development reload retires and adds.
+     * Starts a request to watch the bean definitions of a type, or, continued with
+     * {@link DefinitionWatchRequest#instances()} or {@link DefinitionWatchRequest#methods(Class)}, the beans or the
+     * executable methods of those definitions. Nothing is registered until a terminal operation of the request is
+     * called. The watch receives the definitions present as its first batch, at startup or at once when the context
+     * is already running, then one batch per change: a definition registered at runtime, or the definitions a
+     * development reload retires and adds.
      *
      * @param beanType The bean type
-     * @param qualifier The qualifier, or null for any
-     * @param watcher The watcher
      * @param <T> The bean type
-     * @return The watch, to close when the watcher no longer needs changes
+     * @return The request, which selects every definition of the type
      */
-    <T> BeanWatch watchDefinitions(Argument<T> beanType, @Nullable Qualifier<T> qualifier, BeanDefinitionWatcher<T> watcher);
+    <T> DefinitionWatchRequest<T> definitions(Argument<T> beanType);
 
     /**
-     * Watches the bean definitions of a type.
+     * Starts a request to watch the bean definitions of a type.
      *
      * @param beanType The bean type
-     * @param qualifier The qualifier, or null for any
-     * @param watcher The watcher
      * @param <T> The bean type
-     * @return The watch
-     * @see #watchDefinitions(Argument, Qualifier, BeanDefinitionWatcher)
+     * @return The request, which selects every definition of the type
+     * @see #definitions(Argument)
      */
-    default <T> BeanWatch watchDefinitions(Class<T> beanType, @Nullable Qualifier<T> qualifier, BeanDefinitionWatcher<T> watcher) {
-        return watchDefinitions(Argument.of(beanType), qualifier, watcher);
+    default <T> DefinitionWatchRequest<T> definitions(Class<T> beanType) {
+        return definitions(Argument.of(beanType));
     }
 
     /**
-     * Watches the beans of a type, creating them. The watcher receives the beans present as its first
-     * batch, then one batch per change, with the instances that went and the ones that came. The
-     * instances delivered stay the ones delivered: a prototype among the candidates is created once for
-     * the watch, not again for every batch.
+     * Starts a request to watch every bean definition, narrowed with a qualifier or a stereotype, such as
+     * {@code definitions().stereotype(Controller.class)}.
      *
-     * <p>Who destroys an instance delivered:</p>
-     * <ul>
-     * <li>A bean no scope holds, such as a {@link io.micronaut.context.annotation.Prototype prototype}, is
-     * created for the watch, which owns it: the watch destroys it, its {@code @PreDestroy} methods and the
-     * dependent beans it owns included, once the batch that removes it was delivered, or when the watch is
-     * closed, by {@link BeanWatch#close()}, with the bean that registered the watch, or when the context
-     * stops. The watcher does not destroy it, and does not use a removed instance after the batch that
-     * removed it, nor any instance after the watch was closed.</li>
-     * <li>A singleton, or a bean of a custom scope, belongs to its scope, which destroys it as it would
-     * without the watch: a removed one may already be destroyed, or still be in use elsewhere.</li>
-     * </ul>
-     *
-     * @param beanType The bean type
-     * @param qualifier The qualifier, or null for any
-     * @param watcher The watcher
-     * @param <T> The bean type
-     * @return The watch, to close when the watcher no longer needs changes; closing it destroys the beans it owns
+     * @return The request, which selects every definition
+     * @see #definitions(Argument)
      */
-    <T> BeanWatch watchBeans(Argument<T> beanType, @Nullable Qualifier<T> qualifier, BeanWatcher<T> watcher);
-
-    /**
-     * Watches the beans of a type, creating them.
-     *
-     * @param beanType The bean type
-     * @param qualifier The qualifier, or null for any
-     * @param watcher The watcher
-     * @param <T> The bean type
-     * @return The watch
-     * @see #watchBeans(Argument, Qualifier, BeanWatcher)
-     */
-    default <T> BeanWatch watchBeans(Class<T> beanType, @Nullable Qualifier<T> qualifier, BeanWatcher<T> watcher) {
-        return watchBeans(Argument.of(beanType), qualifier, watcher);
+    default DefinitionWatchRequest<Object> definitions() {
+        return definitions(Argument.OBJECT_ARGUMENT);
     }
 
     /**
-     * Watches the executable methods carrying an annotation: the reload-aware form of an
-     * {@link io.micronaut.context.processor.ExecutableMethodProcessor}. The watcher receives the methods
-     * present as its first batch, then one batch per change.
+     * Starts a request to watch the executable methods of every bean that carry an annotation, directly or as a
+     * stereotype: the reload-aware form of an {@link io.micronaut.context.processor.ExecutableMethodProcessor}. The
+     * watch receives the methods present as its first batch, then one batch per change. The methods of some beans
+     * only are watched with {@link DefinitionWatchRequest#methods(Class)}.
      *
-     * @param annotationType The annotation the methods carry, directly or as a stereotype
-     * @param watcher The watcher
+     * @param annotationType The annotation the methods carry
      * @param <A> The annotation type
-     * @return The watch
+     * @return The request
      */
-    <A extends Annotation> BeanWatch watchMethods(Class<A> annotationType, ExecutableMethodWatcher<A> watcher);
+    <A extends Annotation> MethodWatchRequest<A> methods(Class<A> annotationType);
 
     /**
-     * Watches the configuration under a prefix. The watcher is called, after the configuration beans
-     * under the prefix were rebound, for every refresh that touches the prefix, and says what it did.
-     * A watch registered while a bean is being created belongs to that bean, which is what lets the
-     * watcher answer {@link ConfigurationWatcher.Outcome#RECREATE}.
+     * Starts a request to watch every configuration change.
+     *
+     * @return The request
+     * @see #configuration(String)
+     */
+    ConfigurationWatchRequest configuration();
+
+    /**
+     * Starts a request to watch the configuration under a prefix: the watcher is called, after the configuration
+     * beans under the prefix were bound again, for every refresh that touches the prefix.
      *
      * @param prefix The prefix, such as {@code datasources.default}
-     * @param watcher The watcher
-     * @return The watch
+     * @return The request
      */
-    default BeanWatch watchConfiguration(String prefix, ConfigurationWatcher watcher) {
-        return watchConfiguration(prefix, watcher, false);
-    }
+    ConfigurationWatchRequest configuration(String prefix);
 
     /**
-     * Watches the configuration under a prefix, optionally starting with a first batch. With
-     * {@code initial}, the watcher is called once at registration, at startup when the context has not
-     * started yet, with {@link io.micronaut.context.watch.ConfigurationChange#ofInitial()}: it reads the
-     * configuration as it is then, and every refresh after that read reaches it, which a read of its own
-     * before registering cannot promise. What the watcher answers to the first batch is not acted on: its
-     * bean, if it has one, is still being created. Without {@code initial} this is
-     * {@link #watchConfiguration(String, ConfigurationWatcher)}.
+     * Starts a request to watch the resources of a kind of resource root, such as the views, narrowed by glob. The
+     * watch receives what is under the roots as its first batch, then one batch per change.
      *
-     * @param prefix The prefix, such as {@code datasources.default}
-     * @param watcher The watcher
-     * @param initial Whether the watcher is first called with the configuration as it is
-     * @return The watch
+     * @param kind The kind of resource root
+     * @return The request, which selects every file of the kind
      */
-    BeanWatch watchConfiguration(String prefix, ConfigurationWatcher watcher, boolean initial);
+    ResourceWatchRequest resources(ResourceKind kind);
 
     /**
-     * Watches the resources a selector selects: the files of a kind of resource root, by glob. The
-     * watcher receives what is under the roots as its first batch, then one batch per change.
+     * Starts a request to watch the class changes of a development reload: the watch for a cache keyed by class,
+     * which has no first batch. In a context that is not in development mode, the watch is never registered.
      *
-     * @param selector The selector
-     * @param watcher The watcher
-     * @return The watch
+     * @return The request
      */
-    BeanWatch watchResources(ResourceSelector selector, ResourceWatcher watcher);
-
-    /**
-     * Watches the class changes of a development reload: the watch for a cache keyed by class, which
-     * evicts what {@link io.micronaut.context.reload.ClassChangeEvent#isStaleType(Class)} says belongs to a
-     * retired generation. The watcher is called with each {@link io.micronaut.context.reload.ClassChangeEvent}
-     * the launcher publishes, before the listeners of the event, and has no startup batch.
-     *
-     * <p>Classes change only in {@link io.micronaut.context.env.DevelopmentMode development mode}. In a
-     * context that is not in development mode nothing is registered: the watch returned is already
-     * inactive, and the watcher is never called nor kept.</p>
-     *
-     * @param watcher The watcher
-     * @return The watch
-     */
-    BeanWatch watchClassChanges(ClassChangeWatcher watcher);
+    ClassChangeWatchRequest classChanges();
 
     /**
      * Recreates a singleton the context holds, and the beans that depend on it: the transitive dependents the

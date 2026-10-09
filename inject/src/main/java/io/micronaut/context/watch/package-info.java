@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 /**
- * Watches over the beans, executable methods, configuration and resources of a context: a watcher
- * registers for the specific things it derives state from and receives one batched change whenever
- * they change, the startup state being the first batch.
+ * Watches over the bean definitions, beans, executable methods, configuration, resources and classes of a
+ * context: a watcher describes what it derives state from with a fluent request, such as
+ * {@link DefinitionWatchRequest}, and receives one batch whenever it changes, the state when the watch was
+ * registered being the first batch, or one change at a time through the per-change handlers of the request.
  *
  * @author graemerocher
  * @since 5.3.0

@@ -18,9 +18,11 @@ package io.micronaut.context.watch;
 import io.micronaut.core.annotation.Experimental;
 
 /**
- * Receives the configuration changes under a prefix, registered with
- * {@link io.micronaut.context.WatchableBeanContext#watchConfiguration(String, ConfigurationWatcher)}, and says what
- * it did about them.
+ * Receives the configuration changes a {@link ConfigurationWatchRequest} selects, after the configuration beans they
+ * concern were bound again, and applies them to what the watcher derived from the configuration.
+ *
+ * <p>A watcher that may not be able to apply a change, and needs its bean recreated or the application restarted,
+ * is a {@link ReloadingConfigurationWatcher} instead.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -30,38 +32,12 @@ import io.micronaut.core.annotation.Experimental;
 public interface ConfigurationWatcher {
 
     /**
-     * Called after the configuration beans under the prefix have been rebound, so that the watcher reads
-     * the new values from them. A watch registered with a first batch is also called once when it is
-     * registered, with a change whose {@link ConfigurationChange#initial()} holds, to read the values as
-     * they are; its answer to that call is not acted on.
+     * Called after the configuration beans under the watched prefix have been bound again, so that the watcher
+     * reads the new values from them. A watch registered {@link ConfigurationWatchRequest#withFirstBatch() with a
+     * first batch} is also called once when it is registered, with a change whose
+     * {@link ConfigurationChange#initial()} holds, to read the values as they are.
      *
      * @param change The change, which touches the watched prefix
-     * @return What the watcher did
      */
-    Outcome onChange(ConfigurationChange change);
-
-    /**
-     * What a watcher did with a change.
-     */
-    enum Outcome {
-        /**
-         * The change was applied to the live bean.
-         */
-        APPLIED,
-        /**
-         * The bean that registered the watch while it was created must be replaced; its dependents follow
-         * through the dependency graph. Only a watch registered during the creation of a bean the context
-         * holds, a singleton or a scoped bean, can answer this: for any other watch the outcome is reported
-         * as {@link #IGNORED}.
-         */
-        RECREATE,
-        /**
-         * The change cannot be applied without restarting the application.
-         */
-        REQUIRES_RESTART,
-        /**
-         * The change does not concern the watcher after all.
-         */
-        IGNORED
-    }
+    void onChange(ConfigurationChange change);
 }

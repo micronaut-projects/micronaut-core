@@ -54,17 +54,16 @@ import io.micronaut.context.exceptions.NonUniqueBeanException;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.context.reload.ClassChangeEvent;
+import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.scope.BeanCreationContext;
-import io.micronaut.context.watch.BeanDefinitionWatcher;
-import io.micronaut.context.watch.BeanWatch;
-import io.micronaut.context.watch.BeanWatcher;
-import io.micronaut.context.watch.ClassChangeWatcher;
+import io.micronaut.context.watch.ClassChangeWatchRequest;
 import io.micronaut.context.watch.ConfigurationChange;
-import io.micronaut.context.watch.ConfigurationWatcher;
-import io.micronaut.context.watch.ExecutableMethodWatcher;
+import io.micronaut.context.watch.ConfigurationWatchRequest;
+import io.micronaut.context.watch.DefinitionWatchRequest;
+import io.micronaut.context.watch.MethodWatchRequest;
+import io.micronaut.context.watch.ReloadingConfigurationWatcher;
 import io.micronaut.context.watch.ResourceChange;
-import io.micronaut.context.watch.ResourceSelector;
-import io.micronaut.context.watch.ResourceWatcher;
+import io.micronaut.context.watch.ResourceWatchRequest;
 import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
@@ -181,7 +180,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
     private static final String ARGUMENT_DEFINITION = "definition";
-    private static final String ARGUMENT_WATCHER = "watcher";
     private static final String ARGUMENT_CHANGE = "change";
     private static final String AROUND_TYPE = "io.micronaut.aop.Around";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
@@ -651,48 +649,37 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     }
 
     @Override
-    public <T> BeanWatch watchDefinitions(Argument<T> beanType, @Nullable Qualifier<T> qualifier, BeanDefinitionWatcher<T> watcher) {
+    public <T> DefinitionWatchRequest<T> definitions(Argument<T> beanType) {
         ArgumentUtils.requireNonNull("beanType", beanType);
-        ArgumentUtils.requireNonNull(ARGUMENT_WATCHER, watcher);
-        return watches.watchDefinitions(beanType, qualifier, watcher);
+        return new BeanWatchRequests.DefinitionRequest<>(watches, beanType);
     }
 
     @Override
-    public <T> BeanWatch watchBeans(Argument<T> beanType, @Nullable Qualifier<T> qualifier, BeanWatcher<T> watcher) {
-        ArgumentUtils.requireNonNull("beanType", beanType);
-        ArgumentUtils.requireNonNull(ARGUMENT_WATCHER, watcher);
-        return watches.watchBeans(beanType, qualifier, watcher);
-    }
-
-    @Override
-    public <A extends Annotation> BeanWatch watchMethods(Class<A> annotationType, ExecutableMethodWatcher<A> watcher) {
+    public <A extends Annotation> MethodWatchRequest<A> methods(Class<A> annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
-        ArgumentUtils.requireNonNull(ARGUMENT_WATCHER, watcher);
-        return watches.watchMethods(annotationType, watcher);
+        return new BeanWatchRequests.MethodRequest<>(watches, annotationType, null, null);
     }
 
     @Override
-    public BeanWatch watchConfiguration(String prefix, ConfigurationWatcher watcher, boolean initial) {
+    public ConfigurationWatchRequest configuration() {
+        return new BeanWatchRequests.ConfigurationRequest(watches, null);
+    }
+
+    @Override
+    public ConfigurationWatchRequest configuration(String prefix) {
         ArgumentUtils.requireNonNull("prefix", prefix);
-        ArgumentUtils.requireNonNull(ARGUMENT_WATCHER, watcher);
-        return watches.watchConfiguration(prefix, watcher, initial);
+        return new BeanWatchRequests.ConfigurationRequest(watches, prefix);
     }
 
     @Override
-    public BeanWatch watchResources(ResourceSelector selector, ResourceWatcher watcher) {
-        ArgumentUtils.requireNonNull("selector", selector);
-        ArgumentUtils.requireNonNull(ARGUMENT_WATCHER, watcher);
-        return watches.watchResources(selector, watcher);
+    public ResourceWatchRequest resources(ResourceKind kind) {
+        ArgumentUtils.requireNonNull("kind", kind);
+        return new BeanWatchRequests.ResourceRequest(watches, kind);
     }
 
     @Override
-    public BeanWatch watchClassChanges(ClassChangeWatcher watcher) {
-        ArgumentUtils.requireNonNull(ARGUMENT_WATCHER, watcher);
-        if (!isDevelopmentMode()) {
-            // classes change only under a development launcher: nothing to register, nothing to keep
-            return BeanWatchRegistry.INACTIVE;
-        }
-        return watches.watchClassChanges(watcher);
+    public ClassChangeWatchRequest classChanges() {
+        return new BeanWatchRequests.ClassChangeRequest(watches, this::isDevelopmentMode);
     }
 
     /**
@@ -721,14 +708,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     /**
      * Delivers a configuration change to the watches whose prefix it touches. The configuration refresh
      * calls this after rebinding the configuration beans; a watch answering
-     * {@link ConfigurationWatcher.Outcome#RECREATE} has its bean recreated before this returns.
+     * {@link ReloadingConfigurationWatcher.Outcome#RECREATE} has its bean recreated before this returns.
      *
      * @param change The change
      * @return The outcomes of the watches delivered to
      */
     @Internal
     @Experimental
-    public List<ConfigurationWatcher.Outcome> notifyConfigurationChange(ConfigurationChange change) {
+    public List<ReloadingConfigurationWatcher.Outcome> notifyConfigurationChange(ConfigurationChange change) {
         ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
         return watches.configurationChanged(change);
     }

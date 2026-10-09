@@ -47,7 +47,7 @@ public final class BeanDefinitionChange<T> {
      * @param added The definitions added
      * @param removed The definitions removed
      * @param current The definitions of the watched type after the batch
-     * @param initial Whether this is the startup batch
+     * @param initial Whether this is the first batch
      */
     public BeanDefinitionChange(List<BeanDefinition<T>> added, List<BeanDefinition<T>> removed, Collection<BeanDefinition<T>> current, boolean initial) {
         this.added = List.copyOf(Objects.requireNonNull(added, "added"));
@@ -58,14 +58,14 @@ public final class BeanDefinitionChange<T> {
     }
 
     /**
-     * @return The definitions added; for the startup batch, every definition present
+     * @return The definitions added; for the first batch, every definition selected
      */
     public List<BeanDefinition<T>> added() {
         return added;
     }
 
     /**
-     * @return The definitions removed, empty for the startup batch
+     * @return The definitions removed, empty for the first batch
      */
     public List<BeanDefinition<T>> removed() {
         return removed;
@@ -79,7 +79,7 @@ public final class BeanDefinitionChange<T> {
     }
 
     /**
-     * @return Whether this is the first batch, describing the startup state
+     * @return Whether this is the first batch, describing the state when the watch was registered
      */
     public boolean initial() {
         return initial;

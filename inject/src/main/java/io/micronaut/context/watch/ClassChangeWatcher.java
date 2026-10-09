@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.Experimental;
 
 /**
  * Receives the class changes of a development reload, registered with
- * {@link io.micronaut.context.WatchableBeanContext#watchClassChanges(ClassChangeWatcher)}: the watch for a
+ * {@link ClassChangeWatchRequest#watch(ClassChangeWatcher)}: the watch for a
  * cache keyed by class, which forgets what it holds of a retired generation with
  * {@link ClassChangeEvent#isStaleType(Class)}.
  *
@@ -33,7 +33,7 @@ public interface ClassChangeWatcher {
 
     /**
      * Called once per class change, before any bean of the retired generation is touched. There is no
-     * startup batch: nothing has changed yet when the watch is registered.
+     * first batch: nothing has changed yet when the watch is registered.
      *
      * @param change The change
      */

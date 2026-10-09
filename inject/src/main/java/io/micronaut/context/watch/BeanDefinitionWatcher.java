@@ -18,8 +18,7 @@ package io.micronaut.context.watch;
 import io.micronaut.core.annotation.Experimental;
 
 /**
- * Receives the changes to the bean definitions of a type, registered with
- * {@link io.micronaut.context.WatchableBeanContext#watchDefinitions(io.micronaut.core.type.Argument, io.micronaut.context.Qualifier, BeanDefinitionWatcher)}.
+ * Receives the batches of a definition watch, registered with {@link DefinitionWatchRequest#watch(BeanDefinitionWatcher)}.
  *
  * @param <T> The bean type watched
  * @author graemerocher
@@ -30,9 +29,8 @@ import io.micronaut.core.annotation.Experimental;
 public interface BeanDefinitionWatcher<T> {
 
     /**
-     * Called once per batch: at startup with everything present, and afterwards whenever a definition of
-     * the type is added or removed. A bean of an added definition can be obtained from the context inside
-     * this call.
+     * Called once per batch: first with every definition selected, and afterwards whenever one is added or
+     * removed. A bean of an added definition can be obtained from the context inside this call.
      *
      * @param change The change
      */

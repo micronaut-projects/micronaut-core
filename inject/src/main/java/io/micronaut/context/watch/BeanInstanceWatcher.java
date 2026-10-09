@@ -18,11 +18,10 @@ package io.micronaut.context.watch;
 import io.micronaut.core.annotation.Experimental;
 
 /**
- * Receives the changes to the beans of a type, registered with
- * {@link io.micronaut.context.WatchableBeanContext#watchBeans(io.micronaut.core.type.Argument, io.micronaut.context.Qualifier, BeanWatcher)}.
- * Unlike a {@link BeanDefinitionWatcher} it sees instances: registering one creates the beans of the type.
- * The watch owns the instances it creates for beans no scope holds, such as prototypes, and destroys them;
- * see {@link io.micronaut.context.WatchableBeanContext#watchBeans(io.micronaut.core.type.Argument, io.micronaut.context.Qualifier, BeanWatcher)}.
+ * Receives the batches of an instance watch, registered with {@link InstanceWatchRequest#watch(BeanInstanceWatcher)}.
+ * Unlike a {@link BeanDefinitionWatcher} it sees instances: registering one creates the beans selected. The
+ * watch owns the instances it creates for beans no scope holds, such as prototypes, and destroys them; see
+ * {@link InstanceWatchRequest}.
  *
  * @param <T> The bean type watched
  * @author graemerocher
@@ -30,13 +29,12 @@ import io.micronaut.core.annotation.Experimental;
  */
 @Experimental
 @FunctionalInterface
-public interface BeanWatcher<T> {
+public interface BeanInstanceWatcher<T> {
 
     /**
-     * Called once per batch: at startup with every bean of the type, and afterwards whenever one is
-     * added or removed.
+     * Called once per batch: first with every bean selected, and afterwards whenever one is added or removed.
      *
      * @param change The change
      */
-    void onChange(BeanChange<T> change);
+    void onChange(BeanInstanceChange<T> change);
 }
