@@ -2,11 +2,13 @@ package io.micronaut.runtime.context.scope.refresh.refresher
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.MapPropertySource
+import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.context.watch.ConfigurationChange
 import io.micronaut.context.watch.ConfigurationWatcher
 import io.micronaut.runtime.context.scope.refresh.ConfigurationRefreshedEvent
 import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
+import io.micronaut.runtime.context.scope.refresh.RefreshScope
 import spock.lang.Specification
 
 class ConfigurationRefresherSpec extends Specification {
@@ -264,6 +266,73 @@ class ConfigurationRefresherSpec extends Specification {
 
         where:
         graph << [true, false]
+    }
+
+    void "a property whose placeholder does not resolve fails neither the first refresh event nor a refresh, and is reported once it resolves"() {
+        given: "a property no bean reads, whose placeholder nothing defines, as micronaut-test leaves an unused channel target"
+        Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec", "unused.target": 'localhost:${unused.port}']
+        def source = new MapPropertySource("test", values) {
+            @Override
+            Object get(String key) { values[key] }
+
+            @Override
+            Iterator<String> iterator() { values.keySet().iterator() }
+        }
+        def context = ApplicationContext.builder().propertySources(source).start()
+        def scope = context.getBean(RefreshScope)
+
+        when: "the first refresh event creates the refresher, which resolves every property"
+        scope.onRefreshEvent(new RefreshEvent(Collections.singletonMap("micronaut.test.active.mocks", "changed")))
+
+        then:
+        noExceptionThrown()
+
+        when: "the placeholder resolves: the key is reported as added"
+        values["unused.port"] = 8080
+        def result = context.getBean(ConfigurationRefresher).refresh()
+
+        then:
+        result.change().changed() == ["unused.port", "unused.target"] as Set
+        !result.change().previous().containsKey("unused.target")
+        result.change().current()["unused.target"] == "localhost:8080"
+
+        when: "it no longer resolves: the key is reported as removed"
+        values.remove("unused.port")
+        result = context.getBean(ConfigurationRefresher).refresh()
+
+        then:
+        result.change().changed() == ["unused.port", "unused.target"] as Set
+        result.change().previous()["unused.target"] == "localhost:8080"
+        !result.change().current().containsKey("unused.target")
+
+        cleanup:
+        context.close()
+    }
+
+    void "a bound key whose placeholder no longer resolves fails the refresh, rather than resetting the bean to its default"() {
+        given:
+        Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec", "pool.url": "one", "pool.size": 5, "bound.label": "a"]
+        def source = new MapPropertySource("test", values) {
+            @Override
+            Object get(String key) { values[key] }
+
+            @Override
+            Iterator<String> iterator() { values.keySet().iterator() }
+        }
+        def context = ApplicationContext.builder().beanDependencyTrackingEnabled(true).propertySources(source).start()
+        def refresher = context.getBean(ConfigurationRefresher)
+        context.getBean(PoolConfiguration)
+
+        when:
+        values["pool.url"] = 'jdbc:${pool.missing}'
+        refresher.refresh()
+
+        then:
+        Exception e = thrown()
+        (e instanceof ConfigurationException ? e : e.cause) instanceof ConfigurationException
+
+        cleanup:
+        context.close()
     }
 
     void "refreshAll treats everything as changed"() {
