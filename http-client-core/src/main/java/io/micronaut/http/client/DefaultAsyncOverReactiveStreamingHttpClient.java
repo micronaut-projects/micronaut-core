@@ -49,14 +49,14 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Internal
-public final class DefaultAsyncOverReactiveStreamingHttpClient extends DefaultAsyncOverReactiveHttpClient implements AsyncStreamingHttpClient {
+final class DefaultAsyncOverReactiveStreamingHttpClient extends DefaultAsyncOverReactiveHttpClient implements AsyncStreamingHttpClient {
 
     private final StreamingHttpClient streamingHttpClient;
 
     /**
      * @param streamingHttpClient The delegate client
      */
-    public DefaultAsyncOverReactiveStreamingHttpClient(StreamingHttpClient streamingHttpClient) {
+    DefaultAsyncOverReactiveStreamingHttpClient(StreamingHttpClient streamingHttpClient) {
         super(streamingHttpClient);
         this.streamingHttpClient = streamingHttpClient;
     }

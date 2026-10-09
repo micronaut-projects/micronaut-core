@@ -44,7 +44,7 @@ import java.util.function.Function;
 public final class ByteBodyElements<T> extends PulledBodyElements<T> implements Subscriber<ReadBuffer> {
 
     private final CloseableByteBody body;
-    private final PieceDecoder<T> decoder;
+    private final Function<ReadBuffer, List<T>> decoder;
     private final Function<Throwable, Throwable> wrap;
 
     // guarded by this
@@ -58,7 +58,7 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
      * @param decoder Decodes a piece of the body into the elements it completes
      * @param wrap    The failure of the elements, from a failure to read or decode the body
      */
-    public ByteBodyElements(CloseableByteBody body, PieceDecoder<T> decoder, Function<Throwable, Throwable> wrap) {
+    public ByteBodyElements(CloseableByteBody body, Function<ReadBuffer, List<T>> decoder, Function<Throwable, Throwable> wrap) {
         this.body = body;
         this.decoder = decoder;
         this.wrap = wrap;
@@ -152,7 +152,7 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
         }
         List<T> elements;
         try (piece) {
-            elements = decoder.decode(piece);
+            elements = decoder.apply(piece);
         } catch (Throwable e) {
             abort(e);
             return;
@@ -203,20 +203,4 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
         fail(wrap.apply(error));
     }
 
-    /**
-     * Decodes a piece of a body.
-     *
-     * @param <T> The type of an element
-     */
-    @FunctionalInterface
-    public interface PieceDecoder<T> {
-        /**
-         * Decode a piece. The piece is closed after the call.
-         *
-         * @param piece The piece
-         * @return The elements the piece completes
-         * @throws Exception If decoding fails
-         */
-        List<T> decode(ReadBuffer piece) throws Exception;
-    }
 }
