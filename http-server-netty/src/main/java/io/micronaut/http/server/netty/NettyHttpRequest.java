@@ -189,6 +189,10 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private Object legacyBody;
     @Nullable
     private List<Runnable> disposalResources;
+    /**
+     * Set once {@link #release()} ran. Guarded by {@code this}, like {@link #disposalResources}.
+     */
+    private boolean released;
     @Nullable
     private ParsedFormType parsedFormType;
 
@@ -406,8 +410,14 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         if (attributes != null) {
             attributes.forEach(NettyHttpRequest::cleanup);
         }
-        if (disposalResources != null) {
-            for (Runnable r : disposalResources) {
+        List<Runnable> toDispose;
+        synchronized (this) {
+            released = true;
+            toDispose = disposalResources;
+            disposalResources = null;
+        }
+        if (toDispose != null) {
+            for (Runnable r : toDispose) {
                 r.run();
             }
         }
@@ -794,11 +804,18 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     @Override
-    public synchronized void addDisposalResource(Runnable dispose) {
-        if (disposalResources == null) {
-            disposalResources = new ArrayList<>(1);
+    public void addDisposalResource(Runnable dispose) {
+        synchronized (this) {
+            if (!released) {
+                if (disposalResources == null) {
+                    disposalResources = new ArrayList<>(1);
+                }
+                disposalResources.add(dispose);
+                return;
+            }
         }
-        disposalResources.add(dispose);
+        // the request is already released, nobody would run this later
+        dispose.run();
     }
 
     private sealed interface FormType {
