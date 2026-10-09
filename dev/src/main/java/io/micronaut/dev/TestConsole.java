@@ -16,7 +16,6 @@
 package io.micronaut.dev;
 
 import io.micronaut.dev.test.TestRunSummary;
-import org.jspecify.annotations.NullMarked;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +31,6 @@ import java.util.Locale;
  * @author graemerocher
  * @since 5.3.0
  */
-@NullMarked
 final class TestConsole {
 
     private static final Logger LOG = LoggerFactory.getLogger(TestConsole.class);

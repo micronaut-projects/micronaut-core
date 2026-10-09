@@ -35,7 +35,6 @@ import io.micronaut.dev.test.TestRunStarted;
 import io.micronaut.dev.test.TestRunSummary;
 import io.micronaut.dev.test.TestRunner;
 import io.micronaut.dev.test.TestSelection;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,7 +69,6 @@ import java.util.concurrent.TimeoutException;
  * @author graemerocher
  * @since 5.3.0
  */
-@NullMarked
 final class TestSession {
 
     private static final Logger LOG = LoggerFactory.getLogger(TestSession.class);

@@ -16,7 +16,6 @@
 package io.micronaut.dev.manifest;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -37,7 +36,6 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public record TestSettings(String runner, boolean affectedOnly, boolean initialRun, boolean once, Path reports, List<String> patterns, Map<String, String> parameters) {
 
     /**
