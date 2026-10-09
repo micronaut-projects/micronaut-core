@@ -210,6 +210,111 @@ final class GraalPyContextFactoryTest {
         }
     }
 
+    @Test
+    void javaExceptionsAreCaughtByExceptException() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            Context context = applicationContext.getBean(Context.class);
+            context.getBindings(PYTHON).putMember("thrower", new Thrower());
+            context.eval(PYTHON, """
+                import java
+                Integer = java.type("java.lang.Integer")
+                NumberFormatException = java.type("java.lang.NumberFormatException")
+                IOException = java.type("java.io.IOException")
+
+                def outcome(action):
+                    try:
+                        try:
+                            action()
+                        except Exception:
+                            return "Exception"
+                    except BaseException:
+                        return "BaseException"
+                    return "none"
+
+                def raise_(error):
+                    raise error
+
+                def caught(action):
+                    try:
+                        action()
+                    except BaseException as e:
+                        return e
+                """);
+
+            // an unchecked exception of a Java call, a checked one, and one raised by Python code
+            assertEquals("Exception", context.eval(PYTHON, "outcome(lambda: Integer.parseInt('nope'))").asString());
+            assertEquals("Exception", context.eval(PYTHON, "outcome(lambda: thrower.ioException('unreachable'))").asString());
+            assertEquals("Exception", context.eval(PYTHON, "outcome(lambda: raise_(IOException('raised by Python')))").asString());
+            assertTrue(context.eval(PYTHON, "e = caught(lambda: Integer.parseInt('nope')); isinstance(e, Exception) and isinstance(e, BaseException)").asBoolean());
+            assertTrue(context.eval(PYTHON, "isinstance(e, NumberFormatException) and e.getMessage() == 'For input string: \"nope\"'").asBoolean(),
+                "the exception remains the Java exception");
+            assertTrue(context.eval(PYTHON, "'nope' in str(e)").asBoolean());
+            assertTrue(context.eval(PYTHON, "isinstance(IOException('constructed'), Exception)").asBoolean());
+            assertTrue(context.eval(PYTHON, "not isinstance(e, ValueError)").asBoolean(), "only Exception, not a specific Python error");
+
+            // a Java exception type still selects its except clause
+            assertEquals("IOException", context.eval(PYTHON, """
+                try:
+                    thrower.ioException('selected')
+                except NumberFormatException:
+                    selected = 'NumberFormatException'
+                except IOException:
+                    selected = 'IOException'
+                selected
+                """).asString());
+
+            // a java.lang.Error is a BaseException only, like KeyboardInterrupt, SystemExit and GeneratorExit
+            assertEquals("BaseException", context.eval(PYTHON, "outcome(lambda: thrower.error('fatal'))").asString());
+            assertTrue(context.eval(PYTHON, "e = caught(lambda: thrower.error('fatal')); isinstance(e, BaseException) and not isinstance(e, Exception)").asBoolean());
+            assertEquals("BaseException", context.eval(PYTHON, "outcome(lambda: raise_(KeyboardInterrupt()))").asString());
+            assertEquals("BaseException", context.eval(PYTHON, "outcome(lambda: raise_(SystemExit(1)))").asString());
+            assertEquals("BaseException", context.eval(PYTHON, "outcome(lambda: raise_(GeneratorExit()))").asString());
+
+            // the exception chains, and reaches Java as the host exception it is
+            assertTrue(context.eval(PYTHON, """
+                def wrap():
+                    try:
+                        Integer.parseInt('nope')
+                    except Exception as e:
+                        raise RuntimeError('wrapped') from e
+                w = caught(wrap)
+                isinstance(w, RuntimeError) and isinstance(w.__cause__, NumberFormatException)
+                """).asBoolean());
+            NumberFormatException rethrown = assertThrows(NumberFormatException.class, () -> context.eval(PYTHON, """
+                try:
+                    Integer.parseInt('nope')
+                except Exception:
+                    raise
+                """));
+            assertEquals("For input string: \"nope\"", rethrown.getMessage());
+
+            // pooled contexts are bootstrapped the same way
+            boolean pooled = applicationContext.getBean(PythonContextExecutor.class).withContext(pooledContext -> pooledContext.eval(PYTHON, """
+                import java
+                try:
+                    java.type("java.lang.Integer").parseInt("nope")
+                    result = False
+                except Exception:
+                    result = True
+                result
+                """).asBoolean());
+            assertTrue(pooled);
+        }
+    }
+
+    public static final class Thrower {
+        public void ioException(String message) throws IOException {
+            throw new IOException(message);
+        }
+
+        public void error(String message) {
+            throw new AssertionError(message);
+        }
+    }
+
     public static final class KeywordFactory {
         public KeywordBuilder builder() {
             return new KeywordBuilder();

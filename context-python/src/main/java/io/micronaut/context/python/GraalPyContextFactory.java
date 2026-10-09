@@ -103,6 +103,10 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * failed, retrying with the underscore stripped (the rule the compiler applies, {@code keyword.iskeyword},
      * so the same spelling works everywhere) and then asking the runtime for an inherited member.
      * <p>
+     * It makes every {@link Exception} an instance of the Python {@code Exception} class, so that
+     * {@code except Exception} catches the exceptions of Java calls ({@link Error}s remain only a
+     * {@code BaseException}, as GraalPy makes every foreign exception).
+     * <p>
      * It also makes every {@link java.util.concurrent.CompletionStage} and Reactive Streams publisher
      * awaitable, whichever Java call returned it (see {@link PythonAsyncioRuntime#awaitJava}).
      */
@@ -129,6 +133,14 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                     raise AttributeError(f"foreign object has no attribute '{name}'")
 
             register_interop_type(java.type('java.lang.Object'), MicronautJavaObject)
+
+            # GraalPy makes every Java throwable a BaseException only: a java.lang.Exception thrown by a Java call
+            # is also an Exception, so that `except Exception` catches it like any Python error, while a
+            # java.lang.Error stays out of reach of `except Exception`, as KeyboardInterrupt and SystemExit do
+            class MicronautJavaException(Exception):
+                __slots__ = ()
+
+            register_interop_type(java.type('java.lang.Exception'), MicronautJavaException)
 
             # a CompletionStage or Publisher any Java call returned (Mono.toFuture(), a static factory) is
             # awaitable like the value of an injected client
@@ -206,7 +218,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
     /**
      * Complete the members of the Java objects of a context: keyword-safe aliases, inherited public
-     * methods, and {@code await} on stages and publishers.
+     * methods, {@code await} on stages and publishers, and Java exceptions caught by {@code except Exception}.
      *
      * @param context The context
      */
@@ -403,7 +415,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 LOG.debug("GraalPy Context ID registered in {}ms", System.currentTimeMillis() - now);
             }
             // Before any application code runs: Java objects answer to keyword-safe member aliases and to
-            // the public methods GraalPy does not expose because a non-public superclass declares them
+            // the public methods GraalPy does not expose because a non-public superclass declares them, and
+            // their exceptions to `except Exception`
             now = System.currentTimeMillis();
             registerJavaObjectMembers(context);
             LOG.debug("GraalPy Java object members registered in {}ms", System.currentTimeMillis() - now);
