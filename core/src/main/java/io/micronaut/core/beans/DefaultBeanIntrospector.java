@@ -205,10 +205,12 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
         }
     }
 
+    /**
+     * Removes the entries of the loaders that see a changed one from a cache made with
+     * {@link Collections#synchronizedMap(Map)}, whose key set runs {@code removeIf} under the map's own lock.
+     */
     private static void removeSeeing(Map<ClassLoader, ?> cache, ClassLoader changed) {
-        synchronized (cache) {
-            cache.keySet().removeIf(loader -> sees(loader, changed));
-        }
+        cache.keySet().removeIf(loader -> sees(loader, changed));
     }
 
     /**
