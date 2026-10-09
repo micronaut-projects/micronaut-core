@@ -18,6 +18,8 @@ package io.micronaut.context.watch;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
+import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.NullMarked;
 
 import java.util.Objects;
@@ -45,6 +47,48 @@ final class MetadataComparison {
             // a composed annotation's stereotypes carry values of their own, such as the fixedDelay of the
             // @Scheduled a @Poll annotation is meta-annotated with, which change while the annotation stays
             && sameValues(before.getStereotypeAnnotationNames(), before, after.getStereotypeAnnotationNames(), after);
+    }
+
+    /**
+     * Whether two generations of a method carry the same annotations: on the method, on each parameter and on
+     * its return type, type arguments included.
+     *
+     * @param before The retired method
+     * @param after The replacement
+     * @return True if nothing an annotation of the method, its parameters or its return type says differs
+     */
+    static boolean sameMethod(ExecutableMethod<?, ?> before, ExecutableMethod<?, ?> after) {
+        if (!same(before.getAnnotationMetadata(), after.getAnnotationMetadata())) {
+            return false;
+        }
+        Argument<?>[] previous = before.getArguments();
+        Argument<?>[] current = after.getArguments();
+        if (previous.length != current.length) {
+            return false;
+        }
+        for (int i = 0; i < previous.length; i++) {
+            if (!sameArgument(previous[i], current[i])) {
+                return false;
+            }
+        }
+        return sameArgument(before.getReturnType().asArgument(), after.getReturnType().asArgument());
+    }
+
+    private static boolean sameArgument(Argument<?> before, Argument<?> after) {
+        if (!same(before.getAnnotationMetadata(), after.getAnnotationMetadata())) {
+            return false;
+        }
+        Argument<?>[] previous = before.getTypeParameters();
+        Argument<?>[] current = after.getTypeParameters();
+        if (previous.length != current.length) {
+            return false;
+        }
+        for (int i = 0; i < previous.length; i++) {
+            if (!sameArgument(previous[i], current[i])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean sameValues(Set<String> names, AnnotationMetadata before, Set<String> afterNames, AnnotationMetadata after) {

@@ -186,10 +186,16 @@ public final class ExecutableMethodChange<A extends Annotation> {
     public record Replacement<A extends Annotation>(Entry<A> before, Entry<A> after) {
 
         /**
-         * @return Whether the annotations of the method and its bean are the same in both generations: only bodies changed
+         * Whether the annotations are the same in both generations: those of the method, of each of its
+         * parameters and of its return type, type arguments included, and those of its bean, stereotypes and
+         * their values included. This compares annotations only: a change of structure with the same
+         * annotations, such as another return type, another generic argument or another injection point,
+         * is not reported here, and a caller that derives state from structure compares that itself.
+         *
+         * @return Whether the annotations of the method, its parameters, its return type and its bean are the same
          */
         public boolean metadataUnchanged() {
-            return MetadataComparison.same(before.method().getAnnotationMetadata(), after.method().getAnnotationMetadata())
+            return MetadataComparison.sameMethod(before.method(), after.method())
                 && MetadataComparison.same(before.definition().getAnnotationMetadata(), after.definition().getAnnotationMetadata());
         }
     }

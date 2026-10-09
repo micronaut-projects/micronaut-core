@@ -143,7 +143,7 @@ class BeanWatchTest {
     }
 
     @Test
-    void aMethodWatchSeesTheAnnotatedMethodsPairsAMethodThatComesBackAndKnowsWhenOnlyTheBodyChanged() {
+    void aMethodWatchSeesTheAnnotatedMethodsPairsAMethodThatComesBackAndKnowsItsAnnotationsAreUnchanged() {
         try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
             List<ExecutableMethodChange<Tick>> changes = new ArrayList<>();
             ((WatchableBeanContext) context).watchMethods(Tick.class, changes::add);

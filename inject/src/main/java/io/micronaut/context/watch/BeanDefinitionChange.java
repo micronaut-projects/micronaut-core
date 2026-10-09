@@ -155,7 +155,12 @@ public final class BeanDefinitionChange<T> {
     public record Replacement<T>(BeanDefinition<T> before, BeanDefinition<T> after) {
 
         /**
-         * @return Whether the annotations of the bean are the same in both generations: only bodies changed
+         * Whether the annotations of the bean are the same in both generations, stereotypes and their values
+         * included. This compares annotations only: a change of structure with the same annotations, such as
+         * another constructor, injection point or exposed type, is not reported here, and a caller that derives
+         * state from structure compares that itself.
+         *
+         * @return Whether the annotations of the bean are the same
          */
         public boolean metadataUnchanged() {
             return MetadataComparison.same(before.getAnnotationMetadata(), after.getAnnotationMetadata());
