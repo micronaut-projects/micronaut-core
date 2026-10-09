@@ -16,6 +16,7 @@
 package io.micronaut.http.netty.stream;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.reactive.HandlerPublisher;
@@ -27,6 +28,7 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpMessage;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -179,6 +181,18 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
      * @param ctx The channel handler context
      */
     protected void sentOutMessage(ChannelHandlerContext ctx) {
+    }
+
+    /**
+     * Invoked when the body of an incoming message could not be decoded, e.g. because of a
+     * malformed chunk. The decoder discards all further input, so the connection cannot be
+     * reused.
+     * <p>
+     * Overridden by the server subclass to close the connection once the response is written.
+     *
+     * @param ctx The channel handler context
+     */
+    protected void contentDecoderFailed(ChannelHandlerContext ctx) {
     }
 
     /**
@@ -346,6 +360,10 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     }
 
     private void handleReadHttpContent(ChannelHandlerContext ctx, HttpContent content) {
+        if (!isClient() && content instanceof LastHttpContent && content.decoderResult().isFailure()) {
+            handleContentDecoderFailure(ctx, content);
+            return;
+        }
         if (!ignoreBodyRead) {
             ChannelHandler bodyPublisher = ctx.pipeline().get(HANDLER_BODY_PUBLISHER);
             if (bodyPublisher != null) {
@@ -368,6 +386,42 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                 currentlyStreamedMessage = null;
             }
             ctx.read();
+        }
+    }
+
+    /**
+     * The HTTP decoder could not parse the body, e.g. because of a malformed chunk header or
+     * trailer. It ends the body with an empty {@link LastHttpContent} whose decoder result is a
+     * failure. Fail the body instead of completing it, so that a truncated body is not handled as
+     * a complete one, and close the connection after the response.
+     *
+     * @param ctx     The channel handler context
+     * @param content The failed last content, released by this method
+     */
+    private void handleContentDecoderFailure(ChannelHandlerContext ctx, HttpContent content) {
+        Throwable cause = content.decoderResult().cause();
+        ReferenceCountUtil.release(content);
+        contentDecoderFailed(ctx);
+        if (!ignoreBodyRead) {
+            ChannelHandlerContext publisherCtx = ctx.pipeline().context(HANDLER_BODY_PUBLISHER);
+            if (publisherCtx != null && publisherCtx.handler() instanceof HandlerPublisher) {
+                // same status mapping as for request-level decoder failures
+                HttpStatus status = cause instanceof TooLongFrameException ? HttpStatus.REQUEST_ENTITY_TOO_LARGE : HttpStatus.BAD_REQUEST;
+                HttpStatusException failure = new HttpStatusException(status, "Malformed request body");
+                failure.initCause(cause);
+                ((HandlerPublisher<?>) publisherCtx.handler()).exceptionCaught(publisherCtx, failure);
+            }
+            if (currentlyStreamedMessage != null) {
+                currentlyStreamedMessage = null;
+                removeHandlerIfActive(ctx, HANDLER_BODY_PUBLISHER);
+                consumedInMessage(ctx);
+            }
+        } else {
+            ignoreBodyRead = false;
+            if (currentlyStreamedMessage != null) {
+                removeHandlerIfActive(ctx, HANDLER_BODY_PUBLISHER);
+            }
+            currentlyStreamedMessage = null;
         }
     }
 

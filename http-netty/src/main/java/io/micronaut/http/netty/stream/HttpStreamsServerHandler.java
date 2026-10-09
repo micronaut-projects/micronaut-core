@@ -65,6 +65,11 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
     private boolean continueExpected = true;
     private boolean sendContinue = false;
     private boolean close = false;
+    /**
+     * Whether the body of the current request could not be decoded: its response must close the
+     * connection.
+     */
+    private boolean closeAfterDecoderFailure = false;
 
     private final List<ChannelHandler> dependentHandlers;
 
@@ -154,6 +159,19 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
     }
 
     @Override
+    protected void contentDecoderFailed(ChannelHandlerContext ctx) {
+        // the decoder discards all further input, so the connection cannot be reused
+        if (inFlight > 0) {
+            // close once the response to the current request is written
+            closeAfterDecoderFailure = true;
+            close = true;
+        } else {
+            // the response was already written
+            ctx.close();
+        }
+    }
+
+    @Override
     protected void unbufferedWrite(ChannelHandlerContext ctx, HttpResponse message, ChannelPromise promise) {
 
         if (message instanceof WebSocketHttpResponse) {
@@ -174,6 +192,10 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
                 if (!message.headers().contains(HttpHeaderNames.CONNECTION, "keep-alive", true)) {
                     close = true;
                 }
+            }
+            if (closeAfterDecoderFailure) {
+                HttpUtil.setKeepAlive(message, false);
+                close = true;
             }
             if (inFlight == 1 && continueExpected) {
                 HttpUtil.setKeepAlive(message, false);

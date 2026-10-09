@@ -39,10 +39,12 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpMessage;
+import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
 import io.netty.handler.codec.http2.DefaultHttp2Connection;
@@ -74,6 +76,7 @@ import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -300,7 +303,7 @@ final class HttpPipelineBuilder {
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_KEEP_ALIVE, new HttpServerKeepAliveHandler());
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy()));
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR,
-                    new HttpContentDecompressor(maxDecompressionAllocation()));
+                    new FailurePreservingHttpContentDecompressor(maxDecompressionAllocation()));
 
             insertMicronautHandlers();
         }
@@ -514,6 +517,28 @@ final class HttpPipelineBuilder {
                     server.getServerConfiguration().isValidateHeaders(),
                     server.getServerConfiguration().getInitialBufferSize()
             );
+        }
+    }
+
+    /**
+     * A decompressor that passes on a last content whose decoder result is a failure (e.g. a
+     * malformed chunk), so that the request body is failed instead of completed.
+     * {@link HttpContentDecompressor} would replace it with a successful last content. The
+     * connection is closed after such a failure, the decompression state is cleaned up then.
+     */
+    private static final class FailurePreservingHttpContentDecompressor extends HttpContentDecompressor {
+        FailurePreservingHttpContentDecompressor(int maxAllocation) {
+            super(maxAllocation);
+        }
+
+        @Override
+        protected void decode(ChannelHandlerContext ctx, HttpObject msg, List<Object> out) throws Exception {
+            if (msg instanceof LastHttpContent && !(msg instanceof HttpMessage) && msg.decoderResult().isFailure()) {
+                // msg is released by the superclass after decode
+                out.add(ReferenceCountUtil.retain(msg));
+                return;
+            }
+            super.decode(ctx, msg, out);
         }
     }
 }
