@@ -20,10 +20,13 @@ import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.scheduler.Schedulers;
 
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -32,6 +35,14 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ReactorInteropTest {
+    @Test
+    void preservesReactorNonBlockingThreadDetection() throws Exception {
+        assertEquals(Schedulers.isInNonBlockingThread(), ReactorInterop.isInNonBlockingThread());
+        CompletableFuture<Boolean> detected = new CompletableFuture<>();
+        Schedulers.parallel().schedule(() -> detected.complete(ReactorInterop.isInNonBlockingThread()));
+        assertEquals(true, detected.get(10, TimeUnit.SECONDS));
+    }
+
     @Test
     void subscribesToPlainPublisherWithoutReactor() throws Exception {
         AtomicInteger received = new AtomicInteger();
@@ -81,6 +92,7 @@ class ReactorInteropTest {
         try (URLClassLoader loader = new ReactorHidingClassLoader()) {
             assertThrows(ClassNotFoundException.class, () -> loader.loadClass("reactor.core.CorePublisher"));
             Class<?> interop = loader.loadClass(ReactorInterop.class.getName());
+            assertEquals(false, interop.getMethod("isInNonBlockingThread").invoke(null));
             assertSame(loader, interop.getClassLoader());
             interop.getMethod("subscribe", Publisher.class, Subscriber.class, Supplier.class, Consumer.class)
                 .invoke(null, source, subscriber, null, null);

@@ -21,6 +21,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.CorePublisher;
+import reactor.core.scheduler.Schedulers;
 import reactor.core.CoreSubscriber;
 import reactor.core.publisher.Operators;
 import reactor.util.context.Context;
@@ -42,6 +43,16 @@ public final class ReactorInterop {
     private static final boolean REACTOR_PRESENT = reactorType() != null;
 
     private ReactorInterop() {
+    }
+
+    /**
+     * Preserve Reactor's non-blocking-thread rules without requiring Reactor for native bodies.
+     * This includes predicates registered with Reactor, not just its thread marker interface.
+     *
+     * @return Whether Reactor forbids blocking on the current thread
+     */
+    public static boolean isInNonBlockingThread() {
+        return REACTOR_PRESENT && Schedulers.isInNonBlockingThread();
     }
 
     private static @Nullable Class<?> reactorType() {
