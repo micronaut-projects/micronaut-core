@@ -32,8 +32,9 @@ import java.util.function.Supplier;
 /**
  * Interop with Reactor sources, the only place the publishers of bodies refer to Reactor: a
  * Reactor source is subscribed to with the Reactor context of the downstream subscriber, and with
- * a discard hook, so that it releases the items it drops when it is cancelled. Any other source
- * is subscribed to directly, without a wrapper. Reactor operators are not used.
+ * a discard hook, so that it releases the items it drops when it is cancelled. Delegating sources
+ * also receive that context when a hook is needed, because they may hide a Reactor source.
+ * Without Reactor, sources are subscribed to directly. Reactor operators are not used.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -82,7 +83,9 @@ public final class ReactorInterop {
                                      @Nullable Consumer<Object> discard) {
         // Resolve Reactor types only when the optional library is available. A native
         // publisher used by an async form decoder must also work without Reactor.
-        if (REACTOR_PRESENT && source instanceof CorePublisher<?>) {
+        // A delegating native publisher may subscribe to a Reactor source internally. Pass the
+        // subscriber context/discard hook across that boundary, not just direct CorePublishers.
+        if (REACTOR_PRESENT && (source instanceof CorePublisher<?> || downstream != null || discard != null)) {
             source.subscribe(new ContextSubscriber<>(subscriber, downstream, discard));
         } else {
             source.subscribe(subscriber);
