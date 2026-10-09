@@ -33,8 +33,12 @@ import java.nio.file.StandardWatchEventKinds
 import java.nio.file.WatchEvent
 import java.time.Duration
 import java.nio.file.ClosedWatchServiceException
+import java.nio.file.WatchKey
 import java.nio.file.WatchService
+import java.nio.file.Watchable
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -526,6 +530,62 @@ class DirectoryWatcherSpec extends Specification {
         asyncCalls.get() == 1
     }
 
+    void "changes recorded from a key that became invalid are delivered before its directory is released"() {
+        given: "a controlled service and a registration of java sources"
+        Path src = Files.createDirectories(root.resolve("src"))
+        ControlledWatchService service = new ControlledWatchService()
+        DirectoryWatcher controlled = controlledWatcher(service)
+        List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
+        controlled.directory(root).include("**/*.java").watch(batches::add)
+        Path deleted = src.resolve("Main.java").toAbsolutePath().normalize()
+
+        when: "the source is deleted with its directory, so that the key cannot be reset"
+        service.signal(src, false, event(StandardWatchEventKinds.ENTRY_DELETE, Path.of("Main.java")))
+
+        then: "the deletion is still delivered, and the directory is released"
+        conditions.eventually {
+            assert batches.size() == 1
+        }
+        batches[0].changes() == [new FileChange(deleted, WatchEventType.DELETE)]
+        !controlled.watchedDirectories().contains(src.toAbsolutePath().normalize())
+
+        cleanup:
+        controlled.close()
+    }
+
+    void "a registration made while a change is pending is not merged with what it never saw: #later"() {
+        given: "a controlled service with a long quiet period and a first registration"
+        ControlledWatchService service = new ControlledWatchService()
+        DirectoryWatcher controlled = controlledWatcher(service)
+        List<FileChangeBatch> before = new CopyOnWriteArrayList<>()
+        List<FileChangeBatch> after = new CopyOnWriteArrayList<>()
+        controlled.directory(root).watch(before::add)
+        Path file = root.resolve("a.txt").toAbsolutePath().normalize()
+
+        when: "a file is created, then a second registration is made, then the file changes again within the quiet period"
+        service.signalAndWait(root, true, event(StandardWatchEventKinds.ENTRY_CREATE, Path.of("a.txt")))
+        controlled.directory(root).watch(after::add)
+        service.signalAndWait(root, true, event(later, Path.of("a.txt")))
+
+        then: "the second registration receives the later change as it happened"
+        conditions.eventually {
+            assert after.size() == 1
+        }
+        after[0].changes() == [new FileChange(file, WatchEventType.of(later))]
+
+        and: "the first one receives the changes merged"
+        Thread.sleep(300)
+        before.collectMany { it.changes() } == (expectedBefore == null ? [] : [new FileChange(file, expectedBefore)])
+
+        cleanup:
+        controlled.close()
+
+        where:
+        later                               | expectedBefore
+        StandardWatchEventKinds.ENTRY_DELETE | null
+        StandardWatchEventKinds.ENTRY_MODIFY | WatchEventType.CREATE
+    }
+
     void "a builder without a service creates and closes one of the default file system"() {
         given:
         DirectoryWatcher own = DirectoryWatcher.builder().build()
@@ -602,5 +662,141 @@ class DirectoryWatcherSpec extends Specification {
         } catch (Throwable ignored) {
         }
         return high == null ? dir.register(service, kinds) : dir.register(service, kinds, high)
+    }
+
+    private static DirectoryWatcher controlledWatcher(ControlledWatchService service) {
+        return DirectoryWatcher.builder(service)
+            .registrar({ Path dir, WatchService s -> ((ControlledWatchService) s).register(dir) } as DirectoryWatcher.WatchKeyRegistrar)
+            .checkInterval(Duration.ofMillis(20))
+            .quietPeriod(Duration.ofMillis(400))
+            .build()
+            .start()
+    }
+
+    private static WatchEvent<Path> event(WatchEvent.Kind<Path> kind, Path context) {
+        return new WatchEvent<Path>() {
+            @Override
+            WatchEvent.Kind<Path> kind() {
+                return kind
+            }
+
+            @Override
+            int count() {
+                return 1
+            }
+
+            @Override
+            Path context() {
+                return context
+            }
+        }
+    }
+
+    /**
+     * A watch service whose keys are signalled by the spec, with the events it chooses.
+     */
+    static class ControlledWatchService implements WatchService {
+        final LinkedBlockingQueue<ControlledKey> signalled = new LinkedBlockingQueue<>()
+        final Map<Path, ControlledKey> keys = new ConcurrentHashMap<>()
+        volatile boolean closed
+
+        WatchKey register(Path dir) {
+            return keys.computeIfAbsent(dir.toAbsolutePath().normalize(), { Path p -> new ControlledKey(p) })
+        }
+
+        void signal(Path dir, boolean resettable, WatchEvent<?>... events) {
+            ControlledKey key = keys.get(dir.toAbsolutePath().normalize())
+            assert key != null
+            key.offer(resettable, events)
+            signalled.add(key)
+        }
+
+        /**
+         * Signals the key and waits until the watcher recorded its events, which it has once it reset the key.
+         */
+        void signalAndWait(Path dir, boolean resettable, WatchEvent<?>... events) {
+            ControlledKey key = keys.get(dir.toAbsolutePath().normalize())
+            int resets = key.resets.get()
+            signal(dir, resettable, events)
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+            while (key.resets.get() == resets) {
+                assert System.nanoTime() < deadline
+                Thread.sleep(5)
+            }
+        }
+
+        @Override
+        void close() {
+            closed = true
+        }
+
+        @Override
+        WatchKey poll() {
+            if (closed) {
+                throw new ClosedWatchServiceException()
+            }
+            return signalled.poll()
+        }
+
+        @Override
+        WatchKey poll(long timeout, TimeUnit unit) {
+            if (closed) {
+                throw new ClosedWatchServiceException()
+            }
+            return signalled.poll(timeout, unit)
+        }
+
+        @Override
+        WatchKey take() {
+            return signalled.take()
+        }
+    }
+
+    static class ControlledKey implements WatchKey {
+        final Path dir
+        final List<WatchEvent<?>> events = []
+        final AtomicInteger resets = new AtomicInteger()
+        volatile boolean resettable = true
+        volatile boolean valid = true
+
+        ControlledKey(Path dir) {
+            this.dir = dir
+        }
+
+        synchronized void offer(boolean resettable, WatchEvent<?>... offered) {
+            this.resettable = resettable
+            events.addAll(offered)
+        }
+
+        @Override
+        boolean isValid() {
+            return valid
+        }
+
+        @Override
+        synchronized List<WatchEvent<?>> pollEvents() {
+            List<WatchEvent<?>> polled = List.copyOf(events)
+            events.clear()
+            return polled
+        }
+
+        @Override
+        boolean reset() {
+            if (!resettable) {
+                valid = false
+            }
+            resets.incrementAndGet()
+            return valid
+        }
+
+        @Override
+        void cancel() {
+            valid = false
+        }
+
+        @Override
+        Watchable watchable() {
+            return dir
+        }
     }
 }

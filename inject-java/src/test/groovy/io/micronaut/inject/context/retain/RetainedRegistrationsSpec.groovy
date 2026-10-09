@@ -287,7 +287,7 @@ class RetainedRegistrationsSpec extends Specification {
 
         when: "both are retained, the member first, as the destruction order puts a bean before what it holds"
         def retained = ((DefaultBeanContext) first).stopRetaining { it.bean.is(reader) || it.bean.is(feed) }
-            .sort(false) { it.bean instanceof FeedReader ? 0 : 1 }
+            .toSorted { it.bean instanceof FeedReader ? 0 : 1 }
         ApplicationContext second = ApplicationContext.builder()
             .properties('spec.name': 'RetainedRegistrationsSpec')
             .beanDependencyTrackingEnabled(true)
@@ -306,7 +306,9 @@ class RetainedRegistrationsSpec extends Specification {
     }
 
     static class CountingTask implements Runnable, java.util.concurrent.Callable<String> {
-        void run() {}
+        void run() {
+            // registered only to be found under two types; the spec never runs it
+        }
         String call() { "called" }
     }
 
@@ -326,6 +328,26 @@ class RetainedRegistrationsSpec extends Specification {
         then: "the provider holder and the bean holding it are destroyed, the plain bean is retained"
         retained*.bean*.getClass() == [Helper]
         LazyHolder.DESTROYED.get() == 1
+    }
+
+    void "a bean holding a provider with no candidate is not retained"() {
+        given:
+        EmptyProviderHolder.DESTROYED.set(0)
+        ApplicationContext first = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec')
+            .beanDependencyTrackingEnabled(true)
+            .start()
+        EmptyProviderHolder holder = first.getBean(EmptyProviderHolder)
+
+        expect: "the provider is valid but resolves nothing"
+        !holder.absent.isPresent()
+
+        when: "the predicate accepts it"
+        def retained = ((DefaultBeanContext) first).stopRetaining { it.beanType == EmptyProviderHolder }
+
+        then: "it is destroyed, since its provider resolves through the stopped context"
+        retained.isEmpty()
+        EmptyProviderHolder.DESTROYED.get() == 1
     }
 
     void "stopping without retention destroys everything as before"() {

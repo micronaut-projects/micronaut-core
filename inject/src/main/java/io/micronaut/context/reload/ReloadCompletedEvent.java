@@ -42,8 +42,8 @@ import java.util.Objects;
 public final class ReloadCompletedEvent extends ApplicationEvent {
 
     private final ClassChangeEvent change;
-    private final Collection<BeanDefinition<?>> addedDefinitions;
-    private final Collection<BeanDefinition<?>> removedDefinitions;
+    private final transient Collection<BeanDefinition<?>> addedDefinitions;
+    private final transient Collection<BeanDefinition<?>> removedDefinitions;
     private final Duration elapsed;
 
     /**

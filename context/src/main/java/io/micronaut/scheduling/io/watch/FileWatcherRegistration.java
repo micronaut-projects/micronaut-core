@@ -44,7 +44,8 @@ public interface FileWatcherRegistration extends AutoCloseable {
     /**
      * Closes the registration. Once the method returned the listener is not called again, even when a stage it
      * returned is still pending; unless the method is called from the listener itself, it waits for a call of the
-     * listener under way to return.
+     * listener under way to return, unless the calling thread is interrupted, which stops the wait and leaves the
+     * thread's interrupt flag set.
      */
     @Override
     void close();

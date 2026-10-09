@@ -218,6 +218,29 @@ class BeanDependencyGraphSpec extends Specification {
         context.close()
     }
 
+    void "a prototype receiving the same bean twice forgets the edge once it is destroyed"() {
+        given:
+        ApplicationContext context = ApplicationContext.builder()
+            .properties('spec.name': 'BeanDependencyGraphSpec')
+            .beanDependencyTrackingEnabled(true)
+            .start()
+        BeanDependencyGraph graph = context.findDependencyGraph().get()
+        def definition = context.getBeanDefinition(TwiceReceivingPrototype)
+
+        when: "the only instance, which received the repository at two constructor arguments, is destroyed"
+        def prototype = context.createBean(TwiceReceivingPrototype)
+        def recorded = graph.dependenciesOf(definition)*.dependency()*.beanType
+        context.destroyBean(prototype)
+
+        then: "the one edge it recorded goes with it"
+        recorded == [Repo]
+        graph.dependenciesOf(definition).isEmpty()
+        !graph.dependentsOf(context.getBeanDefinition(Repo)).any { it.dependent().beanType == TwiceReceivingPrototype }
+
+        cleanup:
+        context.close()
+    }
+
     private static BeanDependencyGraph.BeanDependency edge(Collection<BeanDependencyGraph.BeanDependency> edges, Class<?> dependent) {
         def edge = edges.find { it.dependent().beanType == dependent }
         assert edge != null : "no dependency recorded for $dependent in $edges"
