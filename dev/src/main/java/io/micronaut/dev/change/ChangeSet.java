@@ -17,7 +17,6 @@ package io.micronaut.dev.change;
 
 import io.micronaut.context.reload.ClassChange;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 import java.util.List;
 import java.util.Objects;
@@ -33,7 +32,6 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public record ChangeSet(List<ClassChange> classes, Set<String> changedResources, Set<String> removedResources) {
 
     /**

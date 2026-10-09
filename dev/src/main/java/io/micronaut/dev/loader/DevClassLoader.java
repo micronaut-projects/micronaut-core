@@ -18,7 +18,6 @@ package io.micronaut.dev.loader;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.beans.ReloadableBeanIntrospector;
 import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -57,7 +56,6 @@ import java.util.concurrent.atomic.AtomicReference;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class DevClassLoader extends ClassLoader {
 
     static {

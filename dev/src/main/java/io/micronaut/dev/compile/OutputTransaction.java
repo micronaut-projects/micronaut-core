@@ -15,7 +15,6 @@
  */
 package io.micronaut.dev.compile;
 
-import org.jspecify.annotations.NullMarked;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +44,6 @@ import java.util.stream.Stream;
  * @author graemerocher
  * @since 5.3.0
  */
-@NullMarked
 final class OutputTransaction {
 
     private static final Logger LOG = LoggerFactory.getLogger(OutputTransaction.class);

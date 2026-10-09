@@ -17,7 +17,6 @@ package io.micronaut.scheduling.io.watch;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.scheduling.io.watch.event.WatchEventType;
-import org.jspecify.annotations.NullMarked;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -32,7 +31,6 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public record FileChangeBatch(Path root, List<FileChange> changes) {
 
     /**

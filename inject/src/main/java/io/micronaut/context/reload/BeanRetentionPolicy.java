@@ -19,7 +19,6 @@ import io.micronaut.context.BeanDependencyGraph;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
-import org.jspecify.annotations.NullMarked;
 
 import java.util.Set;
 
@@ -39,7 +38,6 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public interface BeanRetentionPolicy extends Ordered {
 
     /**

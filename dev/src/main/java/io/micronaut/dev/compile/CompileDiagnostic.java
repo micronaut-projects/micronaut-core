@@ -16,7 +16,6 @@
 package io.micronaut.dev.compile;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
@@ -34,7 +33,6 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public record CompileDiagnostic(Severity severity, String message, @Nullable Path file, long line, long column) {
 
     /**

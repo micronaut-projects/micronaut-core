@@ -16,7 +16,6 @@
 package io.micronaut.dev.compile;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 import java.io.Closeable;
 import java.util.Set;
@@ -34,7 +33,6 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public interface SourceCompiler extends Closeable {
 
     /**

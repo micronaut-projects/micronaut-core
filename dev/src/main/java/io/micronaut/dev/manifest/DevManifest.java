@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.dev.compile.CompileMode;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -76,7 +75,6 @@ import java.util.Properties;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class DevManifest {
 
     /**

@@ -4610,9 +4610,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * responsible for retaining only beans whose classes and dependencies are not being replaced, which
      * the {@link BeanDependencyGraph} tells it. When the graph is recorded, the singletons a retained bean
      * holds are retained with it, since it keeps them anyway, and a bean is not retained at all when it or
-     * one of them is a proxy or holds a {@link BeanProvider}, a {@code Provider}, a proxy, the context, its
-     * environment, its event publisher or its conversion service, because those would keep resolving
-     * through this stopped context; without the graph the predicate answers for all of that.
+     * one of them is a proxy or a {@link CustomScope}, or holds a {@link BeanProvider}, a {@code Provider}, a proxy,
+     * the context, its environment, its event publisher or its conversion service, because those would keep resolving
+     * through this stopped context, or keep the instances its scopes created; without the graph the predicate answers
+     * for all of that.
      * When the graph is recorded, a bean that a {@link io.micronaut.context.event.BeanCreatedEventListener} replaced,
      * by a wrapper that may hold this context, is retained as the listeners received it; the wrapper is dropped, neither
      * destroyed nor announced. The adopting context runs its own listeners on every retained bean, as the bean's
@@ -5655,7 +5656,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             BeanRegistration<?> bound = collectRetentionClosure(registration, invalidatedBy, closure, Collections.newSetFromMap(new IdentityHashMap<>()));
             if (bound != null) {
                 if (LOG_LIFECYCLE.isWarnEnabled()) {
-                    LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: {} holds a provider, a proxy or the context, which are bound to this context",
+                    LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: {} holds a provider, a proxy, a scope or the context, which are bound to this context",
                         registration.bean, bound == registration ? "it" : "the bean [" + bound.bean + "] it holds");
                 }
                 continue;
@@ -5863,10 +5864,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
 
     /**
      * Whether a type is one the context owns an instance of per context: the context itself and what it
-     * registers or hands out for itself, which is stopped or discarded with it.
+     * registers or hands out for itself, which is stopped or discarded with it, and a custom scope, which holds the
+     * instances created in this context and is what the scoped proxies of this context resolve through.
      */
     private static boolean isContextOwnedType(Class<?> type) {
         return BeanLocator.class.isAssignableFrom(type)
+            || CustomScope.class.isAssignableFrom(type)
             || PropertyResolver.class.isAssignableFrom(type)
             || ApplicationEventPublisher.class.isAssignableFrom(type)
             || ConversionService.class.isAssignableFrom(type)
@@ -5876,6 +5879,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
 
     private boolean isContextOwned(@Nullable Object bean) {
         return bean == this
+            || bean instanceof CustomScope<?>
             || bean instanceof PropertyResolver
             || bean instanceof ApplicationEventPublisher
             || bean instanceof ConversionService

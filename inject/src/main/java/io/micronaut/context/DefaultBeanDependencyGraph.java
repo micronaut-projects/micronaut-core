@@ -24,7 +24,6 @@ import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
 import io.micronaut.inject.qualifiers.AnyQualifier;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
@@ -52,7 +51,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @since 5.3.0
  */
 @Internal
-@NullMarked
 final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
 
     private final Map<Key, Set<BeanDependency>> byDependent = new ConcurrentHashMap<>();
