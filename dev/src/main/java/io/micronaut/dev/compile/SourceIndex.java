@@ -15,7 +15,6 @@
  */
 package io.micronaut.dev.compile;
 
-import org.jspecify.annotations.NullMarked;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,7 +42,6 @@ import java.util.stream.Stream;
  * @author graemerocher
  * @since 5.3.0
  */
-@NullMarked
 final class SourceIndex {
 
     /**

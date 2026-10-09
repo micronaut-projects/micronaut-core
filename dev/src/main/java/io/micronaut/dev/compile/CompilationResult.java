@@ -16,7 +16,6 @@
 package io.micronaut.dev.compile;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 import java.nio.file.Path;
 import java.time.Duration;
@@ -36,7 +35,6 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public record CompilationResult(Status status,
                                 List<CompileDiagnostic> diagnostics,
                                 Set<Path> compiledSources,

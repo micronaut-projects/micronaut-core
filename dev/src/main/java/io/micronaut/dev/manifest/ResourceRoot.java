@@ -17,7 +17,6 @@ package io.micronaut.dev.manifest;
 
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 import java.nio.file.Path;
 import java.util.Objects;
@@ -31,7 +30,6 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public record ResourceRoot(ResourceKind kind, Path path) {
 
     /**

@@ -16,7 +16,6 @@
 package io.micronaut.dev.loader;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +51,6 @@ import java.util.stream.Stream;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class GenerationClassLoader extends URLClassLoader {
 
     private static final Logger LOG = LoggerFactory.getLogger(GenerationClassLoader.class);

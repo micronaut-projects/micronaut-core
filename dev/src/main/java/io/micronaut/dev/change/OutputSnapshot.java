@@ -17,7 +17,6 @@ package io.micronaut.dev.change;
 
 import io.micronaut.context.reload.ClassChange;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -43,7 +42,6 @@ import java.util.stream.Stream;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class OutputSnapshot {
 
     private final Map<String, byte[]> classes;
