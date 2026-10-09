@@ -24,6 +24,7 @@ public class AsPublisherVerificationTest extends PublisherVerification<ReadBuffe
         ByteBodyFactory.StreamingBody body = FACTORY.createStreamingBody(BodySizeLimits.UNLIMITED, new BufferConsumer.Upstream() {
             @Override
             public void onBytesConsumed(long bytesConsumed) {
+                // The finite TCK fixture has already supplied all bytes; no producer needs demand.
             }
         });
         Publisher<ReadBuffer> publisher = body.rootBody().toReadBufferPublisher();
@@ -39,6 +40,7 @@ public class AsPublisherVerificationTest extends PublisherVerification<ReadBuffe
         ByteBodyFactory.StreamingBody body = FACTORY.createStreamingBody(BodySizeLimits.UNLIMITED, new BufferConsumer.Upstream() {
             @Override
             public void onBytesConsumed(long bytesConsumed) {
+                // The failed TCK fixture has no producer to notify about consumption.
             }
         });
         Publisher<ReadBuffer> publisher = body.rootBody().toReadBufferPublisher();

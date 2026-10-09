@@ -719,6 +719,7 @@ public final class BodyPublishers {
          * Runs when the subscriber subscribes, before it gets its subscription.
          */
         protected void onSubscribing() {
+            // Optional subclass hook; the base publisher needs no subscription setup.
         }
 
         /**
@@ -727,12 +728,14 @@ public final class BodyPublishers {
          * @param item The item
          */
         protected void beforeNext(T item) {
+            // Optional subclass hook; the base publisher forwards items without preprocessing.
         }
 
         /**
          * Runs before the failure of the items is delivered.
          */
         protected void beforeError() {
+            // Optional subclass hook; the base publisher has no failure-specific cleanup.
         }
 
         /**
@@ -742,12 +745,14 @@ public final class BodyPublishers {
          * @param item The item
          */
         protected void discard(T item) {
+            // Subclasses owning resources override this; ordinary values need no release.
         }
 
         /**
          * Runs once, when the subscriber cancels or makes a request for no items.
          */
         protected void onCancelled() {
+            // Optional subclass hook; the base publisher has no external source to cancel.
         }
 
         /**

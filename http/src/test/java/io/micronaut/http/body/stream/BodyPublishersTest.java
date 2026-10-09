@@ -402,10 +402,12 @@ class BodyPublishersTest {
 
             @Override
             public void onNext(String s) {
+                // This completion-ordering fixture never emits an item.
             }
 
             @Override
             public void onError(Throwable t) {
+                throw new AssertionError("The completion-ordering fixture must not fail", t);
             }
 
             @Override
