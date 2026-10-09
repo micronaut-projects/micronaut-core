@@ -6,6 +6,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.context.watch.ResourceSelector;
+import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.manifest.DevManifest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,6 +18,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -143,6 +145,75 @@ class DevRuntimeTest {
         }
         assertTrue(runtime.context().map(context -> !context.isRunning()).orElse(true));
         assertEquals(1, RetainedPool.DESTROYED.get());
+    }
+
+    @Test
+    void theSourcesOfAFailedCompilationCompileAgainWithTheNextEdit() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args)
+                        .properties(java.util.Map.of("spec.name", "DevRuntimeTest"))
+                        .mainClass(Application.class)
+                        .start();
+                }
+            }
+            """);
+        Path greeter = src.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        Path other = src.resolve("Other.java");
+        Files.writeString(other, other("one"));
+        Path manifestFile = project.resolve("dev.properties");
+        List<String> classpath = List.of(System.getProperty("java.class.path").split(File.pathSeparator));
+        Files.write(project.resolve("cp.argfile"), classpath);
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            assertEquals(1, runtime.generation());
+
+            // a broken edit of one file fails
+            Files.writeString(greeter, "package app; @jakarta.inject.Singleton public class Greeter { public String greet() { return 1; } }");
+            runtime.sourcesChanged(SourceKind.JAVA, Set.of(greeter), Set.of());
+            assertTrue(runtime.lastFailure().isPresent());
+
+            // a restart compiles nothing: it runs the output that compiled last
+            runtime.restart();
+            ApplicationContext restarted = runtime.awaitGeneration(2, Duration.ofMinutes(2));
+            assertEquals("one", greet(runtime, restarted));
+            assertTrue(runtime.lastFailure().isPresent());
+
+            // a valid edit of an unrelated file compiles the broken one with it: the failure stays, nothing reloads
+            Files.writeString(other, other("two"));
+            runtime.sourcesChanged(SourceKind.JAVA, Set.of(other), Set.of());
+            assertTrue(runtime.lastFailure().isPresent());
+            assertTrue(runtime.lastFailure().get().describe().contains("incompatible types"));
+            assertEquals(2, runtime.generation());
+
+            // the fix reloads both edits
+            Files.writeString(greeter, greeter("three"));
+            runtime.sourcesChanged(SourceKind.JAVA, Set.of(greeter), Set.of());
+            ApplicationContext fixed = runtime.awaitGeneration(3, Duration.ofMinutes(2));
+            assertTrue(runtime.lastFailure().isEmpty());
+            assertEquals("three", greet(runtime, fixed));
+            Class<?> otherType = fixed.getClassLoader().loadClass("app.Other");
+            assertEquals("two", otherType.getMethod("value").invoke(null));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    private static String other(String value) {
+        return "package app; public class Other { public static String value() { return \"" + value + "\"; } }";
     }
 
     private static String greeter(String greeting) {

@@ -135,6 +135,11 @@ public final class DevRuntime implements Closeable {
     private @Nullable DirectoryWatcher watcher;
     private @Nullable Thread worker;
     private OutputSnapshot snapshot = OutputSnapshot.empty();
+    /**
+     * The changes of the batch whose compilation failed, merged into the next batch until they compile: the next edit
+     * may touch another file only, which an incremental compilation would compile alone.
+     */
+    private @Nullable Pending failedBatch;
 
     /**
      * Creates the runtime; {@link #start(String[])} runs it.
@@ -308,6 +313,17 @@ public final class DevRuntime implements Closeable {
      */
     public void reload() {
         awaitBatch(enqueue(new Pending(Map.of(), Map.of(), true)));
+    }
+
+    /**
+     * Handles source changes as the watcher reports them, and waits for the reload.
+     *
+     * @param kind The language
+     * @param changed The files added or modified
+     * @param deleted The files deleted
+     */
+    void sourcesChanged(SourceKind kind, Set<Path> changed, Set<Path> deleted) {
+        awaitBatch(enqueue(new Pending(Map.of(kind, new SourceChanges(changed, deleted)), Map.of(), false)));
     }
 
     /**
@@ -623,8 +639,16 @@ public final class DevRuntime implements Closeable {
         }
     }
 
-    private void handle(Pending batch) {
+    private void handle(Pending next) {
         long start = System.nanoTime();
+        Pending failed = failedBatch;
+        Pending batch = next;
+        if (failed != null && (next.full || !next.sources.isEmpty())) {
+            // a batch that compiles takes the failed sources with it; a restart or a resource change alone compiles
+            // nothing and runs the last output that compiled, the failed sources waiting for the next compilation
+            failedBatch = null;
+            batch = Pending.merge(List.of(failed, next));
+        }
         // compile what changed, or everything on the manual trigger; a failure leaves the generation as it is
         Set<SourceKind> kinds = batch.full ? compilers.keySet() : batch.sources.keySet();
         boolean compiled = false;
@@ -643,6 +667,8 @@ public final class DevRuntime implements Closeable {
                 CompileFailure failure = new CompileFailure(kind, result.diagnostics(), Instant.now());
                 lastFailure = failure;
                 LOG.error("{}", failure.describe().strip());
+                // nothing of the batch reached the application: its sources compile again with the next one
+                failedBatch = withoutSources(batch, compiledKinds);
                 return;
             }
             compiled = true;
@@ -677,6 +703,25 @@ public final class DevRuntime implements Closeable {
             return;
         }
         restart(changeSet, !configurationChanged, start);
+    }
+
+    /**
+     * The batch less the sources of the languages that compiled: their output is written, and the next snapshot
+     * sees it.
+     */
+    private static Pending withoutSources(Pending batch, Set<SourceKind> compiledKinds) {
+        Map<SourceKind, SourceChanges> sources = new EnumMap<>(SourceKind.class);
+        batch.sources.forEach((kind, changes) -> {
+            if (!compiledKinds.contains(kind)) {
+                sources.put(kind, changes);
+            }
+        });
+        return new Pending(sources, batch.resources, batch.full) {
+            @Override
+            boolean forcesRestart() {
+                return batch.forcesRestart();
+            }
+        };
     }
 
     private void restart(ChangeSet changeSet, boolean retentionAllowed, long startNanos) {
