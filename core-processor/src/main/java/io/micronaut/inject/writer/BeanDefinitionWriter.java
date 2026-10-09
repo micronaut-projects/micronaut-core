@@ -2603,13 +2603,17 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 .ofType(arrayOfClasses)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
                 .build();
-            initStatements.add(
-                beanDefinitionTypeDef.getStaticField(indexesField).put(
-                    arrayOfClasses.instantiate(
-                        indexedTypeNames.stream().map(this::asClassExpression).toArray(ExpressionDef[]::new)
-                    )
-                )
+            ExpressionDef indexArray = arrayOfClasses.instantiate(
+                indexedTypeNames.stream().map(this::asClassExpression).toArray(ExpressionDef[]::new)
             );
+            MethodDef loadIndexesMethod = MethodDef.builder("$loadIndexes")
+                .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+                .returns(arrayOfClasses)
+                .buildStatic(methodParameters -> StatementDef.doTry(
+                    indexArray.returning()
+                ).doCatch(NoClassDefFoundError.class, exceptionVar -> arrayOfClasses.instantiate().returning()));
+            classDefBuilder.addMethod(loadIndexesMethod);
+            initStatements.add(beanDefinitionTypeDef.getStaticField(indexesField).put(beanDefinitionTypeDef.invokeStatic(loadIndexesMethod)));
 
             classDefBuilder.addField(indexesField);
             classDefBuilder.addMethod(
