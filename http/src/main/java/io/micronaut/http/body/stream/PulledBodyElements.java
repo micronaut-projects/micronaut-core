@@ -64,7 +64,8 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
     private @Nullable CompletableFuture<@Nullable Void> walking;
     private boolean ended;
     private @Nullable Throwable failure;
-    private @Nullable CancellationException closed;
+    private boolean closed;
+    private @Nullable CancellationException cancellation;
 
     /**
      * Ask the source for more elements. Called by a read that found nothing available, outside
@@ -122,7 +123,7 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
         CompletableFuture<Optional<T>> p;
         synchronized (this) {
             p = null;
-            if (closed == null && !ended && failure == null) {
+            if (!closed && !ended && failure == null) {
                 p = pending;
                 pending = null;
                 if (p == null) {
@@ -144,7 +145,7 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
     protected final void end() {
         CompletableFuture<Optional<T>> p;
         synchronized (this) {
-            if (closed != null || ended || failure != null) {
+            if (closed || ended || failure != null) {
                 return;
             }
             ended = true;
@@ -164,7 +165,7 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
     protected final void fail(Throwable error) {
         CompletableFuture<Optional<T>> p;
         synchronized (this) {
-            if (closed != null || ended || failure != null) {
+            if (closed || ended || failure != null) {
                 return;
             }
             failure = error;
@@ -211,7 +212,7 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
         if (!queue.isEmpty()) {
             return State.AVAILABLE;
         }
-        if (closed != null || failure != null) {
+        if (closed || failure != null) {
             return State.FAILED;
         }
         if (ended) {
@@ -239,7 +240,7 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
         if (!queue.isEmpty()) {
             return null;
         }
-        return closed != null ? closed : failure;
+        return closed ? cancellation() : failure;
     }
 
     @Override
@@ -260,13 +261,13 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
         CompletableFuture<Optional<T>> p;
         CompletableFuture<@Nullable Void> w;
         List<T> queued;
-        CancellationException cancelled;
+        @Nullable CancellationException cancelled;
         synchronized (this) {
-            if (closed != null) {
+            if (closed) {
                 return CLOSED_STAGE;
             }
-            cancelled = new CancellationException(CLOSED_MESSAGE);
-            closed = cancelled;
+            closed = true;
+            cancelled = pending != null || walking != null ? cancellation() : null;
             queued = queue.isEmpty() ? List.of() : List.copyOf(queue);
             queue.clear();
             p = pending;
@@ -274,10 +275,10 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
             w = walking;
             walking = null;
         }
-        if (w != null) {
+        if (w != null && cancelled != null) {
             w.completeExceptionally(cancelled);
         }
-        if (p != null) {
+        if (p != null && cancelled != null) {
             p.completeExceptionally(cancelled);
         }
         // nobody takes them
@@ -297,10 +298,20 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
     }
 
     /**
+     * Create the cancellation reason only when observed. Called under the lock.
+     */
+    private CancellationException cancellation() {
+        if (cancellation == null) {
+            cancellation = new CancellationException(CLOSED_MESSAGE);
+        }
+        return cancellation;
+    }
+
+    /**
      * Start an operation: one at a time, and not after closing. Called under the lock.
      */
     private void checkStart() {
-        if (closed != null) {
+        if (closed) {
             throw new IllegalStateException(CLOSED_MESSAGE);
         }
         if (pending != null || walking != null) {
