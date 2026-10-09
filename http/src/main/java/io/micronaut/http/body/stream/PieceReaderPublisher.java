@@ -72,7 +72,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
     /**
      * The §3.9 failure of a request that is not positive, signalled instead of the cancellation.
      */
-    private volatile @Nullable Throwable badRequest;
+    private final AtomicReference<@Nullable Throwable> badRequest = new AtomicReference<>();
     /**
      * The input emitted more pieces than were requested: it is cancelled.
      */
@@ -151,7 +151,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
     @Override
     public void request(long n) {
         if (n <= 0) {
-            badRequest = new IllegalArgumentException("§3.9: the number of requested elements must be positive: " + n);
+            badRequest.compareAndSet(null, new IllegalArgumentException("§3.9: the number of requested elements must be positive: " + n));
             cancelled = true;
         } else {
             long current;
@@ -263,7 +263,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
         try {
             while (true) {
                 if (cancelled) {
-                    Throwable failure = badRequest;
+                    Throwable failure = badRequest.get();
                     terminate(true);
                     if (failure != null) {
                         // §3.9
