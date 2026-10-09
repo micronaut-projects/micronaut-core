@@ -48,6 +48,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
     private Integer parallelism;
     private Integer corePoolSize;
     private boolean virtual;
+    private boolean propagateContext = true;
     @Nullable
     private Class<? extends ThreadFactory> threadFactoryClass;
 
@@ -57,7 +58,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      * @param name The name
      */
     private UserExecutorConfiguration(@Nullable @Parameter String name) {
-        this(name, null, null, null, null, false, null);
+        this(name, null, null, null, null, false, null, null);
     }
 
     /**
@@ -71,7 +72,6 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      * @param virtual whether to use virtual threads
      * @param threadFactoryClass the thread factory class
      */
-    @ConfigurationInject
     protected UserExecutorConfiguration(@Nullable @Parameter String name,
                                         @Nullable Integer nThreads,
                                         @Nullable ExecutorType type,
@@ -79,6 +79,31 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
                                         @Nullable Integer corePoolSize,
                                         @Nullable Boolean virtual,
                                         @Nullable Class<? extends ThreadFactory> threadFactoryClass) {
+        this(name, nThreads, type, parallelism, corePoolSize, virtual, threadFactoryClass, null);
+    }
+
+    /**
+     * Default Constructor.
+     *
+     * @param name the name
+     * @param nThreads number of threads
+     * @param type the type
+     * @param parallelism the parallelism
+     * @param corePoolSize the core pool size
+     * @param virtual whether to use virtual threads
+     * @param threadFactoryClass the thread factory class
+     * @param propagateContext whether submitted tasks run with the caller's propagated context
+     * @since 5.3.0
+     */
+    @ConfigurationInject
+    protected UserExecutorConfiguration(@Nullable @Parameter String name,
+                                        @Nullable Integer nThreads,
+                                        @Nullable ExecutorType type,
+                                        @Nullable Integer parallelism,
+                                        @Nullable Integer corePoolSize,
+                                        @Nullable Boolean virtual,
+                                        @Nullable Class<? extends ThreadFactory> threadFactoryClass,
+                                        @Nullable Boolean propagateContext) {
         this.name = name;
         this.nThreads = nThreads == null ? AVAILABLE_PROCESSORS * 2 : nThreads;
         this.type = type == null ? ExecutorType.SCHEDULED : type;
@@ -86,6 +111,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
         this.corePoolSize = corePoolSize == null ? AVAILABLE_PROCESSORS * 2 : corePoolSize;
         this.virtual = virtual == null ? false : virtual;
         this.threadFactoryClass = threadFactoryClass;
+        this.propagateContext = propagateContext == null || propagateContext;
     }
 
     @Override
@@ -127,6 +153,22 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      */
     public void setVirtual(boolean virtual) {
         this.virtual = virtual;
+    }
+
+    @Override
+    public boolean isPropagateContext() {
+        return propagateContext;
+    }
+
+    /**
+     * Sets whether tasks submitted to the executor run with the
+     * {@link io.micronaut.core.propagation.PropagatedContext} of the submitting thread. Default value ({@code true}).
+     *
+     * @param propagateContext Whether to propagate the context
+     * @since 5.3.0
+     */
+    public void setPropagateContext(boolean propagateContext) {
+        this.propagateContext = propagateContext;
     }
 
     @Override
