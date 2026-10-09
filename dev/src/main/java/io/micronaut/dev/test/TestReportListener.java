@@ -17,7 +17,6 @@ package io.micronaut.dev.test;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * A report of the runs, registered as a service: an HTML renderer, an IDE bridge, a terminal UI. It receives
@@ -27,6 +26,5 @@ import org.jspecify.annotations.NullMarked;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public interface TestReportListener extends TestEventListener, Ordered {
 }

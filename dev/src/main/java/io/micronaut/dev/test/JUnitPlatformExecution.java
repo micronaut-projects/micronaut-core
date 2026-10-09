@@ -15,7 +15,6 @@
  */
 package io.micronaut.dev.test;
 
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.junit.platform.engine.DiscoverySelector;
 import org.junit.platform.engine.FilterResult;
@@ -56,7 +55,6 @@ import java.util.regex.Pattern;
  * @author graemerocher
  * @since 5.3.0
  */
-@NullMarked
 final class JUnitPlatformExecution {
 
     private static final String CAPTURE_STDOUT = "junit.platform.output.capture.stdout";

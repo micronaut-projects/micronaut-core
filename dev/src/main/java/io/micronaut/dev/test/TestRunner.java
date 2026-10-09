@@ -16,7 +16,6 @@
 package io.micronaut.dev.test;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Runs tests, streaming what happens.
@@ -30,7 +29,6 @@ import org.jspecify.annotations.NullMarked;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public interface TestRunner {
 
     /**

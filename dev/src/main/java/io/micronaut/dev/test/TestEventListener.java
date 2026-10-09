@@ -16,7 +16,6 @@
 package io.micronaut.dev.test;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * The events of a run, from which every report is built.
@@ -30,7 +29,6 @@ import org.jspecify.annotations.NullMarked;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public interface TestEventListener {
 
     /**

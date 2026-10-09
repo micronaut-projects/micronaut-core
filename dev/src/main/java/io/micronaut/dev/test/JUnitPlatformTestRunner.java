@@ -17,7 +17,6 @@ package io.micronaut.dev.test;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.reflect.ClassUtils;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Runs tests on the JUnit Platform, with every engine on the launch classpath: Jupiter, Spock, Kotest, or
@@ -34,7 +33,6 @@ import org.jspecify.annotations.NullMarked;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class JUnitPlatformTestRunner implements TestRunner {
 
     /**

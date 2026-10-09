@@ -16,7 +16,6 @@
 package io.micronaut.dev.test;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,7 +28,6 @@ import java.util.List;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class Cancellation {
 
     private final List<Runnable> callbacks = new ArrayList<>();

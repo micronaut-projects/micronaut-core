@@ -16,7 +16,6 @@
 package io.micronaut.dev.test;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.PrintWriter;
@@ -33,7 +32,6 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public record TestFailure(String type, @Nullable String message, String stackTrace) {
 
     /**

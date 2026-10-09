@@ -17,7 +17,6 @@ package io.micronaut.dev.test;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.OrderUtil;
-import org.jspecify.annotations.NullMarked;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +32,6 @@ import java.util.function.Consumer;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class TestEventListeners {
 
     private static final Logger LOG = LoggerFactory.getLogger(TestEventListeners.class);

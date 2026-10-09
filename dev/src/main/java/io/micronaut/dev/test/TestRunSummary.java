@@ -16,7 +16,6 @@
 package io.micronaut.dev.test;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -37,7 +36,6 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public record TestRunSummary(String runId, int passed, int failed, int errored, int skipped, Duration duration, boolean cancelled, boolean complete) {
 
     /**

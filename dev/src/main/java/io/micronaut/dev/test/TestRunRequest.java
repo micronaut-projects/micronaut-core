@@ -17,7 +17,6 @@ package io.micronaut.dev.test;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.dev.compile.SourceRoot;
-import org.jspecify.annotations.NullMarked;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -38,7 +37,6 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public record TestRunRequest(String runId,
                              ClassLoader classLoader,
                              List<Path> testClassOutputs,
