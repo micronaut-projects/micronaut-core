@@ -22,6 +22,7 @@ import java.time.Duration
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.LinkedBlockingQueue
@@ -64,6 +65,33 @@ class AsyncWebSocketClientStagesSpec extends Specification {
 
         cleanup:
         connect?.getNow(null)?.close()
+    }
+
+    void 'a dependent connect cancellation or timeout still allows the original endpoint to open'(boolean timeout) {
+        given:
+        OpenStages stages = embeddedServer.applicationContext.getBean(OpenStages)
+        CompletableFuture<PendingOpenClient> original = client.toAsyncWebSocket().connect(PendingOpenClient, '/stages').toCompletableFuture()
+        CompletableFuture<Object> opened = stages.opened.poll(10, TimeUnit.SECONDS)
+        assert opened != null
+        def dependent = original.thenApply { it }
+
+        when:
+        if (timeout) {
+            dependent.completeExceptionally(new TimeoutException())
+        } else {
+            dependent.cancel(false)
+        }
+        opened.complete(null)
+
+        then:
+        original.get(10, TimeUnit.SECONDS) != null
+        dependent.isCompletedExceptionally()
+
+        cleanup:
+        original?.getNow(null)?.close()
+
+        where:
+        timeout << [false, true]
     }
 
     void 'the reactive client does not wait for the stage of the open method, as before'() {

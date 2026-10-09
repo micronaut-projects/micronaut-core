@@ -34,7 +34,11 @@ import java.util.concurrent.CompletionStage;
  * <p>Each call connects once. Cancelling the future of the stage (see
  * {@link CompletionStage#toCompletableFuture()}) before the connection is established, or
  * completing it otherwise, e.g. with {@link CompletableFuture#orTimeout}, aborts it; a client
- * endpoint that connects after that is closed. The stage may complete on an event loop thread:
+ * endpoint that connects after that is closed. Cancelling or timing out a dependent stage,
+ * for example one created with {@link CompletionStage#thenApply}, does not abort the original
+ * connect. Cancellation is a best-effort hint. Once connected, close the endpoint or its
+ * {@link WebSocketSession} when finished: cancelling the completed connect future does not
+ * close an active session. The stage may complete on an event loop thread:
  * do not block in its continuations.</p>
  *
  * <p>A client obtained from {@link WebSocketClient#toAsyncWebSocket()}, or injected, is a view

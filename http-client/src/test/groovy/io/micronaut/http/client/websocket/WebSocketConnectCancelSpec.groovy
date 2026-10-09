@@ -20,6 +20,8 @@ import java.security.MessageDigest
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
+import java.util.concurrent.CompletionException
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
@@ -195,6 +197,51 @@ class WebSocketConnectCancelSpec extends Specification {
 
         where:
         adapter << ['netty', 'reactive adapter']
+    }
+
+    void 'cancelling or timing out a dependent connect stage leaves the original handshake running with #adapter'(String adapter, boolean timeout) {
+        given:
+        RawWebSocketServer server = new RawWebSocketServer(false)
+        ApplicationContext ctx = ApplicationContext.run(['spec.name': 'WebSocketConnectCancelSpec'])
+        WebSocketClient client = ctx.createBean(WebSocketClient, server.uri)
+        AsyncWebSocketClient async = adapter == 'netty' ? client.toAsyncWebSocket() : reactiveOnly(client).toAsyncWebSocket()
+        CompletableFuture<CancelClient> original = async.connect(CancelClient, '/ws').toCompletableFuture()
+        server.awaitUpgradeRequest()
+        def dependent = original.thenApply { it.session }
+
+        when:
+        if (timeout) {
+            try {
+                dependent.orTimeout(1, TimeUnit.MILLISECONDS).join()
+            } catch (CompletionException e) {
+                assert e.cause instanceof TimeoutException
+            }
+        } else {
+            dependent.cancel(false)
+        }
+
+        then:
+        dependent.isCompletedExceptionally()
+        !original.isDone()
+        !server.closedWithin(200)
+
+        when:
+        original.cancel(false)
+
+        then:
+        server.awaitClosed()
+
+        cleanup:
+        async?.close()
+        ctx?.close()
+        server?.close()
+
+        where:
+        adapter            | timeout
+        'netty'            | false
+        'netty'            | true
+        'reactive adapter' | false
+        'reactive adapter' | true
     }
 
     void 'the async connect stage completes in the context of the caller'() {
