@@ -31,7 +31,7 @@ import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.server.binding.FormBinding;
 import io.micronaut.http.server.multipart.FormFactory;
-import io.micronaut.http.server.multipart.FormFieldFlows;
+import io.micronaut.http.server.binding.FormFieldFlows;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import org.jspecify.annotations.Nullable;
