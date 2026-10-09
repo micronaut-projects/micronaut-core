@@ -57,6 +57,7 @@ import java.util.stream.Collectors;
  */
 @Internal
 final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpClient, ProxyHttpClient {
+    private static final String OPTIONS_PARAMETER = "options";
     private static final String ALLOW_RESTRICTED_HEADERS_PROPERTY = "jdk.httpclient.allowRestrictedHeaders";
     /**
      * Request attribute with the {@link UploadListener} of the request body.
@@ -105,7 +106,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     @Override
     @SuppressWarnings("java:S2095") // the request wrapper only holds the body, which the exchange releases
     public Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread, RawRequestOptions options) {
-        Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(options, OPTIONS_PARAMETER);
         MutableHttpRequest<?> rawRequest;
         try {
             MutableHttpRequest<Object> copy = RawHttpClientSupport.copyRequest(request, options);
@@ -130,7 +131,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
 
     @Override
     public Publisher<MutableHttpResponse<?>> proxy(HttpRequest<?> request, ProxyRequestOptions options) {
-        Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(options, OPTIONS_PARAMETER);
         // the body bytes of a server request are claimed when the exchange starts
         return Mono.defer(() -> {
             ProxyExchange exchange = proxyExchange(request, options);
@@ -153,7 +154,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
      * @return The future of the response
      */
     CompletionStage<MutableHttpResponse<?>> proxyAsync(HttpRequest<?> request, ProxyRequestOptions options) {
-        Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(options, OPTIONS_PARAMETER);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         ProxyExchange exchange;
         try {

@@ -37,6 +37,7 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * {@link io.micronaut.http.client.HttpClient} implementation for {@literal java.net.http.*} HTTP Client.
@@ -50,8 +51,7 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
      * The pipeline of this client once its codecs were replaced, see
      * {@link #setMediaTypeCodecRegistry}, else {@code null} for the one of its parent.
      */
-    @Nullable
-    private volatile DefaultJdkHttpClient ownPipeline;
+    private final AtomicReference<@Nullable DefaultJdkHttpClient> ownPipeline = new AtomicReference<>();
 
     JdkBlockingHttpClient(AbstractJdkHttpClient prototype) {
         super(prototype);
@@ -107,7 +107,7 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
         }
         // the exchange of the client this client was made from
         Argument<?> error = errorType == null ? HttpClient.DEFAULT_ERROR_TYPE : errorType;
-        DefaultJdkHttpClient own = ownPipeline;
+        DefaultJdkHttpClient own = ownPipeline.get();
         DefaultJdkHttpClient pipeline = own == null ? pipelineClient() : own;
         return Objects.requireNonNull(
             AbstractHttpClient.awaitFlow(pipeline.exchangeFlow(request, bodyType, error)),
@@ -124,7 +124,7 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
     @Override
     public void setMediaTypeCodecRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry) {
         super.setMediaTypeCodecRegistry(mediaTypeCodecRegistry);
-        ownPipeline = new DefaultJdkHttpClient(pipelineClient(), this);
+        ownPipeline.set(new DefaultJdkHttpClient(pipelineClient(), this));
     }
 
     /**
@@ -136,7 +136,7 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
     @Override
     public void setMessageBodyHandlerRegistry(MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
         super.setMessageBodyHandlerRegistry(messageBodyHandlerRegistry);
-        ownPipeline = new DefaultJdkHttpClient(pipelineClient(), this);
+        ownPipeline.set(new DefaultJdkHttpClient(pipelineClient(), this));
     }
 
     @Override
