@@ -105,7 +105,7 @@ abstract class MultiplexedServerHandler {
         private boolean requestAccepted;
         /**
          * Whether the headers of the response were handed to the connection, even if writing them
-         * failed: no other headers may follow them.
+         * failed: no other headers, including an interim 100 Continue, may follow them.
          */
         private boolean headersWritten;
         private boolean finished;
@@ -355,11 +355,14 @@ abstract class MultiplexedServerHandler {
 
                     private void complete0() {
                         if (!finished) {
-                            if (!reset) {
+                            // the end of stream frame uses a void promise, so it must not be
+                            // written to a stream that netty has already closed
+                            boolean open = !reset && !closed;
+                            if (open) {
                                 writeData(Unpooled.EMPTY_BUFFER, true, endPromise(response));
                             }
                             if (finish()) {
-                                if (!reset) {
+                                if (open) {
                                     flush();
                                 }
                             }
@@ -396,8 +399,15 @@ abstract class MultiplexedServerHandler {
                 upstream.allowDiscard();
                 upstream.disregardBackpressure();
                 return;
-            } else if (reset || headersWritten) {
-                // connection closed, or a response whose write failed after its headers
+            } else if (reset || closed) {
+                // stream reset by either side, or connection closed. Writing to a stream that
+                // netty has already closed would fail the whole connection.
+                upstream.allowDiscard();
+                upstream.disregardBackpressure();
+                finish();
+                return;
+            } else if (headersWritten) {
+                // a response whose write failed after its headers
                 upstream.allowDiscard();
                 upstream.disregardBackpressure();
                 abortWrittenResponse();
@@ -423,8 +433,9 @@ abstract class MultiplexedServerHandler {
             if (finished) {
                 content.release();
                 return;
-            } else if (reset) {
-                // stream closed
+            } else if (reset || closed) {
+                // stream reset by either side, or connection closed. Writing to a stream that
+                // netty has already closed would fail the whole connection.
                 content.release();
                 finish();
                 return;
@@ -620,7 +631,12 @@ abstract class MultiplexedServerHandler {
 
                 if (sendContinue) {
                     sendContinue = false;
-                    writeContinue();
+                    // an interim response is only allowed before the final response headers, and
+                    // only on a stream that is still open. Writing it later fails in the encoder,
+                    // which would take down the whole connection.
+                    if (!headersWritten && !finished && !reset && !closed) {
+                        writeContinue();
+                    }
                 }
             }
 
@@ -687,6 +703,8 @@ abstract class MultiplexedServerHandler {
                     return;
                 }
 
+                // the body will not be read, so do not ask the client to send it
+                sendContinue = false;
                 closeInput();
                 dest.discard(); // signal discard
             }
