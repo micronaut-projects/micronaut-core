@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 
 /**
  * Receives the changes to the bean definitions of a type, registered with
- * {@link io.micronaut.context.BeanContext#watchDefinitions(io.micronaut.core.type.Argument, io.micronaut.context.Qualifier, BeanDefinitionWatcher)}.
+ * {@link io.micronaut.context.WatchableBeanContext#watchDefinitions(io.micronaut.core.type.Argument, io.micronaut.context.Qualifier, BeanDefinitionWatcher)}.
  *
  * @param <T> The bean type watched
  * @author graemerocher

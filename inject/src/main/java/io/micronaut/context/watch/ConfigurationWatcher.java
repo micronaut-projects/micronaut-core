@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 
 /**
  * Receives the configuration changes under a prefix, registered with
- * {@link io.micronaut.context.BeanContext#watchConfiguration(String, ConfigurationWatcher)}, and says what
+ * {@link io.micronaut.context.WatchableBeanContext#watchConfiguration(String, ConfigurationWatcher)}, and says what
  * it did about them.
  *
  * @author graemerocher
