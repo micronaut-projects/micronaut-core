@@ -87,6 +87,8 @@ public enum Destination {
      * destination and the {@link Mode#WEBTRANSPORT} mode, but Firefox reports the handshake with
      * this destination instead, so it is listed to classify what arrives on the wire.
      *
+     * @see <a href="https://fetch.spec.whatwg.org/#concept-request-destination">Fetch Standard: request destination</a>
+     * @see <a href="https://searchfox.org/mozilla-central/search?q=webtransport&path=">Firefox implementation reference</a>
      * @since 5.2.16
      */
     WEBTRANSPORT("webtransport"),
