@@ -768,15 +768,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 List<StatementDef> statements = new ArrayList<>();
                 for (Map.Entry<String, List<MethodElement>> entry : baseMethods.entrySet()) {
                     List<StatementDef> overloads = new ArrayList<>();
-                    for (MethodElement method : entry.getValue()) {
+                    // as in Java, an overload taking the arguments as they are is selected before a varargs one
+                    List<MethodElement> methods = new ArrayList<>(entry.getValue());
+                    methods.sort(Comparator.comparing(MethodElement::isVarArgs));
+                    for (MethodElement method : methods) {
                         ParameterElement[] parameters = method.getParameters();
+                        boolean varArgs = method.isVarArgs() && parameters.length > 0;
+                        // the parameters taking one argument each: all but the varargs parameter
+                        int fixedParameters = varArgs ? parameters.length - 1 : parameters.length;
                         boolean sameArityOverloads = entry.getValue().stream()
-                            .filter(other -> other != method && other.getParameters().length == parameters.length)
+                            .filter(other -> other != method && (varArgs || other.isVarArgs() || other.getParameters().length == parameters.length))
                             .findAny()
                             .isPresent();
-                        ExpressionDef.ConditionExpressionDef condition = arity.compare(ExpressionDef.ComparisonOperation.OpType.EQUAL_TO, ExpressionDef.constant(parameters.length));
+                        ExpressionDef.ConditionExpressionDef condition = varArgs
+                            ? arity.compare(ExpressionDef.ComparisonOperation.OpType.GREATER_THAN_OR_EQUAL, ExpressionDef.constant(fixedParameters))
+                            : arity.compare(ExpressionDef.ComparisonOperation.OpType.EQUAL_TO, ExpressionDef.constant(parameters.length));
                         List<ExpressionDef> converted = new ArrayList<>(parameters.length);
-                        for (int i = 0; i < parameters.length; i++) {
+                        for (int i = 0; i < fixedParameters; i++) {
                             ExpressionDef argument = arguments.invoke("get", POLYGLOT_VALUE, ExpressionDef.constant(i));
                             if (sameArityOverloads) {
                                 condition = condition.and(VALUE_COERCIBLES.invokeStatic("matchesArgument", TypeDef.Primitive.BOOLEAN, argument, classLiteral(parameters[i].getType())).isTrue());
@@ -787,6 +795,20 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             converted.add(isParameterizedReference(parameterType)
                                 ? PYTHON_CONVERSION.invokeStatic(CONVERT_VALUE, ClassTypeDef.OBJECT, argument, classLiteral(parameterType)).cast(erasedType(parameterType))
                                 : convertValueForType(parameterType, argument));
+                        }
+                        if (varArgs) {
+                            // the trailing arguments, any number of them, make up the array of the
+                            // component type; the inherited signature of an E... parameter does not
+                            // always keep its array shape, so the array type is built from the component
+                            ClassElement varArgsType = parameters[fixedParameters].getGenericType();
+                            ClassElement componentType = varArgsType.isArray() ? varArgsType.fromArray() : varArgsType;
+                            ExpressionDef componentClass = classLiteral(componentType);
+                            if (sameArityOverloads) {
+                                condition = condition.and(PYTHON_JAVA_BASES.invokeStatic("matchesVarargs", TypeDef.Primitive.BOOLEAN,
+                                    arguments, ExpressionDef.constant(fixedParameters), componentClass).isTrue());
+                            }
+                            converted.add(PYTHON_JAVA_BASES.invokeStatic("varargs", TypeDef.OBJECT,
+                                arguments, ExpressionDef.constant(fixedParameters), componentClass).cast(erasedType(componentType).array()));
                         }
                         ExpressionDef.InvokeInstanceMethod invocation = aThis.superRef().invoke(method.getName(), TypeDef.OBJECT, converted);
                         StatementDef result = method.getReturnType().isVoid()

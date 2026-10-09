@@ -23,6 +23,7 @@ import io.micronaut.python.annotation.processing.test.javabases.GenericHolder
 import io.micronaut.python.annotation.processing.test.javabases.GreetingBase
 import io.micronaut.python.annotation.processing.test.javabases.LongBase
 import io.micronaut.python.annotation.processing.test.javabases.Services
+import io.micronaut.python.annotation.processing.test.javabases.VarargsBase
 import io.micronaut.python.compiler.PyronautCompiler
 import org.graalvm.polyglot.Context
 
@@ -306,6 +307,49 @@ class Hooked(CtorHookBase):
 
         then:
         created.as(CtorHookBase).init() == 'from-python'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Python calls inherited varargs methods of a Java base with any number of arguments"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+import java
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import VarargsBase
+
+
+@Singleton
+class PythonCollector(VarargsBase):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def collect(self) -> int:
+        Item = VarargsBase.Item
+        self.add()
+        self.add(Item("one"))
+        self.add(Item("two"), Item("three"), Item("four"))
+        self.add("text")
+        self.addAll()
+        self.addAll(Item("five"))
+        self.addAll(Item("six"), Item("seven"))
+        self.addAll("more")
+        items = java.type("io.micronaut.python.annotation.processing.test.javabases.VarargsBase$Item[]")(2)
+        items[0] = Item("eight")
+        items[1] = Item("nine")
+        self.add(items)
+        return self.sum("none") + self.sum("single", 1) + self.sum("several", 1, 2, 3)
+''', true)
+
+        when:
+        VarargsBase collector = ctx.getBean(VarargsBase)
+
+        then: 'zero, one and several arguments or an array reach the varargs overloads, the others keep theirs'
+        collector.collect() == 7
+        collector.items == ['one', 'two', 'three', 'four', 't:text', 'i:five', 'i:six', 'i:seven', 't:more', 'eight', 'nine', 'none=0', 'single=1', 'several=6']
 
         cleanup:
         ctx?.close()
