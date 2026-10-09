@@ -30,7 +30,6 @@ import io.micronaut.dev.test.TestReportListener;
 import io.micronaut.dev.test.TestResults;
 import io.micronaut.dev.test.TestRunStarted;
 import io.micronaut.dev.test.TestRunSummary;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +71,6 @@ import java.util.regex.Pattern;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class HtmlTestReport implements TestReportListener {
 
     /**

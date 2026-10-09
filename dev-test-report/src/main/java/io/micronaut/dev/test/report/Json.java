@@ -15,7 +15,6 @@
  */
 package io.micronaut.dev.test.report;
 
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Locale;
@@ -26,7 +25,6 @@ import java.util.Locale;
  * @author graemerocher
  * @since 5.3.0
  */
-@NullMarked
 final class Json {
 
     private static final char LINE_SEPARATOR = (char) 0x2028;

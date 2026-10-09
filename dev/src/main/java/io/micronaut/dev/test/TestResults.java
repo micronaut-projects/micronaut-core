@@ -16,7 +16,6 @@
 package io.micronaut.dev.test;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.file.InvalidPathException;
@@ -41,7 +40,6 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class TestResults {
 
     private final int maxOutput;
