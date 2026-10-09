@@ -16,7 +16,6 @@
 package io.micronaut.scheduling.io.watch;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 import java.nio.file.Path;
 
@@ -28,7 +27,6 @@ import java.nio.file.Path;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public interface FileWatcherRegistration extends AutoCloseable {
 
     /**
