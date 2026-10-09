@@ -291,8 +291,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     /**
      * While a {@link #stopRetaining(RetentionCriteria)} is in progress, which registrations it keeps.
      */
-    @Nullable
-    private volatile RetentionCriteria retentionCriteria;
+    private final AtomicReference<@Nullable RetentionCriteria> retentionCriteria = new AtomicReference<>();
     /**
      * The instances the {@link #stopRetaining(RetentionCriteria)} in progress keeps, once decided.
      */
@@ -2773,6 +2772,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                        @Nullable Map<String, Object> argumentValues) {
         Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
         Qualifier<?> prevQualifier = resolutionContext.getCurrentQualifier();
+        DefaultBeanDependencyGraph graph = dependencyGraph;
+        // what the instance receives is counted once however many injection points receive it
+        DefaultBeanDependencyGraph.Creation creation = graph == null ? null : graph.beginCreation(beanDefinition);
         try {
             resolutionContext.setCurrentQualifier(declaredQualifier != null && !AnyQualifier.INSTANCE.equals(declaredQualifier) ? declaredQualifier : qualifier);
             createDependsOnBeans(resolutionContext, beanDefinition);
@@ -2807,6 +2809,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             throw new BeanInstantiationException(beanDefinition, e);
         } finally {
             resolutionContext.setCurrentQualifier(prevQualifier);
+            if (creation != null) {
+                creation.end();
+            }
         }
     }
 
@@ -3885,9 +3890,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (target instanceof AbstractProviderDefinition<?>) {
             Argument provided = DefaultBeanDependencyGraph.providedArgument(resolutionContext);
             // a provider of Object names no target: every bean would be a candidate
-            if (provided != null && provided.getType() != Object.class) {
-                graph.recordProvided(resolutionContext, getBeanDefinitions(provided, (Qualifier) providerQualifier(resolutionContext, qualifier)));
-            }
+            Collection<? extends BeanDefinition<?>> candidates = provided != null && provided.getType() != Object.class
+                ? getBeanDefinitions(provided, (Qualifier) providerQualifier(resolutionContext, qualifier))
+                : List.of();
+            // a provider resolves through this context on every call, whatever it resolves today: with no candidate
+            // to name, the lazy edge goes to the provider itself, so that holding it is still recorded
+            graph.recordProvided(resolutionContext, candidates.isEmpty() ? List.of(received) : candidates);
             return;
         }
         graph.record(resolutionContext, received);
@@ -4308,11 +4316,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     public synchronized Collection<BeanRegistration<?>> stopRetaining(RetentionCriteria criteria) {
         ArgumentUtils.requireNonNull("criteria", criteria);
         retainedOnStop.clear();
-        retentionCriteria = criteria;
+        retentionCriteria.set(criteria);
         try {
             stop();
         } finally {
-            retentionCriteria = null;
+            retentionCriteria.set(null);
             retainedOnStopBeans = null;
         }
         List<BeanRegistration<?>> retained = List.copyOf(retainedOnStop);
@@ -5252,7 +5260,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @return The retained instances, by identity; empty when no retention is in progress
      */
     private Set<Object> retainedBeans(List<BeanRegistration> registrations) {
-        if (retentionCriteria == null) {
+        if (retentionCriteria.get() == null) {
             return Set.of();
         }
         // decided once, over the singletons as the stop found them: a singleton created while the context stops is not
@@ -5278,7 +5286,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     @Experimental
     @SuppressWarnings({"unchecked", "rawtypes"})
     public boolean isRetainedOnStop(Object bean) {
-        if (retentionCriteria == null) {
+        if (retentionCriteria.get() == null) {
             // no retention in progress: the common stop, which asks nothing more
             return false;
         }
@@ -5288,7 +5296,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private Set<Object> decideRetainedBeans(List<BeanRegistration> registrations) {
-        RetentionCriteria criteria = Objects.requireNonNull(retentionCriteria);
+        RetentionCriteria criteria = Objects.requireNonNull(retentionCriteria.get());
         Map<Object, AtomicBoolean> beans = new IdentityHashMap<>();
         for (BeanRegistration<?> registration : registrations) {
             if (registration.bean == null || !criteria.retain(registration)) {

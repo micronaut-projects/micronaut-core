@@ -51,9 +51,9 @@ import java.util.Set;
 @NullMarked
 public final class ClassChangeEvent extends ApplicationEvent {
 
-    private final Set<ClassLoader> retiredLoaders;
-    private final ClassLoader newLoader;
-    private final List<ClassChange> changes;
+    private final transient Set<ClassLoader> retiredLoaders;
+    private final transient ClassLoader newLoader;
+    private final transient List<ClassChange> changes;
     private final ReloadStrategy strategy;
 
     /**
