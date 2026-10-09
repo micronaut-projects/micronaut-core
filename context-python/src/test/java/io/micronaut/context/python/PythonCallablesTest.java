@@ -246,7 +246,8 @@ class PythonCallablesTest {
             calls
             """);
         assertEquals(
-            List.of("callable:42", "callable:null", "cron-callable:cron", "runnable", "object", "consumer", "map:1", List.of("ran", "name")),
+            List.of("callable:1:42", "callable:1:null", "cron-callable:0 30 4 * * ?:cron", "runnable:name", "object:name=value",
+                "consumer", "map:name:1", List.of("ran", "name")),
             python.execute(overloads).as(List.class)
         );
     }
@@ -362,29 +363,29 @@ class PythonCallablesTest {
 
         public String schedule(Duration delay, Runnable runnable) {
             runnable.run();
-            return "runnable";
+            return "runnable:" + delay.toSeconds();
         }
 
         public <V> String schedule(Duration delay, Callable<V> callable) throws Exception {
-            return "callable:" + callable.call();
+            return "callable:" + delay.toSeconds() + ":" + callable.call();
         }
 
         public String schedule(String cron, Runnable runnable) {
             runnable.run();
-            return "cron-runnable";
+            return "cron-runnable:" + cron;
         }
 
         public <V> String schedule(String cron, Callable<V> callable) throws Exception {
-            return "cron-callable:" + callable.call();
+            return "cron-callable:" + cron + ":" + callable.call();
         }
 
         public String execute(String name, Runnable runnable) {
             runnable.run();
-            return "runnable";
+            return "runnable:" + name;
         }
 
         public String execute(String name, Object value) {
-            return "object";
+            return "object:" + name + "=" + value;
         }
 
         public String accept(String name, Consumer<String> consumer) {
@@ -393,7 +394,7 @@ class PythonCallablesTest {
         }
 
         public String accept(String name, Map<String, String> attributes) {
-            return "map:" + attributes.size();
+            return "map:" + name + ":" + attributes.size();
         }
 
         public void register(Consumer<String> consumer) {
