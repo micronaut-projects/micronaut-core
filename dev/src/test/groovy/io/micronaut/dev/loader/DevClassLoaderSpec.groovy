@@ -106,4 +106,50 @@ class DevClassLoaderSpec extends Specification {
         cleanup:
         loader.current().close()
     }
+
+    void "after Class.forName through the facade, a swap still serves the new class to loadClass on the facade and to Class.forName on the current generation"() {
+        given: "a compiled generation"
+        Path src = Files.createDirectories(project.resolve("src"))
+        Path classes = project.resolve("classes")
+        Path source = src.resolve("example/Example.java")
+        Files.createDirectories(source.parent)
+        Files.writeString(source, 'package example; public class Example { public String value() { return "one"; } }')
+        JavacSourceCompiler compiler = new JavacSourceCompiler()
+        compiler.compile(new CompilationRequest(SourceKind.JAVA, [new SourceRoot(SourceKind.JAVA, src)], [] as Set, [] as Set, true, [], [], classes, project.resolve("generated"), []))
+        DevClassLoader loader = new DevClassLoader(getClass().classLoader, [classes], project.resolve("generations"))
+
+        when: "the class is loaded by name with the facade as the initiating loader"
+        Class<?> one = Class.forName("example.Example", true, loader)
+
+        then:
+        one.classLoader.is(loader.current())
+        value(one) == "one"
+
+        when: "the method changes and a new generation is swapped in"
+        Files.writeString(source, 'package example; public class Example { public String value() { return "two"; } }')
+        compiler.compile(new CompilationRequest(SourceKind.JAVA, [new SourceRoot(SourceKind.JAVA, src)], [source] as Set, [] as Set, false, [], [], classes, project.resolve("generated"), []))
+        def retired = loader.swap()
+        Class<?> viaFacade = loader.loadClass("example.Example")
+        Class<?> viaGeneration = Class.forName("example.Example", true, loader.current())
+
+        then: "loadClass on the facade does not answer with the class the JVM recorded the facade as initiating"
+        !viaFacade.is(one)
+        viaFacade.classLoader.is(loader.current())
+        value(viaFacade) == "two"
+
+        and: "Class.forName on the current generation answers the new class"
+        viaGeneration.is(viaFacade)
+        loader.isStale(one)
+
+        and: "Class.forName on the facade answers from the JVM's record of what the facade initiated, which nothing can clear: the reason callers name the current generation"
+        Class.forName("example.Example", true, loader).is(one)
+
+        cleanup:
+        retired?.close()
+        loader.current().close()
+    }
+
+    private static Object value(Class<?> type) {
+        type.getMethod("value").invoke(type.getDeclaredConstructor().newInstance())
+    }
 }
