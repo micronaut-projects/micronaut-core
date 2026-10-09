@@ -529,6 +529,7 @@ public class DefaultHttpClient implements
                 dataStream(request, errorType).subscribe(new Subscriber<ByteBuffer<?>>() {
                     private Subscription dataSubscription;
                     private CurrentEvent currentEvent;
+                    private final long maxEventSize = configuration.getMaxContentLength();
 
                     @Override
                     public void onSubscribe(Subscription s) {
@@ -551,7 +552,7 @@ public class DefaultHttpClient implements
                             // emit the current event
                             if (len == 0) {
                                 try {
-                                    Event event = Event.of(byteBufferFactory.wrap(currentEvent.data))
+                                    Event event = Event.of(byteBufferFactory.wrap(currentEvent.dataArray()))
                                             .name(currentEvent.name)
                                             .retry(currentEvent.retry)
                                             .id(currentEvent.id);
@@ -576,31 +577,28 @@ public class DefaultHttpClient implements
                                         fromIndex++;
                                     }
                                     if (fromIndex < len) {
-                                        int toIndex = len - fromIndex;
+                                        int length = len - fromIndex;
                                         switch (type) {
                                             case "data":
-                                                ByteBuffer content = buffer.slice(fromIndex, toIndex);
-                                                byte[] d = currentEvent.data;
-                                                if (d == null) {
-                                                    currentEvent.data = content.toByteArray();
-                                                } else {
-                                                    currentEvent.data = ArrayUtils.concat(d, content.toByteArray());
+                                                long newSize = (long) currentEvent.dataLength + length;
+                                                if (newSize > maxEventSize) {
+                                                    currentEvent = null;
+                                                    throw customizeException(new ContentLengthExceededException(maxEventSize, newSize));
                                                 }
-
-
+                                                currentEvent.appendData(buffer.slice(fromIndex, length));
                                                 break;
                                             case "id":
-                                                ByteBuffer id = buffer.slice(fromIndex, toIndex);
+                                                ByteBuffer id = buffer.slice(fromIndex, length);
                                                 currentEvent.id = id.toString(StandardCharsets.UTF_8).trim();
 
                                                 break;
                                             case "event":
-                                                ByteBuffer event = buffer.slice(fromIndex, toIndex);
+                                                ByteBuffer event = buffer.slice(fromIndex, length);
                                                 currentEvent.name = event.toString(StandardCharsets.UTF_8).trim();
 
                                                 break;
                                             case "retry":
-                                                ByteBuffer retry = buffer.slice(fromIndex, toIndex);
+                                                ByteBuffer retry = buffer.slice(fromIndex, length);
                                                 String text = retry.toString(StandardCharsets.UTF_8);
                                                 if (!StringUtils.isEmpty(text)) {
                                                     Long millis = Long.valueOf(text);
@@ -2009,9 +2007,26 @@ public class DefaultHttpClient implements
      */
     private static class CurrentEvent {
         byte[] data;
+        int dataLength;
         String id;
         String name;
         Duration retry;
+
+        void appendData(ByteBuffer<?> content) {
+            int n = content.readableBytes();
+            int required = dataLength + n;
+            if (data == null) {
+                data = new byte[required];
+            } else if (required > data.length) {
+                data = Arrays.copyOf(data, Math.max(required, (int) Math.min(2L * data.length, Integer.MAX_VALUE - 8)));
+            }
+            content.read(data, dataLength, n);
+            dataLength = required;
+        }
+
+        byte[] dataArray() {
+            return data == null || data.length == dataLength ? data : Arrays.copyOf(data, dataLength);
+        }
     }
 
     private abstract class BaseHttpResponseHandler<R extends io.netty.handler.codec.http.HttpResponse, O> extends SimpleChannelInboundHandlerInstrumented<R> {
