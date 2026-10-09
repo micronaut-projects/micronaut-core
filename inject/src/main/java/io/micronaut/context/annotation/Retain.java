@@ -40,6 +40,18 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * <p>The decision is read from the bean definition's annotation metadata, without loading the
  * bean's class, by {@link io.micronaut.context.reload.AnnotatedBeanRetentionPolicy}.</p>
  *
+ * <p>This annotation is the declarative side of retention, the one a module uses; the mechanism
+ * is {@link io.micronaut.context.DefaultBeanContext#stopRetaining(java.util.function.Predicate)},
+ * which the development launcher, and only it, calls when it stops a context to restart it. That
+ * method keeps alive whatever its predicate accepts, but it knows neither which beans are expensive
+ * enough to keep nor which configuration change makes a kept bean stale; a module cannot call it,
+ * since it does not own the context's lifecycle. The launcher builds the predicate from the
+ * {@link io.micronaut.context.reload.BeanRetentionPolicy retention policies}, of which
+ * {@link io.micronaut.context.reload.AnnotatedBeanRetentionPolicy} accepts the beans annotated
+ * with {@code Retain}. A policy also names the configuration prefixes that release what it keeps,
+ * {@link #invalidatedBy()} for this annotation, and the context still refuses what is not safe to
+ * keep, as described above.</p>
+ *
  * @author graemerocher
  * @since 5.3.0
  */
