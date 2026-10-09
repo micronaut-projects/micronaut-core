@@ -178,11 +178,24 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
         return before.method().getAnnotationValuesByType(Scheduled.class).equals(after.method().getAnnotationValuesByType(Scheduled.class));
     }
 
-    @SuppressWarnings("unchecked")
-    private <B> void scheduleTask(ExecutableMethodChange.Entry<Scheduled> entry) {
+    private void scheduleTask(ExecutableMethodChange.Entry<Scheduled> entry) {
         ScheduledMethod scheduled = new ScheduledMethod(entry);
-        List<ScheduledFuture<?>> futures = scheduled.futures;
+        // registered first, so that a close while the timers are being created cancels them
         scheduledTasks.put(entry, scheduled);
+        try {
+            scheduleTimers(entry, scheduled);
+        } catch (RuntimeException | Error e) {
+            // a method with a schedule that failed keeps none of its timers, nor counts as scheduled: the next
+            // batch that adds it schedules it again
+            scheduledTasks.remove(entry, scheduled);
+            scheduled.cancel();
+            throw e;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <B> void scheduleTimers(ExecutableMethodChange.Entry<Scheduled> entry, ScheduledMethod scheduled) {
+        List<ScheduledFuture<?>> futures = scheduled.futures;
         ExecutableMethod<B, ?> method = (ExecutableMethod<B, ?>) entry.method();
         BeanDefinition<B> beanDefinition = (BeanDefinition<B>) entry.definition();
         List<AnnotationValue<Scheduled>> scheduledAnnotations = method.getAnnotationValuesByType(Scheduled.class);

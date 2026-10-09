@@ -2,6 +2,7 @@ package io.micronaut.scheduling.watch
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.env.PropertySource
 import io.micronaut.scheduling.processor.ScheduledMethodProcessor
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -38,6 +39,42 @@ class ScheduledMethodWatcherSpec extends Specification {
         then: "its timer was cancelled"
         processor.scheduledMethods() == 0
         task.runs.get() == stopped
+
+        cleanup:
+        context.close()
+    }
+
+    void "a method whose second schedule fails keeps none of its timers and is scheduled again when it comes back"() {
+        given:
+        def context = ApplicationContext.run(["spec.name": "ScheduledMethodWatcherSpec-partial"])
+        def task = context.getBean(PartlyScheduledTask)
+        def processor = context.getBean(ScheduledMethodProcessor)
+        def definition = context.getBeanDefinition(PartlyScheduledTask)
+        def conditions = new PollingConditions(timeout: 5)
+
+        expect:
+        conditions.eventually { task.runs.get() > 2 }
+        processor.scheduledMethods() == 1
+
+        when: "the method goes, and comes back with a rate that cannot be read"
+        ((DefaultBeanContext) context).notifyDefinitionChange([definition], [])
+        context.environment.addPropertySource(PropertySource.of("partly", ["partly.rate": "not a duration"]))
+        ((DefaultBeanContext) context).notifyDefinitionChange([], [definition])
+        Thread.sleep(150)
+        int stopped = task.runs.get()
+        Thread.sleep(150)
+
+        then: "the first schedule, which could be read, was not left running"
+        processor.scheduledMethods() == 0
+        task.runs.get() == stopped
+
+        when: "the rate is fixed and the method comes back"
+        context.environment.addPropertySource(PropertySource.of("partly-fixed", ["partly.rate": "40ms"], 1000))
+        ((DefaultBeanContext) context).notifyDefinitionChange([], [definition])
+
+        then:
+        processor.scheduledMethods() == 1
+        conditions.eventually { task.runs.get() > stopped + 2 }
 
         cleanup:
         context.close()
