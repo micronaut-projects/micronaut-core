@@ -19,10 +19,13 @@ import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.PropertyElementQuery;
@@ -89,6 +92,13 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private static final String URL_JSON_SCHEMA = "https://json-schema.org/draft/2020-12/schema";
     private static final String STRING = "string";
     private static final String DURATION = "duration";
+    private static final String INTEGER = "integer";
+    private static final String READABLE_BYTES = "readable-bytes";
+    /**
+     * The values {@link io.micronaut.core.convert.format.ReadableBytesTypeConverter} accepts:
+     * a whole number with an optional, case-insensitive KB, MB or GB suffix.
+     */
+    private static final String READABLE_BYTES_PATTERN = "^[+-]?[0-9]+([kKmMgG][bB])?$";
     private static final String ATTR_ADDITIONAL_PROPERTIES = "additionalProperties";
     private static final String BOOLEAN = "boolean";
 
@@ -485,11 +495,57 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                 return;
             }
             // Plain type
+            if (isReadableBytes(pe) && isIntegral(t.getName())) {
+                writeReadableBytesType(out);
+                return;
+            }
             writeSimpleTypeSchema(out, t);
             return;
         }
         // Fallback: map simple by name
         writeSimpleTypeName(out, fqcn);
+    }
+
+    /**
+     * A {@link ReadableBytes} property also accepts a size such as {@code 10MB}, so it is an
+     * integer or a string in that format.
+     */
+    private void writeReadableBytesType(Writer out) throws IOException {
+        attr(out, ATTR_TYPE);
+        out.write('[');
+        str(out, INTEGER);
+        out.write(',');
+        str(out, STRING);
+        out.write(']');
+        out.write(',');
+        attr(out, ATTR_FORMAT);
+        str(out, READABLE_BYTES);
+        out.write(',');
+        attr(out, ATTR_PATTERN);
+        str(out, READABLE_BYTES_PATTERN);
+    }
+
+    private static boolean isReadableBytes(PropertyElement pe) {
+        if (pe.hasStereotype(ReadableBytes.class)) {
+            return true;
+        }
+        MethodElement setter = pe.getWriteMethod().orElse(null);
+        if (setter != null) {
+            ParameterElement[] parameters = setter.getParameters();
+            if (setter.hasStereotype(ReadableBytes.class)
+                || (parameters.length == 1 && parameters[0].hasStereotype(ReadableBytes.class))) {
+                return true;
+            }
+        }
+        return pe.getField().map(field -> field.hasStereotype(ReadableBytes.class)).orElse(false);
+    }
+
+    private static boolean isIntegral(String typeName) {
+        return switch (typeName) {
+            case "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short",
+                 "java.lang.Integer", "java.lang.Long", "java.math.BigInteger" -> true;
+            default -> false;
+        };
     }
 
     private void writeChildTypeSchema(Writer out, ClassElement t) throws IOException {
