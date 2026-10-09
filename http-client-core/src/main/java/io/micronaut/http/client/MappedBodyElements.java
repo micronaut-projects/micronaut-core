@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Elements mapped one by one as they are read.
@@ -38,7 +39,7 @@ public final class MappedBodyElements<S, T> implements BodyElements<T> {
 
     private final BodyElements<S> source;
     private final Function<? super S, ? extends T> mapper;
-    private volatile @Nullable Throwable mappingFailure;
+    private final AtomicReference<@Nullable Throwable> mappingFailure = new AtomicReference<>();
     private volatile boolean closed;
 
     private MappedBodyElements(BodyElements<S> source, Function<? super S, ? extends T> mapper) {
@@ -60,14 +61,14 @@ public final class MappedBodyElements<S, T> implements BodyElements<T> {
     @Override
     public CompletionStage<Optional<T>> next() {
         checkClosed();
-        Throwable error = mappingFailure;
+        Throwable error = mappingFailure.get();
         return error == null ? source.next().thenApply(element -> element.map(this::mapElement)) : CompletableFuture.failedStage(error);
     }
 
     @Override
     public @Nullable T poll() {
         checkClosed();
-        if (mappingFailure != null) {
+        if (mappingFailure.get() != null) {
             return null;
         }
         S element = source.poll();
@@ -76,12 +77,12 @@ public final class MappedBodyElements<S, T> implements BodyElements<T> {
 
     @Override
     public State state() {
-        return mappingFailure == null ? source.state() : State.FAILED;
+        return mappingFailure.get() == null ? source.state() : State.FAILED;
     }
 
     @Override
     public @Nullable Throwable failure() {
-        Throwable error = mappingFailure;
+        Throwable error = mappingFailure.get();
         return error == null ? source.failure() : error;
     }
 
@@ -89,11 +90,11 @@ public final class MappedBodyElements<S, T> implements BodyElements<T> {
     public CompletionStage<Void> forEach(Function<? super T, ? extends CompletionStage<?>> consumer) {
         Objects.requireNonNull(consumer, "consumer");
         checkClosed();
-        Throwable error = mappingFailure;
+        Throwable error = mappingFailure.get();
         if (error != null) {
             try {
                 close();
-            } catch (Throwable closing) {
+            } catch (Exception | Error closing) {
                 if (closing != error) {
                     error.addSuppressed(closing);
                 }
@@ -110,8 +111,8 @@ public final class MappedBodyElements<S, T> implements BodyElements<T> {
     private T mapElement(S element) {
         try {
             return mapper.apply(element);
-        } catch (Throwable e) {
-            mappingFailure = e;
+        } catch (Exception | Error e) {
+            mappingFailure.compareAndSet(null, e);
             throw e;
         }
     }
