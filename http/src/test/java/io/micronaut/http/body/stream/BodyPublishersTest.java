@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -195,6 +196,29 @@ class BodyPublishersTest {
     void awaitFirstFailsWithAFailureBeforeTheFirstItem() {
         IllegalStateException failure = new IllegalStateException("boom");
         assertSame(failure, BodyPublishers.awaitFirst(Flux.error(failure), item -> { }).tryCompleteError());
+    }
+
+    @Test
+    void awaitFirstCancelsASubscriptionArrivingAfterAbandonment() {
+        var subscriber = new AtomicReference<Subscriber<? super String>>();
+        AtomicBoolean cancelled = new AtomicBoolean();
+        AtomicInteger requests = new AtomicInteger();
+        Publisher<String> source = subscriber::set;
+        ExecutionFlow<Publisher<String>> flow = BodyPublishers.awaitFirst(source, item -> { });
+        flow.cancel();
+        subscriber.get().onSubscribe(new Subscription() {
+            @Override
+            public void request(long n) {
+                requests.incrementAndGet();
+            }
+
+            @Override
+            public void cancel() {
+                cancelled.set(true);
+            }
+        });
+        assertTrue(cancelled.get());
+        assertEquals(0, requests.get());
     }
 
     @Test

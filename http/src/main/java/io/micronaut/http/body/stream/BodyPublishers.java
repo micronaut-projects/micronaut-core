@@ -477,8 +477,18 @@ public final class BodyPublishers {
 
         @Override
         public void onSubscribe(Subscription s) {
-            upstream = s;
-            s.request(1);
+            boolean reject;
+            synchronized (this) {
+                reject = cancelled || upstream != null;
+                if (!reject) {
+                    upstream = s;
+                }
+            }
+            if (reject) {
+                s.cancel();
+            } else {
+                s.request(1);
+            }
         }
 
         @Override
@@ -647,6 +657,7 @@ public final class BodyPublishers {
         @Override
         public void cancel() {
             T item;
+            Subscription s;
             synchronized (this) {
                 if (cancelled) {
                     return;
@@ -654,11 +665,11 @@ public final class BodyPublishers {
                 cancelled = true;
                 item = first;
                 first = null;
+                s = upstream;
             }
             if (item != null) {
                 discard.accept(item);
             }
-            Subscription s = upstream;
             if (s != null) {
                 s.cancel();
             }
