@@ -91,7 +91,13 @@ public final class MappedBodyElements<S, T> implements BodyElements<T> {
         checkClosed();
         Throwable error = mappingFailure;
         if (error != null) {
-            close();
+            try {
+                close();
+            } catch (Throwable closing) {
+                if (closing != error) {
+                    error.addSuppressed(closing);
+                }
+            }
             return CompletableFuture.failedStage(error);
         }
         return source.forEach(element -> consumer.apply(mapElement(element))).whenComplete((ignored, failure) -> {
