@@ -1,4 +1,4 @@
-package io.micronaut.http.server.multipart;
+package io.micronaut.http.server.binding;
 
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
