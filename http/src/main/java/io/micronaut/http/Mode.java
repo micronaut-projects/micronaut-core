@@ -18,9 +18,15 @@ package io.micronaut.http;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The request mode values.
+ * The request mode values of the {@code Sec-Fetch-Mode} header.
+ *
+ * <p>The header carries the request's mode as the Fetch Standard defines it, so the list here
+ * follows the Fetch Standard rather than the examples in the Fetch Metadata specification. That
+ * is why {@link #WEBTRANSPORT} is present: the WebTransport specification creates its handshake
+ * request with that mode.
  *
  * @see <a href="https://www.w3.org/TR/fetch-metadata/#sec-fetch-mode-header">Sec-Fetch-Mode</a>
+ * @see <a href="https://fetch.spec.whatwg.org/#concept-request-mode">Request mode</a>
  * @since 5.1.12
  */
 public enum Mode {
@@ -28,7 +34,14 @@ public enum Mode {
     NO_CORS("no-cors"),
     CORS("cors"),
     NAVIGATE("navigate"),
-    WEBSOCKET("websocket");
+    WEBSOCKET("websocket"),
+    /**
+     * The mode of a WebTransport session handshake.
+     *
+     * @see <a href="https://w3c.github.io/webtransport/#webtransport-constructor">WebTransport constructor</a>
+     * @since 5.2.16
+     */
+    WEBTRANSPORT("webtransport");
 
     private final String value;
 
