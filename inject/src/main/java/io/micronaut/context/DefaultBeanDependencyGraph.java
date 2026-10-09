@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -71,6 +72,11 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
      * recorded it, not to every instance of the definition, so only their release removes it.
      */
     private final Map<BeanDependency, AtomicInteger> owned = new ConcurrentHashMap<>();
+    /**
+     * The instances being created on each thread, innermost last, so that an instance that receives one bean at
+     * several injection points counts the edge once, as its destruction releases it once.
+     */
+    private final ThreadLocal<@Nullable Deque<Creation>> creations = new ThreadLocal<>();
 
     /**
      * Records that the bean the given resolution context is creating received the given bean at the
@@ -198,9 +204,56 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
 
     private void add(BeanDependency edge) {
         link(edge);
-        if (!edge.dependent().isSingleton()) {
+        if (!edge.dependent().isSingleton() && firstOfInstance(edge)) {
             instances.computeIfAbsent(edge, e -> new AtomicInteger()).incrementAndGet();
         }
+    }
+
+    /**
+     * Whether the instance being created records the edge for the first time. An edge recorded outside the creation
+     * of an instance of its dependent, such as by a field injected again, is counted each time, as it was.
+     */
+    private boolean firstOfInstance(BeanDependency edge) {
+        Deque<Creation> stack = creations.get();
+        Creation current = stack == null ? null : stack.peekLast();
+        return current == null || current.definition != unwrap(edge.dependent()) || current.counted.add(edge);
+    }
+
+    /**
+     * Marks the start of the creation of one instance of the given definition on this thread, which the
+     * edges recorded until {@link Creation#end()} belong to.
+     *
+     * @param definition The definition of the instance being created
+     * @return The creation, to end once the instance is built
+     */
+    Creation beginCreation(BeanDefinition<?> definition) {
+        Deque<Creation> stack = creations.get();
+        if (stack == null) {
+            stack = new ArrayDeque<>();
+            creations.set(stack);
+        }
+        Creation creation = new Creation(this, unwrap(definition));
+        stack.addLast(creation);
+        return creation;
+    }
+
+    private void endCreation(Creation creation) {
+        Deque<Creation> stack = creations.get();
+        if (stack == null) {
+            return;
+        }
+        if (stack.peekLast() == creation) {
+            stack.removeLast();
+        } else {
+            stack.removeLastOccurrence(creation);
+        }
+        if (stack.isEmpty()) {
+            creations.remove();
+        }
+    }
+
+    private static BeanDefinition<?> unwrap(BeanDefinition<?> definition) {
+        return definition instanceof BeanDefinitionDelegate<?> delegate ? delegate.getDelegate() : definition;
     }
 
     private void link(BeanDependency edge) {
@@ -472,6 +525,27 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
         instances.clear();
         freshSingletons.clear();
         owned.clear();
+    }
+
+    /**
+     * The creation of one instance, with the edges it already counted.
+     */
+    static final class Creation {
+        private final DefaultBeanDependencyGraph graph;
+        private final BeanDefinition<?> definition;
+        private final Set<BeanDependency> counted = new HashSet<>();
+
+        private Creation(DefaultBeanDependencyGraph graph, BeanDefinition<?> definition) {
+            this.graph = graph;
+            this.definition = definition;
+        }
+
+        /**
+         * Marks the end of this creation, on the thread that {@link #beginCreation(BeanDefinition) began} it.
+         */
+        void end() {
+            graph.endCreation(this);
+        }
     }
 
     /**

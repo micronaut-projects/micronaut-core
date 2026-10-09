@@ -2725,6 +2725,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                        @Nullable Map<String, Object> argumentValues) {
         Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
         Qualifier<?> prevQualifier = resolutionContext.getCurrentQualifier();
+        DefaultBeanDependencyGraph graph = dependencyGraph;
+        // what the instance receives is counted once however many injection points receive it
+        DefaultBeanDependencyGraph.Creation creation = graph == null ? null : graph.beginCreation(beanDefinition);
         try {
             resolutionContext.setCurrentQualifier(declaredQualifier != null && !AnyQualifier.INSTANCE.equals(declaredQualifier) ? declaredQualifier : qualifier);
             createDependsOnBeans(resolutionContext, beanDefinition);
@@ -2759,6 +2762,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             throw new BeanInstantiationException(beanDefinition, e);
         } finally {
             resolutionContext.setCurrentQualifier(prevQualifier);
+            if (creation != null) {
+                creation.end();
+            }
         }
     }
 
