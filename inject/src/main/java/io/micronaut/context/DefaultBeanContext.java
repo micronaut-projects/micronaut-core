@@ -181,6 +181,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
     private static final String ARGUMENT_DEFINITION = "definition";
+    private static final String ARGUMENT_WATCHER = "watcher";
+    private static final String ARGUMENT_CHANGE = "change";
     private static final String AROUND_TYPE = "io.micronaut.aop.Around";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     /**
@@ -651,41 +653,41 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     @Override
     public <T> BeanWatch watchDefinitions(Argument<T> beanType, @Nullable Qualifier<T> qualifier, BeanDefinitionWatcher<T> watcher) {
         ArgumentUtils.requireNonNull("beanType", beanType);
-        ArgumentUtils.requireNonNull("watcher", watcher);
+        ArgumentUtils.requireNonNull(ARGUMENT_WATCHER, watcher);
         return watches.watchDefinitions(beanType, qualifier, watcher);
     }
 
     @Override
     public <T> BeanWatch watchBeans(Argument<T> beanType, @Nullable Qualifier<T> qualifier, BeanWatcher<T> watcher) {
         ArgumentUtils.requireNonNull("beanType", beanType);
-        ArgumentUtils.requireNonNull("watcher", watcher);
+        ArgumentUtils.requireNonNull(ARGUMENT_WATCHER, watcher);
         return watches.watchBeans(beanType, qualifier, watcher);
     }
 
     @Override
     public <A extends Annotation> BeanWatch watchMethods(Class<A> annotationType, ExecutableMethodWatcher<A> watcher) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
-        ArgumentUtils.requireNonNull("watcher", watcher);
+        ArgumentUtils.requireNonNull(ARGUMENT_WATCHER, watcher);
         return watches.watchMethods(annotationType, watcher);
     }
 
     @Override
     public BeanWatch watchConfiguration(String prefix, ConfigurationWatcher watcher, boolean initial) {
         ArgumentUtils.requireNonNull("prefix", prefix);
-        ArgumentUtils.requireNonNull("watcher", watcher);
+        ArgumentUtils.requireNonNull(ARGUMENT_WATCHER, watcher);
         return watches.watchConfiguration(prefix, watcher, initial);
     }
 
     @Override
     public BeanWatch watchResources(ResourceSelector selector, ResourceWatcher watcher) {
         ArgumentUtils.requireNonNull("selector", selector);
-        ArgumentUtils.requireNonNull("watcher", watcher);
+        ArgumentUtils.requireNonNull(ARGUMENT_WATCHER, watcher);
         return watches.watchResources(selector, watcher);
     }
 
     @Override
     public BeanWatch watchClassChanges(ClassChangeWatcher watcher) {
-        ArgumentUtils.requireNonNull("watcher", watcher);
+        ArgumentUtils.requireNonNull(ARGUMENT_WATCHER, watcher);
         if (!isDevelopmentMode()) {
             // classes change only under a development launcher: nothing to register, nothing to keep
             return BeanWatchRegistry.INACTIVE;
@@ -727,7 +729,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     @Internal
     @Experimental
     public List<ConfigurationWatcher.Outcome> notifyConfigurationChange(ConfigurationChange change) {
-        ArgumentUtils.requireNonNull("change", change);
+        ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
         return watches.configurationChanged(change);
     }
 
@@ -740,7 +742,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     @Internal
     @Experimental
     public void notifyResourceChange(ResourceChange change) {
-        ArgumentUtils.requireNonNull("change", change);
+        ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
         watches.resourcesChanged(change);
     }
 
@@ -753,7 +755,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     @Internal
     @Experimental
     public void notifyClassChange(ClassChangeEvent change) {
-        ArgumentUtils.requireNonNull("change", change);
+        ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
         watches.classesChanged(change);
     }
 

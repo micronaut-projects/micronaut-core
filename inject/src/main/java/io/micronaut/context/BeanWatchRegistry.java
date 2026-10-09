@@ -89,6 +89,7 @@ final class BeanWatchRegistry {
     static final BeanWatch INACTIVE = new BeanWatch() {
         @Override
         public void close() {
+            // never active: there is nothing to close
         }
 
         @Override
@@ -115,9 +116,10 @@ final class BeanWatchRegistry {
     private final AtomicLong epoch = new AtomicLong();
     /**
      * How many watches the current thread is delivering to: such a thread never waits for another one to
-     * deliver, which is what rules out a cycle of threads each waiting inside a watcher for the other.
+     * deliver, which is what rules out a cycle of threads each waiting inside a watcher for the other. Set only
+     * while the count is above zero, and removed when it returns to zero.
      */
-    private final ThreadLocal<int[]> draining = ThreadLocal.withInitial(() -> new int[1]);
+    private final ThreadLocal<int[]> draining = new ThreadLocal<>();
     private volatile boolean started;
 
     BeanWatchRegistry(DefaultBeanContext context) {
@@ -308,7 +310,7 @@ final class BeanWatchRegistry {
             drain(registration);
             return true;
         }
-        if (drainer == current || draining.get()[0] > 0) {
+        if (drainer == current || draining.get() != null) {
             // delivering to a watch already: the thread draining this queue delivers the batch after the ones before it
             return !delivery.handOff();
         }
@@ -322,6 +324,10 @@ final class BeanWatchRegistry {
      */
     private void drain(Registration registration) {
         int[] depth = draining.get();
+        if (depth == null) {
+            depth = new int[1];
+            draining.set(depth);
+        }
         depth[0]++;
         try {
             while (true) {
@@ -336,7 +342,9 @@ final class BeanWatchRegistry {
                 next.run();
             }
         } finally {
-            depth[0]--;
+            if (--depth[0] == 0) {
+                draining.remove();
+            }
         }
     }
 
@@ -603,7 +611,8 @@ final class BeanWatchRegistry {
             while (!done) {
                 try {
                     wait();
-                } catch (InterruptedException e) {
+                } catch (InterruptedException e) { // NOSONAR java:S2142 the flag is restored once done, after the loop
+                    // restoring the flag here would make the next wait() throw at once and spin
                     interrupted = true;
                 }
             }
@@ -844,6 +853,7 @@ final class BeanWatchRegistry {
          * Releases what the watch owns, once, after it was closed.
          */
         void onClose() {
+            // a watch owns nothing by default; the bean watch overrides this
         }
 
         @Override
@@ -1140,6 +1150,7 @@ final class BeanWatchRegistry {
 
         @Override
         void deliverDefinitions(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
+            // a configuration watch sees configuration changes only, never definitions
         }
 
         @Override
@@ -1178,6 +1189,7 @@ final class BeanWatchRegistry {
 
         @Override
         void deliverDefinitions(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
+            // a resource watch sees resource changes only, never definitions
         }
 
         @Override
@@ -1206,6 +1218,7 @@ final class BeanWatchRegistry {
 
         @Override
         void deliverDefinitions(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
+            // a class change watch sees class changes only, never definitions
         }
 
         @Override

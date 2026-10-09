@@ -9,12 +9,15 @@ public class Ticker {
 
     @Tick("fast")
     public void tick() {
+        // only the @Tick annotation matters to the spec
     }
 
     @Tick("slow")
     public void tock(int times) {
+        // only the @Tick annotation matters to the spec
     }
 
     public void plain() {
+        // a method without @Tick, which the watch must not see
     }
 }

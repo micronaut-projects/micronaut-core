@@ -14,5 +14,6 @@ import jakarta.inject.Singleton;
 public class BuzzOnClass {
 
     public void third() {
+        // only the @Buzz annotation matters to the spec
     }
 }

@@ -140,8 +140,10 @@ public final class BeanDefinitionChange<T> {
      * @return True if they describe the same bean
      */
     static boolean sameBean(BeanDefinition<?> before, BeanDefinition<?> after) {
-        return before.getClass().getName().equals(after.getClass().getName())
-            && before.getBeanType().getName().equals(after.getBeanType().getName())
+        // a generation loads the classes it replaces through its own class loader, so the Class objects of the
+        // same bean in two generations need not be equal nor assignable to each other: only their names pair them
+        return before.getClass().getName().equals(after.getClass().getName()) // NOSONAR java:S1872 compares across class loaders
+            && before.getBeanType().getName().equals(after.getBeanType().getName()) // NOSONAR java:S1872 compares across class loaders
             && Objects.equals(before.getDeclaredQualifier(), after.getDeclaredQualifier());
     }
 

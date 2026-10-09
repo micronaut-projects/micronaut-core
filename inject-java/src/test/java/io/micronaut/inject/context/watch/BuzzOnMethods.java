@@ -14,9 +14,11 @@ public class BuzzOnMethods {
 
     @Buzz
     public void first() {
+        // only the @Buzz annotation matters to the spec
     }
 
     @Buzz
     public void second() {
+        // only the @Buzz annotation matters to the spec
     }
 }
