@@ -21,8 +21,11 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.scheduler.Schedulers;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.net.URL;
+import java.util.List;
 import java.net.URLClassLoader;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CompletableFuture;
@@ -32,9 +35,32 @@ import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReactorInteropTest {
+    @Test
+    void adaptsDeclaredReactorTypesWithoutConverterBeans() {
+        Flux<Integer> flux = Flux.just(1, 2);
+        Publisher<Integer> source = flux::subscribe;
+        Publisher<Integer> adaptedFlux = ReactorInterop.adaptPublisher(source, Flux.class);
+        assertInstanceOf(Flux.class, adaptedFlux);
+        assertEquals(List.of(1, 2), Flux.from(adaptedFlux).collectList().block());
+
+        AtomicInteger cancelled = new AtomicInteger();
+        Publisher<Integer> multiple = subscriber -> flux.doOnCancel(cancelled::incrementAndGet).subscribe(subscriber);
+        Publisher<Integer> adaptedMono = ReactorInterop.adaptPublisher(multiple, Mono.class);
+        assertInstanceOf(Mono.class, adaptedMono);
+        assertEquals(1, Mono.from(adaptedMono).block());
+        assertTrue(cancelled.get() > 0);
+
+        Mono<Integer> mono = Mono.just(1);
+        assertSame(flux, ReactorInterop.adaptPublisher(flux, Flux.class));
+        assertSame(mono, ReactorInterop.adaptPublisher(mono, Mono.class));
+        assertSame(source, ReactorInterop.adaptPublisher(source, Publisher.class));
+    }
+
     @Test
     void preservesReactorNonBlockingThreadDetection() throws Exception {
         assertEquals(Schedulers.isInNonBlockingThread(), ReactorInterop.isInNonBlockingThread());
@@ -93,6 +119,8 @@ class ReactorInteropTest {
             assertThrows(ClassNotFoundException.class, () -> loader.loadClass("reactor.core.CorePublisher"));
             Class<?> interop = loader.loadClass(ReactorInterop.class.getName());
             assertEquals(false, interop.getMethod("isInNonBlockingThread").invoke(null));
+            assertSame(source, interop.getMethod("adaptPublisher", Publisher.class, Class.class)
+                .invoke(null, source, Publisher.class));
             assertSame(loader, interop.getClassLoader());
             interop.getMethod("subscribe", Publisher.class, Subscriber.class, Supplier.class, Consumer.class)
                 .invoke(null, source, subscriber, null, null);
