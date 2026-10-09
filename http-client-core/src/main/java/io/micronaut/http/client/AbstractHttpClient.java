@@ -1155,7 +1155,22 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             }
             @SuppressWarnings("unchecked")
             HttpResponse<T> result = (HttpResponse<T>) response;
+            // Ownership has reached the caller; exchange failure cleanup must no longer own it.
+            created.set(null);
             return ExecutionFlow.just(result);
+        }).onErrorResume(error -> {
+            HttpResponse<T> failed = created.getAndSet(null);
+            if (failed != null) {
+                // A throwing response filter leaves the created stream without a reader.
+                try {
+                    close.accept(failed);
+                } catch (Throwable cleanupError) {
+                    if (cleanupError != error) {
+                        error.addSuppressed(cleanupError);
+                    }
+                }
+            }
+            return ExecutionFlow.error(error);
         });
     }
 
