@@ -16,6 +16,7 @@
 package io.micronaut.http.server.multipart;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.body.stream.ReactorInterop;
 import io.micronaut.core.execution.ExecutionFlow;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -71,7 +72,7 @@ public final class FormFieldFlows {
                 complete(mapped);
             }
         };
-        source.subscribe(result);
+        ReactorInterop.subscribe(source, result, null, null);
         return result;
     }
 
@@ -148,7 +149,7 @@ public final class FormFieldFlows {
                 }
             }
         };
-        source.subscribe(result);
+        ReactorInterop.subscribe(source, result, null, null);
         return result;
     }
 
