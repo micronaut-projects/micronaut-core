@@ -113,14 +113,12 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
      */
     private final Map<WatchKey, WatchedDirectory> directoriesByKey = new LinkedHashMap<>();
     /**
-     * Changes waiting for the quiet period to elapse, in the order first observed. Only the watch thread touches it.
+     * Whether a registration has changes waiting for the quiet period to elapse. Each registration keeps its own,
+     * decided when they are recorded, so that a registration receives only changes recorded after it was made, merged
+     * only with each other, and still receives those of a directory released before they were delivered. Only the
+     * watch thread touches it.
      */
-    private final Map<Path, PendingChange> pending = new LinkedHashMap<>();
-    /**
-     * Counts recorded events. A registration remembers the count at its creation and receives only
-     * changes recorded after it, never ones that were pending before it was made.
-     */
-    private volatile long sequence;
+    private boolean pending;
     private long firstPendingNanos;
     private long lastEventNanos;
     private @Nullable Thread thread;
@@ -222,7 +220,7 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
             if (closed.get()) {
                 throw new IllegalStateException("The watcher is closed");
             }
-            DirectoryRegistration registration = new DirectoryRegistration(absoluteRoot, filter, listener, sequence);
+            DirectoryRegistration registration = new DirectoryRegistration(absoluteRoot, filter, listener);
             registrations.add(registration);
             try {
                 registerTree(absoluteRoot, registration, null);
@@ -304,7 +302,7 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
     private void run() {
         while (active.get()) {
             try {
-                long timeout = pending.isEmpty() ? checkInterval.toMillis() : Math.max(1, millisUntilDue());
+                long timeout = pending ? Math.max(1, millisUntilDue()) : checkInterval.toMillis();
                 if (pendingStages.get() > 0 || !ready.isEmpty()) {
                     timeout = ready.isEmpty() ? Math.max(1, Math.min(timeout, quietPeriod.toMillis())) : 0;
                 }
@@ -312,7 +310,7 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
                 if (key != null) {
                     drain(key);
                 }
-                if (!pending.isEmpty() && millisUntilDue() <= 0) {
+                if (pending && millisUntilDue() <= 0) {
                     flush();
                 }
                 deliverReady();
@@ -384,25 +382,26 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         return Math.min(quietDue, latestDue);
     }
 
+    /**
+     * Records a change for every registration it is delivered to, decided now: a directory whose key became invalid
+     * is released right after its events are recorded, and a registration made later must not receive the change.
+     */
     private void record(Path path, WatchEventType type) {
-        long now = System.nanoTime();
-        if (pending.isEmpty()) {
-            firstPendingNanos = now;
+        lastEventNanos = System.nanoTime();
+        for (DirectoryRegistration registration : registrations) {
+            recordFor(registration, path, type);
         }
-        lastEventNanos = now;
-        long recordedAt = ++sequence;
-        PendingChange existing = pending.get(path);
-        if (existing == null) {
-            pending.put(path, new PendingChange(new FileChange(path, type), recordedAt));
-        } else {
-            FileChange merged = existing.change().merge(type);
-            if (merged == null) {
-                // created and deleted again: no listener was told the path existed
-                pending.remove(path);
-            } else {
-                pending.put(path, new PendingChange(merged, recordedAt));
-            }
+    }
+
+    private void recordFor(DirectoryRegistration registration, Path path, WatchEventType type) {
+        if (!registration.isActive() || !registration.accepts(path)) {
+            return;
         }
+        if (!pending) {
+            pending = true;
+            firstPendingNanos = System.nanoTime();
+        }
+        registration.record(path, type);
     }
 
     /**
@@ -421,7 +420,8 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
                 try {
                     registerTree(created, registration, path -> {
                         if (!path.equals(created)) {
-                            record(path, WatchEventType.CREATE);
+                            lastEventNanos = System.nanoTime();
+                            recordFor(registration, path, WatchEventType.CREATE);
                         }
                     });
                 } catch (IOException e) {
@@ -437,23 +437,14 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
      * Delivers the pending changes to the registrations they fall under, once the quiet period passed.
      */
     private void flush() {
-        if (pending.isEmpty()) {
+        if (!pending) {
             return;
         }
-        List<PendingChange> changes = new ArrayList<>(pending.values());
-        pending.clear();
+        pending = false;
         for (DirectoryRegistration registration : registrations) {
-            if (!registration.isActive()) {
-                continue;
-            }
-            List<FileChange> matching = new ArrayList<>(changes.size());
-            for (PendingChange change : changes) {
-                if (change.recordedAt() > registration.since && registration.accepts(change.change().path())) {
-                    matching.add(change.change());
-                }
-            }
-            if (!matching.isEmpty()) {
-                registration.offer(matching);
+            List<FileChange> changes = registration.takePending();
+            if (!changes.isEmpty() && registration.isActive()) {
+                registration.offer(changes);
             }
         }
     }
@@ -655,9 +646,6 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         }
     }
 
-    private record PendingChange(FileChange change, long recordedAt) {
-    }
-
     private static final class WatchedDirectory {
         private final Path path;
         private final WatchKey key;
@@ -710,9 +698,13 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         private final Path root;
         private final WatchFilter filter;
         private final Function<? super FileChangeBatch, ? extends CompletionStage<?>> listener;
-        private final long since;
         private volatile boolean registrationActive = true;
         private final List<WatchedDirectory> directories = new CopyOnWriteArrayList<>();
+        /**
+         * Changes waiting for the quiet period to elapse, merged by path in the order first observed. Only the watch
+         * thread touches it.
+         */
+        private final Map<Path, FileChange> pending = new LinkedHashMap<>();
         /**
          * Changes that arrived while the listener's stage was pending, merged by path. Guarded by {@code this}.
          */
@@ -726,11 +718,10 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
          */
         private @Nullable Thread delivering;
 
-        DirectoryRegistration(Path root, WatchFilter filter, Function<? super FileChangeBatch, ? extends CompletionStage<?>> listener, long since) {
+        DirectoryRegistration(Path root, WatchFilter filter, Function<? super FileChangeBatch, ? extends CompletionStage<?>> listener) {
             this.root = root;
             this.filter = filter;
             this.listener = listener;
-            this.since = since;
         }
 
         @Override
@@ -817,6 +808,25 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         }
 
         /**
+         * Records a change until the quiet period elapsed. Called on the watch thread.
+         */
+        void record(Path path, WatchEventType type) {
+            merge(pending, path, type);
+        }
+
+        /**
+         * @return The changes recorded since the last call. Called on the watch thread.
+         */
+        List<FileChange> takePending() {
+            if (pending.isEmpty()) {
+                return List.of();
+            }
+            List<FileChange> changes = List.copyOf(pending.values());
+            pending.clear();
+            return changes;
+        }
+
+        /**
          * Hands the changes to the listener, or holds them back while its stage is pending. Called on the watch thread.
          */
         void offer(List<FileChange> changes) {
@@ -826,7 +836,7 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
                 }
                 if (inFlight) {
                     for (FileChange change : changes) {
-                        hold(change);
+                        merge(held, change.path(), change.type());
                     }
                     return;
                 }
@@ -852,17 +862,21 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
             dispatch(changes);
         }
 
-        private void hold(FileChange change) {
-            FileChange existing = held.get(change.path());
+        /**
+         * Merges a later change of a path into the changes of this registration.
+         */
+        private static void merge(Map<Path, FileChange> changes, Path path, WatchEventType type) {
+            FileChange existing = changes.get(path);
             if (existing == null) {
-                held.put(change.path(), change);
+                changes.put(path, new FileChange(path, type));
                 return;
             }
-            FileChange merged = existing.merge(change.type());
+            FileChange merged = existing.merge(type);
             if (merged == null) {
-                held.remove(change.path());
+                // created and deleted again: this registration was never told the path existed
+                changes.remove(path);
             } else {
-                held.put(change.path(), merged);
+                changes.put(path, merged);
             }
         }
 
