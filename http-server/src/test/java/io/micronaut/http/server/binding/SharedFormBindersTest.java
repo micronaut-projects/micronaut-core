@@ -199,9 +199,10 @@ class SharedFormBindersTest {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     @SuppressWarnings({"rawtypes", "unchecked"})
-    void cancellingDiscardsFieldsQueuedByAForeignDecoder() {
+    void cancellingDiscardsFieldsQueuedByAForeignDecoder(boolean wrappedPublisher) {
         var streaming = BODIES.createStreamingBody(BodySizeLimits.UNLIMITED, new BufferConsumer.Upstream() {
             @Override
             public void onBytesConsumed(long bytes) {
@@ -213,6 +214,7 @@ class SharedFormBindersTest {
              RawFormField slow = new RawFormField(request.field.metadata(), streaming.rootBody());
              RawFormField queued = new RawFormField(request.field.metadata(), BODIES.copyOf("queued", StandardCharsets.UTF_8))) {
             request.delayed = Sinks.many().unicast().onBackpressureBuffer();
+            request.wrapPublisher = wrappedPublisher;
             var bodyBinder = context.getBean(ServerBodyAnnotationBinder.class);
             Argument argument = Argument.of(CompletableFuture.class, "body", Argument.of(Map.class));
             var future = (CompletableFuture<?>) new CompletableFutureBodyBinder(bodyBinder)
@@ -380,6 +382,7 @@ class SharedFormBindersTest {
         private final List<Runnable> disposal = new ArrayList<>();
         private Sinks.Many<RawFormField> delayed;
         private boolean failDecoderCreation;
+        private boolean wrapPublisher;
 
         FormRequest(String name, @Nullable String filename, String value) {
             super(HttpRequest.POST("/form", null).contentType(MediaType.MULTIPART_FORM_DATA_TYPE));
@@ -397,7 +400,8 @@ class SharedFormBindersTest {
                 throw new UnsupportedOperationException("decoder creation");
             }
             ((CloseableByteBody) bytes).close();
-            return delayed == null ? Flux.just(field) : delayed.asFlux();
+            Publisher<RawFormField> source = delayed == null ? Flux.just(field) : delayed.asFlux();
+            return wrapPublisher ? subscriber -> source.subscribe(subscriber) : source;
         }
 
         @Override
