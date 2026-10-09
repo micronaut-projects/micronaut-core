@@ -17,6 +17,7 @@ package io.micronaut.dev.test;
 
 import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -163,9 +164,11 @@ public final class TestResults {
                     }
                 }
                 Set<String> replaced = new LinkedHashSet<>(run.keySet());
+                Set<String> known = new LinkedHashSet<>(latest.keySet());
+                known.addAll(run.keySet());
                 // and the tests grouped under a selected file, which reports none when its last test is gone
                 for (String className : latest.keySet()) {
-                    if (isOfFiles(className, selection.files())) {
+                    if (isOfFiles(className, selection.files(), known)) {
                         replaced.add(className);
                     }
                 }
@@ -242,18 +245,27 @@ public final class TestResults {
 
     /**
      * Whether results are grouped under one of these files: the name is the file's path, relative or not, as a runner
-     * without classes, such as pytest, groups its tests.
+     * without classes, such as pytest, groups its tests. A bare file name is that of a file directly under the
+     * directory the runner names files from: it is a selected file of that name unless the results know that file under
+     * a longer name, which a file in a subdirectory has.
      */
-    private static boolean isOfFiles(String className, Set<Path> files) {
-        Path grouped;
-        try {
-            grouped = Path.of(className).normalize();
-        } catch (InvalidPathException e) {
+    private static boolean isOfFiles(String className, Set<Path> files, Set<String> known) {
+        Path grouped = path(className);
+        if (grouped == null) {
             return false;
         }
         if (grouped.getNameCount() < 2 && !grouped.isAbsolute()) {
-            // a class name, or a bare file name that cannot tell two directories apart
-            return files.stream().anyMatch(file -> file.normalize().equals(grouped));
+            // a bare file name, or a class name, which is no selected file's name
+            for (Path file : files) {
+                Path normalized = file.normalize();
+                if (normalized.equals(grouped)) {
+                    return true;
+                }
+                if (grouped.equals(normalized.getFileName()) && known.stream().noneMatch(name -> isLongerNameOf(name, normalized, grouped))) {
+                    return true;
+                }
+            }
+            return false;
         }
         for (Path file : files) {
             Path normalized = file.normalize();
@@ -262,6 +274,26 @@ public final class TestResults {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether a name of results is a name of the file with more than its file name, as the runner names a file in a
+     * subdirectory.
+     */
+    private static boolean isLongerNameOf(String name, Path file, Path fileName) {
+        Path other = path(name);
+        if (other == null || other.getNameCount() < 2 || !fileName.equals(other.getFileName())) {
+            return false;
+        }
+        return file.endsWith(other) || other.endsWith(file);
+    }
+
+    private static @Nullable Path path(String name) {
+        try {
+            return Path.of(name).normalize();
+        } catch (InvalidPathException e) {
+            return null;
+        }
     }
 
     /**

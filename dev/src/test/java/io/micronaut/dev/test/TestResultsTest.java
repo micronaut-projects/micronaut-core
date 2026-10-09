@@ -34,6 +34,28 @@ class TestResultsTest {
     }
 
     @Test
+    void resultsGroupedUnderABareFileNameAreThoseOfTheSelectedFileOfThatName() {
+        TestResults results = new TestResults();
+        Path root = Path.of("/project/tests").toAbsolutePath();
+        runFile(results, TestSelection.all(), "test_top.py", "test_adds");
+        runFile(results, new TestSelection(false, Set.of(), Set.of(), Set.of(root.resolve("sub/test_top.py")), List.of(), "1 file changed"),
+            "sub/test_top.py", "test_nested");
+        assertEquals(1, results.of("test_top.py").size());
+
+        // a file in a subdirectory of the same name ran: the file directly under the root keeps its results
+        TestSelection nested = new TestSelection(false, Set.of(), Set.of(), Set.of(root.resolve("sub/test_top.py")), List.of(), "1 file changed");
+        runFile(results, nested, "sub/test_top.py");
+        assertEquals(1, results.of("test_top.py").size());
+        assertTrue(results.of("sub/test_top.py").isEmpty());
+
+        // the file directly under the root, selected by its absolute path, lost its last test: its results go
+        TestSelection top = new TestSelection(false, Set.of(), Set.of(), Set.of(root.resolve("test_top.py")), List.of(), "1 file changed");
+        TestResults.Applied applied = runFile(results, top, "test_top.py");
+        assertTrue(results.of("test_top.py").isEmpty());
+        assertTrue(applied.classes().contains("test_top.py"));
+    }
+
+    @Test
     void outputBeyondTheLimitIsCountedNotKept() {
         TestResults results = new TestResults(5);
         TestId test = id("test_loud");
@@ -52,6 +74,16 @@ class TestResultsTest {
         results.runStarted(new TestRunStarted("run", "pytest", selection, Instant.now()));
         for (String name : names) {
             TestId test = id(name);
+            results.testStarted(test);
+            results.testFinished(test, new TestOutcome(TestStatus.PASSED, Duration.ZERO, null, null));
+        }
+        return results.runFinished(new TestRunSummary("run", names.length, 0, 0, 0, Duration.ZERO, false, true));
+    }
+
+    private static TestResults.Applied runFile(TestResults results, TestSelection selection, String file, String... names) {
+        results.runStarted(new TestRunStarted("run", "pytest", selection, Instant.now()));
+        for (String name : names) {
+            TestId test = new TestId("[engine:pytest]/[file:" + file + "]/[test:" + name + "]", file, name, name);
             results.testStarted(test);
             results.testFinished(test, new TestOutcome(TestStatus.PASSED, Duration.ZERO, null, null));
         }
