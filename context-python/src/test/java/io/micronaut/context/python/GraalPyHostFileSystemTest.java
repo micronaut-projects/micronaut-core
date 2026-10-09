@@ -123,9 +123,10 @@ final class GraalPyHostFileSystemTest {
     void theVirtualFileSystemStaysReadOnly() {
         Path target = directory.resolve("moved.py");
         String source = python("'/graalpy_vfs/src/' + sorted(__import__('os').listdir('/graalpy_vfs/src'))[0]").asString();
+        Value replace = python("lambda a, b: __import__('os').replace(a, b)");
+        String targetPath = target.toString();
 
-        PolyglotException failure = assertThrows(PolyglotException.class, () ->
-            python("lambda a, b: __import__('os').replace(a, b)").executeVoid(source, target.toString()));
+        PolyglotException failure = assertThrows(PolyglotException.class, () -> replace.executeVoid(source, targetPath));
 
         assertTrue(failure.getMessage().contains("Error"), failure.getMessage());
         assertFalse(Files.exists(target));
