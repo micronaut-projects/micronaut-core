@@ -84,6 +84,7 @@ import static io.micronaut.http.client.AbstractHttpClient.report;
 @Internal
 @Experimental
 abstract class AbstractJdkHttpClient {
+    private static final String ERROR_SENDING_REQUEST = "Error sending request: ";
 
     public static final String H2C_ERROR_MESSAGE = "H2C is not supported by the JDK HTTP client";
     public static final String H3_ERROR_MESSAGE = "HTTP/3 is not supported by the JDK HTTP client";
@@ -397,7 +398,7 @@ abstract class AbstractJdkHttpClient {
                 // a buffered response whose body was cut off
                 report(selection, LoadBalancer.Outcome.RESET);
             }
-            result = new HttpClientException("Error sending request: " + e.getMessage(), e);
+            result = new HttpClientException(ERROR_SENDING_REQUEST + e.getMessage(), e);
         }
         if (result instanceof UnprocessedRequestException unprocessed && uri != null) {
             unprocessed.setTarget(uri, selection == null ? null : selection.instance());
@@ -524,7 +525,7 @@ abstract class AbstractJdkHttpClient {
             if (cause instanceof IOException io) {
                 mapped = sendError(selection, httpRequest.uri(), io, headersReceived.get());
             } else if (cause instanceof InterruptedException) {
-                mapped = new HttpClientException("Error sending request: " + cause.getMessage(), cause);
+                mapped = new HttpClientException(ERROR_SENDING_REQUEST + cause.getMessage(), cause);
             } else {
                 mapped = cause;
             }
@@ -572,7 +573,7 @@ abstract class AbstractJdkHttpClient {
             if (cause instanceof IOException io) {
                 mapped = sendError(selection, httpRequest.uri(), io, headersReceived.get());
             } else if (cause instanceof InterruptedException) {
-                mapped = new HttpClientException("Error sending request: " + cause.getMessage(), cause);
+                mapped = new HttpClientException(ERROR_SENDING_REQUEST + cause.getMessage(), cause);
             } else {
                 mapped = cause;
             }
