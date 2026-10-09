@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.Internal;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +60,6 @@ import java.util.concurrent.TimeoutException;
  * @since 5.3.0
  */
 @Internal
-@NullMarked
 @Singleton
 @DevelopmentActive
 final class PythonInPlaceReloader implements InPlaceResourceReloader {

@@ -17,7 +17,6 @@ package io.micronaut.context.reload;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
-import org.jspecify.annotations.NullMarked;
 
 import java.util.Objects;
 import java.util.Set;
@@ -46,7 +45,6 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public interface InPlaceResourceReloader extends Ordered {
 
     /**
