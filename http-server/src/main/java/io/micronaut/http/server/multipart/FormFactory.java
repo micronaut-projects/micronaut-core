@@ -408,7 +408,8 @@ public final class FormFactory {
                 if (closeResource.compareAndSet(null, cfu)) {
                     result.complete(cfu);
                 } else {
-                    result.completeExceptionally(concurrentClose(null));
+                    // The request ended while the part was arriving: release its content.
+                    result.completeExceptionally(concurrentClose(cfu));
                 }
             } else {
                 // wait for last piece to be written

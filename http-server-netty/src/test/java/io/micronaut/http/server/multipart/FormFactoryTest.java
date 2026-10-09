@@ -1,5 +1,6 @@
 package io.micronaut.http.server.multipart;
 
+import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ConversionService;
@@ -21,12 +22,16 @@ import io.micronaut.http.multipart.FormFieldMetadata;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -39,9 +44,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ParameterizedClass
 @ValueSource(booleans = {true, false})
@@ -105,6 +112,28 @@ class FormFactoryTest {
                 assertEquals(metadata, upload.getMetadata());
                 assertEquals("fizzbuzz", new String(upload.getBytes(), UTF_8));
             }
+        }
+    }
+
+    @Test
+    void inMemoryUploadCompletedAfterTheRequestEndedIsReleased() throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run(StorageMode.STANDARD.config)) {
+            var factory = ctx.getBean(FormFactory.class);
+            FormFieldMetadata metadata = new FormFieldMetadata("foo", "bar.txt", MediaType.TEXT_PLAIN_TYPE);
+            ByteBodyFactory.StreamingBody streamingBody = mockRequest.byteBodyFactory().createStreamingBody(BodySizeLimits.UNLIMITED, new MockUpstream());
+            ExecutionFlow<CompletedFileUpload> flow = factory.completeFileUpload(mockRequest, new RawFormField(metadata, streamingBody.rootBody()));
+            NettyReadBufferFactory buffers = NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT);
+            ByteBuf fizz = Unpooled.copiedBuffer("fizz", UTF_8);
+            ByteBuf buzz = Unpooled.copiedBuffer("buzz", UTF_8);
+            streamingBody.sharedBuffer().add(buffers.adapt(fizz));
+            // The request ends while the part is still arriving.
+            disposeTasks.forEach(Runnable::run);
+            disposeTasks.clear();
+            streamingBody.sharedBuffer().add(buffers.adapt(buzz));
+            streamingBody.sharedBuffer().complete();
+            assertThrows(ExecutionException.class, () -> flow.toCompletableFuture().get());
+            assertEquals(0, fizz.refCnt(), "the content received before the request ended is released");
+            assertEquals(0, buzz.refCnt(), "the content received after the request ended is released");
         }
     }
 
