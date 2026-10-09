@@ -358,37 +358,45 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         VirtualFileSystem vfs = VirtualFileSystem.newBuilder()
             .resourceDirectory(APPLICATION_PATH)
             .resourceClassLoader(classLoader).build();
-        Context.Builder builder = contextConfiguration.getBuilder()
-            .apply(GraalPyResources.forVirtualFileSystem(vfs))
-            .logHandler(new GraalPySlf4jLogHandler())
-            .allowExperimentalOptions(true)
-            .allowCreateProcess(true)
-            .allowEnvironmentAccess(EnvironmentAccess.INHERIT)
-            .allowValueSharing(true)
-            .allowPolyglotAccess(PolyglotAccess.ALL)
-            // Allow access to host classes
-            .allowHostAccess(hostAccess)
-            .hostClassLoader(classLoader)
-            .engine(engine)
-            .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
-            // Python reaches Java through java.type(...) and "from a.b import C". By default the
-            // filter accepts every class the application class loader can load, the application's
-            // own packages included, which is what generated and user Python code needs. That also
-            // exposes java.lang.Runtime, ProcessBuilder and the like, so an application that runs
-            // Python it trusts less than its Java can narrow the surface with
-            // graalpy.context.host-class-lookup; the filter then keeps the JDK, Jakarta and framework
-            // packages the generated code depends on and adds only the configured packages.
-            .allowHostClassLookup(contextConfiguration.hostClassFilter());
-        resolveVirtualEnvExecutable(System.getenv())
-            .ifPresent(executable -> builder.option("python.Executable", executable.toString()));
-        GraalPyContextCustomizers.load(classLoader)
-            .forEach(customizer -> customizer.customize(builder));
+        // the engine must not close under a context it does not know of yet, such as one a pool
+        // warm-up builds while the application shuts down
+        PythonContextRegistry.beginContextBuild(engine);
+        Context context;
+        try {
+            Context.Builder builder = contextConfiguration.getBuilder()
+                .apply(GraalPyResources.forVirtualFileSystem(vfs))
+                .logHandler(new GraalPySlf4jLogHandler())
+                .allowExperimentalOptions(true)
+                .allowCreateProcess(true)
+                .allowEnvironmentAccess(EnvironmentAccess.INHERIT)
+                .allowValueSharing(true)
+                .allowPolyglotAccess(PolyglotAccess.ALL)
+                // Allow access to host classes
+                .allowHostAccess(hostAccess)
+                .hostClassLoader(classLoader)
+                .engine(engine)
+                .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
+                // Python reaches Java through java.type(...) and "from a.b import C". By default the
+                // filter accepts every class the application class loader can load, the application's
+                // own packages included, which is what generated and user Python code needs. That also
+                // exposes java.lang.Runtime, ProcessBuilder and the like, so an application that runs
+                // Python it trusts less than its Java can narrow the surface with
+                // graalpy.context.host-class-lookup; the filter then keeps the JDK, Jakarta and framework
+                // packages the generated code depends on and adds only the configured packages.
+                .allowHostClassLookup(contextConfiguration.hostClassFilter());
+            resolveVirtualEnvExecutable(System.getenv())
+                .ifPresent(executable -> builder.option("python.Executable", executable.toString()));
+            GraalPyContextCustomizers.load(classLoader)
+                .forEach(customizer -> customizer.customize(builder));
 
-        LOG.debug("Configured GraalPy Context.Builder in {}ms", System.currentTimeMillis() - now);
+            LOG.debug("Configured GraalPy Context.Builder in {}ms", System.currentTimeMillis() - now);
 
-        now = System.currentTimeMillis();
-        var context = builder.build();
-        PythonContextRegistry.registerContext(context);
+            now = System.currentTimeMillis();
+            context = builder.build();
+            PythonContextRegistry.registerContext(context);
+        } finally {
+            PythonContextRegistry.endContextBuild(engine);
+        }
         LOG.debug("GraalPy Context Built in {}ms", System.currentTimeMillis() - now);
         boolean bootstrapped = false;
         try {

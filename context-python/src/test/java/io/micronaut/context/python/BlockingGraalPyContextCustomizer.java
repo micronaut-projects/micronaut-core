@@ -16,6 +16,7 @@
 package io.micronaut.context.python;
 
 import org.graalvm.polyglot.Context;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -24,7 +25,14 @@ final class BlockingGraalPyContextCustomizer implements GraalPyContextCustomizer
     private static final AtomicReference<Gate> NEXT_CONTEXT = new AtomicReference<>();
 
     static Gate blockNextContext() {
-        Gate gate = new Gate();
+        return blockNextContextOn(null);
+    }
+
+    /**
+     * Block the next context built on the named thread; contexts other threads build go ahead.
+     */
+    static Gate blockNextContextOn(@Nullable String threadName) {
+        Gate gate = new Gate(threadName);
         if (!NEXT_CONTEXT.compareAndSet(null, gate)) {
             throw new IllegalStateException("A context build is already blocked");
         }
@@ -33,8 +41,10 @@ final class BlockingGraalPyContextCustomizer implements GraalPyContextCustomizer
 
     @Override
     public void customize(Context.Builder builder) {
-        Gate gate = NEXT_CONTEXT.getAndSet(null);
-        if (gate == null) {
+        Gate gate = NEXT_CONTEXT.get();
+        if (gate == null
+            || (gate.threadName != null && !gate.threadName.equals(Thread.currentThread().getName()))
+            || !NEXT_CONTEXT.compareAndSet(gate, null)) {
             return;
         }
         gate.entered.countDown();
@@ -55,5 +65,10 @@ final class BlockingGraalPyContextCustomizer implements GraalPyContextCustomizer
     static final class Gate {
         final CountDownLatch entered = new CountDownLatch(1);
         final CountDownLatch proceed = new CountDownLatch(1);
+        final @Nullable String threadName;
+
+        Gate(@Nullable String threadName) {
+            this.threadName = threadName;
+        }
     }
 }
