@@ -21,6 +21,8 @@ import io.micronaut.core.annotation.Experimental;
  * Receives the changes to the beans of a type, registered with
  * {@link io.micronaut.context.WatchableBeanContext#watchBeans(io.micronaut.core.type.Argument, io.micronaut.context.Qualifier, BeanWatcher)}.
  * Unlike a {@link BeanDefinitionWatcher} it sees instances: registering one creates the beans of the type.
+ * The watch owns the instances it creates for beans no scope holds, such as prototypes, and destroys them;
+ * see {@link io.micronaut.context.WatchableBeanContext#watchBeans(io.micronaut.core.type.Argument, io.micronaut.context.Qualifier, BeanWatcher)}.
  *
  * @param <T> The bean type watched
  * @author graemerocher

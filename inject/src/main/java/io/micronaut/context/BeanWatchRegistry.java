@@ -837,6 +837,13 @@ final class BeanWatchRegistry {
                     adaptedProcessors.remove(adaptedProcessor);
                 }
             }
+            onClose();
+        }
+
+        /**
+         * Releases what the watch owns, once, after it was closed.
+         */
+        void onClose() {
         }
 
         @Override
@@ -897,6 +904,10 @@ final class BeanWatchRegistry {
         @Nullable
         private final Qualifier<T> qualifier;
         private final BeanWatcher<T> watcher;
+        /**
+         * The registrations delivered and not removed since; guarded by itself, since the watch may be closed by
+         * a thread other than the one delivering to it.
+         */
         private final Map<BeanDefinition<T>, BeanRegistration<T>> known = new IdentityHashMap<>();
 
         BeanRegistrationWatch(Argument<T> beanType, @Nullable Qualifier<T> qualifier, BeanWatcher<T> watcher) {
@@ -914,7 +925,9 @@ final class BeanWatchRegistry {
         @Override
         void deliverInitial() {
             Collection<BeanRegistration<T>> current = context.getBeanRegistrations(beanType, qualifier);
-            remember(current);
+            for (BeanRegistration<T> registration : current) {
+                remember(registration.getBeanDefinition(), registration);
+            }
             watcher.onChange(new BeanChange<>(new ArrayList<>(current), List.of(), current, true));
         }
 
@@ -926,33 +939,79 @@ final class BeanWatchRegistry {
                 return;
             }
             List<BeanRegistration<T>> gone = new ArrayList<>(removedHere.size());
-            for (BeanDefinition<T> definition : removedHere) {
-                BeanRegistration<T> registration = known.remove(definition);
-                if (registration != null) {
-                    gone.add(registration);
+            synchronized (known) {
+                for (BeanDefinition<T> definition : removedHere) {
+                    BeanRegistration<T> registration = known.remove(definition);
+                    if (registration != null) {
+                        gone.add(registration);
+                    }
                 }
             }
-            // the registrations delivered before stay what they are: only the added definitions are resolved,
-            // one by one, so a prototype among the candidates is not created again for every batch
-            List<BeanRegistration<T>> came = new ArrayList<>(addedHere.size());
-            for (BeanDefinition<T> definition : addedHere) {
-                if (known.containsKey(definition)) {
-                    // its bean was delivered already, in the first batch read after the definition was added
-                    continue;
+            try {
+                // the registrations delivered before stay what they are: only the added definitions are resolved,
+                // one by one, so a prototype among the candidates is not created again for every batch
+                List<BeanRegistration<T>> came = new ArrayList<>(addedHere.size());
+                for (BeanDefinition<T> definition : addedHere) {
+                    synchronized (known) {
+                        if (known.containsKey(definition)) {
+                            // its bean was delivered already, in the first batch read after the definition was added
+                            continue;
+                        }
+                    }
+                    BeanRegistration<T> registration = context.getBeanRegistration(definition);
+                    came.add(registration);
+                    remember(definition, registration);
                 }
-                BeanRegistration<T> registration = context.getBeanRegistration(definition);
-                came.add(registration);
-                known.put(definition, registration);
+                if (came.isEmpty() && gone.isEmpty()) {
+                    return;
+                }
+                List<BeanRegistration<T>> current;
+                synchronized (known) {
+                    current = new ArrayList<>(known.values());
+                }
+                watcher.onChange(new BeanChange<>(came, gone, current, false));
+            } finally {
+                // a removed instance the watch created is usable until the batch removing it was delivered
+                dispose(gone);
             }
-            if (came.isEmpty() && gone.isEmpty()) {
-                return;
-            }
-            watcher.onChange(new BeanChange<>(came, gone, new ArrayList<>(known.values()), false));
         }
 
-        private void remember(Collection<BeanRegistration<T>> current) {
-            for (BeanRegistration<T> registration : current) {
-                known.put(registration.getBeanDefinition(), registration);
+        /**
+         * Keeps a registration delivered, or disposes of it at once when the watch was closed meanwhile.
+         */
+        private void remember(BeanDefinition<T> definition, BeanRegistration<T> registration) {
+            synchronized (known) {
+                if (!closed.get()) {
+                    known.put(definition, registration);
+                    return;
+                }
+            }
+            dispose(List.of(registration));
+        }
+
+        @Override
+        void onClose() {
+            List<BeanRegistration<T>> held;
+            synchronized (known) {
+                held = new ArrayList<>(known.values());
+                known.clear();
+            }
+            dispose(held);
+        }
+
+        /**
+         * Destroys the instances the watch created: those of a bean no scope holds, such as a prototype. A
+         * singleton or a bean of a custom scope belongs to its scope, which destroys it.
+         */
+        private void dispose(List<BeanRegistration<T>> registrations) {
+            for (BeanRegistration<T> registration : registrations) {
+                if (context.isUnscoped(registration.getBeanDefinition())) {
+                    try {
+                        context.destroyBean(registration);
+                    } catch (RuntimeException e) {
+                        LOG.error("Failed to destroy bean [{}] created for watcher [{}]: {}", registration.getBeanDefinition().getBeanType().getName(), watcher, e.getMessage(), e);
+                    }
+                }
             }
         }
     }

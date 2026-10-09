@@ -105,11 +105,23 @@ public sealed interface WatchableBeanContext extends BeanContext permits Default
      * instances delivered stay the ones delivered: a prototype among the candidates is created once for
      * the watch, not again for every batch.
      *
+     * <p>Who destroys an instance delivered:</p>
+     * <ul>
+     * <li>A bean no scope holds, such as a {@link io.micronaut.context.annotation.Prototype prototype}, is
+     * created for the watch, which owns it: the watch destroys it, its {@code @PreDestroy} methods and the
+     * dependent beans it owns included, once the batch that removes it was delivered, or when the watch is
+     * closed, by {@link BeanWatch#close()}, with the bean that registered the watch, or when the context
+     * stops. The watcher does not destroy it, and does not use a removed instance after the batch that
+     * removed it, nor any instance after the watch was closed.</li>
+     * <li>A singleton, or a bean of a custom scope, belongs to its scope, which destroys it as it would
+     * without the watch: a removed one may already be destroyed, or still be in use elsewhere.</li>
+     * </ul>
+     *
      * @param beanType The bean type
      * @param qualifier The qualifier, or null for any
      * @param watcher The watcher
      * @param <T> The bean type
-     * @return The watch
+     * @return The watch, to close when the watcher no longer needs changes; closing it destroys the beans it owns
      */
     <T> BeanWatch watchBeans(Argument<T> beanType, @Nullable Qualifier<T> qualifier, BeanWatcher<T> watcher);
 

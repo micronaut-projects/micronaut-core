@@ -63,7 +63,11 @@ public final class BeanChange<T> {
     }
 
     /**
-     * @return The beans removed, with the instances they held, empty for the startup batch
+     * The beans removed, with the instances they held. An instance the watch created for a bean no scope
+     * holds, such as a prototype, is destroyed by the watch once this batch was delivered: it is usable
+     * only until the watcher returns.
+     *
+     * @return The beans removed, empty for the startup batch
      */
     public List<BeanRegistration<T>> removed() {
         return removed;

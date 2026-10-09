@@ -143,6 +143,62 @@ class BeanWatchTest {
     }
 
     @Test
+    void aBeanWatchDestroysThePrototypesItCreatedOnceWhenItClosesAndLeavesSingletonsToTheirScope() {
+        DisposablePrototype.DESTROYED.set(0);
+        DisposableSingleton.DESTROYED.set(0);
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            List<BeanChange<Disposable>> changes = new ArrayList<>();
+            BeanWatch watch = ((WatchableBeanContext) context).watchBeans(Disposable.class, null, changes::add);
+            assertEquals(Set.of(DisposablePrototype.class, DisposableSingleton.class),
+                changes.get(0).added().stream().map(r -> r.getBean().getClass()).collect(Collectors.toSet()));
+
+            watch.close();
+            watch.close();
+
+            assertEquals(1, DisposablePrototype.DESTROYED.get());
+            assertEquals(0, DisposableSingleton.DESTROYED.get());
+        }
+        // the context destroys its singleton, and not the prototype again
+        assertEquals(1, DisposablePrototype.DESTROYED.get());
+        assertEquals(1, DisposableSingleton.DESTROYED.get());
+    }
+
+    @Test
+    void aBeanWatchLeftOpenHasThePrototypesItCreatedDestroyedOnceWhenTheContextCloses() {
+        DisposablePrototype.DESTROYED.set(0);
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            ((WatchableBeanContext) context).watchBeans(DisposablePrototype.class, null, change -> { });
+            assertEquals(0, DisposablePrototype.DESTROYED.get());
+        }
+        assertEquals(1, DisposablePrototype.DESTROYED.get());
+    }
+
+    @Test
+    void aBeanWatchDestroysARemovedPrototypeOnceTheBatchRemovingItWasDelivered() {
+        DisposablePrototype.DESTROYED.set(0);
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            BeanDefinition<DisposablePrototype> definition = context.getBeanDefinition(DisposablePrototype.class);
+            List<Integer> destroyedWhenDelivered = new ArrayList<>();
+            BeanWatch watch = beanContext.watchBeans(DisposablePrototype.class, null, change -> {
+                if (!change.removed().isEmpty()) {
+                    destroyedWhenDelivered.add(DisposablePrototype.DESTROYED.get());
+                }
+            });
+
+            beanContext.notifyDefinitionChange(List.of(definition), List.of());
+
+            // the watcher saw the removed instance still usable, and it was destroyed after the batch
+            assertEquals(List.of(0), destroyedWhenDelivered);
+            assertEquals(1, DisposablePrototype.DESTROYED.get());
+
+            watch.close();
+            assertEquals(1, DisposablePrototype.DESTROYED.get());
+        }
+        assertEquals(1, DisposablePrototype.DESTROYED.get());
+    }
+
+    @Test
     void aMethodWatchSeesTheAnnotatedMethodsPairsAMethodThatComesBackAndKnowsItsAnnotationsAreUnchanged() {
         try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
             List<ExecutableMethodChange<Tick>> changes = new ArrayList<>();
