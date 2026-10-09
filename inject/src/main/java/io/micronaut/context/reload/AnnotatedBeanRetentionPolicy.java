@@ -18,7 +18,6 @@ package io.micronaut.context.reload;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.annotation.Retain;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Retains the singletons whose definition is annotated with {@link Retain}: on the bean's class,
@@ -33,7 +32,6 @@ import org.jspecify.annotations.NullMarked;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class AnnotatedBeanRetentionPolicy implements BeanRetentionPolicy {
 
     /**
