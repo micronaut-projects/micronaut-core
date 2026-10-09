@@ -189,8 +189,6 @@ final class HttpPipelineBuilder {
         private final SslContextHolder contextHolder;
         @Nullable
         private SslHandler sslHandler;
-        @Nullable
-        private SSLEngine quicSslEngine;
 
         SslHandlerHolder(SslContextHolder contextHolder) {
             this.contextHolder = contextHolder;
@@ -208,8 +206,19 @@ final class HttpPipelineBuilder {
             return sslHandler;
         }
 
-        Supplier<SSLSession> findSslSession() {
-            return SupplierUtil.memoized(() -> (quicSslEngine == null ? Objects.requireNonNull(sslHandler).engine() : quicSslEngine).getSession());
+        /**
+         * Find the SSL session of the given stream channel. For QUIC, the session is resolved from
+         * the stream's own QUIC connection, because the holder is shared by all connections of
+         * the listener.
+         *
+         * @param streamChannel The channel of the request stream
+         * @return The session supplier
+         */
+        Supplier<SSLSession> findSslSession(Channel streamChannel) {
+            if (quic) {
+                return SupplierUtil.memoized(() -> QuicFactory.findSslEngine(streamChannel).getSession());
+            }
+            return SupplierUtil.memoized(() -> Objects.requireNonNull(sslHandler).engine().getSession());
         }
     }
 
@@ -224,11 +233,18 @@ final class HttpPipelineBuilder {
          * @return The engine provider
          */
         static Function<QuicChannel, ? extends QuicSslEngine> quicEngineFactory(SslHandlerHolder sslHandlerHolder) {
-            return q -> {
-                QuicSslEngine e = sslHandlerHolder.contextHolder.quicSslContext().newEngine(q.alloc());
-                sslHandlerHolder.quicSslEngine = e;
-                return e;
-            };
+            return q -> sslHandlerHolder.contextHolder.quicSslContext().newEngine(q.alloc());
+        }
+
+        /**
+         * Find the SSL engine of the QUIC connection that the given stream channel belongs to.
+         *
+         * @param streamChannel The QUIC stream channel
+         * @return The engine of the parent QUIC connection
+         */
+        static SSLEngine findSslEngine(Channel streamChannel) {
+            QuicChannel connection = ((QuicStreamChannel) streamChannel).parent();
+            return Objects.requireNonNull(connection.sslEngine(), "QUIC connection has no SSL engine");
         }
     }
 
@@ -343,6 +359,8 @@ final class HttpPipelineBuilder {
                 .initialMaxStreamDataBidirectionalRemote(server.getServerConfiguration().getHttp3().getInitialMaxStreamDataBidirectionalRemote())
                 .initialMaxStreamsBidirectional(server.getServerConfiguration().getHttp3().getInitialMaxStreamsBidirectional())
                 .tokenHandler(QuicTokenHandlerImpl.create(channel.alloc()))
+                // 0 disables the QUIC idle timeout
+                .maxIdleTimeout(Math.max(0, idleTimeoutMillis()), TimeUnit.MILLISECONDS)
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
                     protected void initChannel(Channel ch) throws Exception {
@@ -395,6 +413,21 @@ final class HttpPipelineBuilder {
         }
 
         /**
+         * The configured connection idle timeout, used both for TCP and QUIC connections.
+         * Millisecond precision: truncating to whole seconds turns a sub-second timeout into 0,
+         * which both {@link IdleStateHandler} and QUIC treat as "disabled".
+         *
+         * @return The idle timeout in milliseconds, or {@code -1} if no idle timeout is configured
+         */
+        private long idleTimeoutMillis() {
+            Duration idleTime = server.getServerConfiguration().getIdleTimeout();
+            if (idleTime == null || idleTime.isNegative()) {
+                return -1;
+            }
+            return idleTime.toMillis();
+        }
+
+        /**
          * Insert handlers that wrap the outermost TCP stream. This is SSL and potentially packet capture.
          */
         void insertOuterTcpHandlers() {
@@ -421,14 +454,12 @@ final class HttpPipelineBuilder {
          * data for a while.
          */
         private void insertIdleStateHandler() {
-            final Duration idleTime = server.getServerConfiguration().getIdleTimeout();
-            if (idleTime != null && !idleTime.isNegative()) {
-                // millisecond precision: truncating to whole seconds turns a sub-second timeout into 0,
-                // which IdleStateHandler treats as "disabled"
+            final long idleTimeMillis = idleTimeoutMillis();
+            if (idleTimeMillis >= 0) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(
                         server.getServerConfiguration().getReadIdleTimeout().toMillis(),
                         server.getServerConfiguration().getWriteIdleTimeout().toMillis(),
-                        idleTime.toMillis(),
+                        idleTimeMillis,
                         TimeUnit.MILLISECONDS));
             }
         }
@@ -804,7 +835,7 @@ final class HttpPipelineBuilder {
         private GracefulShutdownCapable insertMicronautHandlers() {
             channel.attr(STREAM_PIPELINE_ATTRIBUTE.get()).set(this);
             if (sslHandler != null) {
-                channel.attr(SSL_SESSION_ATTRIBUTE.get()).set(sslHandler.findSslSession());
+                channel.attr(SSL_SESSION_ATTRIBUTE.get()).set(sslHandler.findSslSession(channel));
             }
 
             Optional<NettyServerWebSocketUpgradeHandler> webSocketUpgradeHandler = embeddedServices.getWebSocketUpgradeHandler(server);
@@ -833,7 +864,7 @@ final class HttpPipelineBuilder {
             httpVersion = HttpVersion.HTTP_2_0;
             channel.attr(STREAM_PIPELINE_ATTRIBUTE.get()).set(this);
             if (sslHandler != null) {
-                channel.attr(SSL_SESSION_ATTRIBUTE.get()).set(sslHandler.findSslSession());
+                channel.attr(SSL_SESSION_ATTRIBUTE.get()).set(sslHandler.findSslSession(channel));
             }
         }
 

@@ -106,9 +106,14 @@ class QuicTokenHandlerImpl implements QuicTokenHandler {
      */
     @Override
     public int validateToken(ByteBuf token, InetSocketAddress address) {
+        int dcidLength = token.readableBytes() - MAC_LENGTH;
+        if (dcidLength < 0 || dcidLength > MAX_CONNECTION_ID_LENGTH) {
+            // malformed token, cannot have been produced by writeToken
+            return -1;
+        }
         byte[] actual = new byte[MAC_LENGTH];
         token.getBytes(token.readerIndex(), actual);
-        ByteBuf dcid = token.slice(token.readerIndex() + MAC_LENGTH, token.readableBytes() - MAC_LENGTH);
+        ByteBuf dcid = token.slice(token.readerIndex() + MAC_LENGTH, dcidLength);
 
         long windowId = currentWindowId();
         byte[] expectedHashNow = hash(address, dcid, windowId);
