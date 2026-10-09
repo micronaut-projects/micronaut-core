@@ -180,6 +180,38 @@ class TestModeTest {
     }
 
     @Test
+    void aFailedTestClassLeftWithNoTestNoLongerFails() throws Exception {
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Path test = Files.createDirectories(project.resolve("src/test/java/app"));
+        Files.writeString(main.resolve("Greeter.java"), greeter("one"));
+        Path greeterTest = test.resolve("GreeterTest.java");
+        Files.writeString(greeterTest, greeterTest("two"));
+        runtime = new MicronautDevMain().launch(manifest(""), new String[0]);
+        assertEquals(Set.of("app.GreeterTest"), runtime.failedTestClasses());
+
+        // its last test goes: the class stays, the affected run selects it and it reports nothing
+        Files.writeString(greeterTest, "package app; public class GreeterTest { }");
+        runtime.changed(List.of(greeterTest), List.of());
+        TestRunSummary affected = runtime.awaitTestRun(2, TIMEOUT);
+        assertTrue(affected.complete());
+        assertEquals(0, affected.total());
+        assertTrue(runtime.failedTestClasses().isEmpty(), runtime.failedTestClasses().toString());
+
+        // a failure again, then a complete run of every test with the class emptied once more
+        Files.writeString(greeterTest, greeterTest("two"));
+        runtime.changed(List.of(greeterTest), List.of());
+        runtime.awaitTestRun(3, TIMEOUT);
+        assertEquals(Set.of("app.GreeterTest"), runtime.failedTestClasses());
+        runtime.watchTests(false);
+        Files.writeString(greeterTest, "package app; public class GreeterTest { }");
+        runtime.changed(List.of(greeterTest), List.of());
+        runtime.watchTests(true);
+        TestRunSummary all = runtime.requestTests(TestRequest.ALL);
+        assertTrue(all.complete());
+        assertTrue(runtime.failedTestClasses().isEmpty(), runtime.failedTestClasses().toString());
+    }
+
+    @Test
     void testsTheBuildToolCompilesRunWhenItTouchesTheTrigger() throws Exception {
         Path main = Files.createDirectories(project.resolve("src/main/java/app"));
         Path test = Files.createDirectories(project.resolve("src/test/java/app"));

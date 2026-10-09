@@ -531,17 +531,20 @@ final class TestSession {
     }
 
     /**
-     * Keeps the classes with failures: a complete run replaces what it knows of the classes it ran, one cut short
-     * only adds to it.
+     * Keeps the classes with failures: a complete run replaces what it knows of the classes it ran and of those it
+     * selected by name, which may no longer hold a test, and a complete run of every test with no pattern replaces it
+     * all; one cut short only adds to it.
      */
     private final class FailureTracker implements TestEventListener {
         private final Set<String> ran = new HashSet<>();
         private final Set<String> failed = new LinkedHashSet<>();
+        private TestSelection selection = TestSelection.all();
 
         @Override
         public void runStarted(TestRunStarted event) {
             ran.clear();
             failed.clear();
+            selection = event.selection();
         }
 
         @Override
@@ -557,6 +560,17 @@ final class TestSession {
             synchronized (TestSession.this) {
                 if (summary.complete()) {
                     failedClasses.removeAll(ran);
+                    if (selection.patterns().isEmpty()) {
+                        if (selection.everything()) {
+                            // every test there is ran: a class that reported nothing has no test left
+                            failedClasses.clear();
+                        } else {
+                            // a class selected by name ran in full, with the classes nested in it, whether or not it reported
+                            for (String className : selection.classes()) {
+                                failedClasses.removeIf(name -> name.equals(className) || name.startsWith(className + "$"));
+                            }
+                        }
+                    }
                 }
                 failedClasses.addAll(failed);
             }
