@@ -1852,7 +1852,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ClassTypeDef thisType = javaClassType(element);
 
         boolean extendsJavaBase = model.extendsJavaBase();
-        if (!isJunit5Test && (!extendsHostClass || extendsJavaBase)) {
+        // a Python exception class is wrapped through its Value constructor too: a method returning
+        // or accepting one is bridged like any other method of a generated type
+        if (!isJunit5Test && (!extendsHostClass || extendsJavaBase || extendsThrowable)) {
             builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .addParameter(POLYGLOT_VALUE)
