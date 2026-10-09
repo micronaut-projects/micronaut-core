@@ -21,6 +21,9 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.MediaType;
@@ -258,17 +261,20 @@ class SharedFormBindersTest {
     @ValueSource(booleans = {false, true})
     @SuppressWarnings({"rawtypes", "unchecked"})
     void delayedFormDecoderFailureFailsTheRouteWait(boolean wrapped) {
-        try (ApplicationContext context = ApplicationContext.run();
-             FormRequest request = new FormRequest("message", null, "hello")) {
-            request.delayed = Sinks.many().unicast().onBackpressureBuffer();
-            HttpRequest<?> source = source(request, wrapped);
-            ServerBodyAnnotationBinder<Map> binder = context.getBean(ServerBodyAnnotationBinder.class);
-            binder.bindFullBody(ConversionContext.of(Map.class), source);
-            var waiting = BasicHttpAttributes.getRouteWaitsFor(source).toCompletableFuture();
-            request.delayed.tryEmitError(new IllegalArgumentException("decode failure"));
-            ExecutionException error = assertThrows(ExecutionException.class, () -> waiting.get(10, TimeUnit.SECONDS));
-            assertEquals("Failed to load form fields", error.getCause().getMessage());
-            assertEquals("decode failure", error.getCause().getCause().getMessage());
+        for (Throwable failure : new Throwable[]{new IllegalArgumentException("decode failure"),
+            new HttpStatusException(HttpStatus.BAD_REQUEST, "malformed multipart"),
+            new ContentLengthExceededException("form limit")}) {
+            try (ApplicationContext context = ApplicationContext.run();
+                 FormRequest request = new FormRequest("message", null, "hello")) {
+                request.delayed = Sinks.many().unicast().onBackpressureBuffer();
+                HttpRequest<?> source = source(request, wrapped);
+                ServerBodyAnnotationBinder<Map> binder = context.getBean(ServerBodyAnnotationBinder.class);
+                binder.bindFullBody(ConversionContext.of(Map.class), source);
+                var waiting = BasicHttpAttributes.getRouteWaitsFor(source).toCompletableFuture();
+                request.delayed.tryEmitError(failure);
+                ExecutionException error = assertThrows(ExecutionException.class, () -> waiting.get(10, TimeUnit.SECONDS));
+                assertSame(failure, error.getCause());
+            }
         }
     }
 
