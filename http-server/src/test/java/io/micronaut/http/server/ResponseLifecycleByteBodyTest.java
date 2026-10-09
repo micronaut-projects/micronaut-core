@@ -123,6 +123,14 @@ class ResponseLifecycleByteBodyTest {
     }
 
     @Test
+    void scalarJsonStreamElementsAreSeparated() throws Exception {
+        try (ByteBodyHttpResponse<?> response = encode(HttpRequest.GET("/"),
+            HttpResponse.ok(reactor.core.publisher.Flux.just(1, 2, 3)).contentType(MediaType.APPLICATION_JSON_STREAM_TYPE))) {
+            assertEquals("1\n2\n3", text(response));
+        }
+    }
+
+    @Test
     void byteBodyResponsePassedThrough() throws Exception {
         Tracking<Object> original = new Tracking<>(HttpResponse.ok().header(HttpHeaders.TRANSFER_ENCODING, "chunked"));
         ByteBodyHttpResponse<?> result = encode(HttpRequest.GET("/"), original);

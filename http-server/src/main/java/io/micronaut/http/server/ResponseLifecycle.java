@@ -21,6 +21,8 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.core.io.buffer.LeakTracker;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.http.ByteBodyHttpResponse;
@@ -77,6 +79,8 @@ import java.util.function.Function;
  */
 @Internal
 public abstract class ResponseLifecycle {
+    private static final ConcatenatingSubscriber.Separators JSON_STREAM_SEPARATORS = LeakTracker.Factory.staticInitializer(() ->
+        new ConcatenatingSubscriber.Separators(null, null, ReadBufferFactory.getJdkFactory().copyOf("\n", java.nio.charset.StandardCharsets.UTF_8), null));
     private final RouteExecutor routeExecutor;
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     private final ConversionService conversionService;
@@ -588,8 +592,9 @@ public abstract class ResponseLifecycle {
      *
      * @param type The item type
      * @return {@code true} if the items may be joined into a JSON array
+     * @since 5.3.0
      */
-    private static boolean isJsonFormattable(Argument<?> type) {
+    protected boolean isJsonFormattable(Argument<?> type) {
         // it would be nice to support netty ByteBuf here, but it's not clear how.
         // A ByteBody is raw bytes too: the writer passes it through unchanged, so framing it
         // would splice brackets and commas into a byte stream.
@@ -791,7 +796,8 @@ public abstract class ResponseLifecycle {
                     first = false;
                     // whether the pieces are framed as a JSON array is settled by the time the first
                     // piece is written, see mapToHttpContent
-                    separators = isJson.getAsBoolean() ? jsonSeparators() : null;
+                    separators = isJson.getAsBoolean() ? jsonSeparators() :
+                        MediaType.APPLICATION_JSON_STREAM_TYPE.matches(mediaType) && isJsonFormattable(type) ? JSON_STREAM_SEPARATORS : null;
                     if (separators != null) {
                         separator = separators.beforeFirst();
                     }

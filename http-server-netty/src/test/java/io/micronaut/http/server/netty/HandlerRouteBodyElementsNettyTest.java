@@ -99,6 +99,9 @@ class HandlerRouteBodyElementsNettyTest {
             assertTrue(head(json).contains("content-type: application/json"), json);
             assertEquals("[1,2,3]", chunks(json));
             assertEquals("[]", chunks(get(server, "/netty-elements/empty")));
+            assertEquals("1\n2\n3", chunks(get(server, "/netty-elements/json-stream")));
+            assertEquals("1\n2\n3", chunks(get(server, "/netty-elements/publisher-stream")));
+            assertEquals("12", chunks(get(server, "/netty-elements/raw-json-stream")));
             // the elements of the request body: the body is released when they close
             String echo = exchange(server, "POST /netty-elements/echo HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 5\r\nConnection: close\r\n\r\n[1,2]");
             assertEquals("[1,2]", chunks(echo));
@@ -228,6 +231,19 @@ class HandlerRouteBodyElementsNettyTest {
                 routes.GET("/netty-elements/json")
                     .responseType(Argument.of(BodyElements.class, Integer.class))
                     .handle((request, pathVariables) -> HttpResponse.ok(recorder.source("json", List.of(1, 2, 3))));
+                routes.GET("/netty-elements/json-stream")
+                    .responseType(Argument.of(BodyElements.class, Integer.class))
+                    .handle((request, pathVariables) -> HttpResponse.ok(recorder.source("json-stream", List.of(1, 2, 3)))
+                        .contentType(MediaType.APPLICATION_JSON_STREAM_TYPE));
+                routes.GET("/netty-elements/publisher-stream")
+                    .responseType(Argument.of(org.reactivestreams.Publisher.class, Integer.class))
+                    .handle((request, pathVariables) -> HttpResponse.ok(reactor.core.publisher.Flux.just(1, 2, 3))
+                        .contentType(MediaType.APPLICATION_JSON_STREAM_TYPE));
+                routes.GET("/netty-elements/raw-json-stream", (request, pathVariables) -> HttpResponse.ok(
+                        recorder.source("raw-json-stream", List.of(
+                            io.netty.buffer.Unpooled.copiedBuffer("1", StandardCharsets.UTF_8),
+                            io.netty.buffer.Unpooled.copiedBuffer("2", StandardCharsets.UTF_8))))
+                    .contentType(MediaType.APPLICATION_JSON_STREAM_TYPE));
                 routes.GET("/netty-elements/empty", (request, pathVariables) -> HttpResponse.ok(recorder.source("empty", List.of())));
                 routes.POST("/netty-elements/echo").body().handleAsync((request, pathVariables, body) ->
                     CompletableFuture.completedStage(HttpResponse.ok(body.elements(Integer.class)).contentType(MediaType.APPLICATION_JSON_TYPE)));
