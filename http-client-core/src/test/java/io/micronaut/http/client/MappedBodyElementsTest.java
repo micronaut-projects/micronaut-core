@@ -36,13 +36,15 @@ class MappedBodyElementsTest {
         var source = BodyElements.of(() -> CompletableFuture.completedFuture(
             Optional.of(reads.getAndIncrement() == 0 ? "bad" : "42")), closed::incrementAndGet);
         var elements = MappedBodyElements.map(source, Integer::parseInt);
-        Throwable failure = assertThrows(CompletionException.class, () -> elements.next().toCompletableFuture().join()).getCause();
+        var firstRead = elements.next().toCompletableFuture();
+        Throwable failure = assertThrows(CompletionException.class, firstRead::join).getCause();
         assertEquals(BodyElements.State.FAILED, elements.state());
         assertSame(failure, elements.failure());
-        assertSame(failure, assertThrows(CompletionException.class, () -> elements.next().toCompletableFuture().join()).getCause());
+        var repeatedRead = elements.next().toCompletableFuture();
+        assertSame(failure, assertThrows(CompletionException.class, repeatedRead::join).getCause());
         assertEquals(null, elements.poll());
-        assertSame(failure, assertThrows(CompletionException.class, () ->
-            elements.forEach(value -> CompletableFuture.completedFuture(null)).toCompletableFuture().join()).getCause());
+        var iteration = elements.forEach(value -> CompletableFuture.completedFuture(null)).toCompletableFuture();
+        assertSame(failure, assertThrows(CompletionException.class, iteration::join).getCause());
         assertEquals(1, reads.get());
         assertEquals(1, closed.get());
         assertThrows(IllegalStateException.class, elements::next);
@@ -55,9 +57,10 @@ class MappedBodyElementsTest {
             throw cleanup;
         });
         var elements = MappedBodyElements.map(source, Integer::parseInt);
-        Throwable failure = assertThrows(CompletionException.class, () -> elements.next().toCompletableFuture().join()).getCause();
-        assertSame(failure, assertThrows(CompletionException.class, () ->
-            elements.forEach(value -> CompletableFuture.completedFuture(null)).toCompletableFuture().join()).getCause());
+        var firstRead = elements.next().toCompletableFuture();
+        Throwable failure = assertThrows(CompletionException.class, firstRead::join).getCause();
+        var iteration = elements.forEach(value -> CompletableFuture.completedFuture(null)).toCompletableFuture();
+        assertSame(failure, assertThrows(CompletionException.class, iteration::join).getCause());
         assertSame(cleanup, failure.getSuppressed()[0]);
         assertSame(failure, elements.failure());
     }
@@ -81,7 +84,8 @@ class MappedBodyElementsTest {
         assertEquals(BodyElements.State.FAILED, elements.state());
         assertSame(failure, elements.failure());
         assertEquals(null, elements.poll());
-        assertSame(failure, assertThrows(CompletionException.class, () -> elements.next().toCompletableFuture().join()).getCause());
+        var read = elements.next().toCompletableFuture();
+        assertSame(failure, assertThrows(CompletionException.class, read::join).getCause());
         assertEquals(1, reads.get());
     }
 
@@ -90,8 +94,8 @@ class MappedBodyElementsTest {
         AtomicInteger closed = new AtomicInteger();
         var source = BodyElements.of(() -> CompletableFuture.completedFuture(Optional.of("bad")), closed::incrementAndGet);
         var elements = MappedBodyElements.map(source, Integer::parseInt);
-        Throwable failure = assertThrows(CompletionException.class, () ->
-            elements.forEach(value -> CompletableFuture.completedFuture(null)).toCompletableFuture().join()).getCause();
+        var iteration = elements.forEach(value -> CompletableFuture.completedFuture(null)).toCompletableFuture();
+        Throwable failure = assertThrows(CompletionException.class, iteration::join).getCause();
         assertSame(failure, elements.failure());
         assertEquals(BodyElements.State.FAILED, elements.state());
         assertEquals(1, closed.get());
