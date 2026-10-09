@@ -178,6 +178,7 @@ import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -501,6 +502,7 @@ final class NettyHttpClient implements
                 private Subscription dataSubscription;
                 @Nullable
                 private CurrentEvent currentEvent;
+                private final long maxEventSize = sizeLimits().maxBufferSize();
 
                 @Override
                 public void onSubscribe(Subscription s) {
@@ -523,7 +525,7 @@ final class NettyHttpClient implements
                         // emit the current event
                         if (len == 0) {
                             try {
-                                Event event = Event.of(byteBufferFactory.wrap(Objects.requireNonNull(currentEvent).data))
+                                Event event = Event.of(byteBufferFactory.wrap(Objects.requireNonNull(currentEvent).dataArray()))
                                     .name(currentEvent.name)
                                     .retry(currentEvent.retry)
                                     .id(currentEvent.id);
@@ -548,27 +550,26 @@ final class NettyHttpClient implements
                                     fromIndex++;
                                 }
                                 if (fromIndex < len) {
-                                    int toIndex = len - fromIndex;
+                                    int length = len - fromIndex;
                                     switch (type) {
                                         case "data" -> {
-                                            ByteBuffer<?> content = buffer.slice(fromIndex, toIndex);
-                                            byte[] d = currentEvent.data;
-                                            if (d.length == 0) {
-                                                currentEvent.data = content.toByteArray();
-                                            } else {
-                                                currentEvent.data = ArrayUtils.concat(d, content.toByteArray());
+                                            long newSize = (long) currentEvent.dataLength + length;
+                                            if (newSize > maxEventSize) {
+                                                currentEvent = null;
+                                                throw decorate(new ContentLengthExceededException(maxEventSize, newSize));
                                             }
+                                            currentEvent.appendData(buffer.slice(fromIndex, length));
                                         }
                                         case "id" -> {
-                                            ByteBuffer<?> id = buffer.slice(fromIndex, toIndex);
+                                            ByteBuffer<?> id = buffer.slice(fromIndex, length);
                                             currentEvent.id = id.toString(StandardCharsets.UTF_8).trim();
                                         }
                                         case "event" -> {
-                                            ByteBuffer<?> event = buffer.slice(fromIndex, toIndex);
+                                            ByteBuffer<?> event = buffer.slice(fromIndex, length);
                                             currentEvent.name = event.toString(StandardCharsets.UTF_8).trim();
                                         }
                                         case "retry" -> {
-                                            ByteBuffer<?> retry = buffer.slice(fromIndex, toIndex);
+                                            ByteBuffer<?> retry = buffer.slice(fromIndex, length);
                                             String text = retry.toString(StandardCharsets.UTF_8);
                                             if (!StringUtils.isEmpty(text)) {
                                                 currentEvent.retry = Duration.ofMillis(Long.parseLong(text));
@@ -2183,13 +2184,28 @@ final class NettyHttpClient implements
      * Used as a holder for the current SSE event.
      */
     private static final class CurrentEvent {
-        byte[] data = new byte[0];
+        byte[] data = ArrayUtils.EMPTY_BYTE_ARRAY;
+        int dataLength;
         @Nullable
         String id;
         @Nullable
         String name;
         @Nullable
         Duration retry;
+
+        void appendData(ByteBuffer<?> content) {
+            int n = content.readableBytes();
+            int required = dataLength + n;
+            if (required > data.length) {
+                data = Arrays.copyOf(data, Math.max(required, (int) Math.min(2L * data.length, Integer.MAX_VALUE - 8)));
+            }
+            content.read(data, dataLength, n);
+            dataLength = required;
+        }
+
+        byte[] dataArray() {
+            return data.length == dataLength ? data : Arrays.copyOf(data, dataLength);
+        }
     }
 
     /**
