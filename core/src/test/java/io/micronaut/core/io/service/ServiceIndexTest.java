@@ -59,6 +59,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -76,6 +77,12 @@ public class ServiceIndexTest {
     Path tempDir;
 
     private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
+
+    @BeforeAll
+    static void runTheLoaders() throws ClassNotFoundException {
+        // runs the loaders, as SoftServiceLoader does when an application first uses it, so that each test sees the index
+        Class.forName(StaticOptimizations.class.getName(), true, ServiceIndexTest.class.getClassLoader());
+    }
 
     @BeforeEach
     void captureTheLog() {
@@ -191,6 +198,7 @@ public class ServiceIndexTest {
 
     @Test
     void isIgnoredInNativeImageCode() {
+        // the index was registered outside image code, by runTheLoaders: a lookup in image code does not serve it
         String previous = System.getProperty(NativeImageUtils.PROPERTY_IMAGE_CODE_KEY);
         try {
             for (String imageCode : List.of(NativeImageUtils.PROPERTY_IMAGE_CODE_VALUE_BUILDTIME, NativeImageUtils.PROPERTY_IMAGE_CODE_VALUE_RUNTIME)) {

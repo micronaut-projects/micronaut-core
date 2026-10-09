@@ -81,6 +81,9 @@ import java.util.jar.Manifest;
  *     <li>The name condition given to {@link SoftServiceLoader#load(Class, ClassLoader, java.util.function.Predicate)}
  *     is tested on every name of the index.</li>
  *     <li>At most one index can be registered: registering a second one fails.</li>
+ *     <li>A lookup that comes before {@link StaticOptimizations} is initialized, which runs the loaders, scans the
+ *     class path. That is the case of the preload of the bean definition prefetch, whose one scan starts on a thread
+ *     of the pool before the loaders run.</li>
  *     <li>Setting the system property {@code micronaut.service.index.enabled} to {@code false} switches the index
  *     off, so that the class path is scanned. The property is read at the start of each lookup: when a
  *     {@link SoftServiceLoader.ServiceCollector} is created, which {@link SoftServiceLoader} does for each collection
