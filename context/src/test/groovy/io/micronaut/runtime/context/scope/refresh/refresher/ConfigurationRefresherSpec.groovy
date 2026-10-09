@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.context.watch.ConfigurationChange
-import io.micronaut.context.watch.ConfigurationWatcher
+import io.micronaut.context.watch.ReloadingConfigurationWatcher
 import io.micronaut.runtime.context.scope.refresh.ConfigurationRefreshedEvent
 import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
@@ -56,7 +56,7 @@ class ConfigurationRefresherSpec extends Specification {
         configuration.size == 9
         context.getBean(Pool).is(pool)
         pool.applied == 1
-        result.outcomes() == [ConfigurationWatcher.Outcome.APPLIED]
+        result.outcomes() == [ReloadingConfigurationWatcher.Outcome.APPLIED]
         !result.requiresRestart()
         refreshed.size() == 1
         refreshed[0].change().changed() == ["pool.size"] as Set
@@ -71,7 +71,7 @@ class ConfigurationRefresherSpec extends Specification {
         result = refresher.refresh()
 
         then:
-        result.outcomes() == [ConfigurationWatcher.Outcome.RECREATE]
+        result.outcomes() == [ReloadingConfigurationWatcher.Outcome.RECREATE]
         !context.getBean(Pool).is(pool)
         context.getBean(Pool).url == "two"
         Pool.CREATED.get() == 2
@@ -350,7 +350,7 @@ class ConfigurationRefresherSpec extends Specification {
         result.change().touches("anything")
         result.rebound()*.beanType.contains(PoolConfiguration)
         result.recreated()*.beanType.contains(BoundConfiguration)
-        result.outcomes() == [ConfigurationWatcher.Outcome.RECREATE]
+        result.outcomes() == [ReloadingConfigurationWatcher.Outcome.RECREATE]
 
         cleanup:
         context.close()

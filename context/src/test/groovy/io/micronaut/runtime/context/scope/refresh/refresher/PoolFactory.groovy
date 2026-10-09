@@ -3,7 +3,7 @@ package io.micronaut.runtime.context.scope.refresh.refresher
 import io.micronaut.context.WatchableBeanContext
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Requires
-import io.micronaut.context.watch.ConfigurationWatcher
+import io.micronaut.context.watch.ReloadingConfigurationWatcher
 import jakarta.inject.Singleton
 
 @Factory
@@ -13,13 +13,13 @@ class PoolFactory {
     @Singleton
     Pool pool(PoolConfiguration configuration, WatchableBeanContext beanContext) {
         Pool pool = new Pool(configuration.url)
-        beanContext.watchConfiguration("pool", { change ->
+        beanContext.configuration("pool").watchReloading({ change ->
             if (change.touches("pool.url")) {
-                return ConfigurationWatcher.Outcome.RECREATE
+                return ReloadingConfigurationWatcher.Outcome.RECREATE
             }
             pool.applied++
-            return ConfigurationWatcher.Outcome.APPLIED
-        } as ConfigurationWatcher)
+            return ReloadingConfigurationWatcher.Outcome.APPLIED
+        } as ReloadingConfigurationWatcher)
         return pool
     }
 }

@@ -28,7 +28,6 @@ import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.context.WatchableBeanContext;
-import io.micronaut.context.watch.ConfigurationWatcher;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.context.scope.refresh.RefreshScope;
 import jakarta.inject.Singleton;
@@ -89,10 +88,9 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
         // refresh event as they always did, and the event refreshes nothing else
         this.watched = beanContext.containsBean(RefreshScope.class);
         if (watched) {
-            beanContext.watchConfiguration(LOGGER_PROPERTY_PREFIX, change -> {
+            beanContext.configuration(LOGGER_PROPERTY_PREFIX).watch(change -> {
                 initLogging();
                 configureLogLevels();
-                return ConfigurationWatcher.Outcome.APPLIED;
             });
         }
     }

@@ -16,10 +16,9 @@
 package io.micronaut.runtime.context.scope.refresh;
 
 import io.micronaut.context.watch.ConfigurationChange;
-import io.micronaut.context.watch.ConfigurationWatcher;
+import io.micronaut.context.watch.ReloadingConfigurationWatcher;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.BeanDefinition;
-import org.jspecify.annotations.NullMarked;
 
 import java.util.List;
 import java.util.Objects;
@@ -36,12 +35,11 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public record RefreshResult(ConfigurationChange change,
                             List<BeanDefinition<?>> rebound,
                             List<BeanDefinition<?>> recreated,
                             int disposed,
-                            List<ConfigurationWatcher.Outcome> outcomes) {
+                            List<ReloadingConfigurationWatcher.Outcome> outcomes) {
 
     /**
      * Validating constructor.
@@ -63,6 +61,6 @@ public record RefreshResult(ConfigurationChange change,
      * @return Whether a watch answered that the change needs a restart of the application
      */
     public boolean requiresRestart() {
-        return outcomes.contains(ConfigurationWatcher.Outcome.REQUIRES_RESTART);
+        return outcomes.contains(ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART);
     }
 }
