@@ -1925,7 +1925,7 @@ final class NettyHttpClient implements
                 }
 
                 // send the raw request
-                return sendRawRequestAllowingRetry(propagatedContext, poolHandle, request, selection, byteBody, nettyRequest, blockHint, preferredScheduler);
+                return sendRawRequestAllowingRetry(poolHandle, request, selection, byteBody, nettyRequest, blockHint, preferredScheduler);
             }))
             .flatMap(byteBodyResponse -> propagatedContext.propagate(() -> {
                 // handle redirects or map the response bytes
@@ -2014,8 +2014,10 @@ final class NettyHttpClient implements
      * turns out to be closed already, an idempotent request with an available body is sent again
      * once on another connection, with the same outgoing request head. Nothing is set up for that
      * unless the request could actually be sent again.
+     * <p>
+     * This runs in the {@link PropagatedContext} of the original client call, which is captured
+     * here for the exchange, and for the retry that is started from the event loop.
      *
-     * @param propagatedContext  The context propagated from the original client call
      * @param poolHandle         The connection
      * @param request            The request to send
      * @param selection          The selection of the load balancer, or {@code null}
@@ -2026,7 +2028,6 @@ final class NettyHttpClient implements
      * @return The response flow
      */
     private ExecutionFlow<NettyClientByteBodyResponse> sendRawRequestAllowingRetry(
-        PropagatedContext propagatedContext,
         ConnectionManager.PoolHandle poolHandle,
         MutableHttpRequest<?> request,
         @Nullable LoadBalancerSelection selection,
@@ -2035,23 +2036,11 @@ final class NettyHttpClient implements
         @Nullable BlockHint blockHint,
         AtomicReference<ScheduledExecutorService> preferredScheduler
     ) {
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         boolean reusedConnection = markRequestSent(poolHandle);
         if (!reusedConnection || poolHandle.http2 || !(byteBody instanceof AvailableByteBody) || !request.getMethod().isIdempotent()) {
             return sendRawRequest(propagatedContext, poolHandle, request, selection, byteBody, nettyRequest, false);
         }
-        return sendRawRequestWithRetry(propagatedContext, poolHandle, request, selection, byteBody, nettyRequest, blockHint, preferredScheduler);
-    }
-
-    private ExecutionFlow<NettyClientByteBodyResponse> sendRawRequestWithRetry(
-        PropagatedContext propagatedContext,
-        ConnectionManager.PoolHandle poolHandle,
-        MutableHttpRequest<?> request,
-        @Nullable LoadBalancerSelection selection,
-        CloseableByteBody byteBody,
-        HttpRequest nettyRequest,
-        @Nullable BlockHint blockHint,
-        AtomicReference<ScheduledExecutorService> preferredScheduler
-    ) {
         return sendRawRequest(propagatedContext, poolHandle, request, selection, byteBody, nettyRequest, true)
             .onErrorResume(e -> {
                 if (e instanceof StaleConnectionException stale) {
