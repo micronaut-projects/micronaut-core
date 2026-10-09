@@ -41,7 +41,6 @@ import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,7 +77,6 @@ import java.util.stream.Stream;
  * @since 5.3.0
  */
 @Internal
-@NullMarked
 final class BeanWatchRegistry {
 
     private static final Logger LOG = LoggerFactory.getLogger(BeanWatchRegistry.class);

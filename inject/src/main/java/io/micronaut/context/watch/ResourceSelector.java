@@ -17,7 +17,6 @@ package io.micronaut.context.watch;
 
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
@@ -38,7 +37,6 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public record ResourceSelector(ResourceKind kind, Set<String> includeGlobs) {
 
     /**

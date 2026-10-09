@@ -17,7 +17,6 @@ package io.micronaut.context.watch;
 
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 import java.util.Collection;
 import java.util.List;
@@ -32,7 +31,6 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class BeanChange<T> {
 
     private final List<BeanRegistration<T>> added;

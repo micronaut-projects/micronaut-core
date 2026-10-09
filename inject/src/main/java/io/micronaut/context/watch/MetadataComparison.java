@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
-import org.jspecify.annotations.NullMarked;
 
 import java.util.Objects;
 import java.util.Set;
@@ -29,7 +28,6 @@ import java.util.Set;
  * Compares the annotation metadata of two generations of the same element.
  */
 @Internal
-@NullMarked
 final class MetadataComparison {
 
     private MetadataComparison() {

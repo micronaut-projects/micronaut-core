@@ -17,7 +17,6 @@ package io.micronaut.context.watch;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.BeanDefinition;
-import org.jspecify.annotations.NullMarked;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -34,7 +33,6 @@ import java.util.Optional;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class BeanDefinitionChange<T> {
 
     private final List<BeanDefinition<T>> added;

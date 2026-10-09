@@ -18,7 +18,6 @@ package io.micronaut.context.watch;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import org.jspecify.annotations.NullMarked;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
@@ -37,7 +36,6 @@ import java.util.Optional;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class ExecutableMethodChange<A extends Annotation> {
 
     private final List<Entry<A>> added;

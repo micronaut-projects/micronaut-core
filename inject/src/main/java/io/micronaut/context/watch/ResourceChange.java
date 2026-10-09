@@ -17,7 +17,6 @@ package io.micronaut.context.watch;
 
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -39,7 +38,6 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public record ResourceChange(ResourceKind kind, List<Path> roots, List<Path> changed, List<Path> removed, boolean initial) {
 
     /**

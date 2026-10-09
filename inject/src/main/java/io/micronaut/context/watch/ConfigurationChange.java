@@ -17,7 +17,6 @@ package io.micronaut.context.watch;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.naming.NameUtils;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
@@ -42,7 +41,6 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public record ConfigurationChange(boolean all, Set<String> changed, Map<String, @Nullable Object> previous, Map<String, @Nullable Object> current, boolean initial) {
 
     /**
