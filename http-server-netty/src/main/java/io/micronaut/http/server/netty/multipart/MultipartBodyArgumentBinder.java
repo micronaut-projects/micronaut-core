@@ -26,6 +26,7 @@ import io.micronaut.http.server.multipart.FormFactory;
  * @since 1.3.0
  */
 @Internal
+@SuppressWarnings("java:S2176") // The released facade name must remain binary-compatible.
 @Deprecated(since = "5.3.0", forRemoval = true)
 public class MultipartBodyArgumentBinder extends io.micronaut.http.server.binding.MultipartBodyArgumentBinder {
     /** @param formFactory Form utilities */

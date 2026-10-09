@@ -179,7 +179,10 @@ public final class FormFieldFlows {
     @Internal
     private abstract static class FirstFuture<T, R extends @Nullable Object> extends CompletableFuture<R> implements Subscriber<T> {
         private final AtomicBoolean done = new AtomicBoolean();
+        // References are published, not mutated as containers; done arbitrates item ownership.
+        @SuppressWarnings("java:S3077")
         private volatile @Nullable Subscription subscription;
+        @SuppressWarnings("java:S3077")
         private volatile @Nullable ExecutionFlow<?> running;
         private volatile boolean cancelled;
 
@@ -277,7 +280,9 @@ public final class FormFieldFlows {
         private final Consumer<? super R> onValue;
         private final Consumer<@Nullable Throwable> onDone;
         // Publication only: compound atomic transitions are confined to state and error.
+        @SuppressWarnings("java:S3077") // Publication only; Subscription provides its own concurrency contract.
         private volatile @Nullable Subscription upstream;
+        @SuppressWarnings("java:S3077") // Publication only; RunningFlow has atomic cancellation/observation state.
         private volatile @Nullable RunningFlow running;
 
         /**

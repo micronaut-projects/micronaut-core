@@ -154,6 +154,7 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
             }
 
             @Override
+            @SuppressWarnings("java:S2789") // first() returns null when the named form field is absent.
             public Optional<T> getValue() {
                 Optional<T> res = completableFuture.getNow(Optional.empty());
                 //noinspection OptionalAssignedToNull

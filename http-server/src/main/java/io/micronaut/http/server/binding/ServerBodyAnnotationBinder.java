@@ -139,19 +139,19 @@ public class ServerBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T
 
         var pending = new PendingRequestBindingResult<T>() {
             @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
-            @Nullable
-            Optional<T> result;
+            Optional<T> result = Optional.empty();
+            boolean completed;
             boolean convertedToArgumentType;
 
             @SuppressWarnings("OptionalAssignedToNull")
             @Override
             public boolean isPending() {
-                return result == null;
+                return !completed;
             }
 
             @Override
             public Optional<T> getValue() {
-                return result == null ? Optional.empty() : result;
+                return result;
             }
 
             @Override
@@ -174,6 +174,7 @@ public class ServerBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T
                     pending.convertedToArgumentType = reader != null;
                     return transform(source, server, context, reader, imm).map(value -> {
                         pending.result = value;
+                        pending.completed = true;
                         return null;
                     });
                 } catch (Throwable e) {
@@ -316,6 +317,7 @@ public class ServerBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T
      * @param value The decoded body
      */
     protected void cacheDecodedBody(HttpRequest<?> request, ServerHttpRequest<?> server, @Nullable Object value) {
+        // Transport-independent requests have no legacy decoded-body cache to update.
     }
 
     /**

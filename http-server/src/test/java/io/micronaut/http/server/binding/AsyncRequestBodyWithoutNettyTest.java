@@ -19,7 +19,6 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.BasicHttpAttributes;
-import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
