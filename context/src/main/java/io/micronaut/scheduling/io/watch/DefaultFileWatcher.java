@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Closeable;
@@ -46,7 +45,6 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Internal
-@NullMarked
 @Singleton
 @Requires(notEnv = {Environment.FUNCTION, Environment.ANDROID})
 @Requires(beans = WatchService.class)
