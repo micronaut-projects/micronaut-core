@@ -89,12 +89,25 @@ class AsyncRequestBodyWithoutNettyTest {
 
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
+    void singlePublisherBodyIsConvertedToItsDeclaredType() {
+        try (ApplicationContext ctx = ApplicationContext.run();
+             OtherServerRequest server = request("{\"a\":1}", MediaType.APPLICATION_JSON_TYPE)) {
+            PublisherBodyBinder binder = new PublisherBodyBinder(ctx.getBean(ServerBodyAnnotationBinder.class), new io.micronaut.core.convert.DefaultMutableConversionService());
+            Argument argument = Argument.of(reactor.core.publisher.Mono.class, "body", Argument.of(Map.class));
+            Object publisher = binder.bind(ConversionContext.of(argument), new HttpRequestWrapper<>(server)).getValue().orElseThrow();
+            assertEquals(Map.of("a", 1), assertInstanceOf(reactor.core.publisher.Mono.class, publisher).block(Duration.ofSeconds(10)));
+        }
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
     void sharedPublisherBodyBinderReadsNonNettyRequestBytes() {
         try (ApplicationContext ctx = ApplicationContext.run();
              OtherServerRequest server = request("[{\"a\":1},{\"a\":2}]", MediaType.APPLICATION_JSON_TYPE)) {
-            PublisherBodyBinder binder = new PublisherBodyBinder(ctx.getBean(ServerBodyAnnotationBinder.class));
-            Argument argument = Argument.of(Publisher.class, "body", Argument.of(Map.class));
+            PublisherBodyBinder binder = new PublisherBodyBinder(ctx.getBean(ServerBodyAnnotationBinder.class), new io.micronaut.core.convert.DefaultMutableConversionService());
+            Argument argument = Argument.of(Flux.class, "body", Argument.of(Map.class));
             Publisher<?> publisher = (Publisher<?>) binder.bind(ConversionContext.of(argument), new HttpRequestWrapper<>(server)).getValue().orElseThrow();
+            assertInstanceOf(Flux.class, publisher);
             assertEquals(List.of(Map.of("a", 1), Map.of("a", 2)), Flux.from(publisher).collectList().block(Duration.ofSeconds(10)));
         }
     }

@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -28,6 +29,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.stream.ReactorInterop;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyReader;
@@ -56,12 +58,22 @@ public final class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<
     private static final Argument<Publisher<?>> TYPE = (Argument) Argument.of(Publisher.class);
 
     private final ServerBodyAnnotationBinder<Object> bodyAnnotationBinder;
+    private final ConversionService conversionService;
 
     /**
      * @param bodyAnnotationBinder Body annotation binder
      */
     public PublisherBodyBinder(ServerBodyAnnotationBinder<Object> bodyAnnotationBinder) {
+        this(bodyAnnotationBinder, ConversionService.SHARED);
+    }
+
+    /**
+     * @param bodyAnnotationBinder Body annotation binder
+     * @param conversionService Conversion service
+     */
+    public PublisherBodyBinder(ServerBodyAnnotationBinder<Object> bodyAnnotationBinder, ConversionService conversionService) {
         this.bodyAnnotationBinder = bodyAnnotationBinder;
+        this.conversionService = conversionService;
     }
 
     @Override
@@ -90,7 +102,7 @@ public final class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<
                         .flatMap(PublisherBodyBinder::chunked));
                 if (reader.isPresent()) {
                     Publisher<?> pub = reader.get().readChunked(targetType, mediaType, source.getHeaders(), rootBody.toByteBufferPublisher());
-                    return () -> Optional.of(pub);
+                    return () -> Optional.of(convertPublisher(pub, context));
                 }
             }
             // bind a single result
@@ -100,9 +112,14 @@ public final class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<
                         .map(value -> value.orElseThrow(() -> PublisherBodyBinder.extractError(null, context)));
                 });
             Publisher<Object> future = ReactiveExecutionFlow.toPublisher(flow);
-            return () -> Optional.of(future);
+            return () -> Optional.of(convertPublisher(future, context));
         }
         return BindingResult.empty();
+    }
+
+    private Publisher<?> convertPublisher(Publisher<?> source, ArgumentConversionContext<Publisher<?>> context) {
+        Class<Publisher<?>> type = context.getArgument().getType();
+        return Publishers.convertPublisher(conversionService, ReactorInterop.adaptPublisher(source, type), type);
     }
 
     @SuppressWarnings("unchecked")
