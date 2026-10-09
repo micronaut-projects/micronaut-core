@@ -18,7 +18,6 @@ package io.micronaut.dev;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.dev.compile.CompileDiagnostic;
 import io.micronaut.dev.compile.SourceKind;
-import org.jspecify.annotations.NullMarked;
 
 import java.time.Instant;
 import java.util.List;
@@ -35,7 +34,6 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public record CompileFailure(SourceKind kind, List<CompileDiagnostic> diagnostics, Instant at) {
 
     /**

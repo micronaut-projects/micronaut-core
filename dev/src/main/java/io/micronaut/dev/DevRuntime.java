@@ -45,7 +45,6 @@ import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import io.micronaut.scheduling.io.watch.FileChange;
 import io.micronaut.scheduling.io.watch.FileChangeBatch;
 import io.micronaut.scheduling.io.watch.event.WatchEventType;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,7 +94,6 @@ import java.util.stream.Stream;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class DevRuntime implements Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DevRuntime.class);

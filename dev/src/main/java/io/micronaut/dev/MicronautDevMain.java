@@ -21,7 +21,6 @@ import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.loader.DevClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.dev.manifest.ResourceRoot;
-import org.jspecify.annotations.NullMarked;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -43,7 +42,6 @@ import java.util.Map;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public class MicronautDevMain {
 
     /**
