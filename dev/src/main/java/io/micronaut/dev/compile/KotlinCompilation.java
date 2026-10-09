@@ -23,7 +23,6 @@ import org.jetbrains.kotlin.buildtools.api.KotlinToolchains;
 import org.jetbrains.kotlin.buildtools.api.NoImplementationFoundException;
 import org.jetbrains.kotlin.buildtools.api.jvm.JvmPlatformToolchain;
 import org.jetbrains.kotlin.buildtools.api.jvm.operations.JvmCompilationOperation;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +71,6 @@ import java.util.stream.Stream;
  * @since 5.3.0
  */
 @Internal
-@NullMarked
 final class KotlinCompilation {
 
     private static final Logger LOG = LoggerFactory.getLogger(KotlinCompilation.class);

@@ -17,7 +17,6 @@ package io.micronaut.dev.compile;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.reflect.ClassUtils;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -35,7 +34,6 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class KotlinSourceCompiler extends StagedSourceCompiler {
 
     private static final String TOOLCHAINS = "org.jetbrains.kotlin.buildtools.api.KotlinToolchains";

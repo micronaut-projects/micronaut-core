@@ -16,7 +16,6 @@
 package io.micronaut.dev.compile;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NullMarked;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -33,7 +32,6 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Internal
-@NullMarked
 record KspRun(boolean succeeded, Path work, Map<Path, Set<Path>> originsByOutput) {
 
     /**

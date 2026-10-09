@@ -29,7 +29,6 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration;
 import com.google.devtools.ksp.symbol.KSNode;
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +63,6 @@ import java.util.regex.Pattern;
  * @since 5.3.0
  */
 @Internal
-@NullMarked
 final class KspCompilation {
 
     private static final Logger LOG = LoggerFactory.getLogger(KspCompilation.class);

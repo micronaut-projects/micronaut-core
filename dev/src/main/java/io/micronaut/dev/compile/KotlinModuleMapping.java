@@ -16,7 +16,6 @@
 package io.micronaut.dev.compile;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
@@ -50,7 +49,6 @@ import java.util.function.Predicate;
  * @since 5.3.0
  */
 @Internal
-@NullMarked
 final class KotlinModuleMapping {
 
     private static final int MODULE_PACKAGE_PARTS = 1;
