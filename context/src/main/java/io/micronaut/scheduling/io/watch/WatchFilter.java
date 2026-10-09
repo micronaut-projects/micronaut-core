@@ -15,7 +15,6 @@
  */
 package io.micronaut.scheduling.io.watch;
 
-import org.jspecify.annotations.NullMarked;
 
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
@@ -31,7 +30,6 @@ import java.util.Set;
  * @author graemerocher
  * @since 5.3.0
  */
-@NullMarked
 final class WatchFilter {
 
     private static final String ALL_BELOW = "/**";
