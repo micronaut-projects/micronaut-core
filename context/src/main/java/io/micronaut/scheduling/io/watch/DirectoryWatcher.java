@@ -113,12 +113,12 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
      */
     private final Map<WatchKey, WatchedDirectory> directoriesByKey = new LinkedHashMap<>();
     /**
-     * Whether a registration has changes waiting for the quiet period to elapse. Each registration keeps its own,
-     * decided when they are recorded, so that a registration receives only changes recorded after it was made, merged
-     * only with each other, and still receives those of a directory released before they were delivered. Only the
-     * watch thread touches it.
+     * The registrations with changes waiting for the quiet period to elapse. Each registration keeps its own, decided
+     * when they are recorded, so that a registration receives only changes recorded after it was made, merged only
+     * with each other, and still receives those of a directory released before they were delivered. Only the watch
+     * thread touches it.
      */
-    private boolean pending;
+    private final Set<DirectoryRegistration> pending = new LinkedHashSet<>();
     private long firstPendingNanos;
     private long lastEventNanos;
     private @Nullable Thread thread;
@@ -302,7 +302,7 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
     private void run() {
         while (active.get()) {
             try {
-                long timeout = pending ? Math.max(1, millisUntilDue()) : checkInterval.toMillis();
+                long timeout = pending.isEmpty() ? checkInterval.toMillis() : Math.max(1, millisUntilDue());
                 if (pendingStages.get() > 0 || !ready.isEmpty()) {
                     timeout = ready.isEmpty() ? Math.max(1, Math.min(timeout, quietPeriod.toMillis())) : 0;
                 }
@@ -310,7 +310,7 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
                 if (key != null) {
                     drain(key);
                 }
-                if (pending && millisUntilDue() <= 0) {
+                if (!pending.isEmpty() && millisUntilDue() <= 0) {
                     flush();
                 }
                 deliverReady();
@@ -345,23 +345,26 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
             return false;
         }
         boolean recorded = false;
-        for (WatchEvent<?> event : key.pollEvents()) {
-            WatchEvent.Kind<?> kind = event.kind();
-            if (kind == StandardWatchEventKinds.OVERFLOW) {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn("WatchService overflow under {}: some changes may have been lost", directory.path);
+        // under the lock a registration is never seen half scanned: registerRoot publishes and scans it under the lock
+        synchronized (this) {
+            for (WatchEvent<?> event : key.pollEvents()) {
+                WatchEvent.Kind<?> kind = event.kind();
+                if (kind == StandardWatchEventKinds.OVERFLOW) {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("WatchService overflow under {}: some changes may have been lost", directory.path);
+                    }
+                    continue;
                 }
-                continue;
-            }
-            if (!(event.context() instanceof Path context)) {
-                continue;
-            }
-            Path changed = directory.path.resolve(context).toAbsolutePath().normalize();
-            WatchEventType type = WatchEventType.of(kind);
-            record(changed, type);
-            recorded = true;
-            if (type == WatchEventType.CREATE && Files.isDirectory(changed)) {
-                registerCreatedDirectory(changed);
+                if (!(event.context() instanceof Path context)) {
+                    continue;
+                }
+                Path changed = directory.path.resolve(context).toAbsolutePath().normalize();
+                WatchEventType type = WatchEventType.of(kind);
+                record(changed, type);
+                recorded = true;
+                if (type == WatchEventType.CREATE && Files.isDirectory(changed)) {
+                    registerCreatedDirectory(changed);
+                }
             }
         }
         if (!key.reset()) {
@@ -397,11 +400,15 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         if (!registration.isActive() || !registration.accepts(path)) {
             return;
         }
-        if (!pending) {
-            pending = true;
+        if (pending.isEmpty()) {
             firstPendingNanos = System.nanoTime();
         }
-        registration.record(path, type);
+        if (registration.record(path, type)) {
+            pending.add(registration);
+        } else {
+            // its changes cancelled out: a later change starts a new window
+            pending.remove(registration);
+        }
     }
 
     /**
@@ -437,11 +444,13 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
      * Delivers the pending changes to the registrations they fall under, once the quiet period passed.
      */
     private void flush() {
-        if (!pending) {
+        if (pending.isEmpty()) {
             return;
         }
-        pending = false;
-        for (DirectoryRegistration registration : registrations) {
+        List<DirectoryRegistration> due = List.copyOf(pending);
+        pending.clear();
+        // a registration closed since is cleared here too, although it left the registrations
+        for (DirectoryRegistration registration : due) {
             List<FileChange> changes = registration.takePending();
             if (!changes.isEmpty() && registration.isActive()) {
                 registration.offer(changes);
@@ -807,9 +816,12 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
 
         /**
          * Records a change until the quiet period elapsed. Called on the watch thread.
+         *
+         * @return Whether changes are pending for this registration
          */
-        void record(Path path, WatchEventType type) {
+        boolean record(Path path, WatchEventType type) {
             merge(pending, path, type);
+            return !pending.isEmpty();
         }
 
         /**
