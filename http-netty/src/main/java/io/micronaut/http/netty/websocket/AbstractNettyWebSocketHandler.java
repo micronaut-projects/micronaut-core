@@ -413,7 +413,13 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         payload.release();
                     } else {
                         ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(payload);
-                        data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
+                        try {
+                            data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
+                        } catch (Throwable t) {
+                            // readers release the buffer on success only
+                            payload.release();
+                            throw t;
+                        }
                     }
                 }
 

@@ -92,7 +92,17 @@ public final class TextPlainObjectBodyReader<T> implements TypedMessageBodyReade
 
     @Override
     public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        return Flux.from(input).map(byteBuffer -> read0(type, byteBuffer, getCharset(mediaType)));
+        return Flux.from(input).map(byteBuffer -> {
+            try {
+                return read0(type, byteBuffer, getCharset(mediaType));
+            } catch (Throwable t) {
+                // read0 releases on success only, and a chunk has no caller that releases it on failure
+                if (byteBuffer instanceof ReferenceCounted rc) {
+                    rc.release();
+                }
+                throw t;
+            }
+        });
     }
 
     /**

@@ -15,9 +15,11 @@
  */
 package io.micronaut.http.netty.body;
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
@@ -37,10 +39,11 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Netty json stream implementation for MessageBodyHandler.
@@ -79,11 +82,37 @@ public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, C
         if (!type.getType().isAssignableFrom(List.class)) {
             throw new IllegalArgumentException("Can only read json-stream to a Publisher or list type");
         }
+        if (!(byteBuffer.asNativeBuffer() instanceof ByteBuf buf)) {
+            throw new IllegalArgumentException("Only netty buffers are supported");
+        }
         //noinspection unchecked
-        return (T) Objects.requireNonNull(
-            readChunked((Argument<T>) type.getFirstTypeVariable().orElse(type), mediaType, httpHeaders, Flux.just(byteBuffer)).collectList().block(),
-            "The JSON stream reader returned no result"
-        );
+        Argument<T> elementType = (Argument<T>) type.getFirstTypeVariable().orElse(type);
+        // Like the other readers, the input is released on success only, the caller releases it
+        // on failure
+        List<ByteBuf> nodes;
+        try {
+            nodes = new JsonChunkedProcessor().processFully(buf);
+        } catch (IOException e) {
+            throw new CodecException("Error decoding JSON stream: " + e.getMessage(), e);
+        }
+        List<T> result = new ArrayList<>(nodes.size());
+        int i = 0;
+        try {
+            for (; i < nodes.size(); i++) {
+                result.add(jsonMessageHandler.read(elementType, mediaType, httpHeaders, NettyByteBufferFactory.DEFAULT.wrap(nodes.get(i))));
+            }
+        } catch (Throwable t) {
+            // the reader did not release the node that failed, nor the ones it did not reach
+            for (; i < nodes.size(); i++) {
+                nodes.get(i).release();
+            }
+            throw t;
+        }
+        if (byteBuffer instanceof ReferenceCounted rc) {
+            rc.release();
+        }
+        //noinspection unchecked
+        return (T) result;
     }
 
     @Override
@@ -94,12 +123,7 @@ public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, C
     @Override
     public Flux<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
         JsonChunkedProcessor processor = new JsonChunkedProcessor();
-        return processor.process(Flux.from(input).map(bb -> {
-            if (!(bb.asNativeBuffer() instanceof ByteBuf buf)) {
-                throw new IllegalArgumentException("Only netty buffers are supported");
-            }
-            return buf;
-        })).map(bb -> jsonMessageHandler.read(type, mediaType, httpHeaders, bb));
+        return processor.process(Flux.from(input).map(JsonChunkedProcessor::toByteBuf)).map(bb -> JsonChunkedProcessor.readOrRelease(bb, b -> jsonMessageHandler.read(type, mediaType, httpHeaders, b)));
     }
 
     @Override
