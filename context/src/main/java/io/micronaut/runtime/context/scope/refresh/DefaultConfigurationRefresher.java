@@ -23,6 +23,7 @@ import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.context.watch.ConfigurationWatcher;
 import io.micronaut.core.annotation.Internal;
@@ -88,18 +89,36 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
 
     /**
      * Every property the sources define, resolved: the keys of every source, each with the value the
-     * environment gives it once the sources are ordered and the placeholders expanded.
+     * environment gives it once the sources are ordered and the placeholders expanded. A key whose
+     * placeholders do not resolve has no value: it is reported once they do.
      */
     private Map<String, Object> resolvedProperties() {
         Map<String, Object> resolved = new LinkedHashMap<>();
         for (PropertySource source : environment.getPropertySources()) {
             for (String key : source) {
                 if (!resolved.containsKey(key)) {
-                    resolved.put(key, environment.getProperty(key, Object.class).orElse(null));
+                    resolved.put(key, valueOf(key));
                 }
             }
         }
         return resolved;
+    }
+
+    /**
+     * The value the environment gives a key, or none when its placeholders do not resolve: a property
+     * such as {@code target=localhost:${server.port}} whose placeholder nothing defines yet fails only
+     * the beans that read it, never the refresher's creation on a first refresh event; a bean that reads
+     * it fails when the refresh rebinds or recreates it, as it did when it was created.
+     */
+    private @Nullable Object valueOf(String key) {
+        try {
+            return environment.getProperty(key, Object.class).orElse(null);
+        } catch (ConfigurationException e) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Property [{}] does not resolve, it is compared as having no value: {}", key, e.getMessage());
+            }
+            return null;
+        }
     }
 
     /**
@@ -170,7 +189,7 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
         Map<String, Object> previous = new LinkedHashMap<>();
         Map<String, Object> current = new LinkedHashMap<>();
         for (Map.Entry<String, Object> entry : reported.entrySet()) {
-            Object now = environment.getProperty(entry.getKey(), Object.class).orElse(null);
+            Object now = valueOf(entry.getKey());
             if (entry.getValue() != null && !java.util.Objects.equals(entry.getValue(), now)) {
                 previous.put(entry.getKey(), entry.getValue());
             }
