@@ -27,6 +27,14 @@ tasks.named<Test>("test") {
 // the tests of the client without Netty: the default test classpath has the Netty server
 testing {
     suites {
+        register<JvmTestSuite>("testWithNetty") {
+            useJUnitJupiter(libs.versions.junit5)
+            dependencies {
+                implementation(project())
+                implementation(projects.micronautHttpClient)
+                implementation(projects.micronautJacksonDatabind)
+            }
+        }
         register<JvmTestSuite>("testWithoutNetty") {
             useJUnitJupiter(libs.versions.junit5)
             dependencies {
@@ -39,5 +47,5 @@ testing {
 }
 
 tasks.named("test") {
-    dependsOn(testing.suites.named("testWithoutNetty"))
+    dependsOn(testing.suites.named("testWithoutNetty"), testing.suites.named("testWithNetty"))
 }

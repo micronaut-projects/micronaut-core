@@ -58,7 +58,7 @@ public class DefaultServerRequestBinderRegistry implements ServerRequestBinderRe
         internalRequestBinderRegistry = new DefaultRequestBinderRegistry(conversionService, binders, bodyBinder);
 
         internalRequestBinderRegistry.addArgumentBinder(new CompletableFutureBodyBinder(bodyBinder));
-        internalRequestBinderRegistry.addArgumentBinder(new PublisherBodyBinder(bodyBinder));
+        internalRequestBinderRegistry.addArgumentBinder(new PublisherBodyBinder(bodyBinder, conversionService));
         internalRequestBinderRegistry.addArgumentBinder(new MultipartBodyArgumentBinder(
             formFactory
         ));
