@@ -331,7 +331,7 @@ final class PythonHotPatchTest {
             class Item:
                 pass
 
-            LIMIT = [1]
+            LIMIT = [2]
 
             def handle(items: list[Item]) -> Item | None:
                 return items
@@ -348,6 +348,102 @@ final class PythonHotPatchTest {
             annotations = m.handle.__annotations__
             assert annotations['items'].__args__[0] is Item, annotations
             assert Item in annotations['return'].__args__, annotations
+            """);
+    }
+
+    @Test
+    void aValueImportedUnderAnyNameRefusesAChangeOfItAndAnUnchangedScalarStands() {
+        run("""
+            flags = define('hot.flags', '''
+            ENABLED = True
+            LIMIT = 1000
+            NAMES = ['a']
+
+            def describe():
+                return 'old'
+            ''')
+            consumer = define('hot.consumer', '''
+            from hot.flags import ENABLED
+            from hot.flags import LIMIT as limit
+
+            class Settings:
+                class Nested:
+                    from hot.flags import NAMES
+
+            def current_limit():
+                from hot.flags import LIMIT
+                return LIMIT
+            ''')
+            unrelated = define('hot.unrelated', '''
+            DEBUG = True
+            ''')
+            debug = define('hot.debug', '''
+            DEBUG = True
+            ''')
+            """);
+        // a bool and an aliased int, imported by value, cannot follow the edit: the patch is refused for a restart
+        run("""
+            edit('hot.flags', '''
+            ENABLED = False
+            LIMIT = 1000
+            NAMES = ['a']
+
+            def describe():
+                return 'old'
+            ''')
+            """);
+        assertRefused("hot/flags.py", "imported 'ENABLED'");
+        run("""
+            edit('hot.flags', '''
+            ENABLED = True
+            LIMIT = 2000
+            NAMES = ['a']
+
+            def describe():
+                return 'old'
+            ''')
+            """);
+        assertRefused("hot/flags.py", "imported 'LIMIT'");
+        // a list a class body imported, computed again: the class would keep the old one
+        run("""
+            edit('hot.flags', '''
+            ENABLED = True
+            LIMIT = 1000
+            NAMES = ['b']
+
+            def describe():
+                return 'old'
+            ''')
+            """);
+        assertRefused("hot/flags.py", "hot.consumer.Settings.Nested imported 'NAMES'");
+        run("""
+            del consumer.Settings.Nested.NAMES
+            assert flags.ENABLED is True and flags.LIMIT == 1000
+            edit('hot.flags', '''
+            ENABLED = True
+            LIMIT = 1000
+            NAMES = ['a']
+
+            def describe():
+                return 'new'
+            ''')
+            """);
+        // a body edit with the imported scalars unchanged: what the importers hold stands
+        hotPatch("hot/flags.py");
+        run("""
+            assert flags.describe() == 'new'
+            assert flags.LIMIT is consumer.limit
+            assert consumer.limit == 1000 and consumer.current_limit() == 1000
+            """);
+        // a value another application module holds under the same name without importing it does not refuse
+        run("""
+            edit('hot.debug', '''
+            DEBUG = False
+            ''')
+            """);
+        hotPatch("hot/debug.py");
+        run("""
+            assert debug.DEBUG is False and unrelated.DEBUG is True
             """);
     }
 

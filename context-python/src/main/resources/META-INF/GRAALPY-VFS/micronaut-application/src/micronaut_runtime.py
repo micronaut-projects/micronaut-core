@@ -690,6 +690,108 @@ def _micronaut_new_cell(value):
     return types.CellType(value)
 
 
+# values whose identity no program can rely on: an equal one stands for the other
+_MICRONAUT_SCALAR_TYPES = (bool, int, float, complex, str, bytes, type(None))
+
+
+def _micronaut_equal_values(old, new):
+    """Whether a scalar the module computed again equals the one it replaces, so that the importers' value stands."""
+    if type(old) is not type(new) or not isinstance(old, _MICRONAUT_SCALAR_TYPES):
+        return False
+    try:
+        return (old == new) is True
+    except Exception:
+        return False
+
+
+# the imports by value of the application modules, by path: the source in effect and what it imports
+_micronaut_import_cache = {}
+
+
+def _micronaut_application_source(module):
+    """The path and the current source of an application module, or None."""
+    import os
+    path = getattr(module, "__file__", None)
+    if not isinstance(path, str) or not path.endswith(".py"):
+        return None
+    normalized = os.path.normpath(path).replace("\\", "/")
+    if not any(normalized.startswith(root.replace("\\", "/").rstrip("/") + "/") for root in _micronaut_vfs_source_roots()):
+        return None
+    spec = getattr(module, "__spec__", None)
+    loader = getattr(spec, "loader", None) or getattr(module, "__loader__", None)
+    if loader is None or not hasattr(loader, "get_data"):
+        return None
+    try:
+        return path, loader.get_data(path)
+    except (OSError, NotImplementedError, ValueError):
+        return None
+
+
+def _micronaut_parse_imports(module, path, source):
+    import ast
+    try:
+        tree = ast.parse(source, path)
+    except (SyntaxError, ValueError):
+        return None
+    package = getattr(module, "__package__", None)
+    if package is None:
+        package = module.__name__ if hasattr(module, "__path__") else module.__name__.rpartition(".")[0]
+    imports = []
+
+    def visit(node, scope):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+                continue
+            if isinstance(child, ast.ClassDef):
+                # the class body binds into the class
+                visit(child, scope + (child.name,))
+                continue
+            if isinstance(child, ast.ImportFrom):
+                source_module = child.module or ""
+                if child.level:
+                    base = package.split(".") if package else []
+                    if child.level > 1:
+                        base = base[:len(base) - (child.level - 1)]
+                    source_module = ".".join(part for part in base + ([child.module] if child.module else []) if part)
+                for alias in child.names:
+                    imports.append((source_module, alias.name, alias.asname or alias.name, scope))
+            visit(child, scope)
+    visit(tree, ())
+    return tuple(imports)
+
+
+def _micronaut_imports_by_value(module):
+    """The ``(module, name, bound name, class path)`` imports by value an application module runs when it is
+    executed: at module level, and in class bodies, whose class path names the class bound to; not in functions,
+    which import the current value when they run. A name of ``*`` stands for a star import. The imports of the
+    source the running module was executed from count, as well as those of its current source, when an edit not yet
+    in effect changed them. None for a module whose source is not an application source, or cannot be read.
+    """
+    found = _micronaut_application_source(module)
+    if found is None:
+        return None
+    path, source = found
+    entry = _micronaut_import_cache.get(path)
+    if entry is not None and entry[0] == source:
+        return entry[1]
+    current = _micronaut_parse_imports(module, path, source)
+    if current is None:
+        return None if entry is None else entry[1]
+    if entry is None:
+        # first seen: the source it was executed from, as far as anything tells
+        _micronaut_import_cache[path] = (source, current)
+        return current
+    return entry[1] + tuple(item for item in current if item not in entry[1])
+
+
+def _micronaut_imports_took_effect(module):
+    """The module runs its current source now: its imports are those of that source."""
+    found = _micronaut_application_source(module)
+    if found is not None:
+        _micronaut_import_cache.pop(found[0], None)
+        _micronaut_imports_by_value(module)
+
+
 class _MicronautModulePatch:
     """The patch of one module in one context: planned first, the module's own objects are changed after.
 
@@ -770,8 +872,15 @@ class _MicronautModulePatch:
                 continue
             bound_value = self.plan_value(old, new, f"global '{name}'")
             namespace[name] = bound_value
-            if bound_value is new and _micronaut_member_kind(new) is None and old is not None and not isinstance(old, bool):
-                self.refuse_if_imported(name, old)
+            if bound_value is new and _micronaut_member_kind(new) is None:
+                importer = self.importer_of(name, old)
+                if importer is None:
+                    continue
+                if _micronaut_equal_values(old, new):
+                    # the importers hold the module's value still: the module keeps the object they share
+                    namespace[name] = old
+                else:
+                    self.refuse(f"the module {importer} imported '{name}', whose value changed")
         module_annotations = namespace.get("__annotations__")
         if isinstance(module_annotations, dict):
             # executing the module again filled its annotations, the same dictionary, with the new classes
@@ -956,14 +1065,48 @@ class _MicronautModulePatch:
                 continue
             self.actions.append(lambda n=name: delattr(old, n))
 
-    def refuse_if_imported(self, name, old):
-        """A value another module imported by name keeps the old value there, which a restart would not."""
+    def importer_of(self, name, old):
+        """The name of a module that imported the global by value and holds it still, or None.
+
+        ``from module import name as alias`` binds the value in the importing module, where an in-place patch
+        cannot reach it: a restart would give the importer the new value. An application module's imports are read
+        from its source, so that an alias, and a value such as True or a small int that another module may hold
+        without importing it, are told apart; a module without a source read keeps the old rule, the same name
+        bound to the same object.
+        """
+        module_name = self.module.__name__
+        exported = self.saved.get("__all__")
         for other_name, other in list(sys.modules.items()):
             if other is self.module:
                 continue
             namespace = getattr(other, "__dict__", None)
-            if isinstance(namespace, dict) and namespace.get(name, namespace) is old:
-                self.refuse(f"the module {other_name} imported '{name}', whose value changed")
+            if not isinstance(namespace, dict):
+                continue
+            # the old rule holds for every module: the same name bound to the same object, which a value the module
+            # imported may still be when its source was edited before its imports were first read
+            if old is not None and not isinstance(old, bool) and namespace.get(name, namespace) is old:
+                return other_name
+            imports = _micronaut_imports_by_value(other)
+            if imports is None:
+                continue
+            for source, imported, bound, scope in imports:
+                if source != module_name:
+                    continue
+                if imported == "*":
+                    if (name in exported) if isinstance(exported, (list, tuple)) else not name.startswith("_"):
+                        bound = name
+                    else:
+                        continue
+                elif imported != name:
+                    continue
+                holder = namespace
+                for class_name in scope:
+                    # the module's dictionary, then the mapping proxy of each enclosing class
+                    owner = holder.get(class_name) if holder is not None else None
+                    holder = owner.__dict__ if isinstance(owner, type) else None
+                if holder is not None and holder.get(bound, holder) is old:
+                    return other_name if not scope else other_name + "." + ".".join(scope)
+        return None
 
     def remap_annotations(self, annotations):
         """Annotations naming a class of the module name its old class, which the module keeps."""
@@ -1133,6 +1276,8 @@ def _micronaut_hot_patch(relative_paths):
         raise
     for patch in patches:
         patch.apply()
+    for patch in patches:
+        _micronaut_imports_took_effect(patch.module)
     # parameter layouts are cached by function, and a patched function may lay out its defaults differently
     _micronaut_positional_layouts.clear()
     return [patch.module.__name__ for patch in patches]
