@@ -21,6 +21,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http2.Http2CodecUtil;
 import io.netty.handler.codec.http2.Http2Connection;
+import io.netty.handler.codec.http2.Http2Error;
 import io.netty.handler.codec.http2.Http2EventAdapter;
 import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.codec.http2.Http2Headers;
@@ -195,8 +196,16 @@ public class StreamingInboundHttp2ToHttpAdapter extends Http2EventAdapter {
             Http2Headers headers,
             boolean validateHttpHeaders)
             throws Http2Exception {
-        return connection.isServer() ? HttpConversionUtil.toHttpRequest(stream.id(), headers, validateHttpHeaders) :
-                HttpConversionUtil.toHttpResponse(stream.id(), headers, validateHttpHeaders);
+        if (!connection.isServer()) {
+            return HttpConversionUtil.toHttpResponse(stream.id(), headers, validateHttpHeaders);
+        }
+        try {
+            return HttpConversionUtil.toHttpRequest(stream.id(), headers, validateHttpHeaders);
+        } catch (RuntimeException e) {
+            // e.g. a missing :method or :path pseudo-header. RFC 9113 §8.1.1: a malformed
+            // request is a stream error, it must not fail the other streams of the connection.
+            throw Http2Exception.streamError(stream.id(), Http2Error.PROTOCOL_ERROR, e, "Malformed request headers");
+        }
     }
 
     /**
