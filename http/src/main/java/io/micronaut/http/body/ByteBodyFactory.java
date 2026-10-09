@@ -471,6 +471,16 @@ public class ByteBodyFactory {
         }
         // Available bodies cannot report their length after the publisher claims their bytes.
         OptionalLong expectedLength = body.expectedLength();
+        if (body instanceof AvailableByteBody available) {
+            StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, bytesConsumed -> {
+                // All bytes have arrived; there is no producer to notify about demand.
+            });
+            expectedLength.ifPresent(sb.sharedBuffer::setExpectedLength);
+            // Transfer the owned buffer directly, avoiding a publisher/subscription round trip.
+            sb.sharedBuffer.add(available.toReadBuffer());
+            sb.sharedBuffer.complete(body.trailers());
+            return sb.rootBody;
+        }
         AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
         StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb.sharedBuffer);

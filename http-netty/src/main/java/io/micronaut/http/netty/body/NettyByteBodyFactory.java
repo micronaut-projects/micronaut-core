@@ -137,6 +137,15 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
         }
         // the length first: for an available body it is a claiming operation, like the publisher
         OptionalLong expectedLength = body.expectedLength();
+        if (body instanceof AvailableByteBody available) {
+            StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(BodySizeLimits.UNLIMITED, bytesConsumed -> {
+                // All bytes have arrived; there is no producer to notify about demand.
+            });
+            expectedLength.ifPresent(sb::setExpectedLength);
+            sb.add(available.toReadBuffer());
+            sb.complete(body.trailers());
+            return new StreamingNettyByteBody(sb);
+        }
         NettyBodyAdapter adapter = new NettyBodyAdapter(loop, body.toReadBufferPublisher(), null);
         StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb);

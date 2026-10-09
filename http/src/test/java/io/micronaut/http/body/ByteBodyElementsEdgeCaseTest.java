@@ -111,14 +111,25 @@ class ByteBodyElementsEdgeCaseTest {
         Assertions.assertTrue(e.getCause().getMessage().contains("Content-Length"), e.getCause().getMessage());
     }
 
-    @Test
-    void rebufferingAnAvailableBodyPreservesItsLength() throws Exception {
-        try (CloseableByteBody original = FACTORY.copyOf("hello", StandardCharsets.UTF_8);
+    @ParameterizedTest
+    @ValueSource(strings = {"", "hello"})
+    void rebufferingAnAvailableBodyPreservesItsLength(String content) throws Exception {
+        try (CloseableByteBody original = FACTORY.copyOf(content, StandardCharsets.UTF_8);
              CloseableByteBody streaming = FACTORY.toStreaming(original)) {
-            Assertions.assertEquals(OptionalLong.of(5), streaming.expectedLength());
+            Assertions.assertEquals(OptionalLong.of(content.length()), streaming.expectedLength());
             try (CloseableAvailableByteBody buffered = streaming.buffer().get(10, TimeUnit.SECONDS)) {
-                Assertions.assertEquals("hello", buffered.toString(StandardCharsets.UTF_8));
+                Assertions.assertEquals(content, buffered.toString(StandardCharsets.UTF_8));
             }
+        }
+    }
+
+    @Test
+    void closingAnUnreadRebufferedAvailableBodyReleasesItsBytes() {
+        ReadBuffer bytes = buffer("hello");
+        try (CloseableByteBody original = FACTORY.adapt(bytes)) {
+            FACTORY.toStreaming(original).close();
+            Assertions.assertThrows(IllegalStateException.class, bytes::readable);
+            Assertions.assertThrows(IllegalStateException.class, original::toReadBufferPublisher);
         }
     }
 
