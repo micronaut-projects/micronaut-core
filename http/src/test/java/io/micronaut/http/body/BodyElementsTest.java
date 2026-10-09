@@ -42,6 +42,65 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BodyElementsTest {
 
     @Test
+    void ofRetainsTheEndAcrossReadsAndIteration() {
+        AtomicInteger reads = new AtomicInteger();
+        BodyElements<String> elements = BodyElements.of(() -> CompletableFuture.completedFuture(
+            reads.getAndIncrement() == 0 ? Optional.empty() : Optional.of("unexpected")));
+        assertEquals(Optional.empty(), elements.next().toCompletableFuture().join());
+        assertEquals(BodyElements.State.COMPLETED, elements.state());
+        assertEquals(null, elements.failure());
+        assertEquals(Optional.empty(), elements.next().toCompletableFuture().join());
+        elements.forEach(value -> {
+            throw new AssertionError("An element was read after EOF");
+        }).toCompletableFuture().join();
+        assertEquals(1, reads.get());
+    }
+
+    @Test
+    void ofIterationRetainsTheEndForTheNextRead() {
+        AtomicInteger reads = new AtomicInteger();
+        BodyElements<String> elements = BodyElements.of(() -> {
+            reads.incrementAndGet();
+            return CompletableFuture.completedFuture(Optional.empty());
+        });
+        elements.forEach(value -> CompletableFuture.completedFuture(null)).toCompletableFuture().join();
+        assertEquals(BodyElements.State.COMPLETED, elements.state());
+        assertEquals(Optional.empty(), elements.next().toCompletableFuture().join());
+        assertEquals(1, reads.get());
+    }
+
+    @Test
+    void ofRetainsReadFailuresAcrossReadsAndIteration() {
+        AtomicInteger reads = new AtomicInteger();
+        IllegalArgumentException failure = new IllegalArgumentException("read");
+        BodyElements<String> elements = BodyElements.of(() -> reads.getAndIncrement() == 0 ?
+            CompletableFuture.failedFuture(failure) : CompletableFuture.completedFuture(Optional.of("unexpected")));
+        for (int i = 0; i < 2; i++) {
+            assertSame(failure, assertThrows(CompletionException.class, () -> elements.next().toCompletableFuture().join()).getCause());
+            assertEquals(BodyElements.State.FAILED, elements.state());
+            assertSame(failure, elements.failure());
+        }
+        assertSame(failure, assertThrows(CompletionException.class, () ->
+            elements.forEach(value -> CompletableFuture.completedFuture(null)).toCompletableFuture().join()).getCause());
+        assertSame(failure, elements.failure());
+        assertEquals(1, reads.get());
+    }
+
+    @Test
+    void ofRetainsSynchronousSupplierFailures() {
+        AtomicInteger reads = new AtomicInteger();
+        IllegalArgumentException failure = new IllegalArgumentException("supplier");
+        BodyElements<String> elements = BodyElements.of(() -> {
+            reads.incrementAndGet();
+            throw failure;
+        });
+        assertSame(failure, assertThrows(CompletionException.class, () -> elements.next().toCompletableFuture().join()).getCause());
+        assertSame(failure, assertThrows(CompletionException.class, () -> elements.next().toCompletableFuture().join()).getCause());
+        assertSame(failure, elements.failure());
+        assertEquals(1, reads.get());
+    }
+
+    @Test
     void ofAllowsOneOperationAtATime() {
         CompletableFuture<Optional<String>> pending = new CompletableFuture<>();
         BodyElements<String> elements = BodyElements.of(() -> pending);
