@@ -252,10 +252,10 @@ class DevRuntimeTest {
             assertTrue(runtime.lastFailure().get().describe().contains("incompatible types"));
             assertEquals(2, runtime.generation());
 
-            // the fix reloads both edits
+            // the fix applies both edits, by a restart or, body only, in place
             Files.writeString(greeter, greeter("three"));
             runtime.sourcesChanged(SourceKind.JAVA, Set.of(greeter), Set.of());
-            ApplicationContext fixed = runtime.awaitGeneration(3, Duration.ofMinutes(2));
+            ApplicationContext fixed = runtime.context().orElseThrow();
             assertTrue(runtime.lastFailure().isEmpty());
             assertEquals("three", greet(runtime, fixed));
             Class<?> otherType = fixed.getClassLoader().loadClass("app.Other");
