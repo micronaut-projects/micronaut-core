@@ -55,5 +55,8 @@ java -jar benchmarks/build/libs/benchmarks-5.3.0-SNAPSHOT-jmh.jar \
 
 No released API/default is removed, no blocking body-elements API is added, and
 no custom GitHub Actions workflow is required. Classloader tests cover absent
-Reactor; a new native-image execution has not yet been performed for the added
-scheduler bridge.
+Reactor. A standalone probe using the actual compiled `ReactorInterop` also
+passed with Reactor absent on GraalVM 25.0.3, built with
+`--exact-reachability-metadata --no-fallback` and run with
+`-XX:MissingRegistrationReportingMode=Exit`. It exercises the scheduler check
+and native publisher demand/value/completion, without custom reflection metadata.
