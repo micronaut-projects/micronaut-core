@@ -44,6 +44,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CompositeCookieDecoder;
+import io.micronaut.http.client.jdk.cookie.NettyCookieDecoder;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.client.jdk.cookie.DefaultCookieDecoder;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
@@ -168,7 +169,7 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
             null,
             conversionService,
             new JdkClientSslBuilder(new ResourceResolver()),
-            new CompositeCookieDecoder(List.of(new DefaultCookieDecoder()))
+            defaultCookieDecoder(conversionService)
         );
     }
 
@@ -193,8 +194,23 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
             null,
             conversionService,
             new JdkClientSslBuilder(new ResourceResolver()),
-            new CompositeCookieDecoder(List.of(new DefaultCookieDecoder()))
+            defaultCookieDecoder(conversionService)
         );
+    }
+
+    private static CompositeCookieDecoder defaultCookieDecoder(ConversionService conversionService) {
+        if (nettyRequestType() != null) {
+            return new CompositeCookieDecoder(List.of(new NettyCookieDecoder(conversionService), new DefaultCookieDecoder()));
+        }
+        return new CompositeCookieDecoder(List.of(new DefaultCookieDecoder()));
+    }
+
+    private static @Nullable Class<?> nettyRequestType() {
+        try {
+            return io.micronaut.http.client.netty.NettyClientHttpRequest.class;
+        } catch (NoClassDefFoundError e) {
+            return null;
+        }
     }
 
     private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
