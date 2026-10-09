@@ -35,6 +35,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Generic PEM file parser with type detection. <b>Note that this class does not defend against DER
@@ -50,6 +51,11 @@ record PemParser(
     private static final String DASHES = "-----";
     private static final String START = DASHES + "BEGIN ";
     private static final String END = DASHES + "END ";
+    /**
+     * The whitespace that RFC 7468 section 3 (lax grammar) allows anywhere in the base64 body:
+     * {@code WSP / CR / LF / VT / FF}.
+     */
+    private static final Pattern WHITESPACE = Pattern.compile("[ \\t\\r\\n\\u000B\\f]+");
 
     private static final String OID_RSA = "1.2.840.113549.1.1.1";
     private static final String OID_EC = "1.2.840.10045.2.1";
@@ -76,20 +82,14 @@ record PemParser(
      * at all
      */
     List<Object> loadPem(String pem) throws GeneralSecurityException, IllegalArgumentException, NotPemException {
-        // PEM is a sequence of base64 encoded DER objects delimited by -----BEGIN/END lines
+        // PEM is a sequence of base64 encoded DER objects delimited by -----BEGIN/END lines.
+        // As per RFC 7468 section 2, any other text between or around them is ignored. A boundary
+        // always starts on its own line, so a marker in the middle of a line (e.g. in a comment)
+        // is just text.
         List<Object> list = new ArrayList<>();
-        int i = 0;
-        while (i < pem.length()) {
-            if (Character.isWhitespace(pem.charAt(i))) {
-                i++;
-                continue;
-            } else if (!pem.startsWith(START, i)) {
-                if (list.isEmpty()) {
-                    throw new NotPemException("Missing start tag");
-                } else {
-                    throw invalidPem(false);
-                }
-            }
+        int i = indexOfBeginLine(pem, 0);
+        boolean beginSeen = i != -1;
+        while (i != -1) {
             i += START.length();
             int labelEnd = pem.indexOf(DASHES, i);
             if (labelEnd == -1) {
@@ -104,17 +104,33 @@ record PemParser(
             }
             Decoder decoder = getDecoder(label);
 
-            String contentString = pem.substring(i, sectionEnd)
-                .replace("\r", "")
-                .replace("\n", "");
-            i = sectionEnd + trailer.length();
+            String contentString = WHITESPACE.matcher(pem.substring(i, sectionEnd)).replaceAll("");
+            i = indexOfBeginLine(pem, sectionEnd + trailer.length());
             byte[] content = Base64.getDecoder().decode(contentString);
             list.addAll(decoder.decode(content));
         }
         if (list.isEmpty()) {
+            if (!beginSeen && !pem.isBlank()) {
+                throw new NotPemException("Missing start tag");
+            }
             throw new IllegalArgumentException("PEM file empty");
         }
         return list;
+    }
+
+    /**
+     * Find the next BEGIN boundary that starts a line.
+     *
+     * @param pem  The PEM
+     * @param from The index to start searching at
+     * @return The index of the boundary, or {@code -1} if there is none
+     */
+    private static int indexOfBeginLine(String pem, int from) {
+        int i = pem.indexOf(START, from);
+        while (i > 0 && pem.charAt(i - 1) != '\n' && pem.charAt(i - 1) != '\r') {
+            i = pem.indexOf(START, i + 1);
+        }
+        return i;
     }
 
     private static IllegalArgumentException invalidPem(boolean first) throws NotPemException {
