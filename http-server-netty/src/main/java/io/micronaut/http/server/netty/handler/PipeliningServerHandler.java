@@ -19,12 +19,14 @@ import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.util.NativeImageUtils;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
@@ -44,6 +46,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.compression.Brotli;
 import io.netty.handler.codec.compression.BrotliDecoder;
 import io.netty.handler.codec.compression.DecompressionException;
@@ -70,6 +73,7 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.ReferenceCountUtil;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -277,6 +281,48 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         reading = true;
         inboundHandler.read(msg);
+    }
+
+    /**
+     * Close the connection after a body chunk that the HTTP decoder could not parse, e.g. because
+     * of a malformed chunk header or trailer. The decoder marks the (empty) last content of the
+     * request as failed and discards all further input, so the connection cannot be reused.
+     * Connections with request-level failures are closed by the {@link RequestHandler} (see
+     * {@code RoutingInBoundHandler}) instead.
+     */
+    private void closeAfterContentDecoderFailure() {
+        // close the connection once the response to the current request has been written
+        OutboundAccessImpl lastResponse = outboundQueue.peekLast();
+        if (lastResponse == null && outboundHandler != null) {
+            lastResponse = outboundHandler.outboundAccess;
+        }
+        if (lastResponse == null) {
+            // all responses have been handed to the channel already, but they may not be flushed
+            // or fully sent yet. Close once they are.
+            requiredCtx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+        } else {
+            lastResponse.closeAfterWriteInEventLoop();
+        }
+    }
+
+    /**
+     * Fail the body that is currently being received, because the HTTP decoder could not parse
+     * its last chunk, and close the connection. Must be called from the current body handler.
+     *
+     * @param content The failed content, released by this method
+     */
+    private void handleContentDecoderFailure(HttpContent content) {
+        Throwable cause = content.decoderResult().cause();
+        content.release();
+        closeAfterContentDecoderFailure();
+        // same status mapping as for request-level decoder failures in NettyRequestLifecycle
+        HttpStatus status = cause instanceof TooLongFrameException ? HttpStatus.REQUEST_ENTITY_TOO_LARGE : HttpStatus.BAD_REQUEST;
+        HttpStatusException failure = new HttpStatusException(status, "Malformed request body");
+        failure.initCause(cause);
+        inboundHandler.handleUpstreamError(failure);
+        // end the body. The body handlers switch to the dropping handler on error, which then
+        // resets the state for the next message
+        inboundHandler.read(LastHttpContent.EMPTY_LAST_CONTENT);
     }
 
     @Override
@@ -504,7 +550,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void read(Object message) {
             assert ctx != null;
-            HttpRequest request = (HttpRequest) message;
+            if (!(message instanceof HttpRequest request)) {
+                // content without a request. HttpObjectDecoder does not produce this, but it may
+                // come from a custom pipeline handler
+                if (message instanceof LastHttpContent last && last.decoderResult().isFailure()) {
+                    closeAfterContentDecoderFailure();
+                }
+                ReferenceCountUtil.release(message);
+                return;
+            }
             OutboundAccessImpl outboundAccess = new OutboundAccessImpl(request);
             outboundQueue.add(outboundAccess);
 
@@ -632,6 +686,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void read(Object message) {
             HttpContent content = (HttpContent) message;
+            // exact class check to avoid interface instanceof
+            boolean last = message.getClass() == DefaultLastHttpContent.class || message instanceof LastHttpContent;
+            if (last && content.decoderResult().isFailure()) {
+                handleContentDecoderFailure(content);
+                return;
+            }
             if (content.content().isReadable()) {
                 if (failed) {
                     content.release();
@@ -640,7 +700,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 int readableBytes = content.content().readableBytes();
                 if (bodySizeLimits.maxBodySize() != Long.MAX_VALUE &&
                     readableBytes > bodySizeLimits.maxBodySize() - receivedLength) {
-                    boolean last = content instanceof LastHttpContent;
                     long actualLength = receivedLength > Long.MAX_VALUE - readableBytes ?
                         Long.MAX_VALUE : receivedLength + readableBytes;
                     ContentLengthExceededException failure =
@@ -661,8 +720,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             } else {
                 content.release();
             }
-            // exact class check to avoid interface instanceof
-            if (message.getClass() == DefaultLastHttpContent.class || message instanceof LastHttpContent) {
+            if (last) {
                 // we got the full message before readComplete
                 ByteBuf fullBody;
                 if (buffer.isEmpty()) {
@@ -768,9 +826,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void read(Object message) {
             HttpContent content = (HttpContent) message;
+            boolean last = message instanceof LastHttpContent;
+            if (last && content.decoderResult().isFailure()) {
+                handleContentDecoderFailure(content);
+                return;
+            }
             requested -= content.content().readableBytes();
             dest.add(byteBodyFactory().readBufferFactory().adapt(content.content()));
-            if (message instanceof LastHttpContent) {
+            if (last) {
                 dest.complete();
                 inboundHandler = baseInboundHandler;
             }
@@ -885,9 +948,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void read(Object message) {
+            HttpContent content = (HttpContent) message;
             boolean last = message instanceof LastHttpContent;
+            if (last && content.decoderResult().isFailure()) {
+                handleContentDecoderFailure(content);
+                return;
+            }
 
-            ByteBuf compressed = ((HttpContent) message).content();
+            ByteBuf compressed = content.content();
             if (!compressed.isReadable() && !last) {
                 delegate.read(message);
                 return;
@@ -954,6 +1022,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (message instanceof LastHttpContent lhc) {
                 lhc.release();
                 inboundHandler = baseInboundHandler;
+                if (lhc.decoderResult().isFailure() && !(lhc instanceof HttpRequest)) {
+                    // the body was already discarded, just close the connection. Request-level
+                    // failures are handled by the RequestHandler
+                    closeAfterContentDecoderFailure();
+                }
             } else {
                 ((HttpContent) message).release();
             }
