@@ -30,7 +30,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The application's classloader for the life of the development JVM: one stable identity that the
@@ -59,7 +61,7 @@ public final class DevClassLoader extends ClassLoader {
 
     private final List<Path> sources;
     private final Path generationsDir;
-    private volatile GenerationClassLoader current;
+    private final AtomicReference<GenerationClassLoader> current;
     private final List<WeakReference<GenerationClassLoader>> retired = Collections.synchronizedList(new ArrayList<>());
 
     /**
@@ -78,7 +80,14 @@ public final class DevClassLoader extends ClassLoader {
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot empty the generations directory " + generationsDir, e);
         }
-        this.current = snapshot(1, this.sources);
+        this.current = new AtomicReference<>(snapshot(1, this.sources));
+    }
+
+    /**
+     * The current generation, never null: the constructor sets the first one and a swap only replaces it.
+     */
+    private GenerationClassLoader generationNow() {
+        return Objects.requireNonNull(current.get());
     }
 
     private GenerationClassLoader snapshot(int generation, List<Path> roots) {
@@ -96,14 +105,14 @@ public final class DevClassLoader extends ClassLoader {
      * @return The current generation
      */
     public GenerationClassLoader current() {
-        return current;
+        return generationNow();
     }
 
     /**
      * @return The number of the current generation, counted from one
      */
     public int generation() {
-        return current.generation();
+        return generationNow().generation();
     }
 
     /**
@@ -122,8 +131,8 @@ public final class DevClassLoader extends ClassLoader {
      * @return The retired generation
      */
     public synchronized GenerationClassLoader swap(List<Path> roots) {
-        GenerationClassLoader previous = current;
-        current = snapshot(previous.generation() + 1, roots);
+        GenerationClassLoader previous = generationNow();
+        current.set(snapshot(previous.generation() + 1, roots));
         retired.add(new WeakReference<>(previous));
         MicronautMetaServiceLoaderUtils.invalidate();
         // this loader now delegates to another generation, and the retired one is gone for good
@@ -143,7 +152,7 @@ public final class DevClassLoader extends ClassLoader {
             return false;
         }
         ClassLoader loader = type.getClassLoader();
-        return loader instanceof GenerationClassLoader generation && generation != current && isRetired(generation);
+        return loader instanceof GenerationClassLoader generation && generation != generationNow() && isRetired(generation);
     }
 
     /**
@@ -188,18 +197,18 @@ public final class DevClassLoader extends ClassLoader {
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException {
         // the parent was asked first by loadClass; the generation's own directories come next
-        return current.findInGeneration(name);
+        return generationNow().findInGeneration(name);
     }
 
     @Override
     @Nullable
     protected URL findResource(String name) {
-        return current.findInGenerationResource(name);
+        return generationNow().findInGenerationResource(name);
     }
 
     @Override
     protected Enumeration<URL> findResources(String name) throws IOException {
-        return current.findInGenerationResources(name);
+        return generationNow().findInGenerationResources(name);
     }
 
     @Override

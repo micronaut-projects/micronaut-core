@@ -211,7 +211,8 @@ public final class ClassDependencyIndex {
         int count = in.readUnsignedShort();
         String[] utf8 = new String[count];
         Set<Integer> classIndexes = new HashSet<>();
-        for (int i = 1; i < count; i++) {
+        int i = 1;
+        while (i < count) {
             int tag = in.readUnsignedByte();
             switch (tag) {
                 case 1 -> {
@@ -221,16 +222,15 @@ public final class ClassDependencyIndex {
                     utf8[i] = new String(bytes, StandardCharsets.UTF_8);
                 }
                 case 3, 4 -> in.skipBytes(4);
-                case 5, 6 -> {
-                    in.skipBytes(8);
-                    i++;
-                }
+                case 5, 6 -> in.skipBytes(8);
                 case 7 -> classIndexes.add(in.readUnsignedShort());
                 case 8, 16, 19, 20 -> in.skipBytes(2);
                 case 9, 10, 11, 12, 17, 18 -> in.skipBytes(4);
                 case 15 -> in.skipBytes(3);
                 default -> throw new IOException("Unknown constant pool tag " + tag);
             }
+            // a long or a double takes two entries of the pool
+            i += tag == 5 || tag == 6 ? 2 : 1;
         }
         Set<String> names = new HashSet<>();
         for (int index : classIndexes) {
@@ -240,7 +240,7 @@ public final class ClassDependencyIndex {
             }
         }
         for (String constant : utf8) {
-            if (constant != null && constant.indexOf('L') >= 0 && constant.indexOf(';') > 0) {
+            if (constant != null && holdsTypeDescriptor(constant)) {
                 addDescriptorTypes(constant, names);
             }
         }
@@ -290,6 +290,14 @@ public final class ClassDependencyIndex {
      * and {@code example.Foo}. A type name ends at the first {@code ;}, {@code <} or {@code .}
      * (an inner-class suffix in a signature) after its {@code L}.
      */
+    /**
+     * Whether a constant can hold an {@code L...;} type: a {@code ;} after an {@code L}.
+     */
+    private static boolean holdsTypeDescriptor(String constant) {
+        int typeStart = constant.indexOf('L');
+        return typeStart >= 0 && constant.indexOf(';', typeStart + 1) >= 0;
+    }
+
     private static void addDescriptorTypes(String descriptor, Set<String> names) {
         int start = 0;
         while ((start = descriptor.indexOf('L', start)) >= 0) {
