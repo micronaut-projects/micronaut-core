@@ -16,7 +16,6 @@
 package io.micronaut.dev;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -55,7 +54,6 @@ import java.util.stream.Stream;
  * @since 5.3.0
  */
 @Internal
-@NullMarked
 final class PollingWatchService implements WatchService {
 
     private final Map<Path, Key> keys = new ConcurrentHashMap<>();
