@@ -72,12 +72,12 @@ import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 @Internal
 final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListener<Context>, GracefulShutdownCapable, Ordered,
     ApplicationEventListener<StartupEvent> {
-    private static final Logger LOG = LoggerFactory.getLogger(PythonPool.class);
-
     /**
      * The name of the thread that pre-starts pooled contexts.
      */
     static final String PRESTART_THREAD_NAME = "python-pool-prestart";
+
+    private static final Logger LOG = LoggerFactory.getLogger(PythonPool.class);
 
     /**
      * Contexts to pre-start when none is configured, outside the test environment: enough for the
@@ -184,7 +184,12 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @return The number of contexts to pre-start, at most the pool size
      */
     static int prestartCount(@Nullable Integer configured, int targetSize, boolean testEnvironment) {
-        int requested = configured != null ? configured : (testEnvironment ? 0 : DEFAULT_PRESTART);
+        int requested;
+        if (configured != null) {
+            requested = configured;
+        } else {
+            requested = testEnvironment ? 0 : DEFAULT_PRESTART;
+        }
         return Math.clamp(requested, 0, Math.max(targetSize, 0));
     }
 
@@ -331,7 +336,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Pre-started {} pooled Python context(s) in {}ms", created, Duration.ofNanos(System.nanoTime() - start).toMillis());
             }
-        } catch (RuntimeException | Error e) {
+        } catch (RuntimeException e) {
             if (isPrestartStopped()) {
                 LOG.debug("Pre-starting pooled Python contexts stopped by shutdown", e);
             } else {
