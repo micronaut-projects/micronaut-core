@@ -41,8 +41,14 @@ final class MetadataComparison {
      * @return True if nothing an annotation says differs
      */
     static boolean same(AnnotationMetadata before, AnnotationMetadata after) {
-        Set<String> names = before.getAnnotationNames();
-        if (!names.equals(after.getAnnotationNames())) {
+        return sameValues(before.getAnnotationNames(), before, after.getAnnotationNames(), after)
+            // a composed annotation's stereotypes carry values of their own, such as the fixedDelay of the
+            // @Scheduled a @Poll annotation is meta-annotated with, which change while the annotation stays
+            && sameValues(before.getStereotypeAnnotationNames(), before, after.getStereotypeAnnotationNames(), after);
+    }
+
+    private static boolean sameValues(Set<String> names, AnnotationMetadata before, Set<String> afterNames, AnnotationMetadata after) {
+        if (!names.equals(afterNames)) {
             return false;
         }
         for (String name : names) {
@@ -52,6 +58,6 @@ final class MetadataComparison {
                 return false;
             }
         }
-        return before.getStereotypeAnnotationNames().equals(after.getStereotypeAnnotationNames());
+        return true;
     }
 }
