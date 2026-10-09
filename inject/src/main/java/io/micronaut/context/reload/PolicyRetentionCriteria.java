@@ -34,7 +34,9 @@ import java.util.function.Predicate;
  * What a restart retains according to {@link BeanRetentionPolicy} beans: a singleton a policy
  * {@link BeanRetentionPolicy.Decision#RETAIN retains}, unless a change touched a configuration prefix one of the
  * policies that retain it declares for it, and unless a policy {@link BeanRetentionPolicy.Decision#REFUSE refuses} it,
- * whatever their order. A refusal also keeps a bean that holds the refused one from being retained, and the context
+ * whatever their order. The context that stops also releases it when the change touched the prefix of a configuration
+ * bean in its closure, such as the {@code @ConfigurationProperties} it or its factory received, which no policy has to
+ * declare. A refusal also keeps a bean that holds the refused one from being retained, and the context
  * that stops logs which policy refused.
  *
  * @author graemerocher
@@ -97,6 +99,18 @@ public final class PolicyRetentionCriteria implements DefaultBeanContext.Retenti
             }
         }
         return prefixes;
+    }
+
+    /**
+     * Whether the change behind the restart touched the prefix of a configuration bean in the closure of a retained
+     * singleton, which releases it although no policy declares the prefix.
+     *
+     * @param prefix The prefix
+     * @return True when the change touched it
+     */
+    @Override
+    public boolean touches(String prefix) {
+        return touchedPrefix.test(prefix);
     }
 
     @Override

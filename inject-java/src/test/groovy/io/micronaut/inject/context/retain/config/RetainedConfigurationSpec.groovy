@@ -22,8 +22,9 @@ import io.micronaut.context.annotation.Retain
 import spock.lang.Specification
 
 /**
- * A configuration bean a retained bean received does not keep it from being retained when the configuration is under
- * a prefix whose change releases the bean: the bean only copied the values, which stay valid until such a change.
+ * A configuration bean a retained bean received does not keep it from being retained, whether the configuration is under
+ * a prefix its retention names or under another one, which is observed: the bean only copied the values, which stay
+ * valid until a change under either prefix.
  */
 class RetainedConfigurationSpec extends Specification {
 
@@ -38,16 +39,18 @@ class RetainedConfigurationSpec extends Specification {
         SizedPool uncovered = first.getBean(SizedPool.Uncovered)
         PoolProperties properties = first.getBean(PoolProperties)
         PoolLimits limits = first.getBean(PoolLimits)
+        OtherProperties other = first.getBean(OtherProperties)
 
         when:
-        Collection<BeanRegistration<?>> retained = stopRetaining(first)
+        Collection<BeanRegistration<?>> retained = stopRetaining(first, Set.of())
 
         then: "the pool whose configuration its retention covers is retained, without its configuration beans"
         retained*.bean.any { it.is(covered) }
         !retained*.bean.any { it.is(properties) || it.is(limits) }
 
-        and: "the pool that received configuration under another prefix is refused"
-        !retained*.bean.any { it.is(uncovered) }
+        and: "so is the pool that received configuration under another prefix, which is observed rather than retained"
+        retained*.bean.any { it.is(uncovered) }
+        !retained*.bean.any { it.is(other) }
 
         when:
         ApplicationContext second = start(retained)
@@ -59,14 +62,32 @@ class RetainedConfigurationSpec extends Specification {
         !second.getBean(PoolProperties).is(properties)
         second.getBean(PoolProperties).size == 3
         !second.getBean(PoolLimits).is(limits)
-        !second.getBean(SizedPool.Uncovered).is(uncovered)
-        SizedPool.CREATED.get() == 3
+        second.getBean(SizedPool.Uncovered).is(uncovered)
+        !second.getBean(OtherProperties).is(other)
+        SizedPool.CREATED.get() == 2
 
         cleanup:
         second?.close()
     }
 
-    private static Collection<BeanRegistration<?>> stopRetaining(ApplicationContext context) {
+    void "a change under the prefix of configuration a retained bean received releases it, although its retention names another prefix"() {
+        given:
+        ApplicationContext first = start(List.of())
+        SizedPool covered = first.getBean(SizedPool.Covered)
+        SizedPool uncovered = first.getBean(SizedPool.Uncovered)
+
+        when:
+        Collection<BeanRegistration<?>> retained = stopRetaining(first, Set.of('other.pool'))
+
+        then: "the pool made from the changed configuration is released, the other kept"
+        !retained*.bean.any { it.is(uncovered) }
+        retained*.bean.any { it.is(covered) }
+
+        cleanup:
+        start(retained).close()
+    }
+
+    private static Collection<BeanRegistration<?>> stopRetaining(ApplicationContext context, Set<String> touched) {
         return ((DefaultBeanContext) context).stopRetaining(new DefaultBeanContext.RetentionCriteria() {
             @Override
             boolean retain(BeanRegistration<?> registration) {
@@ -76,6 +97,11 @@ class RetainedConfigurationSpec extends Specification {
             @Override
             Set<String> invalidatedBy(BeanRegistration<?> registration) {
                 return registration.beanDefinition.annotationMetadata.declaredMetadata.stringValues(Retain, 'invalidatedBy') as Set<String>
+            }
+
+            @Override
+            boolean touches(String prefix) {
+                return touched.contains(prefix)
             }
         })
     }
