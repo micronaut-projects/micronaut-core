@@ -117,8 +117,8 @@ class JdkClientJsonStreamWithoutNettyTest {
     private static List<Book> pull(StreamingHttpClient client, String path) {
         List<Book> books = new ArrayList<>();
         try (BodyElements<Book> elements = client.toAsyncStreaming().jsonStream(HttpRequest.GET(path), Argument.of(Book.class)).toCompletableFuture().join()) {
-            Optional<Book> next;
-            while ((next = elements.next().toCompletableFuture().join()).isPresent()) {
+            for (Optional<Book> next = elements.next().toCompletableFuture().join(); next.isPresent();
+                 next = elements.next().toCompletableFuture().join()) {
                 books.add(next.get());
             }
         }

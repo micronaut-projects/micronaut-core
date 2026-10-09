@@ -76,6 +76,19 @@ class PulledBodyElementsTest {
     }
 
     @Test
+    void closingACompletedSourceIsIdempotentAndReportsCancellationOnDemand() {
+        Source<String> elements = new Source<>();
+        elements.finish();
+        elements.close();
+        elements.close();
+        assertEquals(1, elements.released.get());
+        assertEquals(BodyElements.State.FAILED, elements.state());
+        assertInstanceOf(CancellationException.class, elements.failure());
+        assertEquals(elements.failure(), elements.failure());
+        assertThrows(IllegalStateException.class, elements::next);
+    }
+
+    @Test
     void theEndIsReadAgain() {
         Source<String> elements = new Source<>();
         elements.finish();

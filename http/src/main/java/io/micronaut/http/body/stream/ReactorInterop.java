@@ -24,6 +24,8 @@ import reactor.core.CorePublisher;
 import reactor.core.scheduler.Schedulers;
 import reactor.core.CoreSubscriber;
 import reactor.core.publisher.Operators;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 
 import java.util.function.Consumer;
@@ -34,7 +36,8 @@ import java.util.function.Supplier;
  * Reactor source is subscribed to with the Reactor context of the downstream subscriber, and with
  * a discard hook, so that it releases the items it drops when it is cancelled. Delegating sources
  * also receive that context when a hook is needed, because they may hide a Reactor source.
- * Without Reactor, sources are subscribed to directly. Reactor operators are not used.
+ * Without Reactor, sources are subscribed to directly. Declared Reactor argument types are
+ * adapted here without requiring Reactor converter beans.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -54,6 +57,27 @@ public final class ReactorInterop {
      */
     public static boolean isInNonBlockingThread() {
         return REACTOR_PRESENT && Schedulers.isInNonBlockingThread();
+    }
+
+    /**
+     * Adapt a native publisher to a declared Reactor argument without requiring converter beans.
+     *
+     * @param source The source
+     * @param type The declared argument type
+     * @param <T> The element type
+     * @return The Reactor publisher, or the source for other argument types
+     * @since 5.3.0
+     */
+    public static <T> Publisher<T> adaptPublisher(Publisher<T> source, Class<?> type) {
+        if (REACTOR_PRESENT && !type.isInstance(source)) {
+            if (type == Flux.class) {
+                return Flux.from(source);
+            }
+            if (type == Mono.class) {
+                return Mono.from(source);
+            }
+        }
+        return source;
     }
 
     private static @Nullable Class<?> reactorType() {
