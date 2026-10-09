@@ -134,6 +134,30 @@ public interface PropagatedContext {
     }
 
     /**
+     * Whether the current propagation mode supports {@link Scope open/close scopes}, i.e. bringing a context into
+     * scope with one call and taking it out of scope with a later, separate call.
+     *
+     * <p>Scopes are only supported by thread-local propagation (the default, {@code micronaut.propagation=thread-local}).
+     * With scoped-value propagation ({@code micronaut.propagation=scoped-value}) the context is bound with a
+     * {@link ScopedValue}, and a scoped value binding only exists for the dynamic extent of a single
+     * {@link ScopedValue.Carrier#run(Runnable)} or {@link ScopedValue.Carrier#call(ScopedValue.CallableOp)} invocation:
+     * it is tied to that stack frame and there is no way to bind it in one method and unbind it in another.
+     * In that mode only the callback forms such as {@link #propagate(Supplier)}, {@link #propagate(Runnable)} and
+     * {@link #propagateCall(Callable)} can be used.</p>
+     *
+     * <p>Integrations that cannot use a callback, because the context must stay in scope across separate calls into
+     * user code (for example an {@link java.util.Iterator} that brings the context of an element into scope in
+     * {@code next()} and takes it out of scope on the following {@code next()} or {@code close()}), can use this
+     * method or {@link #propagateIfSupported()} to degrade gracefully instead of failing.</p>
+     *
+     * @return true if {@link #propagateIfSupported()} returns a scope
+     * @since 5.3.0
+     */
+    static boolean supportsScopes() {
+        return PropagatedContextConfiguration.get() == PropagatedContextConfiguration.Mode.THREAD_LOCAL;
+    }
+
+    /**
      * Is this propagated context bound? If yes the propagation is not needed.
      * @return true if bound
      * @since 5.0
@@ -247,10 +271,42 @@ public interface PropagatedContext {
      * object must be closed to undo the propagation.
      *
      * @return auto-closeable block to be used in try-resource block.
-     * @deprecated The method is only allowed for thread-local propagation.
+     * @throws IllegalStateException if the propagation mode doesn't {@link #supportsScopes() support scopes}
+     * @deprecated The method is only allowed for thread-local propagation. Prefer the callback forms such as
+     * {@link #propagate(Supplier)}, or {@link #propagateIfSupported()} when the context must stay in scope across
+     * separate calls.
      */
     @Deprecated(since = "5.0")
     Scope propagate();
+
+    /**
+     * Brings this context into scope if the current propagation mode {@link #supportsScopes() supports scopes},
+     * temporarily replacing the previous context (if any). The returned scope must be closed, on the same thread, to
+     * undo the propagation.
+     *
+     * <p>Unlike {@link #propagate()} this method doesn't fail with scoped-value propagation: it returns {@code null}
+     * and nothing is brought into scope. It is intended for integrations that cannot use a callback, because the
+     * context must stay in scope across separate calls into user code, and that would rather skip the propagation
+     * than fail when it isn't possible:</p>
+     *
+     * <pre>{@code
+     * PropagatedContext.Scope scope = context.propagateIfSupported();
+     * // ... later, possibly from another method
+     * if (scope != null) {
+     *     scope.close();
+     * }
+     * }</pre>
+     *
+     * <p>Prefer the callback forms such as {@link #propagate(Supplier)} whenever possible, they work in both
+     * propagation modes.</p>
+     *
+     * @return the scope to close, or {@code null} if the current propagation mode doesn't support scopes
+     * @since 5.3.0
+     */
+    @SuppressWarnings("deprecation")
+    default @Nullable Scope propagateIfSupported() {
+        return supportsScopes() ? propagate() : null;
+    }
 
     /**
      * Returns a new runnable that runs the given runnable with this context in scope.
