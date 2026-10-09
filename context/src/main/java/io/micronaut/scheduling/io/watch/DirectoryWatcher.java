@@ -18,7 +18,6 @@ package io.micronaut.scheduling.io.watch;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.scheduling.io.watch.event.WatchEventType;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,7 +76,6 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class DirectoryWatcher implements FileWatcher, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DirectoryWatcher.class);
