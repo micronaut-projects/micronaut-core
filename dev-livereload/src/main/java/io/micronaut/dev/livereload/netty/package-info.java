@@ -21,6 +21,9 @@
  * @since 5.3.0
  */
 @Experimental
+@NullMarked
 package io.micronaut.dev.livereload.netty;
+
+import org.jspecify.annotations.NullMarked;
 
 import io.micronaut.core.annotation.Experimental;

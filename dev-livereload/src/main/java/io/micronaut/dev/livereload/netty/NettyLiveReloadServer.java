@@ -46,7 +46,6 @@ import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.GlobalEventExecutor;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,7 +74,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class NettyLiveReloadServer implements LiveReloadServer {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyLiveReloadServer.class);
