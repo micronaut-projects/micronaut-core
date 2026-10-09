@@ -255,7 +255,7 @@ public class ServerBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T
                     if (error == null) {
                         collected.complete(null);
                     } else {
-                        collected.completeExceptionally(new IllegalStateException("Failed to load form fields", error));
+                        collected.completeExceptionally(error);
                     }
                 });
             collected.onCancel(collector::cancel);
