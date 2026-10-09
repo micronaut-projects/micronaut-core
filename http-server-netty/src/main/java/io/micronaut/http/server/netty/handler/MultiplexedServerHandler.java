@@ -95,6 +95,11 @@ abstract class MultiplexedServerHandler {
         private Object attachment;
 
         private boolean requestAccepted;
+        /**
+         * Whether the final response headers were handed to the connection: no other headers,
+         * including an interim 100 Continue, may follow them.
+         */
+        private boolean headersWritten;
         private boolean finished;
         private boolean reset;
         private boolean closed;
@@ -338,11 +343,14 @@ abstract class MultiplexedServerHandler {
 
                     private void complete0() {
                         if (!finished) {
-                            if (!reset) {
+                            // the end of stream frame uses a void promise, so it must not be
+                            // written to a stream that netty has already closed
+                            boolean open = !reset && !closed;
+                            if (open) {
                                 writeData(Unpooled.EMPTY_BUFFER, true, endPromise(response));
                             }
                             if (finish()) {
-                                if (!reset) {
+                                if (open) {
                                     flush();
                                 }
                             }
@@ -379,8 +387,9 @@ abstract class MultiplexedServerHandler {
                 upstream.allowDiscard();
                 upstream.disregardBackpressure();
                 return;
-            } else if (reset) {
-                // connection closed?
+            } else if (reset || closed) {
+                // stream reset by either side, or connection closed. Writing to a stream that
+                // netty has already closed would fail the whole connection.
                 upstream.allowDiscard();
                 upstream.disregardBackpressure();
                 finish();
@@ -391,6 +400,7 @@ abstract class MultiplexedServerHandler {
 
             prepareCompression(response, contentLength);
 
+            headersWritten = true;
             writeHeaders(response, false, ctx.voidPromise());
             upstream.start();
         }
@@ -405,8 +415,9 @@ abstract class MultiplexedServerHandler {
             if (finished) {
                 content.release();
                 return;
-            } else if (reset) {
-                // stream closed
+            } else if (reset || closed) {
+                // stream reset by either side, or connection closed. Writing to a stream that
+                // netty has already closed would fail the whole connection.
                 content.release();
                 finish();
                 return;
@@ -431,6 +442,7 @@ abstract class MultiplexedServerHandler {
                 empty = content == null;
             }
 
+            headersWritten = true;
             writeHeaders(response, empty, empty ? endPromise(response) : ctx.voidPromise());
             if (!empty) {
                 // bypass writeDataCompressing
@@ -559,8 +571,13 @@ abstract class MultiplexedServerHandler {
                 }
 
                 if (sendContinue) {
-                    writeHeaders(PipeliningServerHandler.ContinueOutboundHandler.CONTINUE_11, false, ctx.voidPromise());
                     sendContinue = false;
+                    // an interim response is only allowed before the final response headers, and
+                    // only on a stream that is still open. Writing it later fails in the encoder,
+                    // which would take down the whole connection.
+                    if (!headersWritten && !finished && !reset && !closed) {
+                        writeHeaders(PipeliningServerHandler.ContinueOutboundHandler.CONTINUE_11, false, ctx.voidPromise());
+                    }
                 }
             }
 
@@ -616,6 +633,8 @@ abstract class MultiplexedServerHandler {
                     return;
                 }
 
+                // the body will not be read, so do not ask the client to send it
+                sendContinue = false;
                 closeInput();
                 dest.discard(); // signal discard
             }
