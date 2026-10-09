@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.AnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassHelper;
+import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.ListExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
@@ -69,6 +70,14 @@ final class GroovyAnnotationElement extends GroovyClassElement implements Annota
 
     @Override
     public Set<ElementType> getTargets() {
+        return getTargets(classNode);
+    }
+
+    /**
+     * @param classNode The annotation type
+     * @return The element types the annotation is applicable to
+     */
+    static Set<ElementType> getTargets(ClassNode classNode) {
         List<AnnotationNode> targetNodes = classNode.getAnnotations(ClassHelper.makeCached(Target.class));
         if (targetNodes.isEmpty()) {
             return DEFAULT_TARGETS;
