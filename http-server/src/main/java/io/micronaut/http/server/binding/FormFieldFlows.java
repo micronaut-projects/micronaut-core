@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.multipart;
+package io.micronaut.http.server.binding;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.body.stream.ReactorInterop;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.http.server.multipart.FormRouteCompleter;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -273,7 +274,7 @@ public final class FormFieldFlows {
      * @param <T> The type of the item
      * @param <R> The type of the value of a flow
      */
-    public static final class Concat<T, R> implements Subscriber<T> {
+    static final class Concat<T, R> implements Subscriber<T> {
         private final AtomicReference<State> state = new AtomicReference<>(State.INITIAL);
         private final AtomicReference<@Nullable Throwable> error = new AtomicReference<>();
         private final Function<? super T, ? extends ExecutionFlow<? extends R>> complete;
@@ -295,7 +296,7 @@ public final class FormFieldFlows {
          *                 reading failed, with the error; not called when the reading was
          *                 cancelled
          */
-        public Concat(Function<? super T, ? extends ExecutionFlow<? extends R>> complete,
+        Concat(Function<? super T, ? extends ExecutionFlow<? extends R>> complete,
                       Consumer<? super T> discard,
                       Consumer<? super R> onValue,
                       Consumer<@Nullable Throwable> onDone) {
@@ -393,7 +394,7 @@ public final class FormFieldFlows {
          * Stop reading: cancel the publisher and the flow that is running. Neither callback is
          * called afterwards, and the items that arrive afterwards are discarded.
          */
-        public void cancel() {
+        void cancel() {
             switch (Objects.requireNonNull(state.getAndSet(State.CANCELLED))) {
                 case CANCELLED -> {
                 }
