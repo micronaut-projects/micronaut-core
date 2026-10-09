@@ -469,11 +469,13 @@ public class ByteBodyFactory {
         if (body instanceof BaseStreamingByteBody<?> bsbb) {
             return bsbb;
         }
+        // Available bodies cannot report their length after the publisher claims their bytes.
+        OptionalLong expectedLength = body.expectedLength();
         AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
         StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb.sharedBuffer);
         adapter.setTrailers(body.trailers());
-        body.expectedLength().ifPresent(sb.sharedBuffer::setExpectedLength);
+        expectedLength.ifPresent(sb.sharedBuffer::setExpectedLength);
         return sb.rootBody;
     }
 

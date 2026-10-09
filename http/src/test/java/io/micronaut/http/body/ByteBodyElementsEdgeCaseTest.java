@@ -111,6 +111,17 @@ class ByteBodyElementsEdgeCaseTest {
         Assertions.assertTrue(e.getCause().getMessage().contains("Content-Length"), e.getCause().getMessage());
     }
 
+    @Test
+    void rebufferingAnAvailableBodyPreservesItsLength() throws Exception {
+        try (CloseableByteBody original = FACTORY.copyOf("hello", StandardCharsets.UTF_8);
+             CloseableByteBody streaming = FACTORY.toStreaming(original)) {
+            Assertions.assertEquals(OptionalLong.of(5), streaming.expectedLength());
+            try (CloseableAvailableByteBody buffered = streaming.buffer().get(10, TimeUnit.SECONDS)) {
+                Assertions.assertEquals("hello", buffered.toString(StandardCharsets.UTF_8));
+            }
+        }
+    }
+
     private static ReadBuffer buffer(String s) {
         return BUFFERS.copyOf(s, StandardCharsets.UTF_8);
     }
