@@ -78,6 +78,46 @@ class ChunkedSupportedSpec extends Specification {
         server.stop()
     }
 
+    void "a request with a malformed chunk is rejected and the connection is closed"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'ChunkedSupportedSpec'
+        ])
+
+        when: 'a valid chunk is followed by a chunk with an invalid size'
+        String response = new Socket(server.host, server.port).withCloseable { Socket socket ->
+            socket.soTimeout = 10_000
+            socket.outputStream.write(("POST /chunked-supported HTTP/1.1\r\n" +
+                    "Host: ${server.host}:${server.port}\r\n" +
+                    "Content-Type: text/plain\r\n" +
+                    "Transfer-Encoding: chunked\r\n" +
+                    "\r\n" +
+                    "5\r\nhello\r\n" +
+                    "xyz\r\n").getBytes(StandardCharsets.US_ASCII))
+            socket.outputStream.flush()
+            // the connection must be closed by the server, so this does not time out
+            def bytes = new ByteArrayOutputStream()
+            byte[] buf = new byte[1024]
+            try {
+                int n
+                while ((n = socket.inputStream.read(buf)) != -1) {
+                    bytes.write(buf, 0, n)
+                }
+            } catch (SocketException ignored) {
+                // a reset after the response is fine
+            }
+            return new String(bytes.toByteArray(), StandardCharsets.ISO_8859_1)
+        }
+
+        then:
+        response.startsWith('HTTP/1.1 400 Bad Request')
+        response.toLowerCase(Locale.ROOT).contains('connection: close')
+        !response.contains('echo:')
+
+        cleanup:
+        server.stop()
+    }
+
     @Requires(property = "spec.name", value = "ChunkedSupportedSpec")
     @Controller('/chunked-supported')
     static class TestController {
