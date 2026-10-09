@@ -30,7 +30,6 @@ import org.codehaus.groovy.control.messages.SimpleMessage;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -55,7 +54,6 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Internal
-@NullMarked
 final class GroovyCompilation {
 
     private GroovyCompilation() {
