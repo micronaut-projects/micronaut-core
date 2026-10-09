@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 /**
@@ -31,10 +32,8 @@ import java.util.function.Function;
 final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDependencies {
     private final DefaultBeanContext context;
     final DefaultBeanDependencies dependencies;
-    /** The bean the resolver was injected into, which the dependency graph records what it receives under; null when not recorded. */
-    private volatile DefaultBeanDependencyGraph.@Nullable Owner owner;
-    /** Whether this is the resolver injected into the owner, rather than a group it opened, and so releases the owner. */
-    private volatile boolean ownersResolver;
+    /** The bean the resolver was injected into, which the dependency graph records what it receives under; unset when not recorded. */
+    private final AtomicReference<@Nullable Ownership> ownership = new AtomicReference<>();
 
     DefaultBeanDependencyResolver(DefaultBeanContext context) {
         this(context, new DefaultBeanDependencies());
@@ -57,7 +56,7 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
             resolution.require(registration);
             return registration;
         });
-        context.recordOwnedDependency(owner, resolved);
+        context.recordOwnedDependency(owner(), resolved);
         return resolved;
     }
 
@@ -74,7 +73,7 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     public BeanDependencyGroup createGroup() {
         return dependencies.resolve(context, null, resolution -> {
             BeanRegistration<BeanDependencyResolver> child = context.newDependencyGroupRegistration(dependencies.destructionContext);
-            ((DefaultBeanDependencyResolver) child.bean()).owner(owner, false);
+            ((DefaultBeanDependencyResolver) child.bean()).owner(owner(), false);
             resolution.addDependentBean(child);
             return (BeanDependencyGroup) child.bean();
         });
@@ -84,7 +83,7 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     public <T> BeanRegistration<T> createBeanRegistration(BeanDefinition<T> definition) {
         BeanRegistration<T> created = dependencies.resolve(context, null, resolution ->
             context.createFreshRegistration(resolution, definition));
-        context.recordOwnedDependency(owner, created);
+        context.recordOwnedDependency(owner(), created);
         return created;
     }
 
@@ -95,8 +94,12 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
      * @param injected Whether this is the resolver injected into the owner, which releases the owner as its destruction begins
      */
     void owner(DefaultBeanDependencyGraph.@Nullable Owner owner, boolean injected) {
-        this.owner = owner;
-        this.ownersResolver = injected;
+        ownership.set(owner == null ? null : new Ownership(owner, injected));
+    }
+
+    private DefaultBeanDependencyGraph.@Nullable Owner owner() {
+        Ownership current = ownership.get();
+        return current == null ? null : current.owner();
     }
 
     /**
@@ -105,9 +108,9 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
      * @param graph The graph
      */
     void releaseOwner(DefaultBeanDependencyGraph graph) {
-        DefaultBeanDependencyGraph.Owner current = owner;
-        if (ownersResolver && current != null) {
-            graph.release(current);
+        Ownership current = ownership.get();
+        if (current != null && current.injected()) {
+            graph.release(current.owner());
         }
     }
 
@@ -134,5 +137,14 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     public <S> @Nullable S resolveDependencies(BeanLocator context, @Nullable BeanDefinition<?> definition,
                                                Function<BeanResolutionContext, S> operation) {
         return dependencies.resolveDependencies(context, definition, operation);
+    }
+
+    /**
+     * The owner of a resolver, set once as the resolver is injected or its group opened.
+     *
+     * @param owner The bean the resolver was injected into
+     * @param injected Whether this is the resolver injected into the owner, rather than a group it opened, and so releases the owner
+     */
+    private record Ownership(DefaultBeanDependencyGraph.Owner owner, boolean injected) {
     }
 }

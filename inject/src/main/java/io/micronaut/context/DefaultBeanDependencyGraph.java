@@ -85,7 +85,7 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
             return;
         }
         Argument<?> argument = segment.getArgument();
-        add(segment, dependency, false, argument != null && (argument.isContainerType() || argument.getType().isArray()));
+        add(segment, dependency, false, argument.isContainerType() || argument.getType().isArray());
     }
 
     /**
@@ -132,7 +132,7 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
 
     private void add(BeanResolutionContext.Segment<?, ?> segment, BeanDefinition<?> dependency, boolean lazy, boolean collection) {
         BeanDefinition<?> dependent = receiver(segment);
-        if (dependent == null || dependent == dependency || Key.of(dependent).equals(Key.of(dependency))) {
+        if (dependent == dependency || Key.of(dependent).equals(Key.of(dependency))) {
             return;
         }
         add(new BeanDependency(dependent, dependency, kindOf(segment), lazy, collection));
@@ -148,11 +148,8 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
     @Nullable
     Owner ownerOf(@Nullable BeanResolutionContext resolutionContext) {
         BeanResolutionContext.Segment<?, ?> segment = currentSegment(resolutionContext);
-        if (segment == null) {
-            return null;
-        }
-        BeanDefinition<?> dependent = receiver(segment);
-        return dependent == null ? null : new Owner(dependent);
+        // every segment names the bean it injects into, so a segment always yields an owner
+        return segment == null ? null : new Owner(receiver(segment));
     }
 
     /**
@@ -167,15 +164,17 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
         if (owner.definition == dependency) {
             return;
         }
-        BeanDependency edge = new BeanDependency(owner.definition, dependency, InjectionKind.OTHER, false, false);
-        synchronized (owner) {
-            // under the owner's lock: once the owner is released, a lookup that raced its destruction adds nothing
-            if (owner.released || !owner.edges.add(edge)) {
-                return;
-            }
-            link(edge);
-            owned.computeIfAbsent(edge, e -> new AtomicInteger()).incrementAndGet();
-        }
+        owner.record(new BeanDependency(owner.definition, dependency, InjectionKind.OTHER, false, false), this);
+    }
+
+    /**
+     * Links an edge an owner recorded for the first time, under the owner's lock.
+     *
+     * @param edge The edge
+     */
+    private void linkOwned(BeanDependency edge) {
+        link(edge);
+        owned.computeIfAbsent(edge, e -> new AtomicInteger()).incrementAndGet();
     }
 
     /**
@@ -185,16 +184,7 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
      * @param owner The owner
      */
     void release(Owner owner) {
-        List<BeanDependency> edges;
-        synchronized (owner) {
-            if (owner.released) {
-                return;
-            }
-            owner.released = true;
-            edges = List.copyOf(owner.edges);
-            owner.edges.clear();
-        }
-        for (BeanDependency edge : edges) {
+        for (BeanDependency edge : owner.release()) {
             AtomicInteger count = owned.get(edge);
             if (count != null && count.decrementAndGet() > 0) {
                 continue;
@@ -280,12 +270,8 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
     }
 
     @SuppressWarnings("unchecked")
-    @Nullable
     private static BeanDefinition<?> receiver(BeanResolutionContext.Segment<?, ?> segment) {
         BeanDefinition<?> dependent = segment.getDeclaringType();
-        if (dependent == null) {
-            return null;
-        }
         // a segment is pushed with the target definition while the bean being created may be one member of an
         // @EachBean or @EachProperty set: the qualifier the context resolves it under tells the members apart
         Qualifier<?> dependentQualifier = segment.getDeclaringTypeQualifier();
@@ -494,11 +480,45 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
      */
     static final class Owner {
         private final BeanDefinition<?> definition;
+        /** Guards {@link #edges} and {@link #released}: one plain monitor per owner instance, private to it. */
+        private final Object lock = new Object();
         private final Set<BeanDependency> edges = new LinkedHashSet<>();
         private boolean released;
 
         private Owner(BeanDefinition<?> definition) {
             this.definition = definition;
+        }
+
+        /**
+         * Records an edge of this owner and links it in the graph the first time, unless the owner was released.
+         * Both happen under the owner's lock, so a lookup that raced the owner's destruction adds nothing.
+         *
+         * @param edge The edge
+         * @param graph The graph to link the edge in
+         */
+        private void record(BeanDependency edge, DefaultBeanDependencyGraph graph) {
+            synchronized (lock) {
+                if (!released && edges.add(edge)) {
+                    graph.linkOwned(edge);
+                }
+            }
+        }
+
+        /**
+         * Marks this owner released and hands back its edges; a later release hands back none.
+         *
+         * @return The edges recorded until now
+         */
+        private List<BeanDependency> release() {
+            synchronized (lock) {
+                if (released) {
+                    return List.of();
+                }
+                released = true;
+                List<BeanDependency> recorded = List.copyOf(edges);
+                edges.clear();
+                return recorded;
+            }
         }
     }
 
