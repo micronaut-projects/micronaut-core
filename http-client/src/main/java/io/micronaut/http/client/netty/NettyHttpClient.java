@@ -1886,7 +1886,7 @@ final class NettyHttpClient implements
         // first: connect
         return connectionManager.connect(requestKey, blockHint, preferredScheduler)
             .onErrorResume(e -> ExecutionFlow.error(failedBeforeSending(connectFailure(e), request, selection)))
-            .flatMap(poolHandle -> {
+            .flatMap(poolHandle -> propagatedContext.propagate(() -> {
                 poolHandle.touch();
                 preferredScheduler.set(poolHandle.channel.eventLoop());
 
@@ -1925,9 +1925,9 @@ final class NettyHttpClient implements
                 }
 
                 // send the raw request
-                return sendRawRequestAllowingRetry(poolHandle, request, selection, byteBody, nettyRequest, blockHint, preferredScheduler);
-            })
-            .flatMap(byteBodyResponse -> {
+                return sendRawRequestAllowingRetry(propagatedContext, poolHandle, request, selection, byteBody, nettyRequest, blockHint, preferredScheduler);
+            }))
+            .flatMap(byteBodyResponse -> propagatedContext.propagate(() -> {
                 // handle redirects or map the response bytes
 
                 int code = byteBodyResponse.code();
@@ -1974,7 +1974,7 @@ final class NettyHttpClient implements
                     }
                     return readResponse.apply(request, byteBodyResponse);
                 }
-            });
+            }));
     }
 
     /**
@@ -2015,6 +2015,7 @@ final class NettyHttpClient implements
      * once on another connection, with the same outgoing request head. Nothing is set up for that
      * unless the request could actually be sent again.
      *
+     * @param propagatedContext  The context propagated from the original client call
      * @param poolHandle         The connection
      * @param request            The request to send
      * @param selection          The selection of the load balancer, or {@code null}
@@ -2025,6 +2026,7 @@ final class NettyHttpClient implements
      * @return The response flow
      */
     private ExecutionFlow<NettyClientByteBodyResponse> sendRawRequestAllowingRetry(
+        PropagatedContext propagatedContext,
         ConnectionManager.PoolHandle poolHandle,
         MutableHttpRequest<?> request,
         @Nullable LoadBalancerSelection selection,
@@ -2035,12 +2037,13 @@ final class NettyHttpClient implements
     ) {
         boolean reusedConnection = markRequestSent(poolHandle);
         if (!reusedConnection || poolHandle.http2 || !(byteBody instanceof AvailableByteBody) || !request.getMethod().isIdempotent()) {
-            return sendRawRequest(poolHandle, request, selection, byteBody, nettyRequest, false);
+            return sendRawRequest(propagatedContext, poolHandle, request, selection, byteBody, nettyRequest, false);
         }
-        return sendRawRequestWithRetry(poolHandle, request, selection, byteBody, nettyRequest, blockHint, preferredScheduler);
+        return sendRawRequestWithRetry(propagatedContext, poolHandle, request, selection, byteBody, nettyRequest, blockHint, preferredScheduler);
     }
 
     private ExecutionFlow<NettyClientByteBodyResponse> sendRawRequestWithRetry(
+        PropagatedContext propagatedContext,
         ConnectionManager.PoolHandle poolHandle,
         MutableHttpRequest<?> request,
         @Nullable LoadBalancerSelection selection,
@@ -2049,10 +2052,10 @@ final class NettyHttpClient implements
         @Nullable BlockHint blockHint,
         AtomicReference<ScheduledExecutorService> preferredScheduler
     ) {
-        return sendRawRequest(poolHandle, request, selection, byteBody, nettyRequest, true)
+        return sendRawRequest(propagatedContext, poolHandle, request, selection, byteBody, nettyRequest, true)
             .onErrorResume(e -> {
                 if (e instanceof StaleConnectionException stale) {
-                    return resendOnNewConnection(blockHint, preferredScheduler, request, selection, nettyRequest, stale.replayBody);
+                    return resendOnNewConnection(propagatedContext, blockHint, preferredScheduler, request, selection, nettyRequest, stale.replayBody);
                 }
                 return ExecutionFlow.error(e);
             });
@@ -2064,6 +2067,7 @@ final class NettyHttpClient implements
      * {@link StaleConnectionException}). The connection is acquired from the pool as usual, and
      * this attempt is not retried again.
      *
+     * @param propagatedContext  The context propagated from the original client call
      * @param blockHint          The optional block hint
      * @param preferredScheduler The preferred scheduler reference
      * @param request            The request to send
@@ -2078,6 +2082,7 @@ final class NettyHttpClient implements
      * @return The response flow
      */
     private ExecutionFlow<NettyClientByteBodyResponse> resendOnNewConnection(
+        PropagatedContext propagatedContext,
         @Nullable BlockHint blockHint,
         AtomicReference<ScheduledExecutorService> preferredScheduler,
         MutableHttpRequest<?> request,
@@ -2111,7 +2116,7 @@ final class NettyHttpClient implements
                 }
                 return ExecutionFlow.error(failure);
             })
-            .flatMap(poolHandle -> {
+            .flatMap(poolHandle -> propagatedContext.propagate(() -> {
                 if (!replayBodyClaimed.compareAndSet(false, true)) {
                     // the exchange was cancelled while the connection was acquired, and the
                     // body is already closed. This may run on any thread, but like any other
@@ -2128,8 +2133,8 @@ final class NettyHttpClient implements
                 preferredScheduler.set(poolHandle.channel.eventLoop());
                 request.setAttribute(NettyClientHttpRequest.CHANNEL, poolHandle.channel);
                 markRequestSent(poolHandle);
-                return sendRawRequest(poolHandle, request, selection, replayBody, outgoingRequestForRetry(firstAttemptRequest), false);
-            });
+                return sendRawRequest(propagatedContext, poolHandle, request, selection, replayBody, outgoingRequestForRetry(firstAttemptRequest), false);
+            }));
         if (replayBodyClaimed.get()) {
             // the connection was available immediately, the body has been handed off already
             return response;
@@ -2195,6 +2200,7 @@ final class NettyHttpClient implements
     /**
      * This is the low-level request method, without redirect handling and with raw body bytes.
      *
+     * @param propagatedContext The context propagated from the original client call
      * @param poolHandle The pool handle to send the request on
      * @param request    The request to send
      * @param selection  The selection of the load balancer, or {@code null}
@@ -2206,6 +2212,7 @@ final class NettyHttpClient implements
      * @return A mono containing the response
      */
     private ExecutionFlow<NettyClientByteBodyResponse> sendRawRequest(
+        PropagatedContext propagatedContext,
         ConnectionManager.PoolHandle poolHandle,
         io.micronaut.http.HttpRequest<?> request,
         @Nullable LoadBalancerSelection selection,
@@ -2216,11 +2223,16 @@ final class NettyHttpClient implements
         poolHandle.touch();
 
         DelayedExecutionFlow<NettyClientByteBodyResponse> flow = DelayedExecutionFlow.create();
-        // need to run the create() on the event loop so that pipeline modification happens synchronously
+        // need to run the create() on the event loop so that pipeline modification happens
+        // synchronously. The exchange starts in the context of the caller: it logs the request,
+        // runs the customizers, and the response handler captures the context for the response.
+        // This may run on the event loop that completed the acquisition of a new connection, or
+        // on the event loop the request is moved to, where the context is not bound
+        Runnable start = () -> propagatedContext.propagate(() -> sendRawRequest0(poolHandle, request, selection, byteBody, flow, nettyRequest, allowRetry));
         if (poolHandle.channel.eventLoop().inEventLoop()) {
-            sendRawRequest0(poolHandle, request, selection, byteBody, flow, nettyRequest, allowRetry);
+            start.run();
         } else {
-            poolHandle.channel.eventLoop().execute(() -> sendRawRequest0(poolHandle, request, selection, byteBody, flow, nettyRequest, allowRetry));
+            poolHandle.channel.eventLoop().execute(start);
         }
         return flow;
     }
