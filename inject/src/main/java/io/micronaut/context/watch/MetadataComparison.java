@@ -81,7 +81,8 @@ final class MetadataComparison {
         Argument<?>[] previous = before.getTypeParameters();
         Argument<?>[] current = after.getTypeParameters();
         if (previous.length != current.length) {
-            return false;
+            // a change of generic arity is one of structure: the annotations differ only if either side has any
+            return !annotated(previous) && !annotated(current);
         }
         for (int i = 0; i < previous.length; i++) {
             if (!sameArgument(previous[i], current[i])) {
@@ -89,6 +90,15 @@ final class MetadataComparison {
             }
         }
         return true;
+    }
+
+    private static boolean annotated(Argument<?>[] arguments) {
+        for (Argument<?> argument : arguments) {
+            if (!argument.getAnnotationMetadata().isEmpty() || annotated(argument.getTypeParameters())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean sameValues(Set<String> names, AnnotationMetadata before, Set<String> afterNames, AnnotationMetadata after) {

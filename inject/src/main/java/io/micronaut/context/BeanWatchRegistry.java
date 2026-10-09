@@ -909,6 +909,11 @@ final class BeanWatchRegistry {
          * a thread other than the one delivering to it.
          */
         private final Map<BeanDefinition<T>, BeanRegistration<T>> known = new IdentityHashMap<>();
+        /**
+         * Whether a batch is being delivered, guarded by {@link #known}: a watch closed meanwhile, by another
+         * thread or by the watcher itself, disposes of its instances once the batch returns, not under it.
+         */
+        private boolean delivering;
 
         BeanRegistrationWatch(Argument<T> beanType, @Nullable Qualifier<T> qualifier, BeanWatcher<T> watcher) {
             super(false);
@@ -924,11 +929,16 @@ final class BeanWatchRegistry {
 
         @Override
         void deliverInitial() {
-            Collection<BeanRegistration<T>> current = context.getBeanRegistrations(beanType, qualifier);
-            for (BeanRegistration<T> registration : current) {
-                remember(registration.getBeanDefinition(), registration);
+            beginDelivery();
+            try {
+                Collection<BeanRegistration<T>> current = context.getBeanRegistrations(beanType, qualifier);
+                for (BeanRegistration<T> registration : current) {
+                    remember(registration.getBeanDefinition(), registration);
+                }
+                watcher.onChange(new BeanChange<>(new ArrayList<>(current), List.of(), current, true));
+            } finally {
+                endDelivery(List.of());
             }
-            watcher.onChange(new BeanChange<>(new ArrayList<>(current), List.of(), current, true));
         }
 
         @Override
@@ -939,6 +949,7 @@ final class BeanWatchRegistry {
                 return;
             }
             List<BeanRegistration<T>> gone = new ArrayList<>(removedHere.size());
+            beginDelivery();
             synchronized (known) {
                 for (BeanDefinition<T> definition : removedHere) {
                     BeanRegistration<T> registration = known.remove(definition);
@@ -972,27 +983,50 @@ final class BeanWatchRegistry {
                 watcher.onChange(new BeanChange<>(came, gone, current, false));
             } finally {
                 // a removed instance the watch created is usable until the batch removing it was delivered
-                dispose(gone);
+                endDelivery(gone);
             }
         }
 
         /**
-         * Keeps a registration delivered, or disposes of it at once when the watch was closed meanwhile.
+         * Keeps a registration delivered. Called while a batch is delivered, so that a watch closed meanwhile
+         * disposes of it with the others once the batch returns.
          */
         private void remember(BeanDefinition<T> definition, BeanRegistration<T> registration) {
             synchronized (known) {
-                if (!closed.get()) {
-                    known.put(definition, registration);
-                    return;
+                known.put(definition, registration);
+            }
+        }
+
+        private void beginDelivery() {
+            synchronized (known) {
+                delivering = true;
+            }
+        }
+
+        /**
+         * Ends the delivery of a batch: disposes of the instances it removed and, when the watch was closed
+         * while the batch was delivered, of every instance the watch still holds.
+         */
+        private void endDelivery(List<BeanRegistration<T>> removed) {
+            List<BeanRegistration<T>> released = new ArrayList<>(removed);
+            synchronized (known) {
+                delivering = false;
+                if (closed.get()) {
+                    released.addAll(known.values());
+                    known.clear();
                 }
             }
-            dispose(List.of(registration));
+            dispose(released);
         }
 
         @Override
         void onClose() {
             List<BeanRegistration<T>> held;
             synchronized (known) {
+                if (delivering) {
+                    // the batch being delivered disposes of them when it returns
+                    return;
+                }
                 held = new ArrayList<>(known.values());
                 known.clear();
             }

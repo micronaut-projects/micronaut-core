@@ -25,6 +25,14 @@ class ReplacementMetadataSpec extends AbstractTypeElementSpec {
         !replacement(target('String name', '@org.jspecify.annotations.Nullable String'), target('String name', 'String')).metadataUnchanged()
     }
 
+    void "a change of generic arity without annotations leaves the annotations unchanged"() {
+        expect: "String to List<String>, a change of structure only"
+        replacement(target('String name', 'String'), target('String name', 'java.util.List<String>')).metadataUnchanged()
+
+        and: "an annotated type argument that goes with the arity is a change of annotations"
+        !replacement(target('String name', 'java.util.List<@org.jspecify.annotations.Nullable String>'), target('String name', 'String')).metadataUnchanged()
+    }
+
     void "a bean replacement compares the annotations of the bean"() {
         given:
         BeanDefinition<?> before = target('String name')

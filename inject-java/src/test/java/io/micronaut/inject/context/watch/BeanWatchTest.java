@@ -174,6 +174,29 @@ class BeanWatchTest {
     }
 
     @Test
+    void aBeanWatchClosedWhileABatchIsDeliveredDestroysItsPrototypesOnlyOnceTheBatchReturns() {
+        DisposablePrototype.DESTROYED.set(0);
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            AtomicReference<BeanWatch> handle = new AtomicReference<>();
+            List<Integer> destroyedInBatch = new ArrayList<>();
+            handle.set(beanContext.watchBeans(Disposable.class, null, change -> {
+                if (!change.initial()) {
+                    // the watcher closes its own watch, as another thread may, while it still uses the instances
+                    handle.get().close();
+                    destroyedInBatch.add(DisposablePrototype.DESTROYED.get());
+                }
+            }));
+
+            beanContext.notifyDefinitionChange(List.of(context.getBeanDefinition(DisposableSingleton.class)), List.of());
+
+            assertEquals(List.of(0), destroyedInBatch);
+            assertEquals(1, DisposablePrototype.DESTROYED.get());
+        }
+        assertEquals(1, DisposablePrototype.DESTROYED.get());
+    }
+
+    @Test
     void aBeanWatchDestroysARemovedPrototypeOnceTheBatchRemovingItWasDelivered() {
         DisposablePrototype.DESTROYED.set(0);
         try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
