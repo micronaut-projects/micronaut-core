@@ -15,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.LockSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -38,6 +39,10 @@ class LoomCarrierGroupTest {
     }
 
     private static LoomCarrierGroup createGroup(int nThreads) {
+        return createGroup(nThreads, Integer.MAX_VALUE, Duration.ZERO); // no work spilling
+    }
+
+    private static LoomCarrierGroup createGroup(int nThreads, int workSpillThreshold, Duration workSpillMinQueueAge) {
         LoomCarrierConfiguration configuration = new LoomCarrierConfiguration(
             Duration.ofNanos(1), // one continuation per carrier loop iteration
             Duration.ofNanos(1),
@@ -45,7 +50,8 @@ class LoomCarrierGroupTest {
             Duration.ofMillis(5),
             Duration.ofSeconds(1),
             10,
-            Integer.MAX_VALUE, // no work spilling, there is only one runner anyway
+            workSpillThreshold,
+            workSpillMinQueueAge,
             0 // no warmup, every thread goes straight to the runner
         );
         LoomCarrierGroup.Factory factory = new LoomCarrierGroup.Factory(new EventLoopLoomFactory(), configuration);
@@ -171,6 +177,53 @@ class LoomCarrierGroupTest {
     }
 
     @Test
+    void spillsWhenFallingBehind() throws Exception {
+        assertTrue(threadCreatedBehindBacklogIsSpilled(Duration.ofMillis(5)));
+    }
+
+    @Test
+    void doesNotSpillFreshBacklog() throws Exception {
+        assertFalse(threadCreatedBehindBacklogIsSpilled(Duration.ofHours(1)));
+    }
+
+    /**
+     * Queue CPU heavy virtual threads on the first of two runners, then create another thread
+     * from the IO thread of that runner once the backlog has waited for a while. The spill
+     * threshold of 1 would always spill, so only the queue age decides. The busy threads are
+     * scheduled by the first runner directly, so that they are never spilled themselves.
+     *
+     * @return whether the last thread ran on the second runner
+     */
+    private static boolean threadCreatedBehindBacklogIsSpilled(Duration minQueueAge) throws Exception {
+        assumeTrue(PrivateLoomSupport.isSupported());
+        LoomCarrierGroup twoRunners = createGroup(2, 1, minQueueAge);
+        try {
+            LoomCarrierGroup.Runner first = twoRunners.runners.get(0);
+            LoomCarrierGroup.Runner second = twoRunners.runners.get(1);
+            CompletableFuture<Boolean> onSecond = new CompletableFuture<>();
+            first.eventLoop().execute(() -> {
+                for (int i = 0; i < 4; i++) {
+                    Thread.Builder.OfVirtual builder = Thread.ofVirtual().name("busy-" + i);
+                    PrivateLoomSupport.setScheduler(builder, first);
+                    builder.start(() -> {
+                        long end = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(20);
+                        while (System.nanoTime() < end) {
+                            Thread.onSpinWait();
+                        }
+                    });
+                }
+                // runs on the IO thread once a busy thread has finished, while the others wait
+                first.eventLoop().schedule(() -> first.newThread(() -> onSecond.complete(second.isOnRunner(Thread.currentThread()))).start(),
+                    1, TimeUnit.MILLISECONDS);
+            });
+            return onSecond.get(10, TimeUnit.SECONDS);
+        } finally {
+            twoRunners.shutdownGracefully(0, 0, TimeUnit.MILLISECONDS);
+            assertTrue(twoRunners.awaitTermination(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
     void externalEnqueueBeforeDrain() throws Exception {
         CountDownLatch ran = new CountDownLatch(1);
         assertTrue(runner.enqueueExternal(ran::countDown));
@@ -276,6 +329,53 @@ class LoomCarrierGroupTest {
                 thread.join(10_000);
                 assertFalse(thread.isAlive(), "virtual thread submitted around termination never ran in iteration " + i);
             }
+        }
+    }
+
+    @Test
+    void carrierDoesNotParkWhileContinuationsAreQueued() throws Exception {
+        // The IO thread blocks on a monitor held by a parked virtual thread of this runner. That
+        // holder is then made runnable by another thread carried by the runner, which queues the
+        // holder's continuation without unparking the carrier. With one continuation per carrier
+        // loop iteration, the carrier must not park while the holder is still queued, or the IO
+        // thread waits forever.
+        for (int i = 0; i < 20; i++) {
+            Object lock = new Object();
+            CountDownLatch holding = new CountDownLatch(1);
+            Thread holder = runner.newThread(() -> {
+                synchronized (lock) {
+                    holding.countDown();
+                    LockSupport.park();
+                }
+            });
+            holder.start();
+            assertTrue(holding.await(10, TimeUnit.SECONDS));
+            awaitState(holder, Thread.State.WAITING);
+
+            CompletableFuture<Void> ioDone = new CompletableFuture<>();
+            runner.eventLoop().execute(() -> {
+                synchronized (lock) {
+                    ioDone.complete(null);
+                }
+            });
+            awaitState(runner.ioThread, Thread.State.BLOCKED);
+
+            Thread unparker = runner.newThread(() -> LockSupport.unpark(holder));
+            unparker.start();
+
+            ioDone.get(10, TimeUnit.SECONDS);
+            holder.join(10_000);
+            unparker.join(10_000);
+            assertFalse(holder.isAlive(), "holder never ran in iteration " + i);
+            assertFalse(unparker.isAlive(), "unparker never ran in iteration " + i);
+        }
+    }
+
+    private static void awaitState(Thread thread, Thread.State state) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (thread.getState() != state) {
+            assertTrue(System.nanoTime() < deadline, thread + " did not reach " + state + ", is " + thread.getState());
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(1));
         }
     }
 }

@@ -271,7 +271,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * <p>The comparison reads what the arguments carry. The annotation processors write a variable the same way
      * wherever it is used as a parameter, a return type, a field or a type argument, so those compare the same.
      * A recursively bounded variable read out of the bounds of another variable, the {@code U} that
-     * {@code getBounds()} answers for {@code T extends U} where {@code U extends Comparable<U>}, is not always
+     * {@code getBounds()} answers for {@code T extends U} where <code>U extends Comparable&lt;U&gt;</code>, is not always
      * written the way a {@code U} argument is, and may compare different from it.</p>
      *
      * @param other The other argument
@@ -302,7 +302,13 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * <p>An array argument is the array class carrying the type arguments of its component, or a placeholder
      * whose type is an array for an array of a type variable. The component keeps the type arguments, wildcards
      * among them, the rawness, and the variable with its bounds. It does not keep the name or the annotations of
-     * this argument. The component of an array of arrays is an array.</p>
+     * this argument, which are those of the array. The component of an array of arrays is an array.</p>
+     *
+     * <p>A compiled array whose component was annotated where it was used, the {@code @NotBlank String} of
+     * {@code @NotBlank String[]} or the {@code String @Size(max = 3) []} of
+     * {@code String @NotEmpty [] @Size(max = 3) []}, carries its component as it was written, with the type
+     * annotations of that use; see {@link #withComponentType(Argument)}. Otherwise the component is rebuilt and
+     * carries no annotations.</p>
      *
      * @return The component, or {@code null} if this argument is not an array. A wildcard is not an array, even
      * one bounded by an array, for which {@link #isArray()} is true
@@ -325,6 +331,27 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     @Experimental
     default Argument<?> arrayType() {
         return ArgumentStructure.arrayType(this);
+    }
+
+    /**
+     * This array with the component it was written with: the argument {@link #componentType()} answers in place
+     * of the one it rebuilds, which keeps the type annotations written on the component.
+     *
+     * <p>The compiler writes it for an array whose component, or a component of that, was annotated where the
+     * array was used. The name, the annotations, the type arguments and the equality of this argument are not
+     * changed. An argument that cannot carry a component answers itself.</p>
+     *
+     * @param componentType The component, of the type this array is an array of
+     * @return This array with the component
+     * @throws IllegalArgumentException If this argument is not an array of the type of the component, or is a
+     * wildcard
+     * @since 5.3.0
+     */
+    @Experimental
+    @UsedByGeneratedCode
+    default Argument<T> withComponentType(Argument<?> componentType) {
+        ArgumentStructure.checkComponentType(this, componentType);
+        return this;
     }
 
     /**

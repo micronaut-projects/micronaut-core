@@ -235,10 +235,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     public static boolean canHaveBody(HttpResponseStatus status) {
         // All 1xx (Informational), 204 (No Content), and 304 (Not Modified)
-        // responses do not include a message body
-        return !(status == HttpResponseStatus.CONTINUE || status == HttpResponseStatus.SWITCHING_PROTOCOLS ||
-            status == HttpResponseStatus.PROCESSING || status == HttpResponseStatus.NO_CONTENT ||
-            status == HttpResponseStatus.NOT_MODIFIED);
+        // responses do not include a message body. Compare codes: a status with a custom reason
+        // phrase is not the canonical HttpResponseStatus constant.
+        int code = status.code();
+        return !(code >= 100 && code < 200 || code == 204 || code == 304);
     }
 
     /**
@@ -855,6 +855,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             this.outboundAccess = outboundAccess;
             this.sendContinue = sendContinue;
             this.dest = byteBodyFactory().createStreamingBuffer(bodySizeLimits, this);
+            // what arrives before the route reads the body is bounded by requested, not by the
+            // buffer limit, for a reader that streams the body without holding it
+            this.dest.setKeepInitialBytes();
         }
 
         @Override
@@ -1100,6 +1103,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             this.attachment = attachment;
         }
 
+        @Override
+        public Runnable whenAbandoned(Runnable callback) {
+            // an HTTP/1.1 request is abandoned with its connection
+            ChannelFuture closeFuture = requiredCtx().channel().closeFuture();
+            ChannelFutureListener listener = future -> callback.run();
+            closeFuture.addListener(listener);
+            return () -> closeFuture.removeListener(listener);
+        }
+
         /**
          * Mark this channel to be closed after this response has been written.
          */
@@ -1272,6 +1284,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (body instanceof AvailableByteBody available) {
                 writeFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), NettyByteBodyFactory.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE), false);
             } else {
+                EventLoop eventLoop = requiredCtx().channel().eventLoop();
+                if (!eventLoop.inEventLoop()) {
+                    // e.g. a relayed response completed on a thread of another client. The body
+                    // is claimed here, the streaming buffer of the connection is created on its
+                    // event loop, where it is written
+                    CloseableByteBody claimed = body.move();
+                    eventLoop.execute(() -> write(response, claimed));
+                    return;
+                }
                 // a body whose trailers are known, e.g. a relayed body that was received fully
                 // before it is written, may have a known length. The trailers need the chunked
                 // transfer coding: a Content-Length response would drop them
@@ -1531,7 +1552,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * messages, and reports consumption while the channel is writable.
      */
     private final class StreamingOutboundHandler extends OutboundHandler implements StreamingResponseWriter.Sink {
-        final StreamingResponseWriter writer = new StreamingResponseWriter(requiredCtx().channel().eventLoop(), this);
+        final StreamingResponseWriter writer = new StreamingResponseWriter(requiredCtx().channel().eventLoop(), this, requiredCtx().alloc());
         @Nullable
         private HttpResponse initialMessage;
         /**
@@ -1590,6 +1611,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        public boolean canMergeLast() {
+            // Keep QUIC's separate data and trailer writes: its HTTP object codec may complete
+            // the data promise before it has submitted the trailing headers.
+            return !quic;
+        }
+
+        @Override
         public boolean isWritable() {
             return requiredCtx().channel().isWritable();
         }
@@ -1598,9 +1626,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         public void fail(Throwable t) {
             if (LOG.isWarnEnabled()) {
                 if (initialMessage == null) {
-                    LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
+                    LOG.warn("The streamed response body failed after some of it was written. The error cannot be forwarded to the client, and the response ends abruptly.", t);
                 } else {
-                    LOG.warn("Reactive response received an error before the response was written. This error cannot be forwarded to the client.", t);
+                    LOG.warn("The streamed response body failed before the response was written. The error cannot be forwarded to the client.", t);
                 }
             }
             // detach the handler before discarding it, so that the discard does not happen a

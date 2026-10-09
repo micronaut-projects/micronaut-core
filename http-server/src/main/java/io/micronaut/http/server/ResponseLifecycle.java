@@ -35,6 +35,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
@@ -46,9 +47,9 @@ import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.HttpStatusException;
-import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.exceptions.response.Error;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.server.stream.ResponseStreams;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.web.router.DefaultUrlRouteInfo;
@@ -194,6 +195,15 @@ public abstract class ResponseLifecycle {
                 ((MutableHttpResponse<Object>) response).body(headBody);
                 return encodeBody(nettyRequest, response, headBody).map(this::discardContent);
             }
+            if (body instanceof BodyElements<?> elements) {
+                // the response of a HEAD request: the elements are not written; the route
+                // executor discarded the body it moved aside already
+                ResponseStreams.discard(elements, byteBodyFactory, ioExecutor());
+            }
+            if (headBody instanceof BodyElements<?>) {
+                // the headers of a GET request: the media type the elements are written with
+                bodyElementsMediaType(nettyRequest, response, routeInfo(response));
+            }
             return encodeNoBody(response);
         } else if (body != null) {
             return encodeBody(nettyRequest, response, body);
@@ -229,13 +239,16 @@ public abstract class ResponseLifecycle {
     private ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeBody(HttpRequest<?> nettyRequest,
                                                                        MutableHttpResponse<?> response,
                                                                        Object body) {
-        Object routeInfoO = RouteAttributes.getRouteInfo(response).orElse(null);
-        // usually this is a UriRouteInfo, avoid scalability issues here
-        @SuppressWarnings("unchecked") final RouteInfo<Object> routeInfo = (RouteInfo<Object>) (routeInfoO instanceof DefaultUrlRouteInfo<?, ?> uri ? uri : (RouteInfo<?>) routeInfoO);
+        final RouteInfo<Object> routeInfo = routeInfo(response);
 
         if (isImplicitlyEmptyBody(body)) {
             response.body(null);
             return encodeNoBody(response);
+        }
+
+        if (body instanceof BodyElements<?> elements) {
+            response.body(null);
+            return encodeBodyElements(nettyRequest, response, elements, routeInfo);
         }
 
         if (Publishers.isConvertibleToPublisher(body)) {
@@ -276,6 +289,157 @@ public abstract class ResponseLifecycle {
             messageBodyWriter = messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(responseMediaType));
         }
         return buildFinalResponse(nettyRequest, (MutableHttpResponse<Object>) response, responseBodyType, responseMediaType, body, messageBodyWriter, false);
+    }
+
+    /**
+     * The media type the elements of a {@link BodyElements} body are written with: the content
+     * type of the response, else the default of the route, else JSON. The response gets it as its
+     * content type, also the response to a HEAD request, which has the headers of a GET request.
+     *
+     * @param request   The request
+     * @param response  The response
+     * @param routeInfo The route, if any
+     * @return The media type
+     */
+    private MediaType bodyElementsMediaType(HttpRequest<?> request, MutableHttpResponse<?> response, @Nullable RouteInfo<Object> routeInfo) {
+        MediaType mediaType = response.getContentType().orElse(null);
+        if (mediaType == null) {
+            mediaType = routeInfo != null ? routeExecutor.resolveDefaultResponseContentType(request, routeInfo) : MediaType.APPLICATION_JSON_TYPE;
+            response.contentType(mediaType);
+        }
+        return mediaType;
+    }
+
+    /**
+     * @param response The response
+     * @return The route that produced it, if any
+     */
+    @SuppressWarnings("unchecked")
+    private static @Nullable RouteInfo<Object> routeInfo(HttpResponse<?> response) {
+        Object routeInfoO = RouteAttributes.getRouteInfo(response).orElse(null);
+        // usually this is a UriRouteInfo, avoid scalability issues here
+        return (RouteInfo<Object>) (routeInfoO instanceof DefaultUrlRouteInfo<?, ?> uri ? uri : (RouteInfo<?>) routeInfoO);
+    }
+
+    /**
+     * Stream the elements of a {@link BodyElements} body without Reactive Streams: like the
+     * elements of a publisher body ({@link #mapToHttpContent}), each written with the writer of
+     * its type for the media type of the response, and framed as a JSON array for a JSON media
+     * type, through the piece writers of the publisher body: a blocking writer runs on the I/O
+     * executor, and a {@code ByteBody} element is written as it is. The elements are pulled one at
+     * a time while the connection keeps up. The response is sent once the first element (or the
+     * end) is available: a failure of the first element fails the flow, so the error handling of
+     * the route answers it, like a failure of a writer.
+     *
+     * @param request   The request
+     * @param response  The response
+     * @param elements  The elements
+     * @param routeInfo The route, if any
+     * @return The encoded response
+     */
+    private ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeBodyElements(HttpRequest<?> request,
+                                                                                   MutableHttpResponse<?> response,
+                                                                                   BodyElements<?> elements,
+                                                                                   @Nullable RouteInfo<Object> routeInfo) {
+        try {
+            ResponseStreams.ElementEncoder encoder = elementEncoder(request, response, routeInfo);
+            int highWaterMark = routeExecutor.serverConfiguration.getResponseStream().getHighWaterMark();
+            // closing the elements may block, e.g. a database cursor: not on the event loop
+            return ResponseStreams.stream(byteBodyFactory, elements, encoder, highWaterMark, ioExecutor())
+                .map(body -> ByteBodyHttpResponseWrapper.wrap(response, body));
+        } catch (RuntimeException e) {
+            // nothing streams the elements. The encoder holds nothing before its first element
+            ResponseStreams.discard(elements, byteBodyFactory, ioExecutor());
+            return ExecutionFlow.error(e);
+        }
+    }
+
+    /**
+     * The encoder of the elements of a {@link BodyElements} body, see {@link #encodeBodyElements}.
+     *
+     * @param request   The request
+     * @param response  The response
+     * @param routeInfo The route, if any
+     * @return The encoder
+     */
+    private ResponseStreams.ElementEncoder elementEncoder(HttpRequest<?> request,
+                                                          MutableHttpResponse<?> response,
+                                                          @Nullable RouteInfo<Object> routeInfo) {
+        MediaType mediaType = bodyElementsMediaType(request, response, routeInfo);
+        MediaType finalMediaType = mediaType;
+        boolean jsonMediaType = MediaType.EXTENSION_JSON.equals(mediaType.getExtension());
+        if (MediaType.TEXT_EVENT_STREAM_TYPE.matches(mediaType)) {
+            // the events must reach the client as they are sent
+            response.setAttribute(ServerResponseAttributes.SKIP_COMPRESSION, Boolean.TRUE);
+        }
+        List<MediaType> mediaTypes = List.of(mediaType);
+        // like a publisher body: with a route, a JSON array if the declared type of the elements
+        // can be one, and the writer of the route; else decided on the first element
+        boolean routeJson = routeInfo != null && jsonMediaType && routeInfo.isResponseBodyJsonFormattable();
+        AtomicBoolean jsonFormattable = new AtomicBoolean(true);
+        BooleanSupplier isJson = routeInfo != null ? () -> routeJson : () -> jsonMediaType && jsonFormattable.get();
+        PieceStream pieces = new PieceStream(request, response, isJson);
+        return new ResponseStreams.ElementEncoder() {
+            /**
+             * Only touched by the encoding of one element at a time.
+             */
+            private boolean first = true;
+            /**
+             * The class of the last element, with the type and the writer chosen for it: the
+             * elements of a body are mostly of one class, and the choice only depends on the
+             * class. Only touched by the encoding of one element at a time.
+             */
+            private @Nullable Class<?> lastClass;
+            private @Nullable Argument<Object> lastType;
+            private @Nullable MessageBodyWriter<Object> lastWriter;
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public ExecutionFlow<CloseableByteBody> encode(Object element) {
+                MessageBodyWriter<Object> writer = lastWriter;
+                Argument<Object> type = lastType;
+                if (writer != null && type != null && element.getClass() == lastClass) {
+                    return pieces.write(writer, type, finalMediaType, element);
+                }
+                if (routeInfo != null) {
+                    // like mapToHttpContent: the writer of the route, for the declared type
+                    writer = routeInfo.getMessageBodyWriter();
+                    type = (Argument<Object>) routeInfo.getResponseBodyType();
+                    if (writer == null || !type.isInstance(element) || !writer.isWriteable(type, finalMediaType)) {
+                        type = Argument.ofInstance(element);
+                        writer = wrap(messageBodyHandlerRegistry.getWriter(type, mediaTypes));
+                    }
+                } else {
+                    type = Argument.ofInstance(element);
+                    if (first) {
+                        first = false;
+                        if (jsonMediaType && !isJsonFormattable(type)) {
+                            jsonFormattable.set(false);
+                        }
+                    }
+                    writer = messageBodyHandlerRegistry.getWriter(type, mediaTypes);
+                }
+                lastClass = element.getClass();
+                lastType = type;
+                lastWriter = writer;
+                return pieces.write(writer, type, finalMediaType, element);
+            }
+
+            @Override
+            public @Nullable ReadBuffer end(boolean none) {
+                if (!isJson.getAsBoolean()) {
+                    return null;
+                }
+                ConcatenatingSubscriber.Separators separators = jsonSeparators();
+                ReadBuffer end = none ? separators.empty() : separators.afterLast();
+                return end == null ? null : end.duplicate();
+            }
+
+            @Override
+            public void close() {
+                pieces.close();
+            }
+        };
     }
 
     /**
@@ -377,7 +541,7 @@ public abstract class ResponseLifecycle {
             isJson = () -> isJsonRoute;
             MediaType finalMediaType = mediaType;
             pieces = new PieceStream(request, response, isJson);
-            httpContentPublisher = bodyPublisher.concatMap(message -> {
+            httpContentPublisher = new FlowConcatMap<>(bodyPublisher, message -> {
                 MessageBodyWriter<Object> messageBodyWriter = routeInfo.getMessageBodyWriter();
                 @SuppressWarnings("unchecked")
                 Argument<Object> responseBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
@@ -386,8 +550,7 @@ public abstract class ResponseLifecycle {
                     responseBodyType = Argument.ofInstance(message);
                     messageBodyWriter = wrap(messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(finalMediaType)));
                 }
-                ExecutionFlow<CloseableByteBody> flow = pieces.write(messageBodyWriter, responseBodyType, finalMediaType, message);
-                return ReactiveExecutionFlow.toPublisher(flow);
+                return pieces.write(messageBodyWriter, responseBodyType, finalMediaType, message);
             });
         } else {
             MediaType finalMediaType = mediaType;
@@ -405,16 +568,14 @@ public abstract class ResponseLifecycle {
             AtomicBoolean first = new AtomicBoolean(true);
             isJson = () -> isJsonMediaType && jsonFormattable.get();
             pieces = new PieceStream(request, response, isJson);
-            httpContentPublisher = bodyPublisher
-                .concatMap(message -> {
-                    Argument<Object> type = Argument.ofInstance(message);
-                    if (isJsonMediaType && first.compareAndSet(true, false) && !isJsonFormattable(type)) {
-                        jsonFormattable.set(false);
-                    }
-                    MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.getWriter(type, finalMediaType == null ? List.of() : List.of(finalMediaType));
-                    ExecutionFlow<CloseableByteBody> flow = pieces.write(messageBodyWriter, type, finalMediaType == null ? MediaType.ALL_TYPE : finalMediaType, message);
-                    return ReactiveExecutionFlow.toPublisher(flow);
-                });
+            httpContentPublisher = new FlowConcatMap<>(bodyPublisher, message -> {
+                Argument<Object> type = Argument.ofInstance(message);
+                if (isJsonMediaType && first.compareAndSet(true, false) && !isJsonFormattable(type)) {
+                    jsonFormattable.set(false);
+                }
+                MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.getWriter(type, finalMediaType == null ? List.of() : List.of(finalMediaType));
+                return pieces.write(messageBodyWriter, type, finalMediaType == null ? MediaType.ALL_TYPE : finalMediaType, message);
+            });
         }
 
         httpContentPublisher = httpContentPublisher

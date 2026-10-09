@@ -15,6 +15,9 @@ on:
       - master
       - main
       - '[0-9]+.[0-9]+.x'
+      # stacked PRs target each other's branches
+      - 'python/**'
+      - 'python-*'
     types: [opened, synchronize, reopened, ready_for_review]
 # A new push to a pull request cancels its older run, freeing the shared runner
 # pool. Pushes to branches get a group of their own and are never cancelled:
@@ -63,7 +66,7 @@ jobs:
           fetch-depth: 0
 
       - name: "🔧 Setup GraalVM CE"
-        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
+        uses: graalvm/setup-graalvm@27b360dbb857524eaf0b4c4cef364d38e5b4f173 # v1
         with:
           distribution: 'graalvm'
           java-version: ${{ matrix.java }}
@@ -97,8 +100,8 @@ jobs:
       - name: "🔎 Run static analysis"
         id: sonar
         if: env.SONAR_TOKEN_AVAILABLE == 'true' && matrix.java == '25'
-        # Waits for the quality gate so a failing gate stops the native tests, but does not fail this
-        # job: snapshot and docs publishing below keep running on branch pushes.
+        # Waits for the quality gate so a failing gate stops the native and Python tests, but does not
+        # fail this job: snapshot and docs publishing below keep running on branch pushes.
         continue-on-error: true
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -147,10 +150,15 @@ jobs:
       - name: "❓ Optional cleanup step"
         run: |
           [ -f ./cleanup.sh ] && ./cleanup.sh || [ ! -f ./cleanup.sh ]
-  # Native tests start only when the build and its tests passed and the Sonar quality gate did not
-  # fail, so a red or cancelled build never takes runners for the native matrix.
+  # Native and Python tests start only when the build and its tests passed and the Sonar quality gate
+  # did not fail, so a red or cancelled build never takes runners for their matrices.
   native:
     needs: build
     if: needs.build.outputs.sonar != 'failure'
     uses: ./.github/workflows/graalvm-latest.yml
+    secrets: inherit
+  python:
+    needs: build
+    if: needs.build.outputs.sonar != 'failure'
+    uses: ./.github/workflows/python.yml
     secrets: inherit

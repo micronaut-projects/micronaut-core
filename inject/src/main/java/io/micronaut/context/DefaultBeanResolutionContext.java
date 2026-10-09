@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /**
  * Default implementation of {@link BeanResolutionContext}.
@@ -36,7 +37,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 public final class DefaultBeanResolutionContext extends AbstractBeanResolutionContext {
     @Nullable
-    private final BeanDependencies owner;
+    private final DefaultBeanDependencies dependencies;
+    private final @Nullable Thread destructionThread;
+    private volatile boolean closed;
     @Nullable
     private List<BeanRegistration<?>> required;
     private final Map<BeanIdentifier, BeanRegistration<?>> beansInCreation = new ConcurrentHashMap<>(5);
@@ -49,9 +52,35 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
         this(context, rootDefinition, null);
     }
 
-    DefaultBeanResolutionContext(BeanContext context, @Nullable BeanDefinition<?> rootDefinition, @Nullable BeanDependencies owner) {
+    DefaultBeanResolutionContext(BeanContext context, @Nullable BeanDefinition<?> rootDefinition, @Nullable DefaultBeanDependencies dependencies) {
+        this(context, rootDefinition, dependencies, false);
+    }
+
+    DefaultBeanResolutionContext(BeanContext context, @Nullable BeanDefinition<?> rootDefinition,
+                                 @Nullable DefaultBeanDependencies dependencies, boolean destruction) {
         super((DefaultBeanContext) context, rootDefinition);
-        this.owner = owner;
+        this.dependencies = dependencies;
+        this.destructionThread = destruction ? Thread.currentThread() : null;
+    }
+
+    boolean isDestructionInvocationActive() {
+        return !closed && destructionThread == Thread.currentThread() && context.isContextConfigured();
+    }
+
+    @Override
+    public <R> R withDependencies(Function<BeanDependencyGroup, R> action) {
+        if (closed) {
+            throw new IllegalStateException("Cannot resolve dependencies through a closed resolution context");
+        }
+        if (destructionThread == null) {
+            return context.withDependencies(action);
+        }
+        if (!isDestructionInvocationActive()) {
+            throw new IllegalStateException("Destruction dependencies are only available during the synchronous destruction invocation");
+        }
+        try (BeanDependencyGroup group = new DefaultBeanDependencyResolver(context, new DefaultBeanDependencies(this))) {
+            return action.apply(group);
+        }
     }
 
     void require(BeanRegistration<?> registration) {
@@ -68,7 +97,7 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
     @Override
     public <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
         Collection<BeanRegistration<I>> registrations = super.getInterceptorRegistrations(interceptorType, binding);
-        if (owner != null && getPath().isEmpty()) {
+        if (dependencies != null && getPath().isEmpty()) {
             registrations.forEach(this::require);
         }
         return registrations;
@@ -78,15 +107,16 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
     @Nullable
     <I> BeanRegistration<I> findInterceptor(BeanDefinition<I> definition) {
         BeanRegistration<I> created = super.findInterceptor(definition);
-        if (created != null || owner == null || !getPath().isEmpty()) {
+        if (created != null || dependencies == null || !getPath().isEmpty()) {
             // A nested bean owns its own interceptors, even when resolved during another bean's selection.
             return created;
         }
-        return findInterceptor(owner.dependentBeans(), definition);
+        return findInterceptor(dependencies.dependentBeans(), definition);
     }
 
     @Override
     public BeanResolutionContext copy() {
+        // Destruction permission belongs to this invocation and is never transferred to a copy.
         DefaultBeanResolutionContext copy = new DefaultBeanResolutionContext(context, rootDefinition);
         copy.copyStateFrom(this);
         return copy;
@@ -94,6 +124,7 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
 
     @Override
     public void close() {
+        closed = true;
         beansInCreation.clear();
     }
 

@@ -193,7 +193,7 @@ class DestroyDependentBeanSpec extends Specification {
         TrackedDependency.DESTROYED.any { it.is(TrackedDependency.CREATED[1]) }
     }
 
-    void "a lazy proxy destroyed through a registration the context did not create is destroyed without its target's dependents"() {
+    void "a lazy proxy exposes its target registration even when its wrapper registration was not retained"() {
         given:
         def resolved = resolveAsDependent(CachedLazyBean)
         resolved.bean.dependency()
@@ -202,16 +202,16 @@ class DestroyDependentBeanSpec extends Specification {
         when:
         context.destroyDependentBean(untracked)
 
-        then: "such a registration carries neither the dependents of the proxy nor the context the proxy retains"
+        then: "the proxy retains the complete target registration"
         noExceptionThrown()
-        TrackedDependency.DESTROYED.isEmpty()
+        TrackedDependency.DESTROYED.size() == 2
 
         when:
         context.destroyDependentBean(resolved.registration)
 
-        then: "the registration the context created still destroys the dependent of the proxy"
-        TrackedDependency.DESTROYED.size() == 1
-        TrackedDependency.DESTROYED[0].is(TrackedDependency.CREATED[0])
+        then: "the original registration does not destroy the dependent twice"
+        TrackedDependency.DESTROYED.size() == 2
+        TrackedDependency.CREATED.every { created -> TrackedDependency.DESTROYED.any { it.is(created) } }
     }
 
     void "the targets of a lazy proxy that does not cache its target are not retained"() {

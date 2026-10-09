@@ -19,112 +19,33 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.function.Function;
 
 /**
- * The dependents owned by one registration and the shared registrations it requires. Resolution is transactional:
- * only a successful operation can attach resources, and an operation racing destruction rolls back its resources.
- * Interceptor instance reuse and selection caching remain the responsibility of the caller.
+ * The dependencies of one bean instance: the record of what was created for that instance and is destroyed with
+ * it. It is reached through {@link BeanRegistration#dependencies()}.
+ *
+ * <p>This is not an API for acquiring beans; that is {@link BeanDependencyResolver} and
+ * {@link BeanDependencyGroup}. It lets code outside the injection module create something on behalf of a bean
+ * the container already made. A proxy that selects interceptors for a target does so, so that the unscoped ones
+ * are created as dependents of the target and destroyed with it.</p>
  *
  * @since 5.3.0
  */
 @Internal
-final class BeanDependencies implements DependentBeanProvider {
-    private List<BeanRegistration<?>> owned = List.of();
-    private List<BeanRegistration<?>> required = List.of();
-    private boolean closing;
-    private boolean destroyed;
-
-    @Override
-    public synchronized List<BeanRegistration<?>> dependentBeans() {
-        return owned;
-    }
-
-    synchronized List<BeanRegistration<?>> requiredBeans() {
-        return required;
-    }
-
-    synchronized boolean isClosing() {
-        return closing;
-    }
-
-    synchronized void stopResolving() {
-        closing = true;
-    }
-
-    synchronized boolean markDestroyed() {
-        closing = true;
-        if (destroyed) {
-            return false;
-        }
-        destroyed = true;
-        return true;
-    }
-
-    synchronized List<BeanRegistration<?>> takeDependents() {
-        closing = true;
-        destroyed = true;
-        List<BeanRegistration<?>> taken = owned;
-        owned = List.of();
-        required = List.of();
-        return taken;
-    }
+public sealed interface BeanDependencies permits DefaultBeanDependencies, DefaultBeanDependencyResolver {
 
     /**
-     * Attaches construction dependents and records interceptor registrations already selected at construction.
+     * Runs a resolution on behalf of the bean. What the operation creates becomes a dependent of the bean,
+     * destroyed with it; what it adds through {@link BeanResolutionContext#addDependentBean(BeanRegistration)}
+     * does too. A failure destroys what was created instead.
+     *
+     * @param context The context the bean belongs to
+     * @param definition The definition the resolution is rooted at, or null
+     * @param operation The resolution
+     * @param <S> The result type
+     * @return The result, or null when the bean is being destroyed or the context cannot resolve on its behalf
      */
-    synchronized void initialize(@Nullable List<BeanRegistration<?>> created, @Nullable List<?> resolved) {
-        attach(created == null ? List.of() : created, resolved == null ? List.of() : resolved);
-    }
-
-    @SuppressWarnings("ReferenceEquality") // A lifecycle belongs to an instance, even when two beans compare equal.
-    private void attach(List<BeanRegistration<?>> created, List<?> resolved) {
-        if (!created.isEmpty()) {
-            List<BeanRegistration<?>> added = new ArrayList<>(owned);
-            added.addAll(created);
-            owned = List.copyOf(added);
-        }
-        if (resolved.isEmpty()) {
-            return;
-        }
-        List<BeanRegistration<?>> shared = new ArrayList<>(required);
-        for (Object value : resolved) {
-            if (value instanceof BeanRegistration<?> registration
-                && owned.stream().noneMatch(bean -> bean == registration)
-                && shared.stream().noneMatch(bean -> bean.getBean() == registration.getBean())) {
-                shared.add(registration);
-            }
-        }
-        required = List.copyOf(shared);
-    }
-
-    synchronized void checkOpen(DefaultBeanContext context) {
-        if (closing || context.isDependencyResolutionClosed()) {
-            throw new IllegalStateException("Cannot resolve a dependency after owner destruction or context shutdown has begun");
-        }
-    }
-
-    <T> T resolve(DefaultBeanContext context, @Nullable BeanDefinition<?> definition,
-                  Function<DefaultBeanResolutionContext, T> operation) {
-        checkOpen(context);
-        // User factories run outside the owner lock. Publication is atomic with closing.
-        List<BeanRegistration<?>> created = List.of();
-        try (DefaultBeanResolutionContext resolution = new DefaultBeanResolutionContext(context, definition, this)) {
-            try {
-                T result = operation.apply(resolution);
-                created = resolution.getAndResetDependentBeans();
-                synchronized (this) {
-                    checkOpen(context);
-                    attach(created, resolution.requiredBeans());
-                }
-                return result;
-            } catch (RuntimeException | Error failure) {
-                context.destroyCreatedBeans(created, failure);
-                context.destroyCreatedBeans(resolution.getAndResetDependentBeans(), failure);
-                throw failure;
-            }
-        }
-    }
+    <S> @Nullable S resolveDependencies(BeanLocator context, @Nullable BeanDefinition<?> definition,
+                                        Function<BeanResolutionContext, S> operation);
 }

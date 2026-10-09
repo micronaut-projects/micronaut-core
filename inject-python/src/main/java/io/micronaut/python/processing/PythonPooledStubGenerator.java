@@ -29,6 +29,7 @@ import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.python.processing.element.PythonMethodElement;
 import io.micronaut.python.processing.element.AbstractPythonClassElement;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.python.processing.element.PythonScriptElement;
@@ -40,10 +41,12 @@ import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.ParameterDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Modifier;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -58,7 +61,7 @@ import static io.micronaut.python.processing.PythonStubGenerator.PYTHON_ASYNCIO_
 import static io.micronaut.python.processing.PythonStubGenerator.addReferencedPythonClassReferenceFields;
 import static io.micronaut.python.processing.PythonStubGenerator.convertedElementPublisher;
 import static io.micronaut.python.processing.PythonStubGenerator.erasedType;
-import static io.micronaut.python.processing.PythonStubGenerator.handleReturnType;
+import static io.micronaut.python.processing.PythonStubGenerator.returnConvertedValue;
 import static io.micronaut.python.processing.PythonStubGenerator.PUBLISHER;
 import static io.micronaut.python.processing.PythonStubGenerator.isAsyncGeneratorPythonMethod;
 import static io.micronaut.python.processing.PythonStubGenerator.isAsyncPythonMethod;
@@ -71,9 +74,13 @@ final class PythonPooledStubGenerator {
     /**
      * The option naming the dependencies whose pooling cost this compilation already accepts, or
      * {@code false} to report none of them. Camel case in the tail because javac accepts only a
-     * dot-separated sequence of identifiers as the key of a {@code -A} option.
+     * dot-separated sequence of identifiers as the key of a {@code -A} option. Under the prefix of
+     * {@code PythonPoolConfiguration}, which declares it, so the configuration validation of an
+     * application that sets it in its own configuration knows the property.
      */
-    static final String IGNORE_OPTION = "micronaut.python.pooled.ignoreDependencies";
+    static final String IGNORE_OPTION = "micronaut.python.pool.ignoreDependencies";
+    /** The name {@link #IGNORE_OPTION} was released under (5.2.11), still read when it is not set. */
+    static final String LEGACY_IGNORE_OPTION = "micronaut.python.pooled.ignoreDependencies";
 
     private static final ClassTypeDef POLYGLOT_CONTEXT = ClassTypeDef.of("org.graalvm.polyglot.Context");
     private static final String CONTEXT_POOLED = "io.micronaut.context.python.scope.ContextPooled";
@@ -153,15 +160,16 @@ final class PythonPooledStubGenerator {
      * dependency types to leave unreported, by simple or qualified name. The value {@code false}
      * turns the warning off altogether. Following {@code PythonReflectionGate}, the same name is
      * accepted as a system property of the compiler JVM, so a build that cannot pass {@code -A}
-     * options has a way in.
+     * options has a way in. The name it was released under, {@value #LEGACY_IGNORE_OPTION}, is read
+     * the same ways when the current one is not set.
      *
      * @param context The visitor context
      * @return The dependency names to skip, or a set containing {@link #ALL}
      */
     private static Set<String> ignoredPooledDependencies(VisitorContext context) {
-        String value = context.getOptions().get(IGNORE_OPTION);
+        String value = ignoreOptionValue(context, IGNORE_OPTION);
         if (StringUtils.isEmpty(value)) {
-            value = System.getProperty(IGNORE_OPTION);
+            value = ignoreOptionValue(context, LEGACY_IGNORE_OPTION);
         }
         if (StringUtils.isEmpty(value)) {
             return Set.of();
@@ -177,6 +185,11 @@ final class PythonPooledStubGenerator {
             }
         }
         return names;
+    }
+
+    private static @Nullable String ignoreOptionValue(VisitorContext context, String option) {
+        String value = context.getOptions().get(option);
+        return StringUtils.isEmpty(value) ? System.getProperty(option) : value;
     }
 
     /**
@@ -258,7 +271,10 @@ final class PythonPooledStubGenerator {
             builder.superclass(ClassTypeDef.of(PythonStubGenerator.javaTypeName(superType)));
         }
 
-        List<PropertyElement> beanProperties = element.getBeanProperties();
+        Map<String, FieldDef> injectedParameterFields = addInjectedParameterFields(element, builder);
+        List<PropertyElement> beanProperties = element.getBeanProperties().stream()
+            .filter(property -> !injectedParameterFields.containsKey(property.getName()))
+            .toList();
         if (!beanProperties.isEmpty()) {
             throw new ProcessingException(element, "@Pooled does not support introspected bean properties on Python classes.");
         }
@@ -381,7 +397,8 @@ final class PythonPooledStubGenerator {
         addReferencedPythonClassReferenceFields(builder, element, methodsToBridge);
 
         for (MethodElement methodElement : methodsToBridge) {
-            addBridgeMethodPooledClass(methodElement, builder, element, allClasses, pooledInstanceField, hasConstructorArguments);
+            addBridgeMethodPooledClass(methodElement, builder, element, allClasses, pooledInstanceField, hasConstructorArguments,
+                injectedParameterFields);
         }
 
         return builder;
@@ -472,12 +489,59 @@ final class PythonPooledStubGenerator {
         return builder;
     }
 
+    /**
+     * Stores the beans of the parameters injected with a bean ({@code ctx: ApplicationContext = Inject()}) in fields of
+     * the generated class, not in a Python instance: a pooled class has one instance per context, and the bridge passes
+     * the field to whichever instance a call runs on, as it passes the constructor arguments. The bean definition
+     * injects the attribute the processor declares for the parameter through the setter written here.
+     *
+     * @param element The pooled class
+     * @param builder The generated class
+     * @return The field of each injected attribute, by its name
+     */
+    private static Map<String, FieldDef> addInjectedParameterFields(AbstractPythonClassElement element,
+                                                                    ClassDef.ClassDefBuilder builder) {
+        Map<String, FieldDef> fields = new LinkedHashMap<>();
+        for (MethodElement method : element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())) {
+            if (!(method instanceof PythonMethodElement pythonMethod)) {
+                continue;
+            }
+            for (PythonMethodElement.InjectedArgument injected : pythonMethod.injectedArguments()) {
+                PropertyElement property = element.getBeanProperties().stream()
+                    .filter(candidate -> candidate.getName().equals(injected.attribute()))
+                    .findFirst()
+                    .orElse(null);
+                if (property == null || fields.containsKey(injected.attribute())) {
+                    continue;
+                }
+                TypeDef type = erasedType(property.getGenericType());
+                FieldDef field = FieldDef.builder(injected.attribute(), type).addModifiers(Modifier.PRIVATE, Modifier.VOLATILE).build();
+                builder.addField(field);
+                List<String> setterNames = new ArrayList<>();
+                setterNames.add(PythonStubGenerator.beanSetterName(injected.attribute()));
+                property.getWriteMethod().map(MethodElement::getName)
+                    .filter(name -> !setterNames.contains(name))
+                    .ifPresent(setterNames::add);
+                for (String setterName : setterNames) {
+                    builder.addMethod(MethodDef.builder(setterName)
+                        .addModifiers(Modifier.PUBLIC)
+                        .returns(TypeDef.VOID)
+                        .addParameter(ParameterDef.builder(injected.attribute(), type).build())
+                        .build((aThis, params) -> aThis.field(field).assign(params.getFirst())));
+                }
+                fields.put(injected.attribute(), field);
+            }
+        }
+        return fields;
+    }
+
     private static void addBridgeMethodPooledClass(MethodElement methodElement,
                                                    ClassDef.ClassDefBuilder builder,
                                                    AbstractPythonClassElement element,
                                                    Map<String, ClassElement> allClasses,
                                                    FieldDef pooledInstanceField,
-                                                   boolean ownsInstances) {
+                                                   boolean ownsInstances,
+                                                   Map<String, FieldDef> injectedParameterFields) {
         String pythonFunctionName = methodElement.getName();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
@@ -492,6 +556,13 @@ final class PythonPooledStubGenerator {
             List<ExpressionDef> parameterExpressions = new ArrayList<>();
             for (int i = 0; i < methodElement.getParameters().length; i++) {
                 parameterExpressions.add(methodParameters.get(i));
+            }
+            if (methodElement instanceof PythonMethodElement pythonMethod) {
+                // a parameter injected with a bean (ctx: ApplicationContext = Inject()): the bean the setter stored
+                for (PythonMethodElement.InjectedArgument injected : pythonMethod.injectedArguments()) {
+                    int index = Math.min(injected.position(), parameterExpressions.size());
+                    parameterExpressions.add(index, aThis.field(injectedParameterFields.get(injected.attribute())));
+                }
             }
             // A bean that owns its per-context instances is invoked through the holder. One without
             // arguments passes the holder too, so that a proxy takes over when there is one, and
@@ -543,6 +614,15 @@ final class PythonPooledStubGenerator {
             for (int i = 0; i < methodElement.getParameters().length; i++) {
                 parameterExpressions.add(methodParameters.get(i));
             }
+            if (methodElement instanceof PythonMethodElement pythonMethod) {
+                // a parameter injected with a bean (ctx: ApplicationContext = Inject()): the bean injected into the
+                // module attribute the processor declares, read through the pool's module cache as a property is
+                for (PythonMethodElement.InjectedArgument injected : pythonMethod.injectedArguments()) {
+                    int index = Math.min(injected.position(), parameterExpressions.size());
+                    parameterExpressions.add(index, PYTHON_CONTEXT_RUNTIME.invokeStatic("pooledScriptAttribute", POLYGLOT_VALUE,
+                        List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script), ExpressionDef.constant(injected.attribute()))));
+                }
+            }
             List<ExpressionDef> args = new ArrayList<>();
             // the holder first, so a proxy takes over when the module is advised
             args.add(aThis.field(pooledInstanceField));
@@ -591,7 +671,7 @@ final class PythonPooledStubGenerator {
                 ).cast(TypeDef.of(CompletionStage.class)).cast(TypeDef.of(methodElement.getGenericReturnType())).returning()
             );
         }
-        return handleReturnType(allClasses, methodElement.getGenericReturnType(), invoked).returning();
+        return returnConvertedValue(allClasses, methodElement.getGenericReturnType(), invoked);
     }
 
     private static void addGetterScriptPooled(PropertyElement beanProperty,
@@ -611,7 +691,7 @@ final class PythonPooledStubGenerator {
             // module attribute goes through the pool's module cache, as it did before holders existed
             var invoked = PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledScript", POLYGLOT_VALUE,
                 List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script), ExpressionDef.constant(beanProperty.getName())));
-            return handleReturnType(allClasses, beanProperty.getGenericType(), invoked).returning();
+            return returnConvertedValue(allClasses, beanProperty.getGenericType(), invoked);
         })));
     }
 

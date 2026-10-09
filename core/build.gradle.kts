@@ -59,6 +59,7 @@ tasks.withType<JapicmpTask>().configureEach {
 }
 
 noReflection {
+    allowIn("io.micronaut.core.annotation.AnnotationBuilderRegistry", "SERVICE_LOADING")
     allowIn("io.micronaut.core.annotation.AnnotationMetadata", "ANNOTATIONS", "CLASS_LOADING", "ENUM_CONSTANTS", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.core.annotation.AnnotationMetadataDelegate", "ANNOTATION_SYNTHESIS")
     allowIn("io.micronaut.core.annotation.AnnotationMetadataProvider", "ANNOTATION_SYNTHESIS")

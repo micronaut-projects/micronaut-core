@@ -31,6 +31,7 @@ import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -194,8 +195,24 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
         }
         if (classNode.isArray()) {
             ClassNode componentType = classNode.getComponentType();
-            return newClassElement(declaredElement, componentType, parentTypeArguments, visitedTypes, isTypeVariable, isRawTypeParameter)
-                .toArray();
+            ClassElement component = newClassElement(declaredElement, componentType, parentTypeArguments, visitedTypes, isTypeVariable, isRawTypeParameter);
+            // Keep every dimension separately from the legacy element type metadata, innermost first: those of
+            // the component, a resolved T of T[] included, and then that of this dimension
+            List<MutableAnnotationMetadataDelegate<AnnotationMetadata>> annotations = new ArrayList<>();
+            for (ClassElement dimension = component; dimension.isArray(); dimension = dimension.fromArray()) {
+                annotations.add(dimension.getTypeAnnotationMetadata());
+            }
+            Collections.reverse(annotations);
+            annotations.add(elementAnnotationMetadataFactory.buildTypeAnnotations(
+                visitorContext.getAnnotationMetadataBuilder().lookupOrBuildForTypeAnnotations(classNode), classNode));
+            ClassElement array = component.toArray();
+            if (array instanceof GroovyClassElement groovyArray) {
+                return groovyArray.withArrayTypeAnnotations(annotations);
+            }
+            if (array instanceof PrimitiveElement primitiveArray) {
+                return primitiveArray.withArrayTypeAnnotations(annotations);
+            }
+            return array;
         }
         if (classNode.isGenericsPlaceHolder()) {
             GenericsType genericsType;

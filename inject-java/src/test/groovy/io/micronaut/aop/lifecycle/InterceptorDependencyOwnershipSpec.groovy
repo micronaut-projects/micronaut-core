@@ -1,7 +1,6 @@
 package io.micronaut.aop.lifecycle
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.context.RegisteredBeanInterceptors
 import io.micronaut.core.type.Argument
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.context.scope.refresh.RefreshScope
@@ -168,7 +167,7 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         def interceptor = ctx.classLoader.loadClass('test.SlowInterceptor')
         def events = ctx.classLoader.loadClass('test.Events')
         def call = CompletableFuture.supplyAsync {
-            RegisteredBeanInterceptors.select(target, new Object()) { resolution ->
+            target.dependencies().resolveDependencies(ctx, target.beanDefinition) { resolution ->
                 resolution.getInterceptorRegistrations(Argument.of(interceptor), null)
             }
         }
@@ -212,27 +211,22 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         def interceptor = ctx.classLoader.loadClass('test.AInterceptor')
         def target = ctx.getBeanRegistration(type, null)
         def events = ctx.classLoader.loadClass('test.Events')
-        def key = new Object()
-        int selections = 0
 
         expect:
         interceptor.created == 0
 
         when:
-        def selected = RegisteredBeanInterceptors.select(target, key) { resolution ->
-            selections++
+        target.dependencies().resolveDependencies(ctx, target.beanDefinition) { resolution ->
             resolution.getInterceptorRegistrations(Argument.of(interceptor), null).first().bean
         }
-        def reused = RegisteredBeanInterceptors.select(target, key) { throw new AssertionError('selection was not cached') }
         ctx.close()
 
         then:
-        selected.is(reused)
-        selections == 1
+        interceptor.created == 1
         events.LOG == ['target:false', 'interceptor']
     }
 
-    void 'an unmanaged selection racing context shutdown releases its interceptors'() {
+    void 'a selection made through a dependency group racing context shutdown releases its interceptors'() {
         given:
         def ctx = buildContext(IMPORTS + '''
 @Prototype class UnmanagedInterceptor implements MethodInterceptor<Object, Object> {
@@ -245,7 +239,8 @@ class SlowInterceptor implements MethodInterceptor<Object, Object> {
         def entered = new java.util.concurrent.CountDownLatch(1)
         def release = new java.util.concurrent.CountDownLatch(1)
         def selection = CompletableFuture.supplyAsync {
-            RegisteredBeanInterceptors.selectUnowned(ctx, new Object(), Argument.of(interceptor), null) { registrations ->
+            ctx.createDependencyGroup().resolveDependencies(ctx, null) { resolution ->
+                def registrations = resolution.getInterceptorRegistrations(Argument.of(interceptor), null)
                 entered.countDown()
                 assert release.await(10, TimeUnit.SECONDS)
                 registrations

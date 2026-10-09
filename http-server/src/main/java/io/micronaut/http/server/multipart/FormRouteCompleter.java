@@ -110,6 +110,14 @@ public final class FormRouteCompleter {
     }
 
     /**
+     * @return Whether the form data is being read, see {@link #start()}
+     * @since 5.3.0
+     */
+    public boolean isStarted() {
+        return started;
+    }
+
+    /**
      * Start reading the form data. After this method is called, no more fields may be subscribed
      * to.
      */

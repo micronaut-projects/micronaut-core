@@ -20,6 +20,7 @@ import io.micronaut.logging.LoggingSystem;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.PolyglotException;
+import org.graalvm.polyglot.Value;
 import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -41,6 +44,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 final class GraalPyContextFactoryTest {
     @TempDir
     Path temporaryDirectory;
+
+    @Test
+    void loadsMainFromTheConfiguredVfsMountPoint() throws IOException {
+        ClassLoader classLoader = getClass().getClassLoader();
+        System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");
+        System.setProperty("org.graalvm.python.vfs.multiple_vfs_checks_as_warning", "true");
+        try (VirtualFileSystem vfs = VirtualFileSystem.newBuilder()
+            .resourceDirectory(GraalPyContextFactory.APPLICATION_PATH)
+            .resourceClassLoader(classLoader)
+            .unixMountPoint("/micronaut_test_vfs")
+            .windowsMountPoint("Y:\\micronaut_test_vfs")
+            .build();
+             Context context = GraalPyResources.contextBuilder(vfs).build()) {
+            PolyglotException exception = assertThrows(PolyglotException.class, () ->
+                GraalPyContextFactory.evaluateMain(classLoader, "failing_main.py", context, vfs));
+            assertTrue(exception.getMessage().contains("failing_main.py refuses to load"), exception.getMessage());
+            assertEquals(Path.of(vfs.getMountPoint(), "src", "failing_main.py").toString(),
+                context.eval(PYTHON, "import sys; sys.modules['__main__'].__file__").asString());
+        }
+    }
 
     @Test
     void resolvesActiveVirtualEnvExecutableWithoutPyenvVersion() throws IOException {
@@ -153,6 +176,37 @@ final class GraalPyContextFactoryTest {
                 return pooledContext.eval(PYTHON, "factory.spec('p').or_(factory.spec('q')).is_()").asString();
             });
             assertEquals("p|q", pooled);
+        }
+    }
+
+    @Test
+    void javaStagesAndPublishersReturnedByAnyJavaCallAreAwaitable() throws Exception {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            Context context = applicationContext.getBean(Context.class);
+            Value coroutine = context.eval(PYTHON, """
+                import java
+                CompletableFuture = java.type("java.util.concurrent.CompletableFuture")
+                Mono = java.type("reactor.core.publisher.Mono")
+                IllegalStateException = java.type("java.lang.IllegalStateException")
+                async def call():
+                    values = [
+                        await CompletableFuture.completedFuture("future"),
+                        await Mono.just("mono").toFuture(),
+                        await Mono.just("publisher"),
+                    ]
+                    try:
+                        await Mono.error(IllegalStateException("failed")).toFuture()
+                    except IllegalStateException as e:
+                        values.append(e.getMessage())
+                    return ",".join(values)
+                call
+                """).execute();
+
+            CompletionStage<?> stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
+            assertEquals("future,mono,publisher,failed", stage.toCompletableFuture().get(10, TimeUnit.SECONDS));
         }
     }
 
@@ -278,7 +332,7 @@ final class GraalPyContextFactoryTest {
         try (Context context = GraalPyResources.contextBuilder(vfs).allowAllAccess(true).build()) {
             String cachePath = context.eval(PYTHON, "import micronaut_asyncio; micronaut_asyncio.__cached__").asString();
 
-            assertTrue(cachePath.contains("/__pycache__/micronaut_asyncio."));
+            assertTrue(cachePath.replace('\\', '/').contains("/__pycache__/micronaut_asyncio."));
             assertTrue(cachePath.endsWith(".pyc"));
         }
     }

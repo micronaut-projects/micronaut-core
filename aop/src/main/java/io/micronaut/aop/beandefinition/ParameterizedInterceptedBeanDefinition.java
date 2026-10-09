@@ -16,19 +16,15 @@
 package io.micronaut.aop.beandefinition;
 
 import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.chain.ConstructorInterceptorChain;
+import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -76,21 +72,9 @@ public interface ParameterizedInterceptedBeanDefinition<T>
      * @return The interceptors, or {@code null} when the bean binds none
      * @since 5.2.0
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
     default @Nullable List<BeanRegistration<Interceptor<T, T>>> resolveLifecycleInterceptors(BeanResolutionContext resolutionContext,
-                                                                                            AnnotationMetadataProvider constructor) {
-        // The constructor already exposes this bean's metadata combined with the constructor's, so use it rather
-        // than building a second hierarchy around it on every bean creation.
-        AnnotationMetadata metadata = constructor.getAnnotationMetadata();
-        if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
-            return null;
-        }
-        // the bean's own: a non-singleton interceptor is created as a dependent of the bean, which every later
-        // interception point of the bean finds again
-        return new ArrayList(resolutionContext.getInterceptorRegistrations(
-            Interceptor.ARGUMENT,
-            Qualifiers.byInterceptorBinding(metadata)
-        ));
+                                                                                   AnnotationMetadataProvider constructor) {
+        return resolutionContext.getBean(InterceptorChainFactory.ARGUMENT).candidateResolver().resolveBeanCandidates(resolutionContext, constructor);
     }
 
     @Override
@@ -101,22 +85,20 @@ public interface ParameterizedInterceptedBeanDefinition<T>
         if (declared != null) {
             // An explicitly supplied set is bound for construction only, so it is used here but not shared with the
             // post-construct interception of this bean, which may bind interceptors this set does not contain.
-            return ConstructorInterceptorChain.instantiate(resolutionContext, context, declared, this, constructor, values);
+            return context.getBean(InterceptorChainFactory.ARGUMENT).instantiate(resolutionContext, this, constructor, declared, 0, values);
         }
         List<BeanRegistration<Interceptor<T, T>>> interceptors = resolveLifecycleInterceptors(resolutionContext, constructor);
-        SharedInterceptorRegistrations.push(resolutionContext, this, interceptors);
-        try {
-            return ConstructorInterceptorChain.instantiate(
-                resolutionContext,
-                context,
-                interceptors,
-                this,
-                constructor,
-                values
-            );
-        } finally {
-            SharedInterceptorRegistrations.pop(resolutionContext, this, interceptors);
+        if (interceptors != null) {
+            resolutionContext.setBeanInterceptors(this, interceptors);
         }
+        return context.getBean(InterceptorChainFactory.ARGUMENT).instantiate(
+            resolutionContext,
+            this,
+            constructor,
+            interceptors,
+            0,
+            values
+        );
     }
 
     /**

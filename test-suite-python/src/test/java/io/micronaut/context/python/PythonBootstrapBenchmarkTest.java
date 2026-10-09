@@ -42,9 +42,10 @@ class PythonBootstrapBenchmarkTest {
     private static final int CONTEXTS = Integer.parseInt(System.getenv().getOrDefault("MICRONAUT_PYTHON_BENCHMARK_CONTEXTS", "6"));
 
     private static final String COUNT_MODULES = """
-        import sys
+        import os, sys
+        source_directory = os.path.dirname(sys.modules['__main__'].__file__)
         generated = sorted(name for name, module in sys.modules.items()
-                           if (getattr(module, '__file__', None) or '').startswith('/graalpy_vfs/src/'))
+                           if (getattr(module, '__file__', None) or '').startswith(source_directory + os.sep))
         fileless = sorted(name for name, module in sys.modules.items()
                           if getattr(module, '__spec__', None) is not None
                           and (getattr(module.__spec__, 'origin', None) or '').startswith('java:'))
@@ -54,8 +55,10 @@ class PythonBootstrapBenchmarkTest {
     private static final String DEEPEST_IMPORT = """
         def __micronaut_rerun_launcher():
             import importlib.util
+            import os
             import sys
 
+            source_directory = os.path.dirname(sys.modules['__main__'].__file__)
             deepest = [0, None]
 
             class DepthRecorder:
@@ -73,12 +76,12 @@ class PythonBootstrapBenchmarkTest {
             for name, module in list(sys.modules.items()):
                 file = getattr(module, '__file__', None) or ''
                 origin = getattr(getattr(module, '__spec__', None), 'origin', None) or ''
-                if file.startswith('/graalpy_vfs/src/') or origin.startswith('java:'):
+                if file.startswith(source_directory + os.sep) or origin.startswith('java:'):
                     del sys.modules[name]
             recorder = DepthRecorder()
             sys.meta_path.insert(0, recorder)
             try:
-                spec = importlib.util.spec_from_file_location('__micronaut_launcher_rerun', '/graalpy_vfs/src/__main__.py')
+                spec = importlib.util.spec_from_file_location('__micronaut_launcher_rerun', os.path.join(source_directory, '__main__.py'))
                 spec.loader.exec_module(importlib.util.module_from_spec(spec))
             finally:
                 sys.meta_path.remove(recorder)

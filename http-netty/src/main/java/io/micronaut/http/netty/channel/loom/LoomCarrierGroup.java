@@ -329,6 +329,30 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
             return activeThreadsLocal + activeThreadsExternal.get();
         }
 
+        /**
+         * Whether this runner is falling behind, i.e. the oldest continuation in the
+         * {@link #localLoomQueue} has waited for at least
+         * {@link LoomCarrierConfiguration#workSpillMinQueueAge()}. New virtual threads are only
+         * spilled to other runners in that case.
+         *
+         * <p>The local queue may only be accessed on the {@link #carrier}. Virtual threads are
+         * normally created by the IO thread of this runner, but if they are not, this only
+         * applies the thread count based {@link LoomCarrierConfiguration#workSpillThreshold()}.
+         * Without access to the carrier thread, {@link #isOnRunner} only checks the scheduler,
+         * and a sticky thread temporarily running on the default scheduler would pass it, so the
+         * queue age is not checked at all in that case.
+         *
+         * @return {@code true} if new work should be spilled to other runners
+         */
+        private boolean isFallingBehind() {
+            long minAge = factory.configuration.workSpillMinQueueAge().toNanos();
+            if (minAge <= 0 || !PrivateLoomSupport.isCarrierThreadSupported() || !isOnRunner(Thread.currentThread())) {
+                return true;
+            }
+            ScheduledTask oldest = localLoomQueue.peekLast();
+            return oldest != null && System.nanoTime() - oldest.scheduleTime() >= minAge;
+        }
+
         @Override
         public Thread newThread(Runnable r) {
             return unstartedVirtualThread("loom-on-netty-" + id + "-" + Long.toHexString(ThreadLocalRandom.current().nextLong()), b -> {
@@ -342,7 +366,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
                 Runner dst = Runner.this;
                 int active = activeThreads();
-                if (active >= factory.configuration.workSpillThreshold()) {
+                if (active >= factory.configuration.workSpillThreshold() && isFallingBehind()) {
                     // spill to a less busy event loop
                     for (Runner runner : runners) {
                         int a = runner.activeThreads();
@@ -380,7 +404,12 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
             while (!delegate.isTerminated()) {
                 boolean ioContinuationScheduled = this.ioContinuationScheduled;
-                if (!ioContinuationScheduled) {
+                // Only park when there is no other work: continuations left over from the last
+                // time slice, or queued without an unpark (e.g. by a virtual thread mounted on this
+                // carrier), would otherwise wait for the IO thread. If the IO thread is itself
+                // blocked on a monitor that one of those continuations has to release, nothing
+                // would ever unpark the carrier.
+                if (!ioContinuationScheduled && localLoomQueue.isEmpty() && globalLoomQueue.isEmpty()) {
                     LockSupport.park();
                     ioContinuationScheduled = this.ioContinuationScheduled;
                 }

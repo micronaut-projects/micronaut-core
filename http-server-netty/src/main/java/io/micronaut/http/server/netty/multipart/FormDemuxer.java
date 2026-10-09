@@ -221,6 +221,18 @@ public final class FormDemuxer implements BufferConsumer {
         }
     }
 
+    /**
+     * The form is decoded as it arrives, and held to the limits of a form: those of the decoder,
+     * of a field and of the form. The bytes of the request that arrived before the form is read,
+     * e.g. with the headers, are not held to the buffer limit of the request as a whole.
+     *
+     * @return {@code true}
+     */
+    @Override
+    public boolean isUnbuffered() {
+        return true;
+    }
+
     @Override
     public void add(ReadBuffer rb) {
         assert eventLoop == null || eventLoop.inEventLoop();
@@ -232,13 +244,28 @@ public final class FormDemuxer implements BufferConsumer {
 
         unacknowledged += rb.readable();
         try {
-            decoder.add(NettyReadBufferFactory.toByteBuf(rb));
+            decoder.add(decoderInput(NettyReadBufferFactory.toByteBuf(rb)));
             forwardOutput();
         } catch (Exception e) {
             handleDecoderException(e);
             return;
         }
         updateUpstreamDemand();
+    }
+
+    /**
+     * The input for the decoder. The decoder cumulates into the first buffer it is given: it
+     * writes the next input into that buffer and compacts it in place. The bytes of a body can be
+     * shared with another reader, e.g. a copy of the form that a filter decodes as it arrives
+     * while the bytes are buffered for the route: writing into them corrupts the form the route
+     * reads. The decoder is given a composite view of the input, which it extends with components
+     * and compacts by dropping them, without writing into the bytes.
+     *
+     * @param input The input, owned by the view
+     * @return The view
+     */
+    private static ByteBuf decoderInput(ByteBuf input) {
+        return input.alloc().compositeBuffer().addComponent(true, input);
     }
 
     @Override

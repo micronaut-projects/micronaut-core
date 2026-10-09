@@ -38,6 +38,7 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http2.Http2Exception;
+import io.netty.util.concurrent.EventExecutor;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -148,8 +149,23 @@ abstract class MultiplexedServerHandler {
         private boolean requestAccepted;
         private boolean finished;
         private boolean reset;
+        /**
+         * {@code true} iff a task to resume the response writer is submitted and has not run yet,
+         * see {@link #onOutboundWritable()}.
+         */
+        private boolean outboundWritableScheduled;
         private boolean closed;
         private Compressor. @Nullable Session compressionSession;
+        /**
+         * The callbacks of {@link #whenAbandoned(Runnable)}, guarded by this stream, or
+         * {@code null} if none is registered.
+         */
+        @Nullable
+        private List<Runnable> abandonCallbacks;
+        /**
+         * Whether the stream was abandoned, guarded by this stream.
+         */
+        private boolean abandoned;
 
         MultiplexedStream(int streamId) {
             if (JfrSupport.isRecorderInitialized() && Http2RequestEvent.isTurnedOn()) {
@@ -180,6 +196,38 @@ abstract class MultiplexedServerHandler {
          * Close the input of the stream.
          */
         abstract void closeInput();
+
+        /**
+         * Whether data written to this stream now still fits the peer's flow control window and
+         * the channel is writable, so that a streamed response may report it as consumed right
+         * away instead of waiting for the frames to be written. The data queued by the protocol
+         * stays bounded by the window. Protocols without such a signal return {@code false}.
+         *
+         * @return {@code true} iff more data can be queued without exceeding the window
+         */
+        boolean isOutboundWritable() {
+            return false;
+        }
+
+        /**
+         * Called by the protocol when {@link #isOutboundWritable()} became {@code true}. The
+         * protocol may call this while it writes queued data (e.g. from the HTTP/2 flow controller
+         * listener), so the writer resumes in a separate task: data written synchronously here
+         * would be queued while the protocol is still writing.
+         */
+        final void onOutboundWritable() {
+            if (outboundWritableScheduled) {
+                return;
+            }
+            outboundWritableScheduled = true;
+            requiredCtx().executor().execute(() -> {
+                outboundWritableScheduled = false;
+                ResponseStreamer current = responseStreamer;
+                if (current != null && !finished && !reset && isOutboundWritable()) {
+                    current.writer.onWritable();
+                }
+            });
+        }
 
         /**
          * Called when the request headers are read.
@@ -320,6 +368,7 @@ abstract class MultiplexedServerHandler {
          */
         final void onRstStreamRead(Exception e) {
             reset = true;
+            abandon();
             if (streamer != null) {
                 streamer.error(e);
             }
@@ -340,6 +389,77 @@ abstract class MultiplexedServerHandler {
                     buf.release();
                 }
                 bufferedContent = null;
+            }
+        }
+
+        /**
+         * Called when the stream is closed, by either side or with the connection: if the
+         * response was not written, the request is abandoned, and the stream cannot take the
+         * response any more, like a stream the client reset: e.g. a stream that Netty reset for a
+         * stream error, while the request waited for its route.
+         */
+        final void onStreamClosed() {
+            if (!finished) {
+                reset = true;
+                abandon();
+            }
+        }
+
+        /**
+         * Run the callbacks of {@link #whenAbandoned(Runnable)}, once, on the event loop, after
+         * the event that abandoned the stream: a callback may answer the request, which the
+         * closed stream drops.
+         */
+        private void abandon() {
+            List<Runnable> callbacks;
+            synchronized (this) {
+                if (abandoned) {
+                    return;
+                }
+                abandoned = true;
+                callbacks = abandonCallbacks;
+                abandonCallbacks = null;
+            }
+            if (callbacks != null) {
+                requiredCtx().executor().execute(() -> {
+                    for (Runnable callback : callbacks) {
+                        callback.run();
+                    }
+                });
+            }
+        }
+
+        @Override
+        public final Runnable whenAbandoned(Runnable callback) {
+            // the request of a stream is abandoned with the stream, not with the connection
+            synchronized (this) {
+                if (!abandoned) {
+                    List<Runnable> callbacks = abandonCallbacks;
+                    if (callbacks == null) {
+                        callbacks = new ArrayList<>(1);
+                        abandonCallbacks = callbacks;
+                    }
+                    callbacks.add(callback);
+                    return () -> removeAbandonCallback(callback);
+                }
+            }
+            // already abandoned: at once on the event loop, or on it
+            EventExecutor executor = requiredCtx().executor();
+            if (executor.inEventLoop()) {
+                callback.run();
+            } else {
+                executor.execute(callback);
+            }
+            return () -> { };
+        }
+
+        private synchronized void removeAbandonCallback(Runnable callback) {
+            List<Runnable> callbacks = abandonCallbacks;
+            if (callbacks != null) {
+                callbacks.remove(callback);
+                if (callbacks.isEmpty()) {
+                    abandonCallbacks = null;
+                }
             }
         }
 
@@ -606,6 +726,10 @@ abstract class MultiplexedServerHandler {
 
             InputStreamer(boolean sendContinue) {
                 this.sendContinue = sendContinue;
+                // what arrives before the route reads the body is bounded by the flow control
+                // window, not by the buffer limit, for a reader that streams the body without
+                // holding it
+                dest.setKeepInitialBytes();
             }
 
             @Override
@@ -735,7 +859,7 @@ abstract class MultiplexedServerHandler {
             final HttpResponse response;
             final StreamingNettyByteBody body;
             final long contentLength;
-            final StreamingResponseWriter writer = new StreamingResponseWriter(requiredCtx().channel().eventLoop(), this);
+            final StreamingResponseWriter writer = new StreamingResponseWriter(requiredCtx().channel().eventLoop(), this, requiredCtx().alloc());
             /**
              * The last piece written in the current turn. Written by {@link #endBatch()}, or as
              * the final frame of the stream by the last {@link #write}.
@@ -817,8 +941,10 @@ abstract class MultiplexedServerHandler {
 
             @Override
             public boolean isWritable() {
-                // consumption is reported once the batch is written, see endBatch
-                return false;
+                // while the window has room, written bytes count as consumed right away;
+                // otherwise consumption is reported once the batch is written, see endBatch, or
+                // when the stream becomes writable again, see onOutboundWritable
+                return !finished && !reset && isOutboundWritable();
             }
 
             /**
@@ -860,7 +986,7 @@ abstract class MultiplexedServerHandler {
             @Override
             public void fail(Throwable e) {
                 if (!reset(e)) {
-                    LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", e);
+                    LOG.warn("The streamed response body failed after some of it was written. The error cannot be forwarded to the client, and the response ends abruptly.", e);
                 }
                 flush();
             }
