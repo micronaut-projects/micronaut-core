@@ -49,8 +49,7 @@ import io.micronaut.websocket.bind.WebSocketStateBinderRegistry;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
@@ -74,6 +73,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -536,6 +536,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param writeCloseReason Whether to allow writing the close reason to the remote
      */
     protected void handleCloseReason(ChannelHandlerContext ctx, CloseReason cr, boolean writeCloseReason) {
+        if (writeCloseReason) {
+            // echo the close frame first. Once it is written, this method is called again to
+            // invoke the @OnClose handler, and the connection is closed
+            writeCloseFrameAndTerminate(ctx, cr);
+            return;
+        }
         cleanupBuffer();
         if (closed.compareAndSet(false, true)) {
             if (LOG.isDebugEnabled()) {
@@ -554,15 +560,11 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                             Collections.singletonList(cr)
                     );
 
-                    invokeAndClose(ctx, target, boundExecutable, methodExecutionHandle, true);
+                    invokeOnCloseAndClose(ctx, target, boundExecutable, methodExecutionHandle);
                 } catch (Throwable e) {
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error invoking @OnClose handler for WebSocket bean [{}]: {}", target, e.getMessage(), e);
                     }
-                }
-            } else {
-                if (writeCloseReason) {
-                    writeCloseFrameAndTerminate(ctx, cr);
                 }
             }
         }
@@ -573,7 +575,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         handleCloseReason(ctx, cr, true);
     }
 
-    private void invokeAndClose(ChannelHandlerContext ctx, Object target, BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> methodExecutionHandle, boolean isClose) {
+    /**
+     * Invoke the @OnClose handler. The connection is usually already closed or closing at this
+     * point (see {@link #writeCloseFrameAndTerminate(ChannelHandlerContext, int, String)}), the
+     * {@code ctx.close()} calls are a safety net for other callers of {@link #handleCloseReason}.
+     */
+    private void invokeOnCloseAndClose(ChannelHandlerContext ctx, Object target, BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> methodExecutionHandle) {
         ExecutionFlow<?> result;
         try {
             result = invokeExecutable(boundExecutable, methodExecutionHandle);
@@ -588,7 +595,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         result.onComplete((v, t) -> {
             if (t != null) {
                 if (LOG.isErrorEnabled()) {
-                    LOG.error("Error subscribing to @{} handler for WebSocket bean [{}]: {}", (isClose ? "OnClose" : "OnError"), target, t.getMessage(), t);
+                    LOG.error("Error subscribing to @OnClose handler for WebSocket bean [{}]: {}", target, t.getMessage(), t);
                 }
             }
             ctx.close();
@@ -630,36 +637,76 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         if (LOG.isErrorEnabled()) {
             LOG.error("Unexpected Exception in WebSocket [{}]: {}", webSocketBean.getTarget(), cause.getMessage(), cause);
         }
-        Channel channel = ctx.channel();
-        if (channel.isOpen()) {
-            final CloseReason internalError = CloseReason.INTERNAL_ERROR;
-            writeCloseFrameAndTerminate(ctx, internalError);
-        }
+        writeCloseFrameAndTerminate(ctx, CloseReason.INTERNAL_ERROR);
     }
 
     private void writeCloseFrameAndTerminate(ChannelHandlerContext ctx, int code, String reason) {
-        cleanupBuffer();
-        final CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(code, reason);
-        ctx.channel().writeAndFlush(closeFrame)
-                      .addListener(future -> handleCloseReason(ctx, new CloseReason(code, reason), false));
+        if (!ctx.channel().isOpen() || closeInitiated.get()) {
+            // the connection is already gone, or a close frame was already sent and the
+            // connection is being closed
+            return;
+        }
+        // build the frame before changing any state, so that an invalid code fails early.
+        // A close frame received without a status code is echoed without one.
+        CloseWebSocketFrame closeFrame = code == -1 ? new CloseWebSocketFrame() : new CloseWebSocketFrame(code, reason);
+        if (!closeInitiated.compareAndSet(false, true)) {
+            closeFrame.release();
+            return;
+        }
+        // no data frames may be sent after the close frame. The session may not exist yet on the
+        // client if the handshake has not completed
+        NettyWebSocketSession session = ctx.channel().attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
+        if (session != null) {
+            session.markClosing();
+        }
+        CloseReason closeReason = new CloseReason(code, reason);
+        if (ctx.executor().inEventLoop()) {
+            sendCloseFrameAndClose(ctx, closeFrame, closeReason);
+        } else {
+            try {
+                ctx.executor().execute(() -> sendCloseFrameAndClose(ctx, closeFrame, closeReason));
+            } catch (RejectedExecutionException e) {
+                closeFrame.release();
+                ctx.channel().close();
+            }
+        }
     }
 
-    private void rejectTooLargeMessage(ChannelHandlerContext ctx) {
-        if (closeInitiated.compareAndSet(false, true)) {
-            cleanupBuffer();
-            ctx.channel().config().setAutoRead(false);
-            getSession().markClosing();
-            CloseReason closeReason = CloseReason.MESSAGE_TO_BIG;
+    private void sendCloseFrameAndClose(ChannelHandlerContext ctx, CloseWebSocketFrame closeFrame, CloseReason closeReason) {
+        cleanupBuffer();
+        // RFC 6455 section 7.1.1: close the connection once the close frame is sent, whether or not
+        // there is an @OnClose handler. Force the close if the peer does not read the close frame
+        // in time.
+        ChannelFuture writeFuture = ctx.channel().writeAndFlush(closeFrame);
+        if (writeFuture.isDone()) {
+            // don't run @OnClose re-entrantly inside the caller (e.g. WebSocketSession.close())
+            try {
+                ctx.executor().execute(() -> closeFrameWritten(ctx, closeReason, null));
+            } catch (RejectedExecutionException e) {
+                closeFrameWritten(ctx, closeReason, null);
+            }
+        } else {
             ScheduledFuture<?> closeTimeout = ctx.executor().schedule(() -> {
                 ctx.close();
             }, 1, TimeUnit.SECONDS);
-            ctx.channel().writeAndFlush(new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason()))
-                .addListener(ChannelFutureListener.CLOSE)
-                .addListener(future -> {
-                    closeTimeout.cancel(false);
-                    handleCloseReason(ctx, closeReason, false);
-                });
+            writeFuture.addListener(future -> closeFrameWritten(ctx, closeReason, closeTimeout));
         }
+    }
+
+    private void closeFrameWritten(ChannelHandlerContext ctx, CloseReason closeReason, @Nullable ScheduledFuture<?> closeTimeout) {
+        if (closeTimeout != null) {
+            closeTimeout.cancel(false);
+        }
+        try {
+            handleCloseReason(ctx, closeReason, false);
+        } finally {
+            ctx.channel().close();
+        }
+    }
+
+    private void rejectTooLargeMessage(ChannelHandlerContext ctx) {
+        ctx.channel().config().setAutoRead(false);
+        writeCloseFrameAndTerminate(ctx, CloseReason.MESSAGE_TO_BIG);
     }
 
     private void cleanupBuffer() {
