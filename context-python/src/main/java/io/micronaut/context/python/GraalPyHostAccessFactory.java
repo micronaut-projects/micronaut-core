@@ -38,10 +38,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -91,10 +94,22 @@ final class GraalPyHostAccessFactory {
         new StandardLibraryType<>("decimal", "Decimal", BigDecimal.class, PythonConversion::convertBigDecimal, value -> true),
         new StandardLibraryType<>(DATETIME, "date", LocalDate.class, PythonConversion::convertLocalDate, value -> true),
         new StandardLibraryType<>(DATETIME, "time", LocalTime.class, PythonConversion::convertLocalTime, GraalPyHostAccessFactory::isNaive),
-        new StandardLibraryType<>(DATETIME, DATETIME, LocalDateTime.class, PythonConversion::convertLocalDateTime, GraalPyHostAccessFactory::isNaive),
+        new StandardLibraryType<>(DATETIME, DATETIME, LocalDateTime.class, PythonConversion::convertLocalDateTime,
+            GraalPyHostAccessFactory::isConvertibleDateTime, PythonConversion::convertDateTime),
         new StandardLibraryType<>(DATETIME, "timedelta", Duration.class, PythonConversion::convertDuration, value -> true),
         new StandardLibraryType<>(DATETIME, "timezone", ZoneOffset.class, PythonConversion::convertZoneOffset, GraalPyHostAccessFactory::isWholeSecondOffset),
         new StandardLibraryType<>("uuid", "UUID", UUID.class, PythonConversion::convertUuid, value -> true)
+    );
+
+    /**
+     * The further Java types a Python standard library type converts to when a parameter asks for one
+     * by name: an aware {@code datetime} is an absolute instant, which {@code LocalDateTime} cannot hold.
+     * Only the declared-type mappings use these; an {@code Object} parameter goes by the table above.
+     */
+    private static final List<StandardLibraryType<?>> ALTERNATIVE_STANDARD_LIBRARY_TYPES = List.of(
+        new StandardLibraryType<>(DATETIME, DATETIME, Instant.class, PythonConversion::convertInstant, PythonConversion::isAware),
+        new StandardLibraryType<>(DATETIME, DATETIME, OffsetDateTime.class, PythonConversion::convertOffsetDateTime, PythonConversion::isAware),
+        new StandardLibraryType<>(DATETIME, DATETIME, ZonedDateTime.class, PythonConversion::convertZonedDateTime, PythonConversion::isAware)
     );
 
     /**
@@ -359,11 +374,28 @@ final class GraalPyHostAccessFactory {
         for (StandardLibraryType<?> standardType : STANDARD_LIBRARY_TYPES) {
             registerStandardLibraryMapping(builder, standardType);
         }
+        for (StandardLibraryType<?> standardType : ALTERNATIVE_STANDARD_LIBRARY_TYPES) {
+            registerAlternativeStandardLibraryMapping(builder, standardType);
+        }
         registerErasedStandardLibraryMapping(builder);
     }
 
     private static <T> void registerStandardLibraryMapping(HostAccess.Builder builder, StandardLibraryType<T> standardType) {
         builder.targetTypeMapping(Value.class, standardType.targetType(), standardType::matches, standardType.converter());
+    }
+
+    /**
+     * Registers a further Java type of a standard library type for only the values it can hold (an aware
+     * {@code datetime} for {@code Instant}): a Java method overloaded for several of these types
+     * ({@code describe(LocalDateTime)} and {@code describe(Instant)}) is then picked by the value, so a
+     * naive {@code datetime} keeps reaching the {@code LocalDateTime} overload and an aware one reaches the
+     * {@code Instant} overload.
+     */
+    private static <T> void registerAlternativeStandardLibraryMapping(HostAccess.Builder builder, StandardLibraryType<T> standardType) {
+        builder.targetTypeMapping(Value.class, standardType.targetType(),
+            value -> standardType.matches(value) && standardType.convertible().test(value), standardType.converter(),
+            // above the LocalDateTime mapping, which takes every datetime to reject an aware one with a clear message
+            TargetMappingPrecedence.HIGHEST);
     }
 
     /**
@@ -379,7 +411,11 @@ final class GraalPyHostAccessFactory {
      * {@code findById} answered an empty {@code Optional} and {@code existsById} answered {@code false}
      * for a row that is there.
      * <p>
-     * A value the conversion refuses (an aware {@code datetime}, a sub-second {@code timezone} offset)
+     * A {@code datetime} converts by whether it is aware: a naive one to {@code LocalDateTime}, an aware
+     * one to {@code OffsetDateTime} (or {@code ZonedDateTime} in a region zone), so it converts back to
+     * an equal Python value.
+     * <p>
+     * A value the conversion refuses (an aware {@code time}, a sub-second {@code timezone} offset)
      * stays the Python object it was: {@code Object} is the catch-all parameter type, so a value that
      * has no Java counterpart must still be passable rather than fail the call.
      * Non-finite {@code decimal.Decimal} values are rejected explicitly for both declared and erased
@@ -393,7 +429,7 @@ final class GraalPyHostAccessFactory {
             value -> {
                 StandardLibraryType<?> standardType = findStandardLibraryType(value);
                 // The predicate above is the same lookup, so a value only reaches here having matched.
-                return Objects.requireNonNull(standardType).converter().apply(value);
+                return Objects.requireNonNull(standardType).erasedConverter().apply(value);
             }
         );
     }
@@ -428,6 +464,23 @@ final class GraalPyHostAccessFactory {
     private static boolean isNaive(Value value) {
         Value tzinfo = value.getMember("tzinfo");
         return tzinfo == null || tzinfo.isNull();
+    }
+
+    /**
+     * @param value a Python {@code datetime}
+     * @return whether it has a Java counterpart: any naive value, and an aware one whose offset is an
+     * exact number of seconds
+     */
+    private static boolean isConvertibleDateTime(Value value) {
+        if (isNaive(value)) {
+            return true;
+        }
+        try {
+            PythonConversion.convertDateTime(value);
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /**
@@ -908,15 +961,6 @@ final class GraalPyHostAccessFactory {
     }
 
     /**
-     * A Python standard library type and the Java type it converts to.
-     *
-     * @param module The Python module declaring the type
-     * @param typeName The Python type name
-     * @param targetType The Java type
-     * @param converter The conversion
-     * @param <T> The Java type
-     */
-    /**
      * A Python standard library type with a Java counterpart, and what it takes to get there.
      *
      * @param module      the Python module the type is defined in
@@ -926,10 +970,18 @@ final class GraalPyHostAccessFactory {
      * @param convertible whether a given value is one the converter can take. A value it cannot --
      *                    an aware {@code datetime}, an offset finer than a second -- must not match,
      *                    so that it keeps the mapping it would otherwise have had
+     * @param erasedConverter the conversion for an {@code Object} parameter, which may pick a Java type
+     *                    other than {@code targetType} by the value
      * @param <T>         the Java type
      */
     private record StandardLibraryType<T>(String module, String typeName, Class<T> targetType,
-                                         Function<Value, T> converter, Predicate<Value> convertible) {
+                                         Function<Value, T> converter, Predicate<Value> convertible,
+                                         Function<Value, ?> erasedConverter) {
+
+        StandardLibraryType(String module, String typeName, Class<T> targetType,
+                            Function<Value, T> converter, Predicate<Value> convertible) {
+            this(module, typeName, targetType, converter, convertible, converter);
+        }
 
         boolean matches(Value value) {
             return PythonCoercion.isPythonType(value, module, typeName);

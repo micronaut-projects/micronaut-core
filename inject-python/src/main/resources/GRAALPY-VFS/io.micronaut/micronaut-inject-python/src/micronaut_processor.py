@@ -36,6 +36,29 @@ ElementQuery = java.type("io.micronaut.inject.ast.ElementQuery")
 _JAVA_INT_MIN = -2 ** 31
 _JAVA_INT_MAX = 2 ** 31 - 1
 
+# The Java types other than the default that a Python type can be declared to map to with Annotated, as in
+# Annotated[datetime, Instant]: an aware datetime is an absolute instant, which LocalDateTime cannot hold.
+# The runtime converts between each pair.
+_DATETIME_JAVA_TYPES = frozenset((
+    "java.time.LocalDateTime", "java.time.Instant", "java.time.OffsetDateTime", "java.time.ZonedDateTime",
+))
+ALTERNATIVE_JAVA_TYPES = {
+    "datetime": _DATETIME_JAVA_TYPES,
+    "datetime.datetime": _DATETIME_JAVA_TYPES,
+}
+# Marks the elements whose Java instant type stands for a Python datetime, so the generated code hands the
+# value to Python as an aware datetime; a parameter declared with the Java type keeps the Java object
+_PYTHON_DATETIME_ANNOTATION = "io.micronaut.context.python.annotation.PythonDateTime"
+
+
+def _with_java_type(type_ref, java_type):
+    """The type with its Python type (each non-None member of a union) replaced by the named Java type."""
+    if type_ref.isUnion():
+        members = [member if member.isNone() else _with_java_type(member, java_type)
+                   for member in type_ref.typeArguments()]
+        return TypeRef(type_ref.name(), members, type_ref.typeUseDecorators(), type_ref.nativeException())
+    return TypeRef(java_type, type_ref.typeArguments(), type_ref.typeUseDecorators(), type_ref.nativeException())
+
 
 class UnresolvedAnnotationMemberError(ValueError):
     """
@@ -1419,6 +1442,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             decorators.append(self._parse_attribute_metadata(metadata, {}))
                         # For other metadata types (strings, numbers), we could handle them
                         # but for now, focus on decorator names and calls
+                    type_annotation, decorators = self._select_java_type(type_annotation, decorators)
                 else:
                     # Fallback to original annotation if no args
                     type_annotation = TypeRef(ast.unparse(annotation_node))
@@ -1430,6 +1454,38 @@ class MicronautAstVisitor(ast.NodeVisitor):
             type_annotation = TypeRef(ast.unparse(annotation_node))
 
         return type_annotation, decorators
+
+    def _select_java_type(self, type_annotation, decorators):
+        """
+        Apply an ``Annotated`` metadata argument that names the Java type of the annotated Python type
+        rather than an annotation, as ``Instant`` does in ``Annotated[datetime, Instant]``. The Python type
+        (the non-None member of a nullable union) is replaced by the Java type, and the argument is replaced
+        by the PythonDateTime marker (dropped for LocalDateTime, the default).
+        """
+        members = [member for member in type_annotation.typeArguments() if not member.isNone()] \
+            if type_annotation.isUnion() else [type_annotation]
+        if len(members) != 1:
+            return type_annotation, decorators
+        alternatives = ALTERNATIVE_JAVA_TYPES.get(members[0].name())
+        if not alternatives:
+            return type_annotation, decorators
+        for decorator in decorators:
+            java_type = self._java_type_name(decorator.annotationName())
+            if java_type in alternatives:
+                remaining = [other for other in decorators if other is not decorator]
+                if java_type != "java.time.LocalDateTime":
+                    remaining.append(DecoratorDef("PythonDateTime", _PYTHON_DATETIME_ANNOTATION, None, {}, []))
+                return _with_java_type(type_annotation, java_type), remaining
+        return type_annotation, decorators
+
+    def _java_type_name(self, name):
+        """
+        The qualified name of a Java type referenced by a simple name: a Java import such as
+        ``from java.time import Instant`` reaches the processor as ``Instant = java.type("java.time.Instant")``.
+        """
+        if '.' in name:
+            return name
+        return self.java_type_assignments.get(name) or self.imported_types.get(name) or name
 
     def to_decorator_from_reference(self, decorator_reference):
         return self.to_decorator_from_reference_with_members(decorator_reference, {})

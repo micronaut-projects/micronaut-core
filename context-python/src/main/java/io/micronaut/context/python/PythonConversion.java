@@ -23,11 +23,16 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
+import java.time.DateTimeException;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -180,6 +185,115 @@ public final class PythonConversion {
     }
 
     /**
+     * Convert an aware Python {@code datetime.datetime} to the {@link OffsetDateTime} at the offset
+     * its {@code tzinfo} answers for it. A naive value is refused: it names no instant, and guessing
+     * a zone for it would silently shift it.
+     *
+     * @param value The Python datetime
+     * @return The offset date-time
+     */
+    static OffsetDateTime convertOffsetDateTime(Value value) {
+        requireAware(value, OffsetDateTime.class);
+        return OffsetDateTime.parse(value.invokeMember(ISOFORMAT).asString());
+    }
+
+    /**
+     * Convert an aware Python {@code datetime.datetime} to the {@link Instant} it denotes; naive
+     * values are refused for the reason given on {@link #convertOffsetDateTime}.
+     *
+     * @param value The Python datetime
+     * @return The instant
+     */
+    static Instant convertInstant(Value value) {
+        requireAware(value, Instant.class);
+        return OffsetDateTime.parse(value.invokeMember(ISOFORMAT).asString()).toInstant();
+    }
+
+    /**
+     * Convert an aware Python {@code datetime.datetime} to a {@link ZonedDateTime}. A region zone
+     * ({@code zoneinfo.ZoneInfo}, or a pytz zone) is kept as the Java region of the same name, so the
+     * value keeps following its zone's rules; any other {@code tzinfo} becomes its fixed offset.
+     * Naive values are refused for the reason given on {@link #convertOffsetDateTime}.
+     *
+     * @param value The Python datetime
+     * @return The zoned date-time
+     */
+    static ZonedDateTime convertZonedDateTime(Value value) {
+        requireAware(value, ZonedDateTime.class);
+        OffsetDateTime offsetDateTime = OffsetDateTime.parse(value.invokeMember(ISOFORMAT).asString());
+        ZoneId region = regionOf(value);
+        return region != null ? offsetDateTime.atZoneSameInstant(region) : offsetDateTime.toZonedDateTime();
+    }
+
+    /**
+     * Convert a Python {@code datetime.datetime} for a parameter that does not say which Java type it
+     * wants: a naive value is a {@link LocalDateTime}, an aware one in a region zone a
+     * {@link ZonedDateTime} and any other aware one an {@link OffsetDateTime}. Each converts back to an
+     * equal Python value.
+     *
+     * @param value The Python datetime
+     * @return The Java date-time
+     */
+    static Object convertDateTime(Value value) {
+        if (!isAware(value)) {
+            return convertLocalDateTime(value);
+        }
+        return regionOf(value) != null ? convertZonedDateTime(value) : convertOffsetDateTime(value);
+    }
+
+    /**
+     * @param value A Python {@code datetime.datetime}
+     * @return whether it is aware, that is whether its {@code tzinfo} gives it an offset. A
+     * {@code tzinfo} whose {@code utcoffset} answers {@code None} leaves the value naive, as Python
+     * itself defines it
+     */
+    static boolean isAware(Value value) {
+        Value tzinfo = value.getMember("tzinfo");
+        if (tzinfo == null || isNone(tzinfo)) {
+            return false;
+        }
+        Value offset = value.invokeMember("utcoffset");
+        return offset != null && !isNone(offset);
+    }
+
+    /**
+     * @param value An aware Python {@code datetime.datetime}
+     * @return the Java region of its zone, or {@code null} when its {@code tzinfo} is not a named
+     * region Java knows
+     */
+    private static @Nullable ZoneId regionOf(Value value) {
+        Value tzinfo = value.getMember("tzinfo");
+        if (tzinfo == null || isNone(tzinfo)) {
+            return null;
+        }
+        // zoneinfo.ZoneInfo names its region "key", pytz "zone"
+        String name = tzinfo.hasMember("key") ? stringMemberOrNull(tzinfo, "key") : null;
+        if (name == null && tzinfo.hasMember("zone")) {
+            name = stringMemberOrNull(tzinfo, "zone");
+        }
+        if (name == null) {
+            return null;
+        }
+        try {
+            return ZoneId.of(name);
+        } catch (DateTimeException e) {
+            return null;
+        }
+    }
+
+    private static @Nullable String stringMemberOrNull(Value value, String name) {
+        Value member = value.getMember(name);
+        return member != null && member.isString() ? member.asString() : null;
+    }
+
+    private static void requireAware(Value value, Class<?> targetType) {
+        if (!isAware(value)) {
+            throw new IllegalArgumentException("Naive datetime.datetime values cannot be converted to "
+                + targetType.getName() + ": give the value a tzinfo, such as datetime.timezone.utc");
+        }
+    }
+
+    /**
      * Convert a Python {@code datetime.timedelta} from its normalised {@code days}, {@code seconds}
      * and {@code microseconds} members (Python keeps seconds and microseconds non-negative and
      * pushes the sign into days, so the three add up).
@@ -235,7 +349,10 @@ public final class PythonConversion {
     private static void rejectAware(Value value, String typeName) {
         Value tzinfo = value.getMember("tzinfo");
         if (tzinfo != null && !isNone(tzinfo)) {
-            throw new IllegalArgumentException("Aware datetime." + typeName + " values cannot be converted to a naive Java type");
+            throw new IllegalArgumentException("Aware datetime." + typeName + " values cannot be converted to a naive Java type"
+                + ("datetime".equals(typeName)
+                    ? ": declare the type as java.time.Instant, OffsetDateTime or ZonedDateTime, for example Annotated[datetime, Instant]"
+                    : ""));
         }
     }
 
