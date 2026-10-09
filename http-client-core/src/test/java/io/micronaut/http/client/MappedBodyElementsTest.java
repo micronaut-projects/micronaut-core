@@ -49,6 +49,20 @@ class MappedBodyElementsTest {
     }
 
     @Test
+    void cleanupFailureDoesNotReplaceTheRetainedMappingFailure() {
+        IllegalStateException cleanup = new IllegalStateException("close");
+        var source = BodyElements.of(() -> CompletableFuture.completedFuture(Optional.of("bad")), () -> {
+            throw cleanup;
+        });
+        var elements = MappedBodyElements.map(source, Integer::parseInt);
+        Throwable failure = assertThrows(CompletionException.class, () -> elements.next().toCompletableFuture().join()).getCause();
+        assertSame(failure, assertThrows(CompletionException.class, () ->
+            elements.forEach(value -> CompletableFuture.completedFuture(null)).toCompletableFuture().join()).getCause());
+        assertSame(cleanup, failure.getSuppressed()[0]);
+        assertSame(failure, elements.failure());
+    }
+
+    @Test
     void pollRetainsMappingFailure() {
         AtomicInteger reads = new AtomicInteger();
         BodyElements<String> source = new BodyElements<>() {
