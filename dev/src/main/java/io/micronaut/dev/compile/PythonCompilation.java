@@ -17,7 +17,6 @@ package io.micronaut.dev.compile;
 
 import io.micronaut.python.compiler.PyronautCompiler;
 import io.micronaut.python.processing.PythonProcessingSession;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.File;
@@ -53,7 +52,6 @@ import java.util.stream.Stream;
  * @author graemerocher
  * @since 5.3.0
  */
-@NullMarked
 final class PythonCompilation implements AutoCloseable {
 
     private static final String WORK_SUFFIX = "-python";

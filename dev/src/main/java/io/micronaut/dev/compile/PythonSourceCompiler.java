@@ -17,7 +17,6 @@ package io.micronaut.dev.compile;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.reflect.ClassUtils;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Set;
@@ -38,7 +37,6 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public final class PythonSourceCompiler implements SourceCompiler {
 
     private static final String COMPILER = "io.micronaut.python.compiler.PyronautCompiler";
