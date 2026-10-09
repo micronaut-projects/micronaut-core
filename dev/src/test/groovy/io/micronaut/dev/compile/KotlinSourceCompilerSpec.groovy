@@ -121,6 +121,54 @@ class KotlinSourceCompilerSpec extends Specification {
         !Files.exists(project.resolve("build/generated/example/WidgetGenerated.kt"))
     }
 
+    void "an incremental compilation keeps the top-level declarations of the sources it did not compile"() {
+        given: "two sources of top-level functions, compiled"
+        write("demo/A.kt", "package demo\nfun a(): String = \"a\"")
+        write("demo/B.kt", "package demo\nfun b(): String = \"b\"")
+        Path e = write("demo/E.kt", "package demo\nfun e(): String = \"e\"")
+        compiler.compile(request().asFull())
+
+        when: "one of them is compiled alone"
+        Path a = write("demo/A.kt", "package demo\nfun a(): String = \"a2\"")
+        def result = compiler.compile(request([a] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString() == ["A.kt"]
+
+        when: "a new source calls both"
+        Path c = write("demo/C.kt", "package demo\nclass C { fun name(): String = b() + a() }")
+        result = compiler.compile(request([c] as Set, [] as Set))
+
+        then: "the function of the source not compiled since the full compilation still resolves"
+        result.status == CompilationResult.Status.SUCCESS
+        loadAndCall("demo.C", "name") == "ba2"
+
+        when: "a source of top-level functions is deleted with its caller's call, and another source calls what is left"
+        Files.delete(a)
+        write("demo/C.kt", "package demo\nclass C { fun name(): String = b() }")
+        def deletion = compiler.compile(request([c] as Set, [a] as Set))
+        Path d = write("demo/D.kt", "package demo\nclass D { fun name(): String = b() }")
+        result = compiler.compile(request([d] as Set, [] as Set))
+
+        then:
+        deletion.status == CompilationResult.Status.SUCCESS
+        result.status == CompilationResult.Status.SUCCESS
+        loadAndCall("demo.D", "name") == "b"
+        !Files.exists(out.resolve("demo/AKt.class"))
+
+        when: "a source of top-level functions no other calls is deleted alone, which compiles nothing"
+        Files.delete(e)
+        deletion = compiler.compile(request([] as Set, [e] as Set))
+        Path f = write("demo/F.kt", "package demo\nclass F { fun name(): String = b() }")
+        result = compiler.compile(request([f] as Set, [] as Set))
+
+        then: "the module metadata written without a compilation still reads"
+        deletion.status != CompilationResult.Status.FAILED
+        result.status == CompilationResult.Status.SUCCESS
+        loadAndCall("demo.F", "name") == "b"
+    }
+
     private Path write(String relative, String source) {
         Path file = src.resolve(relative)
         Files.createDirectories(file.parent)

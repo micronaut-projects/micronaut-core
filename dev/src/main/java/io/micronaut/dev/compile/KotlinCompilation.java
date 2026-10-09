@@ -155,6 +155,10 @@ final class KotlinCompilation {
         if (!generatedJava.isEmpty() && !compileJava(generatedJava.keySet(), javaRoots(request), classpath, staging, diagnostics)) {
             return null;
         }
+        if (!request.isFull()) {
+            // kotlinc listed the top-level declarations of the compiled sources only: the others stay listed
+            KotlinModuleMapping.mergeInto(MODULE_NAME, request.classOutput(), staging, hiddenClasses::contains);
+        }
         Map<Path, Set<String>> classes = credit(staging, originsBySource);
         Map<Path, Set<String>> generatedSources = new LinkedHashMap<>();
         Map<Path, Set<String>> resources = new LinkedHashMap<>();
