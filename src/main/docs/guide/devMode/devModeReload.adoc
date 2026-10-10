@@ -61,7 +61,9 @@ A changed configuration file restarts the application, retaining nothing.
 Two mechanisms say which beans are kept across restarts:
 
 * The manifest's `micronaut.dev.retain` names the types to keep.
-* A module can contribute a api:context.reload.BeanRetentionPolicy[] bean instead, which is consulted for every singleton when the context stops.
+* A module can contribute a api:context.reload.BeanRetentionPolicy[] bean instead, which is consulted for every singleton when the context stops, and retains it, refuses it or abstains.
+
+A bean is retained when a policy retains it and none refuses it, whatever their order. A module can therefore refuse what `@Retain` or `micronaut.dev.retain` asks for, such as a client whose configuration names a class of the application that the client instantiates and keeps. A bean that holds a refused bean is not retained either. The refusal is logged at debug under `io.micronaut.context.lifecycle`, naming the policy.
 
 A bean is only retained when its class and everything it received, as the dependency graph records, come from the runtime classpath rather than the reloadable tier. A bean that holds an application class cannot survive a change to that class.
 
