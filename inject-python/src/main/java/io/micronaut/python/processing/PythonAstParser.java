@@ -105,6 +105,7 @@ public final class PythonAstParser {
     // the class elements they hold belong to one javac task
     private static final Source TRANSFORM_CACHES_SOURCE = Source.newBuilder(PYTHON, "_mn_transform_caches = {}", "micronaut-transform-caches.py").cached(true).buildLiteral();
     private static final Source PROCESSOR_CACHES_SOURCE = Source.newBuilder(PYTHON, "_mn_processor_caches = {}", "micronaut-processor-caches.py").cached(true).buildLiteral();
+    private static final String VISITOR_CONTEXT_MEMBER = "visitor_context";
     private static final Source TYPE_CHECKER_SOURCE = Source.newBuilder(PYTHON, """
         if type_check_enabled:
             from micronaut_typecheck import TypeChecker
@@ -301,7 +302,7 @@ public final class PythonAstParser {
         bindings.putMember("has_parsed_tree", tree != null);
         bindings.putMember("parsed_tree", tree != null ? tree : "");
         bindings.putMember("package_name", packageName);
-        bindings.putMember("visitor_context", visitorContext);
+        bindings.putMember(VISITOR_CONTEXT_MEMBER, visitorContext);
         bindings.putMember("file_name", fileName);
         bindings.putMember("source_path", sourcePath);
         bindings.putMember("src_root", srcRoot);
@@ -475,7 +476,7 @@ public final class PythonAstParser {
         if (checker == null || checker.isNull()) {
             return List.of();
         }
-        bindings.putMember("visitor_context", visitorContext);
+        bindings.putMember(VISITOR_CONTEXT_MEMBER, visitorContext);
         long started = PipelineTimings.start();
         context.eval(TYPE_CHECK_SOURCE);
         PipelineTimings.stop(PipelineTimings.TYPE_CHECK, started);
@@ -499,7 +500,7 @@ public final class PythonAstParser {
         if (planner == null || planner.isNull()) {
             return StaticCompilationPlan.EMPTY;
         }
-        bindings.putMember("visitor_context", visitorContext);
+        bindings.putMember(VISITOR_CONTEXT_MEMBER, visitorContext);
         long started = PipelineTimings.start();
         context.eval(STATIC_PLAN_SOURCE);
         PipelineTimings.stop(PipelineTimings.PLAN, started);
