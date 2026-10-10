@@ -43,6 +43,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
+import io.micronaut.http.exceptions.HttpException;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
@@ -55,9 +56,9 @@ import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import io.netty.buffer.ByteBuf;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -260,9 +261,9 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         return converted;
     }
 
-    private static <T> List<T> toListNow(Flux<T> flux) {
-        var sub = new Subscriber<T>() {
-            final List<T> list = new ArrayList<>();
+    private static List<RawFormField> toListNow(Publisher<RawFormField> publisher) {
+        var sub = new Subscriber<RawFormField>() {
+            final List<RawFormField> list = new ArrayList<>();
             boolean complete = false;
             @Nullable
             Throwable error = null;
@@ -273,7 +274,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             }
 
             @Override
-            public void onNext(T t) {
+            public void onNext(RawFormField t) {
                 list.add(t);
             }
 
@@ -288,9 +289,20 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                 complete = true;
             }
         };
-        flux.subscribe(sub);
+        publisher.subscribe(sub);
         if (!sub.complete) {
             throw new IllegalStateException("Flux did not finish immediately");
+        }
+        if (sub.error != null) {
+            // the fields read before the failure are not bound
+            for (RawFormField field : sub.list) {
+                field.close();
+            }
+        }
+        if (sub.error instanceof HttpException e) {
+            // a malformed form, e.g. a multipart body without its closing boundary, or a form
+            // over a limit: answered with its status
+            throw e;
         }
         if (sub.error != null) {
             throw new IllegalStateException("Failed to load form fields", sub.error);
