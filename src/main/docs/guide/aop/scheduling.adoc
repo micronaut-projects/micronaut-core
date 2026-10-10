@@ -75,6 +75,43 @@ micronaut:
 
 include::{includedir}configurationProperties/io.micronaut.scheduling.executor.UserExecutorConfiguration.adoc[]
 
+== Intercepting Scheduled Invocations
+
+A `@Scheduled` method is an ordinary method: application code can call it directly, and any api:aop.Around[] advice applied to it runs for both kinds of call. When the scheduler fires the task, the interceptor chain carries an api:aop.ScheduledInvocation[] in its attributes, so that advice which should only apply to scheduled firings, such as a Jakarta Interceptors style around-timeout method, can tell the two apart:
+
+[source,java]
+----
+@Singleton
+public class TimeoutInterceptor implements MethodInterceptor<Object, Object> {
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        ScheduledInvocation scheduled = ScheduledInvocation.find(context).orElse(null); // <1>
+        if (scheduled == null) {
+            return context.proceed(); // <2>
+        }
+        AnnotationValue<?> schedule = scheduled.getSchedule(); // <3>
+        return context.proceed();
+    }
+}
+----
+
+<1> Reads the attribute named by `ScheduledInvocation.ATTRIBUTE`
+<2> A direct call from application code, or a call made by a scheduled method in turn
+<3> The `@Scheduled` annotation that fired the task. A method with several schedules is fired once per schedule, and each firing carries its own annotation
+
+The attribute is present on the chain of the scheduled method only. A direct call to the same method on the same bean, a recursive call, and the methods the scheduled method calls in turn do not carry it, even when they have the same advice.
+
+Code that fires methods on its own schedule, such as a timer service integration, can mark its invocations the same way:
+
+[source,java]
+----
+ExecutableMethod<MyTask, Object> method = beanDefinition.getRequiredMethod("run");
+ScheduledInvocation.invoke(method, schedule, bean); // <1>
+----
+
+<1> Invokes `run()` on the bean, which may be an AOP proxy, and the chain of that invocation carries the `ScheduledInvocation`
+
 == Handling Exceptions
 
 By default, the Micronaut framework includes a api:io.micronaut.scheduling.DefaultTaskExceptionHandler[] bean that implements the api:io.micronaut.scheduling.TaskExceptionHandler[] interface and simply logs the exception if an error occurs invoking a scheduled task.
