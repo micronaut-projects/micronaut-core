@@ -27,6 +27,9 @@ graalvmNative {
     toolchainDetection = false
     metadataRepository {
         enabled = true
+        // The metadata of these modules registers ReferenceCountUtil, depending on the version of the repository, which
+        // would hide whether micronaut-http-netty registers the methods that its static initializer looks up (see CompressionTest)
+        excludedModules.addAll("io.netty:netty-codec", "io.netty:netty-handler-proxy")
     }
     binaries {
         all {
