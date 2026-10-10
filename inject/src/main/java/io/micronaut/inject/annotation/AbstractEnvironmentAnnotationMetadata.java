@@ -395,6 +395,18 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     }
 
     @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(@Nullable String stereotype) {
+        Environment environment = getEnvironment();
+        List<AnnotationValue<T>> values = environmentAnnotationMetadata.getAnnotationValuesByStereotype(stereotype);
+        if (environment != null) {
+            return values.stream().map(entries ->
+                new EnvironmentAnnotationValue<>(environment, entries)
+            ).collect(Collectors.toList());
+        }
+        return values;
+    }
+
+    @Override
     public Set<String> getAnnotationNames() {
         return environmentAnnotationMetadata.getAnnotationNames();
     }
