@@ -21,7 +21,6 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.scheduling.io.watch.FileChangeBatch;
 import io.micronaut.scheduling.io.watch.FileWatcher;
 import io.micronaut.scheduling.io.watch.FileWatcherRegistration;
-import org.jspecify.annotations.NullMarked;
 
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -47,7 +46,6 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Internal
-@NullMarked
 final class DevFileWatcher implements FileWatcher, LifeCycle<DevFileWatcher> {
 
     private final FileWatcher watcher;

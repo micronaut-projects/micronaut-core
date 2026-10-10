@@ -579,7 +579,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
                 // the context. Destroy those stragglers too, with a bound so a pathological hook that
                 // always creates a bean cannot spin forever
                 for (int pass = 0; ; pass++) {
-                    destroyShutdownDependents();
                     List<BeanRegistration> stragglers = singletonScope.getBeanRegistrations()
                         .stream()
                         .filter(br -> !processed.contains(br.bean))
@@ -596,7 +595,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
                         shutdownDependents.clear();
                         break;
                     }
+                    // a singleton created during shutdown goes first: what its own resolver created is destroyed
+                    // with it, after its destruction callbacks, and only the rest is left to destroy here
                     destroySingletons(stragglers, processed);
+                    destroyShutdownDependents();
                 }
             } finally {
                 shutdownThread = null;
@@ -6573,6 +6575,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
         }
 
         @Override
+        public Method getTargetMethod() {
+            return method.getTargetMethod();
+        }
+
+        @Override
         public String toString() {
             return method.toString();
         }
@@ -6638,11 +6645,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
         }
 
         @Override
-        public Method getTargetMethod() {
-            return method.getTargetMethod();
-        }
-
-        @Override
         public Class getDeclaringType() {
             return target.getClass();
         }
@@ -6694,11 +6696,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
                 }
             }
             return target;
-        }
-
-        @Override
-        public Method getTargetMethod() {
-            return method.getTargetMethod();
         }
 
         @Override
