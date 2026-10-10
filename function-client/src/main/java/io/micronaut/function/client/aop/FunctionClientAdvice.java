@@ -143,12 +143,17 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
                 .orElseThrow(() -> new FunctionNotFoundException(def.getName()));
             @SuppressWarnings("unchecked")
             Argument<Publisher<Object>> publisherType = (Argument<Publisher<Object>>) (Argument<?>) Argument.of(Publisher.class, valueType);
-            Publisher<Object> result = Objects.requireNonNull(
-                functionInvoker.invoke(def, body, publisherType),
-                "The function invoker returned no publisher"
+            // an invoker that only returns publishers is adapted by the default invokeAsync
+            CompletionStage<@Nullable Object> result = CompletionStagePublishers.orElse(
+                (CompletionStage<@Nullable Object>) functionInvoker.invokeAsync(def, body, valueType),
+                // a mock invoker that only stubs invoke returns no stage
+                () -> CompletionStagePublishers.first(Objects.requireNonNull(
+                    functionInvoker.invoke(def, body, publisherType),
+                    "The function invoker returned no publisher"
+                ), null)
             );
-            return CompletionStagePublishers.map(CompletionStagePublishers.first(result, null), value -> {
-                if (value == null) {
+            return CompletionStagePublishers.map(result, value -> {
+                if (value == null && !valueType.isVoid() && valueType.getType() != Void.class) {
                     throw new FunctionNotFoundException(functionName);
                 }
                 return value;
