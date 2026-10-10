@@ -63,7 +63,8 @@ public final class GroovyElementAnnotationMetadataFactory extends AbstractElemen
     @Override
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForGenericPlaceholder(GenericPlaceholderElement placeholderElement) {
         var placeholder = (GroovyNativeElement.Placeholder) placeholderElement.getGenericNativeType();
-        return metadataBuilder.lookupOrBuild(placeholder, getTypeAnnotationsOnly(placeholder.annotatedNode()));
+        // Only the type parameter declaration reports the type parameter's annotations, a use reports its own
+        return metadataBuilder.lookupOrBuild(placeholder, getTypeAnnotationsOnly(placeholder.typeAnnotations()));
     }
 
     @Override
@@ -73,8 +74,11 @@ public final class GroovyElementAnnotationMetadataFactory extends AbstractElemen
     }
 
     private AnnotatedNode getTypeAnnotationsOnly(ClassNode classNode) {
+        return getTypeAnnotationsOnly(classNode.getTypeAnnotations());
+    }
+
+    private AnnotatedNode getTypeAnnotationsOnly(List<AnnotationNode> typeAnnotations) {
         var annotatedNode = new AnnotatedNode();
-        List<AnnotationNode> typeAnnotations = classNode.getTypeAnnotations();
         if (CollectionUtils.isNotEmpty(typeAnnotations)) {
             annotatedNode.addAnnotations(typeAnnotations);
         }
