@@ -163,6 +163,7 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
         }
     }
 
+    @SuppressWarnings("java:S1181") // Convert failures of user-supplied elements into the publisher error signal.
     private void emit(Subscriber<? super T> subscriber) {
         Arrival<T> arrival = arrived.getAndSet(null);
         if (arrival != null) {
@@ -186,7 +187,7 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
             T available;
             try {
                 available = elements.poll();
-            } catch (Throwable e) {
+            } catch (Exception | Error e) {
                 done = true;
                 subscriber.onError(e);
                 return;
@@ -200,7 +201,7 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
             CompletionStage<Optional<T>> read;
             try {
                 read = elements.next();
-            } catch (Throwable e) {
+            } catch (Exception | Error e) {
                 read = CompletableFuture.failedFuture(e);
             }
             // a read that completes at once is emitted by the loop of the drain

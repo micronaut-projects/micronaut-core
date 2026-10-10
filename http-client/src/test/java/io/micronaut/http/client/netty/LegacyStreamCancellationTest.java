@@ -60,6 +60,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -143,13 +144,13 @@ class LegacyStreamCancellationTest {
         List<Arguments> cases = new ArrayList<>();
         for (Api api : apis()) {
             for (When when : When.values()) {
-                cases.add(Arguments.of(api, when, expectedServerSignal(api, when), expectedReuse(api, when)));
+                cases.add(Arguments.of(api, when, expectedServerSignal(when), expectedReuse(api, when)));
             }
         }
         return cases.stream();
     }
 
-    static String expectedServerSignal(Api api, When when) {
+    static String expectedServerSignal(When when) {
         return when == When.MID_BODY ? "complete" : "cancel";
     }
 
@@ -209,8 +210,8 @@ class LegacyStreamCancellationTest {
             first.get(TIMEOUT.toSeconds(), TimeUnit.SECONDS);
         } else {
             // the request reaches the server; the response or its first piece is still delayed
-            Thread.sleep(400);
-            assertTrue(!first.isDone(), () -> "the stream ended before it was cancelled: " + first);
+            await().during(Duration.ofMillis(400)).atMost(TIMEOUT)
+                .untilAsserted(() -> assertTrue(!first.isDone(), () -> "the stream ended before it was cancelled: " + first));
             cancelled.set(true);
             subscription.get().cancel();
         }
@@ -238,20 +239,17 @@ class LegacyStreamCancellationTest {
         assertNoLeak();
     }
 
-    private static void assertNoLeak() throws InterruptedException {
-        for (int i = 0; i < 3; i++) {
-            System.gc();
-            // a leak is reported when a buffer is tracked
-            ByteBuf probe = ByteBufAllocator.DEFAULT.buffer(16);
-            probe.release();
-            Thread.sleep(20);
-        }
-        // the leaks of the client: the server has leaks of its own when a response stream is
-        // cancelled, which are not what this test is about
-        List<String> reported = leaks.list.stream().map(ILoggingEvent::getFormattedMessage)
-            .filter(m -> m.contains("LEAK") && m.contains("io.micronaut.http.client"))
-            .toList();
-        assertTrue(reported.isEmpty(), () -> "leaks: " + reported);
+    private static void assertNoLeak() {
+        await().during(Duration.ofMillis(60)).pollInterval(Duration.ofMillis(20)).atMost(TIMEOUT)
+            .untilAsserted(() -> {
+                System.gc();
+                ByteBuf probe = ByteBufAllocator.DEFAULT.buffer(16);
+                probe.release();
+                List<String> reported = leaks.list.stream().map(ILoggingEvent::getFormattedMessage)
+                    .filter(m -> m.contains("LEAK") && m.contains("io.micronaut.http.client"))
+                    .toList();
+                assertTrue(reported.isEmpty(), () -> "leaks: " + reported);
+            });
     }
 
     @Requires(property = "spec.name", value = SPEC)
