@@ -1,5 +1,6 @@
 package io.micronaut.http.client
 
+import io.micronaut.core.execution.DelayedExecutionFlow
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
@@ -10,6 +11,7 @@ import spock.lang.Specification
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 import java.util.concurrent.CompletionStage
+import java.util.concurrent.TimeoutException
 import java.util.function.Function
 
 class ElementsStagesSpec extends Specification {
@@ -78,6 +80,37 @@ class ElementsStagesSpec extends Specification {
 
         then:
         elements.closed
+    }
+
+    void "external timeout aborts a streaming flow and closes its late response"() {
+        given:
+        def flow = DelayedExecutionFlow.<HttpResponse<BodyElements<String>>>create()
+        def future = ElementsStages.response(flow)
+        def elements = new RecordingElements()
+
+        when:
+        future.completeExceptionally(new TimeoutException())
+
+        then:
+        flow.isCancelled()
+
+        when:
+        flow.complete(ElementsResponse.of(HttpResponse.ok(), elements))
+
+        then:
+        elements.closed
+    }
+
+    void "external timeout of a mapped stream cancels its source"() {
+        given:
+        def source = new CompletableFuture<BodyElements<String>>()
+        def mapped = ElementsStages.mapElements(source, Function.identity()).toCompletableFuture()
+
+        when:
+        mapped.completeExceptionally(new TimeoutException())
+
+        then:
+        source.isCancelled()
     }
 
     void "a mapped result is not closed"() {
