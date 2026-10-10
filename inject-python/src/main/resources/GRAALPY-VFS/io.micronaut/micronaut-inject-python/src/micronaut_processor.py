@@ -341,8 +341,10 @@ class MicronautAstVisitor(ast.NodeVisitor):
             candidates.append(f"python.{imported_name}")
         for candidate in candidates:
             class_element = self.visitor_context.getClassElement(candidate).orElse(None)
-            if class_element is not None and _JavaTypes.isPythonClass(class_element):
-                return candidate
+            if class_element is not None:
+                # a Java class of that name: the import is a Java import, not a compiled Python class
+                # (asking javac for the package form of a Java import would search the class path in vain)
+                return candidate if _JavaTypes.isPythonClass(class_element) else None
         return None
 
     def _is_compiled_python_package(self, name):
