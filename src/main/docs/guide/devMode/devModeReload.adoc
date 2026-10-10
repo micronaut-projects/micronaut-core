@@ -67,9 +67,7 @@ A bean is retained when a policy retains it and none refuses it, whatever their 
 
 A bean is only retained when its class and everything it received, as the dependency graph records, come from the runtime classpath rather than the reloadable tier. A bean that holds an application class cannot survive a change to that class.
 
-A module declares which of its beans are retained with api:context.annotation.Retain[], on the bean's class or on the factory method that produces it. A module that defines a connection pool does so, so that a restart keeps the pool, and an in-memory database with it. The bean is dropped and created again when the configuration under one of the prefixes its `invalidatedBy` names changes.
-
-A configuration bean the retained bean received under one of those prefixes, such as its `@ConfigurationProperties`, does not keep it from being retained, and is not retained with it. Each generation binds it again, so the retained bean must copy the values it needs rather than keep the configuration bean.
+A module declares which of its beans are retained with api:context.annotation.Retain[], on the bean's class or on the factory method that produces it. A module that defines a connection pool does so, so that a restart keeps the pool, and an in-memory database with it.
 
 Set `micronaut.dev.retain-annotated=false` to retain only what `micronaut.dev.retain` names.
 
@@ -77,6 +75,20 @@ Two cases concern pools in particular:
 
 * A pool that a `BeanCreatedEventListener` wraps, as Micronaut Data wraps a data source, is retained as the listener received it, and wrapped again by the new context's listeners.
 * A pool is not retained when the factory that made it holds the application context, since destroying the factory would close it. The log says why.
+
+=== When a retained bean is released
+
+A retained bean is dropped and created again when the configuration it was made from changes. That configuration is found from the dependency graph: the prefix of every configuration bean in the retained bean's closure releases it without being named. A configuration bean here is a `@ConfigurationProperties`, an `@EachProperty` entry or another configuration reader, nested configuration included, that one of these received:
+
+* the bean;
+* the factory that produced it;
+* any singleton it holds.
+
+An `@EachProperty` entry counts under its own prefix, so a change of one entry releases only the beans made from it.
+
+`invalidatedBy` then only names what the bean reads outside configuration beans, such as a raw `@Property` or `@Value`. With an empty `invalidatedBy`, the bean is released by the configuration of its closure alone. The prefixes a policy's `observedConfigurationPrefixes` declares add to it in the same way.
+
+A configuration bean in the closure does not keep the bean from being retained, and is not retained with it. Each generation binds it again, so the retained bean must copy the values it needs rather than keep the configuration bean.
 
 == What the console shows
 
