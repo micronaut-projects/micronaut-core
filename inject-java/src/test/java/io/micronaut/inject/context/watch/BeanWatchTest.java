@@ -253,6 +253,20 @@ class BeanWatchTest {
     }
 
     @Test
+    void aMethodWatchLeavesTheConditionsOfBeansWithoutTheAnnotationUndecided() {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            List<ExecutableMethodChange<Tick>> changes = new ArrayList<>();
+            ((WatchableBeanContext) context).methods(Tick.class).watch(changes::add);
+            assertEquals(1, changes.size());
+
+            // the first batch, read while no Gate was registered, did not decide that the bean requiring one is
+            // disabled: registering a Gate makes it a bean, as it does without the watch
+            context.registerSingleton(new Gate());
+            assertEquals(1, context.getBeansOfType(GatedHandler.class).size());
+        }
+    }
+
+    @Test
     void aProcessorWrittenBeforeWatchesIsFedTheAdditionsThroughTheAdapter() {
         try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
             DefaultBeanContext beanContext = (DefaultBeanContext) context;
