@@ -128,11 +128,8 @@ public final class EventStreamDecoder {
         // eight bytes at a time, without reflection
         ByteBuffer words = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
         int start = offset;
-        while (true) {
-            int i = lineEnd(bytes, words, start, end);
-            if (i < 0) {
-                break;
-            }
+        int i;
+        while ((i = lineEnd(bytes, words, start, end)) >= 0) {
             byte b = bytes[i];
             if (b == LF && skipLineFeed && i == start && line.size() == 0) {
                 // the second half of a CRLF split between two pieces
