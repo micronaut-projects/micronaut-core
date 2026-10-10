@@ -194,15 +194,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
     protected final AtomicBoolean terminating = new AtomicBoolean(false);
     /**
-     * The thread running {@link #stop()} until the singletons are destroyed. Lookups made on it are made on behalf
-     * of a shutdown event listener or a destruction callback, and may resolve through existing dependency groups.
+     * Whether {@link #stop()} is still running its callbacks: the {@link ShutdownEvent} listeners and the destruction
+     * callbacks of the beans. Until the last of them returns, dependency groups may be created and resolved through,
+     * on any thread, and what they create is destroyed before the shutdown completes. Cleared, and read when recording
+     * a dependent, while holding {@link #shutdownDependents}.
      */
-    @SuppressWarnings("java:S3077") // only the reference is published and compared with the current thread
-    private volatile @Nullable Thread shutdownThread;
-    /** The thread publishing the {@link ShutdownEvent}, whose listeners may open new dependency groups. */
-    @SuppressWarnings("java:S3077") // only the reference is published and compared with the current thread
-    private volatile @Nullable Thread shutdownEventThread;
-    /** What dependency groups created during shutdown, destroyed before it completes. Confined to the shutdown thread. */
+    private volatile boolean shutdownCallbacksRunning;
+    /** What dependency groups created during shutdown, destroyed before it completes. Guarded by itself. */
     private final List<ShutdownDependent> shutdownDependents = new ArrayList<>();
 
     final BeanResolutionTraceMode traceMode;
@@ -470,14 +468,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Stopping BeanContext");
             }
-            shutdownThread = Thread.currentThread();
+            shutdownCallbacksRunning = true;
             try {
-                shutdownEventThread = Thread.currentThread();
-                try {
-                    publishEvent(new ShutdownEvent(this));
-                } finally {
-                    shutdownEventThread = null;
-                }
+                publishEvent(new ShutdownEvent(this));
                 attributes.clear();
 
                 // wait for parallel bean startup to finish so that the singletons it creates are
@@ -498,22 +491,30 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         .stream()
                         .filter(br -> !processed.contains(br.bean))
                         .toList();
-                    if (stragglers.isEmpty() && shutdownDependents.isEmpty()) {
-                        break;
-                    }
-                    if (pass == MAX_SHUTDOWN_PASSES) {
-                        if (LOG.isWarnEnabled()) {
-                            LOG.warn("Beans are still being created during shutdown after {} destruction passes. "
-                                + "Giving up, {} bean(s) will not be destroyed.", MAX_SHUTDOWN_PASSES,
-                                stragglers.size() + shutdownDependents.size());
+                    synchronized (shutdownDependents) {
+                        // a dependent recorded by another thread after the check above is destroyed by the next pass,
+                        // one recorded after the callbacks ended is rejected
+                        if (stragglers.isEmpty() && shutdownDependents.isEmpty()) {
+                            shutdownCallbacksRunning = false;
+                            break;
                         }
-                        shutdownDependents.clear();
-                        break;
+                        if (pass == MAX_SHUTDOWN_PASSES) {
+                            if (LOG.isWarnEnabled()) {
+                                LOG.warn("Beans are still being created during shutdown after {} destruction passes. "
+                                    + "Giving up, {} bean(s) will not be destroyed.", MAX_SHUTDOWN_PASSES,
+                                    stragglers.size() + shutdownDependents.size());
+                            }
+                            shutdownCallbacksRunning = false;
+                            shutdownDependents.clear();
+                            break;
+                        }
                     }
                     destroySingletons(stragglers, processed);
                 }
             } finally {
-                shutdownThread = null;
+                synchronized (shutdownDependents) {
+                    shutdownCallbacksRunning = false;
+                }
             }
 
             if (checkEnabledBeans != null) {
@@ -4482,25 +4483,35 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     @Override
     public <T> CreatedBean<T> createBeanRegistration(BeanDefinition<T> definition) {
         ArgumentUtils.requireNonNull(ARGUMENT_DEFINITION, definition);
-        if (isDependencyCreationClosed()) {
+        if (isDependencyResolutionClosed()) {
             throw new IllegalStateException("Cannot create a bean before the context is configured or after its shutdown has begun");
         }
         BeanRegistration<T> registration = createFreshRegistration(null, definition);
-        trackShutdownDependents(null, List.<BeanRegistration<?>>of(registration));
+        List<BeanRegistration<?>> created = List.of(registration);
+        try {
+            trackShutdownDependents(null, created);
+        } catch (IllegalStateException e) {
+            destroyCreatedBeans(created, e);
+            throw e;
+        }
         return registration;
     }
 
     @Override
     public BeanDependencyGroup createDependencyGroup() {
-        if (isDependencyCreationClosed()) {
+        if (isDependencyResolutionClosed()) {
             throw new IllegalStateException("Cannot create a dependency group before the context is configured or after its shutdown has begun");
         }
         return new DefaultBeanDependencyResolver(this);
     }
 
-    BeanRegistration<BeanDependencyResolver> newDependencyGroupRegistration(@Nullable DefaultBeanResolutionContext destructionContext) {
-        return BeanRegistration.of(this, BeanIdentifier.of(BeanDependencyResolver.class.getName()),
-            dependencyResolverDefinition, new DefaultBeanDependencyResolver(this, new DefaultBeanDependencies(destructionContext)));
+    BeanRegistration<BeanDependencyResolver> newDependencyGroupRegistration(DefaultBeanDependencies parent,
+                                                                            @Nullable DefaultBeanResolutionContext destructionContext) {
+        DefaultBeanDependencyResolver group = new DefaultBeanDependencyResolver(this, new DefaultBeanDependencies(destructionContext));
+        BeanRegistration<BeanDependencyResolver> registration = BeanRegistration.of(this,
+            BeanIdentifier.of(BeanDependencyResolver.class.getName()), dependencyResolverDefinition, group);
+        group.ownedBy(parent, registration);
+        return registration;
     }
 
     boolean isContextConfigured() {
@@ -4508,26 +4519,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     /**
-     * Whether lookups through an existing dependency group or resolver are rejected: before the context is configured,
-     * after it stopped, and during shutdown on any thread but the one running it. On that thread every lookup is made
-     * on behalf of a shutdown event listener or a destruction callback, and what it creates is destroyed before the
-     * shutdown completes.
+     * Whether new groups and fresh registrations, and lookups through existing dependency groups and resolvers, are
+     * rejected: before the context is configured, and once shutdown has begun, except while it runs its callbacks.
+     * Those lookups are made on behalf of a shutdown event listener or a destruction callback, possibly on a thread
+     * the callback waits for, and what they create is destroyed before the shutdown completes.
      *
      * @return Whether the lookups are rejected
      */
     boolean isDependencyResolutionClosed() {
-        return !configured.get() || terminating.get() && shutdownThread != Thread.currentThread();
-    }
-
-    /**
-     * Whether new top-level ownership, an independent group or a fresh registration, is rejected. During shutdown only
-     * a listener of the {@link ShutdownEvent} may start it; a destruction callback uses the dependencies of its own
-     * invocation instead.
-     *
-     * @return Whether new top-level ownership is rejected
-     */
-    private boolean isDependencyCreationClosed() {
-        return !configured.get() || terminating.get() && shutdownEventThread != Thread.currentThread();
+        return !configured.get() || terminating.get() && !shutdownCallbacksRunning;
     }
 
     /**
@@ -4535,9 +4535,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      *
      * @param owner The dependencies that own the registrations, or null when the caller of the context owns them
      * @param created The registrations
+     * @throws IllegalStateException if the shutdown callbacks have ended, the caller then destroys the registrations
      */
     void trackShutdownDependents(@Nullable DefaultBeanDependencies owner, List<BeanRegistration<?>> created) {
-        if (!created.isEmpty() && shutdownThread == Thread.currentThread()) {
+        if (created.isEmpty() || !terminating.get()) {
+            return;
+        }
+        synchronized (shutdownDependents) {
+            if (!shutdownCallbacksRunning) {
+                throw new IllegalStateException("Cannot resolve a dependency after the context shutdown callbacks have completed");
+            }
             for (BeanRegistration<?> registration : created) {
                 shutdownDependents.add(new ShutdownDependent(owner, registration));
             }
@@ -4549,9 +4556,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * destroyed with its owner, or released by it, is skipped.
      */
     private void destroyShutdownDependents() {
-        while (!shutdownDependents.isEmpty()) {
-            List<ShutdownDependent> taken = List.copyOf(shutdownDependents);
-            shutdownDependents.clear();
+        while (true) {
+            List<ShutdownDependent> taken;
+            synchronized (shutdownDependents) {
+                if (shutdownDependents.isEmpty()) {
+                    return;
+                }
+                taken = List.copyOf(shutdownDependents);
+                shutdownDependents.clear();
+            }
             for (int i = taken.size() - 1; i >= 0; i--) {
                 ShutdownDependent dependent = taken.get(i);
                 try {
