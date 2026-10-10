@@ -294,6 +294,8 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
                     // no demand: nothing more is read from the input
                     break;
                 }
+                // Observe completion before taking the last piece published before it.
+                boolean ended = inputEnded;
                 I next = piece.getAndSet(null);
                 if (next != null) {
                     // the request is answered when the drain takes the piece, not in onNext: only the drain touches the flag
@@ -305,7 +307,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
                     }
                     continue;
                 }
-                if (inputEnded || readerFailure != null) {
+                if (ended || readerFailure != null) {
                     if (!readerCompleted) {
                         readerCompleted = true;
                         completeReader();

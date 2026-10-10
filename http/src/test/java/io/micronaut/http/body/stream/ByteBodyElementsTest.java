@@ -14,6 +14,9 @@ import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -66,6 +69,28 @@ class ByteBodyElementsTest {
     }
 
     @Test
+    void inputDeliveryDoesNotWaitForWorkerDecoding() throws Exception {
+        Sinks.Many<ReadBuffer> input = Sinks.many().unicast().onBackpressureBuffer();
+        RacingReader reader = new RacingReader();
+        try (ByteBodyElements<String> elements = new ByteBodyElements<>(BODIES.adapt(input.asFlux()), reader, e -> e)) {
+            var first = elements.next().toCompletableFuture();
+            input.tryEmitNext(ReadBufferFactoryHolder.copyOf("a,b"));
+            assertEquals(Optional.of("a"), first.get(1, TimeUnit.SECONDS));
+            reader.blockOnPoll = true;
+            CompletableFuture<String> decoded = CompletableFuture.supplyAsync(elements::poll);
+            try {
+                assertTrue(reader.decoding.await(1, TimeUnit.SECONDS));
+                CompletableFuture.runAsync(() -> elements.onNext(ReadBufferFactoryHolder.copyOf("c")))
+                    .get(1, TimeUnit.SECONDS);
+            } finally {
+                reader.resume.countDown();
+            }
+            assertEquals("b", decoded.get(1, TimeUnit.SECONDS));
+            assertEquals(Optional.of("c"), elements.next().toCompletableFuture().get(1, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
     void onePieceIsReceivedAhead() {
         Sinks.Many<ReadBuffer> input = Sinks.many().unicast().onBackpressureBuffer();
         for (String piece : List.of("a", "b", "c", "d", "e")) {
@@ -100,6 +125,9 @@ class ByteBodyElementsTest {
         private final ArrayDeque<String> words = new ArrayDeque<>();
         ByteBodyElements<String> elements;
         volatile boolean raceOnPoll;
+        volatile boolean blockOnPoll;
+        final CountDownLatch decoding = new CountDownLatch(1);
+        final CountDownLatch resume = new CountDownLatch(1);
         int pieces;
 
         @Override
@@ -118,14 +146,27 @@ class ByteBodyElementsTest {
         @Override
         public @Nullable String poll() {
             String word = words.poll();
+            if (word != null && blockOnPoll) {
+                blockOnPoll = false;
+                decoding.countDown();
+                try {
+                    assertTrue(resume.await(5, TimeUnit.SECONDS));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new AssertionError(e);
+                }
+            }
             if (word != null && raceOnPoll) {
                 raceOnPoll = false;
                 Thread completer = new Thread(elements::onComplete);
                 completer.start();
-                // the completer waits for the lock this poll holds
-                while (completer.getState() != Thread.State.BLOCKED && completer.isAlive()) {
-                    Thread.onSpinWait();
+                try {
+                    completer.join(1000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new AssertionError(e);
                 }
+                assertTrue(!completer.isAlive(), "Input completion must not wait for decoding");
             }
             return word;
         }

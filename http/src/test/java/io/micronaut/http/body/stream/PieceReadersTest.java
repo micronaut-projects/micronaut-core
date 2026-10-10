@@ -172,6 +172,30 @@ class PieceReadersTest {
     }
 
     @Test
+    void boundedReadChunkedPreservesTheLegacyBufferAdapter() {
+        ChunkedMessageBodyReader<String> reader = new ChunkedMessageBodyReader<>() {
+            @Override
+            public Publisher<? extends String> readChunked(Argument<String> type, @Nullable MediaType mediaType,
+                                                          Headers headers, Publisher<ByteBuffer<?>> input) {
+                return Flux.from(input).map(buffer -> buffer.toString(StandardCharsets.UTF_8));
+            }
+
+            @Override
+            public PieceReader<String> openPieceReader(Argument<String> type, @Nullable MediaType mediaType,
+                                                       Headers headers, long maxElementSize) {
+                throw new AssertionError("The legacy adapter must be used");
+            }
+
+            @Override
+            public String read(Argument<String> type, @Nullable MediaType mediaType, Headers headers, InputStream input) {
+                throw new UnsupportedOperationException();
+            }
+        };
+        assertEquals(List.of("one", "two"), Flux.from(reader.readChunked(Argument.STRING,
+            MediaType.TEXT_PLAIN_TYPE, HEADERS, Flux.just(buffer("one"), buffer("two")), 10)).collectList().block());
+    }
+
+    @Test
     void aReaderWithNeitherMethodFails() {
         ChunkedMessageBodyReader<String> neither = new ChunkedMessageBodyReader<>() {
             @Override
@@ -195,6 +219,56 @@ class PieceReadersTest {
         recorder.request(5);
         assertEquals(List.of(0, 1, 2), recorder.elements);
         assertTrue(recorder.complete);
+        assertTrue(closed.get());
+    }
+
+    @Test
+    void thePublisherCompletesAndClosesWithoutExtraDemand() {
+        AtomicInteger closes = new AtomicInteger();
+        BodyElements<Integer> elements = new BodyElements<>() {
+            private boolean taken;
+
+            @Override
+            public CompletionStage<Optional<Integer>> next() {
+                throw new AssertionError("The element is available without a stage");
+            }
+
+            @Override
+            public Integer poll() {
+                taken = true;
+                return 1;
+            }
+
+            @Override
+            public State state() {
+                return taken ? State.COMPLETED : State.AVAILABLE;
+            }
+
+            @Override
+            public void close() {
+                closes.incrementAndGet();
+            }
+        };
+        Recorder<Integer> recorder = new Recorder<>();
+        new BodyElementsPublisher<>(elements).subscribe(recorder);
+        recorder.request(1);
+        assertEquals(List.of(1), recorder.elements);
+        assertTrue(recorder.complete);
+        recorder.subscription.cancel();
+        assertEquals(1, closes.get());
+    }
+
+    @Test
+    void failingElementsAreClosedAndKeepTheOriginalFailure() {
+        RuntimeException failure = new IllegalStateException("read failed");
+        RuntimeException closeFailure = new IllegalStateException("close failed");
+        Recorder<Integer> recorder = new Recorder<>();
+        new BodyElementsPublisher<Integer>(BodyElements.of(() -> CompletableFuture.failedStage(failure), () -> {
+            throw closeFailure;
+        })).subscribe(recorder);
+        recorder.request(1);
+        assertEquals(failure, recorder.failure);
+        assertEquals(List.of(closeFailure), List.of(failure.getSuppressed()));
     }
 
     @Test
