@@ -20,7 +20,6 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.ConfigurableBeanContext;
 import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.inject.BeanDefinition;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.LinkedHashSet;
@@ -34,7 +33,6 @@ import java.util.Set;
  * @author graemerocher
  * @since 5.3.0
  */
-@NullMarked
 final class ConfigurationStaleness {
 
     private ConfigurationStaleness() {

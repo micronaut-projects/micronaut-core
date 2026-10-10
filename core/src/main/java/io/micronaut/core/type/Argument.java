@@ -271,7 +271,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * <p>The comparison reads what the arguments carry. The annotation processors write a variable the same way
      * wherever it is used as a parameter, a return type, a field or a type argument, so those compare the same.
      * A recursively bounded variable read out of the bounds of another variable, the {@code U} that
-     * {@code getBounds()} answers for {@code T extends U} where {@code U extends Comparable<U>}, is not always
+     * {@code getBounds()} answers for {@code T extends U} where <code>U extends Comparable&lt;U&gt;</code>, is not always
      * written the way a {@code U} argument is, and may compare different from it.</p>
      *
      * @param other The other argument
@@ -433,6 +433,35 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      */
     default Argument<T> withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return Argument.of(getType(), getName(), annotationMetadata, getTypeParameters());
+    }
+
+    /**
+     * Creates a copy of this argument with different type parameters, written the way this argument was: a
+     * wildcard stays a wildcard with its upper and lower bounds, a type variable keeps its variable name, its
+     * bounds and whether it {@link GenericPlaceholder#isResolved() is resolved}, a raw type stays raw and an array
+     * stays an array, the type parameters given being those of its component. The name and the annotation
+     * metadata are kept, {@link #withAnnotationMetadata(AnnotationMetadata)} replaces the latter.
+     *
+     * @param typeParameters The type parameters
+     * @return A new argument
+     * @since 5.3.0
+     */
+    @Experimental
+    default Argument<T> withTypeParameters(Argument<?>... typeParameters) {
+        if (this instanceof WildcardArgument<?> wildcard) {
+            return Argument.ofWildcard(getType(), getName(), getAnnotationMetadata(), typeParameters,
+                wildcard.getUpperBounds().toArray(ZERO_ARGUMENTS), wildcard.getLowerBounds().toArray(ZERO_ARGUMENTS));
+        }
+        if (this instanceof GenericPlaceholder<?> placeholder) {
+            Argument<?>[] bounds = placeholder.getBounds().toArray(ZERO_ARGUMENTS);
+            return placeholder.isResolved()
+                ? Argument.ofResolvedTypeVariable(getType(), getName(), placeholder.getVariableName(), getAnnotationMetadata(), typeParameters, bounds)
+                : Argument.ofTypeVariable(getType(), getName(), placeholder.getVariableName(), getAnnotationMetadata(), typeParameters, bounds);
+        }
+        if (isRawType()) {
+            return Argument.ofRawType(getType(), getName(), getAnnotationMetadata(), typeParameters);
+        }
+        return Argument.of(getType(), getName(), getAnnotationMetadata(), typeParameters);
     }
 
     /**

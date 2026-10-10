@@ -2609,20 +2609,22 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 .ofType(arrayOfClasses)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
                 .build();
-            initStatements.add(
-                beanDefinitionTypeDef.getStaticField(indexesField).put(
-                    arrayOfClasses.instantiate(
-                        indexedTypeNames.stream().map(this::asClassExpression).toArray(ExpressionDef[]::new)
+            VariableDef.StaticField staticFieldIndexes = beanDefinitionTypeDef.getStaticField(indexesField);
+            // Like the exposed types, the indexes only make the bean enumerable, so a missing type does not fail the bean
+            statements.add(StatementDef.doTry(
+                    staticFieldIndexes.put(
+                        arrayOfClasses.instantiate(
+                            indexedTypeNames.stream().map(this::asClassExpression).toArray(ExpressionDef[]::new)
+                        )
                     )
-                )
+                ).doCatch(Throwable.class,
+                    exceptionVar -> staticFieldIndexes.put(arrayOfClasses.instantiate()))
             );
 
             classDefBuilder.addField(indexesField);
             classDefBuilder.addMethod(
                 MethodDef.override(GET_INDEXES_METHOD).build((aThis, methodParameters) -> aThis.type().getStaticField(indexesField).returning())
             );
-
-            failStatements.add(beanDefinitionTypeDef.getStaticField(indexesField).put(arrayOfClasses.instantiate()));
         }
 
         statements.add(
