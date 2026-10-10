@@ -122,6 +122,7 @@ public class ServerBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T
     }
 
     @Override
+    @SuppressWarnings("java:S1181") // Decoder failures, including errors, must complete the pending binding.
     public BindingResult<T> bindFullBody(ArgumentConversionContext<T> context, HttpRequest<?> source) {
         ServerHttpRequest<?> server = bodyOf(source);
         if (server == null) {
@@ -209,6 +210,7 @@ public class ServerBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T
         return reader;
     }
 
+    @SuppressWarnings("java:S1181") // Close the untransferred body before rethrowing a decoder error.
     private ExecutionFlow<Optional<T>> transform(HttpRequest<?> request, ServerHttpRequest<?> server, ArgumentConversionContext<T> context, @Nullable MessageBodyReader<T> reader, AvailableByteBody imm) {
         FormCapableHttpRequest<?> formRequest = formRequest(server);
         MediaType mediaType = request.getContentType().orElse(null);
