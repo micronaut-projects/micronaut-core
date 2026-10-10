@@ -199,9 +199,13 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 return;
             }
 
-            Optional<UriRouteMatch<Object, Object>> optionalRoute = router.find(HttpMethod.GET, msg.getPath(), msg)
-                .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
-                .findFirst();
+            // the conditions of the route, e.g. a @RouteCondition, which reads the request of the
+            // context, apply to the upgrade request
+            Optional<UriRouteMatch<Object, Object>> optionalRoute = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(msg))
+                .propagate(() -> router.<Object, Object>find(HttpMethod.GET, msg.getPath(), msg)
+                    .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
+                    .filter(rm -> rm.getRouteInfo().matching(msg))
+                    .findFirst());
 
             WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, optionalRoute.orElse(null));
             ExecutionFlow<HttpResponse<?>> responseFlow = ExecutionFlow.async(

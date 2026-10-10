@@ -30,6 +30,7 @@ import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -45,7 +46,7 @@ import java.util.Set;
 @Requires(classes = {ServerWebSocket.class, WebSocketBeanRegistry.class})
 public class ServerWebSocketProcessor extends DefaultRouteBuilder implements BeanDefinitionProcessor<ServerWebSocket> {
 
-    private Set<Class<?>> mappedWebSockets = new HashSet<>(4);
+    private final Set<Class<?>> mappedWebSockets = new HashSet<>(4);
 
     /**
      * Default constructor.
@@ -64,18 +65,40 @@ public class ServerWebSocketProcessor extends DefaultRouteBuilder implements Bea
         if (mappedWebSockets.contains(beanType)) {
             return;
         }
+        ExecutableMethod<?, ?> target = routeTarget(beanDefinition);
+        if (target == null) {
+            return;
+        }
+        mappedWebSockets.add(beanType);
+        String uri = beanDefinition.stringValue(ServerWebSocket.class).orElse("/ws");
 
+        // a single route per WebSocket, which only an upgrade request matches: a plain HTTP
+        // request to the same path is left to the other routes
+        UriRoute route = GET(uri, target).where(WebSocketUpgradeCondition.INSTANCE);
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Created WebSocket: {}", route);
+        }
+    }
+
+    /**
+     * The method the route of a WebSocket targets: the {@link OnOpen} method, which the upgrade
+     * request opens the WebSocket with, or else the {@link OnMessage} method. Its annotations are
+     * the annotations of the route, e.g. for filters and route conditions.
+     *
+     * @param beanDefinition The bean definition of the WebSocket
+     * @return The method, or {@code null} if the WebSocket has neither
+     */
+    private static @Nullable ExecutableMethod<?, ?> routeTarget(BeanDefinition<?> beanDefinition) {
+        ExecutableMethod<?, ?> onMessage = null;
         for (ExecutableMethod<?, ?> method : beanDefinition.getExecutableMethods()) {
-            if (method.isAnnotationPresent(OnMessage.class) || method.isAnnotationPresent(OnOpen.class)) {
-                mappedWebSockets.add(beanType);
-                String uri = beanDefinition.stringValue(ServerWebSocket.class).orElse("/ws");
-
-                UriRoute route = GET(uri, method);
-
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Created WebSocket: {}", route);
-                }
+            if (method.isAnnotationPresent(OnOpen.class)) {
+                return method;
+            }
+            if (onMessage == null && method.isAnnotationPresent(OnMessage.class)) {
+                onMessage = method;
             }
         }
+        return onMessage;
     }
 }
