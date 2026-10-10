@@ -513,7 +513,8 @@ public final class DevManifest {
     /**
      * How long a request that arrives while a batch is processed is held, {@value #REQUESTS_HOLD_TIMEOUT}: it is
      * served once the batch is done, by the generation that runs then, or answered with a 503 and a {@code Retry-After}
-     * when the batch takes longer. 30 seconds by default.
+     * when the batch takes longer. 30 seconds by default; the application's configuration may set it when the manifest
+     * does not (see {@link #sets(String)}).
      *
      * @return The timeout
      */
@@ -524,12 +525,28 @@ public final class DevManifest {
     /**
      * How long a restart waits for the requests in flight on the stopping generation, {@value #REQUESTS_DRAIN_TIMEOUT}:
      * they finish on the generation they started on. 10 seconds by default: a connection that never finishes, such as a
-     * websocket or an event stream, holds each restart this long.
+     * websocket or an event stream, holds each restart this long. The application's configuration may set it when the
+     * manifest does not (see {@link #sets(String)}).
      *
      * @return The timeout
      */
     public Duration requestDrainTimeout() {
         return requestDrainTimeout;
+    }
+
+    /**
+     * Whether the manifest, or a system property of the same name, sets a key rather than leaving it to its default. A
+     * setting the application's configuration may give as well, such as {@value #REQUESTS_HOLD_TIMEOUT} and
+     * {@value #REQUESTS_DRAIN_TIMEOUT}, is taken from the application only when the manifest leaves it out: what the
+     * launcher was told wins.
+     *
+     * @param key The key, with the {@code micronaut.dev.} prefix
+     * @return True when the manifest gives the key a value
+     * @since 5.3.0
+     */
+    public boolean sets(String key) {
+        String value = properties.getProperty(key);
+        return value != null && !value.isBlank();
     }
 
     /**

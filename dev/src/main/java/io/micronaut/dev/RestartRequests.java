@@ -60,8 +60,14 @@ final class RestartRequests implements RequestAdmission {
     private static final Logger LOG = LoggerFactory.getLogger(DevRuntime.class);
     private static final Duration SERVER_START_WAIT = Duration.ofSeconds(10);
 
-    private final Duration holdTimeout;
-    private final Duration drainTimeout;
+    private final DevManifest manifest;
+    /**
+     * The timeouts in force: the manifest's when it sets them, otherwise the running generation's configuration's,
+     * otherwise the defaults. Read again when a generation starts and when a batch is done, so that a configuration
+     * refreshed in place counts too; never per request.
+     */
+    private volatile Duration holdTimeout;
+    private volatile Duration drainTimeout;
     private final @Nullable DevServerSockets serverSockets;
     /**
      * Completes when the requests the gate holds may proceed: when the batch is done, or when a restart drains the
@@ -74,6 +80,7 @@ final class RestartRequests implements RequestAdmission {
      * @param retainSockets Whether the listening sockets are kept bound across generations
      */
     RestartRequests(DevManifest manifest, boolean retainSockets) {
+        this.manifest = manifest;
         this.holdTimeout = manifest.requestHoldTimeout();
         this.drainTimeout = manifest.requestDrainTimeout();
         this.serverSockets = retainSockets ? new DevServerSockets() : null;
@@ -131,11 +138,14 @@ final class RestartRequests implements RequestAdmission {
     }
 
     /**
-     * The batch is done: the servers accept again, and the requests it held proceed.
+     * The batch is done: the timeouts follow the configuration of the generation that runs now, which the batch may
+     * have refreshed in place, the servers accept again, and the requests it held proceed.
      *
      * @param admission The admission {@link #batchStarted()} returned
+     * @param running The generation running now, if any
      */
-    void batchDone(CompletableFuture<Void> admission) {
+    void batchDone(CompletableFuture<Void> admission, @Nullable ApplicationContext running) {
+        configure(running);
         DevServerSockets sockets = serverSockets;
         if (sockets != null) {
             sockets.resume();
@@ -186,6 +196,9 @@ final class RestartRequests implements RequestAdmission {
      * @return Whether the generation's context defines an HTTP server, for the runtime to tell whether it runs
      */
     boolean started(ApplicationContext fresh, BooleanSupplier current, BooleanSupplier launching) {
+        if (current.getAsBoolean()) {
+            configure(fresh);
+        }
         // the servers are created after the context starts: the definition says one is coming before any is registered,
         // and a retained socket is bound only once a server claimed it. Looked up first: a context whose server
         // cannot bind stops again, and then no longer tells
@@ -206,6 +219,40 @@ final class RestartRequests implements RequestAdmission {
             awaitServers(fresh, launching);
         }
         return definesServer;
+    }
+
+    /**
+     * Takes the hold and drain timeouts the manifest leaves out from a generation's configuration,
+     * {@value DevManifest#REQUESTS_HOLD_TIMEOUT} and {@value DevManifest#REQUESTS_DRAIN_TIMEOUT} in
+     * {@code application.properties} for instance: the manifest wins, then the application, then the defaults. A value
+     * that is not a duration, or is negative, is ignored with a warning.
+     *
+     * @param generation The generation, or null when none runs, which leaves the timeouts as they are
+     */
+    void configure(@Nullable ApplicationContext generation) {
+        if (generation == null) {
+            return;
+        }
+        holdTimeout = configured(generation, DevManifest.REQUESTS_HOLD_TIMEOUT, manifest.requestHoldTimeout());
+        drainTimeout = configured(generation, DevManifest.REQUESTS_DRAIN_TIMEOUT, manifest.requestDrainTimeout());
+    }
+
+    private Duration configured(ApplicationContext generation, String key, Duration fromManifest) {
+        if (manifest.sets(key)) {
+            return fromManifest;
+        }
+        try {
+            Optional<Duration> value = generation.getEnvironment().getProperty(key, Duration.class);
+            if (value.isPresent() && value.get().isNegative()) {
+                LOG.warn("Ignoring the negative {} of the application's configuration: {}", key, value.get());
+                return fromManifest;
+            }
+            return value.orElse(fromManifest);
+        } catch (RuntimeException e) {
+            // not a duration, or a context stopped meanwhile: the default holds
+            LOG.warn("Ignoring the {} of the application's configuration: {}", key, e.getMessage());
+            return fromManifest;
+        }
     }
 
     /**
@@ -233,7 +280,7 @@ final class RestartRequests implements RequestAdmission {
 
     /**
      * Shuts the HTTP servers of a generation down gracefully before the context stops: they stop accepting, close their
-     * idle connections, and let every request in flight finish, within {@link DevManifest#requestDrainTimeout()}. A
+     * idle connections, and let every request in flight finish, within {@link #drainTimeout()}. A
      * request that would otherwise still run while the context destroys its beans fails half way through.
      */
     private void drain(ApplicationContext context, int generation) {

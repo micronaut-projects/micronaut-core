@@ -16,7 +16,6 @@
 package io.micronaut.dev;
 
 import io.micronaut.context.reload.ResourceKind;
-import io.micronaut.dev.DevRuntime.SourceChanges;
 import io.micronaut.dev.compile.SourceKind;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;

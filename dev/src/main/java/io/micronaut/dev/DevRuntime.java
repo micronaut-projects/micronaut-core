@@ -1197,12 +1197,13 @@ public final class DevRuntime implements Closeable {
             } catch (Throwable e) {
                 LOG.error("Reload failed: {}", e.getMessage(), e);
             } finally {
+                // the timeouts follow the generation's configuration before whoever awaits the batch sees it done
+                requests.batchDone(admission, context);
                 long last = 0;
                 for (Pending batch : batches) {
                     last = Math.max(last, batch.sequence);
                 }
                 completed.accumulateAndGet(last, Math::max);
-                requests.batchDone(admission);
                 gate.complete(null);
             }
         }
@@ -1222,7 +1223,7 @@ public final class DevRuntime implements Closeable {
      */
     CompileRound compileRound(DevManifest target, Map<SourceKind, SourceKind> joint, Map<SourceKind, SourceChanges> changes, boolean full, Set<String> seed) {
         Map<SourceKind, SourceChanges> sources = new EnumMap<>(SourceKind.class);
-        changes.forEach((kind, change) -> sources.merge(joint.getOrDefault(kind, kind), change, SourceChanges::merge));
+        changes.forEach((kind, change) -> sources.merge(joint.getOrDefault(kind, kind), change.settled(), SourceChanges::merge));
         // what another compilation changed reaches every language, as the changes of this batch do
         Set<SourceKind> kinds = full || !seed.isEmpty() ? compilers.keySet() : sources.keySet();
         boolean compiled = false;
@@ -1972,27 +1973,6 @@ public final class DevRuntime implements Closeable {
     record CompileRound(@Nullable CompileFailure failure, boolean compiled, Set<SourceKind> compiledKinds, Set<String> affectedClasses) {
         static CompileRound failed(CompileFailure failure) {
             return new CompileRound(failure, false, Set.of(), Set.of());
-        }
-    }
-
-    /**
-     * The changed and deleted files of one language or resource kind.
-     *
-     * @param changed The files added or modified
-     * @param deleted The files deleted
-     */
-    record SourceChanges(Set<Path> changed, Set<Path> deleted) {
-        static final SourceChanges NONE = new SourceChanges(Set.of(), Set.of());
-
-        SourceChanges merge(SourceChanges other) {
-            Set<Path> allChanged = new LinkedHashSet<>(changed);
-            allChanged.addAll(other.changed);
-            Set<Path> allDeleted = new LinkedHashSet<>(deleted);
-            allDeleted.addAll(other.deleted);
-            // the later batch wins: a file deleted then written again is a change, a file written then deleted is gone
-            allChanged.removeAll(other.deleted);
-            allDeleted.removeAll(other.changed);
-            return new SourceChanges(allChanged, allDeleted);
         }
     }
 }

@@ -98,8 +98,8 @@ final class TestSession {
     // what changed and no complete run has covered yet: a run cancelled, or not run while watching was off, leaves it owed
     private final Set<String> owedChanges = new LinkedHashSet<>();
     private boolean owedAll;
-    private final Map<SourceKind, DevRuntime.SourceChanges> retrySources = new LinkedHashMap<>();
-    private final Map<SourceKind, DevRuntime.SourceChanges> retryTestSources = new LinkedHashMap<>();
+    private final Map<SourceKind, SourceChanges> retrySources = new LinkedHashMap<>();
+    private final Map<SourceKind, SourceChanges> retryTestSources = new LinkedHashMap<>();
     // the class files as the last batch left them: the dependency indexes, the test classes, and the classes declaring constants
     private List<ClassDependencyIndex> indexes = List.of();
     private Set<String> knownTestClasses = Set.of();
@@ -157,11 +157,11 @@ final class TestSession {
     /**
      * Compiles a batch's changes and runs the tests they affect, or those asked for.
      */
-    void handle(Map<SourceKind, DevRuntime.SourceChanges> sources, Map<SourceKind, DevRuntime.SourceChanges> testSources,
-                Map<ResourceKind, DevRuntime.SourceChanges> resources, boolean full, @Nullable TestRequest requested) {
+    void handle(Map<SourceKind, SourceChanges> sources, Map<SourceKind, SourceChanges> testSources,
+                Map<ResourceKind, SourceChanges> resources, boolean full, @Nullable TestRequest requested) {
         // the sources of a batch that did not compile are compiled again with the next one, a request included
-        Map<SourceKind, DevRuntime.SourceChanges> allSources;
-        Map<SourceKind, DevRuntime.SourceChanges> allTestSources;
+        Map<SourceKind, SourceChanges> allSources;
+        Map<SourceKind, SourceChanges> allTestSources;
         Set<String> previousConstants;
         synchronized (this) {
             allSources = merge(retrySources, sources);
@@ -271,10 +271,10 @@ final class TestSession {
         run(selection, true);
     }
 
-    private static Map<SourceKind, DevRuntime.SourceChanges> merge(Map<SourceKind, DevRuntime.SourceChanges> first, Map<SourceKind, DevRuntime.SourceChanges> second) {
-        Map<SourceKind, DevRuntime.SourceChanges> merged = new LinkedHashMap<>();
+    private static Map<SourceKind, SourceChanges> merge(Map<SourceKind, SourceChanges> first, Map<SourceKind, SourceChanges> second) {
+        Map<SourceKind, SourceChanges> merged = new LinkedHashMap<>();
         merged.putAll(first);
-        second.forEach((kind, changes) -> merged.merge(kind, changes, DevRuntime.SourceChanges::merge));
+        second.forEach((kind, changes) -> merged.merge(kind, changes, SourceChanges::merge));
         return merged;
     }
 
@@ -616,7 +616,7 @@ final class TestSession {
         }
     }
 
-    private void compilationFailed(CompileFailure failure, Map<SourceKind, DevRuntime.SourceChanges> sources, Map<SourceKind, DevRuntime.SourceChanges> testSources) {
+    private void compilationFailed(CompileFailure failure, Map<SourceKind, SourceChanges> sources, Map<SourceKind, SourceChanges> testSources) {
         runtime.compilationFailed(failure);
         synchronized (this) {
             compileFailed = true;
