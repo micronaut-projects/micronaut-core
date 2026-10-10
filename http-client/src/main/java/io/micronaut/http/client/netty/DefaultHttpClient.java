@@ -39,6 +39,7 @@ import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.AsyncHttpClient;
+import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
@@ -48,6 +49,7 @@ import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.sse.Event;
+import io.micronaut.websocket.AsyncWebSocketClient;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.ChannelFactory;
@@ -84,7 +86,7 @@ public class DefaultHttpClient implements
     AutoCloseable {
 
     private final NettyHttpClient nettyHttpClient;
-    private final AsyncHttpClient asyncHttpClient;
+    private final AsyncStreamingHttpClient asyncHttpClient;
 
     DefaultHttpClient(DefaultHttpClientBuilder builder) {
         this(builder.nettyBuilder().build());
@@ -480,8 +482,18 @@ public class DefaultHttpClient implements
     }
 
     @Override
+    public AsyncStreamingHttpClient toAsyncStreaming() {
+        return asyncHttpClient;
+    }
+
+    @Override
     public AsyncRawHttpClient toAsyncRaw() {
         return nettyHttpClient.toAsyncRaw();
+    }
+
+    @Override
+    public AsyncWebSocketClient toAsyncWebSocket() {
+        return nettyHttpClient.toAsyncWebSocket();
     }
 
     @Override
