@@ -3,9 +3,14 @@ package io.micronaut.websocket
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.annotation.RouteCondition
 import io.micronaut.http.annotation.ServerFilter
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.server.annotation.PreMatching
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
@@ -30,6 +35,10 @@ class WebsocketRouteLookupErrorSpec extends Specification {
     @Inject
     EmbeddedServer embeddedServer
 
+    @Inject
+    @Client("/")
+    HttpClient httpClient
+
     @Timeout(30)
     void "a route condition that fails answers the upgrade request with an error"() {
         given:
@@ -42,6 +51,11 @@ class WebsocketRouteLookupErrorSpec extends Specification {
         then:
         WebSocketClientException e = thrown()
         e.message.contains("500")
+    }
+
+    void "a plain request does not evaluate the route condition of the WebSocket"() {
+        expect:
+        httpClient.toBlocking().retrieve(HttpRequest.GET("/route-lookup/failing")) == "fallback"
     }
 
     void "the route of the WebSocket is matched after the pre-matching filters"() {
@@ -74,6 +88,15 @@ class WebsocketRouteLookupErrorSpec extends Specification {
         @OnMessage
         void onMessage(String message, WebSocketSession session) {
             session.sendSync("echo " + message)
+        }
+    }
+
+    @Requires(property = "spec.name", value = "WebsocketRouteLookupErrorSpec")
+    @Controller("/route-lookup")
+    static class FallbackController {
+        @Get(value = "/failing", produces = MediaType.TEXT_PLAIN)
+        String fallback() {
+            "fallback"
         }
     }
 

@@ -414,9 +414,9 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     }
 
     private static final class WebsocketRequestLifecycle extends RequestLifecycle {
-        private final Router router;
-
         boolean shouldProceedNormally;
+
+        private final Router router;
         @Nullable
         private NettyHttpRequest<?> nettyRequest;
         @Nullable

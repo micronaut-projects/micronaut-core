@@ -24,7 +24,9 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.DefaultRouteBuilder;
+import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.UriRoute;
+import io.micronaut.web.router.builder.RouteCondition;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
@@ -73,8 +75,15 @@ public class ServerWebSocketProcessor extends DefaultRouteBuilder implements Bea
         String uri = beanDefinition.stringValue(ServerWebSocket.class).orElse("/ws");
 
         // a single route per WebSocket, which only an upgrade request matches: a plain HTTP
-        // request to the same path is left to the other routes
-        UriRoute route = GET(uri, target).where(WebSocketUpgradeCondition.INSTANCE);
+        // request to the same path is left to the other routes. The upgrade condition is a
+        // declared condition of the route, which is tested before the @RouteCondition of the
+        // method, so that a plain request never evaluates the conditions of the WebSocket
+        UriRoute route = GET(uri, target);
+        if (route instanceof RouteAssembly.DefaultUriRoute defaultRoute) {
+            defaultRoute.settings().where(RouteCondition.custom(WebSocketUpgradeCondition.INSTANCE));
+        } else {
+            route = route.where(WebSocketUpgradeCondition.INSTANCE);
+        }
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("Created WebSocket: {}", route);
