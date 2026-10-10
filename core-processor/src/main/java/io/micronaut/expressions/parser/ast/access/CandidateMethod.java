@@ -326,7 +326,7 @@ final class CandidateMethod {
 
     private ClassElement getParameterType(int index) {
         if (isVarArgs() && index >= varargsIndex) {
-            return getLastParameter().fromArray();
+            return parameterTypes.get(varargsIndex).fromArray();
         }
         return parameterTypes.get(index);
     }
