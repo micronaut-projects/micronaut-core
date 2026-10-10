@@ -18,7 +18,6 @@ package io.micronaut.dev.test;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -35,7 +34,6 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Internal
-@NullMarked
 public final class TestFileNames {
 
     private static final Set<SourceKind> JVM_KINDS = Set.of(SourceKind.JAVA, SourceKind.KOTLIN, SourceKind.GROOVY);
