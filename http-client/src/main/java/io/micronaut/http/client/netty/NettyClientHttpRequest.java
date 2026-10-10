@@ -50,7 +50,6 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -223,15 +222,23 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
 
     private String resolveUriPath() {
         URI uri = getUri();
-        if (StringUtils.isNotEmpty(uri.getScheme())) {
-            try {
-                // obtain just the path
-                uri = new URI(null, null, null, -1, uri.getPath(), uri.getQuery(), uri.getFragment());
-            } catch (URISyntaxException e) {
-                // ignore
-            }
+        if (StringUtils.isEmpty(uri.getScheme())) {
+            return uri.toString();
         }
-        return uri.toString();
+        // obtain just the path, keeping the percent-encoding of the request URI: an encoded '&',
+        // ';' or '=' of a query parameter value would otherwise come back as a separator and the
+        // upstream server would read the value as further parameters
+        String rawPath = uri.getRawPath();
+        StringBuilder target = new StringBuilder(rawPath == null ? StringUtils.EMPTY_STRING : rawPath);
+        String rawQuery = uri.getRawQuery();
+        if (rawQuery != null) {
+            target.append('?').append(rawQuery);
+        }
+        String rawFragment = uri.getRawFragment();
+        if (rawFragment != null) {
+            target.append('#').append(rawFragment);
+        }
+        return target.toString();
     }
 
     @Override

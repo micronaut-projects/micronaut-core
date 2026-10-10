@@ -69,7 +69,9 @@ class NettyHttpRequestQueryParametersSpec extends Specification {
         '/p%20q?a=1'                     | false  | [a: ['1']]
         '/p?a=1#frag'                    | false  | [a: ['1']]
         'http://example.com/p?a=1&b=x+y' | false  | [a: ['1'], b: ['x y']]
-        'http://example.com/p?a=%26'     | false  | [a: ['']]
+        'http://example.com/p?a=%26'     | false  | [a: ['&']]
+        'http://example.com/p?a=%26b%3Dc' | false | [a: ['&b=c']]
+        'http://example.com/p?a=1%3B2'   | false  | [a: ['1;2']]
         '/p?a=%zz'                       | true   | [a: ['%zz']]
         '/p?a=|'                         | true   | [a: ['|']]
         '/p?a=%'                         | true   | [a: ['%']]
@@ -96,6 +98,24 @@ class NettyHttpRequestQueryParametersSpec extends Specification {
 
         expect:
         params(request('/p?a=1;b=2', config)) == [a: ['1;b=2']]
+    }
+
+    @Unroll
+    void "an absolute request target keeps the percent-encoding of #uri"() {
+        given:
+        def request = request(uri)
+
+        expect:
+        request.path == path
+        request.uri.rawPath == rawPath
+        request.uri.rawQuery == rawQuery
+
+        where:
+        uri                               | path     | rawPath  | rawQuery
+        'http://example.com/p?a=%26b%3Dc' | '/p'     | '/p'     | 'a=%26b%3Dc'
+        'http://example.com/a%2Fb?a=1'    | '/a%2Fb' | '/a%2Fb' | 'a=1'
+        'http://example.com/p?a=%26#f'    | '/p'     | '/p'     | 'a=%26'
+        'http://example.com/p'            | '/p'     | '/p'     | null
     }
 
     void "max params"() {
