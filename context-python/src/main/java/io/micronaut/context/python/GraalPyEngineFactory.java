@@ -67,6 +67,17 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
             LOG.info("Sharing the GraalPy engine of the reusable context using the {} runtime", engine.getImplementationName());
             return engine;
         }
+        PythonApplicationRuntime unclaimed = PythonApplicationRuntime.unclaimed();
+        if (unclaimed != null) {
+            // The context generated code built before this application started brings its own engine,
+            // and the GraalPy context bean of this application claims that context: the engine is
+            // adopted with it, and the destruction listener closes it once the context is closed.
+            if (!engineConfiguration.configuredOptions.isEmpty()) {
+                LOG.warn("The GraalPy engine was created before the application context started, from the default " +
+                    "configuration: the configured {}.options do not apply to it", GraalPyEngineConfiguration.PREFIX);
+            }
+            return unclaimed.context().getEngine();
+        }
         // Keep defaults; options and instruments are configured on contexts.
         LOG.debug("Creating GraalPy Engine");
         long now = System.currentTimeMillis();
