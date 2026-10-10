@@ -1537,7 +1537,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             .flatMapMany(response -> {
                 BodyElements<ByteBuffer<?>> pieces = Objects.requireNonNull(response.body(), "The response has no body");
                 return Flux.from(streamPiecesPublisher(pieces))
-                    .map(piece -> (HttpResponse<ByteBuffer<?>>) new ElementResponse<ByteBuffer<?>>(response, piece));
+                    .map(piece -> (HttpResponse<ByteBuffer<?>>) new ElementResponse<>(response, piece));
             }));
     }
 
