@@ -768,7 +768,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             // dispatcher declares none of them, so the variable has no name in its body
                             ClassElement parameterType = parameters[i].getGenericType();
                             converted.add(isParameterizedReference(parameterType) || isDeclaredTypeVariable(method, parameterType)
-                                ? PYTHON_CONVERSION.invokeStatic(CONVERT_VALUE, ClassTypeDef.OBJECT, argument, classLiteral(parameterType)).cast(erasedType(parameterType))
+                                ? PYTHON_CONVERSION.invokeStatic(CONVERT_VALUE, ClassTypeDef.OBJECT, argument, classLiteral(parameterType)).cast(dispatchedType(method, parameterType))
                                 : convertValueForType(parameterType, argument));
                         }
                         ExpressionDef.InvokeInstanceMethod invocation = aThis.superRef().invoke(method.getName(), TypeDef.OBJECT, converted);
@@ -784,6 +784,67 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 return StatementDef.multi(statements);
             }));
         addedMethodNames.add(INVOKE_JAVA_BASE_METHOD + "(" + String.class.getName() + ";" + List.class.getName() + ";)");
+    }
+
+    /**
+     * The type an argument of a base method is cast to in the dispatcher: the erasure of the parameter type, or,
+     * for a parameterized type over a type variable the method declares with a single bound
+     * ({@code Class<T>} of {@code <T extends Component> navigate(Class<T>, Map)}), that type over a wildcard of
+     * the bound ({@code Class<? extends Component>}). From a raw {@code Class}, javac could not tell that
+     * method from an overload whose type variable has more bounds ({@code <C, T extends Component &
+     * HasUrlParameter<C>> navigate(Class<T>, C)}); over the wildcard, only the intended one applies.
+     *
+     * @param method The method of the Java base
+     * @param parameterType The type of one of its parameters
+     * @return The type the argument is cast to
+     */
+    private static TypeDef dispatchedType(MethodElement method, ClassElement parameterType) {
+        if (parameterType instanceof GenericPlaceholderElement || parameterType.isArray()
+            || parameterType.getTypeArguments().size() != 1 || method.getDeclaredTypeVariables().isEmpty()) {
+            return erasedType(parameterType);
+        }
+        // only a single type argument that is the variable itself (Class<T>): a concrete argument next to it
+        // (Map<String, T>) would have to be written out as well, and a nested one (Class<List<T>>) has no
+        // wildcard that the parameter accepts
+        ClassElement argument = parameterType.getTypeArguments().values().iterator().next();
+        if (!(argument instanceof GenericPlaceholderElement placeholder) || argument.isArray() || !isDeclaredTypeVariable(method, placeholder)) {
+            // an array of the variable (toArray(IntFunction<T[]>)), which the element model may carry on the
+            // variable itself, has no wildcard of the bound either
+            return erasedType(parameterType);
+        }
+        GenericPlaceholderElement declared = method.getDeclaredTypeVariables().stream()
+            .<GenericPlaceholderElement>map(variable -> variable)
+            .filter(variable -> variable.getVariableName().equals(placeholder.getVariableName()))
+            .findFirst()
+            .orElse(placeholder);
+        if (declared.getBounds().size() > 1 || occurrences(method, declared.getVariableName()) > 1) {
+            // an intersection has no wildcard to stand for it, and wildcards for two occurrences are captured
+            // apart (addListener(Class<T>, ComponentEventListener<T>)), as is a bound naming the variable
+            // (<T, U extends T>, <T extends Comparable<T>>): the erasure it is
+            return erasedType(parameterType);
+        }
+        return TypeDef.parameterized(ClassTypeDef.of(parameterType.getName()), List.of(TypeDef.wildcardSubtypeOf(erasedType(declared))));
+    }
+
+    private static long occurrences(MethodElement method, String variable) {
+        long inParameters = Arrays.stream(method.getParameters())
+            .mapToLong(parameter -> occurrences(parameter.getGenericType(), variable))
+            .sum();
+        long inBounds = method.getDeclaredTypeVariables().stream()
+            .flatMap(declared -> declared.getBounds().stream())
+            .mapToLong(bound -> occurrences(bound, variable))
+            .sum();
+        return inParameters + inBounds;
+    }
+
+    private static long occurrences(ClassElement type, String variable) {
+        if (type instanceof GenericPlaceholderElement placeholder) {
+            return variable.equals(placeholder.getVariableName()) ? 1 : 0;
+        }
+        if (type.isArray()) {
+            return occurrences(type.fromArray(), variable);
+        }
+        return type.getTypeArguments().values().stream().mapToLong(argument -> occurrences(argument, variable)).sum();
     }
 
     /**

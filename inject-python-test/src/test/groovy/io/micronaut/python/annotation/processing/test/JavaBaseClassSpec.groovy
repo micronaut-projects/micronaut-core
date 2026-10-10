@@ -22,6 +22,7 @@ import io.micronaut.python.annotation.processing.test.javabases.CtorHookBase
 import io.micronaut.python.annotation.processing.test.javabases.GenericHolder
 import io.micronaut.python.annotation.processing.test.javabases.GreetingBase
 import io.micronaut.python.annotation.processing.test.javabases.LongBase
+import io.micronaut.python.annotation.processing.test.javabases.NavigatorBase
 import io.micronaut.python.annotation.processing.test.javabases.Services
 import io.micronaut.python.compiler.PyronautCompiler
 import org.graalvm.polyglot.Context
@@ -126,6 +127,57 @@ class GenericCaller(GreetingBase):
 
         and: 'a method taking an array of its own type variable stays out: its erasure cannot be named in the dispatcher'
         !greeter.pack_is_not_a_member()
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Python calls generic overloads of a Java base that a raw class argument would make ambiguous"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+import java
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import NavigatorBase
+
+
+@Singleton
+class Navigating(NavigatorBase):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def to_detail(self) -> str:
+        return self.navigate(NavigatorBase.Detail, "42")
+
+    @Executable
+    def to_detail_with_map(self) -> str:
+        return self.navigate(NavigatorBase.Detail, java.type("java.util.Map").of("id", "7"))
+
+    @Executable
+    def collect_none(self) -> str:
+        return self.collect(NavigatorBase.Detail, java.type("java.util.List").of())
+
+    @Executable
+    def index_and_pairs(self) -> str:
+        empty = java.type("java.util.Map").of()
+        return self.index(empty) + "|" + self.pairs(empty)
+
+    @Executable
+    def bounded_by_variables(self) -> str:
+        String = java.type("java.lang.String")
+        return self.narrowed(String, "s") + "|" + self.compared(String)
+''', true)
+
+        when:
+        NavigatorBase navigating = ctx.getBean(NavigatorBase)
+
+        then: 'the generated dispatcher compiles and each overload receives its arguments'
+        navigating.to_detail() == 'parameter:Detail=42'
+        navigating.to_detail_with_map() == 'map:Detail{id=7}'
+        navigating.collect_none() == 'collect:Detail0'
+        navigating.index_and_pairs() == 'index:0|pairs:0'
+        navigating.bounded_by_variables() == 'narrowed:String=s|compared:String'
 
         cleanup:
         ctx?.close()
