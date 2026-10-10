@@ -25,6 +25,7 @@ import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
+import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
 import io.micronaut.core.propagation.MutablePropagatedContext;
@@ -56,9 +57,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -162,6 +167,7 @@ record MethodFilter<T>(FilterOrder order,
         boolean filtersException = false;
         ContinuationCreator continuationCreator = null;
         boolean reactiveContinuation = false;
+        String resultContinuationType = null;
         int mutableRequestIndex = -1;
         int[] bodyIndexes = null;
         for (int i = 0; i < arguments.length; i++) {
@@ -219,6 +225,17 @@ record MethodFilter<T>(FilterOrder order,
                     } else {
                         continuationCreator = ExecutionFlowContinuationImpl::new;
                     }
+                    resultContinuationType = "ExecutionFlow";
+                    fulfilled[i] = ctx -> ctx.continuation;
+                } else if (isStage(continuationReturnType) && continuationReturnType.getWrappedType().isAssignableFrom(MutableHttpResponse.class)) {
+                    // CompletionStage or CompletableFuture: a returned stage is completed with the
+                    // context of the continuation
+                    if (returnType.isAsync() && isResponse(returnType.getWrappedType())) {
+                        continuationCreator = ResultAwareCompletionStageContinuationImpl::new;
+                    } else {
+                        continuationCreator = CompletionStageContinuationImpl::new;
+                    }
+                    resultContinuationType = continuationReturnType.getType() == CompletableFuture.class ? "CompletableFuture" : "CompletionStage";
                     fulfilled[i] = ctx -> ctx.continuation;
                 } else if (isReactive(continuationReturnType) && continuationReturnType.getWrappedType().isAssignableFrom(MutableHttpResponse.class)) {
                     if (isReactive(returnType)) {
@@ -289,6 +306,11 @@ record MethodFilter<T>(FilterOrder order,
                 }
             }
         }
+        if (resultContinuationType != null && returnType.isVoid()) {
+            // the filter result is the response: a void method would complete the filter before
+            // the downstream produced it
+            throw new IllegalArgumentException(voidResultContinuationMessage(resultContinuationType));
+        }
         if (skipOnError) {
             filterCondition = filterCondition.and(ctx -> ctx.failure == null);
         } else if (filterCondition == FILTER_CONDITION_ALWAYS_TRUE) {
@@ -313,6 +335,18 @@ record MethodFilter<T>(FilterOrder order,
             isResponseFilter || continuationCreator != null ? -1 : mutableRequestIndex,
             bodyIndexes
         );
+    }
+
+    /**
+     * The message for a {@code void} filter method with a continuation that produces the response
+     * later, the same as the compile-time check of the filter.
+     *
+     * @param continuationType The simple name of the type the continuation produces
+     * @return The message
+     */
+    private static String voidResultContinuationMessage(String continuationType) {
+        return "A filter method with a FilterContinuation<" + continuationType + "<HttpResponse<?>>> must return the response, e.g. as "
+            + continuationType + "<HttpResponse<?>>: a void method completes before the downstream produced the response";
     }
 
     private static int[] append(int[] indexes, int index) {
@@ -348,6 +382,19 @@ record MethodFilter<T>(FilterOrder order,
 
     private static boolean isExecutionFlow(Argument<?> type) {
         return ExecutionFlow.class.isAssignableFrom(type.getType());
+    }
+
+    /**
+     * @param type A type
+     * @return Whether it is exactly {@link CompletionStage} or {@link CompletableFuture}: a stage
+     * continuation yields a {@link CompletableFuture}, which is no other subtype
+     */
+    private static boolean isStage(Argument<?> type) {
+        return type.getType() == CompletionStage.class || type.getType() == CompletableFuture.class;
+    }
+
+    private static boolean isResponse(Argument<?> type) {
+        return type.getType() == HttpResponse.class || type.getType() == MutableHttpResponse.class;
     }
 
     @Override
@@ -739,6 +786,15 @@ record MethodFilter<T>(FilterOrder order,
             var next = prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, false);
             return new DelayedFilterReturnHandler(isResponseFilter, next, nullable) {
                 @Override
+                @SuppressWarnings("unchecked")
+                public ExecutionFlow<FilterContext> handle(FilterContext context, @Nullable Object returnValue, @Nullable InternalFilterContinuation<?> continuation) {
+                    if (returnValue != null && continuation instanceof ResultAwareCompletionStageContinuationImpl resultAware) {
+                        return resultAware.processResult((CompletionStage<HttpResponse<?>>) returnValue);
+                    }
+                    return super.handle(context, returnValue, continuation);
+                }
+
+                @Override
                 protected ExecutionFlow<?> toFlow(FilterContext context, Object returnValue, @Nullable InternalFilterContinuation<?> continuation) {
                     //noinspection unchecked
                     return CompletableFutureExecutionFlow.just(((CompletionStage<Object>) returnValue).toCompletableFuture());
@@ -1061,6 +1117,177 @@ record MethodFilter<T>(FilterOrder order,
         @Override
         public FilterContext afterMethodContext() {
             return filterContext;
+        }
+    }
+
+    /**
+     * Continuation implementation that yields a {@link CompletableFuture}, also for a continuation
+     * declared with a {@link CompletionStage}. Unlike a flow, a future runs the downstream when
+     * {@link #proceed()} is called, which may be called once. The future and the stages derived
+     * from it complete with the propagated context of the downstream, and cancelling any of them
+     * cancels the downstream.
+     */
+    private static sealed class CompletionStageContinuationImpl implements FilterContinuation<CompletableFuture<HttpResponse<?>>>,
+        InternalFilterContinuation<CompletableFuture<HttpResponse<?>>> {
+
+        protected final AtomicReference<FilterContext> filterContext;
+        private final Function<FilterContext, ExecutionFlow<FilterContext>> downstream;
+        private final MutablePropagatedContext mutablePropagatedContext;
+        private final AtomicBoolean proceeded = new AtomicBoolean();
+        /**
+         * The downstream, once {@link #proceed()} was called.
+         */
+        private final AtomicReference<@Nullable ExecutionFlow<?>> downstreamFlow = new AtomicReference<>();
+
+        private CompletionStageContinuationImpl(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
+                                                FilterContext filterContext,
+                                                MutablePropagatedContext mutablePropagatedContext) {
+            this.downstream = downstream;
+            this.filterContext = new AtomicReference<>(filterContext);
+            this.mutablePropagatedContext = mutablePropagatedContext;
+        }
+
+        @Override
+        public FilterContinuation<CompletableFuture<HttpResponse<?>>> request(HttpRequest<?> request) {
+            filterContext.updateAndGet(context -> context.withRequest(request));
+            return this;
+        }
+
+        @Override
+        public CompletableFuture<HttpResponse<?>> proceed() {
+            if (!proceeded.compareAndSet(false, true)) {
+                // the downstream filters and the route ran already: running them again would
+                // skip the filters, and return the first response
+                throw new IllegalStateException("A FilterContinuation<CompletionStage<HttpResponse<?>>> can only proceed once");
+            }
+            FilterContext context = afterMethodContext();
+            PropagatedContext propagatedContext = context.propagatedContext();
+            PropagatedContext mutatedPropagatedContext = mutablePropagatedContext.getContext();
+            if (propagatedContext != mutatedPropagatedContext && mutatedPropagatedContext != null) {
+                context = context.withPropagatedContext(mutatedPropagatedContext);
+            } else {
+                context = context.withPropagatedContext(PropagatedContext.find().orElse(context.propagatedContext()));
+            }
+            filterContext.set(context);
+            ExecutionFlow<FilterContext> flow;
+            try {
+                flow = downstream.apply(context);
+            } catch (Exception e) {
+                return CompletableFuture.failedFuture(e);
+            }
+            ExecutionFlow<HttpResponse<?>> responseFlow = flow.map(newFilterContext -> {
+                filterContext.set(newFilterContext);
+                return Objects.requireNonNull(newFilterContext.response(), RESPONSE_MISSING_MESSAGE);
+            });
+            downstreamFlow.set(responseFlow);
+            DownstreamFuture<HttpResponse<?>> future = new DownstreamFuture<>(responseFlow);
+            responseFlow.onComplete((response, error) -> {
+                PropagatedContext downstreamContext = afterMethodContext().propagatedContext();
+                // the callbacks of the stages run with the context of the downstream
+                Runnable complete = () -> {
+                    if (error != null) {
+                        future.completeExceptionally(error);
+                    } else {
+                        future.complete(response);
+                    }
+                };
+                if (downstreamContext.isBound()) {
+                    complete.run();
+                } else {
+                    downstreamContext.propagate(complete);
+                }
+            });
+            return future;
+        }
+
+        /**
+         * Cancel the downstream, if it runs.
+         */
+        void cancelDownstream() {
+            ExecutionFlow<?> flow = downstreamFlow.get();
+            if (flow != null) {
+                flow.cancel();
+            }
+        }
+
+        @Override
+        public FilterContext afterMethodContext() {
+            return Objects.requireNonNull(filterContext.get());
+        }
+    }
+
+    /**
+     * The stage continuation that processes the stage the method returns: the response
+     * completes the context of the continuation, with the request it proceeded with and the
+     * context of the downstream, and cancelling the filter cancels the downstream.
+     */
+    private static final class ResultAwareCompletionStageContinuationImpl extends CompletionStageContinuationImpl {
+
+        private ResultAwareCompletionStageContinuationImpl(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
+                                                           FilterContext filterContext,
+                                                           MutablePropagatedContext mutablePropagatedContext) {
+            super(downstream, filterContext, mutablePropagatedContext);
+        }
+
+        /**
+         * @param stage The stage the filter method returned
+         * @return The context after the filter
+         */
+        public ExecutionFlow<FilterContext> processResult(CompletionStage<HttpResponse<?>> stage) {
+            CompletableFuture<HttpResponse<?>> future = stage.toCompletableFuture();
+            if (future.isDone()) {
+                ImperativeExecutionFlow<HttpResponse<?>> done = Objects.requireNonNull(CompletableFutureExecutionFlow.just(future).tryComplete());
+                Throwable error = done.getError();
+                if (error != null) {
+                    return ExecutionFlow.error(error);
+                }
+                HttpResponse<?> response = done.getValue();
+                FilterContext context = afterMethodContext();
+                return ExecutionFlow.just(response == null ? context : context.withResponse(response));
+            }
+            DelayedExecutionFlow<FilterContext> result = DelayedExecutionFlow.create();
+            result.onCancel(() -> {
+                future.cancel(false);
+                cancelDownstream();
+            });
+            future.whenComplete((response, error) -> {
+                if (error != null) {
+                    result.completeExceptionally(error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
+                } else {
+                    // a stage completed with null proceeds with the context after the continuation
+                    FilterContext context = afterMethodContext();
+                    result.complete(response == null ? context : context.withResponse(response));
+                }
+            });
+            return result;
+        }
+    }
+
+    /**
+     * The future of a stage continuation: cancelling it, or a stage derived from it, cancels the
+     * downstream.
+     *
+     * @param <T> The type of the value
+     */
+    private static final class DownstreamFuture<T> extends CompletableFuture<T> {
+        private final ExecutionFlow<?> downstream;
+
+        DownstreamFuture(ExecutionFlow<?> downstream) {
+            this.downstream = downstream;
+        }
+
+        @Override
+        public <U> CompletableFuture<U> newIncompleteFuture() {
+            return new DownstreamFuture<>(downstream);
+        }
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            boolean cancelled = super.cancel(mayInterruptIfRunning);
+            if (cancelled) {
+                downstream.cancel();
+            }
+            return cancelled;
         }
     }
 

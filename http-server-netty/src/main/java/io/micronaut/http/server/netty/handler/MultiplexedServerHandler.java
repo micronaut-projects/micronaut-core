@@ -986,7 +986,7 @@ abstract class MultiplexedServerHandler {
             @Override
             public void fail(Throwable e) {
                 if (!reset(e)) {
-                    LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", e);
+                    LOG.warn("The streamed response body failed after some of it was written. The error cannot be forwarded to the client, and the response ends abruptly.", e);
                 }
                 flush();
             }
