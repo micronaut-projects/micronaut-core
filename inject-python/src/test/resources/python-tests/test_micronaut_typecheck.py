@@ -121,3 +121,37 @@ class Service:
         self.assertFalse(scope.switch([Decorator(False)]))
         self.assertFalse(scope.switch([Decorator("False")]))
         self.assertIsNone(scope.switch([]))
+
+
+class SuggestionTest(unittest.TestCase):
+    def test_suggestions_prefer_case_then_camel_case_then_close_spellings(self):
+        from micronaut_typecheck import suggest, literal_kind, literal_fits
+        members = ["value", "consumes", "produces", "uri", "uris"]
+        self.assertEqual(["consumes"], suggest("Consumes", members))
+        self.assertEqual(["consumes"], suggest("consume", members))
+        # a short name allows one edit only, so "uris" is not offered for "url"
+        self.assertEqual(["uri"], suggest("url", members))
+        self.assertEqual(["produces"], suggest("producer", members))
+        self.assertEqual([], suggest("something", members))
+        self.assertEqual(["produceValue"], suggest("produce_value", ["produceValue", "other"]))
+        self.assertEqual("bool", literal_kind(ast.parse("True").body[0].value))
+        self.assertEqual("int", literal_kind(ast.parse("1").body[0].value))
+        self.assertIsNone(literal_kind(ast.parse("NAME").body[0].value))
+
+        class Member:
+            def __init__(self, java_type, enum=False):
+                self._type = java_type
+                self._enum = enum
+
+            def type(self):
+                return self._type
+
+            def enumType(self):
+                return self._enum
+
+        self.assertTrue(literal_fits("str", Member("java.lang.String")))
+        self.assertFalse(literal_fits("int", Member("java.lang.String")))
+        self.assertTrue(literal_fits("int", Member("double")))
+        self.assertFalse(literal_fits("str", Member("boolean")))
+        self.assertTrue(literal_fits("str", Member("io.micronaut.http.HttpMethod", enum=True)))
+        self.assertTrue(literal_fits("int", Member("java.lang.Object")))
