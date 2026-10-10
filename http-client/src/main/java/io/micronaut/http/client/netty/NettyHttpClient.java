@@ -1137,7 +1137,8 @@ final class NettyHttpClient implements
             ExecutionFlow<NettyWebSocketClientHandler<T>> flow;
             try {
                 flow = connect.get();
-            } catch (Throwable e) {
+            } catch (Exception e) {
+                // an Error is left to Reactor, which fails the sink unless the error is fatal
                 sink.error(e);
                 return;
             }
