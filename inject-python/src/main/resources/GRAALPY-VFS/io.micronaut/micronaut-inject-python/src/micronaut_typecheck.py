@@ -106,6 +106,15 @@ class _ModuleRecord:
         self.script = None     # the ScriptDef of the module, once modelled: the generated class of its functions and attributes
         self.visitor = None    # the MicronautAstVisitor that modelled the module: locations and name bindings
         self.span_of = lambda node: None
+        self._class_index = None
+        self._class_count = -1
+
+    def class_index(self):
+        """The classes of the module by name, built once the modelling is over and shared by every check."""
+        if self._class_index is None or self._class_count != len(self.classes):
+            self._class_index = {class_def.name(): class_def for class_def, _ in self.classes}
+            self._class_count = len(self.classes)
+        return self._class_index
 
 
 class TypeChecker:
