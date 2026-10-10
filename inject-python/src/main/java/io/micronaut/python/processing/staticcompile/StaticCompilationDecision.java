@@ -46,10 +46,25 @@ public record StaticCompilationDecision(String qualifiedName,
                                         List<Reason> reasons,
                                         Stats stats) {
 
+    // the field names of the JSON and properties forms
+    private static final String NAME = "name";
+    private static final String SOURCE = "source";
+    private static final String LINE = "line";
+    private static final String COLUMN = "column";
+    private static final String OUTCOME = "outcome";
+    private static final String SCOPE = "scope";
+    private static final String REASONS = "reasons";
+    private static final String RULE = "rule";
+    private static final String MESSAGE = "message";
+    private static final String STATEMENTS = "statements";
+    private static final String JAVA_CALLS = "javaCalls";
+    private static final String BRIDGE_CALLS = "bridgeCalls";
+    private static final String HELPER_CALLS = "helperCalls";
+
     public StaticCompilationDecision {
         Objects.requireNonNull(qualifiedName, "qualifiedName");
-        Objects.requireNonNull(outcome, "outcome");
-        Objects.requireNonNull(scope, "scope");
+        Objects.requireNonNull(outcome, OUTCOME);
+        Objects.requireNonNull(scope, SCOPE);
         reasons = reasons == null ? List.of() : List.copyOf(reasons);
         stats = stats == null ? Stats.NONE : stats;
     }
@@ -67,26 +82,26 @@ public record StaticCompilationDecision(String qualifiedName,
     public String toJson() {
         JsonWriter json = new JsonWriter().beginObject()
             .name("record").value("decision")
-            .name("name").value(qualifiedName)
-            .name("source").value(sourcePath())
-            .name("line").value(span == null ? null : (Number) span.line())
-            .name("column").value(span == null ? null : (Number) span.column())
-            .name("outcome").value(outcome.name())
-            .name("scope").value(scope.name())
-            .name("reasons").beginArray();
+            .name(NAME).value(qualifiedName)
+            .name(SOURCE).value(sourcePath())
+            .name(LINE).value(span == null ? null : (Number) span.line())
+            .name(COLUMN).value(span == null ? null : (Number) span.column())
+            .name(OUTCOME).value(outcome.name())
+            .name(SCOPE).value(scope.name())
+            .name(REASONS).beginArray();
         for (Reason reason : reasons) {
             json.beginObject()
-                .name("rule").value(reason.rule())
-                .name("message").value(reason.message())
+                .name(RULE).value(reason.rule())
+                .name(MESSAGE).value(reason.message())
                 .name("location").value(reason.span() == null ? null : reason.span().location())
                 .endObject();
         }
         return json.endArray()
             .name("stats").beginObject()
-            .name("statements").value(stats.statements())
-            .name("javaCalls").value(stats.javaCalls())
-            .name("bridgeCalls").value(stats.bridgeCalls())
-            .name("helperCalls").value(stats.helperCalls())
+            .name(STATEMENTS).value(stats.statements())
+            .name(JAVA_CALLS).value(stats.javaCalls())
+            .name(BRIDGE_CALLS).value(stats.bridgeCalls())
+            .name(HELPER_CALLS).value(stats.helperCalls())
             .endObject()
             .endObject()
             .toString();
@@ -99,40 +114,40 @@ public record StaticCompilationDecision(String qualifiedName,
      * @param prefix     The prefix of the decision's keys
      */
     public void writeTo(Properties properties, String prefix) {
-        properties.setProperty(prefix + "name", qualifiedName);
+        properties.setProperty(prefix + NAME, qualifiedName);
         writeSpan(properties, prefix, span);
-        properties.setProperty(prefix + "outcome", outcome.name());
-        properties.setProperty(prefix + "scope", scope.name());
-        properties.setProperty(prefix + "statements", Integer.toString(stats.statements()));
-        properties.setProperty(prefix + "javaCalls", Integer.toString(stats.javaCalls()));
-        properties.setProperty(prefix + "bridgeCalls", Integer.toString(stats.bridgeCalls()));
-        properties.setProperty(prefix + "helperCalls", Integer.toString(stats.helperCalls()));
-        properties.setProperty(prefix + "reasons", Integer.toString(reasons.size()));
+        properties.setProperty(prefix + OUTCOME, outcome.name());
+        properties.setProperty(prefix + SCOPE, scope.name());
+        properties.setProperty(prefix + STATEMENTS, Integer.toString(stats.statements()));
+        properties.setProperty(prefix + JAVA_CALLS, Integer.toString(stats.javaCalls()));
+        properties.setProperty(prefix + BRIDGE_CALLS, Integer.toString(stats.bridgeCalls()));
+        properties.setProperty(prefix + HELPER_CALLS, Integer.toString(stats.helperCalls()));
+        properties.setProperty(prefix + REASONS, Integer.toString(reasons.size()));
         for (int i = 0; i < reasons.size(); i++) {
             Reason reason = reasons.get(i);
             String reasonPrefix = prefix + "reason." + i + '.';
-            properties.setProperty(reasonPrefix + "rule", reason.rule());
-            properties.setProperty(reasonPrefix + "message", reason.message());
+            properties.setProperty(reasonPrefix + RULE, reason.rule());
+            properties.setProperty(reasonPrefix + MESSAGE, reason.message());
             writeSpan(properties, reasonPrefix, reason.span());
         }
     }
 
     private static void writeSpan(Properties properties, String prefix, @Nullable SourceSpan span) {
         if (span != null) {
-            properties.setProperty(prefix + "source", span.path());
-            properties.setProperty(prefix + "line", Integer.toString(span.line()));
-            properties.setProperty(prefix + "column", Integer.toString(span.column()));
+            properties.setProperty(prefix + SOURCE, span.path());
+            properties.setProperty(prefix + LINE, Integer.toString(span.line()));
+            properties.setProperty(prefix + COLUMN, Integer.toString(span.column()));
             properties.setProperty(prefix + "endLine", Integer.toString(span.endLine()));
             properties.setProperty(prefix + "endColumn", Integer.toString(span.endColumn()));
         }
     }
 
     private static @Nullable SourceSpan readSpan(Properties properties, String prefix) {
-        String source = properties.getProperty(prefix + "source");
+        String source = properties.getProperty(prefix + SOURCE);
         if (source == null) {
             return null;
         }
-        return new SourceSpan(source, intOf(properties.getProperty(prefix + "line")), intOf(properties.getProperty(prefix + "column")),
+        return new SourceSpan(source, intOf(properties.getProperty(prefix + LINE)), intOf(properties.getProperty(prefix + COLUMN)),
             intOf(properties.getProperty(prefix + "endLine")), intOf(properties.getProperty(prefix + "endColumn")));
     }
 
@@ -145,28 +160,28 @@ public record StaticCompilationDecision(String qualifiedName,
      * @throws IllegalArgumentException When a stored value is not what the decision needs
      */
     public static @Nullable StaticCompilationDecision fromProperties(Properties properties, String prefix) {
-        String name = properties.getProperty(prefix + "name");
+        String name = properties.getProperty(prefix + NAME);
         if (name == null) {
             return null;
         }
         SourceSpan span = readSpan(properties, prefix);
         List<Reason> reasons = new ArrayList<>();
-        int count = intOf(properties.getProperty(prefix + "reasons"));
+        int count = intOf(properties.getProperty(prefix + REASONS));
         for (int i = 0; i < count; i++) {
             String reasonPrefix = prefix + "reason." + i + '.';
             reasons.add(new Reason(
-                Objects.requireNonNull(properties.getProperty(reasonPrefix + "rule"), reasonPrefix + "rule"),
-                Objects.requireNonNull(properties.getProperty(reasonPrefix + "message"), reasonPrefix + "message"),
+                Objects.requireNonNull(properties.getProperty(reasonPrefix + RULE), reasonPrefix + RULE),
+                Objects.requireNonNull(properties.getProperty(reasonPrefix + MESSAGE), reasonPrefix + MESSAGE),
                 readSpan(properties, reasonPrefix)));
         }
         Stats stats = new Stats(
-            intOf(properties.getProperty(prefix + "statements")),
-            intOf(properties.getProperty(prefix + "javaCalls")),
-            intOf(properties.getProperty(prefix + "bridgeCalls")),
-            intOf(properties.getProperty(prefix + "helperCalls")));
+            intOf(properties.getProperty(prefix + STATEMENTS)),
+            intOf(properties.getProperty(prefix + JAVA_CALLS)),
+            intOf(properties.getProperty(prefix + BRIDGE_CALLS)),
+            intOf(properties.getProperty(prefix + HELPER_CALLS)));
         return new StaticCompilationDecision(name, span,
-            Outcome.of(Objects.requireNonNull(properties.getProperty(prefix + "outcome"), prefix + "outcome")),
-            Scope.of(Objects.requireNonNull(properties.getProperty(prefix + "scope"), prefix + "scope")),
+            Outcome.of(Objects.requireNonNull(properties.getProperty(prefix + OUTCOME), prefix + OUTCOME)),
+            Scope.of(Objects.requireNonNull(properties.getProperty(prefix + SCOPE), prefix + SCOPE)),
             reasons, stats);
     }
 
@@ -270,8 +285,8 @@ public record StaticCompilationDecision(String qualifiedName,
      */
     public record Reason(String rule, String message, @Nullable SourceSpan span) {
         public Reason {
-            Objects.requireNonNull(rule, "rule");
-            Objects.requireNonNull(message, "message");
+            Objects.requireNonNull(rule, RULE);
+            Objects.requireNonNull(message, MESSAGE);
         }
     }
 
