@@ -54,7 +54,15 @@ Patching is not atomic across contexts: a failure in any of them restarts the ap
 
 A changed template, static file or message bundle does not restart anything: it reaches the beans that watch resources of that kind (see the next section).
 
-A changed configuration file restarts the application, retaining nothing.
+A changed configuration file is applied in place, without a new generation. The configuration is refreshed: the configuration beans are bound again, the refreshable beans are disposed of, and the configuration watches are told.
+
+The application restarts only when the refresh cannot apply the change:
+
+* a configuration watch answers `REQUIRES_RESTART`;
+* a singleton received a changed property through `@Value` or `@Property` rather than a configuration bean;
+* a definition's `@Requires` names a changed property, whose presence the change may have flipped.
+
+A bean retained across restarts that watched a changed prefix is not kept when that restart comes.
 
 Logback is configured from the application's resources, in the order Logback's own startup follows: `logback-test.xml`, then `logback.xml`, and the file named by the `logback.configurationFile` system property ahead of both. The launcher does so before it logs anything; when the resources hold no Logback configuration, the launcher and the application log at INFO rather than at the DEBUG of Logback's basic configuration. A changed Logback configuration file applies at once, without a restart, and resets the levels set since, which `logger.levels` sets again at the next restart. Logback itself stays on the launcher's classpath: an `<include resource="...">` and the appender classes a configuration names are looked up there, so a file included from the application's resources is not found, and an appender must come from a dependency rather than from the application's sources; `<include file="...">` works.
 
