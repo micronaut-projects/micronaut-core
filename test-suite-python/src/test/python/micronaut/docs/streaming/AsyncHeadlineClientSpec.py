@@ -13,6 +13,7 @@ from .AsyncHeadlineClient import AsyncHeadlineClient
 
 HeadlineClass = java.type("micronaut.docs.streaming.Headline")
 TimeUnit = java.type("java.util.concurrent.TimeUnit")
+PythonAsyncioRuntime = java.type("io.micronaut.context.python.PythonAsyncioRuntime")
 
 
 @Property(name="spec.name", value="StreamingHeadlineControllerSpec")
@@ -23,25 +24,30 @@ class AsyncHeadlineClientSpec:
 
     @Test
     def declarativeClient(self):
-        # tag::declarative[]
-        headlines = self.headlineClient.streamHeadlines() \
-            .toCompletableFuture().get(10, TimeUnit.SECONDS)  # <1>
-        first = headlines.next() \
-            .toCompletableFuture().get(10, TimeUnit.SECONDS)  # <2>
-        headlines.close()  # <3>
-        # end::declarative[]
+        result = PythonAsyncioRuntime.toCompletionStage(self.firstHeadline())
+        assert result.toCompletableFuture().get(10, TimeUnit.SECONDS).startswith("Latest Headline")
 
-        assert first.orElseThrow().text.startswith("Latest Headline")
+    # tag::declarative[]
+    async def firstHeadline(self) -> str:
+        headlines = await self.headlineClient.streamHeadlines()  # <1>
+        try:
+            first = await headlines.next()  # <2>
+            return first.orElseThrow().text
+        finally:
+            headlines.close()  # <3>
+        # end::declarative[]
 
     @Test
     def asyncStreamingClient(self):
-        # tag::async[]
-        def first_of(headlines):
-            return headlines.next() \
-                .whenComplete(lambda headline, error: headlines.close())  # <2> <3>
+        result = PythonAsyncioRuntime.toCompletionStage(self.firstStreamingHeadline())
+        assert result.toCompletableFuture().get(10, TimeUnit.SECONDS).startswith("Latest Headline")
 
-        first = self.client.jsonStream(HttpRequest.GET("/streaming/headlines"), HeadlineClass) \
-            .thenCompose(first_of)  # <1>
+    # tag::async[]
+    async def firstStreamingHeadline(self) -> str:
+        headlines = await self.client.jsonStream(HttpRequest.GET("/streaming/headlines"), HeadlineClass)  # <1>
+        try:
+            first = await headlines.next()  # <2>
+            return first.orElseThrow().text
+        finally:
+            headlines.close()  # <3>
         # end::async[]
-
-        assert first.toCompletableFuture().get(10, TimeUnit.SECONDS).orElseThrow().text.startswith("Latest Headline")
