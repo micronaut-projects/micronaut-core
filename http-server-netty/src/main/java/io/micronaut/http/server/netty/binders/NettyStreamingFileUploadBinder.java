@@ -53,6 +53,9 @@ final class NettyStreamingFileUploadBinder implements TypedRequestArgumentBinder
     @Override
     public BindingResult<StreamingFileUpload> bindForNettyRequest(ArgumentConversionContext<StreamingFileUpload> context,
                                                                   NettyHttpRequest<?> request) {
+        if (request.getContentType().isEmpty() || !request.hasFormBody()) {
+            return BindingResult.unsatisfied();
+        }
 
         Argument<StreamingFileUpload> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
