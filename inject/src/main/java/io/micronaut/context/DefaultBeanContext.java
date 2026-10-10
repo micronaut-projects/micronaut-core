@@ -184,6 +184,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     private static final String ARGUMENT_CHANGE = "change";
     private static final String AROUND_TYPE = "io.micronaut.aop.Around";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
+    private static final String INTERCEPTOR_BEAN_TYPE = "io.micronaut.aop.InterceptorBean";
     /**
      * The maximum number of additional destruction passes performed during {@link #stop()} to destroy
      * singletons created by {@code @PreDestroy} hooks, bounding a hook that always creates a new bean.
@@ -4996,10 +4997,40 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             BeanDefinition<T> found = findBeanDefinition(delegate.asArgument(), delegate.getDeclaredQualifier())
                 .filter(definition -> definition.isEnabled(this))
                 .orElse(null);
+            if (found == null) {
+                found = findTypedDelegateDefinition(delegate);
+            }
             return found != null ? found : resolveNestedEntryDefinition(delegate);
         }
         BeanDefinition<T> definition = findBeanDefinitionByDefinitionClass((Class<? extends BeanDefinition<T>>) retained.getClass()).orElse(null);
         return definition != null && definition.isEnabled(this) ? definition : null;
+    }
+
+    /**
+     * This context's delegate for a retained {@code @EachBean} member or {@code @EachProperty} entry whose definition
+     * restricts the types it is exposed as, with {@code @Bean(typed = ...)}, so that it is not found by its own class:
+     * it is looked up by each type it exposes, and taken only when it is a delegate of the same generated definition,
+     * making beans of the same class, so that another bean exposed as the same type under the same name is not taken.
+     */
+    @Nullable
+    @SuppressWarnings("unchecked")
+    private <T> BeanDefinition<T> findTypedDelegateDefinition(BeanDefinitionDelegate<T> delegate) {
+        Set<Class<?>> exposed = delegate.getExposedTypes();
+        if (exposed.isEmpty() || exposed.contains(delegate.getBeanType())) {
+            return null;
+        }
+        Class<?> generated = delegate.getTarget().getClass();
+        for (Class<?> type : exposed) {
+            for (BeanDefinition<Object> candidate : getBeanDefinitions((Argument<Object>) Argument.of(type), (Qualifier<Object>) delegate.getDeclaredQualifier())) {
+                if (candidate instanceof BeanDefinitionDelegate<Object> found
+                    && found.getTarget().getClass() == generated
+                    && found.getBeanType() == delegate.getBeanType()
+                    && found.isEnabled(this)) {
+                    return (BeanDefinition<T>) found;
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -5719,11 +5750,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             // except configuration: it is not retained, but made again by the next context
             List<BeanRegistration<?>> closure = new ArrayList<>();
             ClosureConfiguration configuration = new ClosureConfiguration(criteria.invalidatedBy(registration), !(criteria instanceof PredicateRetentionCriteria));
-            BeanRegistration<?> bound = collectRetentionClosure(registration, configuration, closure, Collections.newSetFromMap(new IdentityHashMap<>()));
+            Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+            BeanRegistration<?> bound = collectRetentionClosure(registration, configuration, closure, visited);
             if (bound != null) {
                 if (LOG_LIFECYCLE.isWarnEnabled()) {
                     LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: {} holds a provider, a proxy, a scope or the context, which are bound to this context",
                         registration.bean, bound == registration ? "it" : "the bean [" + bound.bean + "] it holds");
+                }
+                continue;
+            }
+            // a configuration bean left out of the closure is bound again by the next context, but what it received
+            // may have reached the retained bean through it: a listener, a builder or a provider it was handed
+            String carried = carriedThroughConfiguration(configuration, criteria, visited);
+            if (carried != null) {
+                if (LOG_LIFECYCLE.isWarnEnabled()) {
+                    LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: {}", registration.bean, carried);
                 }
                 continue;
             }
@@ -5900,6 +5941,118 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     }
 
     /**
+     * What the configuration beans left out of a retained bean's closure received, which the retained bean may hold
+     * through them although the next context binds the configuration again: their own dependencies, other
+     * configuration beans aside, which are examined in turn. A provider, a proxy, a scope or the context among them,
+     * or a bean holding one, is bound to this context, and a class the restart replaces among them, or held by them,
+     * would keep the old generation of the application running in the retained bean.
+     *
+     * @param configuration The configuration of the retained bean's closure, with the configuration beans it left out
+     * @param criteria The criteria, which know the classes the restart replaces
+     * @param visited The members of the closure, examined already
+     * @return Why the retained bean is refused, or null when what the configuration received is neither
+     */
+    @Nullable
+    private String carriedThroughConfiguration(ClosureConfiguration configuration, RetentionCriteria criteria, Set<Object> visited) {
+        if (dependencyGraph == null) {
+            return null;
+        }
+        Set<Object> examined = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<Object> inspected = Collections.newSetFromMap(new IdentityHashMap<>());
+        List<BeanDefinition<?>> leftOut = configuration.leftOut;
+        // the list grows as configuration that this configuration received is left out in turn
+        for (int i = 0; i < leftOut.size(); i++) {
+            BeanDefinition<?> held = leftOut.get(i);
+            if (!inspected.add(held)) {
+                continue;
+            }
+            for (BeanDependencyGraph.BeanDependency edge : dependencyGraph.dependenciesOf(held)) {
+                BeanDefinition<?> dependency = edge.dependency();
+                if (!edge.lazy() && held.hasStereotype(INTRODUCTION_TYPE) && isInterceptor(dependency)) {
+                    // the advice of a configuration interface's introduction, which reads the environment for it: it
+                    // serves the configuration bean's own methods and is reached only through the configuration bean
+                    continue;
+                }
+                if (edge.lazy() || dependency.isProxy()) {
+                    return "the configuration [" + held.getBeanType().getName() + "] it was made from holds a provider or a proxy, which are bound to this context";
+                }
+                List<BeanRegistration<?>> received = new ArrayList<>();
+                BeanRegistration<?> bound = null;
+                Class<?> replaced = null;
+                if (dependency.isSingleton()) {
+                    BeanRegistration<?> registration = singletonScope.findBeanRegistration(dependency);
+                    if (registration == null || configuration.leavesOut(registration.beanDefinition, true)) {
+                        // another configuration bean, examined in turn
+                        continue;
+                    }
+                    bound = collectRetentionClosure(registration, configuration, received, visited);
+                } else if (configuration.leavesOut(dependency, true)) {
+                    continue;
+                } else if (isContextBound(dependency, configuration, Collections.newSetFromMap(new IdentityHashMap<>()))) {
+                    return "the configuration [" + held.getBeanType().getName() + "] it was made from holds a [" + dependency.getBeanType().getName() + "] bound to this context";
+                } else {
+                    bound = collectRetentionClosure(dependency, configuration, received, visited);
+                    replaced = replacedClassOf(dependency, criteria, configuration, examined);
+                }
+                if (bound != null) {
+                    return "the configuration [" + held.getBeanType().getName() + "] it was made from holds the bean [" + bound.bean
+                        + "], which holds a provider, a proxy, a scope or the context, which are bound to this context";
+                }
+                for (BeanRegistration<?> member : received) {
+                    if (replaced != null) {
+                        break;
+                    }
+                    replaced = replacedClassOf(member, criteria, configuration, examined);
+                }
+                if (replaced != null) {
+                    return "the configuration [" + held.getBeanType().getName() + "] it was made from holds what is bound to the class ["
+                        + replaced.getName() + "], which the restart replaces";
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether a definition is of an interceptor, {@code @InterceptorBean}, which a proxy received to serve its own
+     * methods. One declared otherwise is examined as any other bean, which may refuse more than needed, never less.
+     */
+    private static boolean isInterceptor(BeanDefinition<?> definition) {
+        return definition.hasStereotype(INTERCEPTOR_BEAN_TYPE);
+    }
+
+    /**
+     * Whether a prototype definition's beans are bound to this context: a proxy, or one that received a provider, a
+     * proxy, or what the context owns, directly or through the prototypes it received. The singletons it received
+     * are examined as members of a closure.
+     */
+    private boolean isContextBound(BeanDefinition<?> definition, ClosureConfiguration configuration, Set<Object> visited) {
+        if (!visited.add(definition)) {
+            return false;
+        }
+        if (definition.isProxy()) {
+            return true;
+        }
+        for (Class<?> required : definition.getRequiredComponents()) {
+            if (required.isInstance(this) || isContextOwnedType(required)) {
+                return true;
+            }
+        }
+        if (dependencyGraph != null) {
+            for (BeanDependencyGraph.BeanDependency dependency : dependencyGraph.dependenciesOf(definition)) {
+                if (dependency.lazy() || dependency.dependency().isProxy()) {
+                    return true;
+                }
+                BeanDefinition<?> received = dependency.dependency();
+                if (!received.isSingleton() && !configuration.leavesOut(received, true) && isContextBound(received, configuration, visited)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * The first class the restart replaces that a member of a retained bean's closure is bound to: its definition, its
      * instance, the instance the bean created listeners received, and the prototypes it owns or received.
      */
@@ -6021,6 +6174,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
         private final Set<String> invalidatedBy;
         private final boolean observing;
         private Set<String> observed = Set.of();
+        /**
+         * The definitions of the configuration beans left out of the closure, whose own dependencies are examined.
+         */
+        private final List<BeanDefinition<?>> leftOut = new ArrayList<>();
 
         ClosureConfiguration(Set<String> invalidatedBy, boolean observing) {
             this.invalidatedBy = invalidatedBy;
@@ -6045,6 +6202,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
                 return false;
             }
             if (isCovered(prefix, invalidatedBy)) {
+                if (observe) {
+                    leftOut.add(definition);
+                }
                 return true;
             }
             if (!observing) {
@@ -6055,6 +6215,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
                     observed = new LinkedHashSet<>();
                 }
                 observed.add(prefix);
+                leftOut.add(definition);
             }
             return true;
         }

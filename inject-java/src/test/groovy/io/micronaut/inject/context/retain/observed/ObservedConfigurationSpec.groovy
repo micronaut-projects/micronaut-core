@@ -144,6 +144,27 @@ class ObservedConfigurationSpec extends Specification {
         second?.close()
     }
 
+    void "a retained @EachBean member exposed with @Bean(typed) only as another type is adopted, not destroyed"() {
+        given:
+        ApplicationContext first = start(List.of(), PROPERTIES)
+        Endpoint a = first.getBean(Endpoint, Qualifiers.byName('a'))
+        Endpoint b = first.getBean(Endpoint, Qualifiers.byName('b'))
+
+        when:
+        Collection<BeanRegistration<?>> retained = stopRetaining(first, ['observed.servers.b.port'])
+        ApplicationContext second = start(retained, PROPERTIES + ['observed.servers.b.port': '7'])
+
+        then: "the endpoint of the untouched entry is the same instance, found by the type it is exposed as"
+        retained*.bean.any { it.is(a) }
+        second.getBean(Endpoint, Qualifiers.byName('a')).is(a)
+
+        and: "the endpoint of the changed entry is made again"
+        !second.getBean(Endpoint, Qualifiers.byName('b')).is(b)
+
+        cleanup:
+        second?.close()
+    }
+
     void "a bean holding a provider of configuration is not retained, since the provider resolves through the stopped context"() {
         given:
         ApplicationContext first = start(List.of(), PROPERTIES)
