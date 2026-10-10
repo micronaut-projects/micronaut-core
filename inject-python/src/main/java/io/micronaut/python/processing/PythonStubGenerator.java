@@ -62,6 +62,9 @@ import io.micronaut.python.processing.model.ArgumentDef;
 import io.micronaut.python.processing.model.DecoratorDef;
 import io.micronaut.python.processing.model.DefaultFactoryDef;
 import io.micronaut.python.processing.model.FunctionDef;
+import io.micronaut.python.processing.staticcompile.Ir;
+import io.micronaut.python.processing.staticcompile.StaticBodyGenerator;
+import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.sourcegen.model.AbstractElementBuilder;
 import io.micronaut.sourcegen.model.AnnotationDef;
@@ -144,6 +147,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String JAVA_LANG_DOUBLE = "java.lang.Double";
     private static final String JAVA_LANG_FLOAT = "java.lang.Float";
     private static final String AS_SHORT = "asShort";
+    private static final String AS_INT = "asInt";
+    private static final String AS_LONG = "asLong";
+    private static final String AS_BOOLEAN = "asBoolean";
+    private static final String AS_BYTE = "asByte";
+    private static final String CHAR_AT = "charAt";
     private static final String AS_DOUBLE = "asDouble";
     private static final String AS_FLOAT = "asFloat";
     private static final String JAVA_LANG_STRING = "java.lang.String";
@@ -1378,7 +1386,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .anyMatch(PythonStubGenerator::isAsyncPythonMethod);
 
         for (MethodElement methodElement : methodsToBridge) {
-            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(isJunit5TestMethod(methodElement)), builder, context, addedMethodNames);
+            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(isJunit5TestMethod(methodElement)), builder, context, addedMethodNames, model);
         }
         // A class can name its own pre-destroy callback with @Bean(preDestroy), the class-level counterpart of the
         // factory case handled in addBridgeMethod. The generated bean definition invokes the callback directly on the
@@ -1394,7 +1402,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .filter(method -> !method.hasParameters())))
             .ifPresent(method -> addBridgeMethod(BridgeMethodSpec.of(method, element), builder, context, addedMethodNames));
         for (MethodElement methodElement : publicMethods) {
-            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(isJunit5TestMethod(methodElement)), builder, context, addedMethodNames);
+            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(isJunit5TestMethod(methodElement)), builder, context, addedMethodNames, model);
         }
 
         return new BridgedMethods(methodsToBridge, hasAsyncBridgeMethod);
@@ -4530,6 +4538,83 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private void addBridgeMethod(BridgeMethodSpec spec, ObjectDefBuilder<?> builder, VisitorContext visitorContext, Set<String> addedMethodNames) {
+        addBridgeMethod(spec, builder, visitorContext, addedMethodNames, null);
+    }
+
+    /**
+     * The statically compiled body of a method of the class being generated, when the plan holds
+     * one for a bridge that can carry it: a plain instance method with its own signature.
+     */
+    private static Ir.@Nullable CompiledBody compiledBody(BridgeMethodSpec spec, @Nullable ClassStubModel model) {
+        if (model == null || spec.junit5Test() || spec.script() || spec.introduced() || spec.returnTypeOverride() != null
+            || spec.signatureMethod() != spec.method() || spec.method().isStatic() || isAsyncPythonMethod(spec.method())) {
+            return null;
+        }
+        StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
+        return plan == null ? null : plan.body(model.element().getName(), spec.method().getName());
+    }
+
+    /**
+     * How a compiled body reaches the properties of {@code self}: the Java field of an introspected
+     * bean, else the member of the Python object behind the stub, converted as the accessors convert it.
+     */
+    private StaticBodyGenerator.SelfAccess selfAccess(ClassStubModel model, VariableDef.This aThis) {
+        return new StaticBodyGenerator.SelfAccess() {
+            @Override
+            public ExpressionDef read(String property, String typeName, TypeDef type) {
+                FieldDef field = model.propertyFields().get(property);
+                if (field != null) {
+                    return aThis.field(field);
+                }
+                ExpressionDef member = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(property));
+                Optional<PropertyElement> element = propertyElement(model, property);
+                if (element.isPresent()) {
+                    return convertValueForType(element.get().getGenericType(), member);
+                }
+                if (!(type instanceof TypeDef.Primitive) && !TypeDef.STRING.equals(type)) {
+                    // a Java or Python object: converted as a property of that type is converted
+                    Optional<ClassElement> propertyType = model.context().getClassElement(typeName.replace('$', '.'));
+                    if (propertyType.isEmpty()) {
+                        propertyType = model.context().getClassElement(typeName);
+                    }
+                    if (propertyType.isPresent()) {
+                        return convertValueForType(propertyType.get(), member);
+                    }
+                }
+                if (type instanceof TypeDef.Primitive primitive) {
+                    return switch (primitive.name()) {
+                        case "int" -> member.invoke(AS_INT, TypeDef.Primitive.INT);
+                        case "long" -> member.invoke(AS_LONG, TypeDef.Primitive.LONG);
+                        case DOUBLE_TYPE -> member.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE);
+                        case FLOAT_TYPE -> member.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT);
+                        case BOOLEAN_TYPE -> member.invoke(AS_BOOLEAN, TypeDef.Primitive.BOOLEAN);
+                        case SHORT_TYPE -> member.invoke(AS_SHORT, TypeDef.Primitive.SHORT);
+                        case "byte" -> member.invoke(AS_BYTE, TypeDef.Primitive.BYTE);
+                        default -> member.invoke(AS_STRING_METHOD, TypeDef.STRING).invoke(CHAR_AT, TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
+                    };
+                }
+                if (TypeDef.STRING.equals(type)) {
+                    return convertNullableValue(member, member.invoke(AS_STRING_METHOD, TypeDef.STRING));
+                }
+                return PYTHON_CONVERSION.invokeStatic(AS_OBJECT_METHOD, TypeDef.OBJECT, member).cast(type);
+            }
+
+            @Override
+            public StatementDef write(String property, TypeDef type, ExpressionDef value) {
+                FieldDef field = model.propertyFields().get(property);
+                if (field != null) {
+                    return aThis.field(field).assign(value);
+                }
+                return aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).invoke(PUT_MEMBER, TypeDef.VOID, ExpressionDef.constant(property), value);
+            }
+        };
+    }
+
+    private static Optional<PropertyElement> propertyElement(ClassStubModel model, String property) {
+        return model.beanProperties().stream().filter(element -> element.getName().equals(property)).findFirst();
+    }
+
+    private void addBridgeMethod(BridgeMethodSpec spec, ObjectDefBuilder<?> builder, VisitorContext visitorContext, Set<String> addedMethodNames, @Nullable ClassStubModel model) {
         MethodElement methodElement = spec.method();
         ClassElement bridgeOwner = spec.owner();
         boolean isJunit5Test = spec.junit5Test();
@@ -4640,6 +4725,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         int receiverOffset = parameters.length - parameterDefs.size();
 
         boolean spreadsVarargs = spreadsVarargs(methodElement, bridgeOwner);
+        Ir.CompiledBody compiledBody = compiledBody(spec, model);
+        if (compiledBody != null && compiledBody.parameterNames().size() == parameterDefs.size()) {
+            // the body runs as Java: no crossing into Python for callers of the stub
+            if (compiledBody.span() != null) {
+                methodBuilder.addJavadoc("Compiled from " + compiledBody.span().location());
+            }
+            builder.addMethod(methodBuilder.build((aThis, methodParameters) ->
+                StaticBodyGenerator.generate(compiledBody, methodParameters, selfAccess(model, aThis))));
+            return;
+        }
         builder.addMethod(methodBuilder
             .build(((aThis, methodParameters) -> rethrowingCheckedExceptions(checkedExceptions, javaClassType(bridgeOwner), () -> {
                 List<ExpressionDef> parameterExpressions = new ArrayList<>();
@@ -5986,22 +6081,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             String referenceTypeName = returnType.getName();
             return switch (referenceTypeName) {
                 case "java.lang.Integer" ->
-                    convertNullableValue(invokedValue, invokedValue.invoke("asInt", TypeDef.Primitive.INT));
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_INT, TypeDef.Primitive.INT));
                 case "java.lang.Boolean" ->
-                    convertNullableValue(invokedValue, invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN));
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_BOOLEAN, TypeDef.Primitive.BOOLEAN));
                 case JAVA_LANG_DOUBLE ->
                     convertNullableValue(invokedValue, invokedValue.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE));
                 case JAVA_LANG_FLOAT ->
                     convertNullableValue(invokedValue, invokedValue.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT));
                 case "java.lang.Long" ->
-                    convertNullableValue(invokedValue, invokedValue.invoke("asLong", TypeDef.Primitive.LONG));
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_LONG, TypeDef.Primitive.LONG));
                 case JAVA_LANG_SHORT ->
                     convertNullableValue(invokedValue, invokedValue.invoke(AS_SHORT, TypeDef.Primitive.SHORT));
                 case "java.lang.Byte" ->
-                    convertNullableValue(invokedValue, invokedValue.invoke("asByte", TypeDef.Primitive.BYTE));
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_BYTE, TypeDef.Primitive.BYTE));
                 case "java.lang.Character" ->
                     convertNullableValue(invokedValue, invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING)
-                        .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
+                        .invoke(CHAR_AT, TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
                 case JAVA_LANG_STRING ->
                     convertNullableValue(invokedValue, invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING));
                 case "java.lang.Object" ->
@@ -6505,22 +6600,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         String primitiveTypeName = returnType.getName();
         return switch (primitiveTypeName) {
             case "int", "java.lang.Integer" ->
-                invokedValue.invoke("asInt", TypeDef.Primitive.INT);
+                invokedValue.invoke(AS_INT, TypeDef.Primitive.INT);
             case BOOLEAN_TYPE, "java.lang.Boolean" ->
-                invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
+                invokedValue.invoke(AS_BOOLEAN, TypeDef.Primitive.BOOLEAN);
             case DOUBLE_TYPE, JAVA_LANG_DOUBLE ->
                 invokedValue.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE);
             case FLOAT_TYPE, JAVA_LANG_FLOAT ->
                 invokedValue.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT);
             case "long", "java.lang.Long" ->
-                invokedValue.invoke("asLong", TypeDef.Primitive.LONG);
+                invokedValue.invoke(AS_LONG, TypeDef.Primitive.LONG);
             case SHORT_TYPE, JAVA_LANG_SHORT ->
                 invokedValue.invoke(AS_SHORT, TypeDef.Primitive.SHORT);
             case "byte", "java.lang.Byte" ->
-                invokedValue.invoke("asByte", TypeDef.Primitive.BYTE);
+                invokedValue.invoke(AS_BYTE, TypeDef.Primitive.BYTE);
             case "char", "java.lang.Character" ->
                 invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING)
-                    .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
+                    .invoke(CHAR_AT, TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
             default -> invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING);
         };
     }
@@ -6560,35 +6655,35 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return convertRuntimeValue(type, member);
         } else if (type.isPrimitive()) {
             return switch (type.getName()) {
-                case "int" -> member.invoke("asInt", TypeDef.Primitive.INT);
-                case BOOLEAN_TYPE -> member.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
+                case "int" -> member.invoke(AS_INT, TypeDef.Primitive.INT);
+                case BOOLEAN_TYPE -> member.invoke(AS_BOOLEAN, TypeDef.Primitive.BOOLEAN);
                 case DOUBLE_TYPE -> member.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE);
                 case FLOAT_TYPE -> member.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT);
-                case "long" -> member.invoke("asLong", TypeDef.Primitive.LONG);
+                case "long" -> member.invoke(AS_LONG, TypeDef.Primitive.LONG);
                 case SHORT_TYPE -> member.invoke(AS_SHORT, TypeDef.Primitive.SHORT);
-                case "byte" -> member.invoke("asByte", TypeDef.Primitive.BYTE);
-                case "char" -> member.invoke(AS_STRING_METHOD, TypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
+                case "byte" -> member.invoke(AS_BYTE, TypeDef.Primitive.BYTE);
+                case "char" -> member.invoke(AS_STRING_METHOD, TypeDef.STRING).invoke(CHAR_AT, TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
                 default -> member.invoke(AS_STRING_METHOD, TypeDef.STRING);
             };
         } else {
             String referenceTypeName = type.getName();
             switch (referenceTypeName) {
                 case "java.lang.Integer":
-                    return convertNullableValue(member, member.invoke("asInt", TypeDef.Primitive.INT));
+                    return convertNullableValue(member, member.invoke(AS_INT, TypeDef.Primitive.INT));
                 case "java.lang.Boolean":
-                    return convertNullableValue(member, member.invoke("asBoolean", TypeDef.Primitive.BOOLEAN));
+                    return convertNullableValue(member, member.invoke(AS_BOOLEAN, TypeDef.Primitive.BOOLEAN));
                 case JAVA_LANG_DOUBLE:
                     return convertNullableValue(member, member.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE));
                 case JAVA_LANG_FLOAT:
                     return convertNullableValue(member, member.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT));
                 case "java.lang.Long":
-                    return convertNullableValue(member, member.invoke("asLong", TypeDef.Primitive.LONG));
+                    return convertNullableValue(member, member.invoke(AS_LONG, TypeDef.Primitive.LONG));
                 case JAVA_LANG_SHORT:
                     return convertNullableValue(member, member.invoke(AS_SHORT, TypeDef.Primitive.SHORT));
                 case "java.lang.Byte":
-                    return convertNullableValue(member, member.invoke("asByte", TypeDef.Primitive.BYTE));
+                    return convertNullableValue(member, member.invoke(AS_BYTE, TypeDef.Primitive.BYTE));
                 case "java.lang.Character":
-                    return convertNullableValue(member, member.invoke(AS_STRING_METHOD, TypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
+                    return convertNullableValue(member, member.invoke(AS_STRING_METHOD, TypeDef.STRING).invoke(CHAR_AT, TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
                 case JAVA_LANG_STRING:
                     return convertNullableValue(member, member.invoke(AS_STRING_METHOD, TypeDef.STRING));
                 default:

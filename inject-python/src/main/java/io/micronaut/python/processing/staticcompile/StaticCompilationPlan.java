@@ -18,27 +18,66 @@ package io.micronaut.python.processing.staticcompile;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 
+import org.jspecify.annotations.Nullable;
+
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
- * What the planner decided for a compilation: one decision per function, and the diagnostics for
- * the explicit switches it could not honour.
+ * What the planner decided for a compilation: one decision per function, the bodies it lowered,
+ * and the diagnostics for the explicit switches it could not honour.
  *
  * @param decisions   The decisions, in source order
+ * @param bodies      The compiled bodies by {@link Ir.CompiledBody#key()}
  * @param diagnostics The warnings (errors in strict mode) for explicit switches that are not honoured
  * @author Graeme Rocher
  * @since 5.3.0
  */
 @Experimental
-public record StaticCompilationPlan(List<StaticCompilationDecision> decisions, List<PythonDiagnostic> diagnostics) {
+public record StaticCompilationPlan(List<StaticCompilationDecision> decisions,
+                                    Map<String, Ir.CompiledBody> bodies,
+                                    List<PythonDiagnostic> diagnostics) {
 
     /**
      * An empty plan.
      */
-    public static final StaticCompilationPlan EMPTY = new StaticCompilationPlan(List.of(), List.of());
+    public static final StaticCompilationPlan EMPTY = new StaticCompilationPlan(List.of(), Map.of(), List.of());
 
     public StaticCompilationPlan {
         decisions = decisions == null ? List.of() : List.copyOf(decisions);
+        bodies = bodies == null ? Map.of() : Map.copyOf(bodies);
         diagnostics = diagnostics == null ? List.of() : List.copyOf(diagnostics);
+    }
+
+    /**
+     * A plan without compiled bodies.
+     *
+     * @param decisions   The decisions
+     * @param diagnostics The diagnostics
+     */
+    public StaticCompilationPlan(List<StaticCompilationDecision> decisions, List<PythonDiagnostic> diagnostics) {
+        this(decisions, Map.of(), diagnostics);
+    }
+
+    /**
+     * @param bodies The compiled bodies
+     * @return The bodies by key
+     */
+    public static Map<String, Ir.CompiledBody> byKey(List<Ir.CompiledBody> bodies) {
+        Map<String, Ir.CompiledBody> map = new LinkedHashMap<>();
+        for (Ir.CompiledBody body : bodies) {
+            map.put(body.key(), body);
+        }
+        return map;
+    }
+
+    /**
+     * @param className  The generated class
+     * @param methodName The method
+     * @return The compiled body of the method, or {@code null} when it is not compiled
+     */
+    public Ir.@Nullable CompiledBody body(String className, String methodName) {
+        return bodies.get(Ir.CompiledBody.key(className, methodName));
     }
 }
