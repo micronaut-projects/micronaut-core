@@ -322,7 +322,8 @@ class Pair:
                 results[m]['copied'] = calc.copied(new ArrayList<>(['a'])).collect { it.toString() }
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
-                    assert compiled.containsAll(CASES*.get(0).unique().collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied']), decisions.toString()
+                    // guarded and rows call sibling methods, which have no static lowering yet: they run in Python in both modes
+                    assert compiled.containsAll((CASES*.get(0).unique() - ['guarded']).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied']), decisions.toString()
                 }
             } finally {
                 context.close()
