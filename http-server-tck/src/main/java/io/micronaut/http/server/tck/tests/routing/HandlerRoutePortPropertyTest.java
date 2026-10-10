@@ -17,6 +17,7 @@ package io.micronaut.http.server.tck.tests.routing;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -34,9 +35,11 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.ServerSocket;
 import java.net.http.HttpClient;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
  * The port of a handler route and of a group given as a property expression,
@@ -55,9 +58,9 @@ public class HandlerRoutePortPropertyTest {
 
     @Test
     void theRoutesOnAPortPropertyAnswerOnThatPortOnlyLikeAControllerWithThePortProperty() throws Exception {
-        ExtraPortServer started = ExtraPortServer.start(SPEC_NAME, PORT_PROPERTY);
-        int port = started.port();
-        try (ServerUnderTest server = started.server()) {
+        int port = SocketUtils.findAvailableTcpPort();
+        try (ServerUnderTest server = PortRouteTestServer.start(SPEC_NAME, PORT_PROPERTY, port)) {
+            port = server.getApplicationContext().getProperty(PORT_PROPERTY, Integer.class).orElseThrow();
             for (String path : new String[]{"/port-property/group", "/port-property/route", "/port-property/default", "/port-property-controller"}) {
                 assertEquals(200, status(port, path), path);
                 assertEquals("ported", body(port, path), path);
@@ -69,6 +72,16 @@ public class HandlerRoutePortPropertyTest {
                 .status(HttpStatus.OK)
                 .body("plain")
                 .build());
+        }
+    }
+
+    @Test
+    void retriesWhenTheChosenPortIsOccupied() throws Exception {
+        try (ServerSocket occupied = new ServerSocket(0);
+             ServerUnderTest server = PortRouteTestServer.start(SPEC_NAME, PORT_PROPERTY, occupied.getLocalPort())) {
+            int port = server.getApplicationContext().getProperty(PORT_PROPERTY, Integer.class).orElseThrow();
+            assertNotEquals(occupied.getLocalPort(), port);
+            assertEquals("ported", body(port, "/port-property/route"));
         }
     }
 

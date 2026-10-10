@@ -17,6 +17,7 @@ package io.micronaut.http.server.tck.tests.routing;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -55,9 +56,9 @@ public class HandlerRoutePortTest {
 
     @Test
     void theRoutesOfAGroupWithAPortAnswerOnThatPortOnlyLikeAControllerWithAPort() throws Exception {
-        ExtraPortServer started = ExtraPortServer.start(SPEC_NAME, PORT_PROPERTY);
-        int port = started.port();
-        try (ServerUnderTest server = started.server()) {
+        int port = SocketUtils.findAvailableTcpPort();
+        try (ServerUnderTest server = PortRouteTestServer.start(SPEC_NAME, PORT_PROPERTY, port)) {
+            port = server.getApplicationContext().getProperty(PORT_PROPERTY, Integer.class).orElseThrow();
             for (String path : new String[]{"/port-routes/group", "/port-routes/group/nested", "/port-routes/route", "/port-controller"}) {
                 assertEquals(200, status(port, path), path);
                 assertEquals("ported", body(port, path), path);
