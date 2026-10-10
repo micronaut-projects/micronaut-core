@@ -57,7 +57,7 @@ class PieceReaderPublisherConcurrencyTest {
 
     @Test
     void requestsOnAnotherThreadNeverAskForASecondPiece() throws Exception {
-        try (ExecutorService requester = Executors.newSingleThreadExecutor(); AutoCloseable stop = requester::shutdownNow) {
+        try (ExecutorService requester = Executors.newSingleThreadExecutor()) {
             for (int round = 0; round < 200; round++) {
                 int count = 500;
                 Flux<ReadBuffer> input = Flux.range(0, count)
@@ -209,7 +209,7 @@ class PieceReaderPublisherConcurrencyTest {
 
     @Test
     void cancelRacingRequestNeverFailsTheRequest() throws Exception {
-        try (ExecutorService canceller = Executors.newSingleThreadExecutor(); AutoCloseable stop = canceller::shutdownNow) {
+        try (ExecutorService canceller = Executors.newSingleThreadExecutor()) {
             for (int round = 0; round < 2000; round++) {
                 StrictElements elements = new StrictElements();
                 AtomicReference<Subscription> subscription = new AtomicReference<>();

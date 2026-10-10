@@ -12,7 +12,6 @@ micronautBuild {
 }
 
 dependencies {
-    annotationProcessor(projects.micronautInjectJava)
     api(projects.micronautContext)
     api(projects.micronautHttpClientCore)
     api(projects.micronautWebsocket)
@@ -20,7 +19,8 @@ dependencies {
     api(libs.managed.netty.handler.proxy)
 
     compileOnly(projects.micronautHttpNettyHttp3)
-    testImplementation(projects.micronautHttpNettyHttp3)
+
+    annotationProcessor(projects.micronautInjectJava)
 
     testAnnotationProcessor(platform(libs.test.boms.micronaut.validation))
     testAnnotationProcessor(libs.micronaut.validation.processor) {
@@ -29,8 +29,9 @@ dependencies {
     testAnnotationProcessor(projects.micronautInjectJava)
 
     testCompileOnly(projects.micronautInjectGroovy)
-    testImplementation(projects.micronautInject)
 
+    testImplementation(projects.micronautHttpNettyHttp3)
+    testImplementation(projects.micronautInject)
     testImplementation(platform(libs.test.boms.micronaut.validation))
     testImplementation(libs.micronaut.validation) {
         exclude(group = "io.micronaut")
