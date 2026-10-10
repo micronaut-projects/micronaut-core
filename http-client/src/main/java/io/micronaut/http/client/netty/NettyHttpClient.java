@@ -898,7 +898,7 @@ final class NettyHttpClient implements
             .flatMapMany(response -> {
                 BodyElements<ByteBuffer<?>> pieces = Objects.requireNonNull(response.body(), "The response has no body");
                 return Flux.from(pieces(pieces))
-                    .map(piece -> (HttpResponse<ByteBuffer<?>>) new ElementResponse<ByteBuffer<?>>(response, piece));
+                    .map(piece -> (HttpResponse<ByteBuffer<?>>) new ElementResponse<>(response, piece));
             }));
     }
 

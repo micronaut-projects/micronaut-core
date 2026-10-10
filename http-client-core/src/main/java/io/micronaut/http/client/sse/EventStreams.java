@@ -108,7 +108,7 @@ public final class EventStreams {
                                                                    Argument<B> eventType,
                                                                    long maxBufferSize,
                                                                    UnaryOperator<HttpClientException> decorate) {
-        Function<Throwable, Throwable> wrap = error -> wrap(error, decorate);
+        UnaryOperator<Throwable> wrap = error -> wrap(error, decorate);
         CloseableByteBody body = response.byteBody().move();
         try {
             MediaType contentType = response.getContentType().orElse(null);
@@ -214,7 +214,7 @@ public final class EventStreams {
                                                                               Argument<B> eventType,
                                                                               long maxBufferSize,
                                                                               UnaryOperator<HttpClientException> decorate) {
-        Function<Throwable, Throwable> wrap = error -> error instanceof DataDecodeFailure failure && failure.getCause() != null
+        UnaryOperator<Throwable> wrap = error -> error instanceof DataDecodeFailure failure && failure.getCause() != null
             ? failure.getCause()
             : wrap(error, decorate);
         CloseableByteBody body = response.byteBody().move();
