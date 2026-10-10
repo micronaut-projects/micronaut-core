@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.model;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.python.processing.util.PythonValues;
 import java.util.List;
 import java.util.Objects;
@@ -39,6 +40,7 @@ import java.util.Objects;
  * @param injected Whether the parameter is injected with a bean by its default ({@code ctx: ApplicationContext = Inject()}) rather than passed by the caller.
  * @author Micronaut Team
  * @since 5.2.0
+ * @param span The location of the definition in its Python source, or {@code null} for a generated definition
  */
 @Experimental
 public record ArgumentDef(
@@ -51,7 +53,8 @@ public record ArgumentDef(
     String documentation,
     FunctionDef declaringFunction,
     boolean variadic,
-    boolean injected
+    boolean injected,
+    @Nullable SourceSpan span
 ) implements ElementDef {
 
     public ArgumentDef {
@@ -77,15 +80,15 @@ public record ArgumentDef(
      */
     public ArgumentDef(String name, String annotation, TypeRef typeAnnotation, Object defaultValue, boolean hasDefaultValue,
                        List<DecoratorDef> decorators, String documentation, FunctionDef declaringFunction, boolean variadic) {
-        this(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic, false);
+        this(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic, false, null);
     }
 
     public ArgumentDef(String name, TypeRef typeAnnotation) {
-        this(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, null, false, List.of(), null, null, false);
+        this(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, null, false, List.of(), null, null, false, false, null);
     }
 
     public ArgumentDef(String name, String annotation, TypeRef typeAnnotation, Object defaultValue, List<DecoratorDef> decorators, String documentation) {
-        this(name, annotation, typeAnnotation, defaultValue, defaultValue != null, decorators, documentation, null, false);
+        this(name, annotation, typeAnnotation, defaultValue, defaultValue != null, decorators, documentation, null, false, false, null);
     }
 
     public ArgumentDef(String name,
@@ -95,7 +98,7 @@ public record ArgumentDef(
                        List<DecoratorDef> decorators,
                        String documentation,
                        FunctionDef declaringFunction) {
-        this(name, annotation, typeAnnotation, defaultValue, defaultValue != null, decorators, documentation, declaringFunction, false);
+        this(name, annotation, typeAnnotation, defaultValue, defaultValue != null, decorators, documentation, declaringFunction, false, false, null);
     }
 
     @Override
@@ -120,7 +123,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name, TypeRef typeAnnotation) {
-        return new ArgumentDef(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, null, false, List.of(), null, null, false);
+        return new ArgumentDef(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, null, false, List.of(), null, null, false, false, null);
     }
 
     /**
@@ -130,7 +133,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name) {
-        return new ArgumentDef(name, null, null, null, false, List.of(), null, null, false);
+        return new ArgumentDef(name, null, null, null, false, List.of(), null, null, false, false, null);
     }
 
     /**
@@ -142,7 +145,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name, TypeRef typeAnnotation, Object defaultValue) {
-        return new ArgumentDef(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, defaultValue, defaultValue != null, List.of(), null, null, false);
+        return new ArgumentDef(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, defaultValue, defaultValue != null, List.of(), null, null, false, false, null);
     }
 
     /**
@@ -155,7 +158,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name, TypeRef typeAnnotation, Object defaultValue, String documentation) {
-        return new ArgumentDef(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, defaultValue, defaultValue != null, List.of(), documentation, null, false);
+        return new ArgumentDef(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, defaultValue, defaultValue != null, List.of(), documentation, null, false, false, null);
     }
 
     /**
@@ -170,7 +173,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name, String annotation, TypeRef typeAnnotation, Object defaultValue, List<DecoratorDef> decorators, String documentation) {
-        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, defaultValue != null, decorators, documentation, null, false);
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, defaultValue != null, decorators, documentation, null, false, false, null);
     }
 
     /**
@@ -192,7 +195,7 @@ public record ArgumentDef(
                                  boolean hasDefaultValue,
                                  List<DecoratorDef> decorators,
                                  String documentation) {
-        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, null, false);
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, null, false, false, null);
     }
 
     /**
@@ -202,7 +205,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef with the declaring function set
      */
     public ArgumentDef withDeclaringFunction(FunctionDef declaringFunction) {
-        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic, injected);
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic, injected, span);
     }
 
     /**
@@ -212,7 +215,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef with the variadic flag set
      */
     public ArgumentDef withVariadic(boolean variadic) {
-        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic, injected);
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic, injected, span);
     }
 
     /**
@@ -223,6 +226,15 @@ public record ArgumentDef(
      * @since 5.3.0
      */
     public ArgumentDef withInjected(boolean injected) {
-        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic, injected);
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic, injected, span);
+    }
+
+    /**
+     * @param span The location of the definition in its Python source
+     * @return A copy of this definition located at the given span
+     * @since 5.3.0
+     */
+    public ArgumentDef withSpan(@Nullable SourceSpan span) {
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic, injected, span);
     }
 }
