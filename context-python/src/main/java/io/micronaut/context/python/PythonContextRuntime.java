@@ -1233,34 +1233,6 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * An instance allocated by {@link #allocateInstance}, with the arguments its {@code __init__}
-     * receives from {@link #initializeInstance(AllocatedInstance)}.
-     *
-     * @since 5.2.16
-     */
-    public static final class AllocatedInstance {
-        private final Value instance;
-        private final Value pythonClass;
-        private final Object[] arguments;
-        private final boolean initialized;
-
-        private AllocatedInstance(Value instance, Value pythonClass, Object[] arguments, boolean initialized) {
-            this.instance = instance;
-            this.pythonClass = pythonClass;
-            this.arguments = arguments;
-            this.initialized = initialized;
-        }
-
-        /**
-         * @return The instance, not initialized yet
-         */
-        @UsedByGeneratedCode
-        public Value instance() {
-            return instance;
-        }
-    }
-
-    /**
      * Create a new instance and set properties via member assignment when no constructor exists.
      *
      * @param classReference The Python class reference
@@ -1928,6 +1900,34 @@ public final class PythonContextRuntime {
                 + ", displayName=" + displayName
                 + ", cacheKey=" + cacheKey
                 + ']';
+        }
+    }
+
+    /**
+     * An instance allocated by {@link #allocateInstance}, with the arguments its {@code __init__}
+     * receives from {@link #initializeInstance(AllocatedInstance)}.
+     *
+     * @since 5.2.16
+     */
+    public static final class AllocatedInstance {
+        private final Value instance;
+        private final Value pythonClass;
+        private final Object[] arguments;
+        private final boolean initialized;
+
+        private AllocatedInstance(Value instance, Value pythonClass, Object[] arguments, boolean initialized) {
+            this.instance = instance;
+            this.pythonClass = pythonClass;
+            this.arguments = arguments;
+            this.initialized = initialized;
+        }
+
+        /**
+         * @return The instance, not initialized yet
+         */
+        @UsedByGeneratedCode
+        public Value instance() {
+            return instance;
         }
     }
 }
