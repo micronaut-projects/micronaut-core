@@ -20,6 +20,7 @@ import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.propagation.ReactivePropagation;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.convert.ConversionService;
@@ -202,7 +203,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -1783,12 +1787,19 @@ final class NettyHttpClient implements
             return ExecutionFlow.error(decorate(new NoHostException("Request URI specifies no host to connect to")));
         }
         ExecutionFlow<ServiceInstance> selected;
-        if (loadBalancer instanceof FixedLoadBalancer fixed) {
+        if (loadBalancer instanceof FixedLoadBalancer fixed && fixed.getClass() == FixedLoadBalancer.class) {
+            // only the built-in one: a subclass of FixedLoadBalancer may override select
             selected = ExecutionFlow.just(fixed.getServiceInstance());
         } else {
             // a synchronous balancer (round-robin) completes right away, so the request proceeds
-            // without a Reactor chain
-            selected = ReactiveExecutionFlow.fromPublisherEager(loadBalancer.select(getLoadBalancerDiscriminator(request)), PropagatedContext.getOrEmpty());
+            // without an asynchronous chain
+            LoadBalancer lb = loadBalancer;
+            Object discriminator = getLoadBalancerDiscriminator(request);
+            CompletionStage<@Nullable ServiceInstance> selection = CompletionStagePublishers.orElse(
+                lb.selectAsync(discriminator),
+                () -> CompletionStagePublishers.first(lb.select(discriminator), null)
+            );
+            selected = toFlow(selection.toCompletableFuture(), PropagatedContext.getOrEmpty());
         }
 
         LoadBalancer balancer = loadBalancer;
@@ -1807,6 +1818,44 @@ final class NettyHttpClient implements
                 }
             }
         );
+    }
+
+    /**
+     * The flow of a selection of the load balancer. A selection that is not complete yet is
+     * cancelled when the flow is, if the framework created it, and completes the flow in the
+     * propagated context of the request, so that the steps of the flow run in it, as they did
+     * with the publisher of the selection.
+     *
+     * @param future            The selection
+     * @param propagatedContext The propagated context of the request
+     * @return The flow
+     */
+    private static ExecutionFlow<ServiceInstance> toFlow(CompletableFuture<@Nullable ServiceInstance> future, PropagatedContext propagatedContext) {
+        if (future.isDone()) {
+            try {
+                return ExecutionFlow.just(future.join());
+            } catch (CompletionException | CancellationException e) {
+                return ExecutionFlow.error(CompletionStagePublishers.unwrap(e));
+            }
+        }
+        DelayedExecutionFlow<ServiceInstance> flow = DelayedExecutionFlow.create();
+        future.whenComplete((instance, throwable) -> {
+            if (propagatedContext.isEmpty() || propagatedContext.isBound()) {
+                complete(flow, instance, throwable);
+            } else {
+                propagatedContext.propagate(() -> complete(flow, instance, throwable));
+            }
+        });
+        flow.onCancel(() -> CompletionStagePublishers.cancel(future));
+        return flow;
+    }
+
+    private static void complete(DelayedExecutionFlow<ServiceInstance> flow, @Nullable ServiceInstance instance, @Nullable Throwable throwable) {
+        if (throwable != null) {
+            flow.completeExceptionally(CompletionStagePublishers.unwrap(throwable));
+        } else {
+            flow.complete(instance);
+        }
     }
 
     private <R extends HttpResponse<?>> ExecutionFlow<R> handleStreamHttpError(
