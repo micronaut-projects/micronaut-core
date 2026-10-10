@@ -1116,6 +1116,16 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
+     * The resource changes of a batch as the file system has them now, a late report of a write or a deletion settled.
+     */
+    private Map<ResourceKind, SourceChanges> settledResources(Map<ResourceKind, SourceChanges> resources) {
+        return ResourceNotifier.settle(resources, this::liveRemoved, file -> {
+            Path root = mostSpecificRoot(file);
+            return root == null ? null : resourceRootKinds.get(root);
+        });
+    }
+
+    /**
      * The deepest resource root a file is under, which decides its kind when roots nest.
      */
     @Nullable
@@ -1133,7 +1143,7 @@ public final class DevRuntime implements Closeable {
     /**
      * @return The sequence number of the batch, which {@link #awaitBatch} waits for
      */
-    private long enqueue(Pending batch) {
+    long enqueue(Pending batch) {
         if (closed || batch.isEmpty()) {
             // a watcher over a nesting root sees the files of the nested one too, and keeps none of them
             return completed.get();
@@ -1153,7 +1163,7 @@ public final class DevRuntime implements Closeable {
      * Waits until the worker has handled the batch with the given sequence number, whichever merge it
      * ended up in.
      */
-    private void awaitBatch(long sequence) {
+    void awaitBatch(long sequence) {
         long deadline = System.nanoTime() + START_TIMEOUT.toNanos() + APP_STOP_TIMEOUT.toNanos();
         while (completed.get() < sequence && !closed) {
             if (System.nanoTime() > deadline) {
@@ -1285,7 +1295,7 @@ public final class DevRuntime implements Closeable {
     private void handle(Pending next) {
         TestSession session = tests;
         if (session != null) {
-            session.handle(next.sources, next.testSources, next.resources, next.full, next.requested);
+            session.handle(next.sources, next.testSources, settledResources(next.resources), next.full, next.requested);
             return;
         }
         long start = System.nanoTime();
@@ -1316,7 +1326,7 @@ public final class DevRuntime implements Closeable {
         // every resource change reaches the running context's watches, those under the configuration root too;
         // a configuration file changed also refreshes the configuration
         ApplicationContext current = context;
-        boolean configurationChanged = ResourceNotifier.notify(current, batch.resources, this::rootsOf, this::refreshBrowsers);
+        boolean configurationChanged = ResourceNotifier.notify(current, settledResources(batch.resources), this::rootsOf, this::refreshBrowsers);
         OutputSnapshot previous = snapshot;
         OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
         ChangeSet changeSet = previous.diff(latest);
