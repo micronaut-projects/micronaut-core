@@ -79,4 +79,37 @@ class ScheduledMethodWatcherSpec extends Specification {
         cleanup:
         context.close()
     }
+
+    void "a scheduled method is scheduled once at startup, and once per entry of an @EachProperty or @EachBean bean"() {
+        given:
+        OnceScheduledTask.RUNS.set(0)
+        EntryScheduledTask.RUNS.clear()
+        EntryBeanScheduledTask.RUNS.clear()
+        def context = ApplicationContext.run([
+                "spec.name"                     : "ScheduledMethodWatcherSpec-entries",
+                "scheduled-watch.jobs.a.enabled": true,
+                "scheduled-watch.jobs.b.enabled": true,
+        ])
+        def processor = context.getBean(ScheduledMethodProcessor)
+        def conditions = new PollingConditions(timeout: 5)
+
+        expect: "each entry's method runs on its own bean, and every method runs once: its next run is an hour away"
+        conditions.eventually {
+            OnceScheduledTask.RUNS.get() == 1
+            EntryScheduledTask.RUNS.sort(false) == ["a", "b"]
+            EntryBeanScheduledTask.RUNS.sort(false) == ["a", "b"]
+        }
+        processor.scheduledMethods() == 5
+
+        when:
+        Thread.sleep(200)
+
+        then: "no method was scheduled twice"
+        OnceScheduledTask.RUNS.get() == 1
+        EntryScheduledTask.RUNS.size() == 2
+        EntryBeanScheduledTask.RUNS.size() == 2
+
+        cleanup:
+        context.close()
+    }
 }
