@@ -61,6 +61,41 @@ class Child extends Base<String> implements Titled {
         hierarchy.getDeclaringTypes(methods.getName) == [base, named]
     }
 
+    void "an inherited method lists an interface the introspected type introduces"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Child', '''
+package test
+
+import io.micronaut.context.annotation.Executable
+import io.micronaut.core.annotation.Introspected
+
+interface Deep {
+    String run()
+}
+
+interface Contract {
+    String run()
+}
+
+class Parent implements Deep {
+    @Executable
+    String run() { "parent" }
+}
+
+@Introspected(hierarchy = true)
+class Child extends Parent implements Contract {
+}
+''')
+        def hierarchy = introspection.getTypeHierarchy().orElseThrow()
+        def loader = introspection.beanType.classLoader
+        def (parent, deep, contract) = ['Parent', 'Deep', 'Contract'].collect { loader.loadClass('test.' + it) }
+        def run = introspection.beanMethods.find { it.name == 'run' }
+
+        then:
+        hierarchy.getDeclaringTypes(run) == [parent, contract, deep]
+        !hierarchy.isDeclared(run)
+    }
+
     void "an introspection does not describe the hierarchy by default"() {
         expect:
         !buildBeanIntrospection('test.Plain', '''

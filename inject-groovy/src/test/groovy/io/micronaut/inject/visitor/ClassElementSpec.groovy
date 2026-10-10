@@ -2022,6 +2022,35 @@ class UserController implements MyApi {
             ce.getMethods().get(0).overriddenMethods.size() == 1
     }
 
+    void "test inherited method reports the interface methods the subclass introduces"() {
+        given:
+        ClassElement ce = buildClassElement('''
+package test
+
+interface Deep {
+    void run()
+}
+
+interface Contract {
+    void run()
+}
+
+class Parent implements Deep {
+    void run() {
+    }
+}
+
+class Child extends Parent implements Contract, Runnable {
+}
+''')
+        def method = ce.getEnclosedElements(ElementQuery.ALL_METHODS.named("run"))
+            .find { it.declaringType.name == "test.Parent" }
+
+        expect:
+        ce.name == "test.Child"
+        method.overriddenMethods*.declaringType*.name == ["test.Deep", "test.Contract", "java.lang.Runnable"]
+    }
+
     void "test how the annotations from the type are propagated"() {
         given:
             ClassElement ce = buildClassElement('''\
