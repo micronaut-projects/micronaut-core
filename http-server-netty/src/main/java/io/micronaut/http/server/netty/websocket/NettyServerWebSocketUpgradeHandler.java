@@ -29,7 +29,6 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.context.ServerHttpRequestContext;
-import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
@@ -45,7 +44,6 @@ import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.web.router.RouteAttributes;
-import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.websocket.CloseReason;
@@ -80,7 +78,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * Handles WebSocket upgrade requests.
@@ -199,28 +196,26 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 return;
             }
 
-            // the conditions of the route, e.g. a @RouteCondition, which reads the request of the
-            // context, apply to the upgrade request
-            Optional<UriRouteMatch<Object, Object>> optionalRoute = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(msg))
-                .propagate(() -> router.<Object, Object>find(HttpMethod.GET, msg.getPath(), msg)
-                    .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
-                    .filter(rm -> rm.getRouteInfo().matching(msg))
-                    .findFirst());
-
-            WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, optionalRoute.orElse(null));
+            // the route is matched by the lifecycle, after the pre-matching filters, so that a
+            // failure to match, e.g. of a route condition, is answered with an error response
+            WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, router);
             ExecutionFlow<HttpResponse<?>> responseFlow = ExecutionFlow.async(
                 ctx.channel().eventLoop(),
                 () -> PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(msg))
                     .propagate(() -> requestLifecycle.handle(msg))
             );
-            responseFlow.onComplete((response, throwable) -> {
+            responseFlow.onComplete((r, throwable) -> {
+                HttpResponse<?> response = r;
                 if (response == null) {
-                    return;
+                    // the lifecycle answers failures itself, this is a last resort so that the
+                    // client is not left waiting for a response
+                    response = routeExecutor.createDefaultErrorResponse(msg, throwable == null ? new IllegalStateException("No response to the WebSocket upgrade request") : throwable);
                 }
+                HttpResponse<?> actualResponse = response;
                 if (ctx.executor().inEventLoop()) {
-                    writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, response, outboundAccess);
+                    writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, actualResponse, outboundAccess);
                 } else {
-                    ctx.executor().execute(() -> writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, response, outboundAccess));
+                    ctx.executor().execute(() -> writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, actualResponse, outboundAccess));
                 }
             });
         } else {
@@ -419,16 +414,17 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     }
 
     private static final class WebsocketRequestLifecycle extends RequestLifecycle {
-        @Nullable
-        final RouteMatch<?> route;
+        private final Router router;
 
         boolean shouldProceedNormally;
         @Nullable
         private NettyHttpRequest<?> nettyRequest;
+        @Nullable
+        private MutableHttpResponse<?> proceed;
 
-        WebsocketRequestLifecycle(RouteExecutor routeExecutor, @Nullable RouteMatch<?> route) {
+        WebsocketRequestLifecycle(RouteExecutor routeExecutor, Router router) {
             super(routeExecutor);
-            this.route = route;
+            this.router = router;
         }
 
         @Override
@@ -439,25 +435,35 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             }
         }
 
+        @Override
+        protected @Nullable UriRouteMatch<Object, Object> matchRoute(HttpRequest<?> request) {
+            // the conditions of the route, e.g. a @RouteCondition, which reads the request of the
+            // context, apply to the upgrade request
+            return PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request))
+                .propagate(() -> router.<Object, Object>find(HttpMethod.GET, request.getPath(), request)
+                    .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
+                    .filter(rm -> rm.getRouteInfo().matching(request))
+                    .findFirst()
+                    .orElse(null));
+        }
+
+        @Override
+        protected ExecutionFlow<HttpResponse<?>> provideRouteResponse(HttpRequest<?> request,
+                                                                      @Nullable UriRouteMatch<Object, Object> routeMatch,
+                                                                      PropagatedContext propagatedContext) {
+            if (routeMatch == null) {
+                return ExecutionFlow.error(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
+            }
+            MutableHttpResponse<?> response = HttpResponse.ok();
+            RouteAttributes.setRouteMatch(response, routeMatch);
+            RouteAttributes.setRouteInfo(response, routeMatch.getRouteInfo());
+            proceed = response;
+            return ExecutionFlow.just(response);
+        }
+
         ExecutionFlow<HttpResponse<?>> handle(NettyHttpRequest<?> request) {
             this.nettyRequest = request;
-            MutableHttpResponse<?> proceed = HttpResponse.ok();
-
-            if (route != null) {
-                RouteAttributes.setRouteMatch(request, route);
-                RouteAttributes.setRouteInfo(request, route.getRouteInfo());
-                RouteAttributes.setRouteMatch(proceed, route);
-                RouteAttributes.setRouteInfo(proceed, route.getRouteInfo());
-            }
-
-            ExecutionFlow<HttpResponse<?>> response;
-            if (route != null) {
-                response = runWithFilters(request, (filteredRequest, propagatedContext) -> ExecutionFlow.just(proceed));
-            } else {
-                response = onError(request, new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"))
-                    .putInContext(ServerRequestContext.KEY, request);
-            }
-            return response.map(r -> {
+            return normalFlow(request).map(r -> {
                 if (r == proceed) {
                     shouldProceedNormally = true;
                 }
