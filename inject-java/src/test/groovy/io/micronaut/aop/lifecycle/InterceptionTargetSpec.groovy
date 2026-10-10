@@ -177,4 +177,150 @@ class Probe {
         cleanup:
         context.close()
     }
+
+    void 'test a qualified per target interceptor of an @EachBean learns the definition of each of two targets - #parameter'() {
+        given:
+        ApplicationContext context = buildContext('intercepted.MyBean', eachBeanInterceptorSource(around, kinds, parameter),
+            true, PROPERTIES + ['seeds.a.value': 'a', 'seeds.b.value': 'b'])
+        Class<?> beanType = context.classLoader.loadClass('intercepted.MyBean')
+        Class<?> seen = context.classLoader.loadClass('intercepted.Seen')
+        Map<String, BeanDefinition<?>> definitions = seen.DEFINITIONS
+        List<Boolean> dependencyTargets = seen.DEPENDENCY_TARGETS
+
+        when:
+        def one = context.getBean(beanType, Qualifiers.byName('one'))
+        def two = context.getBean(beanType, Qualifiers.byName('two'))
+
+        then:
+        one.work() == 'one'
+        two.work() == 'two'
+        definitions.keySet() == ['a/one', 'b/one', 'a/two', 'b/two'] as Set
+        definitions.values().every { definition -> definition != null && definition.beanType == beanType }
+        definitions['a/one'].declaredQualifier == Qualifiers.byName('one')
+        definitions['b/one'].declaredQualifier == Qualifiers.byName('one')
+        definitions['a/two'].declaredQualifier == Qualifiers.byName('two')
+        definitions['b/two'].declaredQualifier == Qualifiers.byName('two')
+
+        and: 'the dependencies of the interceptors, qualified ones too, are not told the bean'
+        dependencyTargets.size() == 8
+        dependencyTargets.every { !it }
+
+        cleanup:
+        context.close()
+
+        where:
+        around                                                                        | kinds                                                        | parameter
+        ''                                                                            | '@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)' | 'InterceptionTarget target'
+        ''                                                                            | '@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)' | '@Nullable InterceptionTarget target'
+        '@Around(proxyTarget = true, lazyInterceptorsPerTarget = true)'               | '@InterceptorBinding(kind = InterceptorKind.AROUND)'         | 'InterceptionTarget target'
+        '@Around(proxyTarget = true, lazy = true, lazyInterceptorsPerTarget = true)'  | '@InterceptorBinding(kind = InterceptorKind.AROUND)'         | 'InterceptionTarget target'
+    }
+
+    private static String eachBeanInterceptorSource(String around, String kinds, String parameter) {
+        """
+package intercepted;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.InterceptionTarget;
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.inject.BeanDefinition;
+import jakarta.annotation.PostConstruct;
+import org.jspecify.annotations.Nullable;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+$kinds
+@interface Seeded {
+}
+
+class Seen {
+    // the name of the seed of the interceptor / the name of the target -> the definition the interceptor was created for
+    static final Map<String, BeanDefinition<?>> DEFINITIONS = Collections.synchronizedMap(new LinkedHashMap<>());
+    // whether a dependency of an interceptor was told an intercepted bean, for each dependency created
+    static final List<Boolean> DEPENDENCY_TARGETS = Collections.synchronizedList(new ArrayList<>());
+}
+
+@EachProperty("seeds")
+class Seed {
+    final String name;
+    String value;
+
+    Seed(@Parameter String name) {
+        this.name = name;
+    }
+
+    public String getValue() { return value; }
+
+    public void setValue(String value) { this.value = value; }
+}
+
+@Prototype
+class Dependency {
+    Dependency(@Nullable InterceptionTarget target) {
+        Seen.DEPENDENCY_TARGETS.add(target != null);
+    }
+}
+
+@EachBean(Seed.class)
+@Prototype
+class SeedDependency {
+    SeedDependency(Seed seed, @Nullable InterceptionTarget target) {
+        Seen.DEPENDENCY_TARGETS.add(target != null);
+    }
+}
+
+@EachBean(Seed.class)
+@Prototype
+${kinds.replace('@InterceptorBinding(', '@InterceptorBinding(value = Seeded.class, ')}
+class SeedInterceptor implements MethodInterceptor<Object, Object> {
+    final Seed seed;
+    final BeanDefinition<?> definition;
+
+    SeedInterceptor(Seed seed, $parameter, Dependency dependency, @Parameter SeedDependency seedDependency) {
+        this.seed = seed;
+        this.definition = target == null ? null : target.definition();
+    }
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        Seen.DEFINITIONS.put(seed.name + "/" + ((MyBean) context.getTarget()).name, definition);
+        return context.proceed();
+    }
+}
+
+@EachProperty("targets")
+class TargetConfig {
+    final String name;
+    String value;
+
+    TargetConfig(@Parameter String name) {
+        this.name = name;
+    }
+
+    public String getValue() { return value; }
+
+    public void setValue(String value) { this.value = value; }
+}
+
+@EachBean(TargetConfig.class)
+$around
+@Seeded
+class MyBean {
+    final String name;
+
+    MyBean(TargetConfig config) {
+        this.name = config.name;
+    }
+
+    @PostConstruct void init() {}
+
+    String work() { return name; }
+}
+"""
+    }
 }

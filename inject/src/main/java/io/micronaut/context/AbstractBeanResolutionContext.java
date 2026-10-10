@@ -98,6 +98,19 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      * @param target The definition of the bean it is created for
      */
     record InterceptorCreation(BeanDefinition<?> interceptor, BeanDefinition<?> target) {
+
+        /**
+         * Whether an injection point is one of the interceptor's own. A qualified interceptor, one of an
+         * {@code @EachBean} for example, is a delegate, and its injection points are declared by the definition it
+         * delegates to.
+         *
+         * @param declaringType The definition that declares the injection point
+         * @return True if it is the definition of the interceptor
+         */
+        boolean isInterceptorDefinition(BeanDefinition<?> declaringType) {
+            return declaringType.equals(interceptor)
+                || interceptor instanceof BeanDefinitionDelegate<?> delegate && declaringType.equals(delegate.getDelegate());
+        }
     }
 
     /**
@@ -125,7 +138,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             return null;
         }
         Segment<?, ?> segment = path.peek();
-        return segment != null && segment.getDeclaringType().equals(creation.interceptor()) ? creation.target() : null;
+        return segment != null && creation.isInterceptorDefinition(segment.getDeclaringType()) ? creation.target() : null;
     }
 
     /**
