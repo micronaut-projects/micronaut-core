@@ -117,7 +117,7 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 
 === The Supported Subset
 
-Python integers are compiled as `long`, floats as `double`, strings as `String`, booleans as `boolean` and `None` as `null`. Where Python and Java differ, the generated code calls a helper of `io.micronaut.context.python.PythonStatic` instead of approximating: `//` and `%` floor, `/` always divides as floats, `str()` spells floats, booleans and `None` as Python does, a string is indexed by code point, `len()`, `in`, negative indexes and a missing key behave as in Python.
+Python integers are compiled as `long`, floats as `double`, strings as `String`, booleans as `boolean` and `None` as `null`. Where Python and Java differ, the generated code calls a helper of `io.micronaut.context.python.PythonStatic` instead of approximating: `//` and `%` floor, `/` always divides as floats, `str()` spells floats, booleans and `None` as Python does, a string is indexed by code point, `len()`, `in`, negative indexes and a missing key behave as in Python, `int()` of a NaN or an infinity raises, `strip()` and `split()` use Python's whitespace, a tuple renders in parentheses and a literal mixing ints and floats keeps each element's type.
 
 [cols="1,2"]
 |===
