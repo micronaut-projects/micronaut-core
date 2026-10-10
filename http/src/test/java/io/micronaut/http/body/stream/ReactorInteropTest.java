@@ -62,6 +62,32 @@ class ReactorInteropTest {
     }
 
     @Test
+    void nativeSourcesReceiveDownstreamContextAndDiscardHooks() {
+        AtomicInteger received = new AtomicInteger();
+        AtomicInteger discarded = new AtomicInteger();
+        reactor.core.publisher.BaseSubscriber<Integer> downstream = new reactor.core.publisher.BaseSubscriber<>() {
+            @Override
+            public reactor.util.context.Context currentContext() {
+                return reactor.util.context.Context.of("tenant", "expected");
+            }
+
+            @Override
+            protected void hookOnNext(Integer value) {
+                received.set(value);
+            }
+        };
+        Publisher<Integer> source = subscriber -> {
+            reactor.core.CoreSubscriber<?> core = assertInstanceOf(reactor.core.CoreSubscriber.class, subscriber);
+            assertEquals("expected", core.currentContext().get("tenant"));
+            reactor.core.publisher.Operators.onDiscard(7, core.currentContext());
+            Mono.just(42).subscribe(subscriber);
+        };
+        ReactorInterop.subscribe(source, downstream, () -> downstream, item -> discarded.addAndGet((Integer) item));
+        assertEquals(42, received.get());
+        assertEquals(7, discarded.get());
+    }
+
+    @Test
     void preservesReactorNonBlockingThreadDetection() throws Exception {
         assertEquals(Schedulers.isInNonBlockingThread(), ReactorInterop.isInNonBlockingThread());
         CompletableFuture<Boolean> detected = new CompletableFuture<>();
