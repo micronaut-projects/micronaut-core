@@ -23,6 +23,31 @@ Micronaut framework by default contains `PropertySourceLoader` implementations t
 
 NOTE: 'micronaut.config.files' will be ignored in bootstrap.yml or application.yml.
 
+=== Kubernetes Environment Variables
+
+When the application detects that it is running inside Kubernetes (the `kubernetes` environment is active, which the Micronaut framework deduces automatically whenever the `KUBERNETES_SERVICE_HOST` environment variable is present), OS environment variables are loaded through api:io.micronaut.context.env.KubernetesEnvironmentPropertySource[] instead of the regular loader used above.
+
+To avoid slow application startup in large clusters -- where Kubernetes can inject thousands of https://kubernetes.io/docs/concepts/services-networking/service/#environment-variables[service link] environment variables for every `Service` in the namespace -- this property source silently excludes any environment variable whose name ends with one of the following suffixes:
+
+* `_TCP`
+* `_TCP_PORT`
+* `_TCP_PROTO`
+* `_TCP_ADDR`
+* `_UDP_PORT`
+* `_UDP_PROTO`
+* `_UDP_ADDR`
+* `_SERVICE_PORT`
+* `_SERVICE_PORT_HTTP`
+* `_SERVICE_HOST`
+
+It also excludes any variable ending in `_PORT` whose value starts with `tcp://` (the Docker-link style format Kubernetes also injects).
+
+IMPORTANT: This filtering is based purely on the variable *name*, so it also applies to variables you define yourself, not only to the ones Kubernetes injects automatically. For example, an environment variable you set named `MY_SYSTEM_SERVICE_PORT` is silently excluded because it ends with `_SERVICE_PORT`, even though it has nothing to do with Kubernetes service discovery. Prefer a different suffix for your own application-specific environment variables to avoid this.
+
+TIP: If your application does not rely on Kubernetes' automatic service link variables, set `enableServiceLinks: false` on the container spec in your Pod/Deployment manifest. This stops Kubernetes from injecting them in the first place, reducing the number of environment variables Micronaut has to filter through at startup. Note this does not by itself prevent the naming collision described above for a variable you define yourself; it only stops Kubernetes from adding more variables of that shape for other `Service` resources in the namespace. See the Kubernetes documentation on https://kubernetes.io/docs/concepts/services-networking/service/#environment-variables[Environment Variables] for details.
+
+If your deployment needs every OS environment variable to be processed as configuration, including ones matching the suffixes above, disable environment deduction entirely (see <<disablingEnvironmentDetection,Disabling Environment Detection>>) so that the `kubernetes` environment is never activated and the regular, non-filtering property source is used instead. Note that this also disables automatic detection of other environments, such as `test` or `cloud`.
+
 [[configImport]]
 === Importing Additional Configuration
 
