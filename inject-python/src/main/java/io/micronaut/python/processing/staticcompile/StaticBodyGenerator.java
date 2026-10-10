@@ -89,7 +89,7 @@ public final class StaticBodyGenerator {
             return statements;
         }
         return StatementDef.multi(
-            (StatementDef) PYTHON_STATIC.invokeStatic("entered", List.of(ClassTypeDef.STRING), TypeDef.VOID, ExpressionDef.constant(body.key())),
+            PYTHON_STATIC.invokeStatic("entered", List.of(TypeDef.STRING), TypeDef.VOID, ExpressionDef.constant(body.key())),
             statements
         );
     }
@@ -299,7 +299,7 @@ public final class StaticBodyGenerator {
             case Ir.BOOLEAN -> value;
             case Ir.LONG -> value.compare(ExpressionDef.ComparisonOperation.OpType.NOT_EQUAL_TO, ExpressionDef.constant(0L));
             case Ir.DOUBLE -> value.compare(ExpressionDef.ComparisonOperation.OpType.NOT_EQUAL_TO, ExpressionDef.constant(0.0d));
-            case Ir.STRING -> PYTHON_STATIC.invokeStatic("truthy", List.of(ClassTypeDef.STRING), BOOLEAN, value);
+            case Ir.STRING -> PYTHON_STATIC.invokeStatic("truthy", List.of(TypeDef.STRING), BOOLEAN, value);
             default -> PYTHON_STATIC.invokeStatic("truthy", List.of(TypeDef.OBJECT), BOOLEAN, value);
         };
     }
@@ -323,10 +323,10 @@ public final class StaticBodyGenerator {
             return value;
         }
         return switch (part.type()) {
-            case Ir.LONG -> PYTHON_STATIC.invokeStatic("str", List.of(LONG), ClassTypeDef.STRING, value);
-            case Ir.DOUBLE -> PYTHON_STATIC.invokeStatic("str", List.of(DOUBLE), ClassTypeDef.STRING, value);
-            case Ir.BOOLEAN -> PYTHON_STATIC.invokeStatic("str", List.of(BOOLEAN), ClassTypeDef.STRING, value);
-            default -> PYTHON_STATIC.invokeStatic("str", List.of(TypeDef.OBJECT), ClassTypeDef.STRING, value);
+            case Ir.LONG -> PYTHON_STATIC.invokeStatic("str", List.of(LONG), TypeDef.STRING, value);
+            case Ir.DOUBLE -> PYTHON_STATIC.invokeStatic("str", List.of(DOUBLE), TypeDef.STRING, value);
+            case Ir.BOOLEAN -> PYTHON_STATIC.invokeStatic("str", List.of(BOOLEAN), TypeDef.STRING, value);
+            default -> PYTHON_STATIC.invokeStatic("str", List.of(TypeDef.OBJECT), TypeDef.STRING, value);
         };
     }
 

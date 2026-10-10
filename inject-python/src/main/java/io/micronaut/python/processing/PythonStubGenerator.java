@@ -1212,7 +1212,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     assigns.add(aThis.field(pythonValueFinal).assign(val));
                                 }
                                 assigns.addAll(polyglotValuePropertyAssignments(aThis, val, beanProperties, propertyFields, syncSnapshotFields));
-                                assigns.add(bindWrapper(model, aThis, val));
+                                assigns.add(bindWrapper(model, val));
                                 return StatementDef.multi(assigns);
                             })
                         ));
@@ -1225,13 +1225,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 if (extendsPythonClass) {
                                     return StatementDef.multi(
                                         aThis.superRef().invokeSuperConstructor(methodParameters.get(0)),
-                                        bindWrapper(model, aThis, methodParameters.get(0))
+                                        bindWrapper(model, methodParameters.get(0))
                                     );
                                 } else {
                                     return StatementDef.multi(
                                         aThis.field(pythonValueField(model)).assign(methodParameters.get(0)),
                                         aThis.field(ownedClassReferenceField(model)).assign(ExpressionDef.nullValue()),
-                                        bindWrapper(model, aThis, methodParameters.get(0))
+                                        bindWrapper(model, methodParameters.get(0))
                                     );
                                 }
                             })
@@ -1248,13 +1248,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     // the object lives in the base stub's field: reached through asPolyglotValue()
                                     return StatementDef.multi(
                                         invokeOwnedObjectSuperConstructor(aThis, superType, methodParameters.get(0)),
-                                        bindWrapper(model, aThis, aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE))
+                                        bindWrapper(model, aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE))
                                     );
                                 }
                                 return StatementDef.multi(
                                     aThis.field(pythonValueField(model)).assign(newInstanceUnlessProxy(aThis, methodParameters.get(0))),
                                     aThis.field(ownedClassReferenceField(model)).assign(methodParameters.get(0)),
-                                    bindWrapper(model, aThis, aThis.field(pythonValueField(model)))
+                                    bindWrapper(model, aThis.field(pythonValueField(model)))
                                 );
                             })
                         ));
@@ -1560,7 +1560,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 storedValue.returning(),
                 StatementDef.multi(
                     aThis.field(pythonValueField(model)).assign(newValue),
-                    bindWrapper(model, aThis, aThis.field(pythonValueField(model))),
+                    bindWrapper(model, aThis.field(pythonValueField(model))),
                     aThis.field(pythonValueField(model)).returning()
                 )
             );
@@ -1860,7 +1860,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         .doIf(StatementDef.multi(
                                             value.assign(newInstance),
                                             aThis.field(pythonValueFinal).assign(value),
-                                            bindWrapper(model, aThis, value)
+                                            bindWrapper(model, value)
                                         ))
                                 ))),
                             value.returning()
@@ -4617,7 +4617,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 if (element.isPresent()) {
                     return convertValueForType(element.get().getGenericType(), member);
                 }
-                if (!(type instanceof TypeDef.Primitive) && !ClassTypeDef.STRING.equals(type)) {
+                if (!(type instanceof TypeDef.Primitive) && !TypeDef.STRING.equals(type)) {
                     // a Java or Python object: converted as a property of that type is converted
                     Optional<ClassElement> propertyType = model.context().getClassElement(typeName.replace('$', '.'));
                     if (propertyType.isEmpty()) {
@@ -4636,18 +4636,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         case "boolean" -> member.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
                         case "short" -> member.invoke(AS_SHORT, TypeDef.Primitive.SHORT);
                         case "byte" -> member.invoke("asByte", TypeDef.Primitive.BYTE);
-                        default -> member.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
+                        default -> member.invoke("asString", TypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
                     };
                 }
-                if (ClassTypeDef.STRING.equals(type)) {
-                    return convertNullableValue(member, member.invoke("asString", ClassTypeDef.STRING));
+                if (TypeDef.STRING.equals(type)) {
+                    return convertNullableValue(member, member.invoke("asString", TypeDef.STRING));
                 }
                 return PYTHON_CONVERSION.invokeStatic(AS_OBJECT_METHOD, TypeDef.OBJECT, member).cast(type);
             }
 
             @Override
             public StatementDef write(String property, TypeDef type, ExpressionDef value) {
-                return (StatementDef) self.invoke(PUT_MEMBER, TypeDef.VOID, ExpressionDef.constant(property), value);
+                return self.invoke(PUT_MEMBER, TypeDef.VOID, ExpressionDef.constant(property), value);
             }
         };
     }
@@ -4668,12 +4668,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * The stub itself cannot be handed to Python: a generated wrapper entering Python becomes its
      * Python object again, so the delegate is a plain Java object over the Python object.
      */
-    private static StatementDef bindWrapper(ClassStubModel model, VariableDef.This aThis, ExpressionDef value) {
+    private static StatementDef bindWrapper(ClassStubModel model, ExpressionDef value) {
         if (!bindsWrapper(model)) {
             return StatementDef.multi();
         }
         ExpressionDef delegate = compiledDelegateType(model).instantiate(value);
-        return value.isNonNull().doIf((StatementDef) PYTHON_STATIC.invokeStatic("bindCompiled", TypeDef.VOID, value, delegate));
+        return value.isNonNull().doIf(PYTHON_STATIC.invokeStatic("bindCompiled", TypeDef.VOID, value, delegate));
     }
 
     /**
@@ -4741,7 +4741,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static StatementDef assignPythonValue(ClassStubModel model, VariableDef.This aThis, ExpressionDef value) {
         return StatementDef.multi(
             aThis.field(pythonValueField(model)).assign(value),
-            bindWrapper(model, aThis, aThis.field(pythonValueField(model)))
+            bindWrapper(model, aThis.field(pythonValueField(model)))
         );
     }
 
@@ -4751,8 +4751,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static StatementDef bindStoredValue(ClassStubModel model, VariableDef.This aThis) {
         // a subclass stub keeps the object in its base stub's field: reached through asPolyglotValue()
         return model.pythonValue() == null
-            ? bindWrapper(model, aThis, aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE))
-            : bindWrapper(model, aThis, aThis.field(model.pythonValue()));
+            ? bindWrapper(model, aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE))
+            : bindWrapper(model, aThis.field(model.pythonValue()));
     }
 
     private static Optional<PropertyElement> propertyElement(ClassStubModel model, String property) {
