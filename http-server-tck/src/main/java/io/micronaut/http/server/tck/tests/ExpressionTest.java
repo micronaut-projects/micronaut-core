@@ -57,12 +57,38 @@ public class ExpressionTest {
                     .build()));
     }
 
+    @Test
+    void testRouteConditionWithOverloadedMethod() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/expr/overloaded"),
+            (server, request) -> AssertionUtils.assertThrows(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.NOT_FOUND)
+                    .build()));
+
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/expr/overloaded")
+                .header("X-Expression-Test", "foo"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("ok")
+                    .build()));
+    }
+
     @Controller("/expr")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class ExpressionController {
         @Get(value = "/test")
         @RouteCondition("#{request.headers.getFirst('Authorization')?.contains('foo')}")
         String testGet() {
+            return "ok";
+        }
+
+        @Get(value = "/overloaded")
+        // HttpHeaders declares contains(CharSequence) and inherits contains(String)
+        @RouteCondition("#{request.headers.contains('X-Expression-Test')}")
+        String testOverloaded() {
             return "ok";
         }
     }
