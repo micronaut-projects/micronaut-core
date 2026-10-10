@@ -137,6 +137,31 @@ class PieceReadersTest {
     }
 
     @Test
+    void eachPieceIsDecodedInOrderAndClosingDiscardsQueuedPieces() throws IOException {
+        try (PieceReader<String> reader = PieceReaders.eachPiece(buffer -> buffer.toString(StandardCharsets.UTF_8))) {
+            assertNull(reader.poll());
+            reader.read(piece("one"));
+            reader.read(piece("two"));
+            reader.read(piece("three"));
+            reader.complete();
+            assertEquals("one", reader.poll());
+            assertEquals("two", reader.poll());
+            reader.close();
+            assertNull(reader.poll());
+            reader.read(piece("after close"));
+            assertNull(reader.poll());
+        }
+    }
+
+    @Test
+    void eachPieceRejectsANullDecodedElement() throws IOException {
+        try (PieceReader<String> reader = PieceReaders.eachPiece(buffer -> null)) {
+            reader.read(piece("one"));
+            assertThrows(NullPointerException.class, reader::poll);
+        }
+    }
+
+    @Test
     void readChunkedIsDerivedFromThePieceReader() {
         ChunkedMessageBodyReader<String> onlyPieces = new OnlyPiecesReader();
         List<String> lines = Flux.<String>from(onlyPieces.readChunked(Argument.STRING, MediaType.TEXT_PLAIN_TYPE, HEADERS,
