@@ -39,7 +39,9 @@ import java.util.concurrent.CompletionStage;
  * {@link CompletableFuture#cancel(boolean) Cancelling} it before the response arrives cancels
  * the exchange, like cancelling the subscription to the publisher of a {@link RawHttpClient}
  * exchange: the request is aborted and its body is released, and a response that arrives
- * anyway is closed. Cancelling a stage that is <i>derived</i> from it (e.g. with
+ * anyway is closed. Completing the original future exceptionally, including with
+ * {@code orTimeout}, also aborts outstanding work. Cancellation is a best-effort hint.
+ * Cancelling or timing out a stage that is <i>derived</i> from it (e.g. with
  * {@link CompletionStage#thenApply}) only fails the derived stage, it does not cancel the
  * exchange. Once the stage has completed with the response, cancelling it has no effect: close
  * the {@link ByteBodyHttpResponse} to release its body.
