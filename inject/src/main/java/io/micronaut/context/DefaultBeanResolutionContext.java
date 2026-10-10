@@ -83,6 +83,19 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
         }
     }
 
+    /**
+     * Opens a group for the caller to close, which resolves as {@link #withDependencies(Function)} does: during the
+     * synchronous destruction invocation for a context created for one, as an independent group otherwise.
+     *
+     * @return The group
+     */
+    BeanDependencyGroup newDependencyGroup() {
+        if (destructionThread == null) {
+            return context.createDependencyGroup();
+        }
+        return new DefaultBeanDependencyResolver(context, new DefaultBeanDependencies(this));
+    }
+
     void require(BeanRegistration<?> registration) {
         if (required == null) {
             required = new ArrayList<>(2);
