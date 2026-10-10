@@ -46,6 +46,7 @@ import java.util.function.Predicate;
 @Requires(beans = WebSocketSessionRepository.class)
 public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
 
+    private static final String BROADCAST_FAILURE = "Broadcast Failure: ";
     private final WebSocketMessageEncoder webSocketMessageEncoder;
     private final WebSocketSessionRepository webSocketSessionRepository;
 
@@ -145,20 +146,20 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
                 }
             }).addListener(future -> {
                 if (filterFailure[0] != null) {
-                    done.accept(new WebSocketSessionException("Broadcast Failure: " + filterFailure[0].getMessage(), filterFailure[0]));
+                    done.accept(new WebSocketSessionException(BROADCAST_FAILURE + filterFailure[0].getMessage(), filterFailure[0]));
                     return;
                 }
                 if (!future.isSuccess()) {
                     Throwable cause = extractBroadcastFailure(future.cause());
                     if (cause != null) {
-                        done.accept(new WebSocketSessionException("Broadcast Failure: " + cause.getMessage(), cause));
+                        done.accept(new WebSocketSessionException(BROADCAST_FAILURE + cause.getMessage(), cause));
                         return;
                     }
                 }
                 done.accept(null);
             });
         } catch (Throwable e) {
-            done.accept(new WebSocketSessionException("Broadcast Failure: " + e.getMessage(), e));
+            done.accept(new WebSocketSessionException(BROADCAST_FAILURE + e.getMessage(), e));
         }
     }
 
