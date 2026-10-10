@@ -61,15 +61,21 @@ public final class TypeFacts {
      */
     public static final String PYTHON_TYPE_PREFIX = "python:";
 
-    private static final Set<String> JAVA_STRING = Set.of("java.lang.String", "java.lang.CharSequence", "java.lang.Object", "java.io.Serializable", "java.lang.Comparable");
+    private static final String OBJECT_TYPE = "java.lang.Object";
+    private static final String SHORT_TYPE = "short";
+    private static final String FLOAT_TYPE = "float";
+    private static final String DOUBLE_TYPE = "double";
+    private static final String BOOLEAN_TYPE = "boolean";
+
+    private static final Set<String> JAVA_STRING = Set.of("java.lang.String", "java.lang.CharSequence", OBJECT_TYPE, "java.io.Serializable", "java.lang.Comparable");
     private static final Set<String> JAVA_CHAR = Set.of("char", "java.lang.Character");
-    private static final Set<String> JAVA_INTEGRAL = Set.of("int", "long", "short", "byte", "java.lang.Integer", "java.lang.Long", "java.lang.Short", "java.lang.Byte", "java.lang.Number", "java.math.BigInteger", "java.math.BigDecimal");
-    private static final Set<String> JAVA_FLOATING = Set.of("double", "float", "java.lang.Double", "java.lang.Float", "java.lang.Number", "java.math.BigDecimal");
-    private static final Set<String> JAVA_BOOLEAN = Set.of("boolean", "java.lang.Boolean");
+    private static final Set<String> JAVA_INTEGRAL = Set.of("int", "long", SHORT_TYPE, "byte", "java.lang.Integer", "java.lang.Long", "java.lang.Short", "java.lang.Byte", "java.lang.Number", "java.math.BigInteger", "java.math.BigDecimal");
+    private static final Set<String> JAVA_FLOATING = Set.of(DOUBLE_TYPE, FLOAT_TYPE, "java.lang.Double", "java.lang.Float", "java.lang.Number", "java.math.BigDecimal");
+    private static final Set<String> JAVA_BOOLEAN = Set.of(BOOLEAN_TYPE, "java.lang.Boolean");
     private static final Set<String> JAVA_LIST = Set.of("java.util.List", "java.util.Collection", "java.lang.Iterable", "java.util.ArrayList", "java.util.SequencedCollection");
     private static final Set<String> JAVA_SET = Set.of("java.util.Set", "java.util.Collection", "java.lang.Iterable", "java.util.HashSet");
     private static final Set<String> JAVA_MAP = Set.of("java.util.Map", "java.util.HashMap", "java.util.LinkedHashMap");
-    private static final Set<String> PRIMITIVES = Set.of("boolean", "byte", "short", "int", "long", "char", "float", "double");
+    private static final Set<String> PRIMITIVES = Set.of(BOOLEAN_TYPE, "byte", SHORT_TYPE, "int", "long", "char", FLOAT_TYPE, DOUBLE_TYPE);
 
     private final VisitorContext visitorContext;
     private final Map<String, Optional<AnnotationDescription>> annotations = new HashMap<>();
@@ -137,7 +143,7 @@ public final class TypeFacts {
     }
 
     private boolean computeAssignable(String from, String to) {
-        if (from.equals(to) || "java.lang.Object".equals(to)) {
+        if (from.equals(to) || OBJECT_TYPE.equals(to)) {
             return true;
         }
         if (from.startsWith(PYTHON_TYPE_PREFIX)) {
@@ -167,7 +173,7 @@ public final class TypeFacts {
         if (f.equals(t)) {
             return true;
         }
-        List<String> order = List.of("byte", "short", "int", "long", "float", "double");
+        List<String> order = List.of("byte", SHORT_TYPE, "int", "long", FLOAT_TYPE, DOUBLE_TYPE);
         int fi = order.indexOf(f);
         int ti = order.indexOf(t);
         return fi >= 0 && ti >= 0 && fi <= ti;
@@ -177,11 +183,11 @@ public final class TypeFacts {
         return switch (name) {
             case "java.lang.Integer" -> "int";
             case "java.lang.Long" -> "long";
-            case "java.lang.Short" -> "short";
+            case "java.lang.Short" -> SHORT_TYPE;
             case "java.lang.Byte" -> "byte";
-            case "java.lang.Double" -> "double";
-            case "java.lang.Float" -> "float";
-            case "java.lang.Boolean" -> "boolean";
+            case "java.lang.Double" -> DOUBLE_TYPE;
+            case "java.lang.Float" -> FLOAT_TYPE;
+            case "java.lang.Boolean" -> BOOLEAN_TYPE;
             case "java.lang.Character" -> "char";
             default -> name;
         };
@@ -195,14 +201,14 @@ public final class TypeFacts {
         }
         return switch (kind) {
             case "str" -> JAVA_STRING.contains(to) || JAVA_CHAR.contains(to) || isEnumOrClass(to);
-            case "int" -> JAVA_INTEGRAL.contains(to) || JAVA_FLOATING.contains(to) || "java.lang.Object".equals(to);
-            case "float" -> JAVA_FLOATING.contains(to) || "java.lang.Object".equals(to);
-            case "bool" -> JAVA_BOOLEAN.contains(to) || "java.lang.Object".equals(to);
+            case "int" -> JAVA_INTEGRAL.contains(to) || JAVA_FLOATING.contains(to) || OBJECT_TYPE.equals(to);
+            case FLOAT_TYPE -> JAVA_FLOATING.contains(to) || OBJECT_TYPE.equals(to);
+            case "bool" -> JAVA_BOOLEAN.contains(to) || OBJECT_TYPE.equals(to);
             case "none" -> !PRIMITIVES.contains(to);
-            case "bytes" -> "byte[]".equals(to) || "java.lang.Object".equals(to);
-            case "list", "tuple" -> JAVA_LIST.contains(to) || "java.lang.Object".equals(to) || isInterfaceAssignableFrom(to, "java.util.List");
-            case "set" -> JAVA_SET.contains(to) || "java.lang.Object".equals(to) || isInterfaceAssignableFrom(to, "java.util.Set");
-            case "dict" -> JAVA_MAP.contains(to) || "java.lang.Object".equals(to) || isInterfaceAssignableFrom(to, "java.util.Map");
+            case "bytes" -> "byte[]".equals(to) || OBJECT_TYPE.equals(to);
+            case "list", "tuple" -> JAVA_LIST.contains(to) || OBJECT_TYPE.equals(to) || isInterfaceAssignableFrom(to, "java.util.List");
+            case "set" -> JAVA_SET.contains(to) || OBJECT_TYPE.equals(to) || isInterfaceAssignableFrom(to, "java.util.Set");
+            case "dict" -> JAVA_MAP.contains(to) || OBJECT_TYPE.equals(to) || isInterfaceAssignableFrom(to, "java.util.Map");
             default -> true;
         };
     }
