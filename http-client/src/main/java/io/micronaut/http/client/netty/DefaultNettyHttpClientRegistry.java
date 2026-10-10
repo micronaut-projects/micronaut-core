@@ -78,6 +78,7 @@ import io.micronaut.json.codec.MapperMediaTypeCodec;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
 import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.websocket.AsyncWebSocketClient;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.WebSocketClientRegistry;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
@@ -347,6 +348,27 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             @Parameter @Nullable HttpClientConfiguration configuration,
             BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsyncRaw();
+    }
+
+    /**
+     * Creates a new {@link AsyncWebSocketClient} for the given injection point.
+     *
+     * @param injectionPoint The injection point
+     * @param loadBalancer   The load balancer to use (Optional)
+     * @param configuration  The configuration (Optional)
+     * @param beanContext    The bean context to use
+     * @return The client
+     * @since 5.3.0
+     */
+    @Bean
+    @BootstrapContextCompatible
+    @Primary
+    protected AsyncWebSocketClient asyncWebSocketClient(
+            @Nullable InjectionPoint<?> injectionPoint,
+            @Parameter @Nullable LoadBalancer loadBalancer,
+            @Parameter @Nullable HttpClientConfiguration configuration,
+            BeanContext beanContext) {
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsyncWebSocket();
     }
 
     /**

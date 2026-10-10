@@ -607,6 +607,39 @@ public final class PythonCoercion {
     }
 
     /**
+     * A member of the Python object of a generated wrapper as the caller reads it: a standard library
+     * value of the object ({@code uuid.UUID}, {@code decimal.Decimal}, a {@code datetime}, ...) read by
+     * Python code of another context is materialised again in the context of the caller.
+     * <p>
+     * A wrapper keeps the object of the context it created it in, the primary context for an entity
+     * that Java created (a repository result, a joined association). Python code of a pooled context
+     * that reads an attribute of the wrapper through its proxy would otherwise get the value of that
+     * other context, which it sees as a {@code ForeignObject}: its {@code str()} is the {@code repr} of
+     * the Python value ({@code UUID('...')}) and it compares equal to no value of its own context, so
+     * the same attribute read the same way differed with the context the wrapper was created in.
+     * Wrappers and other host objects are not copied (they cross contexts by reference), nor are the
+     * objects and callables of the wrapper's own context, which keep their identity.
+     *
+     * @param member The member read from the Python object of a wrapper
+     * @return The member of the context the caller runs in, or the member itself
+     */
+    static Object memberInEnteredContext(Value member) {
+        if (member.isHostObject() || member.isString() || member.isNumber() || member.isBoolean()) {
+            return member;
+        }
+        Context current = enteredContext();
+        if (current == null || isValueInContext(member, current)) {
+            return member;
+        }
+        Object standardValue = GraalPyHostAccessFactory.standardLibraryValue(member);
+        if (standardValue == null) {
+            return member;
+        }
+        Object converted = coerceStandardTypeToContext(standardValue, current);
+        return converted != null ? converted : member;
+    }
+
+    /**
      * The polyglot context the calling thread is executing in.
      *
      * @return The entered context, or {@code null} when the caller is plain Java
