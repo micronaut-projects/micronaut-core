@@ -11,10 +11,13 @@ import io.micronaut.http.body.CloseableByteBody
 import reactor.core.publisher.Mono
 import reactor.core.publisher.Sinks
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 class RawResponseFutureSpec extends Specification {
 
@@ -40,6 +43,48 @@ class RawResponseFutureSpec extends Specification {
         then:
         late.closed()
         future.isCancelled()
+    }
+
+    void "timing out the original flow future aborts the exchange and closes a late response"() {
+        given:
+        DelayedExecutionFlow<HttpResponse<?>> flow = DelayedExecutionFlow.create()
+        def requestBody = body("request")
+        def late = response()
+        RawResponseFuture future = RawResponseFuture.of(flow, requestBody.body)
+
+        when:
+        future.orTimeout(1, TimeUnit.MILLISECONDS).join()
+
+        then:
+        def e = thrown(CompletionException)
+        e.cause instanceof TimeoutException
+        new PollingConditions(timeout: 5).eventually {
+            assert flow.isCancelled()
+            assert requestBody.closed()
+        }
+
+        when:
+        flow.complete(late.response)
+
+        then:
+        late.closed()
+    }
+
+    void "external exceptional completion cancels a subscription arriving later exactly once"() {
+        given:
+        org.reactivestreams.Subscriber subscriber
+        def publisher = { org.reactivestreams.Subscriber s -> subscriber = s } as org.reactivestreams.Publisher
+        def subscription = Mock(org.reactivestreams.Subscription)
+        RawResponseFuture future = RawResponseFuture.of(publisher)
+
+        when:
+        future.completeExceptionally(new TimeoutException())
+        subscriber.onSubscribe(subscription)
+        future.cancel(false)
+
+        then:
+        1 * subscription.cancel()
+        0 * subscription.request(_)
     }
 
     void "the future of a flow completes with the response and closes the request body"() {
@@ -107,14 +152,18 @@ class RawResponseFutureSpec extends Specification {
         e.cause instanceof IllegalStateException
     }
 
-    void "cancelling a derived stage does not cancel the exchange"() {
+    void "cancelling or timing out a derived stage does not cancel the exchange"(boolean timeout) {
         given:
         DelayedExecutionFlow<HttpResponse<?>> flow = DelayedExecutionFlow.create()
         RawResponseFuture future = RawResponseFuture.of(flow, body("request").body)
         CompletableFuture<Integer> derived = future.thenApply { it.code() }
 
         when:
-        derived.cancel(false)
+        if (timeout) {
+            derived.completeExceptionally(new TimeoutException())
+        } else {
+            derived.cancel(false)
+        }
 
         then:
         !flow.isCancelled()
@@ -130,7 +179,11 @@ class RawResponseFutureSpec extends Specification {
         derived.join()
 
         then:
-        thrown(CancellationException)
+        def e = thrown(Exception)
+        timeout ? e instanceof CompletionException && e.cause instanceof TimeoutException : e instanceof CancellationException
+
+        where:
+        timeout << [false, true]
     }
 
     void "the adapter over a raw client cancels the subscription of the exchange"() {

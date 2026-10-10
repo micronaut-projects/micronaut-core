@@ -16,6 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.env.CachedEnvironment;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.http.HttpHeaders;
@@ -185,6 +186,9 @@ public abstract class HttpClientConfiguration {
     private Duration expectContinueTimeout = Duration.ofSeconds(DEFAULT_EXPECT_CONTINUE_TIMEOUT_SECONDS);
 
     @Nullable
+    private Duration handshakeTimeout;
+
+    @Nullable
     private Duration requestTimeout = null;
 
     @Nullable
@@ -333,6 +337,7 @@ public abstract class HttpClientConfiguration {
             this.connectionPoolIdleTimeout = copy.connectionPoolIdleTimeout;
             this.readTimeout = copy.readTimeout;
             this.expectContinueTimeout = copy.expectContinueTimeout;
+            this.handshakeTimeout = copy.handshakeTimeout;
             this.shutdownTimeout = copy.shutdownTimeout;
             this.shutdownQuietPeriod = copy.shutdownQuietPeriod;
             this.sslConfiguration = copy.sslConfiguration;
@@ -792,6 +797,33 @@ public abstract class HttpClientConfiguration {
      */
     public void setExpectContinueTimeout(@Nullable Duration expectContinueTimeout) {
         this.expectContinueTimeout = expectContinueTimeout;
+    }
+
+    /**
+     * How long a WebSocket connect waits for the response to its upgrade request once connected:
+     * a server that does not answer in time fails the connect with a
+     * {@link io.micronaut.http.client.exceptions.ReadTimeoutException}, and the connection is
+     * closed. Empty, the default, to wait without a limit.
+     * [available in the Netty HTTP client]
+     *
+     * @return The WebSocket handshake timeout
+     * @since 5.3.0
+     */
+    @Experimental
+    public Optional<Duration> getHandshakeTimeout() {
+        return Optional.ofNullable(handshakeTimeout);
+    }
+
+    /**
+     * Sets how long a WebSocket connect waits for the response to its upgrade request once
+     * connected. {@code null}, the default, waits without a limit.
+     *
+     * @param handshakeTimeout The WebSocket handshake timeout
+     * @since 5.3.0
+     */
+    @Experimental
+    public void setHandshakeTimeout(@Nullable Duration handshakeTimeout) {
+        this.handshakeTimeout = handshakeTimeout;
     }
 
     /**

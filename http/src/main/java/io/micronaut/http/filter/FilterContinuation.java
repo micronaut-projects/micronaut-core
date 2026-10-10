@@ -41,7 +41,10 @@ import io.micronaut.http.HttpRequest;
  * an {@link IllegalStateException}. The stage and the stages derived from it complete with the
  * propagated context of the downstream, so that their callbacks see it when they run as the stage
  * completes. Cancelling the stage returned by {@link #proceed()}, a stage derived from it, or the
- * filter itself, is a hint to the downstream that the response is no longer needed.
+ * filter itself, is a hint to the downstream that the response is no longer needed. Completing
+ * the original or derived continuation future exceptionally (including {@code orTimeout})
+ * also sends this hint. This propagation through derived futures is specific to filter
+ * continuations; ordinary {@code CompletionStage} dependent stages do not cancel their source.
  *
  * @param <R> The type to return in {@link #proceed()}
  */
