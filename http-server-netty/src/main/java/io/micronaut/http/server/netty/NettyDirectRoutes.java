@@ -91,7 +91,7 @@ import java.util.function.Supplier;
  * loop, in the order of the requests of the connection. A stage completed
  * with {@code null} continues the request as an ordinary request, with its body untouched. The
  * stage is cancelled when the request is abandoned: the connection closes, or its HTTP/2 stream
- * is reset or closed, see {@link OutboundAccess#onAbandoned(Runnable)}.</p>
+ * is reset or closed, see {@link OutboundAccess#whenAbandoned(Runnable)}.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -240,7 +240,7 @@ final class NettyDirectRoutes {
                              CloseableByteBody body,
                              OutboundAccess outboundAccess) {
         // the connection closes, or the HTTP/2 stream of the request is reset or closed
-        Runnable cancelOnAbandon = outboundAccess.onAbandoned(() -> stage.cancel(false));
+        Runnable cancelOnAbandon = outboundAccess.whenAbandoned(() -> stage.cancel(false));
         stage.whenComplete((response, error) -> {
             // on the thread that completed the stage
             if (error != null || response == null) {

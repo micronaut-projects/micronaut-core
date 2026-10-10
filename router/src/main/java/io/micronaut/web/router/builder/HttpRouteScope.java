@@ -19,22 +19,27 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
- * The declarations of handler routes, group routes, error routes and status routes that the
- * {@link HttpRouteBuilder} of an {@link HttpRoutes} bean and an {@link HttpRouteGroup} have in
- * common. A route is declared in stages, see {@link HttpRouteSpec}. Only the builder declares
- * server filters, see {@link HttpRouteBuilder#serverFilter(String...)}: the filters of a group are
- * route filters, which apply to the routes of the group only.
+ * The declarations of handler routes, locator routes, error routes and status routes that the
+ * {@link HttpRouteBuilder} of an {@link HttpRoutes} bean, an {@link HttpRouteGroup}, and the
+ * {@link LocatedHttpRouteBuilder} of {@link LocatedRoutes} and its groups have in common. A route
+ * is declared in stages, see {@link HttpRouteSpec}. The groups of routes are declared on the
+ * builders and on the groups, see {@link HttpRouteBuilder#group(Consumer)} and
+ * {@link LocatedHttpRouteScope#group(Consumer)}. Only the builder of an {@link HttpRoutes} bean
+ * declares server filters, see {@link HttpRouteBuilder#serverFilter(String...)}: the filters of a
+ * group are route filters, which apply to the routes of the group only.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
 @SuppressWarnings("MethodName")
-public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup, AbstractHttpRouteBuilder {
+public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup, LocatedHttpRouteScope, AbstractHttpRouteBuilder {
 
     /**
      * Declare a route of {@code GET} requests, with an implicit {@code HEAD} route in an
@@ -359,46 +364,120 @@ public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup,
     StatusRouteSpec statusAsync(HttpStatus status, AsyncStatusRouteHandler handler);
 
     /**
-     * Declare a group of routes, whose filters apply to every route declared in the lambda,
-     * e.g. to filter every route of an {@link HttpRoutes} bean. The builder of an
-     * {@link HttpRoutes} bean has no route filter methods of its own, as it is shared by the beans:
-     * the group is the scope of the filters, see {@link HttpRouteBuilder#serverFilter(String...)} for a server filter.
+     * Route the requests under a prefix to the routes of a target located at runtime, like a
+     * JAX-RS sub-resource locator. The prefix, e.g. {@code /orders/{id}}, is matched for every
+     * standard HTTP method, followed by the rest of the path, which is empty or starts with a
+     * slash. When the router selects the locator route, it runs the locator, and matches the rest
+     * of the path, e.g. {@code /items/3} of {@code /orders/5/items/3}, with the
+     * {@link LocatedRoutes} of the target: the request is handled by the route they declare, as if
+     * they were the application routes, with the path variables of the prefix and of the route,
+     * and with the target, see {@link LocatedRoutes#locatedTarget(PathVariables)}. A locator route of the
+     * located routes locates again, from the rest of the path.
      *
      * <pre>{@code
-     * routes.group(all -> {
-     *     all.beforeReplacing((request, propagatedContext) -> {
-     *         propagatedContext.add(new MdcPropagationContext(Map.of("path", request.getPath())));
-     *         return null;
-     *     });
-     *     all.GET("/orders", ordersHandler);
-     *     all.GET("/customers", customersHandler);
-     * });
+     * routes.locate("/orders/{id}",
+     *     (request, pathVariables) -> orders.find(pathVariables.getLong("id")),
+     *     order -> order.isArchived() ? archivedOrderRoutes : orderRoutes);
      * }</pre>
      *
-     * <p>See {@link HttpRouteGroup} for which routes the filters apply to, and in which order.
-     * A route declared in the lambda is ended with a terminal, see {@link HttpRouteSpec}, before
-     * the lambda returns: otherwise the group fails with an {@link IllegalStateException} naming
-     * the route.</p>
+     * <p>The type of the target is the type the locator returns: the function receives it, e.g.
+     * to choose the routes of a subtype. The handlers of the located routes receive the target of
+     * the type of the routes, see {@link LocatedRoutes#targetType()}; a located target that is not
+     * an instance of that type fails the request, answered by the error routes like a failed
+     * controller method.</p>
      *
-     * @param routes Declares the routes and the filters of the group
+     * <p>When the located routes have no route for the rest of the path, the request is answered
+     * like a request that no route matches: {@code 404}, or {@code 405}, {@code 415} or
+     * {@code 406} if a located route matches the path with another method or media type. No other
+     * route of the application is tried. The filters of the matched located route apply, after
+     * the filters of the groups of the locator route, and the server filters apply to the full
+     * path. A located route inherits the annotations, the attributes, the media types and the
+     * executor of the groups of the locator route, like a route declared in them, unless it, or a
+     * group of its {@link LocatedRoutes}, declares its own, see {@link HttpRouteGroup}.</p>
+     *
+     * <p>The locator runs while the request is matched, see {@link LocatorHandler}, at most once
+     * per request: matching the request again, e.g. to find the allowed methods of a
+     * {@code 405}, reuses the target, or the exception, of the first call. The routes of a
+     * {@link LocatedRoutes} instance are declared once, when the first target it routes is
+     * located, and shared by every locator that returns the instance; routes that fail to
+     * declare, e.g. a global error route, fail every request routed to them, and are declared
+     * again for the next one.
+     * The prefix is a path, without a query or a fragment.
+     * A request with a custom HTTP method is located like any other: the located routes of that
+     * method answer it, or those declared with {@code any(...)}, and the allowed methods of its
+     * {@code 405} are those of the located routes.</p>
+     *
+     * @param prefixUri The URI template of the prefix
+     * @param locator   Locates the target, or answers {@code null} for {@code 404}
+     * @param routesOf  The routes of a located target
+     * @param <T>       The type of the target
      * @since 5.3.0
      */
-    void group(Consumer<HttpRouteGroup> routes);
+    <T> void locate(String prefixUri, LocatorHandler<? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf);
 
     /**
-     * Declare a group of routes under a prefix: the URI template of every route of the group,
-     * including the routes of its nested groups, is the prefix followed by
-     * the URI template of the route, like the URI of a controller method under the URI of the
-     * controller: {@code path("/api", api -> api.GET("/orders", handler))} routes
-     * {@code GET /api/orders}. The prefixes of nested groups add up. The filters of the group apply
-     * to every route declared in the lambda, see {@link HttpRouteGroup}.
+     * Route the requests under a prefix to one set of routes of the targets a locator locates, see
+     * {@link #locate(String, LocatorHandler, Function)}.
      *
-     * <p>The prefix is a path: it may have path variables, e.g. {@code /tenants/{tenant}}, but no
-     * query or fragment.</p>
+     * <pre>{@code
+     * routes.locate("/orders/{id}", (request, pathVariables) -> orders.find(pathVariables.getLong("id")), orderRoutes);
+     * }</pre>
      *
-     * @param prefix The prefix of the URI templates of the routes of the group
-     * @param routes Declares the routes and the filters of the group
+     * @param prefixUri The URI template of the prefix
+     * @param locator   Locates the target, or answers {@code null} for {@code 404}
+     * @param routes    The routes of every located target
+     * @param <T>       The type of the target
      * @since 5.3.0
      */
-    void path(String prefix, Consumer<HttpRouteGroup> routes);
+    default <T> void locate(String prefixUri, LocatorHandler<? extends T> locator, LocatedRoutes<T> routes) {
+        Objects.requireNonNull(routes, "routes");
+        locate(prefixUri, locator, target -> routes);
+    }
+
+    /**
+     * Route the requests under a prefix to the routes of a target located asynchronously, e.g.
+     * loaded from a database: the same as {@link #locate(String, LocatorHandler, Function)}, but
+     * the locator returns a stage of the target, and the router matches the rest of the path with
+     * the routes of the target when the stage completes, without blocking the thread that matches
+     * the request. See {@link AsyncLocatorHandler}.
+     *
+     * <pre>{@code
+     * routes.locateAsync("/orders/{id}",
+     *     (request, pathVariables) -> orders.findAsync(pathVariables.getLong("id")), // completes with null: 404
+     *     order -> orderRoutes);
+     * }</pre>
+     *
+     * <p>The filters of the located route, the error routes and the server filters apply like
+     * for {@link #locate(String, LocatorHandler, Function)}; the located routes may locate again,
+     * synchronously or asynchronously. The target is located once per request.
+     * {@link io.micronaut.web.router.Router#findClosest} of an application with an asynchronous
+     * locator that has not located its target yet fails: the server matches such a request
+     * again when the stage completes. A server that tells when the client goes away, e.g. closes
+     * the connection or resets the HTTP/2 stream, stops waiting for the stage then, without
+     * cancelling it: a locator may return a stage it shares with other requests, e.g. of a cache.
+     * A CORS preflight request of the prefix is answered once the target is located, with the
+     * methods of its routes.</p>
+     *
+     * @param prefixUri The URI template of the prefix
+     * @param locator   Locates the target later, or completes with {@code null} for {@code 404}
+     * @param routesOf  The routes of a located target
+     * @param <T>       The type of the target
+     * @since 5.3.0
+     */
+    <T> void locateAsync(String prefixUri, AsyncLocatorHandler<? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf);
+
+    /**
+     * Route the requests under a prefix to one set of routes of the targets a locator locates
+     * asynchronously, see {@link #locateAsync(String, AsyncLocatorHandler, Function)}.
+     *
+     * @param prefixUri The URI template of the prefix
+     * @param locator   Locates the target later, or completes with {@code null} for {@code 404}
+     * @param routes    The routes of every located target
+     * @param <T>       The type of the target
+     * @since 5.3.0
+     */
+    default <T> void locateAsync(String prefixUri, AsyncLocatorHandler<? extends T> locator, LocatedRoutes<T> routes) {
+        Objects.requireNonNull(routes, "routes");
+        locateAsync(prefixUri, locator, target -> routes);
+    }
 }

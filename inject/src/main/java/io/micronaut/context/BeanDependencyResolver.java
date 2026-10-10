@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -27,9 +28,15 @@ import org.jspecify.annotations.Nullable;
  * its scope. Resolved singleton dependencies outlive the consumer during context shutdown.</p>
  *
  * <p>The resolver can be retained and used after injection. Each lookup uses normal scope and qualifier rules;
- * prototype lookups create separate instances. Lookups are rejected once destruction of the consumer or shutdown
- * of the context begins. Existing dependencies remain usable during the consumer's destruction callbacks.
- * A custom scope's lifetime and explicit destruction of a shared dependency are not extended by this resolver.</p>
+ * prototype lookups create separate instances. A custom scope's lifetime and explicit destruction of a shared
+ * dependency are not extended by this resolver.</p>
+ *
+ * <p>Once destruction of the consumer begins, only its own destruction callbacks, such as a {@code @PreDestroy}
+ * method, may still look up, on the destroying thread and until they return; what they create is destroyed with
+ * the consumer, after them. Once context shutdown begins, lookups are only accepted on the thread running the
+ * shutdown, where they are made on behalf of a {@link io.micronaut.context.event.ShutdownEvent} listener or a
+ * destruction callback; what they create is destroyed before the shutdown completes, with its owner or after it.
+ * Any other lookup is rejected.</p>
  *
  * <p>Obtain this resolver by injection into a managed bean. It is not available as a standalone context lookup.
  * It does not retain a construction path and must not be used to resolve the consumer recursively while it is
@@ -66,7 +73,8 @@ public interface BeanDependencyResolver {
      * @param qualifier The qualifier, or {@code null}
      * @param <T> The bean type
      * @return The dependency
-     * @throws IllegalStateException if destruction or context shutdown has begun
+     * @throws IllegalStateException if destruction or context shutdown has begun and the lookup is not made on behalf
+     * of a destruction callback or a shutdown event listener
      */
     <T> T getBean(Argument<T> type, @Nullable Qualifier<T> qualifier);
 
@@ -111,6 +119,38 @@ public interface BeanDependencyResolver {
      * @return The registration
      */
     <T> BeanRegistration<T> getBeanRegistration(Argument<T> type, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Resolves the bean of an exact definition as the given type, using the same scope and ownership rules as
+     * {@link #getBean(Argument, Qualifier)}: a newly created dependent is owned like one a lookup by type creates.
+     * The caller has already chosen the definition, so no candidate lookup takes place, see
+     * {@link BeanDefinitionRegistry#getBeanRegistration(BeanDefinition, Argument)}.
+     * @param definition The bean definition
+     * @param type The type to resolve the definition as, including generic arguments; the definition may be of a
+     *             subtype of it
+     * @param <T> The bean type
+     * @return The dependency
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the type
+     * @throws IllegalStateException if destruction or context shutdown has begun
+     * @since 5.3.0
+     */
+    default <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> type) {
+        return getBeanRegistration(definition, type).getBean();
+    }
+
+    /**
+     * Resolves the registration of an exact definition as the given type, using the same ownership rules as
+     * {@link #getBean(BeanDefinition, Argument)}. Shared registrations remain scope-owned.
+     * @param definition The bean definition
+     * @param type The type to resolve the definition as, including generic arguments; the definition may be of a
+     *             subtype of it
+     * @param <T> The bean type
+     * @return The registration
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the type
+     * @throws IllegalStateException if destruction or context shutdown has begun
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type);
 
     /**
      * Creates a child group. The consumer closes it automatically, but the caller may close it earlier.

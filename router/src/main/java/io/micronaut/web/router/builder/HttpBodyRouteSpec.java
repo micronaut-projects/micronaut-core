@@ -39,7 +39,7 @@ import org.jspecify.annotations.Nullable;
  * @since 5.3.0
  */
 @Experimental
-public sealed interface HttpBodyRouteSpec<B extends @Nullable Object> extends RouteSpec<HttpBodyRouteSpec<B>> permits DefaultHttpBodyRouteSpec {
+public sealed interface HttpBodyRouteSpec<B extends @Nullable Object> extends RouteSpec<HttpBodyRouteSpec<B>> permits DefaultHttpBodyRouteSpec, LocatedHttpBodyRouteSpec {
 
     /**
      * Declare the type of the body of the responses of the route, see
@@ -78,4 +78,26 @@ public sealed interface HttpBodyRouteSpec<B extends @Nullable Object> extends Ro
      * @throws IllegalStateException if the route was already ended
      */
     void handleAsync(AsyncBodyRequestHandler<B> handler);
+
+    /**
+     * End the route with a server-sent events handler that receives the body: the response is a
+     * {@code text/event-stream} of the events the handler pushes, see
+     * {@link HttpRouteSpec#sse(SseHandler)}. What the body stage bound, e.g. an
+     * {@link io.micronaut.http.body.AsyncRequestBody} the handler reads while it sends events, is
+     * released when the stream ends.
+     *
+     * <pre>{@code
+     * routes.POST("/completions").body(Prompt.class).executeOn(TaskExecutors.BLOCKING).sse((request, pathVariables, prompt, events) -> {
+     *     for (String token : model.generate(prompt)) {
+     *         events.send(token).toCompletableFuture().join();
+     *     }
+     * });
+     * }</pre>
+     *
+     * @param handler The handler
+     * @throws IllegalStateException if the route was already ended, or declared media types without {@code text/event-stream} with {@code produces}
+     * @see SseBodyHandler
+     * @since 5.3.0
+     */
+    void sse(SseBodyHandler<B> handler);
 }

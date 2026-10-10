@@ -39,6 +39,7 @@ import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.AsyncHttpClient;
+import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
@@ -84,7 +85,7 @@ public class DefaultHttpClient implements
     AutoCloseable {
 
     private final NettyHttpClient nettyHttpClient;
-    private final AsyncHttpClient asyncHttpClient;
+    private final AsyncStreamingHttpClient asyncHttpClient;
 
     DefaultHttpClient(DefaultHttpClientBuilder builder) {
         this(builder.nettyBuilder().build());
@@ -405,6 +406,11 @@ public class DefaultHttpClient implements
     }
 
     @Override
+    public <I, B> Publisher<HttpResponse<Event<B>>> exchangeEventStream(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
+        return nettyHttpClient.exchangeEventStream(request, eventType, errorType);
+    }
+
+    @Override
     public <I> Publisher<ByteBuffer<?>> dataStream(HttpRequest<I> request) {
         return nettyHttpClient.dataStream(request);
     }
@@ -471,6 +477,11 @@ public class DefaultHttpClient implements
 
     @Override
     public AsyncHttpClient toAsync() {
+        return asyncHttpClient;
+    }
+
+    @Override
+    public AsyncStreamingHttpClient toAsyncStreaming() {
         return asyncHttpClient;
     }
 

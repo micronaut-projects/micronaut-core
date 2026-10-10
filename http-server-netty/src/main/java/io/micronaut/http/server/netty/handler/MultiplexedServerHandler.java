@@ -38,6 +38,7 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http2.Http2Exception;
+import io.netty.util.concurrent.EventExecutor;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -156,11 +157,15 @@ abstract class MultiplexedServerHandler {
         private boolean closed;
         private Compressor. @Nullable Session compressionSession;
         /**
-         * Runs once if the stream is reset or closed before its response is finished, see
-         * {@link #onAbandoned(Runnable)}.
+         * The callbacks of {@link #whenAbandoned(Runnable)}, guarded by this stream, or
+         * {@code null} if none is registered.
          */
         @Nullable
-        private Runnable abandoned;
+        private List<Runnable> abandonCallbacks;
+        /**
+         * Whether the stream was abandoned, guarded by this stream.
+         */
+        private boolean abandoned;
 
         MultiplexedStream(int streamId) {
             if (JfrSupport.isRecorderInitialized() && Http2RequestEvent.isTurnedOn()) {
@@ -363,11 +368,11 @@ abstract class MultiplexedServerHandler {
          */
         final void onRstStreamRead(Exception e) {
             reset = true;
+            abandon();
             if (streamer != null) {
                 streamer.error(e);
             }
             disposeWriteSide();
-            abandon();
         }
 
         /**
@@ -385,34 +390,76 @@ abstract class MultiplexedServerHandler {
                 }
                 bufferedContent = null;
             }
-            abandon();
         }
 
         /**
-         * The stream of the request is reset or closed, with the connection too, so the request
-         * is abandoned unless its response is finished.
+         * Called when the stream is closed, by either side or with the connection: if the
+         * response was not written, the request is abandoned, and the stream cannot take the
+         * response any more, like a stream the client reset: e.g. a stream that Netty reset for a
+         * stream error, while the request waited for its route.
          */
-        @Override
-        public final Runnable onAbandoned(Runnable task) {
-            if (reset || closed) {
-                if (!finished) {
-                    task.run();
-                }
-                return () -> { };
+        final void onStreamClosed() {
+            if (!finished) {
+                reset = true;
+                abandon();
             }
-            abandoned = task;
-            return () -> {
-                if (abandoned == task) {
-                    abandoned = null;
-                }
-            };
         }
 
+        /**
+         * Run the callbacks of {@link #whenAbandoned(Runnable)}, once, on the event loop, after
+         * the event that abandoned the stream: a callback may answer the request, which the
+         * closed stream drops.
+         */
         private void abandon() {
-            Runnable task = abandoned;
-            abandoned = null;
-            if (task != null && !finished) {
-                task.run();
+            List<Runnable> callbacks;
+            synchronized (this) {
+                if (abandoned) {
+                    return;
+                }
+                abandoned = true;
+                callbacks = abandonCallbacks;
+                abandonCallbacks = null;
+            }
+            if (callbacks != null) {
+                requiredCtx().executor().execute(() -> {
+                    for (Runnable callback : callbacks) {
+                        callback.run();
+                    }
+                });
+            }
+        }
+
+        @Override
+        public final Runnable whenAbandoned(Runnable callback) {
+            // the request of a stream is abandoned with the stream, not with the connection
+            synchronized (this) {
+                if (!abandoned) {
+                    List<Runnable> callbacks = abandonCallbacks;
+                    if (callbacks == null) {
+                        callbacks = new ArrayList<>(1);
+                        abandonCallbacks = callbacks;
+                    }
+                    callbacks.add(callback);
+                    return () -> removeAbandonCallback(callback);
+                }
+            }
+            // already abandoned: at once on the event loop, or on it
+            EventExecutor executor = requiredCtx().executor();
+            if (executor.inEventLoop()) {
+                callback.run();
+            } else {
+                executor.execute(callback);
+            }
+            return () -> { };
+        }
+
+        private synchronized void removeAbandonCallback(Runnable callback) {
+            List<Runnable> callbacks = abandonCallbacks;
+            if (callbacks != null) {
+                callbacks.remove(callback);
+                if (callbacks.isEmpty()) {
+                    abandonCallbacks = null;
+                }
             }
         }
 
@@ -434,7 +481,6 @@ abstract class MultiplexedServerHandler {
                 return false;
             }
             finished = true;
-            abandoned = null;
             disposeWriteSide();
             requestHandler.responseWritten(attachment);
             return true;
@@ -940,7 +986,7 @@ abstract class MultiplexedServerHandler {
             @Override
             public void fail(Throwable e) {
                 if (!reset(e)) {
-                    LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", e);
+                    LOG.warn("The streamed response body failed after some of it was written. The error cannot be forwarded to the client, and the response ends abruptly.", e);
                 }
                 flush();
             }

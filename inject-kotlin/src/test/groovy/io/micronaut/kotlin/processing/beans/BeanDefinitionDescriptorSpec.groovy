@@ -1,6 +1,7 @@
 package io.micronaut.kotlin.processing.beans
 
 import io.micronaut.annotation.processing.test.KotlinCompiler
+import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.writer.AbstractBeanDefinitionDescriptorSpec
 
 class BeanDefinitionDescriptorSpec extends AbstractBeanDefinitionDescriptorSpec {
@@ -22,15 +23,6 @@ class BeanDefinitionDescriptorSpec extends AbstractBeanDefinitionDescriptorSpec 
     }
 
     @Override
-    protected List<String> getUndescribed() {
-        // given no element, KSP types an array by the class of its declared element when the processor can load
-        // that class: KClass for an array of classes, and the annotation itself for an array of an annotation of the
-        // class path, where an element makes them AnnotationClassValue and AnnotationValue. The definition holds the
-        // same array, and the format has no value kind for either
-        return super.getUndescribed() + ['test.$Untyped$Definition', 'test.$Unrequired$Definition']
-    }
-
-    @Override
     protected Class<?> getIntArrayType() {
         // KSP holds the elements of an array of a primitive type as their wrappers
         return Integer[]
@@ -38,9 +30,8 @@ class BeanDefinitionDescriptorSpec extends AbstractBeanDefinitionDescriptorSpec 
 
     @Override
     protected List<Class<?>> getEmptyArrayTypes() {
-        // and an empty IntArray, which is not a kotlin.Array so its element type is not looked at, and an empty array
-        // of an annotation of the same compilation, whose class the processor cannot load, as one of objects
-        return [String[], Object[], Object[]]
+        // and an empty IntArray, which is not a kotlin.Array so its element type is not looked at, as one of objects
+        return [String[], Object[], AnnotationValue[]]
     }
 
     // the beans of the specs of the other processors, but the one @Import adds: KSP has no beans added by visitors

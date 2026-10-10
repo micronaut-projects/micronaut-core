@@ -127,8 +127,10 @@ class AsyncErrorRoutesTest {
             routes.statusAsync(HttpStatus.NOT_FOUND, request -> null);
         });
 
-        assertEquals("handler failed", assertThrows(IllegalStateException.class, () -> handle(router, new IOException())).getMessage());
-        assertThrows(NullPointerException.class, () -> handle(router, new IllegalArgumentException()));
+        IOException io = new IOException();
+        assertEquals("handler failed", assertThrows(IllegalStateException.class, () -> handle(router, io)).getMessage());
+        IllegalArgumentException illegalArgument = new IllegalArgumentException();
+        assertThrows(NullPointerException.class, () -> handle(router, illegalArgument));
         RouteMatch<Object> noStatusStage = router.<Object>findStatusRoute(HttpStatus.NOT_FOUND, REQUEST).orElseThrow();
         assertThrows(NullPointerException.class, () -> execute(noStatusStage, null));
     }

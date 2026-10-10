@@ -19,6 +19,7 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.ReturnType;
@@ -31,6 +32,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.FilterRunner;
@@ -54,6 +56,7 @@ import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.DefaultUriRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UriRouteMatch;
 import org.jspecify.annotations.Nullable;
@@ -68,6 +71,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
@@ -378,7 +382,7 @@ public class RequestLifecycle {
     protected final ExecutionFlow<HttpResponse<?>> runWithFilters(HttpRequest<?> request, BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
         try {
             List<GenericHttpFilter> httpFilters = routeExecutor.router.findFilters(request);
-            FilterRunner filterRunner = new FilterRunner(httpFilters, (filteredRequest, propagatedContext) -> {
+            FilterRunner filterRunner = new LifecycleFilterRunner(null, httpFilters, (filteredRequest, propagatedContext) -> {
                 onFilteredRequest(filteredRequest);
                 return responseProvider.apply(filteredRequest, propagatedContext);
             }) {
@@ -416,7 +420,7 @@ public class RequestLifecycle {
                                                               @Nullable RouteMatch<?> routeMatch,
                                                               HttpResponse<?> response,
                                                               PropagatedContext propagatedContext) {
-        FilterRunner filterRunner = new FilterRunner(
+        FilterRunner filterRunner = new LifecycleFilterRunner(
             routeExecutor.router.findPreMatchingFilters(request),
             // the filters of the route too, like the filters that ran for the request
             routeExecutor.router.findFilters(request, routeMatch),
@@ -442,7 +446,7 @@ public class RequestLifecycle {
         try {
             PropagatedContext propagatedContext = PropagatedContext.get();
             List<GenericHttpFilter> preMatchingFilters = routeExecutor.router.findPreMatchingFilters(request);
-            FilterRunner filterRunner = new FilterRunner(preMatchingFilters, null, new BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>>() {
+            FilterRunner filterRunner = new LifecycleFilterRunner(preMatchingFilters, null, new BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>>() {
                 @Override
                 public ExecutionFlow<HttpResponse<?>> apply(HttpRequest<?> httpRequest, PropagatedContext propagatedContext) {
                     throw new IllegalStateException("Should not be called");
@@ -478,6 +482,26 @@ public class RequestLifecycle {
                             propagatedContext);
                     }
                     return executeRoute(request, propagatedContext, routeMatch);
+                }
+
+                @Override
+                protected @Nullable ExecutionFlow<?> doRouteMatchAsync(HttpRequest<?> request) {
+                    try {
+                        doRouteMatch(request);
+                        return null;
+                    } catch (RuntimeException e) {
+                        CompletionStage<?> pending = RouteLocator.pendingLocation(e);
+                        if (pending == null) {
+                            throw e;
+                        }
+                        // an asynchronous locator locates its target: match again when it has
+                        onPendingLocation(request, pending);
+                        PropagatedContext context = PropagatedContext.getOrEmpty();
+                        return CompletableFutureExecutionFlow.just(pending).flatMap(located -> context.propagate(() -> {
+                            ExecutionFlow<?> next = doRouteMatchAsync(request);
+                            return next == null ? ExecutionFlow.just(Boolean.TRUE) : next;
+                        }));
+                    }
                 }
 
                 @Override
@@ -652,6 +676,21 @@ public class RequestLifecycle {
     }
 
     /**
+     * Called when matching the request waits for an asynchronous route locator to locate its
+     * target. A server that can tell when the client goes away, e.g. closes the connection,
+     * stops waiting for the locators of the request with {@link RouteLocator#abandonPendingLocations}
+     * then, so that the request fails instead of waiting for a target no one receives a response
+     * for, and the stages of the locators no longer reference the request.
+     *
+     * @param request The request
+     * @param located Completes when the target is located, or the request is abandoned
+     * @since 5.3.0
+     */
+    protected void onPendingLocation(HttpRequest<?> request, CompletionStage<?> located) {
+        // nothing to abandon by default: a server that knows when the client goes away overrides this
+    }
+
+    /**
      * Try to find a static file for this request. If there is a file, filters will still run, but
      * only after the call to this method.
      *
@@ -756,5 +795,23 @@ public class RequestLifecycle {
         return routeExecutor.router.findStatusRoute(status, request)
                 .map(routeMatch -> executeRoute(request, propagatedContext, routeMatch))
                 .orElse(null);
+    }
+
+    /**
+     * The filter runner of the lifecycle: it closes the elements of a response body that a filter
+     * dropped off the event loop, since closing them may block.
+     */
+    private abstract class LifecycleFilterRunner extends FilterRunner {
+
+        LifecycleFilterRunner(@Nullable List<GenericHttpFilter> preMatchingFilters,
+                              @Nullable List<GenericHttpFilter> filters,
+                              BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
+            super(preMatchingFilters, filters, responseProvider);
+        }
+
+        @Override
+        protected void closeElements(HttpRequest<?> request, BodyElements<?> elements) {
+            routeExecutor.discardElements(request, elements);
+        }
     }
 }

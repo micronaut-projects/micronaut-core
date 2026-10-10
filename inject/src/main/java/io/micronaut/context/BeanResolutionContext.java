@@ -130,6 +130,30 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     PropertyResolver getPropertyResolver();
 
     /**
+     * Resolves the bean of the given definition as the given bean type, on behalf of the bean this context resolves
+     * for.
+     *
+     * <p>The bean is the one {@link #getBean(Argument, Qualifier)} returns for the bean type when its lookup picks this
+     * definition, without the lookup: the caller has already chosen the definition, so no other candidate is
+     * considered and no candidate lookup or cache is involved. The bean is resolved in the scope of the definition and
+     * with its declared qualifier, as {@link BeanDefinitionRegistry#getBeanRegistration(BeanDefinition, Argument)}
+     * resolves it, and a bean that has no scope of its own is a dependent of the bean this context resolves for and
+     * is destroyed with it, as one {@link #getBean(Argument, Qualifier)} creates is.</p>
+     *
+     * <p>The definition may be of a subtype of the bean type: a definition of an implementation is resolved as an
+     * interface it implements.</p>
+     *
+     * @param definition The bean definition
+     * @param beanType   The potentially parameterized bean type to resolve the definition as
+     * @param <T>        The bean type
+     * @return The bean
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the bean
+     *                                                             type
+     * @since 5.3.0
+     */
+    <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType);
+
+    /**
      * Obtains the bean registrations for the given type and qualifier.
      *
      * @param beanType          The bean type

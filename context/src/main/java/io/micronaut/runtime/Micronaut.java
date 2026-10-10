@@ -18,6 +18,7 @@ package io.micronaut.runtime;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.DefaultApplicationContextBuilder;
+import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.banner.Banner;
 import io.micronaut.context.banner.MicronautBanner;
@@ -31,6 +32,7 @@ import io.micronaut.context.env.PropertySource;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Described;
+import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -50,6 +52,20 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
 /**
  * <p>Main entry point for running a Micronaut application.</p>
  *
+ * <p><b>Experimental:</b> starting the JVM with the system property
+ * {@code micronaut.bean-definitions.prefetch=true} makes {@link #start()} use bean definitions
+ * that the common {@link java.util.concurrent.ForkJoinPool} loaded while the main thread
+ * configured logging, and read while it created the builder. It is off by default and may change
+ * or be removed. It is read when this class is initialized, so only a JVM system property switches
+ * it on, not the application's configuration. It stands down in a native image and when the common
+ * pool has fewer than three threads. A context gets it only through {@code Micronaut.run(...)} or
+ * {@code Micronaut.build(...).start()} with the default bean definitions provider. With it on,
+ * {@code TypeConverterRegistrar} services and the static initializers of bean definitions can run
+ * on a pool thread before {@link #start()}. Code that runs in between must not construct
+ * {@code DefaultMutableConversionService} directly (use {@code MutableConversionService.create()})
+ * or call {@code StaticOptimizations.set(...)}. Measure startup with and without it: it helps
+ * mostly without a JDK AOT cache.</p>
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -57,8 +73,26 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
     static final String TRAINING_ENABLED_ENVIRONMENT_VARIABLE = "MICRONAUT_APPLICATION_TRAINING_ENABLED";
     private static final String BANNER_NAME = "micronaut-banner.txt";
+    /**
+     * The experimental bean definition prefetch, or {@code null} when it is off or stood down.
+     * Created before {@link #LOG}, whose creation usually configures logging: in the meantime the
+     * pool only loads the bean definition reference classes, which runs none of their code. The
+     * task itself is submitted once {@link #LOG} exists, so that no pool thread creates a logger
+     * while logging is being configured. With the property unset, the class of the task is not
+     * even loaded.
+     */
+    @Nullable
+    private static final BeanDefinitionPrefetch BEAN_DEFINITION_PREFETCH = Boolean.getBoolean(BeanDefinitionPrefetch.PROPERTY)
+        ? BeanDefinitionPrefetch.start(Micronaut.class.getClassLoader())
+        : null;
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
+
+    static {
+        if (BEAN_DEFINITION_PREFETCH != null) {
+            BEAN_DEFINITION_PREFETCH.submit();
+        }
+    }
 
     private final Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
 
@@ -76,7 +110,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     public ApplicationContext start() {
         long start = System.nanoTime();
         printBanner();
-        ApplicationContext applicationContext = super.build();
+        ApplicationContext applicationContext = buildContext();
 
         try {
 
@@ -222,6 +256,48 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             handleStartupException(applicationContext.getEnvironment(), e);
             Thread.currentThread().interrupt();
             return applicationContext;
+        }
+    }
+
+    /**
+     * Builds the context. A running or finished bean definition prefetch is handed to it, unless
+     * the application or a configurer set a provider of its own, and afterwards a prefetch that
+     * the context did not take gives its result up.
+     *
+     * <p>When the prefetch failed to build the shared conversion service, the context fails on
+     * the class that this left erroneous, with a {@link NoClassDefFoundError}. What the prefetch
+     * met, which the context would have met without it, is rethrown instead. When this thread
+     * ran the initializer of the conversion service itself, its own error is kept.</p>
+     *
+     * @return The application context, not started
+     */
+    @SuppressWarnings("java:S1181") // Rethrown, or replaced by what the prefetch met first
+    private ApplicationContext buildContext() {
+        BeanDefinitionPrefetch prefetch = BEAN_DEFINITION_PREFETCH;
+        if (prefetch == null) {
+            return super.build();
+        }
+        if (getBeanDefinitionsProvider() instanceof DefaultBeanDefinitionsProvider) {
+            beanDefinitionsProvider(prefetch);
+        }
+        try {
+            return super.build();
+        } catch (Throwable t) {
+            Throwable conversionFailure = prefetch.conversionFailure(t);
+            if (conversionFailure != null) {
+                return ExceptionUtils.sneakyThrow(conversionFailure);
+            }
+            throw t;
+        } finally {
+            Throwable failure = prefetch.giveUp();
+            if (failure != null) {
+                // The context read the references itself, beside the prefetch. A reference whose static initializer
+                // failed on the prefetch's thread reached it as a NoClassDefFoundError, which Micronaut skips
+                LOG.warn("The bean definition prefetch ({}=true) failed and was not handed to the application context, "
+                        + "so Micronaut may have skipped a bean definition that would otherwise stop the application. "
+                        + "Start without {}=true to see Micronaut's own handling",
+                    BeanDefinitionPrefetch.PROPERTY, BeanDefinitionPrefetch.PROPERTY, failure);
+            }
         }
     }
 

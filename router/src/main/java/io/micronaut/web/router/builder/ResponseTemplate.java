@@ -74,7 +74,7 @@ record ResponseTemplate(int code,
         Map<String, Object> attributes = new LinkedHashMap<>();
         response.getAttributes().forEach((name, value) -> {
             if (value != null) {
-                attributes.put(name.toString(), value);
+                attributes.put(name, value);
             }
         });
         return new ResponseTemplate(response.code(), response.reason(), headers, attributes, response.body());

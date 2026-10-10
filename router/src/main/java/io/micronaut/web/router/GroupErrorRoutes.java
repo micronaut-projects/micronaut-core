@@ -28,7 +28,8 @@ import java.util.Optional;
  * the non-global {@code @Error} methods of a controller are local to its routes. The error route
  * of a request is looked up in the innermost group of its route first, then in the groups around
  * it, and for a route resolved by a {@link DynamicRouteTarget}, then in the error scopes of the
- * resolution. Within a group, the error route of the closest exception type answers.
+ * resolution. The error of a route locator that failed, before any route matched, is looked up in
+ * the error scopes of its locator routes. Within a group, the error route of the closest exception type answers.
  * The server looks the local error routes of the declaring type up before, and the global error
  * routes after them.
  *
@@ -52,6 +53,16 @@ public final class GroupErrorRoutes {
      */
     public static <R> @Nullable RouteMatch<R> findErrorRoute(HttpRequest<?> request, @Nullable RouteInfo<?> routeInfo, Throwable error) {
         if (!(routeInfo instanceof DefaultUrlRouteInfo<?, ?> route)) {
+            if (routeInfo != null) {
+                return null;
+            }
+            // no route matched: a route locator that failed, answered by the groups of its locator routes
+            for (RouteAssembly.RouteGroup scope : RouteLocator.failedLocationScopes(request, error)) {
+                RouteMatch<R> match = findErrorRoute(scope, request, error);
+                if (match != null) {
+                    return match;
+                }
+            }
             return null;
         }
         RouteMatch<R> match = findErrorRoute(route.errorScope, request, error);
@@ -77,7 +88,33 @@ public final class GroupErrorRoutes {
      * @return The match of the status route, or {@code null} if no group of the route handles the status
      */
     public static <R> @Nullable RouteMatch<R> findStatusRoute(HttpRequest<?> request, @Nullable RouteInfo<?> routeInfo, int status) {
+        return findStatusRoute(request, routeInfo, status, null);
+    }
+
+    /**
+     * The status route of the groups of the route of a request, or, when no route matched, of the
+     * locator routes whose locator failed with the error.
+     *
+     * @param request   The request, with the route it matched
+     * @param routeInfo The route that answered the status, or {@code null}
+     * @param status    The status code
+     * @param error     The error that has the status, or {@code null}
+     * @param <R>       The result type
+     * @return The match of the status route, or {@code null} if no group of the route handles the status
+     */
+    public static <R> @Nullable RouteMatch<R> findStatusRoute(HttpRequest<?> request, @Nullable RouteInfo<?> routeInfo, int status,
+                                                              @Nullable Throwable error) {
         if (!(routeInfo instanceof DefaultUrlRouteInfo<?, ?> route)) {
+            if (routeInfo != null || error == null) {
+                return null;
+            }
+            // no route matched: a route locator that failed, answered by the groups of its locator routes
+            for (RouteAssembly.RouteGroup scope : RouteLocator.failedLocationScopes(request, error)) {
+                RouteMatch<R> match = findStatusRoute(scope, request, status);
+                if (match != null) {
+                    return match;
+                }
+            }
             return null;
         }
         RouteMatch<R> match = findStatusRoute(route.errorScope, request, status);

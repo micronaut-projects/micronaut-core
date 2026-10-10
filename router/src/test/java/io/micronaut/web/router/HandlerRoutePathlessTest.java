@@ -26,6 +26,7 @@ import io.micronaut.web.router.builder.AsyncRequestHandler;
 import io.micronaut.web.router.builder.BodyRequestHandler;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.builder.RequestHandler;
 import org.junit.jupiter.api.Test;
@@ -44,10 +45,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Routes declared without a path, like a controller method mapped without a URI: at the prefix
- * of the group or at the root. Every shortcut
+ * of the group, at the prefix of the locator in a located table, or at the root. Every shortcut
  * compiles with lambdas and method references, next to the forms with a path.
  */
 class HandlerRoutePathlessTest {
+
 
     @Test
     void aRouteWithoutAPathIsAtThePrefixOfItsGroup() {
@@ -66,6 +68,13 @@ class HandlerRoutePathlessTest {
     }
 
     @Test
+    void aServerSentEventsRouteWithoutAPathIsAtThePrefixOfItsGroup() {
+        Router router = router(routes -> routes.path("/ticks", ticks -> ticks.GET("/").sse((request, pathVariables, events) -> events.complete())),
+            uri -> uri);
+        assertEquals("/ticks", route(router, HttpRequest.GET("/ticks")).getUriMatchTemplate().toString());
+    }
+
+    @Test
     void aRouteWithoutAPathIsAtTheRoot() {
         Router router = router(routes -> routes.GET("/", (request, pathVariables) -> HttpResponse.ok("root")), uri -> uri);
         assertEquals("/", route(router, HttpRequest.GET("/")).getUriMatchTemplate().toString());
@@ -79,6 +88,20 @@ class HandlerRoutePathlessTest {
         }, uri -> RouteAssembly.underContextPath("/cp", uri));
         assertEquals(RouteAssembly.underContextPath("/cp", "/"), route(router, HttpRequest.GET("/cp")).getUriMatchTemplate().toString());
         assertEquals("/cp/users", route(router, HttpRequest.GET("/cp/users")).getUriMatchTemplate().toString());
+    }
+
+    @Test
+    void aRouteWithoutAPathInALocatedTableIsAtThePrefixOfTheLocator() {
+        LocatedRoutes<?> table = TestLocatedRoutes.of(Item.class, item -> {
+            item.GET("/").handle((request, pathVariables, target) -> HttpResponse.ok("item " + target.name()));
+            item.PUT("/").body(Item.class).handle((request, pathVariables, target, body) -> HttpResponse.ok());
+            item.GET("/details", (request, pathVariables) -> HttpResponse.ok("details"));
+        });
+        Router router = router(routes -> routes.locate("/items/{name}", (request, pathVariables) -> new Item(pathVariables.getString("name")),
+            target -> table), uri -> uri);
+        assertNotNull(router.findClosest(HttpRequest.GET("/items/a")));
+        assertNotNull(router.findClosest(HttpRequest.PUT("/items/a", "")));
+        assertNotNull(router.findClosest(HttpRequest.GET("/items/a/details")));
     }
 
     /**

@@ -409,21 +409,17 @@ public interface BeanDefinitionRegistry {
      * interface it implements.</p>
      *
      * <p>A bean of a scope is the one an ordinary lookup returns: the definition is resolved under the key its scope
-     * holds it by. A registry can only guarantee that by resolving the definition itself, so the default throws an
-     * {@link UnsupportedOperationException} rather than narrow a lookup with a qualifier, which would become part of
-     * that key. {@link DefaultBeanContext} implements it.</p>
+     * holds it by, which is why the registry resolves the definition itself rather than narrowing a lookup with a
+     * qualifier, which would become part of that key.</p>
      *
      * @param beanDefinition The bean definition
      * @param beanType       The potentially parameterized bean type to resolve the definition as
      * @param <T>            The concrete type
      * @return The bean registration
      * @throws NoSuchBeanException if the definition is not a candidate for the bean type
-     * @throws UnsupportedOperationException if the registry cannot resolve a definition as a given type
      * @since 5.3.0
      */
-    default <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> beanDefinition, Argument<T> beanType) {
-        throw new UnsupportedOperationException("This implementation of BeanDefinitionRegistry doesn't support resolving a bean definition as a given type");
-    }
+    <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> beanDefinition, Argument<T> beanType);
 
     /**
      * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.

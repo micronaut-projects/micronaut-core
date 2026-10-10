@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.filter.GenericHttpFilter;
@@ -23,6 +24,7 @@ import io.micronaut.web.router.builder.HandlerMethod;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * The target of a handler route that is resolved when a request matches the route, instead of
@@ -75,11 +77,14 @@ interface DynamicRouteTarget {
      *
      * @param request The request
      * @param match   The match of the route
+     * @param filter  The filter of the candidates, applied to the resolved matches before their
+     *                ambiguity is resolved, or {@code null}
      * @param <T>     The target type
      * @param <R>     The result type
      * @return The matches
      */
-    <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, UriRouteMatch<T, R> match);
+    <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                                    @Nullable Predicate<UriRouteMatch<T, R>> filter);
 
     /**
      * The matches of any method to use instead of a match of the route, see
@@ -113,5 +118,13 @@ interface DynamicRouteTarget {
          * @return The groups whose error and status routes apply after the ones of the matched route
          */
         List<RouteAssembly.RouteGroup> errorScopes();
+
+        /**
+         * @return The annotations the matched route inherits from the resolution, e.g. of the
+         * groups of the locator routes, which the annotations of the route override
+         */
+        default AnnotationMetadata annotationMetadata() {
+            return AnnotationMetadata.EMPTY_METADATA;
+        }
     }
 }
