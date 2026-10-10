@@ -129,21 +129,28 @@ class DevRuntimeTest {
             assertEquals(3, runtime.generation());
             assertTrue(third.isRunning());
 
-            // a forced restart without a change, retaining the pool again; the edited configuration file, read live
-            // from the resource root ahead of the build output, is what the new generation sees
-            Files.writeString(config, "app.label=beta\n");
+            // a forced restart without a change, retaining the pool again; a static file is read live from its root
             Files.writeString(staticRoot.resolve("app.css"), "body { color: red }");
             assertEquals("body { color: red }", new String(third.getClassLoader().getResourceAsStream("app.css").readAllBytes()));
             runtime.restart();
             ApplicationContext fourth = runtime.awaitGeneration(4, Duration.ofMinutes(2));
             assertFalse(third.isRunning());
             assertSame(pool, fourth.getBean(RetainedPool.class));
-            assertEquals("beta", fourth.getEnvironment().getProperty("app.label", String.class).orElse(null));
+
+            // an edited configuration file: the watcher of its root restarts the application, and the new generation
+            // reads the file live from the resource root ahead of the build output; until the configuration refresh
+            // tells which prefixes changed, the restart retains nothing, the pool among it
+            Files.writeString(config, "app.label=beta\n");
+            ApplicationContext fifth = runtime.awaitGeneration(5, Duration.ofMinutes(2));
+            assertFalse(fourth.isRunning());
+            assertEquals("beta", fifth.getEnvironment().getProperty("app.label", String.class).orElse(null));
+            assertEquals(1, RetainedPool.DESTROYED.get());
+            assertNotSame(pool, fifth.getBean(RetainedPool.class));
         } finally {
             runtime.close();
         }
         assertTrue(runtime.context().map(context -> !context.isRunning()).orElse(true));
-        assertEquals(1, RetainedPool.DESTROYED.get());
+        assertEquals(2, RetainedPool.DESTROYED.get());
     }
 
     @Test
