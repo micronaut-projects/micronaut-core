@@ -275,4 +275,81 @@ snippet::io.micronaut.docs.config.mapFormat.VehicleSpec[tags="start",indent=0,ti
 
 The above example prints: `"Engine Starting V8 [sensors=2]"`
 
+== Configuration Metadata
+
+At compilation time, the Micronaut framework writes metadata about every `@ConfigurationProperties` and `@EachProperty` type, which tooling uses to complete, document, and validate configuration:
+
+* `META-INF/spring-configuration-metadata.json` lists the groups and properties of the module, with their types, descriptions, and default values.
+* `META-INF/micronaut-configuration-schemas/<class>.json` is a https://json-schema.org/draft/2020-12/schema[JSON Schema (Draft 2020-12)] of each configuration class. The configuration validator of https://micronaut-projects.github.io/micronaut-json-schema/latest/guide/[Micronaut JSON Schema] uses these schemas to validate the configuration of an application.
+
+The description of a property comes from its Javadoc, and its default value from ann:core.bind.annotation.Bindable[] `defaultValue` or, for the JSON schema, a `DEFAULT_<PROPERTY_NAME>` constant of the class, such as `DEFAULT_AUTO_OFFSET_RESET`. The JSON schema of a property also reflects its type and annotations:
+
+|===
+|Java type or annotation |JSON schema
+
+|`boolean`, integer, and decimal types
+|`type` `boolean`, `integer`, or `number`
+
+|An enum
+|`type` `string` and `enum` with the constants of the enum
+
+|`URI` or `URL`, and `Duration`
+|`type` `string` and `format` `uri` or `duration`
+
+|A collection or an array, and a `Map`
+|`type` `array` with the schema of the elements as `items`, and `type` `object` with the schema of the values as `additionalProperties`
+
+|`@NotNull` and `@NotBlank`
+|The property is `required`
+
+|`@Size`, `@NotEmpty`, `@NotBlank`
+|`minLength` and `maxLength`, `minItems` and `maxItems`, or `minProperties` and `maxProperties`
+
+|`@Min`, `@Max`, `@DecimalMin`, `@DecimalMax`, `@Positive`, `@PositiveOrZero`, `@Negative`, `@NegativeOrZero`
+|`minimum`, `maximum`, `exclusiveMinimum`, and `exclusiveMaximum`
+
+|`@Pattern`, `@Digits`, and `@Email`
+|`pattern`, and `format` `email`
+
+|`@AssertTrue` and `@AssertFalse`
+|`const` `true` or `false`
+
+|ann:core.annotation.AllowedValues[]
+|`enum` with the values of the annotation
+
+|`@Deprecated`
+|`deprecated` `true`
+|===
+
+=== Allowed Values
+
+When a property only accepts some values, but its type does not list them, such as a `String` option of a third-party library, annotate the field, the setter, or the record component with ann:core.annotation.AllowedValues[]. The values become the `enum` of the property in its JSON schema, so the configuration validator rejects any other value:
+
+.@AllowedValues Example
+[source,java]
+----
+@ConfigurationProperties("my.consumer")
+public class ConsumerConfiguration {
+
+    @AllowedValues({"earliest", "latest", "none"}) // <1>
+    private String autoOffsetReset = "latest";
+
+    @AllowedValues({"1", "2", "4"}) // <2>
+    private int threads = 1;
+
+    @AllowedValues({"gzip", "snappy", "zstd"}) // <3>
+    private List<String> codecs = List.of();
+
+    // getters and setters
+}
+----
+
+<1> The schema of `my.consumer.auto-offset-reset` is `{"type":"string","enum":["earliest","latest","none"]}`
+<2> The values are written with the JSON type of the property, here `[1,2,4]`. A value that does not convert to the type of the property, or for an enum property is not one of its constants, fails the compilation
+<3> For a collection or an array, the values apply to its elements, and for a `Map` to its values
+
+On an enum property, ann:core.annotation.AllowedValues[] narrows the constants that the configuration accepts. You can also annotate your own annotation with ann:core.annotation.AllowedValues[] to reuse a set of values across properties.
+
+NOTE: ann:core.annotation.AllowedValues[] is metadata for tooling: binding the property does not check its value. To validate the value at runtime, also use a constraint such as `@Pattern` with <<beanValidation, Bean Validation>>.
+
 TIP: See the guide for https://guides.micronaut.io/latest/micronaut-configuration.html[@Configuration and @ConfigurationBuilder] to learn more.
