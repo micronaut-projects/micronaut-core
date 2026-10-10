@@ -38,6 +38,13 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     private volatile AbstractBeanResolutionContext proxyTargetContext;
     // whether this bean was created as an interceptor of the bean it is a dependent of
     private volatile boolean createdAsInterceptor;
+    /**
+     * The instance the {@link io.micronaut.context.event.BeanCreatedEventListener}s received, when they replaced it
+     * and the context records its dependency graph: a development context retains it across a restart and wraps it
+     * again with the next context's listeners. Set before the registration is published.
+     */
+    @Nullable
+    private Object beforeListeners;
 
     @SuppressWarnings("unchecked") // Adapt the registration compatibility boundary once.
     BeanDisposingRegistration(BeanContext beanContext,
@@ -134,5 +141,17 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
      */
     boolean isCreatedAsInterceptor() {
         return createdAsInterceptor;
+    }
+
+    /**
+     * @return The instance the bean created listeners received, when they replaced it and the context records it
+     */
+    @Nullable
+    Object getBeforeListeners() {
+        return beforeListeners;
+    }
+
+    void setBeforeListeners(@Nullable Object beforeListeners) {
+        this.beforeListeners = beforeListeners;
     }
 }

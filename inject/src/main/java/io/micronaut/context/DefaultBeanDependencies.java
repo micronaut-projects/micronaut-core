@@ -136,6 +136,16 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
     }
 
     /**
+     * Records shared registrations that the owner only orders its destruction by, as an owner rebound to another
+     * context carries over those of the one it replaces.
+     *
+     * @param registrations The shared registrations
+     */
+    synchronized void requireAll(List<BeanRegistration<?>> registrations) {
+        attach(List.of(), registrations);
+    }
+
+    /**
      * @return Whether this owner stopped accepting new dependencies
      */
     synchronized boolean isClosing() {

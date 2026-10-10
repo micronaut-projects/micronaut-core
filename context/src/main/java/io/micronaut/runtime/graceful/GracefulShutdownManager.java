@@ -17,11 +17,13 @@ package io.micronaut.runtime.graceful;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import jakarta.inject.Singleton;
 
 import java.util.List;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Predicate;
 
 /**
  * Helper class that can be used to call all {@link GracefulShutdownCapable} beans.
@@ -48,6 +50,18 @@ public final class GracefulShutdownManager {
      */
     public CompletionStage<?> shutdownGracefully() {
         return GracefulShutdownCapable.shutdownAll(delegates.stream());
+    }
+
+    /**
+     * Shut down the {@link GracefulShutdownCapable} beans the filter accepts, as {@link #shutdownGracefully()} does.
+     *
+     * @param filter Which beans to shut down
+     * @return A future that completes when those beans have shut down
+     * @since 5.3.0
+     */
+    @Internal
+    public CompletionStage<?> shutdownGracefully(Predicate<? super GracefulShutdownCapable> filter) {
+        return GracefulShutdownCapable.shutdownAll(delegates.stream().filter(filter));
     }
 
     /**

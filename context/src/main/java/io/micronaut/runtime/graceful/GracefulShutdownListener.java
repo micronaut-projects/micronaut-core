@@ -15,10 +15,12 @@
  */
 package io.micronaut.runtime.graceful;
 
+import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ShutdownEvent;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.StringUtils;
 import jakarta.inject.Singleton;
@@ -26,10 +28,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 /**
  * Listener that intercepts {@link ShutdownEvent} to initiate and wait for a graceful shutdown, if
@@ -56,7 +60,10 @@ public final class GracefulShutdownListener implements ApplicationEventListener<
 
     @Override
     public void onApplicationEvent(ShutdownEvent event) {
-        shutdownGracefully();
+        // a context stopping for a restart in development mode leaves running what it retains for the next one
+        shutdownGracefully(event.getSource() instanceof DefaultBeanContext context
+            ? capable -> !context.isRetainedOnStop(capable)
+            : null);
     }
 
     /**
@@ -72,13 +79,17 @@ public final class GracefulShutdownListener implements ApplicationEventListener<
      * @since 5.2.16
      */
     public void shutdownGracefully() {
+        shutdownGracefully(null);
+    }
+
+    private void shutdownGracefully(@Nullable Predicate<? super GracefulShutdownCapable> filter) {
         Shutdown current = shutdown.get();
         if (current == null) {
             Shutdown created = new Shutdown(new CompletableFuture<>(), System.nanoTime() + config.getGracePeriod().toNanos());
             current = shutdown.compareAndExchange(null, created);
             if (current == null) {
                 current = created;
-                start(created.future);
+                start(created.future, filter);
             }
         }
         long remaining = current.deadlineNanos - System.nanoTime();
@@ -97,13 +108,14 @@ public final class GracefulShutdownListener implements ApplicationEventListener<
         }
     }
 
-    private void start(CompletableFuture<Object> future) {
+    private void start(CompletableFuture<Object> future, @Nullable Predicate<? super GracefulShutdownCapable> filter) {
         long start = System.nanoTime();
         if (LOG.isDebugEnabled()) {
             LOG.debug("Starting graceful shutdown...");
         }
         try {
-            manager.shutdownGracefully().whenComplete((result, error) -> {
+            CompletionStage<?> stage = filter == null ? manager.shutdownGracefully() : manager.shutdownGracefully(filter);
+            stage.whenComplete((result, error) -> {
                 if (error != null) {
                     LOG.warn("Error in graceful shutdown. This is against the GracefulShutdownCapable contract!", error);
                     future.completeExceptionally(error);

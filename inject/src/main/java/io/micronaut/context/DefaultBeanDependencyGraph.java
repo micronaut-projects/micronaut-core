@@ -351,6 +351,17 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
             && qualifier.equals(definition.getDeclaredQualifier());
     }
 
+    /**
+     * Records a dependency carried over from another context, for a bean adopted from it. An edge of a prototype the
+     * bean owns counts as one more live instance holding it, as if that instance had been created here, so destroying
+     * another instance that holds the same edge does not drop it.
+     *
+     * @param edge The dependency, with this context's definitions, once per instance that holds it
+     */
+    void record(BeanDependency edge) {
+        add(edge);
+    }
+
     private static InjectionKind kindOf(BeanResolutionContext.Segment<?, ?> segment) {
         // the segments are their own injection points; the constructor segment covers factory methods too
         if (segment instanceof AbstractBeanResolutionContext.FactorySegment) {
