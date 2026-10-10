@@ -30,7 +30,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * @since 5.3.0
  */
 @Internal
-@SuppressWarnings("NullAway.Init")
+// the target is set when the handler is initialized, before any call reads it
+@SuppressWarnings({"NullAway.Init", "java:S2637"})
 public final class HotSwapProxyTargetHandler<T> extends AbstractProxyTargetHandler<T> implements HotSwappableProxyTargetHandler<T> {
     private final Lock readLock;
     private final Lock writeLock;

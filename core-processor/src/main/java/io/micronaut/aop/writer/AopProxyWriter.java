@@ -181,7 +181,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final Method HANDLER_TARGET_REGISTRATION = ReflectionUtils.getRequiredInternalMethod(HeldTargetProxyTargetHandler.class, "targetRegistration");
     private static final Method HANDLER_WITH_QUALIFIER = ReflectionUtils.getRequiredInternalMethod(ProxyTargetHandler.class, "withQualifier", Qualifier.class);
     private static final Method HANDLER_DEPENDENCIES = ReflectionUtils.getRequiredInternalMethod(ProxyTargetHandler.class, "dependencies");
-    private static final Method HANDLER_INTERCEPTED_METHODS = ReflectionUtils.getRequiredInternalMethod(ProxyTargetHandler.class, "interceptedMethods");
+    private static final String METHOD_INTERCEPTED_METHODS = "interceptedMethods";
+    private static final Method HANDLER_INTERCEPTED_METHODS = ReflectionUtils.getRequiredInternalMethod(ProxyTargetHandler.class, METHOD_INTERCEPTED_METHODS);
     private static final Method HANDLER_INTERCEPTOR_REGISTRATIONS = ReflectionUtils.getRequiredInternalMethod(ProxyTargetHandler.class, "interceptorRegistrations");
     private static final Method HANDLER_SWAP = ReflectionUtils.getRequiredInternalMethod(HotSwappableProxyTargetHandler.class, "swap", Object.class);
 
@@ -517,7 +518,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             }));
         }
         if (!interceptedMethods.isEmpty()) {
-            proxyBuilder.addMethod(MethodDef.builder("interceptedMethods")
+            proxyBuilder.addMethod(MethodDef.builder(METHOD_INTERCEPTED_METHODS)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(ClassTypeDef.of(ExecutableMethod.class).array())
                 .build((aThis, methodParameters) -> aThis.field(handlerField).invoke(HANDLER_INTERCEPTED_METHODS).returning()));
@@ -713,7 +714,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             proxyBuilder.addMethod(buildMethodIntercept(method, index++, interceptorsField, proxyMethodsField));
         }
         if (!interceptedMethods.isEmpty()) {
-            proxyBuilder.addMethod(MethodDef.builder("interceptedMethods")
+            proxyBuilder.addMethod(MethodDef.builder(METHOD_INTERCEPTED_METHODS)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(ClassTypeDef.of(ExecutableMethod.class).array())
                 .build((aThis, methodParameters) -> aThis.field(proxyMethodsField)

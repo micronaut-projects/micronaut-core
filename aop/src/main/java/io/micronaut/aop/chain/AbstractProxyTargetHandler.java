@@ -52,13 +52,14 @@ import java.util.List;
  * @since 5.3.0
  */
 @Internal
-@SuppressWarnings({"NullAway.Init", "rawtypes", "unchecked"})
+// the target definition is set when the handler is bound, before any call reads it
+@SuppressWarnings({"NullAway.Init", "rawtypes", "unchecked", "java:S2637"})
 public abstract class AbstractProxyTargetHandler<T> implements ProxyTargetHandler<T> {
     private final InterceptorChainFactory chainFactory;
     private final InterceptorCandidateResolver resolver;
     private final BeanContext beanContext;
     /** The binding the interceptors of the proxy are qualified by, or null when it binds none. */
-    private final @Nullable Qualifier<Interceptor<?, ?>> binding;
+    private final @Nullable Qualifier<Interceptor<?, ?>> interceptorBinding;
     /** The interceptors the proxy was created with; empty when they are those of the target. */
     private final List<BeanRegistration<Interceptor<?, ?>>> registrations;
     /** The context the proxy is created in, released once the handler is bound. */
@@ -80,16 +81,16 @@ public abstract class AbstractProxyTargetHandler<T> implements ProxyTargetHandle
     AbstractProxyTargetHandler(Creation creation) {
         this.chainFactory = creation.chainFactory();
         this.resolver = chainFactory.candidateResolver();
-        this.binding = creation.binding();
+        this.interceptorBinding = creation.binding();
         this.creationContext = creation.resolutionContext();
         this.beanContext = creation.beanContext();
         this.qualifier = (Qualifier<T>) creation.qualifier();
         // The interceptors of the proxy are created here, in the resolution of the proxy, so they are its dependents.
         // They are needed before the proxy exists, to intercept its construction. A binding of nothing, which a proxy
         // that takes its interceptors from its targets has, qualifies none.
-        this.registrations = binding == null
+        this.registrations = interceptorBinding == null
             ? List.of()
-            : new ArrayList(creationContext.getBeanRegistrations(Interceptor.ARGUMENT, binding));
+            : new ArrayList(creationContext.getBeanRegistrations(Interceptor.ARGUMENT, interceptorBinding));
     }
 
     @Override

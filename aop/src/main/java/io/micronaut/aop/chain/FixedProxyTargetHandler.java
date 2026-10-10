@@ -28,7 +28,8 @@ import org.jspecify.annotations.Nullable;
  * @since 5.3.0
  */
 @Internal
-@SuppressWarnings({"NullAway.Init", "rawtypes"})
+// the registration and the target are set when the handler is initialized, before any call reads them
+@SuppressWarnings({"NullAway.Init", "rawtypes", "java:S2637"})
 public final class FixedProxyTargetHandler<T> extends AbstractProxyTargetHandler<T> implements HeldTargetProxyTargetHandler<T> {
     private BeanRegistration<T> registration;
     private T target;

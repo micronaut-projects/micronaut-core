@@ -28,7 +28,8 @@ import org.jspecify.annotations.Nullable;
  * @since 5.3.0
  */
 @Internal
-@SuppressWarnings("NullAway.Init")
+// the lookup context is set when the handler is initialized, before any call reads it
+@SuppressWarnings({"NullAway.Init", "java:S2637"})
 public final class LazyProxyTargetHandler<T> extends AbstractProxyTargetHandler<T> {
     /** A copy of the context the proxy was created in, which the target is looked up through. */
     private BeanResolutionContext lookupContext;
