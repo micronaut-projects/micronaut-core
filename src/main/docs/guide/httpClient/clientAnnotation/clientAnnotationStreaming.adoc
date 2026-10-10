@@ -147,7 +147,7 @@ snippet::io.micronaut.docs.sse.AsyncEventStreamSpec[tags="async", indent=0, titl
 <1> The async view shares the client: closing it closes the client
 <2> `exchangeEventStream` completes with the response once its status and headers arrived, and fails with an api:http.client.exceptions.HttpClientResponseException[] for an error status. The `Accept` header and the decoding of the body follow the reactive `exchangeEventStream`
 <3> The body of the response is a api:http.body.BodyElements[] cursor over the events: the next event is read from the connection when it is asked for. A single body is one event, and a response without a body has no event
-<4> `forEach` reads the next event when the stage returned for the previous one completed. `next()` reads one event at a time
+<4> `forEach` reads the next event when the stage returned for the previous one completed. `next()` reads one event at a time. The Python example adapts these reads to an async generator and consumes it with `async for`
 <5> The status and the headers of the response are available while the events are read
 
 The connection stays reserved until the events were read to the end or the api:http.body.BodyElements[] was closed, so close the events of a stream that you do not read to the end. The stages complete on an I/O thread: do not block in them. `eventStream` sets `Accept: text/event-stream` and completes with the events only.

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.sse;
+package io.micronaut.http.client;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
@@ -29,10 +29,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Header;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.body.BodyElements;
-import io.micronaut.http.client.AsyncStreamingHttpClient;
-import io.micronaut.http.client.DefaultAsyncOverReactiveStreamingHttpClient;
-import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.StreamingHttpClient;
+import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.sse.Event;
 import io.micronaut.runtime.server.EmbeddedServer;
