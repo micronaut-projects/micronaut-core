@@ -120,7 +120,8 @@ class DefaultFunctionDiscoveryClientAsyncTest {
                 // the test client holds no resources
             }
         }, new FunctionDefinitionProvider[0]);
-        assertThrows(FunctionNotFoundException.class, () -> Mono.from(publisherClient.getFunction("max")).block());
+        Mono<FunctionDefinition> publisherFunction = Mono.from(publisherClient.getFunction("max"));
+        assertThrows(FunctionNotFoundException.class, publisherFunction::block);
     }
 
     @Test
