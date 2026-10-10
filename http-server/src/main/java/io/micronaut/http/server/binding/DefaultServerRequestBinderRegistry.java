@@ -39,6 +39,7 @@ import java.util.Optional;
  */
 @Internal
 @Singleton
+@io.micronaut.context.annotation.Secondary
 @io.micronaut.core.annotation.Order(100) // Preserve precedence of custom and generic registries.
 public class DefaultServerRequestBinderRegistry implements ServerRequestBinderRegistry {
 

@@ -42,6 +42,7 @@ import jakarta.inject.Singleton;
  */
 @Internal
 @Singleton
+@io.micronaut.context.annotation.Secondary
 @Order(200)
 @Deprecated(since = "5.3.0", forRemoval = true)
 public final class NettyServerRequestBinderRegistry implements ServerRequestBinderRegistry {

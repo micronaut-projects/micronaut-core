@@ -65,6 +65,24 @@ class AsyncRequestBodyWithoutNettyTest {
     }
 
     @Test
+    void aLegacySecondaryReplacementRemainsTheServerRegistry() {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", "legacy-secondary-registry"))) {
+            assertInstanceOf(LegacyRegistry.class, ctx.getBean(RequestArgumentSatisfier.class).getBinderRegistry());
+            assertInstanceOf(LegacyRegistry.class, io.micronaut.http.bind.ServerRequestBinderRegistry.find(ctx).orElseThrow());
+        }
+    }
+
+    @jakarta.inject.Singleton
+    @io.micronaut.context.annotation.Secondary
+    @io.micronaut.context.annotation.Replaces(io.micronaut.http.bind.DefaultRequestBinderRegistry.class)
+    @io.micronaut.context.annotation.Requires(property = "spec.name", value = "legacy-secondary-registry")
+    static class LegacyRegistry extends io.micronaut.http.bind.DefaultRequestBinderRegistry {
+        LegacyRegistry(io.micronaut.core.convert.ConversionService conversionService) {
+            super(conversionService);
+        }
+    }
+
+    @Test
     void sharedFullBodyBinderReadsNonNettyRequestBytes() throws Exception {
         try (ApplicationContext ctx = ApplicationContext.run();
              OtherServerRequest server = request("{\"a\":1}", MediaType.APPLICATION_JSON_TYPE)) {

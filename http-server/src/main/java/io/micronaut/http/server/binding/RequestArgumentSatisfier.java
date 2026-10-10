@@ -41,9 +41,14 @@ public class RequestArgumentSatisfier {
     }
 
     /** @param requestBinderRegistry The registry selected for server routes */
-    @jakarta.inject.Inject
     public RequestArgumentSatisfier(io.micronaut.http.bind.ServerRequestBinderRegistry requestBinderRegistry) {
         this((RequestBinderRegistry) requestBinderRegistry);
+    }
+
+    /** @param context The context containing transport defaults and custom registries */
+    @jakarta.inject.Inject
+    public RequestArgumentSatisfier(io.micronaut.context.BeanContext context) {
+        this(io.micronaut.http.bind.ServerRequestBinderRegistry.find(context).orElseThrow());
     }
 
     /**
