@@ -209,7 +209,8 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * ({@link GenericPlaceholder#isResolved()}) and for an array of a variable, {@code T[]}, which is an array
      * whose {@link #componentType()} is the variable. An argument that answers {@code true} is a
      * {@link GenericPlaceholder}; its {@link #getType()} is the type the variable erases to. See
-     * {@link #isWildcard()} for how the shapes of an argument are told apart.</p>
+     * {@link #isWildcard()} for how the shapes of an argument are told apart, and
+     * {@link #isArrayOfUnresolvedTypeVariable()} for an array of a variable.</p>
      *
      * <p>A placeholder built by hand with {@link #ofTypeVariable(Class, String)} for a type resolved in place of a
      * variable, or compiled before {@link GenericPlaceholder#isResolved()} was recorded, is taken for the variable
@@ -224,6 +225,35 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
             && !(this instanceof WildcardArgument<?>)
             && !placeholder.isResolved()
             && !getType().isArray();
+    }
+
+    /**
+     * Whether this argument stands for an array, of any dimension, of a type variable that was left unresolved
+     * where the argument was written: {@code T[]} and {@code T[][]}, but not {@code T} itself, which
+     * {@link #isUnresolvedTypeVariable()} answers for. Exactly one of the two is {@code true} for an argument whose
+     * {@link #getType()} is only the erasure of a variable.
+     *
+     * <p>An array of a variable is a {@link GenericPlaceholder} of that variable whose {@link #getType()} is the
+     * array of the type the variable erases to, and whose {@link #componentType()} is the variable, or an array of
+     * it of one dimension less.</p>
+     *
+     * <p>It is {@code false} for a wildcard, for a type resolved in place of a variable
+     * ({@link GenericPlaceholder#isResolved()}) and for an array of a type that only has a variable among its type
+     * arguments, {@code List<T>[]}.</p>
+     *
+     * <p>A placeholder built by hand with {@link #ofTypeVariable(Class, String)} for an array type resolved in
+     * place of a variable, or compiled before {@link GenericPlaceholder#isResolved()} was recorded, is taken for an
+     * array of the variable here.</p>
+     *
+     * @return Whether this argument is an array of an unresolved type variable
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean isArrayOfUnresolvedTypeVariable() {
+        return this instanceof GenericPlaceholder<?> placeholder
+            && !(this instanceof WildcardArgument<?>)
+            && !placeholder.isResolved()
+            && getType().isArray();
     }
 
     /**
