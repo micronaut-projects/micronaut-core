@@ -94,6 +94,35 @@ public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup,
     }
 
     /**
+     * Declare a route of {@code HEAD} requests, like a {@code @Head} controller method, see
+     * {@link #GET(String)}. In an {@link HttpRoutes} bean, it replaces the implicit {@code HEAD}
+     * route of the {@code GET} route of the same URI template. The server writes the headers of
+     * its response only, so it answers with the headers the {@code GET} route would, e.g. the
+     * {@code Content-Length} of its body.
+     *
+     * @param uri The URI template
+     * @return The pending route
+     */
+    default HttpRouteSpec HEAD(String uri) {
+        return route(HttpMethod.HEAD, uri);
+    }
+
+    /**
+     * Declare a route of {@code OPTIONS} requests, like an {@code @Options} controller method,
+     * see {@link #GET(String)}. A CORS preflight request, an {@code OPTIONS} request with an
+     * {@code Origin} and an {@code Access-Control-Request-Method} header, is still answered by the
+     * CORS filter, before any route, when CORS is enabled for its origin. With
+     * {@code micronaut.server.dispatch-options-requests}, the route answers the {@code OPTIONS}
+     * requests of its URI instead of the {@code Allow} response of the server.
+     *
+     * @param uri The URI template
+     * @return The pending route
+     */
+    default HttpRouteSpec OPTIONS(String uri) {
+        return route(HttpMethod.OPTIONS, uri);
+    }
+
+    /**
      * Declare a route of the requests of a method. The route runs like a controller method:
      * filters, error routes, body readers and writers and executor selection apply as they do for
      * a controller method. Like a controller route it consumes JSON unless
@@ -215,6 +244,28 @@ public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup,
      */
     default void DELETE(String uri, RequestHandler handler) {
         DELETE(uri).handle(handler);
+    }
+
+    /**
+     * Route {@code HEAD} requests to a handler function: the same as
+     * {@code HEAD(uri).handle(handler)}, see {@link #HEAD(String)}.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     */
+    default void HEAD(String uri, RequestHandler handler) {
+        HEAD(uri).handle(handler);
+    }
+
+    /**
+     * Route {@code OPTIONS} requests to a handler function: the same as
+     * {@code OPTIONS(uri).handle(handler)}, see {@link #OPTIONS(String)}.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     */
+    default void OPTIONS(String uri, RequestHandler handler) {
+        OPTIONS(uri).handle(handler);
     }
 
     /**

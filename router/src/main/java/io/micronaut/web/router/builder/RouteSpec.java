@@ -25,19 +25,16 @@ import io.micronaut.http.PathVariables;
 import io.micronaut.inject.ExecutableMethod;
 
 import java.lang.annotation.Annotation;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
  * The settings a handler route, see {@link HttpRouteSpec}, and a group of routes, see
  * {@link HttpRouteGroup}, share: the media types, the annotations, the attributes, the conditions,
- * the order and the port, besides the filters of {@link RouteFilterSpec} and the executor of
- * {@link ExecutionSpec}.
+ * the order and the port, besides the filters of {@link RouteFilterSpec}, the executor of
+ * {@link ExecutionSpec} and the overloads of {@code constrain} of {@link MatchSpec}, which a direct
+ * route shares.
  *
  * <p>On a route, a setting is the value of the route. On a group, it is the default of the
  * routes declared in the lambda of the group, and of its nested groups, wherever it is declared
@@ -58,7 +55,7 @@ import java.util.function.Predicate;
  * @since 5.3.0
  */
 @Experimental
-public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpec<S>, ExecutionSpec<S> permits HttpRouteSpec, HttpBodyRouteSpec, HttpRouteGroup, LocatedHttpRouteGroup {
+public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpec<S>, ExecutionSpec<S>, MatchSpec<S> permits HttpRouteSpec, HttpBodyRouteSpec, HttpRouteGroup, LocatedHttpRouteGroup {
 
     /**
      * Accept requests with these media types only, like {@code @Consumes} on a controller method,
@@ -310,6 +307,7 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * @return The route or the group
      * @since 5.3.0
      */
+    @Override
     S where(RouteCondition condition);
 
     /**
@@ -365,130 +363,8 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * @return The route or the group
      * @since 5.3.0
      */
-    @Experimental
+    @Override
     S constrain(Predicate<? super PathVariables> accepted);
-
-    /**
-     * Constrain a path variable, see {@link #constrain(Predicate)}: a request whose variable has
-     * no value, or a value the predicate does not accept, is not a match of the route.
-     *
-     * <pre>{@code
-     * routes.GET("/files/{name}")
-     *     .constrain("name", name -> !name.startsWith("."))
-     *     .handle(filesHandler);
-     * }</pre>
-     *
-     * @param variable The name of the variable
-     * @param accepted Whether the value, as a string, is accepted
-     * @return The route or the group
-     * @since 5.3.0
-     */
-    @Experimental
-    default S constrain(String variable, Predicate<? super String> accepted) {
-        Objects.requireNonNull(variable, "variable");
-        Objects.requireNonNull(accepted, "accepted");
-        return constrain(variables -> {
-            String value = variables.findString(variable).orElse(null);
-            return value != null && accepted.test(value);
-        });
-    }
-
-    /**
-     * Constrain a path variable converted to a type, see {@link #constrain(Predicate)}: a request
-     * whose variable has no value, a value that does not convert to the type, or a value the
-     * predicate does not accept, is not a match of the route.
-     *
-     * <pre>{@code
-     * routes.GET("/orders/{id}")
-     *     .constrain("id", Long.class, id -> id > 0)
-     *     .handle(ordersHandler); // "/orders/abc" is not a match either
-     * }</pre>
-     *
-     * @param variable The name of the variable
-     * @param type     The type to convert the value to
-     * @param accepted Whether the converted value is accepted
-     * @param <T>      The type
-     * @return The route or the group
-     * @since 5.3.0
-     */
-    @Experimental
-    default <T> S constrain(String variable, Class<T> type, Predicate<? super T> accepted) {
-        Objects.requireNonNull(variable, "variable");
-        Objects.requireNonNull(type, "type");
-        Objects.requireNonNull(accepted, "accepted");
-        // a conversion error throws, which rejects the variables
-        return constrain(variables -> variables.find(variable, type).map(accepted::test).orElse(false));
-    }
-
-    /**
-     * Constrain a path variable to a set of values, see {@link #constrain(Predicate)}: a request
-     * whose variable has another value, or none, is not a match of the route. The values are
-     * copied when the constraint is declared.
-     *
-     * <pre>{@code
-     * routes.path("/shops/{shop}", shop -> shop
-     *     .constrain("shop", Set.of("north", "south"))
-     *     .GET("/stock", stockHandler));
-     * }</pre>
-     *
-     * @param variable The name of the variable
-     * @param values   The accepted values
-     * @return The route or the group
-     * @since 5.3.0
-     */
-    @Experimental
-    default S constrain(String variable, Collection<String> values) {
-        Objects.requireNonNull(values, "values");
-        return constrain(variable, new ValueMatcher.OneOf(Set.copyOf(values), false));
-    }
-
-    /**
-     * Constrain a path variable with a matcher of its value, see {@link #constrain(Predicate)}:
-     * a request whose variable has a value the matcher does not match is not a match of the
-     * route. A variable without a value is given to the matcher as an absent value, which only a
-     * negated matcher, e.g. {@code present().negate()}, matches.
-     *
-     * <pre>{@code
-     * routes.GET("/files/{name}")
-     *     .constrain("name", ValueMatcher.startsWith(".").negate())
-     *     .handle(filesHandler);
-     * }</pre>
-     *
-     * @param variable The name of the variable
-     * @param matcher  The matcher of the value, as a string
-     * @return The route or the group
-     * @since 5.3.0
-     */
-    @Experimental
-    default S constrain(String variable, ValueMatcher matcher) {
-        Objects.requireNonNull(variable, "variable");
-        ValueMatcher normalized = RouteConditions.normalize(Objects.requireNonNull(matcher, "matcher"));
-        return constrain(variables -> normalized.matches(variables.findString(variable).orElse(null)));
-    }
-
-    /**
-     * Constrain path variables with matchers of their values, see
-     * {@link #constrain(String, ValueMatcher)}: every variable must match its matcher.
-     *
-     * @param matchers The matchers of the values, by the name of the variable, copied
-     * @return The route or the group
-     * @since 5.3.0
-     */
-    @Experimental
-    default S constrain(Map<String, ValueMatcher> matchers) {
-        Objects.requireNonNull(matchers, "matchers");
-        Map<String, ValueMatcher> normalized = new LinkedHashMap<>(matchers.size());
-        matchers.forEach((variable, matcher) -> normalized.put(Objects.requireNonNull(variable, "variable"),
-            RouteConditions.normalize(Objects.requireNonNull(matcher, "matcher"))));
-        return constrain(variables -> {
-            for (Map.Entry<String, ValueMatcher> entry : normalized.entrySet()) {
-                if (!entry.getValue().matches(variables.findString(entry.getKey()).orElse(null))) {
-                    return false;
-                }
-            }
-            return true;
-        });
-    }
 
     /**
      * Break a tie with other routes that are equally good for a request: the route with the
@@ -522,6 +398,7 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * @param order The order, lower wins
      * @return The route or the group
      */
+    @Override
     S order(int order);
 
     /**

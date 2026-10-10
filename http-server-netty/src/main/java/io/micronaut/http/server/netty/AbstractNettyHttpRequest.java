@@ -81,9 +81,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         String uri = nettyRequest.uri();
         this.validPath = UriUtil.isValidPath(uri);
         if (!validPath) {
-            if (escapeHtmlUrl && UriUtil.isRelative(uri)) {
-                uri = UriUtil.toValidPath(uri);
-            }
+            uri = escaped(uri, escapeHtmlUrl);
             this.uri = createURI(uri);
         }
         this.unvalidatedUrl = uri;
@@ -249,6 +247,25 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         return httpMethodName;
     }
 
+    /**
+     * The request target a request uses when {@link UriUtil#isValidPath(String)} rejects it,
+     * validated like the constructor validates it.
+     *
+     * @param uri           The request target as it was received
+     * @param escapeHtmlUrl Whether to escape the characters a browser sends but a URI forbids
+     * @return The request target the request uses, e.g. an escaped one
+     * @throws IllegalArgumentException if it is not a valid URI: the server answers {@code 400}
+     */
+    static String validatedTarget(String uri, boolean escapeHtmlUrl) {
+        String target = escaped(uri, escapeHtmlUrl);
+        createURI(target);
+        return target;
+    }
+
+    private static String escaped(String uri, boolean escapeHtmlUrl) {
+        return escapeHtmlUrl && UriUtil.isRelative(uri) ? UriUtil.toValidPath(uri) : uri;
+    }
+
     private static URI createURI(String url) {
         URI fullUri = URI.create(url);
         if (fullUri.getAuthority() != null || fullUri.getScheme() != null) {
@@ -272,7 +289,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
      * Extract the path out of the uri.
      * https://github.com/eclipse-vertx/vert.x/blob/master/src/main/java/io/vertx/core/http/impl/HttpUtils.java
      */
-    private static String parsePath(String uri) {
+    static String parsePath(String uri) {
         if (uri.isEmpty()) {
             return "";
         }

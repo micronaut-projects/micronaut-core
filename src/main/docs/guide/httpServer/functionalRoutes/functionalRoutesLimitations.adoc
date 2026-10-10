@@ -4,6 +4,7 @@ Functional routes are experimental and have these known limitations:
 
 * Tools that read the annotations of controllers, such as Micronaut OpenAPI, do not see handler routes.
 * There is no Kotlin DSL and no support for `suspend` handler functions.
+* Only the Netty server answers <<functionalRoutesDirect, direct routes>>: on another server runtime an application that declares one fails to start. A direct route has no filters, no port, and only the conditions the server decides from the request it received; an asynchronous direct route needs a runtime that holds the request until its response is complete.
 
 NOTE: A handler route has no annotations unless it is given some, see <<functionalRoutesAnnotations, Annotations on Handler Routes>>, so the body and the path variables of a handler route are not validated. To validate them, let the handler call a method of a bean whose parameters carry the constraints, e.g. `@Valid Item item` or `@NotBlank String name`: the method is validated like any other bean method, and a violation is answered with `400`, as for a controller.
 
