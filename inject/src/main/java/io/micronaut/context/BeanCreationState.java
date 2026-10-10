@@ -49,6 +49,20 @@ final class BeanCreationState {
         this.parent = parent;
     }
 
+    /**
+     * Whether this is the creation of the bean of the given definition. A qualified {@link BeanDefinitionDelegate},
+     * such as the one of an {@link io.micronaut.context.annotation.EachBean} bean, is created as itself, while the
+     * definition it wraps is the one instantiated and the one its injection segments name, so that definition
+     * matches too. This state, the one of the qualified bean, remains the owner.
+     *
+     * @param candidate The definition
+     * @return Whether this state creates the bean of the definition
+     */
+    boolean isCreating(BeanDefinition<?> candidate) {
+        return definition.equals(candidate)
+            || (definition instanceof BeanDefinitionDelegate<?> delegate && delegate.getDelegate().equals(candidate));
+    }
+
     InterceptorCandidates lifecycleInterceptorCandidates() {
         InterceptorCandidates candidates = dependencies.interceptorCandidates();
         if (proxyInterceptors.isEmpty()) {

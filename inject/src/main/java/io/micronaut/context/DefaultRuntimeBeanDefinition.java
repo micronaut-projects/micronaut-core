@@ -286,14 +286,15 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
 
     /**
      * The owner of the bean the given context is creating, as a resolver, if that bean is the one of this
-     * definition. The same owner is held by the registration of the bean once the creation completes.
+     * definition or of a qualified delegate of it. The same owner is held by the registration of the bean once the
+     * creation completes.
      *
      * @param resolutionContext The resolution context of the creation
      * @return The resolver, or {@code null} if the context does not track the creation of this bean
      */
     private @Nullable BeanDependencyResolver creationDependencies(BeanResolutionContext resolutionContext) {
         if (resolutionContext instanceof AbstractBeanResolutionContext creating
-            && creating.creationState != null && creating.creationState.definition.equals(this)) {
+            && creating.creationState != null && creating.creationState.isCreating(this)) {
             return new DefaultBeanDependencyResolver(creating.context, creating.creationState.dependencies);
         }
         return null;

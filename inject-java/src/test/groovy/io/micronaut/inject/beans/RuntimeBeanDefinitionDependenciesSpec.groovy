@@ -9,6 +9,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.inject.beans.injectionpoints.DisposableDependency
 import io.micronaut.inject.beans.injectionpoints.DisposableSingletonDependency
 import io.micronaut.inject.beans.lookups.LookupHolder
+import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
 import java.util.function.BiConsumer
@@ -260,6 +261,38 @@ class RuntimeBeanDefinitionDependenciesSpec extends Specification {
 
         then:
         results == [true, true, true]
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test a dependent the creator resolved is owned by the qualified delegate of the runtime bean being created'() {
+        given:
+        def context = start(holderBuilder(ctx -> new LookupHolder(ctx.dependencies.getBean(DisposableDependency)))
+                .singleton(true)
+                .qualifier(Qualifiers.any())
+                .build())
+        BeanRegistration<LookupHolder> one = context.getBeanRegistration(LookupHolder, Qualifiers.byName("one"))
+        BeanRegistration<LookupHolder> two = context.getBeanRegistration(LookupHolder, Qualifiers.byName("two"))
+        def oneDependency = one.bean.created as DisposableDependency
+        def twoDependency = two.bean.created as DisposableDependency
+
+        expect:
+        !one.bean.is(two.bean)
+        !oneDependency.is(twoDependency)
+
+        when:
+        context.destroyBean(one)
+
+        then:
+        oneDependency.destroyed
+        !twoDependency.destroyed
+
+        when:
+        context.destroyBean(two)
+
+        then:
+        twoDependency.destroyed
 
         cleanup:
         context.close()

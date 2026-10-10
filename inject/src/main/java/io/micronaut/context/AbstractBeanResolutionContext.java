@@ -120,9 +120,10 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
         BeanDefinition<?> owner = segment.getDeclaringType();
         // The bean the segment injects into is still being created, with the creation of the bean being injected
-        // nested in it.
+        // nested in it. The segment names the definition that declares the injection point, which the qualified
+        // delegate being created wraps.
         for (BeanCreationState state = creationState; state != null; state = state.parent) {
-            if (state.definition.equals(owner)) {
+            if (state.isCreating(owner)) {
                 return new DefaultBeanDependencyResolver(context, state.dependencies);
             }
         }
