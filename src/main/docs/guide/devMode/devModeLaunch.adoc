@@ -28,6 +28,8 @@ The launcher reads the entries as follows:
 * `@file` reads a list from an argument file.
 * A system property of the same name overrides an entry.
 
+On macOS, put `micronaut-runtime-osx` on the development runtime classpath as well, which the build plugins do. The launcher then watches through the native file system events instead of the JDK's polling service, and a save is noticed at once rather than seconds later.
+
 == Starting the launcher
 
 The launcher is started with the runtime classpath, which holds the framework, the libraries and `micronaut-dev` itself. It does not hold the project's own class directories: those belong to the reloadable tier.
