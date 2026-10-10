@@ -36,7 +36,6 @@ import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -56,7 +55,6 @@ import java.util.Set;
  * @author graemerocher
  * @since 5.3.0
  */
-@NullMarked
 final class ConfigurationStaleness {
 
     private ConfigurationStaleness() {

@@ -17,7 +17,6 @@ package io.micronaut.dev;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.loader.GenerationClassLoader;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -49,7 +48,6 @@ import java.util.Set;
  * rather than for as long as a bean lives.</p>
  */
 @Internal
-@NullMarked
 final class GenerationThreads {
 
     private GenerationThreads() {
