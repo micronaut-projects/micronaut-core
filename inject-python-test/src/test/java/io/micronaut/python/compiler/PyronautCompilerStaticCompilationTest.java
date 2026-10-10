@@ -107,12 +107,12 @@ class PyronautCompilerStaticCompilationTest {
 
     @Test
     void strictModeFailsTheBuildForAnExplicitSwitchThatCannotBeHonoured() {
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> PyronautCompiler.builder()
+        PyronautCompiler compiler = PyronautCompiler.builder()
             .pythonCode(SOURCE)
             .staticCompilation(StaticCompilationMode.ANNOTATED)
             .options(List.of("-A" + StaticCompilationMode.STRICT_OPTION + "=true"))
-            .build()
-            .buildClassLoader());
+            .build();
+        RuntimeException exception = assertThrows(RuntimeException.class, compiler::buildClassLoader);
 
         assertTrue(exception.getMessage().contains("[python:compile-static] [PricingService.describe] cannot be compiled statically"), exception.getMessage());
     }
@@ -137,11 +137,11 @@ class PyronautCompilerStaticCompilationTest {
 
     @Test
     void anUnknownModeIsRejectedWithAClearMessage() {
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> PyronautCompiler.builder()
+        PyronautCompiler compiler = PyronautCompiler.builder()
             .pythonCode("answer = 42")
             .options(List.of("-A" + StaticCompilationMode.OPTION + "=fast"))
-            .build()
-            .buildClassLoader());
+            .build();
+        RuntimeException exception = assertThrows(RuntimeException.class, compiler::buildClassLoader);
 
         assertTrue(exception.getMessage().contains("Unknown value [fast] of the option micronaut.python.compile.static"), exception.getMessage());
     }
