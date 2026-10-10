@@ -103,6 +103,7 @@ A connection is kept only when all of these hold:
 * It carries no handler of a `NettyClientCustomizer`, a proxy or a packet capture.
 * Its client's configuration, TLS builders and channel factory are not classes of the application.
 * Its TLS session comes from the configuration alone, not from certificate providers.
+* Its client sets no `connect-ttl`, which a restart would start again, and uses the default connection pool.
 
 HTTP/2 and HTTP/3 connections are not kept: their multiplexing handlers and streams belong to the client that opened them.
 

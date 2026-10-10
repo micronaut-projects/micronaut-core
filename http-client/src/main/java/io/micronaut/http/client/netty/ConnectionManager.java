@@ -319,12 +319,15 @@ public class ConnectionManager {
     /**
      * The identity of this client's configuration, when its idle connections may outlive it: they run on event loops
      * it does not shut down, carry no handler of a customizer, a capture or HTTP/3, and their TLS sessions were made
-     * from the configuration alone, without certificate providers.
+     * from the configuration alone, without certificate providers. A pool that picks the loops of its connections
+     * itself cannot take them back, and a connection whose lifetime is limited would start it again.
      */
     @Nullable
     private String retainedClient(RetainedClientConnections retained) {
         SslConfiguration ssl = configuration.getSslConfiguration();
         if (shutdownGroup || httpVersion.isHttp3() || configuration.getPcapLoggingPathPattern() != null
+            || configuration.getConnectTtl().isPresent()
+            || configuration.getConnectionPoolConfiguration().getVersion() != HttpClientConfiguration.ConnectionPoolConfiguration.PoolVersion.V4_9
             || ssl.getKeyName() != null || ssl.getTrustName() != null || !customizersEmpty()
             || !retained.isRetainable(Arrays.asList(configuration, nettyClientSslBuilder, sslFactory, socketChannelFactory))) {
             return null;
@@ -527,8 +530,15 @@ public class ConnectionManager {
     public final void shutdown() {
         if (running.compareAndSet(true, false)) {
 
+            List<Future<?>> retaining = new ArrayList<>();
             for (PoolHolder pool : pools.values()) {
-                pool.shutdown();
+                pool.shutdown(retaining);
+            }
+            if (!retaining.isEmpty() && ThreadExecutorMap.currentExecutor() == null) {
+                // offered before this client is gone, so that the next one finds them
+                for (Future<?> future : retaining) {
+                    future.awaitUninterruptibly(ADOPTION_TIMEOUT_MILLIS);
+                }
             }
             pools.clear();
             if (shutdownGroup) {
@@ -1602,10 +1612,22 @@ public class ConnectionManager {
         }
 
         public void shutdown() {
-            boolean retaining = retainedClient != null && customizersEmpty();
+            shutdown(new ArrayList<>());
+        }
+
+        /**
+         * Closes the connections, or offers the idle ones to {@link RetainedClientConnections}.
+         *
+         * @param retaining Receives the tasks that offer them, on their event loops
+         */
+        void shutdown(List<Future<?>> retaining) {
+            boolean retain = retainedClient != null && customizersEmpty();
             pool.forEachConnection(c -> {
-                if (retaining && c instanceof Http1ConnectionHolder http1) {
-                    http1.retainOrClose();
+                if (retain && c instanceof Http1ConnectionHolder http1) {
+                    Future<?> offered = http1.retainOrClose();
+                    if (offered != null) {
+                        retaining.add(offered);
+                    }
                 } else {
                     ((ConnectionHolder) c).channel.close();
                 }
@@ -1913,10 +1935,13 @@ public class ConnectionManager {
             /**
              * As the client shuts down: offers the connection to {@link RetainedClientConnections} if it is idle and
              * carries only this class's handlers, which are taken off first, or closes it.
+             *
+             * @return The task that does it on the connection's event loop, or {@code null} if it is closed already
              */
-            void retainOrClose() {
+            @Nullable
+            Future<?> retainOrClose() {
                 try {
-                    channel.eventLoop().execute(() -> {
+                    return channel.eventLoop().submit(() -> {
                         if (hasLiveRequest || windDownConnection || !channel.isActive() || !detachHandlers()
                             || !Objects.requireNonNull(retainedConnections).retain(Objects.requireNonNull(retainedClient), requestKey, channel)) {
                             channel.close();
@@ -1924,6 +1949,7 @@ public class ConnectionManager {
                     });
                 } catch (RejectedExecutionException e) {
                     channel.close();
+                    return null;
                 }
             }
 
