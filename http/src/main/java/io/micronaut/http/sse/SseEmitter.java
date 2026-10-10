@@ -55,8 +55,10 @@ import java.util.function.Consumer;
  * because the client reads slower than the events are sent. The stage returned by
  * {@link #send(Event)} completes once the bytes of the event, together with the bytes queued
  * before it, are below the {@link #highWaterMark(int) high-water mark}: immediately if the client
- * keeps up, otherwise once the connection took enough of the queue. Waiting for the stage (or
- * using {@link #sendAndAwait(Event)}) paces the sender to the client. {@link #isWritable()} tells
+ * keeps up, otherwise once the connection took enough of the queue. Waiting for the stage before
+ * the next send paces the sender to the client: a handler that sends from a loop continues in the
+ * stage, or, on a virtual thread or a thread of a blocking executor, waits for it, e.g. with
+ * {@code send(event).toCompletableFuture().join()}. {@link #isWritable()} tells
  * whether a send would complete immediately, for senders that would rather drop events than wait,
  * such as a broadcast to many clients.</p>
  * <p>The queue is bounded: a send while sixteen times the high-water mark are already queued fails
@@ -83,8 +85,8 @@ import java.util.function.Consumer;
 public interface SseEmitter {
 
     /**
-     * Send an event. The send does not wait: wait for the returned stage (or use
-     * {@link #sendAndAwait(Event)}) to pace the sender to the client. Sends that do not wait queue
+     * Send an event. The send does not wait: wait for the returned stage before the next send to
+     * pace the sender to the client. Sends that do not wait queue
      * the events of a slow client until the queue overflows and the stream fails, see the class
      * documentation.
      *
@@ -112,31 +114,6 @@ public interface SseEmitter {
      * @return Completes like {@link #send(Event)}
      */
     CompletionStage<Void> comment(String comment);
-
-    /**
-     * Send an event, and wait until its stage completes: pacing a sender on a virtual thread or on
-     * a thread of a blocking executor to the client.
-     *
-     * @param event The event
-     * @throws InterruptedException           if the thread was interrupted while waiting: the event
-     *                                        may still be sent
-     * @throws IllegalStateException          if called on an event loop thread, which must not
-     *                                        block, or if the stream was completed or failed
-     * @throws io.micronaut.http.exceptions.ConnectionClosedException if the client disconnected
-     * @throws io.micronaut.http.exceptions.StreamOverflowException if the queue overflowed
-     */
-    void sendAndAwait(Event<?> event) throws InterruptedException;
-
-    /**
-     * Send an event with the given data, and wait until its stage completes, see
-     * {@link #sendAndAwait(Event)}.
-     *
-     * @param data The data of the event, or an {@link Event}
-     * @throws InterruptedException if the thread was interrupted while waiting
-     */
-    default void sendAndAwait(Object data) throws InterruptedException {
-        sendAndAwait(data instanceof Event<?> event ? event : Event.of(data));
-    }
 
     /**
      * Whether a send would complete immediately: the stream is open, and the bytes the

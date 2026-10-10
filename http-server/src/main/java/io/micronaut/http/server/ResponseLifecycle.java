@@ -198,7 +198,7 @@ public abstract class ResponseLifecycle {
             if (body instanceof BodyElements<?> elements) {
                 // the response of a HEAD request: the elements are not written; the route
                 // executor discarded the body it moved aside already
-                ResponseStreams.discard(elements);
+                ResponseStreams.discard(elements, byteBodyFactory, ioExecutor());
             }
             if (headBody instanceof BodyElements<?>) {
                 // the headers of a GET request: the media type the elements are written with
@@ -341,6 +341,30 @@ public abstract class ResponseLifecycle {
                                                                                    MutableHttpResponse<?> response,
                                                                                    BodyElements<?> elements,
                                                                                    @Nullable RouteInfo<Object> routeInfo) {
+        try {
+            ResponseStreams.ElementEncoder encoder = elementEncoder(request, response, routeInfo);
+            int highWaterMark = routeExecutor.serverConfiguration.getResponseStream().getHighWaterMark();
+            // closing the elements may block, e.g. a database cursor: not on the event loop
+            return ResponseStreams.stream(byteBodyFactory, elements, encoder, highWaterMark, ioExecutor())
+                .map(body -> ByteBodyHttpResponseWrapper.wrap(response, body));
+        } catch (RuntimeException e) {
+            // nothing streams the elements. The encoder holds nothing before its first element
+            ResponseStreams.discard(elements, byteBodyFactory, ioExecutor());
+            return ExecutionFlow.error(e);
+        }
+    }
+
+    /**
+     * The encoder of the elements of a {@link BodyElements} body, see {@link #encodeBodyElements}.
+     *
+     * @param request   The request
+     * @param response  The response
+     * @param routeInfo The route, if any
+     * @return The encoder
+     */
+    private ResponseStreams.ElementEncoder elementEncoder(HttpRequest<?> request,
+                                                          MutableHttpResponse<?> response,
+                                                          @Nullable RouteInfo<Object> routeInfo) {
         MediaType mediaType = bodyElementsMediaType(request, response, routeInfo);
         MediaType finalMediaType = mediaType;
         boolean jsonMediaType = MediaType.EXTENSION_JSON.equals(mediaType.getExtension());
@@ -355,7 +379,7 @@ public abstract class ResponseLifecycle {
         AtomicBoolean jsonFormattable = new AtomicBoolean(true);
         BooleanSupplier isJson = routeInfo != null ? () -> routeJson : () -> jsonMediaType && jsonFormattable.get();
         PieceStream pieces = new PieceStream(request, response, isJson);
-        ResponseStreams.ElementEncoder encoder = new ResponseStreams.ElementEncoder() {
+        return new ResponseStreams.ElementEncoder() {
             /**
              * Only touched by the encoding of one element at a time.
              */
@@ -416,9 +440,6 @@ public abstract class ResponseLifecycle {
                 pieces.close();
             }
         };
-        int highWaterMark = routeExecutor.serverConfiguration.getResponseStream().getHighWaterMark();
-        return ResponseStreams.stream(byteBodyFactory, elements, encoder, highWaterMark)
-            .map(body -> ByteBodyHttpResponseWrapper.wrap(response, body));
     }
 
     /**

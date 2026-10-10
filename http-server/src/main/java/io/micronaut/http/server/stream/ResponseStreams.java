@@ -18,12 +18,19 @@ package io.micronaut.http.server.stream;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.BodyElements;
+import io.micronaut.http.server.binding.ServerRequestBody;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Streamed response bodies without Reactive Streams: the entry point of the response encoding
@@ -55,7 +62,32 @@ public final class ResponseStreams {
                                                           BodyElements<?> elements,
                                                           ElementEncoder encoder,
                                                           int highWaterMark) {
-        return ElementsBody.start(factory, elements, encoder, highWaterMark);
+        return stream(factory, elements, encoder, highWaterMark, null);
+    }
+
+    /**
+     * Stream the elements of a {@link BodyElements} body, pulled one element at a time while
+     * the connection keeps up. The elements are closed once: when the body ends, fails, or the
+     * client disconnects, or when the result is cancelled before the first element.
+     *
+     * @param factory       The body factory of the response
+     * @param elements      The elements
+     * @param encoder       Encodes the elements
+     * @param highWaterMark The high-water mark of the stream, in bytes
+     * @param closeExecutor Closes the elements when they would be closed on an event loop, since
+     *                      closing them may block (e.g. a database cursor), or {@code null} to
+     *                      close them on the closing thread
+     * @return Completes with the body once the first element (or the end) is available, or
+     * exceptionally if producing or encoding the first element failed: nothing was sent then
+     * @throws IllegalArgumentException if the high-water mark is not positive: the caller closes
+     * the elements then
+     */
+    public static ExecutionFlow<CloseableByteBody> stream(ByteBodyFactory factory,
+                                                          BodyElements<?> elements,
+                                                          ElementEncoder encoder,
+                                                          int highWaterMark,
+                                                          @Nullable Executor closeExecutor) {
+        return ElementsBody.start(factory, elements, encoder, highWaterMark, closeExecutor);
     }
 
     /**
@@ -68,6 +100,44 @@ public final class ResponseStreams {
             elements.close();
         } catch (Throwable e) {
             LOG.warn("Failed to close the elements of a response", e);
+        }
+    }
+
+    /**
+     * Close elements that are not written, or no longer: on the executor when the current thread
+     * is an event loop, since closing them may block (e.g. a database cursor), else on this thread.
+     *
+     * @param elements The elements
+     * @param factory  The body factory of the response, which knows its event loops
+     * @param executor The executor that may block, or {@code null} to close them on this thread
+     */
+    public static void discard(BodyElements<?> elements, ByteBodyFactory factory, @Nullable Executor executor) {
+        if (executor != null && factory.isEventLoopThread()) {
+            try {
+                executor.execute(PropagatedContext.getOrEmpty().wrap(() -> discard(elements)));
+                return;
+            } catch (RejectedExecutionException e) {
+                LOG.debug("The executor refused to close the elements of a response, they are closed on the event loop", e);
+            }
+        }
+        discard(elements);
+    }
+
+    /**
+     * Close the elements of the response to a request like
+     * {@link #discard(BodyElements, ByteBodyFactory, Executor)}, with the body factory of the server
+     * request, or on this thread if the request is none.
+     *
+     * @param elements The elements
+     * @param request  The request
+     * @param executor The executor that may block, or {@code null} to close them on this thread
+     */
+    public static void discard(BodyElements<?> elements, HttpRequest<?> request, @Nullable Executor executor) {
+        ServerHttpRequest<?> server = ServerRequestBody.of(request);
+        if (server == null) {
+            discard(elements);
+        } else {
+            discard(elements, server.byteBodyFactory(), executor);
         }
     }
 

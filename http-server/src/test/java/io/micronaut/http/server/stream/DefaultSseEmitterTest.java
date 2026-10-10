@@ -37,6 +37,7 @@ import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.ConnectionClosedException;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.exceptions.StreamOverflowException;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.sse.SseEmitter;
@@ -53,6 +54,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -281,11 +283,8 @@ class DefaultSseEmitterTest {
     @Test
     void anEventThatCannotBeEncodedFailsItsSendOnly() throws Exception {
         AtomicReference<Throwable> send = new AtomicReference<>();
-        AtomicReference<Throwable> sendAndAwait = new AtomicReference<>();
         Consumer body = read(response(start(HttpRequest.GET("/events"), events -> {
             events.send(new Broken()).whenComplete((ignored, error) -> send.set(error));
-            Broken broken = new Broken();
-            sendAndAwait.set(assertThrows(CodecException.class, () -> events.sendAndAwait(broken)));
             events.send("after");
         }, null)));
         assertInstanceOf(CodecException.class, send.get());
@@ -299,18 +298,24 @@ class DefaultSseEmitterTest {
         try {
             AtomicReference<Throwable> afterEnd = new AtomicReference<>();
             Consumer body = read(response(start(HttpRequest.GET("/events"), events -> {
-                events.sendAndAwait(Event.of("one"));
-                events.sendAndAwait("two");
+                // a blocking handler waits for the stage of each send
+                events.send(Event.of("one")).toCompletableFuture().join();
+                events.send("two").toCompletableFuture().join();
                 events.complete();
-                afterEnd.set(assertThrows(IllegalStateException.class, () -> events.sendAndAwait("three")));
+                afterEnd.set(assertThrows(CompletionException.class, () -> events.send("three").toCompletableFuture().join()));
             }, executor)));
             assertTrue(awaitTrue(() -> body.complete));
             assertEquals("data: one\n\ndata: two\n\n", body.received());
             assertTrue(awaitTrue(() -> afterEnd.get() != null));
-            assertTrue(afterEnd.get().getMessage().startsWith("The stream is closed"), afterEnd.get().getMessage());
+            assertInstanceOf(IllegalStateException.class, afterEnd.get().getCause());
         } finally {
             executor.shutdownNow();
         }
+        // a blocking handler that fails while it waits for a send fails with the cause
+        HttpStatusException missing = new HttpStatusException(HttpStatus.NOT_FOUND, "missing");
+        assertSame(missing, failure(start(HttpRequest.GET("/events"), events -> {
+            throw new CompletionException(missing);
+        }, null)));
         // an executor that refuses the handler fails the response
         RejectedExecutionException refused = new RejectedExecutionException("full");
         assertSame(refused, failure(start(HttpRequest.GET("/events"), events -> events.send("never"), command -> {
@@ -330,8 +335,7 @@ class DefaultSseEmitterTest {
         assertInstanceOf(ConnectionClosedException.class, closed.get());
         assertFalse(emitter.get().isOpen());
         SseEmitter left = emitter.get();
-        ConnectionClosedException failure = assertThrows(ConnectionClosedException.class, () -> left.sendAndAwait("two"));
-        assertTrue(failure.getMessage().startsWith("The stream is closed"), failure.getMessage());
+        CompletionException failure = assertThrows(CompletionException.class, () -> left.send("two").toCompletableFuture().join());
         assertSame(closed.get(), failure.getCause());
     }
 
@@ -345,9 +349,8 @@ class DefaultSseEmitterTest {
             events.send("one");
             events.send("two");
             events.send("three");
-            overflow.set(assertThrows(StreamOverflowException.class, () -> events.sendAndAwait("four")));
+            overflow.set(assertThrows(CompletionException.class, () -> events.send("four").toCompletableFuture().join()));
         }, null)));
-        assertTrue(overflow.get().getMessage().startsWith("The stream is closed"), overflow.get().getMessage());
         assertInstanceOf(StreamOverflowException.class, overflow.get().getCause());
         assertInstanceOf(StreamOverflowException.class, body.error);
     }

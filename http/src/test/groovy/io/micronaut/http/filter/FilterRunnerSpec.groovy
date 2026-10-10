@@ -17,6 +17,7 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.bind.DefaultRequestBinderRegistry
+import io.micronaut.http.body.BodyElements
 import io.micronaut.http.context.ServerHttpRequestContext
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
@@ -1415,6 +1416,75 @@ class FilterRunnerSpec extends Specification {
         then:
         result != null
         result.value == resp1
+    }
+
+    def 'elements dropped by a response filter are closed by the runner'() {
+        given:
+        boolean closed = false
+        def elements = BodyElements.of({ CompletableFuture.completedFuture(Optional.empty()) }, { closed = true })
+        List<BodyElements<?>> closedByRunner = []
+        List<GenericHttpFilter> filters = [
+                after(ReturnType.of(MutableHttpResponse), [Argument.of(MutableHttpResponse)]) { MutableHttpResponse<?> response ->
+                    response.body("replaced")
+                }
+        ]
+        def runner = new FilterRunner(filters, (req, ctx) -> ExecutionFlow.just(HttpResponse.ok(elements))) {
+            @Override
+            protected void closeElements(HttpRequest<?> request, BodyElements<?> dropped) {
+                closedByRunner.add(dropped)
+                super.closeElements(request, dropped)
+            }
+        }
+
+        when:
+        def response = runner.run(HttpRequest.GET("/")).tryCompleteValue()
+        then:
+        response.body() == "replaced"
+        closedByRunner == [elements]
+        closed
+    }
+
+    def 'elements replaced by unrelated elements are closed after them'() {
+        given:
+        boolean oldClosed = false
+        boolean newClosed = false
+        def elements = BodyElements.of({ CompletableFuture.completedFuture(Optional.empty()) }, { oldClosed = true })
+        def replacement = BodyElements.of({ CompletableFuture.completedFuture(Optional.empty()) }, { newClosed = true })
+        List<GenericHttpFilter> filters = [
+                after(ReturnType.of(MutableHttpResponse), [Argument.of(MutableHttpResponse)]) { MutableHttpResponse<?> response ->
+                    response.body(replacement)
+                }
+        ]
+
+        when:
+        def response = filterRunner(filters, { ExecutionFlow.just(HttpResponse.ok(elements)) }).run(HttpRequest.GET("/")).tryCompleteValue()
+        then:
+        !oldClosed
+        def body = (BodyElements<?>) ((MutableHttpResponse<?>) response).body()
+
+        when:
+        // the server closes the elements of the response
+        body.close()
+        then:
+        newClosed
+        oldClosed
+    }
+
+    def 'elements a response filter keeps are not closed'() {
+        given:
+        boolean closed = false
+        def elements = BodyElements.of({ CompletableFuture.completedFuture(Optional.empty()) }, { closed = true })
+        List<GenericHttpFilter> filters = [
+                after(ReturnType.of(MutableHttpResponse), [Argument.of(MutableHttpResponse)]) { MutableHttpResponse<?> response ->
+                    response.header("X-Filtered", "true")
+                }
+        ]
+
+        when:
+        def response = filterRunner(filters, { ExecutionFlow.just(HttpResponse.ok(elements)) }).run(HttpRequest.GET("/")).tryCompleteValue()
+        then:
+        ((MutableHttpResponse<?>) response).body().is(elements)
+        !closed
     }
 
     private static Argument<?> nullableArgument(Class<?> type) {

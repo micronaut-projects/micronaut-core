@@ -31,7 +31,7 @@ class StreamRoutes(HttpRoutes):
     def routes(self, routes: HttpRouteBuilder) -> None:
         def countdown(request, path_variables, events):
             for i in range(path_variables.getInt("from"), 0, -1):
-                events.sendAndAwait(Event.of(i).id(str(i)))  # <2>
+                events.send(Event.of(i).id(str(i))).toCompletableFuture().join()  # <2>
 
         routes.GET("/countdown/{from}").executeOn(TaskExecutors.BLOCKING).sse(countdown)  # <1>
 

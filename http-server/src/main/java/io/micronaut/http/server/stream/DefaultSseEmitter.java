@@ -29,7 +29,6 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.exceptions.ConnectionClosedException;
-import io.micronaut.http.exceptions.StreamOverflowException;
 import io.micronaut.http.server.ServerResponseAttributes;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.sse.SseEmitter;
@@ -45,6 +44,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -161,10 +161,15 @@ final class DefaultSseEmitter implements SseEmitter {
      * The handler returned: the stream ends, unless the handler kept it open. A failure of the
      * handler fails the stream.
      *
-     * @param failure The failure of the handler, or {@code null}
+     * @param thrown The failure of the handler, or {@code null}
      */
-    private void handlerReturned(@Nullable Throwable failure) {
+    private void handlerReturned(@Nullable Throwable thrown) {
         boolean keptOpen = handlerState.getAndSet(HandlerState.RETURNED) == HandlerState.KEPT_OPEN;
+        Throwable failure = thrown;
+        if ((thrown instanceof CompletionException || thrown instanceof ExecutionException) && thrown.getCause() != null) {
+            // a blocking handler that waited for a send, e.g. with join(): the cause of the send
+            failure = thrown.getCause();
+        }
         if (failure != null) {
             if (!failStream(failure) && !(failure instanceof ConnectionClosedException)) {
                 // the stream ended before, e.g. the handler completed it: the failure has
@@ -244,40 +249,6 @@ final class DefaultSseEmitter implements SseEmitter {
         // after the write: the first event is in the body when the response goes out
         sendResponse();
         return result;
-    }
-
-    @Override
-    public void sendAndAwait(Event<?> event) throws InterruptedException {
-        Objects.requireNonNull(event, "event");
-        if (stream.isEventLoopThread()) {
-            throw new IllegalStateException("sendAndAwait blocks the calling thread: call it on a virtual thread or on a thread of a blocking executor, not on an event loop, where send(event) returns a stage instead");
-        }
-        // an event that cannot be encoded fails this call only, with its own exception
-        ReadBuffer data = factory.encode(bodyFactory, event);
-        active = true;
-        try {
-            write(data).toCompletableFuture().get();
-        } catch (ExecutionException e) {
-            throw closed(e.getCause() == null ? e : e.getCause());
-        }
-    }
-
-    /**
-     * The exception of a send that failed because the stream is closed: a new one, since every
-     * send after the close shares the cause.
-     *
-     * @param cause Why the stream closed
-     * @return The exception to throw
-     */
-    private static RuntimeException closed(Throwable cause) {
-        String message = "The stream is closed: " + cause.getMessage();
-        if (cause instanceof StreamOverflowException) {
-            return new StreamOverflowException(message, cause);
-        }
-        if (cause instanceof ConnectionClosedException) {
-            return new ConnectionClosedException(message, cause);
-        }
-        return new IllegalStateException(message, cause);
     }
 
     @Override

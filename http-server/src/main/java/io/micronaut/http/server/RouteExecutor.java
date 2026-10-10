@@ -29,6 +29,7 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -61,6 +62,7 @@ import io.micronaut.http.server.util.HttpDateHeader;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.GroupErrorRoutes;
@@ -132,6 +134,11 @@ public final class RouteExecutor {
      */
     private final boolean suspendedRoutesNeedReactorContext;
     private final ConversionService conversionService;
+    /**
+     * The executor that may block, which closes the elements of a response body that would be
+     * closed on an event loop.
+     */
+    private final Supplier<@Nullable ExecutorService> blockingExecutor;
 
     /**
      * Default constructor.
@@ -158,6 +165,7 @@ public final class RouteExecutor {
         this.coroutineHelper = beanContext.findBean(CoroutineHelper.class);
         this.suspendedRoutesNeedReactorContext = coroutineHelper.isPresent() && coroutineHelper.get().isReactorContextPropagated();
         this.conversionService = beanContext.getConversionService();
+        this.blockingExecutor = SupplierUtil.memoized(() -> executorSelector.select(TaskExecutors.BLOCKING).orElse(null));
     }
 
     /**
@@ -794,6 +802,18 @@ public final class RouteExecutor {
         return ReleasingBodyElements.onClose(elements, () -> releaseLogged(request, bodies));
     }
 
+    /**
+     * Close the {@link BodyElements} of a response body that is not written: on the blocking
+     * executor when the current thread is an event loop, since closing them may block, e.g. a
+     * database cursor.
+     *
+     * @param request  The request
+     * @param elements The elements
+     */
+    void discardElements(HttpRequest<?> request, BodyElements<?> elements) {
+        ResponseStreams.discard(elements, request, blockingExecutor.get());
+    }
+
     private MutableHttpResponse<?> finaliseResponse(@Nullable HttpRequest<?> request, RouteInfo<?> routeInfo, @Nullable RouteMatch<?> routeMatch, MutableHttpResponse<?> response) {
         // for head request we never emit the body
         if (request != null && request.getMethod().equals(HttpMethod.HEAD)) {
@@ -802,7 +822,7 @@ public final class RouteExecutor {
                 referenceCounted.release();
             } else if (o instanceof BodyElements<?> elements) {
                 // they are never pulled
-                ResponseStreams.discard(elements);
+                discardElements(request, elements);
             }
             response.body(null);
             if (o != null) {
