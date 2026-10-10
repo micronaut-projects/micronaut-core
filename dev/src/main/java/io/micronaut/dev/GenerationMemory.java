@@ -21,7 +21,6 @@ import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.dev.loader.DevClassLoader;
 import io.micronaut.dev.loader.GenerationClassLoader;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +34,6 @@ import java.util.List;
  * and what the process-wide caches hold of a retired generation. Reports the generations that stay reachable.
  */
 @Internal
-@NullMarked
 final class GenerationMemory {
 
     // the runtime's logger: what is logged here is logged as the runtime's
