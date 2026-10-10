@@ -102,8 +102,13 @@ internal open class KotlinMethodElement(
 
     override fun isSuspend() = declaration.modifiers.contains(Modifier.SUSPEND)
 
+    /**
+     * The methods this method overrides as a member of its owning type, as javac reports them: the methods it
+     * overrides in the hierarchy of its declaring type and, for an inherited method, the methods it implements of
+     * the interfaces the owning type introduces.
+     */
     override fun getOverriddenMethods(): Collection<MethodElement> {
-        return visitorContext.nativeElementsHelper
+        val overriddenMethods: MutableList<MethodElement> = visitorContext.nativeElementsHelper
             .findOverriddenMethods(owningType.declaration, declaration)
             .stream()
             .map { KotlinMethodElement(
@@ -112,8 +117,45 @@ internal open class KotlinMethodElement(
                     presetParameters,
                     elementAnnotationMetadataFactory,
                     visitorContext
-                )
+                ) as MethodElement
             }.collect(Collectors.toList())
+        for (implementedMethod in findImplementedMethods()) {
+            if (overriddenMethods.none { it.declaringType.name == implementedMethod.declaringType.name }) {
+                overriddenMethods.add(implementedMethod)
+            }
+        }
+        return overriddenMethods
+    }
+
+    /**
+     * The methods an inherited method implements of the interfaces the owning type, or a class between it and the
+     * declaring type, introduces. The interfaces the declaring type implements itself are covered by the methods it
+     * overrides in the hierarchy of its declaring type.
+     */
+    private fun findImplementedMethods(): List<MethodElement> {
+        val declaringType = getDeclaringType()
+        if (isAbstract || isStatic || isPrivate || declaringType.name == owningType.name) {
+            return emptyList()
+        }
+        val implementedMethods = mutableListOf<MethodElement>()
+        var type: ClassElement? = owningType
+        while (type != null && type.name != declaringType.name) {
+            for (anInterface in type.interfaces) {
+                if (!declaringType.isAssignable(anInterface)) {
+                    addImplementedMethods(anInterface, implementedMethods)
+                }
+            }
+            type = type.superType.orElse(null)
+        }
+        return implementedMethods
+    }
+
+    private fun addImplementedMethods(anInterface: ClassElement, implementedMethods: MutableList<MethodElement>) {
+        for (candidate in anInterface.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance().named(name))) {
+            if (!candidate.isPrivate && isSubSignature(candidate) && !implementedMethods.contains(candidate)) {
+                implementedMethods.add(candidate)
+            }
+        }
     }
 
     override fun withNewOwningType(owningType: ClassElement): MethodElement {

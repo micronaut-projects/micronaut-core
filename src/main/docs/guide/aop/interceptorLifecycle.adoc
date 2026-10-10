@@ -161,8 +161,10 @@ target was created. During context shutdown, a singleton target or a singleton o
 before those shared interceptors. Failed selections clean up newly created dependents, and a selection racing target
 destruction cannot attach new interceptors to the destroyed target. Custom-scoped interceptors remain owned by their
 scope.
-New selections are rejected once context shutdown begins; selections already cached on a target remain available
-to destruction callbacks until that target is destroyed.
+Once context shutdown begins, new selections are only made on the thread running the shutdown, on behalf of a shutdown
+event listener or a destruction callback, including the destruction callbacks of the target itself; the interceptors
+they create are destroyed with the target. Selections already cached on a target remain available to destruction
+callbacks until that target is destroyed.
 
 An interceptor that resolves additional beans dynamically can inject api:context.BeanDependencyResolver[] to give
 those dependencies its lifetime. It uses the same ownership and failure-cleanup infrastructure as native interceptor

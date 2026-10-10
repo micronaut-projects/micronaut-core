@@ -887,7 +887,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
         return classElement.getTypeParameters().stream()
             // we want the *declared* variables, so we don't pass in our genericsInfo.
-            .map(tpe -> (GenericPlaceholderElement) newClassElement(tpe.asType(), Collections.emptyMap()))
+            .map(this::newTypeParameterElement)
             .toList();
     }
 
