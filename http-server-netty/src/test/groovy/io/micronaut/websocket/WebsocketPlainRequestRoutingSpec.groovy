@@ -148,6 +148,7 @@ class WebsocketPlainRequestRoutingSpec extends Specification {
 
         @OnMessage
         void onMessage(String message, WebSocketSession session) {
+            // intentionally empty: the spec only checks that the route condition opens the WebSocket
         }
     }
 
