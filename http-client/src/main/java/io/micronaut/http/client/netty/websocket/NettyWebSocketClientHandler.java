@@ -494,7 +494,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     /**
      * A settled handshake, including one that provides no load-balancer outcome.
      *
-     * @param outcome The outcome, or {@code null} when the handshake says nothing about the instance
+     * @param outcome The outcome to report, or {@code null} if the handshake says nothing about the instance
      */
     @Internal
     private record HandshakeResult(LoadBalancer.@Nullable Outcome outcome) {
