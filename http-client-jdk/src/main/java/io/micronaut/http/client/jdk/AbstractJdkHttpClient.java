@@ -39,6 +39,7 @@ import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
 import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
+import io.micronaut.http.client.AsyncLoadBalancer;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
@@ -479,10 +480,10 @@ abstract class AbstractJdkHttpClient {
         }
     }
 
-    private static CompletableFuture<@Nullable ServiceInstance> select(LoadBalancer balancer, @Nullable Object discriminator) {
-        // a mock load balancer that only stubs select returns no stage
+    private static CompletableFuture<@Nullable ServiceInstance> select(AsyncLoadBalancer asyncBalancer, LoadBalancer balancer, @Nullable Object discriminator) {
+        // a mock load balancer returns no stage
         return CompletionStagePublishers.orElse(
-            balancer.selectAsync(discriminator),
+            asyncBalancer.selectAsync(discriminator),
             () -> CompletionStagePublishers.first(balancer.select(discriminator), null)
         ).toCompletableFuture();
     }
@@ -502,21 +503,27 @@ abstract class AbstractJdkHttpClient {
         }
 
         LoadBalancer balancer = loadBalancer;
-        // a selection that is not complete yet is cancelled with the subscription, if the
-        // framework created it. The selection is made in the propagated context of the
-        // subscriber, so that a load balancer or a discovery client with publishers finds it in
-        // its Reactor context, as it did when its publisher was part of this chain
-        return Mono.deferContextual(contextView -> {
-            Object discriminator = getLoadBalancerDiscriminator(request);
-            PropagatedContext propagatedContext = ReactorPropagation.findPropagatedContext(contextView).orElse(null);
-            CompletableFuture<@Nullable ServiceInstance> selection;
-            if (propagatedContext == null || propagatedContext.isBound()) {
-                selection = select(balancer, discriminator);
-            } else {
-                selection = propagatedContext.propagate(() -> select(balancer, discriminator));
-            }
-            return Mono.fromFuture(selection, true).doOnCancel(() -> CompletionStagePublishers.cancel(selection));
-        }).map(server -> {
+        Mono<ServiceInstance> selected;
+        if (balancer instanceof AsyncLoadBalancer asyncBalancer) {
+            // a selection that is not complete yet is cancelled with the subscription, if the
+            // framework created it. The selection is made in the propagated context of the
+            // subscriber, so that a discovery client with publishers finds it in its Reactor
+            // context, as it did when its publisher was part of this chain
+            selected = Mono.deferContextual(contextView -> {
+                Object discriminator = getLoadBalancerDiscriminator(request);
+                PropagatedContext propagatedContext = ReactorPropagation.findPropagatedContext(contextView).orElse(null);
+                CompletableFuture<@Nullable ServiceInstance> selection;
+                if (propagatedContext == null || propagatedContext.isBound()) {
+                    selection = select(asyncBalancer, balancer, discriminator);
+                } else {
+                    selection = propagatedContext.propagate(() -> select(asyncBalancer, balancer, discriminator));
+                }
+                return Mono.fromFuture(selection, true).doOnCancel(() -> CompletionStagePublishers.cancel(selection));
+            });
+        } else {
+            selected = Mono.from(balancer.select(getLoadBalancerDiscriminator(request)));
+        }
+        return selected.map(server -> {
                 LoadBalancerSelection selection = new LoadBalancerSelection(balancer, server);
                 Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
                 if (request instanceof MutableHttpRequest<?> mutableRequest && authInfo.isPresent()) {

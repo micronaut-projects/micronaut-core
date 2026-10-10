@@ -20,6 +20,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.DiscoveryClientStages;
 import io.micronaut.discovery.ServiceInstance;
+import io.micronaut.http.client.AsyncLoadBalancer;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
@@ -38,7 +39,7 @@ import java.util.concurrent.CompletionStage;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoadBalancer {
+public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoadBalancer implements AsyncLoadBalancer {
 
     private final String serviceID;
     private final DiscoveryClient discoveryClient;
@@ -77,7 +78,7 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
     }
 
     /**
-     * Selects from {@link DiscoveryClient#getInstancesAsync(String)} without a publisher. A
+     * Selects with {@link io.micronaut.discovery.AsyncDiscoveryClient#getInstancesAsync(String)} when the discovery client implements it. A
      * subclass is selected through {@link #select(Object)}, so that its override keeps working.
      * Cancelling the stage cancels the lookup when the discovery client adapts a publisher.
      *
@@ -88,7 +89,7 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
     @Override
     public CompletionStage<@Nullable ServiceInstance> selectAsync(@Nullable Object discriminator) {
         if (getClass() != DiscoveryClientRoundRobinLoadBalancer.class) {
-            return super.selectAsync(discriminator);
+            return CompletionStagePublishers.first(select(discriminator), null);
         }
         CompletableFuture<List<ServiceInstance>> instances = DiscoveryClientStages.getInstances(discoveryClient, serviceID).toCompletableFuture();
         if (instances.isDone() && !instances.isCompletedExceptionally()) {

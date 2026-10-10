@@ -17,8 +17,10 @@ package io.micronaut.http.client.loadbalance;
 
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.ServiceInstance;
+import io.micronaut.http.client.AsyncLoadBalancer;
 import io.micronaut.http.client.LoadBalancer;
 import org.reactivestreams.Publisher;
 
@@ -37,7 +39,7 @@ import java.util.concurrent.CompletionStage;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class FixedLoadBalancer implements LoadBalancer  {
+public class FixedLoadBalancer implements LoadBalancer, AsyncLoadBalancer {
     private final Publisher<ServiceInstance> publisher;
     private final ServiceInstance serviceInstance;
     private final URI uri;
@@ -80,7 +82,7 @@ public class FixedLoadBalancer implements LoadBalancer  {
     @Override
     public CompletionStage<@Nullable ServiceInstance> selectAsync(@Nullable Object discriminator) {
         if (getClass() != FixedLoadBalancer.class) {
-            return LoadBalancer.super.selectAsync(discriminator);
+            return CompletionStagePublishers.first(select(discriminator), null);
         }
         return CompletableFuture.completedFuture(serviceInstance);
     }

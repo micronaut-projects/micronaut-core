@@ -20,6 +20,8 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.function.client.AsyncFunctionDiscoveryClient;
+import io.micronaut.function.client.DefaultAsyncFunctionDiscoveryClient;
 import io.micronaut.function.client.DefaultFunctionDiscoveryClient;
 import io.micronaut.function.client.FunctionClient;
 import io.micronaut.function.client.FunctionDefinition;
@@ -53,12 +55,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The {@link FunctionClient} advice finds the function with
- * {@link FunctionDiscoveryClient#getFunctionAsync(String)} for the {@link CompletionStage} and the
+ * {@link AsyncFunctionDiscoveryClient#getFunction(String)} for the {@link CompletionStage} and the
  * blocking methods, and with the publisher for the reactive ones.
  */
 class FunctionClientAdviceAsyncTest {
 
     static final String SPEC = "FunctionClientAdviceAsyncTest";
+    static final String REPLACED_SPEC = "FunctionClientAdviceAsyncTest-replaced";
     static final IllegalStateException BOOM = new IllegalStateException("boom");
 
     private final ApplicationContext context = ApplicationContext.run(Map.of("spec.name", SPEC));
@@ -151,17 +154,15 @@ class FunctionClientAdviceAsyncTest {
     }
 
     @Test
-    void theDefaultGetFunctionAsyncAdaptsThePublisher() {
-        FunctionDefinition definition = () -> "max";
-        FunctionDiscoveryClient publisherOnly = name -> Publishers.just(definition);
-        FunctionDiscoveryClient empty = name -> Publishers.empty();
-        FunctionDiscoveryClient failing = name -> Publishers.just(new FunctionNotFoundException(name));
+    void aReplacedPublisherClientIsUsedInsteadOfTheDefaultAsyncClient() throws Exception {
+        try (ApplicationContext replaced = ApplicationContext.run(Map.of("spec.name", REPLACED_SPEC))) {
+            ReplacedMathClient replacedClient = replaced.getBean(ReplacedMathClient.class);
+            PublisherOnlyDiscoveryClient publisherOnly = replaced.getBean(PublisherOnlyDiscoveryClient.class);
 
-        assertSame(definition, publisherOnly.getFunctionAsync("max").toCompletableFuture().getNow(null));
-        ExecutionException e = assertThrows(ExecutionException.class, () -> empty.getFunctionAsync("max").toCompletableFuture().get());
-        assertInstanceOf(FunctionNotFoundException.class, e.getCause());
-        e = assertThrows(ExecutionException.class, () -> failing.getFunctionAsync("max").toCompletableFuture().get());
-        assertInstanceOf(FunctionNotFoundException.class, e.getCause());
+            assertEquals(42L, replacedClient.maxAsync().get());
+            assertEquals(42L, replacedClient.maxSync());
+            assertEquals(2, publisherOnly.publisherCalls.get());
+        }
     }
 
     @Test
@@ -256,8 +257,7 @@ class FunctionClientAdviceAsyncTest {
             return Publishers.just(definition(functionName));
         }
 
-        @Override
-        public CompletionStage<FunctionDefinition> getFunctionAsync(String functionName) {
+        CompletionStage<FunctionDefinition> stage(String functionName) {
             asyncCalls.incrementAndGet();
             CompletableFuture<FunctionDefinition> pending = next.getAndSet(null);
             if (pending != null) {
@@ -276,8 +276,53 @@ class FunctionClientAdviceAsyncTest {
         }
     }
 
+    /**
+     * The stages of {@link StubDiscoveryClient}.
+     */
     @Singleton
+    @Replaces(DefaultAsyncFunctionDiscoveryClient.class)
     @Requires(property = "spec.name", value = SPEC)
+    static final class StubAsyncDiscoveryClient implements AsyncFunctionDiscoveryClient {
+        private final StubDiscoveryClient discoveryClient;
+
+        StubAsyncDiscoveryClient(StubDiscoveryClient discoveryClient) {
+            this.discoveryClient = discoveryClient;
+        }
+
+        @Override
+        public CompletionStage<FunctionDefinition> getFunction(String functionName) {
+            return discoveryClient.stage(functionName);
+        }
+    }
+
+    /**
+     * Replaces only the publisher client, and leaves the default asynchronous one.
+     */
+    @Singleton
+    @Replaces(DefaultFunctionDiscoveryClient.class)
+    @Requires(property = "spec.name", value = REPLACED_SPEC)
+    static final class PublisherOnlyDiscoveryClient implements FunctionDiscoveryClient {
+        final AtomicInteger publisherCalls = new AtomicInteger();
+
+        @Override
+        public Publisher<FunctionDefinition> getFunction(String functionName) {
+            publisherCalls.incrementAndGet();
+            return Publishers.just(() -> functionName);
+        }
+    }
+
+    @FunctionClient
+    @Requires(property = "spec.name", value = REPLACED_SPEC)
+    interface ReplacedMathClient {
+        @Named("max")
+        CompletableFuture<Long> maxAsync();
+
+        @Named("max")
+        Long maxSync();
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", pattern = "FunctionClientAdviceAsyncTest.*")
     static final class StubInvokerChooser implements FunctionInvokerChooser {
         private static final Set<String> KNOWN = Set.of("max", "empty", "failing", "mocked");
 

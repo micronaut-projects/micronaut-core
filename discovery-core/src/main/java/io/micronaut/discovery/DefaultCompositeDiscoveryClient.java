@@ -31,7 +31,8 @@ import java.util.concurrent.CompletionStage;
  * The default {@link CompositeDiscoveryClient} that is activated when caching is disabled.
  *
  * <p>{@link #getInstancesAsync(String)} and {@link #getServiceIdsAsync()} combine the
- * {@link CompletionStage}s of the discovery clients without a publisher: the lists are
+ * {@link CompletionStage}s of the discovery clients without a publisher, with the
+ * {@link AsyncDiscoveryClient} methods of the clients that implement it: the lists are
  * concatenated in the order of the clients, and the first client that fails fails the result.
  * A subclass is called through its publisher methods instead, so that its overrides of
  * {@link #getInstances(String)} and {@link #getServiceIds()} keep working; it may override the
@@ -42,7 +43,7 @@ import java.util.concurrent.CompletionStage;
  */
 @Primary
 @Singleton
-public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient {
+public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient implements AsyncDiscoveryClient {
 
     /**
      * Create a default composite discovery for the discovery clients.
@@ -66,7 +67,7 @@ public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient {
     @Override
     public CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
         if (getClass() != DefaultCompositeDiscoveryClient.class) {
-            return super.getInstancesAsync(serviceId);
+            return CompletionStagePublishers.first(getInstances(serviceId), Collections.emptyList());
         }
         DiscoveryClient[] discoveryClients = getDiscoveryClients();
         if (discoveryClients.length == 0) {
@@ -86,7 +87,7 @@ public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient {
     @Override
     public CompletionStage<List<String>> getServiceIdsAsync() {
         if (getClass() != DefaultCompositeDiscoveryClient.class) {
-            return super.getServiceIdsAsync();
+            return CompletionStagePublishers.first(getServiceIds(), Collections.emptyList());
         }
         DiscoveryClient[] discoveryClients = getDiscoveryClients();
         if (discoveryClients.length == 0) {

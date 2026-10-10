@@ -1,14 +1,9 @@
 
 This section documents breaking changes between Micronaut versions
 
-=== The HTTP clients select an instance with `LoadBalancer.selectAsync` (5.3)
+=== The built-in load balancers look up the discovery clients without a Reactor chain (5.3)
 
-The load balancing and discovery SPIs have `CompletionStage` counterparts: `LoadBalancer.selectAsync`, `DiscoveryClient.getInstancesAsync` and `getServiceIdsAsync`, `ConfigurationClient.getPropertySourcesAsync` and `FunctionDiscoveryClient.getFunctionAsync`. They are experimental default methods, which adapt the publisher methods. The HTTP clients, the composite discovery and configuration clients, the round robin load balancer of a discovery client and the `@FunctionClient` methods that return a `CompletionStage` or a value now call them.
-
-* *Subclasses.* `FixedLoadBalancer`, `ServiceInstanceListRoundRobinLoadBalancer`, `DiscoveryClientRoundRobinLoadBalancer`, `DefaultCompositeDiscoveryClient`, `DefaultCompositeConfigurationClient` and `DefaultFunctionDiscoveryClient` select or look up without a publisher. A subclass of one of them is called through its publisher methods, so that its overrides keep working. A subclass that wants the asynchronous path overrides the `*Async` methods as well.
-* *Mocks.* A mock of an SPI that stubs only the publisher methods does not run the default `*Async` methods: a Spock or Mockito mock returns `null`, or a stage completed with `null`. The framework then calls the publisher method instead, so such a mock keeps working where the framework calls it, but a test that calls a `*Async` method of the mock directly has to stub it.
-* *Cancellation.* An implementation of an `*Async` method returns a new stage for each call. The framework cancels the stages it created, for example the default adapters, which cancel the subscription to the publisher, when the request no longer needs them, but it never cancels a stage that an implementation returned, since such a stage may be shared: it ignores its result instead.
-* *Reactor context.* A publisher of a load balancer or a discovery client is now subscribed to by a plain subscriber. When it is a Reactor publisher, its Reactor context holds the propagated context of the request, but no longer the other entries of the Reactor context of the caller.
+The built-in load balancers and composite clients implement the new experimental `AsyncLoadBalancer`, `AsyncDiscoveryClient` and `AsyncConfigurationClient` interfaces, and `DefaultAsyncFunctionDiscoveryClient` serves the `@FunctionClient` methods that return a `CompletionStage` or a value. They call the `DiscoveryClient` beans that do not implement `AsyncDiscoveryClient` through their publishers, with a plain subscriber. When such a publisher is a Reactor publisher, its Reactor context holds the propagated context of the request, but no longer the other entries of the Reactor context of the caller. The `LoadBalancer`, `DiscoveryClient`, `ConfigurationClient` and `FunctionDiscoveryClient` interfaces are unchanged, and a load balancer that does not implement `AsyncLoadBalancer` is selected through its publisher as before.
 
 === Refreshing the Logback configuration follows Logback's own lookup (5.3)
 

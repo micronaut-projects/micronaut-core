@@ -70,6 +70,7 @@ import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.AsyncLoadBalancer;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
@@ -1790,16 +1791,21 @@ final class NettyHttpClient implements
         if (loadBalancer instanceof FixedLoadBalancer fixed && fixed.getClass() == FixedLoadBalancer.class) {
             // only the built-in one: a subclass of FixedLoadBalancer may override select
             selected = ExecutionFlow.just(fixed.getServiceInstance());
-        } else {
+        } else if (loadBalancer instanceof AsyncLoadBalancer asyncBalancer) {
             // a synchronous balancer (round-robin) completes right away, so the request proceeds
             // without an asynchronous chain
             LoadBalancer lb = loadBalancer;
             Object discriminator = getLoadBalancerDiscriminator(request);
+            // a mock load balancer returns no stage
             CompletionStage<@Nullable ServiceInstance> selection = CompletionStagePublishers.orElse(
-                lb.selectAsync(discriminator),
+                asyncBalancer.selectAsync(discriminator),
                 () -> CompletionStagePublishers.first(lb.select(discriminator), null)
             );
             selected = toFlow(selection.toCompletableFuture(), PropagatedContext.getOrEmpty());
+        } else {
+            // a synchronous balancer completes right away, so the request proceeds without a
+            // Reactor chain
+            selected = ReactiveExecutionFlow.fromPublisherEager(loadBalancer.select(getLoadBalancerDiscriminator(request)), PropagatedContext.getOrEmpty());
         }
 
         LoadBalancer balancer = loadBalancer;

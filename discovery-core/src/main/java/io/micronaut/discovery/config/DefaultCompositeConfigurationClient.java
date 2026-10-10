@@ -36,7 +36,8 @@ import java.util.stream.Collectors;
  * The default {@link ConfigurationClient} implementation.
  *
  * <p>{@link #getPropertySourcesAsync(Environment)} combines the {@link CompletionStage}s of the
- * configuration clients without a publisher: the property sources are concatenated in the order
+ * configuration clients without a publisher, with the {@link AsyncConfigurationClient} method of
+ * the clients that implement it: the property sources are concatenated in the order
  * of the clients, and the first client that fails fails the result. A subclass is called through
  * {@link #getPropertySources(Environment)} instead, so that its override keeps working.</p>
  *
@@ -46,7 +47,7 @@ import java.util.stream.Collectors;
 @Singleton
 @Primary
 @BootstrapContextCompatible
-public class DefaultCompositeConfigurationClient implements ConfigurationClient {
+public class DefaultCompositeConfigurationClient implements ConfigurationClient, AsyncConfigurationClient {
 
     private final ConfigurationClient[] configurationClients;
 
@@ -79,7 +80,7 @@ public class DefaultCompositeConfigurationClient implements ConfigurationClient 
     @Override
     public CompletionStage<List<PropertySource>> getPropertySourcesAsync(Environment environment) {
         if (getClass() != DefaultCompositeConfigurationClient.class) {
-            return ConfigurationClient.super.getPropertySourcesAsync(environment);
+            return CompletionStagePublishers.collect(getPropertySources(environment));
         }
         if (ArrayUtils.isEmpty(configurationClients)) {
             return CompletableFuture.completedFuture(new ArrayList<>());
@@ -93,10 +94,13 @@ public class DefaultCompositeConfigurationClient implements ConfigurationClient 
 
     private static CompletionStage<List<PropertySource>> propertySourcesOf(ConfigurationClient configurationClient, Environment environment) {
         try {
-            return CompletionStagePublishers.orElseIfNull(
-                configurationClient.getPropertySourcesAsync(environment),
-                () -> CompletionStagePublishers.collect(configurationClient.getPropertySources(environment))
-            );
+            if (configurationClient instanceof AsyncConfigurationClient asyncConfigurationClient) {
+                return CompletionStagePublishers.orElseIfNull(
+                    asyncConfigurationClient.getPropertySourcesAsync(environment),
+                    () -> CompletionStagePublishers.collect(configurationClient.getPropertySources(environment))
+                );
+            }
+            return CompletionStagePublishers.collect(configurationClient.getPropertySources(environment));
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }

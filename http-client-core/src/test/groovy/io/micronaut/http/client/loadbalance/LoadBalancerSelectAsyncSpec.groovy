@@ -2,12 +2,14 @@ package io.micronaut.http.client.loadbalance
 
 import io.micronaut.core.async.publisher.CompletionStagePublishers
 import io.micronaut.core.async.publisher.Publishers
+import io.micronaut.discovery.AsyncDiscoveryClient
 import io.micronaut.discovery.DefaultCompositeDiscoveryClient
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.StaticServiceInstanceList
 import io.micronaut.discovery.exceptions.NoAvailableServiceException
 import io.micronaut.health.HealthStatus
+import io.micronaut.http.client.AsyncLoadBalancer
 import io.micronaut.http.client.LoadBalancer
 import org.jspecify.annotations.Nullable
 import org.reactivestreams.Publisher
@@ -25,7 +27,16 @@ class LoadBalancerSelectAsyncSpec extends Specification {
     static final ServiceInstance ONE = ServiceInstance.of('svc', URI.create('http://one:8080'))
     static final ServiceInstance TWO = ServiceInstance.of('svc', URI.create('http://two:8080'))
 
-    void 'the default selectAsync adapts the first instance of select'() {
+    void 'the built-in load balancers are asynchronous, the interface is unchanged'() {
+        expect:
+        AsyncLoadBalancer.isAssignableFrom(FixedLoadBalancer)
+        AsyncLoadBalancer.isAssignableFrom(ServiceInstanceListRoundRobinLoadBalancer)
+        AsyncLoadBalancer.isAssignableFrom(DiscoveryClientRoundRobinLoadBalancer)
+        !AsyncLoadBalancer.isAssignableFrom(LoadBalancer)
+        !(LoadBalancer.empty() instanceof AsyncLoadBalancer)
+    }
+
+    void 'a load balancer without a stage is selected with the first instance of select'() {
         given:
         def discriminators = []
         LoadBalancer loadBalancer = { discriminator ->
@@ -34,17 +45,17 @@ class LoadBalancerSelectAsyncSpec extends Specification {
         } as LoadBalancer
 
         expect:
-        loadBalancer.selectAsync('key').toCompletableFuture().getNow(null).is(ONE)
-        loadBalancer.selectAsync().toCompletableFuture().getNow(null).is(ONE)
+        select(loadBalancer, 'key').getNow(null).is(ONE)
+        select(loadBalancer, null).getNow(null).is(ONE)
         discriminators == ['key', null]
     }
 
-    void 'the default selectAsync completes with null when select is empty'() {
+    void 'a load balancer without a stage selects null when select is empty'() {
         given:
         LoadBalancer loadBalancer = { discriminator -> Publishers.empty() } as LoadBalancer
 
         when:
-        def future = loadBalancer.selectAsync(null).toCompletableFuture()
+        def future = select(loadBalancer, null)
 
         then:
         future.isDone()
@@ -52,9 +63,9 @@ class LoadBalancerSelectAsyncSpec extends Specification {
         future.getNow(ONE) == null
     }
 
-    void 'the default selectAsync fails with the error of select'() {
+    void 'a load balancer without a stage fails with the error of select'() {
         when:
-        LoadBalancer.empty().selectAsync(null).toCompletableFuture().get()
+        select(LoadBalancer.empty(), null).get()
 
         then:
         def e = thrown(ExecutionException)
@@ -62,13 +73,13 @@ class LoadBalancerSelectAsyncSpec extends Specification {
         e.cause.message == 'No available services for ID: Load balancer contains no servers'
     }
 
-    void 'cancelling the default selectAsync cancels the subscription to select'() {
+    void 'cancelling the selection of a load balancer without a stage cancels the subscription to select'() {
         given:
         def cancelled = new AtomicInteger()
         LoadBalancer loadBalancer = { discriminator -> Flux.never().doOnCancel(() -> cancelled.incrementAndGet()) } as LoadBalancer
 
         when:
-        def future = loadBalancer.selectAsync(null).toCompletableFuture()
+        def future = select(loadBalancer, null)
 
         then:
         !future.isDone()
@@ -89,7 +100,7 @@ class LoadBalancerSelectAsyncSpec extends Specification {
 
         then:
         future.getNow(null).is(loadBalancer.serviceInstance)
-        loadBalancer.selectAsync().toCompletableFuture().getNow(null).is(loadBalancer.serviceInstance)
+        loadBalancer.selectAsync(null).toCompletableFuture().getNow(null).is(loadBalancer.serviceInstance)
     }
 
     void 'the service instance list load balancer selects right away, round robin'() {
@@ -245,12 +256,12 @@ class LoadBalancerSelectAsyncSpec extends Specification {
         def loadBalancer = new DiscoveryClientLoadBalancerFactory(new DefaultCompositeDiscoveryClient(discoveryClient)).create('svc')
 
         expect:
-        loadBalancer.selectAsync().toCompletableFuture().get(5, TimeUnit.SECONDS).is(ONE)
+        loadBalancer.selectAsync(null).toCompletableFuture().get(5, TimeUnit.SECONDS).is(ONE)
     }
 
     void 'a discovery client stage that completes with null is replaced by the publisher'() {
         given:
-        DiscoveryClient discoveryClient = new PublisherOnlyDiscoveryClient() {
+        DiscoveryClient discoveryClient = new MockLikeDiscoveryClient() {
             @Override
             CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
                 CompletableFuture.completedFuture(null)
@@ -259,13 +270,13 @@ class LoadBalancerSelectAsyncSpec extends Specification {
         discoveryClient.instances = [TWO]
 
         expect:
-        new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient).selectAsync().toCompletableFuture().getNow(null).is(TWO)
+        new DiscoveryClientRoundRobinLoadBalancer('svc', discoveryClient).selectAsync(null).toCompletableFuture().getNow(null).is(TWO)
     }
 
     void 'cancelling one selection does not cancel a shared stage of the discovery client'() {
         given:
         def shared = new CompletableFuture<List<ServiceInstance>>()
-        DiscoveryClient discoveryClient = new PublisherOnlyDiscoveryClient() {
+        DiscoveryClient discoveryClient = new MockLikeDiscoveryClient() {
             @Override
             CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
                 shared
@@ -274,8 +285,8 @@ class LoadBalancerSelectAsyncSpec extends Specification {
         def loadBalancer = new DiscoveryClientLoadBalancerFactory(new DefaultCompositeDiscoveryClient(discoveryClient)).create('svc')
 
         when:
-        loadBalancer.selectAsync().toCompletableFuture().cancel(false)
-        def second = loadBalancer.selectAsync().toCompletableFuture()
+        loadBalancer.selectAsync(null).toCompletableFuture().cancel(false)
+        def second = loadBalancer.selectAsync(null).toCompletableFuture()
         shared.complete([ONE])
 
         then:
@@ -368,7 +379,7 @@ class LoadBalancerSelectAsyncSpec extends Specification {
      * Fails the publisher methods, so that only the stages can serve. Its stages are new for each
      * call, so the framework may cancel them.
      */
-    static class AsyncOnlyDiscoveryClient implements DiscoveryClient {
+    static class AsyncOnlyDiscoveryClient implements DiscoveryClient, AsyncDiscoveryClient {
         final List<String> requested = []
         final List<CompletableFuture<List<ServiceInstance>>> futures = []
 
@@ -388,6 +399,11 @@ class LoadBalancerSelectAsyncSpec extends Specification {
             CompletableFuture<List<ServiceInstance>> future = CompletionStagePublishers.future()
             futures << future
             return future
+        }
+
+        @Override
+        CompletionStage<List<String>> getServiceIdsAsync() {
+            CompletableFuture.completedFuture(['svc'])
         }
 
         @Override
@@ -422,5 +438,31 @@ class LoadBalancerSelectAsyncSpec extends Specification {
         @Override
         void close() {
         }
+    }
+
+    /**
+     * Like a mock of both interfaces that only stubs the publisher methods: its stages are null.
+     */
+    static class MockLikeDiscoveryClient extends PublisherOnlyDiscoveryClient implements AsyncDiscoveryClient {
+        @Override
+        CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
+            null
+        }
+
+        @Override
+        CompletionStage<List<String>> getServiceIdsAsync() {
+            null
+        }
+    }
+
+    /**
+     * Selects as the HTTP clients do: with the stage of an {@link AsyncLoadBalancer}, and with
+     * the first instance of {@link LoadBalancer#select(Object)} otherwise.
+     */
+    static CompletableFuture<ServiceInstance> select(LoadBalancer loadBalancer, @Nullable Object discriminator) {
+        if (loadBalancer instanceof AsyncLoadBalancer) {
+            return ((AsyncLoadBalancer) loadBalancer).selectAsync(discriminator).toCompletableFuture()
+        }
+        return CompletionStagePublishers.first(loadBalancer.select(discriminator), null)
     }
 }

@@ -52,38 +52,38 @@ class DiscoveryClientAsyncTest {
     private static final ServiceInstance C = ServiceInstance.of("my-service", URI.create("http://c:8080"));
 
     @Test
-    void theDefaultAdaptersTakeTheSingleResult() {
+    void thePublisherAdaptersTakeTheSingleResult() {
         DiscoveryClient client = new PublisherClient("p", Publishers.just(List.of(A, B)), Publishers.just(List.of("my-service")));
 
-        assertEquals(List.of(A, B), client.getInstancesAsync("my-service").toCompletableFuture().getNow(null));
-        assertEquals(List.of("my-service"), client.getServiceIdsAsync().toCompletableFuture().getNow(null));
+        assertEquals(List.of(A, B), DiscoveryClientStages.getInstances(client, "my-service").toCompletableFuture().getNow(null));
+        assertEquals(List.of("my-service"), DiscoveryClientStages.getServiceIds(client).toCompletableFuture().getNow(null));
     }
 
     @Test
-    void theDefaultAdaptersCompleteWithAnEmptyListForAnEmptyPublisher() {
+    void thePublisherAdaptersCompleteWithAnEmptyListForAnEmptyPublisher() {
         DiscoveryClient client = new PublisherClient("p", Publishers.empty(), Publishers.empty());
 
-        assertEquals(List.of(), client.getInstancesAsync("my-service").toCompletableFuture().getNow(null));
-        assertEquals(List.of(), client.getServiceIdsAsync().toCompletableFuture().getNow(null));
+        assertEquals(List.of(), DiscoveryClientStages.getInstances(client, "my-service").toCompletableFuture().getNow(null));
+        assertEquals(List.of(), DiscoveryClientStages.getServiceIds(client).toCompletableFuture().getNow(null));
     }
 
     @Test
-    void theDefaultAdaptersFailWithTheErrorOfThePublisher() {
+    void thePublisherAdaptersFailWithTheErrorOfThePublisher() {
         IllegalStateException error = new IllegalStateException("boom");
         DiscoveryClient client = new PublisherClient("p", Mono.error(error), Mono.error(error));
 
-        ExecutionException e = assertThrows(ExecutionException.class, () -> client.getInstancesAsync("my-service").toCompletableFuture().get());
+        ExecutionException e = assertThrows(ExecutionException.class, () -> DiscoveryClientStages.getInstances(client, "my-service").toCompletableFuture().get());
         assertSame(error, e.getCause());
-        e = assertThrows(ExecutionException.class, () -> client.getServiceIdsAsync().toCompletableFuture().get());
+        e = assertThrows(ExecutionException.class, () -> DiscoveryClientStages.getServiceIds(client).toCompletableFuture().get());
         assertSame(error, e.getCause());
     }
 
     @Test
-    void cancellingTheDefaultAdapterCancelsTheSubscription() {
+    void cancellingThePublisherAdapterCancelsTheSubscription() {
         AtomicInteger cancelled = new AtomicInteger();
         DiscoveryClient client = new PublisherClient("p", Flux.<List<ServiceInstance>>never().doOnCancel(cancelled::incrementAndGet), Flux.never());
 
-        CompletableFuture<List<ServiceInstance>> future = client.getInstancesAsync("my-service").toCompletableFuture();
+        CompletableFuture<List<ServiceInstance>> future = DiscoveryClientStages.getInstances(client, "my-service").toCompletableFuture();
         assertFalse(future.isDone());
         future.cancel(false);
         assertEquals(1, cancelled.get());
@@ -95,7 +95,7 @@ class DiscoveryClientAsyncTest {
         AsyncClient second = new AsyncClient("second");
         DiscoveryClient composite = new DefaultCompositeDiscoveryClient(first, second);
 
-        CompletableFuture<List<ServiceInstance>> instances = composite.getInstancesAsync("myService").toCompletableFuture();
+        CompletableFuture<List<ServiceInstance>> instances = DiscoveryClientStages.getInstances(composite, "myService").toCompletableFuture();
         // the service ID is hyphenated, like for the publisher
         assertEquals(List.of("my-service"), first.requested);
         assertEquals(List.of("my-service"), second.requested);
@@ -104,7 +104,7 @@ class DiscoveryClientAsyncTest {
         first.instances.get(0).complete(List.of(A, B));
         assertEquals(List.of(A, B, C), instances.getNow(null));
 
-        CompletableFuture<List<String>> serviceIds = composite.getServiceIdsAsync().toCompletableFuture();
+        CompletableFuture<List<String>> serviceIds = DiscoveryClientStages.getServiceIds(composite).toCompletableFuture();
         first.serviceIds.get(0).complete(List.of("x"));
         second.serviceIds.get(0).complete(List.of("y", "x"));
         // no dedup, like the publisher
@@ -119,8 +119,8 @@ class DiscoveryClientAsyncTest {
             new PublisherClient("two", Publishers.just(List.of(B)), Publishers.just(List.of("two")))
         );
 
-        assertEquals(List.of(A, B), composite.getInstancesAsync("my-service").toCompletableFuture().getNow(null));
-        assertEquals(List.of("one", "two"), composite.getServiceIdsAsync().toCompletableFuture().getNow(null));
+        assertEquals(List.of(A, B), DiscoveryClientStages.getInstances(composite, "my-service").toCompletableFuture().getNow(null));
+        assertEquals(List.of("one", "two"), DiscoveryClientStages.getServiceIds(composite).toCompletableFuture().getNow(null));
         // the publishers keep their behaviour
         assertEquals(List.of(A, B), Mono.from(composite.getInstances("my-service")).block());
     }
@@ -132,7 +132,7 @@ class DiscoveryClientAsyncTest {
         DiscoveryClient composite = new DefaultCompositeDiscoveryClient(first, second);
         IllegalStateException error = new IllegalStateException("boom");
 
-        CompletableFuture<List<ServiceInstance>> instances = composite.getInstancesAsync("my-service").toCompletableFuture();
+        CompletableFuture<List<ServiceInstance>> instances = DiscoveryClientStages.getInstances(composite, "my-service").toCompletableFuture();
         second.instances.get(0).completeExceptionally(error);
 
         ExecutionException e = assertThrows(ExecutionException.class, instances::get);
@@ -146,7 +146,7 @@ class DiscoveryClientAsyncTest {
         DiscoveryClient publishers = new DefaultCompositeDiscoveryClient(new PublisherClient("ok", Publishers.just(List.of(A)), Publishers.just(List.of())), failing);
         Mono<List<ServiceInstance>> publisherInstances = Mono.from(publishers.getInstances("my-service"));
         assertSame(error, assertThrows(IllegalStateException.class, publisherInstances::block));
-        e = assertThrows(ExecutionException.class, () -> publishers.getInstancesAsync("my-service").toCompletableFuture().get());
+        e = assertThrows(ExecutionException.class, () -> DiscoveryClientStages.getInstances(publishers, "my-service").toCompletableFuture().get());
         assertSame(error, e.getCause());
     }
 
@@ -159,7 +159,7 @@ class DiscoveryClientAsyncTest {
             new PublisherClient("failing", Mono.error(error), Mono.error(error))
         );
 
-        CompletableFuture<List<ServiceInstance>> instances = composite.getInstancesAsync("my-service").toCompletableFuture();
+        CompletableFuture<List<ServiceInstance>> instances = DiscoveryClientStages.getInstances(composite, "my-service").toCompletableFuture();
 
         assertTrue(instances.isCompletedExceptionally());
         assertEquals(1, cancelled.get());
@@ -174,7 +174,7 @@ class DiscoveryClientAsyncTest {
             async
         );
 
-        composite.getServiceIdsAsync().toCompletableFuture().cancel(false);
+        DiscoveryClientStages.getServiceIds(composite).toCompletableFuture().cancel(false);
 
         assertEquals(1, cancelled.get());
         assertFalse(async.serviceIds.get(0).isDone());
@@ -191,8 +191,8 @@ class DiscoveryClientAsyncTest {
         };
         DiscoveryClient composite = new DefaultCompositeDiscoveryClient(client, new PublisherClient("other", Publishers.just(List.of(B)), Publishers.just(List.of())));
 
-        composite.getInstancesAsync("my-service").toCompletableFuture().cancel(false);
-        CompletableFuture<List<ServiceInstance>> second = composite.getInstancesAsync("my-service").toCompletableFuture();
+        DiscoveryClientStages.getInstances(composite, "my-service").toCompletableFuture().cancel(false);
+        CompletableFuture<List<ServiceInstance>> second = DiscoveryClientStages.getInstances(composite, "my-service").toCompletableFuture();
         shared.complete(List.of(A));
 
         assertFalse(shared.isCancelled());
@@ -207,12 +207,12 @@ class DiscoveryClientAsyncTest {
             new MockLikeClient(CompletableFuture.completedFuture(null), Publishers.just(List.of(B)), Publishers.just(List.of("b")))
         );
 
-        assertEquals(List.of(A, B), composite.getInstancesAsync("my-service").toCompletableFuture().getNow(null));
-        assertEquals(List.of("a", "b"), composite.getServiceIdsAsync().toCompletableFuture().getNow(null));
+        assertEquals(List.of(A, B), DiscoveryClientStages.getInstances(composite, "my-service").toCompletableFuture().getNow(null));
+        assertEquals(List.of("a", "b"), DiscoveryClientStages.getServiceIds(composite).toCompletableFuture().getNow(null));
         CompletableFuture<Object> later = new CompletableFuture<>();
         DiscoveryClient single = new DefaultCompositeDiscoveryClient(new MockLikeClient(later, Publishers.just(List.of(C)), Publishers.just(List.of("c"))));
-        CompletableFuture<List<ServiceInstance>> instances = single.getInstancesAsync("my-service").toCompletableFuture();
-        CompletableFuture<List<String>> serviceIds = single.getServiceIdsAsync().toCompletableFuture();
+        CompletableFuture<List<ServiceInstance>> instances = DiscoveryClientStages.getInstances(single, "my-service").toCompletableFuture();
+        CompletableFuture<List<String>> serviceIds = DiscoveryClientStages.getServiceIds(single).toCompletableFuture();
         later.complete(null);
         assertEquals(List.of(C), instances.getNow(null));
         assertEquals(List.of("c"), serviceIds.getNow(null));
@@ -222,8 +222,8 @@ class DiscoveryClientAsyncTest {
     void aCompositeWithoutClientsIsEmpty() {
         DiscoveryClient composite = new DefaultCompositeDiscoveryClient();
 
-        assertEquals(List.of(), composite.getInstancesAsync("my-service").toCompletableFuture().getNow(null));
-        assertEquals(List.of(), composite.getServiceIdsAsync().toCompletableFuture().getNow(null));
+        assertEquals(List.of(), DiscoveryClientStages.getInstances(composite, "my-service").toCompletableFuture().getNow(null));
+        assertEquals(List.of(), DiscoveryClientStages.getServiceIds(composite).toCompletableFuture().getNow(null));
     }
 
     @Test
@@ -237,7 +237,7 @@ class DiscoveryClientAsyncTest {
             }
         };
 
-        assertEquals(List.of(A), composite.getInstancesAsync("my-service").toCompletableFuture().join());
+        assertEquals(List.of(A), DiscoveryClientStages.getInstances(composite, "my-service").toCompletableFuture().join());
         assertEquals(1, calls.get());
     }
 
@@ -261,8 +261,8 @@ class DiscoveryClientAsyncTest {
             }
         };
 
-        assertEquals(List.of(C), composite.getInstancesAsync("my-service").toCompletableFuture().getNow(null));
-        assertEquals(List.of("custom"), composite.getServiceIdsAsync().toCompletableFuture().getNow(null));
+        assertEquals(List.of(C), DiscoveryClientStages.getInstances(composite, "my-service").toCompletableFuture().getNow(null));
+        assertEquals(List.of("custom"), DiscoveryClientStages.getServiceIds(composite).toCompletableFuture().getNow(null));
         assertEquals(1, instancesCalls.get());
         assertEquals(1, serviceIdsCalls.get());
         assertTrue(client.requested.isEmpty());
@@ -273,7 +273,7 @@ class DiscoveryClientAsyncTest {
         AsyncClient client = new AsyncClient("only");
         DiscoveryClient composite = new DefaultCompositeDiscoveryClient(client);
 
-        CompletableFuture<List<ServiceInstance>> instances = composite.getInstancesAsync("myService").toCompletableFuture();
+        CompletableFuture<List<ServiceInstance>> instances = DiscoveryClientStages.getInstances(composite, "myService").toCompletableFuture();
 
         assertEquals(List.of("my-service"), client.requested);
         client.instances.get(0).complete(List.of(A));
@@ -306,7 +306,7 @@ class DiscoveryClientAsyncTest {
         try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "DiscoveryClientAsyncTest"))) {
             DiscoveryClient discoveryClient = context.getBean(DiscoveryClient.class);
             assertTrue(discoveryClient instanceof ReplacedCompositeDiscoveryClient);
-            assertEquals(List.of(C), discoveryClient.getInstancesAsync("my-service").toCompletableFuture().getNow(null));
+            assertEquals(List.of(C), DiscoveryClientStages.getInstances(discoveryClient, "my-service").toCompletableFuture().getNow(null));
         }
     }
 
@@ -329,9 +329,9 @@ class DiscoveryClientAsyncTest {
     }
 
     /**
-     * Like a mock that only stubs the publisher methods.
+     * Like a mock of both interfaces that only stubs the publisher methods.
      */
-    private record MockLikeClient(CompletableFuture<?> stage, Publisher<List<ServiceInstance>> instances, Publisher<List<String>> serviceIds) implements DiscoveryClient {
+    private record MockLikeClient(CompletableFuture<?> stage, Publisher<List<ServiceInstance>> instances, Publisher<List<String>> serviceIds) implements DiscoveryClient, AsyncDiscoveryClient {
 
         @Override
         public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
@@ -392,7 +392,7 @@ class DiscoveryClientAsyncTest {
     /**
      * Fails the publisher methods, so that only the stages can serve.
      */
-    private static class AsyncClient implements DiscoveryClient {
+    private static class AsyncClient implements DiscoveryClient, AsyncDiscoveryClient {
         final String name;
         final List<String> requested = new ArrayList<>();
         final List<CompletableFuture<List<ServiceInstance>>> instances = new ArrayList<>();
