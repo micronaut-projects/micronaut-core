@@ -5,7 +5,7 @@ import io.micronaut.inject.qualifiers.Qualifiers
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
-class LabelInterceptorSpec {
+class LabelInterceptorTest {
 
     @Test
     fun testEachTargetIsLabelledWithItsQualifier() {

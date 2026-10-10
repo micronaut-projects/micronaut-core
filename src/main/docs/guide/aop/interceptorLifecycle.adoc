@@ -201,7 +201,7 @@ snippet::io.micronaut.docs.aop.lifecycle.pertarget.labelled.LabelInterceptor[tag
 <1> The bean this instance is created for, injected like any other dependency
 <2> The qualifier of that bean, `@Named("sms")` for the `sms` channel
 
-snippet::io.micronaut.docs.aop.lifecycle.pertarget.labelled.LabelInterceptorSpec[tags="test", indent=0, title="Each target is labelled with its own qualifier"]
+snippet::io.micronaut.docs.aop.lifecycle.pertarget.labelled.LabelInterceptorTest[tags="test", indent=0, title="Each target is labelled with its own qualifier"]
 
 The target is known whenever the container creates the interceptor for a bean: while the bean itself is created, to
 intercept its construction or lifecycle, and when a proxy resolves the interceptors of a target on its first call. It

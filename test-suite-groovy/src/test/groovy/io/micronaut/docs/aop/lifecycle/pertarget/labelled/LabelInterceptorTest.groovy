@@ -6,7 +6,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-class LabelInterceptorSpec extends Specification {
+class LabelInterceptorTest extends Specification {
 
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
         'labelled-channels.sms.sender': 'Fred',
