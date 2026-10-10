@@ -51,6 +51,7 @@ import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -1153,6 +1154,11 @@ final class BeanWatchRegistry {
         private final ExecutableMethodWatcher<A> watcher;
         private final ChangeHandlers<BeanExecutableMethod<A>, ExecutableMethodChange.Replacement<A>> handlers;
         private final boolean processedAtStartup;
+        /**
+         * The definitions delivered for an iterable definition, one per entry, by that definition: a removal of it
+         * removes their methods. Read and updated only by the delivery of a batch, which is one at a time.
+         */
+        private final Map<BeanDefinition<?>, List<BeanDefinition<?>>> resolved = new IdentityHashMap<>();
 
         MethodRegistration(Class<A> annotationType, @Nullable Argument<?> beanType, @Nullable Qualifier<?> qualifier,
                            @Nullable ExecutableMethodWatcher<A> watcher,
@@ -1180,12 +1186,71 @@ final class BeanWatchRegistry {
 
         @Override
         void deliverDefinitions(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
-            List<BeanExecutableMethod<A>> removedHere = entries(removed);
-            List<BeanExecutableMethod<A>> addedHere = entries(added);
+            List<BeanDefinition<?>> removedResolved = new ArrayList<>(removed.size());
+            for (BeanDefinition<?> definition : removed) {
+                if (resolvesPerEntry(definition)) {
+                    // the definitions it was resolved to when they were delivered: its configuration may be gone already
+                    List<BeanDefinition<?>> delivered = resolved.get(definition);
+                    if (delivered != null) {
+                        removedResolved.addAll(delivered);
+                    }
+                } else {
+                    removedResolved.add(definition);
+                }
+            }
+            List<BeanExecutableMethod<A>> removedHere = entries(removedResolved);
+            List<BeanExecutableMethod<A>> addedHere = entries(resolve(added, false));
             if (removedHere.isEmpty() && addedHere.isEmpty()) {
                 return;
             }
             deliver(new ExecutableMethodChange<>(addedHere, removedHere, current(), false));
+        }
+
+        /**
+         * Whether a definition is delivered as one definition per entry of its configuration or per bean it is
+         * created for, as an {@code @EachProperty} or {@code @EachBean} is, and as the definition and instance watches
+         * deliver it. A processor adapted to a watch keeps receiving the definition itself, as it always has.
+         */
+        private boolean resolvesPerEntry(BeanDefinition<?> definition) {
+            return !adapted && definition.isIterable() && !(definition instanceof BeanDefinitionDelegate<?>);
+        }
+
+        /**
+         * Resolves the definitions whose methods are watched: an iterable definition to one definition per entry,
+         * each other definition to itself, and an entry of an iterable definition that is also listed to nothing, as
+         * the iterable definition resolves to it.
+         *
+         * @param definitions The definitions
+         * @param remember Whether the definitions resolved are what is delivered from now on, replacing what was
+         */
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        private List<BeanDefinition<?>> resolve(Collection<? extends BeanDefinition<?>> definitions, boolean remember) {
+            if (adapted) {
+                return new ArrayList<>(definitions);
+            }
+            Set<BeanDefinition<?>> iterables = Collections.newSetFromMap(new IdentityHashMap<>());
+            for (BeanDefinition<?> definition : definitions) {
+                BeanDefinition<?> origin = origin(definition);
+                if (resolvesPerEntry(origin)) {
+                    iterables.add(origin);
+                }
+            }
+            if (remember) {
+                resolved.clear();
+            }
+            List<BeanDefinition<?>> result = new ArrayList<>(definitions.size());
+            Set<BeanDefinition<?>> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+            for (BeanDefinition<?> definition : definitions) {
+                BeanDefinition<?> origin = origin(definition);
+                if (!iterables.contains(origin)) {
+                    result.add(definition);
+                } else if (seen.add(origin)) {
+                    List<BeanDefinition<?>> entries = new ArrayList<>((Collection) resolveConfiguration(null, (BeanDefinition) origin));
+                    resolved.put(origin, entries);
+                    result.addAll(entries);
+                }
+            }
+            return result;
         }
 
         private void deliver(ExecutableMethodChange<A> change) {
@@ -1211,7 +1276,7 @@ final class BeanWatchRegistry {
             } else {
                 candidates.addAll(context.getAllBeanDefinitions());
             }
-            return entries(candidates);
+            return entries(resolve(candidates, true));
         }
 
         private List<BeanExecutableMethod<A>> entries(Collection<? extends BeanDefinition<?>> definitions) {

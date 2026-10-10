@@ -1053,6 +1053,49 @@ class BeanWatchTest {
         }
     }
 
+    @Test
+    void theMethodsOfEachPropertyAndEachBeanBeansAreWatchedOnePerEntryInEveryBatch() {
+        Map<String, Object> properties = Map.of("spec.name", "BeanWatchTest", "chiming.pools.first.size", 1, "chiming.pools.second.size", 2);
+        try (ApplicationContext context = ApplicationContext.run(properties)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            List<ExecutableMethodChange<Chime>> all = new ArrayList<>();
+            beanContext.methods(Chime.class).watch(all::add);
+            List<BeanExecutableMethod<Chime>> named = new ArrayList<>();
+            beanContext.definitions(ChimingPool.class).qualifier(Qualifiers.byName("second")).methods(Chime.class).onAdded(named::add).onRemoved(named::add).watch();
+
+            // one method per entry of the @EachProperty and per bean of the @EachBean, each of a definition that
+            // resolves its own bean
+            assertEquals(4, all.get(0).added().size());
+            assertEquals(Set.of(1, 2), sizes(context, all.get(0).added(), ChimingPool.class));
+            assertEquals(Set.of(1, 2), sizes(context, all.get(0).added(), ChimingBell.class));
+            assertEquals(1, named.size());
+            assertEquals(Set.of(2), sizes(context, named, ChimingPool.class));
+
+            // the @EachProperty definition goes, as a reload retires it: the method of both entries goes
+            BeanDefinition<ChimingPool> entry = context.getBeanDefinition(ChimingPool.class, Qualifiers.byName("first"));
+            BeanDefinition<ChimingPool> template = entry instanceof io.micronaut.inject.DelegatingBeanDefinition<ChimingPool> delegating
+                ? delegating.getTarget() : entry;
+            beanContext.notifyDefinitionChange(List.of(template), List.of());
+            assertEquals(2, all.get(1).removed().size());
+            assertTrue(all.get(1).removed().stream().allMatch(m -> m.definition().getBeanType() == ChimingPool.class));
+            assertEquals(2, named.size());
+
+            // and comes back, as an edit: each entry's method is paired with its new generation
+            beanContext.notifyDefinitionChange(List.of(), List.of(template));
+            assertEquals(2, all.get(2).added().size());
+            beanContext.notifyDefinitionChange(List.of(template), List.of(template));
+            assertEquals(2, all.get(3).replaced().size());
+        }
+    }
+
+    private static Set<Integer> sizes(ApplicationContext context, List<BeanExecutableMethod<Chime>> methods, Class<?> beanType) {
+        return methods.stream()
+            .filter(m -> m.definition().getBeanType() == beanType)
+            .map(m -> context.getBean(m.definition()))
+            .map(bean -> bean instanceof ChimingBell bell ? bell.getPool().getSize() : ((ChimingPool) bean).getSize())
+            .collect(Collectors.toSet());
+    }
+
     /**
      * Qualifies every candidate; the first time the given thread asks, it signals and waits.
      */
