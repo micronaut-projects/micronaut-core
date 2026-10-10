@@ -35,14 +35,6 @@ import io.micronaut.core.annotation.Experimental;
 @Experimental
 public sealed interface BeanDependencyGroup extends BeanDependencyResolver, AutoCloseable permits DefaultBeanDependencyResolver {
     /**
-     * Destroys and forgets a registration owned by this group. A shared registration is never destroyed.
-     * Registration identity, rather than equality of bean definitions or instances, identifies ownership.
-     * @param registration The registration
-     * @return Whether this group owned the registration
-     */
-    boolean destroy(BeanRegistration<?> registration);
-
-    /**
      * Creates and owns a fresh instance of an exact definition, bypassing that bean's scope.
      * @param definition The definition
      * @param <T> The bean type

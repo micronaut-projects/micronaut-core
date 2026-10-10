@@ -856,8 +856,9 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     public @NonNull Publisher<RawFormField> getRawFormFields(ByteBody byteBody) {
         NettyHttpServerConfiguration nhsc = (NettyHttpServerConfiguration) serverConfiguration;
         long undecodedLimit = Math.min(nhsc.getFieldMaxBufferedBytes(), nhsc.getFormMaxBufferedBytes());
+        Charset charset = getCharacterEncoding();
         PostBodyDecoder.Builder builder = PostBodyDecoder.builder()
-            .charset(getCharacterEncoding())
+            .charset(charset)
             .maxFields(nhsc.getFormMaxFields())
             .enableQuirks(nhsc.getFormDecoderQuirks().toArray(new DecoderQuirk[0]))
             .undecodedLimit(undecodedLimit > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) undecodedLimit);
@@ -873,6 +874,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
         return new FormDemuxer(
             decoder,
+            formType instanceof NettyHttpRequest.FormTypeMultipart multipart ? multipart.boundary() : null,
+            charset,
             channelHandlerContext.channel(),
             new BodySizeLimits(nhsc.getFieldMaxBytes(), nhsc.getFieldMaxBufferedBytes()),
             new BodySizeLimits(nhsc.getFormMaxBytes(), nhsc.getFormMaxBufferedBytes()),

@@ -141,7 +141,7 @@ public class PythonElementAnnotationMetadataFactory extends AbstractElementAnnot
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForMethod(MethodElement methodElement) {
         if (methodElement instanceof PythonMethodElement pythonMethodElement) {
             return metadataBuilder.lookupOrBuildForMethod(
-                getNativeElement(methodElement.getDeclaringType()),
+                getNativeElement(methodElement.getOwningType()),
                 methodMetadataKey(pythonMethodElement.getNativeType())
             );
         }
