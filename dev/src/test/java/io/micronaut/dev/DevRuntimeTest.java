@@ -448,7 +448,7 @@ class DevRuntimeTest {
     }
 
     @Test
-    void onlyThePropertySourcesAtTheConfigurationRootAreConfigurationFiles() {
+    void theConfigurationFilesAreTheApplicationAndBootstrapFilesAtTheRootAndThePropertySourcesTheEnvironmentRead() {
         List<Path> roots = List.of(project);
         Set<String> names = ResourceNotifier.names();
         Set<String> extensions = Set.of("properties", "yml", "yaml");
@@ -460,6 +460,11 @@ class DevRuntimeTest {
         assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("applications.yml"), roots, names, extensions));
         assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("graphql/application.yml"), roots, names, extensions));
         assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("messages.properties"), roots, names, extensions));
+        // a property source micronaut.config.files names
+        Set<String> origins = Set.of("classpath:custom.yml", "file:" + project.resolve("other/extra.yml").toAbsolutePath());
+        assertTrue(ResourceNotifier.isPropertySource(project.resolve("custom.yml"), roots, origins));
+        assertTrue(ResourceNotifier.isPropertySource(project.resolve("other/extra.yml"), roots, origins));
+        assertFalse(ResourceNotifier.isPropertySource(project.resolve("schema.graphqls"), roots, origins));
     }
 
     private static List<Path> removedIn(List<ResourceChange> changes) {

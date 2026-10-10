@@ -102,7 +102,7 @@ snippet::io.micronaut.docs.devmode.watch.SerializerLookup[tags="imports,class", 
 
 Resources are watched the same way: a template engine registers `resources(ResourceKind.VIEWS).include("**/*.html").watch(change -> ...)` and clears what the change affects, rather than filtering an event every engine receives.
 
-The build tools give `src/main/resources` as the configuration root, so a file kept there, such as a GraphQL schema, is watched with `resources(ResourceKind.CONFIG).include("**/*.graphqls")`. Every change under that root reaches the watches of `CONFIG`, the configuration files among them. Only a configuration file refreshes the configuration: an `application` or `bootstrap` file, plain or for an environment such as `application-dev.yml`, at the root, in a format a property source loader reads.
+The build tools give `src/main/resources` as the configuration root, so a file kept there, such as a GraphQL schema, is watched with `resources(ResourceKind.CONFIG).include("**/*.graphqls")`. Every change under that root reaches the watches of `CONFIG`, the configuration files among them. Only a configuration file refreshes the configuration: an `application` or `bootstrap` file, plain or for an environment such as `application-dev.yml`, at the root, in a format a property source loader reads, or a file the environment read a property source from, such as one `micronaut.config.files` names.
 
 NOTE: Existing api:context.processor.ExecutableMethodProcessor[] and api:context.processor.BeanDefinitionProcessor[] beans keep working. The context feeds them what is added after startup, through an adapter that sees additions only, which is also how the launcher tells that such a processor cannot follow a reload.
 

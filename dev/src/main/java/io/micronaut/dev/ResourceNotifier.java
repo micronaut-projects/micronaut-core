@@ -18,6 +18,7 @@ package io.micronaut.dev;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourceLoader;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.watch.ResourceChange;
@@ -43,8 +44,9 @@ import java.util.function.Function;
  * configuration: a GraphQL schema, a template or a data file kept there is a resource like any other. Every change
  * under a root reaches the watches of that root's kind, the configuration root included; a watch of
  * {@link ResourceKind#CONFIG} asked for the files of that root and is told of the configuration files too, as it is
- * of every file when the context starts. Only a configuration file, one the environment reads as a property source,
- * refreshes the configuration.</p>
+ * of every file when the context starts. Only a configuration file refreshes the configuration: an application or
+ * bootstrap file at the root, or a file the environment read a property source from, such as one
+ * {@code micronaut.config.files} names.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -56,6 +58,8 @@ final class ResourceNotifier {
      * The extensions of the property source loaders core and the configuration modules provide, for a context that
      * is not running to ask.
      */
+    private static final String CLASSPATH_PREFIX = "classpath:";
+    private static final String FILE_PREFIX = "file:";
     private static final Set<String> DEFAULT_EXTENSIONS = Set.of("properties", "yml", "yaml", "json", "toml", "groovy");
 
     private ResourceNotifier() {
@@ -94,9 +98,10 @@ final class ResourceNotifier {
     private static boolean anyConfigurationFile(@Nullable ApplicationContext current, List<Path> roots, SourceChanges changes) {
         Set<String> extensions = extensions(current);
         Set<String> names = names();
+        Set<String> origins = origins(current);
         for (Set<Path> files : List.of(changes.changed(), changes.deleted())) {
             for (Path file : files) {
-                if (isConfigurationFile(file, roots, names, extensions)) {
+                if (isConfigurationFile(file, roots, names, extensions) || isPropertySource(file, roots, origins)) {
                     return true;
                 }
             }
@@ -134,6 +139,56 @@ final class ResourceNotifier {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether a file is where a property source of the running environment came from, such as one
+     * {@code micronaut.config.files} names: {@code classpath:custom.yml} is read from a configuration root.
+     *
+     * @param file The file
+     * @param roots The configuration roots
+     * @param origins The locations the property sources of the environment came from
+     * @return Whether the environment read the file as a property source
+     */
+    static boolean isPropertySource(Path file, List<Path> roots, Set<String> origins) {
+        if (origins.isEmpty()) {
+            return false;
+        }
+        Path absolute = file.toAbsolutePath().normalize();
+        if (origins.contains(absolute.toString()) || origins.contains(FILE_PREFIX + absolute)) {
+            return true;
+        }
+        for (Path root : roots) {
+            Path normalizedRoot = root.toAbsolutePath().normalize();
+            if (!absolute.startsWith(normalizedRoot) || absolute.equals(normalizedRoot)) {
+                continue;
+            }
+            StringBuilder relative = new StringBuilder();
+            for (Path segment : normalizedRoot.relativize(absolute)) {
+                if (!relative.isEmpty()) {
+                    relative.append('/');
+                }
+                relative.append(segment);
+            }
+            if (origins.contains(CLASSPATH_PREFIX + relative) || origins.contains(CLASSPATH_PREFIX + "/" + relative)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Set<String> origins(@Nullable ApplicationContext current) {
+        Set<String> origins = new HashSet<>();
+        if (current != null && current.isRunning()) {
+            try {
+                for (PropertySource propertySource : current.getEnvironment().getPropertySources()) {
+                    origins.add(propertySource.getOrigin().location());
+                }
+            } catch (RuntimeException e) {
+                LOG.debug("Cannot list the property sources", e);
+            }
+        }
+        return origins;
     }
 
     static Set<String> names() {
