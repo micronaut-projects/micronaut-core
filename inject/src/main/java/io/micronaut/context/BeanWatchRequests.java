@@ -109,6 +109,11 @@ final class BeanWatchRequests {
         }
 
         @Override
+        public DefinitionWatchRequest<T> stereotype(String annotationName) {
+            return qualifier(Qualifiers.byStereotype(Objects.requireNonNull(annotationName, "annotationName")));
+        }
+
+        @Override
         public DefinitionWatchRequest<T> onAdded(Consumer<? super BeanDefinition<T>> handler) {
             handlers.onAdded(handler);
             return this;

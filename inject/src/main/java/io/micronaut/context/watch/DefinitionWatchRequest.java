@@ -79,6 +79,17 @@ public interface DefinitionWatchRequest<T> {
     DefinitionWatchRequest<T> stereotype(Class<? extends Annotation> stereotype);
 
     /**
+     * Selects only the definitions of beans carrying an annotation, directly or as a stereotype, named by its class
+     * name: a shorthand for {@code qualifier(Qualifiers.byStereotype(annotationName))}. A module matches an annotation
+     * of an optional dependency this way without referencing its class, which may not be on the classpath; when it is
+     * not, no definition carries the annotation and the request selects none.
+     *
+     * @param annotationName The fully qualified name of the annotation, such as {@code io.micronaut.http.annotation.Controller}
+     * @return This request
+     */
+    DefinitionWatchRequest<T> stereotype(String annotationName);
+
+    /**
      * Adds a handler called with each definition added, once the batch that adds it is applied. For the first
      * batch, it is called with every definition selected.
      *

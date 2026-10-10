@@ -961,6 +961,24 @@ class BeanWatchTest {
     }
 
     @Test
+    void aDefinitionRequestMatchesAStereotypeByTheNameOfItsAnnotation() {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            WatchableBeanContext beanContext = (WatchableBeanContext) context;
+            List<BeanDefinitionChange<Rule>> byClass = new ArrayList<>();
+            List<BeanDefinitionChange<Rule>> byName = new ArrayList<>();
+            List<BeanDefinitionChange<Rule>> absent = new ArrayList<>();
+            beanContext.definitions(Rule.class).stereotype(jakarta.inject.Named.class).watch(byClass::add);
+            beanContext.definitions(Rule.class).stereotype("jakarta.inject.Named").watch(byName::add);
+            // an annotation of an optional dependency that is not on the classpath: matched by nothing
+            beanContext.definitions(Rule.class).stereotype("com.example.absent.Absent").watch(absent::add);
+
+            assertEquals(Set.of(ARule.class, BRule.class), beanTypes(List.copyOf(byName.get(0).current())));
+            assertEquals(beanTypes(List.copyOf(byClass.get(0).current())), beanTypes(List.copyOf(byName.get(0).current())));
+            assertTrue(absent.get(0).current().isEmpty());
+        }
+    }
+
+    @Test
     void anInstanceWatchCallsItsHandlersWithTheBeansAndReplacements() {
         try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
             DefaultBeanContext beanContext = (DefaultBeanContext) context;

@@ -38,6 +38,8 @@ import java.util.function.Function;
 @Internal
 final class ChangeHandlers<E, R> {
 
+    private static final String ARGUMENT_HANDLER = "handler";
+
     private final List<Consumer<? super E>> added;
     private final List<Consumer<? super E>> removed;
     private final List<Consumer<? super R>> replaced;
@@ -53,15 +55,15 @@ final class ChangeHandlers<E, R> {
     }
 
     void onAdded(Consumer<? super E> handler) {
-        added.add(Objects.requireNonNull(handler, "handler"));
+        added.add(Objects.requireNonNull(handler, ARGUMENT_HANDLER));
     }
 
     void onRemoved(Consumer<? super E> handler) {
-        removed.add(Objects.requireNonNull(handler, "handler"));
+        removed.add(Objects.requireNonNull(handler, ARGUMENT_HANDLER));
     }
 
     void onReplaced(Consumer<? super R> handler) {
-        replaced.add(Objects.requireNonNull(handler, "handler"));
+        replaced.add(Objects.requireNonNull(handler, ARGUMENT_HANDLER));
     }
 
     /**
