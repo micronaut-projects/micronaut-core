@@ -27,7 +27,7 @@ import ast
 import java
 
 from micronaut_typecheck import Bindings, CheckUnit, JavaReceiverRules, TypeFacts, PythonClasses, PythonClassModel, _function_node, _switch_value
-from micronaut_lowering import JAVA_RESERVED_NAMES, Lowering
+from micronaut_lowering import JAVA_RESERVED_NAMES, Lowering, stub_type_name
 
 PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
 Decision = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision")
@@ -127,10 +127,11 @@ class StaticPlanner:
         span = function_def.span()
         if not compiled:
             return self._record(qualified, span, "EXCLUDED", scope, [], 0)
-        reasons = self._candidate_reasons(module, class_def, class_node, function_def, node, span)
+        java_layout = self._java_layout(module, class_def, function_def, node) if class_def is not None else None
+        reasons = self._candidate_reasons(module, class_def, class_node, function_def, node, span, java_layout)
         if reasons:
             return self._record(qualified, span, "NOT_CANDIDATE", scope, reasons, 0, explicit=scope == "FUNCTION")
-        reasons = self._signature_reasons(module, class_def, function_def, node, span)
+        reasons = self._signature_reasons(module, class_def, function_def, node, span, java_layout)
         statements = 0
         if node is not None:
             statements = len(node.body)
@@ -138,7 +139,7 @@ class StaticPlanner:
         if reasons or node is None or getattr(self.checker, "facts", None) is None:
             outcome = "SKIPPED" if reasons else "CANDIDATE"
             return self._record(qualified, span, outcome, scope, reasons, statements, explicit=scope != "MODE")
-        body, reasons = self._lower(module, class_def, function_def, node)
+        body, reasons = self._lower(module, class_def, function_def, node, java_layout)
         if body is None:
             return self._record(qualified, span, "SKIPPED", scope, reasons, statements, explicit=scope != "MODE")
         if class_def is None and not module.decorators and body.stats().bridgeCalls() > 0:
@@ -149,7 +150,7 @@ class StaticPlanner:
         self.bodies.append(body)
         return self._record(qualified, span, "COMPILED", scope, [], statements, stats=body.stats())
 
-    def _lower(self, module, class_def, function_def, node):
+    def _lower(self, module, class_def, function_def, node, java_layout=None):
         """The compiled body of a candidate, or None with the reasons: what the inference flags, then what the lowering refuses."""
         unit = CheckUnit(module.source_path, f"{class_def.name()}.{function_def.name()}" if class_def is not None else function_def.name(), function_def, node, class_def, None, module)
         rules = JavaReceiverRules(self.checker, unit, silent=True)
@@ -159,7 +160,8 @@ class StaticPlanner:
         class_model = self.checker.python_classes.of(class_def) if class_def is not None else None
         lowering = Lowering(self.checker, module, class_def, function_def, node, rules, class_model,
                             advised=lambda sibling: self._advice(class_def, sibling) is not None,
-                            advised_method=class_def is not None and self._advice(class_def, function_def) is not None)
+                            advised_method=class_def is not None and self._advice(class_def, function_def) is not None,
+                            java_layout=java_layout)
         body = lowering.lower()
         return body, lowering.reasons
 
@@ -177,7 +179,7 @@ class StaticPlanner:
 
     # ---------------------------------------------------------------- the checks
 
-    def _candidate_reasons(self, module, class_def, class_node, function_def, node, span):
+    def _candidate_reasons(self, module, class_def, class_node, function_def, node, span, java_layout=None):
         """Why the function can never be compiled, whatever its body."""
         reasons = []
         if class_def is None:
@@ -208,8 +210,8 @@ class StaticPlanner:
         if function_def.isAbstract() or function_def.hasPlaceholderBody():
             reasons.append(("abstract-method", "an abstract method has no body to compile; a call of it runs the implementation of the object", span))
         implemented = self._java_method_implemented(class_def, name) if class_def is not None else None
-        if implemented is not None:
-            reasons.append(("overriding-java-method", f"the method implements [{implemented}], whose bridge keeps the Java signature; not compiled yet", span))
+        if implemented is not None and java_layout is None:
+            reasons.append(("overriding-java-method", f"the method implements [{implemented}], whose bridge keeps the Java signature; the hints must spell that signature (a parameter hinted with its Java type, a return hinted with a type the Java method returns or left unhinted)", span))
         advice = self._advice(class_def, function_def)
         if advice is not None and class_def is not None and self._introduced(class_def, function_def):
             reasons.append(("intercepted-method", f"the method is advised by [{advice}] of an introduction; the introduction proxy runs its chain on the Python object; not compiled yet", span))
@@ -267,6 +269,73 @@ class StaticPlanner:
         name = decorator.annotationName()
         return facts.describeAnnotation(name) if "." in name else None
 
+    def _java_layout(self, module, class_def, function_def, node):
+        """
+        The (parameter types, return type) of the Java method the function implements, when the
+        hints spell it: each parameter hinted with the Java parameter type (or the Java parameter
+        is an Object), the return unhinted or hinted with a type the Java method returns. None
+        when the function implements no Java method, or the hints do not fit it.
+        """
+        facts = getattr(self.checker, "facts", None)
+        if facts is None or node is None:
+            return None
+        parameters = [argument for argument in function_def.arguments().arguments() if argument.name() not in ("self", "cls")]
+        layouts = self._java_signatures(class_def, function_def.name(), len(parameters))
+        if not layouts:
+            return None
+        unit = CheckUnit(module.source_path, function_def.name(), function_def, node, class_def, None, module)
+        bindings = Bindings(self.checker, unit)
+        hinted = []
+        for argument in parameters:
+            hint = argument.typeAnnotation()
+            hinted.append(stub_type_name(bindings.of_hint(hint)) if hint is not None else None)
+        spelled = [layout for layout in layouts
+                   if all(hint == java_type or java_type == "java.lang.Object" for hint, java_type in zip(hinted, layout[0]))]
+        if len(spelled) != 1:
+            return None
+        # the stub bridges every overload of the arity to the one Python function: another abstract
+        # overload would hand the compiled body values of another type, a default one is the
+        # interface's own entry to the spelled method (MethodInterceptor.intercept)
+        if any(not layouts[layout] for layout in layouts if layout != spelled[0]):
+            return None
+        parameter_types, return_type = spelled[0]
+        return_def = function_def.returnType()
+        hint = return_def.typeAnnotation() if return_def is not None else None
+        if hint is not None and hint.name() not in ("object", "Any", "typing.Any"):
+            hinted = stub_type_name(bindings.of_hint(hint))
+            if hint.name() == "None":
+                hinted = "void"
+            if hinted != return_type and return_type != "java.lang.Object" and not (hinted is not None and return_type != "void" and facts.isAssignable(hinted, return_type)):
+                return None
+        return list(parameter_types), return_type
+
+    def _java_signatures(self, class_def, name, arity):
+        """
+        The Java methods of the name and arity the bases of the class declare: a dict of
+        (parameter types, return type) to whether every declaration of that signature is a default method.
+        """
+        classes = getattr(self.checker, "python_classes", None)
+        model = classes.of(class_def) if classes is not None else None
+        seen = set()
+        stack = [model] if model is not None else []
+        found = {}
+        while stack:
+            current = stack.pop()
+            if current is None or current.qualified in seen:
+                continue
+            seen.add(current.qualified)
+            for base in current.bases:
+                if base is None:
+                    continue
+                if isinstance(base, PythonClassModel):
+                    stack.append(base)
+                elif base.methods().containsKey(name):
+                    for signature in base.methods().get(name):
+                        if len(signature.parameterTypes()) == arity and not signature.varargs():
+                            layout = (tuple(signature.parameterTypes()), signature.returnType())
+                            found[layout] = found.get(layout, True) and signature.isDefault()
+        return found
+
     def _java_method_implemented(self, class_def, name):
         """The Java base or interface declaring a method of the name the class implements, or None."""
         classes = getattr(self.checker, "python_classes", None)
@@ -309,7 +378,7 @@ class StaticPlanner:
             return f"[{class_def.name()}] compiles to an interface"
         return None
 
-    def _signature_reasons(self, module, class_def, function_def, node, span):
+    def _signature_reasons(self, module, class_def, function_def, node, span, java_layout=None):
         """Why the signature has no fixed Java layout, and which hints resolve to no type."""
         reasons = []
         bindings = None
@@ -339,7 +408,9 @@ class StaticPlanner:
                 reasons.append(("varargs-signature", f"parameter [**{node.args.kwarg.arg}] collects the keyword arguments", module.span_of(node.args.kwarg) or span))
         return_type = function_def.returnType()
         hint = return_type.typeAnnotation() if return_type is not None else None
-        if hint is None:
+        if java_layout is not None:
+            pass  # the Java method fixes the return type
+        elif hint is None:
             pass  # the stub declares an Object return: the body returns its values boxed
         elif bindings is not None and hint.name() not in ("None",) and bindings.of_hint(hint) is None:
             reasons.append(("unhinted-return", f"the return hint [{hint.name()}] resolves to no Java type or class of the compilation", span))
