@@ -253,6 +253,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
      * Emit the elements that are requested and available, read the pieces that arrived, and
      * request the next piece when the pieces read so far complete no requested element.
      */
+    @SuppressWarnings("java:S135") // Each transition returns to the drain before touching the next owned piece.
     private void drainOnce() {
         Subscriber<? super T> subscriber = downstream.get();
         if (subscriber == null) {
@@ -298,16 +299,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
                     // the request is answered when the drain takes the piece, not in onNext: only the drain touches the flag
                     pieceRequested = false;
                     if (readerFailure == null) {
-                        try {
-                            reader.read(adapter.apply(next));
-                        } catch (Throwable e) {
-                            // the values the piece completed before the failure are emitted
-                            // first, as the reactive readers emit them
-                            readerFailure = e;
-                            readerCompleted = true;
-                            upstreamCancelRequested = true;
-                            cancelUpstream();
-                        }
+                        readPiece(next);
                     } else {
                         discard.accept(next);
                     }
@@ -316,12 +308,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
                 if (inputEnded || readerFailure != null) {
                     if (!readerCompleted) {
                         readerCompleted = true;
-                        try {
-                            reader.complete();
-                        } catch (Throwable e) {
-                            // e.g. the input ends inside a value: the values before it first
-                            readerFailure = e;
-                        }
+                        completeReader();
                         continue;
                     }
                     // the end, also without demand: an element the end completed waits for one
@@ -347,13 +334,34 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
                 }
                 break;
             }
-        } catch (Throwable e) {
+        } catch (Exception | Error e) {
             terminate(true);
             subscriber.onError(e);
             return;
         }
         if (emitted != 0 && demand != Long.MAX_VALUE) {
             requested.addAndGet(-emitted);
+        }
+    }
+
+    private void readPiece(I next) {
+        try {
+            reader.read(adapter.apply(next));
+        } catch (Exception | Error e) {
+            // Emit the values the piece completed before its failure, like the reactive readers.
+            readerFailure = e;
+            readerCompleted = true;
+            upstreamCancelRequested = true;
+            cancelUpstream();
+        }
+    }
+
+    private void completeReader() {
+        try {
+            reader.complete();
+        } catch (Exception | Error e) {
+            // Emit preceding values before reporting an incomplete final value.
+            readerFailure = e;
         }
     }
 

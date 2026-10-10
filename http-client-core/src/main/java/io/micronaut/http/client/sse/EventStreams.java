@@ -348,7 +348,7 @@ public final class EventStreams {
                 }
                 Optional<ByteBuffer<?>> value;
                 try {
-                    value = piece.join();
+                    value = Objects.requireNonNullElse(piece.join(), Optional.empty());
                 } catch (CompletionException | CancellationException e) {
                     read(null, e.getCause() == null ? e : e.getCause());
                     readAgain();
