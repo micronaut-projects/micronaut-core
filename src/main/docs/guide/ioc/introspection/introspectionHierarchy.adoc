@@ -1,0 +1,36 @@
+An introspection describes the properties and methods of a type, not the types it extends. Some specifications need those too. Jakarta Bean Validation, for example, validates what a super class or an interface declares on its own terms, and has to know whether a type declares a method itself or inherits it.
+
+Setting the `hierarchy` member of the ann:core.annotation.Introspected[] annotation to `true` records the hierarchy at compile time, so it is read without reflection through the `getTypeHierarchy()` method of api:core.beans.BeanIntrospection[]:
+
+[source,java]
+----
+@Introspected(hierarchy = true)
+public class Book extends Publication implements Comparable<Book> {
+    public String getTitle() { ... }
+    public int compareTo(Book other) { ... }
+}
+----
+
+[source,java]
+----
+BeanTypeHierarchy hierarchy = introspection.getTypeHierarchy().orElseThrow();
+
+hierarchy.getTypes();                    // [Book, Publication, ..., Comparable]
+hierarchy.getSuperclass(Book.class);     // Optional[Publication]
+hierarchy.getInterfaces(Book.class);     // [Comparable]
+hierarchy.getDeclaringTypes(method);     // [Book, Comparable] for compareTo
+hierarchy.isDeclared(method);            // whether Book declares a bean method itself
+----
+
+api:core.beans.BeanTypeHierarchy[] exposes:
+
+* `getTypes()` - the type and every super class and interface of it, each once, depth first: the super class and its super types, then the interfaces and theirs. `Object` is reported as a super class but not described itself.
+* `getSuperclass(type)` and `getInterfaces(type)` - what a type of the hierarchy extends and implements itself
+* `getDeclaringTypes(method)` - the levels a bean method is declared on: the type declaring it, then every type declaring a method it overrides, nearest first. A level whose method is not a bean method is included, and so is an interface the type introduces that an inherited method implements.
+* `getDeclaredMethods()` and `isDeclared(method)` - which of the bean methods of the introspection the type declares itself, overrides included; the others it inherits
+
+The methods are looked up by identity, so pass the api:core.beans.BeanMethod[] instances of the same introspection. The declarations of properties are not part of the hierarchy: they are the members of each property, see <<propertyMembers, Bean Property Members>>.
+
+The hierarchy is the one the compiler saw, with raw types: the type arguments passed to super types are not described.
+
+IMPORTANT: `hierarchy` defaults to `false` because the generated introspection grows by the code describing the hierarchy. The hierarchy is built, and its classes loaded, when it is first asked for.
