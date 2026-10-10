@@ -79,12 +79,14 @@ record TypeHierarchyDef(ExpressionDef types, ExpressionDef superTypes, Expressio
             superTypes.add(TypeDef.Primitive.INT.array().instantiate(parents));
         }
 
+        // the levels of every method are ordered by the hierarchy of the bean type, an inherited one included
+        Set<String> order = breadthFirst(beanClassElement.getName(), hierarchy);
         List<ExpressionDef> methodLevels = new ArrayList<>(beanMethods.size());
         for (MethodElement method : beanMethods) {
             // the declaring type, then the types declaring a method it overrides, nearest first, each once; Object
             // is not in the table, so it is no level
             Set<Integer> levels = new LinkedHashSet<>();
-            collectLevels(method, hierarchy, table, levels);
+            collectLevels(method, order, table, levels);
             methodLevels.add(TypeDef.Primitive.INT.array().instantiate(
                 levels.stream().<ExpressionDef>map(ExpressionDef::constant).toList()));
         }
@@ -98,15 +100,20 @@ record TypeHierarchyDef(ExpressionDef types, ExpressionDef superTypes, Expressio
     }
 
     /**
-     * Collects the declaring levels of a method: the type declaring it and the types declaring a method it
-     * overrides, in the breadth first order of the super types of the declaring type, so a type the declaring
-     * type extends or implements directly comes before a type that one extends or implements in turn.
+     * Collects the declaring levels of a method: the type declaring it, then the types declaring a method it
+     * overrides, in the breadth first order of the hierarchy of the bean type, so a type the bean type extends or
+     * implements directly comes before a type that one extends or implements in turn. An inherited method
+     * overrides the methods of the interfaces the bean type introduces as well, these are levels too.
      */
-    private static void collectLevels(MethodElement method, Map<String, ClassElement> hierarchy,
+    private static void collectLevels(MethodElement method, Set<String> order,
                                       Map<String, Integer> table, Set<Integer> levels) {
         Set<String> declaring = new HashSet<>();
         collectDeclaringTypes(method, declaring);
-        for (String type : breadthFirst(method.getDeclaringType().getName(), hierarchy)) {
+        Integer declaringType = table.get(method.getDeclaringType().getName());
+        if (declaringType != null) {
+            levels.add(declaringType);
+        }
+        for (String type : order) {
             if (declaring.remove(type)) {
                 levels.add(table.get(type));
             }

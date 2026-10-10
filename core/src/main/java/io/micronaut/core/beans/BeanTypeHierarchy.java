@@ -87,10 +87,11 @@ public interface BeanTypeHierarchy {
 
     /**
      * The declaring levels of a bean method: the type declaring it, then every type of the hierarchy declaring a
-     * method it overrides, each once, nearest first: in the breadth first order of the super types of the
-     * declaring type, the super class before the interfaces, so a type the declaring type extends or implements
-     * directly comes before a type that one extends or implements in turn. {@link Class#isInterface()} tells
-     * which levels are interfaces.
+     * method it overrides, each once, nearest first: in the breadth first order of the hierarchy of the
+     * introspected type, the super class before the interfaces, so a type the introspected type extends or
+     * implements directly comes before a type that one extends or implements in turn. An inherited method
+     * overrides the methods of the interfaces the introspected type introduces as well, those are levels too.
+     * {@link Class#isInterface()} tells which levels are interfaces.
      *
      * @param method A bean method instance of the introspection, compared by identity
      * @return The declaring types, empty for a method that is not a bean method of the introspection

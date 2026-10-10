@@ -26,7 +26,7 @@ api:core.beans.BeanTypeHierarchy[] exposes:
 
 * `getTypes()` - the type and every super class and interface of it, each once, depth first: the super class and its super types, then the interfaces and theirs. `Object` is reported as a super class but not described itself.
 * `getSuperclass(type)` and `getInterfaces(type)` - what a type of the hierarchy extends and implements itself
-* `getDeclaringTypes(method)` - the levels a bean method is declared on: the type declaring it, then every type declaring a method it overrides, nearest first. A level whose method is not a bean method is included.
+* `getDeclaringTypes(method)` - the levels a bean method is declared on: the type declaring it, then every type declaring a method it overrides, nearest first. A level whose method is not a bean method is included, and so is an interface the type introduces that an inherited method implements.
 * `getDeclaredMethods()` and `isDeclared(method)` - which of the bean methods of the introspection the type declares itself, overrides included; the others it inherits
 
 The methods are looked up by identity, so pass the api:core.beans.BeanMethod[] instances of the same introspection. The declarations of properties are not part of the hierarchy: they are the members of each property, see <<propertyMembers, Bean Property Members>>.

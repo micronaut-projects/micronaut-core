@@ -128,6 +128,43 @@ class Diamond implements Mid, Side, Far {
         hierarchy.isDeclared(run)
     }
 
+    void "an inherited method lists an interface the introspected type introduces"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Child', '''
+package test;
+
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Introspected;
+
+interface Deep {
+    String run();
+}
+
+interface Contract {
+    String run();
+}
+
+class Parent implements Deep {
+    @Executable
+    public String run() { return "parent"; }
+}
+
+@Introspected(hierarchy = true)
+class Child extends Parent implements Contract {
+}
+''')
+        def hierarchy = introspection.getTypeHierarchy().orElseThrow()
+        def loader = introspection.beanType.classLoader
+        def (parent, deep, contract) = ['Parent', 'Deep', 'Contract'].collect { loader.loadClass('test.' + it) }
+        def run = introspection.beanMethods.find { it.name == 'run' }
+
+        then: 'the declaring type first, then the levels breadth first from the introspected type'
+        hierarchy.types == [introspection.beanType, parent, deep, contract]
+        hierarchy.getDeclaringTypes(run) == [parent, contract, deep]
+        !hierarchy.isDeclared(run)
+        hierarchy.declaredMethods.isEmpty()
+    }
+
     void "a bean method of another introspection is not one of the hierarchy"() {
         when:
         def introspection = buildBeanIntrospection('test.Child', SOURCE)
