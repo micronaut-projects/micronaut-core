@@ -22,7 +22,6 @@ import io.micronaut.dev.http.DevServerSockets;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +52,6 @@ import java.util.function.BooleanSupplier;
  * @author graemerocher
  * @since 5.3.0
  */
-@NullMarked
 final class RestartRequests implements RequestAdmission {
 
     // the runtime's logger: these are the runtime's messages
