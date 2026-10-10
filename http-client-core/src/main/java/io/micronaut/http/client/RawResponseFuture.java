@@ -32,7 +32,8 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * The {@link CompletableFuture} of an {@link AsyncRawHttpClient} exchange.
  * {@link #cancel(boolean) Cancelling} it cancels the exchange, and a response that arrives after
- * the future was cancelled is closed.
+ * the future was cancelled or externally failed is closed. Exceptional external completion,
+ * including {@code orTimeout}, also cancels the exchange.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -94,8 +95,8 @@ public final class RawResponseFuture extends CompletableFuture<HttpResponse<?>> 
             @Override
             public void onSubscribe(Subscription s) {
                 future.onCancel.set(s::cancel);
-                if (future.isCancelled()) {
-                    s.cancel();
+                if (future.isDone()) {
+                    future.abort();
                 } else {
                     s.request(Long.MAX_VALUE);
                 }
@@ -121,10 +122,10 @@ public final class RawResponseFuture extends CompletableFuture<HttpResponse<?>> 
 
     private void deliver(@Nullable HttpResponse<?> response, @Nullable Throwable error) {
         if (error != null) {
-            completeExceptionally(error);
+            super.completeExceptionally(error);
         } else if (response == null) {
             if (!isDone()) {
-                completeExceptionally(new IllegalStateException("The exchange completed without a response"));
+                super.completeExceptionally(new IllegalStateException("The exchange completed without a response"));
             }
         } else if (!complete(response) && response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
             // cancelled before the response arrived: nobody takes it
@@ -136,11 +137,24 @@ public final class RawResponseFuture extends CompletableFuture<HttpResponse<?>> 
     public boolean cancel(boolean mayInterruptIfRunning) {
         boolean cancelled = super.cancel(mayInterruptIfRunning);
         if (cancelled) {
-            Runnable onCancel = this.onCancel.get();
-            if (onCancel != null) {
-                onCancel.run();
-            }
+            abort();
         }
         return cancelled;
+    }
+
+    @Override
+    public boolean completeExceptionally(Throwable error) {
+        boolean completed = super.completeExceptionally(error);
+        if (completed) {
+            abort();
+        }
+        return completed;
+    }
+
+    private void abort() {
+        Runnable callback = onCancel.getAndSet(null);
+        if (callback != null) {
+            callback.run();
+        }
     }
 }
