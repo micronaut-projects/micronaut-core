@@ -46,4 +46,15 @@ public @interface AnnotationExpressionContext {
      */
     @AliasFor(member = AnnotationMetadata.VALUE_MEMBER)
     String className() default "";
+
+    /**
+     * Whether the parameters of the annotated method can be referenced by name in expressions.
+     *
+     * <p>Set to {@code false} for an annotation whose expressions are evaluated without the method
+     * arguments, so that a parameter cannot shadow, or clash with, a property of the context class.</p>
+     *
+     * @return {@code false} if the method parameters are not part of the evaluation context
+     * @since 5.3.0
+     */
+    boolean methodArguments() default true;
 }

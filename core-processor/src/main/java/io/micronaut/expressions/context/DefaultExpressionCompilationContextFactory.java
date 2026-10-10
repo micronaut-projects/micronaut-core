@@ -43,6 +43,7 @@ import java.util.stream.Stream;
 @Internal
 public final class DefaultExpressionCompilationContextFactory implements ExpressionCompilationContextFactory {
 
+    private static final String METHOD_ARGUMENTS_MEMBER = "methodArguments";
     private static final Collection<ClassElement> CONTEXT_TYPES = ConcurrentHashMap.newKeySet();
     private ExtensibleExpressionEvaluationContext sharedContext;
     private final VisitorContext visitorContext;
@@ -59,8 +60,13 @@ public final class DefaultExpressionCompilationContextFactory implements Express
     @Override
     public ExpressionEvaluationContext buildContextForMethod(EvaluatedExpressionReference expression,
                                                              MethodElement methodElement) {
-        return buildForExpression(expression, null)
+        ExtensibleExpressionEvaluationContext methodContext = buildForExpression(expression, null)
                  .extendWith(methodElement);
+        if (excludesMethodArguments(expression)) {
+            // the expression is evaluated without the method arguments, so only the type of this is known
+            return buildForExpression(expression, methodContext.findThis());
+        }
+        return methodContext;
     }
 
     @Override
@@ -91,6 +97,16 @@ public final class DefaultExpressionCompilationContextFactory implements Express
             return evaluationContext.withThis(thisElement);
         }
         return evaluationContext;
+    }
+
+    private boolean excludesMethodArguments(EvaluatedExpressionReference expression) {
+        return visitorContext.getClassElement(expression.annotationName())
+            .stream()
+            .flatMap(annotation -> Stream.concat(
+                annotation.findAnnotation(AnnotationExpressionContext.class).stream(),
+                findAnnotationMembers(annotation, expression.annotationMember())
+                    .flatMap(element -> Optional.ofNullable(element.getDeclaredAnnotation(AnnotationExpressionContext.class)).stream())))
+            .anyMatch(av -> !av.booleanValue(METHOD_ARGUMENTS_MEMBER).orElse(true));
     }
 
     private ExtensibleExpressionEvaluationContext addAnnotationEvaluationContext(
