@@ -226,7 +226,8 @@ NOTE: Prefer `scoped-value` when your integrations only need lambda-based propag
 
 Some integrations still require `ThreadLocal` semantics because their APIs expose explicit “update” callbacks instead of accepting a lambda to execute with the context in scope. In those scenarios switch Micronaut’s propagation mode to `thread-local` before invoking the libraries involved. Common examples include:
 
-* **Kotlin coroutines** – when wiring custom coroutine dispatchers or using `withContext`, the runtime expects Micronaut to call `MicronautPropagatedContext.updateThreadContext`. That API assumes a `ThreadLocal`, so you must run in thread-local mode whenever coroutine propagation is active. If you see `Scope propagation requires thread-local support` while running coroutine-based code, enable the thread-local mode.
 * **Reactor instrumentation** – certain Micrometer/`ContextView` bridges expose callbacks that pull data from a `ThreadLocal` instead of accepting a lambda. If your reactive pipelines depend on that behaviour, configure thread-local propagation so the state is visible.
 
 After the critical section completes you can switch the propagation mode back to `scoped-value` to regain the benefits of structured lifetimes.
+
+NOTE: Kotlin coroutines work in both modes. A coroutine is resumed and suspended by separate callbacks, so in `scoped-value` mode Micronaut binds the coroutine's context to the thread it runs on instead of binding a `ScopedValue`: `PropagatedContext.get()` and the api:core.propagation.ThreadPropagatedContextElement[] elements see the coroutine's context, and a context propagated with a `propagate(…)` helper inside the coroutine takes precedence for the duration of the callback. The api:core.propagation.ScopedValuePropagatedContextElement[] elements of the coroutine's context are only bound inside such a callback.

@@ -72,7 +72,7 @@ final class PropagatedContextImpl implements PropagatedContext {
     public <V> V propagate(Supplier<V> supplier) {
         return switch (PropagatedContextConfiguration.get()) {
             case SCOPED_VALUE -> {
-                if (ScopedValues.get() == this) {
+                if (isScopedValueBound()) {
                     yield supplier.get();
                 } else {
                     Supplier<V> originalSupplier = supplier;
@@ -91,7 +91,12 @@ final class PropagatedContextImpl implements PropagatedContext {
                             }
                         };
                     }
-                    yield ScopedValues.propagate(this, delegate);
+                    PropagatedContext threadBound = ThreadBoundPropagation.suspend();
+                    try {
+                        yield ScopedValues.propagate(this, delegate);
+                    } finally {
+                        ThreadBoundPropagation.resume(threadBound);
+                    }
                 }
             }
             case THREAD_LOCAL -> ThreadContext.propagate(this, supplier);
@@ -102,7 +107,7 @@ final class PropagatedContextImpl implements PropagatedContext {
     public <V> V propagateCall(Callable<V> callable) throws Exception {
         return switch (PropagatedContextConfiguration.get()) {
             case SCOPED_VALUE -> {
-                if (ScopedValues.get() == this) {
+                if (isScopedValueBound()) {
                     yield callable.call();
                 } else {
                     Callable<V> originalCallable = callable;
@@ -121,7 +126,12 @@ final class PropagatedContextImpl implements PropagatedContext {
                             }
                         };
                     }
-                    yield ScopedValues.propagate(this, delegate);
+                    PropagatedContext threadBound = ThreadBoundPropagation.suspend();
+                    try {
+                        yield ScopedValues.propagate(this, delegate);
+                    } finally {
+                        ThreadBoundPropagation.resume(threadBound);
+                    }
                 }
             }
             case THREAD_LOCAL -> ThreadContext.propagate(this, callable);
@@ -133,7 +143,7 @@ final class PropagatedContextImpl implements PropagatedContext {
         PropagatedContextConfiguration.Mode mode = PropagatedContextConfiguration.get();
         switch (mode) {
             case SCOPED_VALUE -> {
-                if (ScopedValues.get() == this) {
+                if (isScopedValueBound()) {
                     runnable.run();
                 } else {
                     Runnable originalRunnable = runnable;
@@ -152,12 +162,31 @@ final class PropagatedContextImpl implements PropagatedContext {
                             }
                         };
                     }
-                    ScopedValues.propagate(this, delegate);
+                    PropagatedContext threadBound = ThreadBoundPropagation.suspend();
+                    try {
+                        ScopedValues.propagate(this, delegate);
+                    } finally {
+                        ThreadBoundPropagation.resume(threadBound);
+                    }
                 }
             }
             case THREAD_LOCAL -> ThreadContext.propagate(this, runnable);
             default -> throw new IllegalStateException("Unsupported propagation mode: " + mode);
         }
+    }
+
+    /**
+     * Whether this context is already in scope with scoped-value propagation, so that a callback can run directly.
+     * A context only {@link ThreadBoundPropagation bound to the thread} doesn't have its scoped value elements bound.
+     *
+     * @return true if this context is in scope
+     */
+    private boolean isScopedValueBound() {
+        PropagatedContext threadBound = ThreadBoundPropagation.get();
+        if (threadBound == null) {
+            return ScopedValues.get() == this;
+        }
+        return threadBound == this && !containsScopedValueElements;
     }
 
     @Override
@@ -220,7 +249,10 @@ final class PropagatedContextImpl implements PropagatedContext {
     @Nullable
     public static PropagatedContext getOrNull() {
         return switch (PropagatedContextConfiguration.get()) {
-            case SCOPED_VALUE -> ScopedValues.get();
+            case SCOPED_VALUE -> {
+                PropagatedContext threadBound = ThreadBoundPropagation.get();
+                yield threadBound != null ? threadBound : ScopedValues.get();
+            }
             case THREAD_LOCAL -> ThreadContext.get();
         };
     }
