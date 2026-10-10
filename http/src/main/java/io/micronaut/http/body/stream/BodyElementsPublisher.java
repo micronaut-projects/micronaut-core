@@ -163,6 +163,7 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
         }
     }
 
+    @SuppressWarnings("java:S1181") // Convert failures of user-supplied elements into the publisher error signal.
     private void emit(Subscriber<? super T> subscriber) {
         Arrival<T> arrival = arrived.getAndSet(null);
         if (arrival != null) {
