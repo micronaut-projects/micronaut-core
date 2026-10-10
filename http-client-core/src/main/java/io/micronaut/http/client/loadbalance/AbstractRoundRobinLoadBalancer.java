@@ -40,6 +40,7 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
     /**
      * A load balancer that ignores the reported outcomes.
      */
+    @SuppressWarnings("java:S5993") // Preserve the public constructor present in released binaries.
     public AbstractRoundRobinLoadBalancer() {
         this(null);
     }
