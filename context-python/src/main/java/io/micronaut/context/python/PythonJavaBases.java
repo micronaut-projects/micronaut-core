@@ -330,7 +330,8 @@ public final class PythonJavaBases {
                 // a generic method (toArray(T[])) is not reachable through the generated dispatcher either
                 continue;
             }
-            if (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)) {
+            // no Python name can call a method whose name contains $, which the dispatcher leaves out
+            if ((Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)) && method.getName().indexOf('$') < 0) {
                 names.add(method.getName());
             }
         }

@@ -742,9 +742,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         Set<String> signatures = new HashSet<>();
         for (MethodElement method : superType.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance())) {
             // a generic method (toArray(T[])) has no erasure javac can select an overload for; it is left out,
-            // as is a method throwing a Throwable that is not an Exception, which the dispatcher declares
+            // as is a method throwing a Throwable that is not an Exception, which the dispatcher declares, and a
+            // method whose name contains $ (browserless-test's $(Class)), which no Python name can call
             if (method.isAbstract() || method.isStatic() || !(method.isPublic() || method.isProtected())
                 || !method.getDeclaredTypeVariables().isEmpty()
+                || method.getName().indexOf('$') >= 0
                 || Object.class.getName().equals(method.getDeclaringType().getName())
                 || !Arrays.stream(method.getThrownTypes()).allMatch(thrown -> thrown.isAssignable(Exception.class))
                 || !signatures.add(bridgeMethodKey(method))) {
