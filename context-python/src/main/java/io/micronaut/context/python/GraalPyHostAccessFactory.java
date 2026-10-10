@@ -17,6 +17,7 @@ package io.micronaut.context.python;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.env.Environment;
 import io.micronaut.context.python.annotation.PythonClass;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import jakarta.inject.Named;
@@ -111,14 +112,23 @@ final class GraalPyHostAccessFactory {
      * @param mappings The discovered TargetTypeMapping beans
      * @param functionalInterfaceProviders The generated providers of the functional interfaces the Python sources reference
      * @param beanContext The bean context, whose class loader loads the generated classes
+     * @param environment The environment
      * @return A HostAccess configured with custom target type mappings
      */
     @Singleton
     @Named(PythonContextRuntime.PYTHON)
     HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings,
                           Collection<PythonFunctionalInterfaceProvider> functionalInterfaceProviders,
-                          BeanContext beanContext) {
-        return hostAccess(mappings, beanContext.getClassLoader(), entries(functionalInterfaceProviders));
+                          BeanContext beanContext,
+                          Environment environment) {
+        ClassLoader classLoader = beanContext.getClassLoader();
+        List<PythonFunctionalInterfaceProvider.Entry> functionalInterfaces = entries(functionalInterfaceProviders);
+        if (GraalPyWarmEngine.isEnabled(environment)) {
+            // the warm engine of a generation takes one host access for all its contexts
+            return GraalPyWarmEngine.hostAccess(classLoader, mappings, functionalInterfaces,
+                () -> hostAccess(mappings, classLoader, functionalInterfaces));
+        }
+        return hostAccess(mappings, classLoader, functionalInterfaces);
     }
 
     /**

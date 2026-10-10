@@ -70,6 +70,19 @@ A run that no change preceded, as one asked for from the console, uses that gene
 
 `micronaut.dev.patch-in-place=false` turns this off, as it does in development mode.
 
+== A warm GraalPy engine
+
+Each test class that starts an application context with Python beans gets a GraalPy context of its own. Test mode sets `micronaut.dev.test.enabled` on the contexts the tests start, and in test mode the contexts of one generation share a GraalPy engine. The engine stays open between them, so a context built after the first one reuses the code the engine has already parsed and compiled, instead of starting cold.
+
+An engine accepts only one host access configuration for all its contexts. The Python host access holds a target type mapping for each generated class, so a shared engine cannot outlive its generation:
+
+* The engine is kept with the host access of its generation. That host access is built from the target type mappings of the first context.
+* A context of a new generation retires both. The retired engine closes when its last context closes, so it does not keep the retired generation reachable.
+* An application with a target type mapping that has instance fields does not share an engine. A shared host access would convert with the mapping instances of another context.
+* A change to the `graalpy.engine` configuration replaces the warm engine.
+
+`micronaut.dev.python.warm-engine=false` turns this off: every application context then creates and closes its own engine. Development mode starts one context per generation, so there is nothing for it to share.
+
 == HTML Report
 
 Add `micronaut-dev-test-report` to the development runtime classpath, as the build plugins do for `mnTest` and `mn:test`, and test mode also writes a page of the latest result of every test. The page goes to `micronaut.dev.test.html-report`, by default `build/micronaut-dev/test-report/index.html`. On the page:

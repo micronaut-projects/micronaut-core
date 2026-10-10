@@ -18,6 +18,7 @@ package io.micronaut.context.python;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
 import io.micronaut.core.convert.format.MapFormat;
@@ -25,6 +26,7 @@ import io.micronaut.core.naming.conventions.StringConvention;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Engine;
+import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotException;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -53,12 +55,20 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
      * Context-level configuration is intentionally kept out of the shared engine
      * so package collaborators can create isolated Python contexts while still
      * sharing compiled code, instruments, and engine-level resources.
+     * <p>
+     * In the test mode of a development launcher, the application contexts the tests of a class loader
+     * generation start share one engine, which stays warm across them; see {@link GraalPyWarmEngine}.
      *
+     * @param engineConfiguration The engine configuration
+     * @param hostAccess The host access of the contexts, which a warm engine is kept with
+     * @param environment The environment
      * @return The shared Python polyglot engine.
      */
     @Singleton
     @Named(PythonContextRuntime.PYTHON)
-    Engine pythonEngine(GraalPyEngineConfiguration engineConfiguration) {
+    Engine pythonEngine(GraalPyEngineConfiguration engineConfiguration,
+                        @Named(PythonContextRuntime.PYTHON) HostAccess hostAccess,
+                        Environment environment) {
         if (PythonContextRuntime.isInitialized() && PythonContextRuntime.isReuseContext()) {
             // A reusable bootstrap context brings its own engine. Sharing it keeps compiled code
             // and one compiler queue for the primary and the pooled contexts; the reusable context
@@ -67,6 +77,15 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
             LOG.info("Sharing the GraalPy engine of the reusable context using the {} runtime", engine.getImplementationName());
             return engine;
         }
+        if (GraalPyWarmEngine.isEnabled(environment)) {
+            // test mode: the contexts the tests of the generation start share an engine, which stays warm across them
+            return GraalPyWarmEngine.engine(hostAccess, environment.getProperties(GraalPyEngineConfiguration.PREFIX, StringConvention.RAW),
+                () -> createPythonEngine(engineConfiguration));
+        }
+        return createPythonEngine(engineConfiguration);
+    }
+
+    private static Engine createPythonEngine(GraalPyEngineConfiguration engineConfiguration) {
         // Keep defaults; options and instruments are configured on contexts.
         LOG.debug("Creating GraalPy Engine");
         long now = System.currentTimeMillis();
@@ -180,6 +199,11 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
     @Override
     public void onDestroyed(@NonNull BeanDestroyedEvent<Engine> event) {
         Engine engine = event.getBean();
+        if (GraalPyWarmEngine.isWarm(engine)) {
+            // kept for the next context of the generation, which closes it when a context of another generation retires it
+            LOG.debug("Keeping the warm GraalPy engine open for the next context of the generation");
+            return;
+        }
         PythonContextRegistry.onNoContexts(engine, () -> closeEngine(engine));
     }
 
@@ -193,7 +217,7 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
      *
      * @param engine The engine to close.
      */
-    private static void closeEngine(Engine engine) {
+    static void closeEngine(Engine engine) {
         try {
             engine.close(false);
         } catch (PolyglotException e) {
