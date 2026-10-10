@@ -21,6 +21,8 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.python.processing.PythonProcessingSession;
 import io.micronaut.python.processing.PythonSourceVisitor;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
+import io.micronaut.python.processing.staticcompile.StaticCompilationDecision;
+import io.micronaut.python.processing.staticcompile.StaticCompilationMode;
 import io.micronaut.python.processing.typecheck.TypeCheckMode;
 
 import javax.tools.JavaFileObject;
@@ -40,7 +42,9 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.processing.Processor;
 import java.util.StringTokenizer;
@@ -84,6 +88,7 @@ public final class PyronautCompiler {
     private final ClassLoader parentClassLoader;
     private final Consumer<ClassElement> classElementCallback;
     private final Consumer<PythonDiagnostic> pythonDiagnosticCallback;
+    private final Consumer<StaticCompilationDecision> staticCompilationDecisionCallback;
     private final List<String> compilerOptions;
     private final boolean verboseErrors;
     private final boolean compilePythonBytecode;
@@ -112,7 +117,8 @@ public final class PyronautCompiler {
         this.parentClassLoader = builder.parentClassLoader != null ? builder.parentClassLoader : PyronautCompiler.class.getClassLoader();
         this.classElementCallback = builder.classElementCallback;
         this.pythonDiagnosticCallback = builder.pythonDiagnosticCallback;
-        this.compilerOptions = compilerOptions(builder.compilerOptions, builder.typeCheckMode);
+        this.staticCompilationDecisionCallback = builder.staticCompilationDecisionCallback;
+        this.compilerOptions = compilerOptions(builder.compilerOptions, builder.typeCheckMode, builder.staticCompilationMode, builder.staticCompilationReport);
         this.verboseErrors = builder.verboseErrors;
         this.compilePythonBytecode = builder.compilePythonBytecode;
         this.errorDumpDirectory = builder.errorDumpDirectory;
@@ -187,19 +193,33 @@ public final class PyronautCompiler {
     }
 
     /**
-     * The compiler options with the type-check mode passed to the annotation processor as its option.
+     * The compiler options with the type-check mode, the static compilation mode and the report
+     * directory passed to the annotation processor as its options.
      */
-    private static List<String> compilerOptions(List<String> options, TypeCheckMode typeCheckMode) {
-        if (typeCheckMode == null) {
+    private static List<String> compilerOptions(List<String> options,
+                                                TypeCheckMode typeCheckMode,
+                                                StaticCompilationMode staticCompilationMode,
+                                                File staticCompilationReport) {
+        if (typeCheckMode == null && staticCompilationMode == null && staticCompilationReport == null) {
             return options != null ? List.copyOf(options) : null;
+        }
+        Map<String, String> set = new LinkedHashMap<>();
+        if (typeCheckMode != null) {
+            set.put(TypeCheckMode.OPTION, typeCheckMode.optionValue());
+        }
+        if (staticCompilationMode != null) {
+            set.put(StaticCompilationMode.OPTION, staticCompilationMode.optionValue());
+        }
+        if (staticCompilationReport != null) {
+            set.put(StaticCompilationMode.REPORT_OPTION, staticCompilationReport.getAbsolutePath());
         }
         List<String> result = new ArrayList<>();
         if (options != null) {
             options.stream()
-                .filter(option -> !option.startsWith("-A" + TypeCheckMode.OPTION + "="))
+                .filter(option -> set.keySet().stream().noneMatch(name -> option.startsWith("-A" + name + "=")))
                 .forEach(result::add);
         }
-        result.add("-A" + TypeCheckMode.OPTION + "=" + typeCheckMode.optionValue());
+        set.forEach((name, value) -> result.add("-A" + name + "=" + value));
         return List.copyOf(result);
     }
 
@@ -491,6 +511,9 @@ public final class PyronautCompiler {
         if (pythonDiagnosticCallback != null) {
             compiler.setPythonDiagnosticCallback(pythonDiagnosticCallback);
         }
+        if (staticCompilationDecisionCallback != null) {
+            compiler.setStaticCompilationDecisionCallback(staticCompilationDecisionCallback);
+        }
         return compiler;
     }
 
@@ -718,6 +741,9 @@ public final class PyronautCompiler {
         private Consumer<ClassElement> classElementCallback;
         private Consumer<PythonDiagnostic> pythonDiagnosticCallback;
         private TypeCheckMode typeCheckMode;
+        private StaticCompilationMode staticCompilationMode;
+        private File staticCompilationReport;
+        private Consumer<StaticCompilationDecision> staticCompilationDecisionCallback;
         private boolean verboseErrors;
         private boolean compilePythonBytecode;
         private File errorDumpDirectory;
@@ -896,6 +922,45 @@ public final class PyronautCompiler {
          */
         public Builder typeCheck(TypeCheckMode typeCheckMode) {
             this.typeCheckMode = typeCheckMode;
+            return this;
+        }
+
+        /**
+         * Set how much of the Python code is compiled to Java in the generated stubs. The mode is
+         * passed to the annotation processor as the {@code micronaut.python.compile.static} option;
+         * when unset, the option given through {@link #options(List)}, if any, applies.
+         *
+         * @param staticCompilationMode The mode
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder staticCompilation(StaticCompilationMode staticCompilationMode) {
+            this.staticCompilationMode = staticCompilationMode;
+            return this;
+        }
+
+        /**
+         * Set the directory the static compilation report ({@code decisions.jsonl} and
+         * {@code summary.txt}) is written to.
+         *
+         * @param directory The directory
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder staticCompilationReport(File directory) {
+            this.staticCompilationReport = directory;
+            return this;
+        }
+
+        /**
+         * Set a callback to be invoked for each static compilation decision, before the report is written.
+         *
+         * @param callback The callback function
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder staticCompilationDecisionCallback(Consumer<StaticCompilationDecision> callback) {
+            this.staticCompilationDecisionCallback = callback;
             return this;
         }
 
