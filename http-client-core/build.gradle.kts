@@ -15,6 +15,8 @@ dependencies {
     compileOnly(libs.managed.kotlinx.coroutines.core)
 
     testImplementation(projects.micronautJacksonDatabind)
+    // an independent event stream parser, the oracle of the differential test of the decoder
+    testImplementation(libs.okhttp.sse)
 }
 
 //tasks.withType(Test).configureEach {

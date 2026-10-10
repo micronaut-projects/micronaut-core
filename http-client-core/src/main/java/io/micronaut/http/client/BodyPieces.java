@@ -23,10 +23,13 @@ import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.body.stream.ByteBodyElements;
+import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
+import java.util.Arrays;
+import java.util.function.Function;
 
 /**
  * The pieces of a response body as they were received, as heap buffers that are not reference
@@ -50,6 +53,33 @@ public final class BodyPieces implements PieceReader<ByteBuffer<?>> {
     @SuppressWarnings("java:S2095") // the elements own the piece reader, and close it
     public static BodyElements<ByteBuffer<?>> elements(CloseableByteBody body) {
         return new ByteBodyElements<>(body, new BodyPieces(), BodyPieces::wrap);
+    }
+
+    /**
+     * The lines of a response body, without their line ending: a line feed, a carriage return, or
+     * a carriage return and a line feed. Every line is an element, an empty one too, and the bytes after the last
+     * line ending are not, as the lines of an event stream were split before.
+     *
+     * @param body          The body, which the elements take over
+     * @param maxLineLength The largest number of bytes a line may have
+     * @return The lines
+     */
+    public static BodyElements<ByteBuffer<?>> lines(CloseableByteBody body, long maxLineLength) {
+        return new ByteBodyElements<>(body, lineReader(maxLineLength, ByteArrayBufferFactory.INSTANCE::wrap), BodyPieces::wrap);
+    }
+
+    /**
+     * The reader of the lines of a body, without their line ending: a line feed, a carriage
+     * return, or a carriage return and a line feed, as for an event stream. Every line is an
+     * element, an empty one too, and the bytes after the last line ending are not.
+     *
+     * @param maxLineLength The largest number of bytes a line may have
+     * @param factory       The element of the bytes of a line
+     * @param <T>           The type of a line
+     * @return The reader
+     */
+    public static <T> PieceReader<T> lineReader(long maxLineLength, Function<byte[], T> factory) {
+        return new Lines<>(maxLineLength, factory);
     }
 
     /**
@@ -84,5 +114,100 @@ public final class BodyPieces implements PieceReader<ByteBuffer<?>> {
     @Override
     public void close() {
         pieces.clear();
+    }
+
+    /**
+     * Splits the pieces of a body into lines. A line ends with a line feed, a carriage return,
+     * or a carriage return and a line feed, as the lines of an event stream do. The bytes of a
+     * line that is not ended yet are kept in one growable array, so a long line that arrives in
+     * many pieces is copied once per piece, not once per piece for every piece before it.
+     *
+     * @param <T> The type of a line
+     */
+    private static final class Lines<T> implements PieceReader<T> {
+        private final long maxLineLength;
+        private final Function<byte[], T> factory;
+        private final ArrayDeque<byte[]> completedLines = new ArrayDeque<>(1);
+        /**
+         * The bytes of the line that is not ended yet: the first {@link #pendingLength}.
+         */
+        private byte[] pending = new byte[0];
+        private int pendingLength;
+        /**
+         * The last byte read was a carriage return: a line feed that follows it is part of the
+         * same line ending.
+         */
+        private boolean afterCr;
+
+        Lines(long maxLineLength, Function<byte[], T> factory) {
+            this.maxLineLength = maxLineLength;
+            this.factory = factory;
+        }
+
+        @Override
+        public void read(ReadBuffer piece) {
+            byte[] bytes;
+            try (piece) {
+                bytes = piece.toArray();
+            }
+            int start = 0;
+            for (int i = 0; i < bytes.length; i++) {
+                byte b = bytes[i];
+                if (b == '\n' && afterCr && i == start) {
+                    // the line feed of a carriage return and a line feed
+                    afterCr = false;
+                    start = i + 1;
+                    continue;
+                }
+                afterCr = false;
+                if (b == '\n' || b == '\r') {
+                    append(bytes, start, i);
+                    completedLines.add(Arrays.copyOf(pending, pendingLength));
+                    pendingLength = 0;
+                    afterCr = b == '\r';
+                    start = i + 1;
+                }
+            }
+            append(bytes, start, bytes.length);
+        }
+
+        /**
+         * Append bytes to the line that is not ended yet.
+         */
+        private void append(byte[] bytes, int from, int to) {
+            int count = to - from;
+            long length = (long) pendingLength + count;
+            if (length > maxLineLength) {
+                throw new ContentLengthExceededException(maxLineLength, length);
+            }
+            if (count == 0) {
+                return;
+            }
+            if (length > pending.length) {
+                pending = Arrays.copyOf(pending, (int) Math.min(Math.max(length, (long) pending.length * 2), Integer.MAX_VALUE - 8L));
+            }
+            System.arraycopy(bytes, from, pending, pendingLength, count);
+            pendingLength = (int) length;
+        }
+
+        @Override
+        public void complete() {
+            // the bytes after the last line ending are not a line
+            pendingLength = 0;
+            pending = new byte[0];
+        }
+
+        @Override
+        public @Nullable T poll() {
+            byte[] line = completedLines.poll();
+            return line == null ? null : factory.apply(line);
+        }
+
+        @Override
+        public void close() {
+            completedLines.clear();
+            pendingLength = 0;
+            pending = new byte[0];
+        }
     }
 }

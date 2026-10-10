@@ -17,6 +17,8 @@ package io.micronaut.http.client
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.type.Argument
+import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -46,6 +48,34 @@ class StreamErrorResponseConnectionSpec extends Specification {
     @Inject
     @Client("/")
     StreamingHttpClient client
+
+    @Inject EmbeddedServer server
+
+    void "explicit null error type does not buffer even when configured"() {
+        given:
+        def configured = HttpClient.create(server.URL, new DefaultHttpClientConfiguration().tap {
+            bufferErrorBodyForStreaming = true
+        }) as StreamingHttpClient
+
+        when:
+        Flux.from(configured.dataStream(HttpRequest.GET('/stream-error/typed'), null)).blockLast()
+
+        then:
+        def error = thrown(HttpClientResponseException)
+        !error.response.body.isPresent()
+
+        cleanup:
+        configured.close()
+    }
+
+    void "custom streaming error type is the response body"() {
+        when:
+        Flux.from(client.dataStream(HttpRequest.GET('/stream-error/typed'), Argument.of(Map))).blockLast()
+
+        then:
+        def error = thrown(HttpClientResponseException)
+        error.response.body.orElseThrow() == [message: 'bad']
+    }
 
     @Timeout(value = 20, unit = TimeUnit.SECONDS)
     void "dataStream error response releases the connection"() {
@@ -107,6 +137,11 @@ class StreamErrorResponseConnectionSpec extends Specification {
             return HttpResponse.<Flux<byte[]>>serverError()
                 .header("X-Custom", "custom")
                 .body(Flux.range(0, 2048).map { new byte[8192] })
+        }
+
+        @Get(uri = "/typed", produces = MediaType.APPLICATION_JSON)
+        HttpResponse<Map<String, String>> typed() {
+            HttpResponse.badRequest([message: 'bad'])
         }
 
         @Get(uri = "/ok", produces = MediaType.TEXT_PLAIN)
