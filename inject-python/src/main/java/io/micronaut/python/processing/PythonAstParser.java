@@ -95,6 +95,7 @@ public final class PythonAstParser {
      * name as well, for any library and not only {@code io.micronaut}.
      */
     private static final String JAVA_IO_PACKAGE_PREFIX = "io.";
+    private static final String VISITOR_CONTEXT_MEMBER = "visitor_context";
     private static final Source TYPE_CHECKER_SOURCE = Source.newBuilder(PYTHON, """
         if type_check_enabled:
             from micronaut_typecheck import TypeChecker
@@ -281,7 +282,7 @@ public final class PythonAstParser {
         bindings.putMember("has_parsed_tree", tree != null);
         bindings.putMember("parsed_tree", tree != null ? tree : "");
         bindings.putMember("package_name", packageName);
-        bindings.putMember("visitor_context", visitorContext);
+        bindings.putMember(VISITOR_CONTEXT_MEMBER, visitorContext);
         bindings.putMember("file_name", fileName);
         bindings.putMember("source_path", sourcePath);
         bindings.putMember("src_root", srcRoot);
@@ -442,7 +443,7 @@ public final class PythonAstParser {
         if (checker == null || checker.isNull()) {
             return List.of();
         }
-        bindings.putMember("visitor_context", visitorContext);
+        bindings.putMember(VISITOR_CONTEXT_MEMBER, visitorContext);
         context.eval(TYPE_CHECK_SOURCE);
         Value diagnostics = bindings.getMember("diagnostics");
         return diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class));
@@ -464,7 +465,7 @@ public final class PythonAstParser {
         if (planner == null || planner.isNull()) {
             return StaticCompilationPlan.EMPTY;
         }
-        bindings.putMember("visitor_context", visitorContext);
+        bindings.putMember(VISITOR_CONTEXT_MEMBER, visitorContext);
         context.eval(STATIC_PLAN_SOURCE);
         Value decisions = bindings.getMember("static_decisions");
         Value bodies = bindings.getMember("static_bodies");
