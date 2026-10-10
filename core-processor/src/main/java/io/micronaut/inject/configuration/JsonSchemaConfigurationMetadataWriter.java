@@ -97,6 +97,21 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private static final String BOOLEAN = "boolean";
     private static final String INTEGER = "integer";
     private static final String NUMBER = "number";
+    private static final String DIGITS_INTEGER = "integer";
+    private static final String BYTE = "byte";
+    private static final String SHORT = "short";
+    private static final String INT = "int";
+    private static final String LONG = "long";
+    private static final String FLOAT = "float";
+    private static final String DOUBLE = "double";
+    private static final String BYTE_WRAPPER = "java.lang.Byte";
+    private static final String SHORT_WRAPPER = "java.lang.Short";
+    private static final String INTEGER_WRAPPER = "java.lang.Integer";
+    private static final String LONG_WRAPPER = "java.lang.Long";
+    private static final String FLOAT_WRAPPER = "java.lang.Float";
+    private static final String DOUBLE_WRAPPER = "java.lang.Double";
+    private static final String BIG_INTEGER = "java.math.BigInteger";
+    private static final String BIG_DECIMAL = "java.math.BigDecimal";
 
     @Override
     public void write(ConfigurationMetadataBuilder metadataBuilder, ClassWriterOutputVisitor outputVisitor) throws IOException {
@@ -469,9 +484,9 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private void writeSimpleTypeName(JsonWriter out, String fqcn, @Nullable AllowedValuesSchema allowed) {
         String type = switch (fqcn) {
             case BOOLEAN, "java.lang.Boolean" -> BOOLEAN;
-            case "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short",
-                 "java.lang.Integer", "java.lang.Long", "java.math.BigInteger" -> INTEGER;
-            case "float", "double", "java.lang.Float", "java.lang.Double", "java.math.BigDecimal" ->
+            case BYTE, SHORT, INT, LONG, BYTE_WRAPPER, SHORT_WRAPPER,
+                 INTEGER_WRAPPER, LONG_WRAPPER, BIG_INTEGER -> INTEGER;
+            case FLOAT, DOUBLE, FLOAT_WRAPPER, DOUBLE_WRAPPER, BIG_DECIMAL ->
                 NUMBER;
             default -> STRING;
         };
@@ -485,11 +500,11 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         try {
             return switch (typeName) {
                 case BOOLEAN, "java.lang.Boolean" -> Boolean.parseBoolean(value);
-                case "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short",
-                     "java.lang.Integer", "java.lang.Long", "java.math.BigInteger" ->
+                case BYTE, SHORT, INT, LONG, BYTE_WRAPPER, SHORT_WRAPPER,
+                     INTEGER_WRAPPER, LONG_WRAPPER, BIG_INTEGER ->
                     Long.parseLong(value);
-                case "float", "double", "java.lang.Float", "java.lang.Double",
-                     "java.math.BigDecimal" -> Double.parseDouble(value);
+                case FLOAT, DOUBLE, FLOAT_WRAPPER, DOUBLE_WRAPPER,
+                     BIG_DECIMAL -> Double.parseDouble(value);
                 default -> value; // string/enum/uri fall back to string
             };
         } catch (Exception e) {
@@ -635,7 +650,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             out.name(ATTR_MAX).value(0);
         }
         // Digits -> regex
-        Integer intDigits = intValue(pe, JV_DIGITS, "integer");
+        Integer intDigits = intValue(pe, JV_DIGITS, DIGITS_INTEGER);
         Integer fracDigits = intValue(pe, JV_DIGITS, "fraction");
         if (intDigits != null || fracDigits != null) {
             StringBuilder re = new StringBuilder("^");
@@ -793,21 +808,27 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             String v = value.trim();
             try {
                 return switch (javaType) {
-                    case "byte", "java.lang.Byte" -> Byte.parseByte(v);
-                    case "short", "java.lang.Short" -> Short.parseShort(v);
-                    case "int", "java.lang.Integer" -> Integer.parseInt(v);
-                    case "long", "java.lang.Long" -> Long.parseLong(v);
-                    case "java.math.BigInteger" -> new java.math.BigInteger(v);
-                    case "float", "java.lang.Float" -> finite(Float.valueOf(v));
-                    case "double", "java.lang.Double" -> finite(Double.valueOf(v));
-                    case "java.math.BigDecimal" -> new java.math.BigDecimal(v);
-                    default -> BOOLEAN.equals(type)
-                        ? (StringUtils.TRUE.equals(value) || StringUtils.FALSE.equals(value) ? Boolean.valueOf(value) : null)
-                        : value;
+                    case BYTE, BYTE_WRAPPER -> Byte.parseByte(v);
+                    case SHORT, SHORT_WRAPPER -> Short.parseShort(v);
+                    case INT, INTEGER_WRAPPER -> Integer.parseInt(v);
+                    case LONG, LONG_WRAPPER -> Long.parseLong(v);
+                    case BIG_INTEGER -> new java.math.BigInteger(v);
+                    case FLOAT, FLOAT_WRAPPER -> finite(Float.valueOf(v));
+                    case DOUBLE, DOUBLE_WRAPPER -> finite(Double.valueOf(v));
+                    case BIG_DECIMAL -> new java.math.BigDecimal(v);
+                    default -> BOOLEAN.equals(type) ? parseBoolean(value) : value;
                 };
             } catch (NumberFormatException e) {
                 return null;
             }
+        }
+
+        @Nullable
+        private static Boolean parseBoolean(String value) {
+            if (StringUtils.TRUE.equals(value) || StringUtils.FALSE.equals(value)) {
+                return Boolean.valueOf(value);
+            }
+            return null;
         }
 
         @Nullable
