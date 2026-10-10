@@ -34,13 +34,28 @@ final class NioReadBuffer extends ReadBuffer {
     private static final LeakTracker.Factory<NioReadBuffer> TRACKER_FACTORY = LeakTracker.Factory.forClass(NioReadBuffer.class);
 
     @Nullable
-    private final LeakTracker<NioReadBuffer> tracker = TRACKER_FACTORY.track(this);
+    private final LeakTracker<NioReadBuffer> tracker;
+    private final boolean tracked;
 
     private final ByteBuffer buffer;
     private boolean closed;
 
     NioReadBuffer(ByteBuffer buffer) {
+        this(buffer, true);
+    }
+
+    /**
+     * @param buffer  The data
+     * @param tracked Whether the buffer, and the buffers derived from it, are leak tracked
+     */
+    NioReadBuffer(ByteBuffer buffer, boolean tracked) {
         this.buffer = buffer;
+        this.tracked = tracked;
+        this.tracker = tracked ? TRACKER_FACTORY.track(this) : null;
+    }
+
+    private NioReadBuffer derive(ByteBuffer derived) {
+        return new NioReadBuffer(derived, tracked);
     }
 
     private void checkOpen() {
@@ -58,7 +73,7 @@ final class NioReadBuffer extends ReadBuffer {
     @Override
     public ReadBuffer duplicate() {
         checkOpen();
-        return new NioReadBuffer(buffer.duplicate());
+        return derive(buffer.duplicate());
     }
 
     @Override
@@ -69,14 +84,14 @@ final class NioReadBuffer extends ReadBuffer {
         }
         ByteBuffer slice = buffer.slice(buffer.position(), splitPosition);
         buffer.position(buffer.position() + splitPosition);
-        return new NioReadBuffer(slice);
+        return derive(slice);
     }
 
     @Override
     public ReadBuffer move() {
         checkOpen();
         close();
-        return new NioReadBuffer(buffer);
+        return derive(buffer);
     }
 
     @Override

@@ -11,7 +11,7 @@ class SameServerSpec extends Specification {
 
     void "#a and #b are the same server: #same"() {
         expect:
-        AbstractJdkHttpClient.sameServer(URI.create(a), URI.create(b)) == same
+        DefaultJdkHttpClient.sameServer(URI.create(a), URI.create(b)) == same
 
         where:
         a                           | b                           | same

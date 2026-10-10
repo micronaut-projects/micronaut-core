@@ -53,6 +53,7 @@ import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.ByteBodyElements;
 import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
+import io.micronaut.http.client.exceptions.HttpClientErrorDecoder;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
@@ -151,6 +152,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     protected final Logger log;
     @Nullable
     protected final LoadBalancer loadBalancer;
+    @Nullable
     protected final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
     protected final List<HttpFilterResolver.FilterEntry> clientFilterEntries;
     /**
@@ -161,6 +163,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     @Nullable
     protected final String informationalServiceId;
     protected final ConversionService conversionService;
+    @Nullable
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected MessageBodyHandlerRegistry handlerRegistry;
 
@@ -174,9 +177,9 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @param defaultLog             The logger, unless the configuration names one
      * @param contextPath            The context path prepended to relative request URIs, or {@code null}
      * @param loadBalancer           The load balancer of relative request URIs, or {@code null}
-     * @param mediaTypeCodecRegistry The codecs
+     * @param mediaTypeCodecRegistry The codecs, or {@code null}
      * @param handlerRegistry        The body readers and writers
-     * @param filterResolver         The resolver of the filters
+     * @param filterResolver         The resolver of the filters, or {@code null} for no filters
      * @param clientFilterEntries    The filter entries of this client, or {@code null} to resolve them
      * @param conversionService      The conversion service
      * @param informationalServiceId The service id of the client for its exceptions, or {@code null}
@@ -185,9 +188,9 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                                  Logger defaultLog,
                                  @Nullable String contextPath,
                                  @Nullable LoadBalancer loadBalancer,
-                                 MediaTypeCodecRegistry mediaTypeCodecRegistry,
+                                 @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
                                  MessageBodyHandlerRegistry handlerRegistry,
-                                 HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
+                                 @Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
                                  @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries,
                                  ConversionService conversionService,
                                  @Nullable String informationalServiceId) {
@@ -204,9 +207,14 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         this.handlerRegistry = handlerRegistry;
         this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(defaultLog);
         this.filterResolver = filterResolver;
-        this.clientFilterEntries = clientFilterEntries != null ? clientFilterEntries
-            : filterResolver.resolveFilterEntries(new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA));
-        this.noFilters = this.clientFilterEntries.isEmpty() && filterResolver.getClass() == DefaultHttpClientFilterResolver.class;
+        if (clientFilterEntries != null) {
+            this.clientFilterEntries = clientFilterEntries;
+        } else if (filterResolver != null) {
+            this.clientFilterEntries = filterResolver.resolveFilterEntries(new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA));
+        } else {
+            this.clientFilterEntries = List.of();
+        }
+        this.noFilters = filterResolver == null || this.clientFilterEntries.isEmpty() && filterResolver.getClass() == DefaultHttpClientFilterResolver.class;
         this.conversionService = conversionService;
         this.informationalServiceId = informationalServiceId;
         this.redirectSameOriginPreserveBodyHeaders = redirectFilteredHeaders(false, true);
@@ -233,6 +241,31 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                                              @Nullable Thread blockedThread,
                                              MutableHttpRequest<?> request,
                                              @Nullable LoadBalancerSelection selection);
+
+    /**
+     * Send one request of an exchange whose response body is read whole, see
+     * {@link #readFullResponse}, without filters and without following redirects: a transport may
+     * read the body into memory right away. By default, see {@link #send}.
+     *
+     * @param propagatedContext  The context propagated from the original client call
+     * @param preferredScheduler A reference holding the preferred scheduler for timeouts, which
+     *                           the transport may replace with the one of its connection
+     * @param blockedThread      The thread that blocks on the response, if any
+     * @param request            The request to send, with a resolved absolute URI
+     * @param selection          The selection of the load balancer for the request, or {@code null}
+     * @param headersReceived    Set by a transport that reads the body before the flow completes,
+     *                           once the response headers arrived: a timeout of the exchange then
+     *                           elapsed while the body was read
+     * @return The flow of the raw response
+     */
+    protected ExecutionFlow<R> sendBuffered(PropagatedContext propagatedContext,
+                                            AtomicReference<ScheduledExecutorService> preferredScheduler,
+                                            @Nullable Thread blockedThread,
+                                            MutableHttpRequest<?> request,
+                                            @Nullable LoadBalancerSelection selection,
+                                            AtomicBoolean headersReceived) {
+        return send(propagatedContext, preferredScheduler, blockedThread, request, selection);
+    }
 
     /**
      * Build the response of an exchange whose body was read, decoded into the body type, or the
@@ -300,7 +333,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     /**
      * @return The {@link MediaTypeCodecRegistry} used by this client
      */
-    public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
+    public @Nullable MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
         return mediaTypeCodecRegistry;
     }
 
@@ -510,10 +543,10 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 }
 
                 try {
-                    return new ResolvedTarget(server.resolve(includeContextPath ? ContextPathUtils.prepend(requestURI, contextPath) : requestURI), selection);
-                } catch (URISyntaxException e) {
+                    return new ResolvedTarget(resolveAgainst(server, requestURI, includeContextPath), selection);
+                } catch (RuntimeException e) {
                     selection.release();
-                    throw decorate(new HttpClientException("Failed to construct the request URI", e));
+                    throw e;
                 }
             }
         );
@@ -568,27 +601,52 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         @Nullable LoadBalancerSelection selection,
         BiFunction<MutableHttpRequest<?>, R, ? extends ExecutionFlow<? extends HttpResponse<?>>> readResponse
     ) {
+        return sendRequestWithRedirects(propagatedContext, preferredScheduler, blockedThread, request, selection, null, readResponse);
+    }
+
+    /**
+     * @param propagatedContext  The context propagated from the original client call
+     * @param preferredScheduler A reference holding the preferred scheduler for timeouts
+     * @param blockedThread      The thread that blocks on the response, if any
+     * @param request            The request to send
+     * @param selection          The selection of the load balancer for the request, or {@code null}
+     * @param bufferedHeaders    For an exchange whose response body is read whole, see
+     *                           {@link #sendBuffered}, else {@code null}. It is kept out of the
+     *                           request, which may be the object of the caller
+     * @param readResponse       Reads the response from the raw response
+     * @return A flow containing the response
+     */
+    private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirects(
+        PropagatedContext propagatedContext,
+        AtomicReference<ScheduledExecutorService> preferredScheduler,
+        @Nullable Thread blockedThread,
+        MutableHttpRequest<?> request,
+        @Nullable LoadBalancerSelection selection,
+        @Nullable AtomicBoolean bufferedHeaders,
+        BiFunction<MutableHttpRequest<?>, R, ? extends ExecutionFlow<? extends HttpResponse<?>>> readResponse
+    ) {
         if (informationalServiceId != null && BasicHttpAttributes.getServiceId(request).isEmpty()) {
             ClientAttributes.setServiceId(request, informationalServiceId);
         }
 
         List<GenericHttpFilter> filters;
-        if (noFilters) {
+        if (noFilters || filterResolver == null) {
             filters = List.of();
         } else {
             filters = filterResolver.resolveFilters(request, clientFilterEntries);
             FilterRunner.sortReverse(filters);
         }
 
+        URI resolvedUri = request.getUri();
         ExecutionFlow<HttpResponse<?>> flow;
         if (filters.isEmpty()) {
             // what the filter runner does without a filter
-            flow = sendFiltered(propagatedContext, preferredScheduler, blockedThread, request, selection, readResponse);
+            flow = sendFiltered(propagatedContext, preferredScheduler, blockedThread, resolvedUri, request, selection, bufferedHeaders, readResponse);
         } else {
             FilterRunner runner = new FilterRunner(filters) {
                 @Override
                 protected ExecutionFlow<HttpResponse<?>> provideResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
-                    return sendFiltered(propagatedContext, preferredScheduler, blockedThread, request, selection, readResponse);
+                    return sendFiltered(propagatedContext, preferredScheduler, blockedThread, resolvedUri, request, selection, bufferedHeaders, readResponse);
                 }
             };
             flow = runner.run(request, propagatedContext);
@@ -598,6 +656,10 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         }
         // the selection ends with the exchange, whether it was sent, failed before, was
         // cancelled, or a filter answered without it: unless the response handling took it over
+        return releaseWhenDone(flow, selection);
+    }
+
+    private static ExecutionFlow<HttpResponse<?>> releaseWhenDone(ExecutionFlow<HttpResponse<?>> flow, LoadBalancerSelection selection) {
         DelayedExecutionFlow<HttpResponse<?>> released = DelayedExecutionFlow.create();
         flow.onComplete((response, failure) -> {
             selection.releaseUnclaimed();
@@ -618,21 +680,92 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         PropagatedContext propagatedContext,
         AtomicReference<ScheduledExecutorService> preferredScheduler,
         @Nullable Thread blockedThread,
+        URI resolvedUri,
         HttpRequest<?> request,
         @Nullable LoadBalancerSelection selection,
+        @Nullable AtomicBoolean bufferedHeaders,
         BiFunction<MutableHttpRequest<?>, R, ? extends ExecutionFlow<? extends HttpResponse<?>>> readResponse
     ) {
         try {
-            return propagatedContext.propagate(() -> sendRequestWithRedirectsNoFilter(
-                propagatedContext,
-                preferredScheduler,
-                blockedThread,
-                MutableHttpRequestWrapper.wrapIfNecessary(conversionService, request),
-                selection,
-                readResponse
-            ));
+            MutableHttpRequest<?> filtered = MutableHttpRequestWrapper.wrapIfNecessary(conversionService, request);
+            // a filter may have changed the URI of the request
+            return afterFilters(resolvedUri, selection, filtered).flatMap(sent -> {
+                ExecutionFlow<HttpResponse<?>> sending = propagatedContext.propagate(() -> sendRequestWithRedirectsNoFilter(
+                    propagatedContext,
+                    preferredScheduler,
+                    blockedThread,
+                    sent.uri().equals(filtered.getUri()) ? filtered : filtered.uri(sent.uri()),
+                    sent.selection(),
+                    bufferedHeaders,
+                    readResponse
+                ));
+                LoadBalancerSelection other = sent.selection();
+                // a selection made for the filtered request ends with its exchange too
+                return other == null || other == selection ? sending : releaseWhenDone(sending, other);
+            });
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
+        }
+    }
+
+    /**
+     * The target of a request once the client filters ran, since a filter may have changed its
+     * URI: the request stays with the instance the load balancer selected as long as it goes to
+     * the same scheme, host and port, and the load balancer is not asked again.
+     *
+     * @param resolved  The URI resolved before the filters ran
+     * @param selection The selection of the load balancer before the filters ran, or {@code null}
+     * @param request   The request the filters passed on
+     * @return The target the request is sent to
+     */
+    protected ExecutionFlow<ResolvedTarget> afterFilters(URI resolved, @Nullable LoadBalancerSelection selection, HttpRequest<?> request) {
+        URI filtered = request.getUri();
+        if (filtered.equals(resolved)) {
+            return ExecutionFlow.just(new ResolvedTarget(resolved, selection));
+        }
+        if (filtered.getScheme() != null) {
+            return ExecutionFlow.just(new ResolvedTarget(filtered, sameServer(filtered, resolved) ? selection : null));
+        }
+        if (selection == null) {
+            return resolveRequestURI(request);
+        }
+        try {
+            return ExecutionFlow.just(new ResolvedTarget(resolveAgainst(selection.instance(), filtered, true), selection));
+        } catch (RuntimeException e) {
+            return ExecutionFlow.error(e);
+        }
+    }
+
+    /**
+     * @param a The first URI
+     * @param b The second URI
+     * @return Whether both URIs name the same server: scheme and host ignoring case, and port,
+     * the default port of the scheme when there is none
+     */
+    protected static boolean sameServer(URI a, URI b) {
+        return a.getScheme() != null && a.getScheme().equalsIgnoreCase(b.getScheme())
+            && a.getHost() != null && a.getHost().equalsIgnoreCase(b.getHost())
+            && effectivePort(a) == effectivePort(b);
+    }
+
+    private static int effectivePort(URI uri) {
+        if (uri.getPort() != -1) {
+            return uri.getPort();
+        }
+        return "https".equalsIgnoreCase(uri.getScheme()) || "wss".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
+    }
+
+    /**
+     * @param instance           The service instance
+     * @param requestUri         The relative request URI
+     * @param includeContextPath Whether to prepend the context path of the client
+     * @return The request URI resolved against the instance
+     */
+    private URI resolveAgainst(ServiceInstance instance, URI requestUri, boolean includeContextPath) {
+        try {
+            return instance.resolve(includeContextPath ? ContextPathUtils.prepend(requestUri, contextPath) : requestUri);
+        } catch (URISyntaxException e) {
+            throw decorate(new HttpClientException("Failed to construct the request URI", e));
         }
     }
 
@@ -642,14 +775,22 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         @Nullable Thread blockedThread,
         MutableHttpRequest<?> request,
         @Nullable LoadBalancerSelection selection,
+        @Nullable AtomicBoolean bufferedHeaders,
         BiFunction<MutableHttpRequest<?>, R, ? extends ExecutionFlow<? extends HttpResponse<?>>> readResponse
     ) {
-        return send(propagatedContext, preferredScheduler, blockedThread, request, selection).flatMap(byteBodyResponse -> {
+        ExecutionFlow<R> sending = bufferedHeaders == null
+            ? send(propagatedContext, preferredScheduler, blockedThread, request, selection)
+            : sendBuffered(propagatedContext, preferredScheduler, blockedThread, request, selection, bufferedHeaders);
+        return sending.flatMap(byteBodyResponse -> {
             // handle redirects or map the response bytes
             int code = byteBodyResponse.code();
             String location = byteBodyResponse.getHeaders().get(HttpHeaders.LOCATION);
-            if (code > 300 && code < 400 && configuration.isFollowRedirects() && request.getAttribute(NO_FOLLOW_REDIRECTS).isEmpty() && location != null) {
+            if (code > 300 && code < 400 && followsRedirects(request) && location != null) {
                 byteBodyResponse.close();
+                if (bufferedHeaders != null) {
+                    // the headers of the redirect are not those of the response
+                    bufferedHeaders.set(false);
+                }
 
                 MutableHttpRequest<Object> redirectRequest;
                 boolean isRedirectWithBody = code == 307 || code == 308;
@@ -667,12 +808,11 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 }
                 redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
                 // the per-exchange options apply to the whole exchange, redirects included
-                request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirectRequest.setAttribute(NO_DECOMPRESSION, noDecompression));
-                request.getAttribute(READ_IDLE_TIMEOUT).ifPresent(timeout -> redirectRequest.setAttribute(READ_IDLE_TIMEOUT, timeout));
+                copyRedirectAttributes(request, redirectRequest);
                 return resolveRedirectURI(request, redirectRequest)
                     .flatMap(target -> {
                         setRedirectHeaders(request, redirectRequest.uri(target.uri()), preserveBody);
-                        return sendRequestWithRedirects(propagatedContext, blockedThread, redirectRequest.uri(target.uri()), target.selection(), readResponse);
+                        return sendRequestWithRedirects(propagatedContext, new AtomicReference<>(), blockedThread, redirectRequest.uri(target.uri()), target.selection(), bufferedHeaders, readResponse);
                     })
                     .onErrorResume(e -> {
                         // the body went to the server that redirected, it is not unsent
@@ -690,6 +830,30 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 return readResponse.apply(request, byteBodyResponse);
             }
         });
+    }
+
+    /**
+     * Whether the redirects of a request are followed here: by default, as configured, unless the
+     * request disables them, see {@link #NO_FOLLOW_REDIRECTS}. A transport whose client follows
+     * the redirects itself returns {@code false}.
+     *
+     * @param request The request
+     * @return Whether its redirects are followed
+     */
+    protected boolean followsRedirects(MutableHttpRequest<?> request) {
+        return configuration.isFollowRedirects() && request.getAttribute(NO_FOLLOW_REDIRECTS).isEmpty();
+    }
+
+    /**
+     * Copy the attributes of a request that apply to the whole exchange to the request of a
+     * redirect.
+     *
+     * @param request  The request that was redirected
+     * @param redirect The request of the redirect
+     */
+    protected void copyRedirectAttributes(MutableHttpRequest<?> request, MutableHttpRequest<?> redirect) {
+        request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirect.setAttribute(NO_DECOMPRESSION, noDecompression));
+        request.getAttribute(READ_IDLE_TIMEOUT).ifPresent(timeout -> redirect.setAttribute(READ_IDLE_TIMEOUT, timeout));
     }
 
     private void setRedirectHeaders(@Nullable HttpRequest<?> request,
@@ -742,6 +906,27 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         return headers;
     }
 
+    /**
+     * Read the whole body of a response, and build the response of the exchange, see
+     * {@link #fullResponse}.
+     *
+     * @param response   The raw response
+     * @param bodyType   The body type, or {@code null}
+     * @param errorType  The error type
+     * @param readFailure Maps a failure to read the body
+     * @param <O>        The body type
+     * @param <E>        The error type
+     * @return The flow of the response, or of the error of an error status
+     */
+    protected <O, E> ExecutionFlow<? extends HttpResponse<O>> readFullResponse(R response,
+                                                                              @Nullable Argument<O> bodyType,
+                                                                              Argument<E> errorType,
+                                                                              Function<Throwable, Throwable> readFailure) {
+        return InternalByteBody.bufferFlow(response.byteBody())
+            .onErrorResume(t -> ExecutionFlow.error(readFailure.apply(t)))
+            .flatMap(av -> fullResponse(bodyType, errorType, response, av));
+    }
+
     // ---- errors
 
     /**
@@ -786,6 +971,66 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             }
         }
         return result;
+    }
+
+    /**
+     * Whether the body of a response is decoded into the body type: unless the status is an
+     * error, which fails the exchange, except when the body type is the error type and the client
+     * does not fail on an error status.
+     *
+     * @param code      The status of the response
+     * @param bodyType  The body type, or {@code null}
+     * @param errorType The error type
+     * @param <O>       The body type
+     * @param <E>       The error type
+     * @return Whether the body is decoded into the body type
+     */
+    protected <O, E> boolean convertsWithBodyType(int code, @Nullable Argument<O> bodyType, Argument<E> errorType) {
+        if (code < 400) {
+            return true;
+        }
+        return !configuration.isExceptionOnErrorStatus() && bodyType != null && bodyType.equalsType(errorType);
+    }
+
+    /**
+     * The failure of an exchange whose response has an error status: its body is decoded into
+     * the error type.
+     *
+     * @param errorType The error type, or {@code null}
+     * @param response  The response
+     * @return The failure
+     */
+    protected HttpClientResponseException errorStatusException(@Nullable Argument<?> errorType, HttpResponse<?> response) {
+        if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
+            return decorate(new HttpClientResponseException(
+                response.reason(),
+                null,
+                response,
+                new HttpClientErrorDecoder() {
+                    @Override
+                    public Argument<?> getErrorType(MediaType mediaType) {
+                        return errorType;
+                    }
+                }
+            ));
+        }
+        return decorate(new HttpClientResponseException(response.reason(), response));
+    }
+
+    /**
+     * The failure of a streaming exchange whose response has an error status, with the error body
+     * decoded into the error type.
+     *
+     * @param errorType The error type
+     * @param response  The raw response
+     * @param body      The error body, which this takes over
+     * @return The flow of the failure
+     */
+    private ExecutionFlow<HttpResponse<?>> errorStatusResponse(Argument<?> errorType, R response, CloseableAvailableByteBody body) {
+        // a transport may return the response of an error status of an exchange, e.g. when the
+        // client does not fail on an error status: a stream fails in any case
+        return streamingErrorResponse(errorType, response, body)
+            .flatMap(full -> ExecutionFlow.error(errorStatusException(errorType, full)));
     }
 
     /**
@@ -879,28 +1124,21 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 blockedThread,
                 mutableRequest,
                 target.selection(),
+                headersReceived,
                 (req, resp) -> {
                     headersReceived.set(true);
-                    return InternalByteBody.bufferFlow(resp.byteBody())
-                        .onErrorResume(t -> {
-                            headersReceived.set(false);
-                            return ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t));
-                        })
-                        .flatMap(av -> {
-                            headersReceived.set(false);
-                            return fullResponse(bodyType, errorType, resp, av);
-                        });
+                    return readFullResponse(resp, bodyType, errorType, t -> {
+                        headersReceived.set(false);
+                        return handleResponseError(mutableRequest, target.instance(), t);
+                    }).map(r -> {
+                        headersReceived.set(false);
+                        return r;
+                    });
                 }
             ).map(r -> (HttpResponse<O>) r);
         });
 
-        Duration requestTimeout = configuration.getRequestTimeout();
-        if (requestTimeout == null) {
-            // for compatibility
-            requestTimeout = configuration.getReadTimeout()
-                .filter(d -> !d.isNegative())
-                .map(d -> d.plusSeconds(1)).orElse(null);
-        }
+        Duration requestTimeout = requestTimeout();
         if (requestTimeout != null) {
             if (!requestTimeout.isNegative()) {
                 flow = flow.timeout(requestTimeout, Objects.requireNonNull(scheduler.get()), null)
@@ -913,6 +1151,23 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             }
         }
         return flow;
+    }
+
+    /**
+     * The timeout of an exchange whose response body is read whole: the
+     * {@link HttpClientConfiguration#getRequestTimeout() request timeout}, or, when none is
+     * configured, for compatibility, the read timeout plus one second.
+     *
+     * @return The timeout, or {@code null} for none
+     */
+    protected @Nullable Duration requestTimeout() {
+        Duration requestTimeout = configuration.getRequestTimeout();
+        if (requestTimeout != null) {
+            return requestTimeout;
+        }
+        return configuration.getReadTimeout()
+            .filter(d -> !d.isNegative())
+            .map(d -> d.plusSeconds(1)).orElse(null);
     }
 
     @Override
@@ -1035,14 +1290,16 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
 
     /**
      * The pieces of the body of {@link #dataStream} and {@link #exchangeStream}: the lines of an
-     * event stream that the request accepts, or the pieces of the body as they are read.
+     * event stream that the request accepts, or the pieces of the body as they are read. As a
+     * publisher, the body is read as it arrives, with the bytes that wait for the subscriber
+     * limited by {@code max-content-length}.
      *
      * @param body  The body, which the pieces take over
      * @param lines Whether the body is split into the lines of an event stream
      * @return The pieces of the body
      */
     protected BodyElements<ByteBuffer<?>> streamPieces(CloseableByteBody body, boolean lines) {
-        return lines ? BodyPieces.lines(body, sizeLimits().maxBufferSize()) : BodyPieces.elements(body);
+        return new StreamedPieces(body, lines, sizeLimits().maxBufferSize());
     }
 
     /**
@@ -1053,6 +1310,10 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @return The publisher of the pieces, for one subscriber
      */
     protected Publisher<ByteBuffer<?>> streamPiecesPublisher(BodyElements<ByteBuffer<?>> pieces) {
+        if (pieces instanceof StreamedPieces streamed) {
+            return streamed.publisher();
+        }
+        // e.g. the empty body of a response without one
         return publisher(pieces);
     }
 
@@ -1174,7 +1435,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                     // the error body is decoded into the error type, as for exchange
                     return InternalByteBody.bufferFlow(resp.byteBody())
                         .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t)))
-                        .flatMap(av -> streamingErrorResponse(errorType, resp, av));
+                        .flatMap(av -> errorStatusResponse(errorType, resp, av));
                 }
                 if (!hasBody(resp)) {
                     // no element
@@ -1407,7 +1668,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @return The flow value
      */
     @Nullable
-    protected static <T> T awaitFlow(ExecutionFlow<T> flow) {
+    public static <T> T awaitFlow(ExecutionFlow<T> flow) {
         T value;
         Throwable error;
         ImperativeExecutionFlow<T> complete = flow.tryComplete();
