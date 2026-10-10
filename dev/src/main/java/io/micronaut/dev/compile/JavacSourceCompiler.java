@@ -27,6 +27,7 @@ import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
 import java.io.IOException;
+import java.lang.module.ModuleFinder;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -144,7 +145,9 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
     private static final class ProcessorPathLoader extends URLClassLoader {
 
         /**
-         * The loaders of the packages of the JDK's modules that the platform loader does not define, by package.
+         * The loaders of the packages of the JDK's modules that the platform loader does not define, by package: only
+         * the modules of the run-time image, so that an application launched on the module path, whose modules are in
+         * the boot layer too, does not resolve its own packages from the launcher's loader.
          */
         private static final Map<String, ClassLoader> JDK_PACKAGES = jdkPackages();
 
@@ -172,10 +175,11 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
 
         private static Map<String, ClassLoader> jdkPackages() {
             ClassLoader platform = ClassLoader.getPlatformClassLoader();
+            ModuleFinder system = ModuleFinder.ofSystem();
             Map<String, ClassLoader> packages = new HashMap<>();
             for (Module module : ModuleLayer.boot().modules()) {
                 ClassLoader loader = module.getClassLoader();
-                if (loader != null && loader != platform) {
+                if (loader != null && loader != platform && system.find(module.getName()).isPresent()) {
                     for (String packageName : module.getPackages()) {
                         packages.put(packageName, loader);
                     }
