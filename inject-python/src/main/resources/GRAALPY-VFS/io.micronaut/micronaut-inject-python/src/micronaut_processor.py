@@ -29,6 +29,7 @@ ReturnDef = java.type("io.micronaut.python.processing.model.ReturnDef")
 TypeRef = java.type("io.micronaut.python.processing.model.TypeRef")
 ScriptDef = java.type("io.micronaut.python.processing.model.ScriptDef")
 SourceSpan = java.type("io.micronaut.python.processing.model.SourceSpan")
+PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
 SuperArgumentDef = java.type("io.micronaut.python.processing.model.SuperArgumentDef")
 _AnnotationTypes = java.type("io.micronaut.python.processing.util.PythonAnnotationTypes")
 _JavaTypes = java.type("io.micronaut.python.processing.util.PythonJavaTypes")
@@ -252,8 +253,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.local_annotation_source_loading = set()
         self.local_classes = set()  # Track class names defined in this file
         self.local_constant_values = {}  # Track local class constants visible to annotation expressions
-        self.unresolved_member_errors = []  # Decorator members referencing a Java class member that does not exist
         self.annotation_instance_assignments = {}  # Module-level names bound to an annotation call, to diagnose Annotated[..., NAME]
+        self.diagnostics = []  # The problems found in the module, as located PythonDiagnostic values
         self.current_class_nested_types = {}  # Track nested classes visible in the current class body
         # Script handling
         self.current_script = None
@@ -668,8 +669,6 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     stmt.name for stmt in node.body if isinstance(stmt, ast.ClassDef)
                 )
                 result = super().visit(node)
-                if self.unresolved_member_errors:
-                    raise ValueError(self.unresolved_member_errors[0])
 
                 # A MicronautTest module owns all of its top-level functions. Other
                 # scripts retain the existing decorated-function-only behavior.
@@ -1406,10 +1405,12 @@ class MicronautAstVisitor(ast.NodeVisitor):
         elif self.current_class is not None and is_static_method(func_node):
             unsupported = "a static or class method"
         if unsupported is not None:
-            self.unresolved_member_errors.append(
+            self.diagnostics.append(PythonDiagnostic.error(
+                "injected-parameter",
                 f"The parameter [{arg.arg}] of [{func_node.name}] is injected with Inject(), which {unsupported} "
-                f"does not support: inject the bean into an attribute instead"
-            )
+                f"does not support: inject the bean into an attribute instead",
+                self._span(arg)
+            ))
             return False
         name = f"micronaut_inject_{func_node.name}_{arg.arg}"
         annotation = ast.unparse(arg.annotation) if arg.annotation is not None else ""
@@ -1435,10 +1436,12 @@ class MicronautAstVisitor(ast.NodeVisitor):
             decorator = self._parse_metadata_call(node)
             return [decorator] if decorator is not None else None
         if isinstance(node, (ast.Name, ast.Attribute)) and self._names_annotation(node):
-            self.unresolved_member_errors.append(
+            self.diagnostics.append(PythonDiagnostic.error(
+                "annotation-not-called",
                 f"The annotation [{ast.unparse(node)}] is a default value without being called: write "
-                f"[{ast.unparse(node)}()] to apply it to the parameter or attribute as a marker"
-            )
+                f"[{ast.unparse(node)}()] to apply it to the parameter or attribute as a marker",
+                self._span(node)
+            ))
         return None
 
     def _names_annotation(self, node):
@@ -1620,12 +1623,14 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             if (decorator_reference in self.annotation_instance_assignments
                                     and decorator_reference not in self.known_decorators
                                     and decorator_reference not in self.imported_types):
-                                self.unresolved_member_errors.append(
+                                self.diagnostics.append(PythonDiagnostic.error(
+                                    "annotation-alias",
                                     f"[{decorator_reference}] in Annotated[...] is a name bound to "
                                     f"[{self.annotation_instance_assignments[decorator_reference]}], not an annotation. "
                                     "Annotations are read from source and never evaluated, so this one would be "
-                                    "dropped, taking any constraint it carries with it. Write the annotation inline."
-                                )
+                                    "dropped, taking any constraint it carries with it. Write the annotation inline.",
+                                    self._span(metadata)
+                                ))
                                 continue
                             decorator = self.to_decorator_from_reference(decorator_reference)
                             decorators.append(decorator)
@@ -2809,18 +2814,22 @@ def convert_annotation_member_value(annotation_name, member_name, node, visitor=
             # AST. Left alone that dump becomes the member's value, so the annotation carries nonsense --
             # a computed `defaultValue` publishes the parameter as required, a computed constraint bound
             # stops constraining. Say so rather than emit it.
-            visitor.unresolved_member_errors.append(
+            visitor.diagnostics.append(PythonDiagnostic.error(
+                "annotation-member-constant",
                 f"The value [{ast.unparse(node)}] of member [{member_name}] of @{annotation_name} is not a "
                 "compile-time constant. Annotation arguments are read from source and never evaluated; "
-                "use a literal."
-            )
+                "use a literal.",
+                visitor._span(node) if hasattr(visitor, "_span") else None
+            ))
             return ast.unparse(node)
         return value
     except UnresolvedAnnotationMemberError as e:
-        # reported once the module is visited; the value stays the dotted name meanwhile
-        visitor.unresolved_member_errors.append(
-            f"Cannot resolve the value [{ast.unparse(node)}] of member [{member_name}] of @{annotation_name}: {e}"
-        )
+        # reported with the module's other problems; the value stays the dotted name meanwhile
+        visitor.diagnostics.append(PythonDiagnostic.error(
+            "unresolved-annotation-member",
+            f"Cannot resolve the value [{ast.unparse(node)}] of member [{member_name}] of @{annotation_name}: {e}",
+            visitor._span(node) if hasattr(visitor, "_span") else None
+        ))
         return ast.unparse(node)
 
 
