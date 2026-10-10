@@ -37,14 +37,16 @@ class ConfigurationReceivedSpec extends Specification {
         given:
         ApplicationContext first = start(List.of())
         ProvidedClient provided = first.getBean(ProvidedClient)
+        ChainedClient chained = first.getBean(ChainedClient)
         PlainClient plain = first.getBean(PlainClient)
         ListenedClient listened = first.getBean(ListenedClient)
 
         when:
         Collection<BeanRegistration<?>> retained = stopRetaining(first, { false })
 
-        then: "the provider would resolve through the stopped context"
+        then: "the provider would resolve through the stopped context, received directly or through prototypes"
         !retained*.bean.any { it.is(provided) }
+        !retained*.bean.any { it.is(chained) }
 
         and: "the beans whose configuration received nothing bound to the context are kept, without the configuration"
         retained*.bean.any { it.is(plain) }

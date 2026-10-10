@@ -5968,7 +5968,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             }
             for (BeanDependencyGraph.BeanDependency edge : dependencyGraph.dependenciesOf(held)) {
                 BeanDefinition<?> dependency = edge.dependency();
-                if (isInterceptor(dependency)) {
+                if (!edge.lazy() && held.hasStereotype(INTRODUCTION_TYPE) && isInterceptor(dependency)) {
                     // the advice of a configuration interface's introduction, which reads the environment for it: it
                     // serves the configuration bean's own methods and is reached only through the configuration bean
                     continue;
@@ -5988,7 +5988,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
                     bound = collectRetentionClosure(registration, configuration, received, visited);
                 } else if (configuration.leavesOut(dependency, true)) {
                     continue;
-                } else if (isContextBound(dependency)) {
+                } else if (isContextBound(dependency, configuration, Collections.newSetFromMap(new IdentityHashMap<>()))) {
                     return "the configuration [" + held.getBeanType().getName() + "] it was made from holds a [" + dependency.getBeanType().getName() + "] bound to this context";
                 } else {
                     bound = collectRetentionClosure(dependency, configuration, received, visited);
@@ -6022,10 +6022,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     }
 
     /**
-     * Whether a definition's beans are bound to this context by the definition alone: a proxy, or one that received
-     * a provider, a proxy, or what the context owns.
+     * Whether a prototype definition's beans are bound to this context: a proxy, or one that received a provider, a
+     * proxy, or what the context owns, directly or through the prototypes it received. The singletons it received
+     * are examined as members of a closure.
      */
-    private boolean isContextBound(BeanDefinition<?> definition) {
+    private boolean isContextBound(BeanDefinition<?> definition, ClosureConfiguration configuration, Set<Object> visited) {
+        if (!visited.add(definition)) {
+            return false;
+        }
         if (definition.isProxy()) {
             return true;
         }
@@ -6037,6 +6041,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
         if (dependencyGraph != null) {
             for (BeanDependencyGraph.BeanDependency dependency : dependencyGraph.dependenciesOf(definition)) {
                 if (dependency.lazy() || dependency.dependency().isProxy()) {
+                    return true;
+                }
+                BeanDefinition<?> received = dependency.dependency();
+                if (!received.isSingleton() && !configuration.leavesOut(received, true) && isContextBound(received, configuration, visited)) {
                     return true;
                 }
             }
