@@ -117,12 +117,15 @@ class AsyncProxyHttpClientTest {
     @ParameterizedTest
     @ValueSource(strings = {"injected", "toAsyncProxy", "reactive adapter"})
     void cancellingTheStageCancelsTheExchange(String kind) throws Exception {
-        try (ServerUnderTest server = server()) {
+        try (ServerUnderTest server = server(); RawUpstream upstream = new RawUpstream()) {
             AsyncProxyHttpClient client = client(server, kind);
-            CompletionStage<MutableHttpResponse<?>> stage = client.proxy(HttpRequest.GET(server.getURL().get() + "/async-proxy-client/host"));
-            stage.toCompletableFuture().cancel(true);
-            Assertions.assertTrue(stage.toCompletableFuture().isDone());
-            // the client goes on
+            CompletionStage<MutableHttpResponse<?>> stage = client.proxy(HttpRequest.GET(upstream.uri("/pending")));
+            RawUpstream.Connection connection = upstream.nextConnection(10);
+            Assertions.assertNotNull(connection);
+            Assertions.assertTrue(connection.awaitRequest(10));
+            Assertions.assertTrue(stage.toCompletableFuture().cancel(true));
+            Assertions.assertTrue(stage.toCompletableFuture().isCancelled());
+            Assertions.assertTrue(connection.awaitClosed(10), "Cancellation must abort the upstream exchange");
             try (ByteBodyHttpResponse<?> response = proxy(client, HttpRequest.GET(server.getURL().get() + "/async-proxy-client/host"), ProxyRequestOptions.getDefault())) {
                 Assertions.assertEquals(200, response.code());
             }

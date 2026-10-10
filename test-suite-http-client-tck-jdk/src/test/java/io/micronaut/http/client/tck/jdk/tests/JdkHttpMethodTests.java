@@ -19,7 +19,6 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 @ExcludeClassNamePatterns({
     "io.micronaut.http.client.tck.tests.ContinueTest", // Unsupported body type errors
     "io.micronaut.http.client.tck.tests.RawTest", // There's no raw client for the JDK client
-    "io.micronaut.http.client.tck.tests.AsyncProxyHttpClientRelayTest", // The server writes the relayed response on a thread of the JDK client, which does not inherit the resource scope of the TCK leak detector, and only logs that failure
     "io.micronaut.http.client.tck.tests.DecompressionConfigTest", // Netty-specific decompression behavior; not applicable to JDK client
     "io.micronaut.http.client.tck.tests.RedirectHeaderCopyTest", // The JDK client does not send the Proxy-Authorization header to a server that is not a proxy
 })
