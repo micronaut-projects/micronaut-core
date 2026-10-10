@@ -40,7 +40,7 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
     /**
      * A load balancer that ignores the reported outcomes.
      */
-    protected AbstractRoundRobinLoadBalancer() {
+    public AbstractRoundRobinLoadBalancer() {
         this(null);
     }
 
