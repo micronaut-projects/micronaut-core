@@ -29,6 +29,7 @@ import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.condition.Failure;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.ConfigurationPath;
+import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.event.BeanCreatedEvent;
@@ -52,7 +53,17 @@ import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.context.exceptions.NonUniqueBeanException;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.context.reload.ClassChangeEvent;
+import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.scope.BeanCreationContext;
+import io.micronaut.context.watch.ClassChangeWatchRequest;
+import io.micronaut.context.watch.ConfigurationChange;
+import io.micronaut.context.watch.ConfigurationWatchRequest;
+import io.micronaut.context.watch.DefinitionWatchRequest;
+import io.micronaut.context.watch.MethodWatchRequest;
+import io.micronaut.context.watch.ReloadingConfigurationWatcher;
+import io.micronaut.context.watch.ResourceChange;
+import io.micronaut.context.watch.ResourceWatchRequest;
 import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
@@ -163,12 +174,13 @@ import java.util.stream.StreamSupport;
 @Internal
 @NextMajorVersion("Remove public in v6")
 @SuppressWarnings("MagicNumber")
-public sealed class DefaultBeanContext implements ConfigurableBeanContext permits DefaultApplicationContext {
+public sealed class DefaultBeanContext implements ConfigurableBeanContext, WatchableBeanContext permits DefaultApplicationContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
     private static final String ARGUMENT_DEFINITION = "definition";
+    private static final String ARGUMENT_CHANGE = "change";
     private static final String AROUND_TYPE = "io.micronaut.aop.Around";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     /**
@@ -214,6 +226,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     final BeanResolutionTraceMode traceMode;
     final Set<String> tracePatterns;
     final Map<BeanIdentifier, BeanRegistration<?>> singlesInCreation = new ConcurrentHashMap<>(5);
+    private final BeanWatchRegistry watches = new BeanWatchRegistry(this);
 
     protected final SingletonScope singletonScope = new SingletonScope();
 
@@ -250,6 +263,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private final Set<Class<?>> thisInterfaces = CollectionUtils.setOf(
         BeanDefinitionRegistry.class,
         BeanContext.class,
+        WatchableBeanContext.class,
         AnnotationMetadataResolver.class,
         BeanLocator.class,
         ExecutionHandleLocator.class,
@@ -276,6 +290,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private final boolean eventsEnabled;
     private final boolean eagerBeansEnabled;
+    /**
+     * Whether the startup pass has fed the executable method processors: a processor recreated before it, such as by
+     * the first batch of a watch, is fed by that pass, not again by {@link #recreateBean(Object)}.
+     */
+    private volatile boolean startupMethodsProcessed;
     /**
      * The recorded dependency graph, null when the context does not track dependencies. Decided by the configuration
      * as the context is constructed, or by its environment as it starts (see {@link #isBeanDependencyTrackingEnabledOnStart()}),
@@ -595,6 +614,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             beanConfigurations.clear();
             disabledConfigurations.clear();
             singletonScope.clear();
+            watches.clear();
+            startupMethodsProcessed = false;
             attributes.clear();
             beanInitializedEventListeners = null;
             beanCreationEventListeners = null;
@@ -627,6 +648,258 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return findBeanDefinitionInternal(Argument.of(type), null)
             .map(AnnotationMetadataProvider::getAnnotationMetadata)
             .orElse(AnnotationMetadata.EMPTY_METADATA);
+    }
+
+    @Override
+    public <T> DefinitionWatchRequest<T> definitions(Argument<T> beanType) {
+        ArgumentUtils.requireNonNull("beanType", beanType);
+        return new BeanWatchRequests.DefinitionRequest<>(watches, beanType);
+    }
+
+    @Override
+    public <A extends Annotation> MethodWatchRequest<A> methods(Class<A> annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
+        return new BeanWatchRequests.MethodRequest<>(watches, annotationType, null, null);
+    }
+
+    @Override
+    public ConfigurationWatchRequest configuration() {
+        return new BeanWatchRequests.ConfigurationRequest(watches, null);
+    }
+
+    @Override
+    public ConfigurationWatchRequest configuration(String prefix) {
+        ArgumentUtils.requireNonNull("prefix", prefix);
+        return new BeanWatchRequests.ConfigurationRequest(watches, prefix);
+    }
+
+    @Override
+    public ResourceWatchRequest resources(ResourceKind kind) {
+        ArgumentUtils.requireNonNull("kind", kind);
+        return new BeanWatchRequests.ResourceRequest(watches, kind);
+    }
+
+    @Override
+    public ClassChangeWatchRequest classChanges() {
+        return new BeanWatchRequests.ClassChangeRequest(watches, this::isDevelopmentMode);
+    }
+
+    /**
+     * @return Whether the context runs in development mode, the only mode in which classes change
+     */
+    private boolean isDevelopmentMode() {
+        if (this instanceof PropertyResolver propertyResolver) {
+            return DevelopmentMode.isEnabled(propertyResolver);
+        }
+        return DevelopmentMode.isEnabledBySystemProperty();
+    }
+
+    /**
+     * Delivers a change of definitions to the watches: the removed definitions are no longer resolvable,
+     * the added ones are. A development launcher calls this once per reload, after swapping the definitions.
+     *
+     * @param removed The definitions retired
+     * @param added The definitions added
+     */
+    @Internal
+    @Experimental
+    public void notifyDefinitionChange(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
+        watches.definitionsChanged(removed, added);
+    }
+
+    /**
+     * Delivers a configuration change to the watches whose prefix it touches. The configuration refresh
+     * calls this after rebinding the configuration beans; a watch answering
+     * {@link ReloadingConfigurationWatcher.Outcome#RECREATE} has its bean recreated before this returns.
+     *
+     * @param change The change
+     * @return The outcomes of the watches delivered to
+     */
+    @Internal
+    @Experimental
+    public List<ReloadingConfigurationWatcher.Outcome> notifyConfigurationChange(ConfigurationChange change) {
+        ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
+        return watches.configurationChanged(change);
+    }
+
+    /**
+     * Delivers a resource change to the watches its kind and files concern. An initial change is kept
+     * as the state of its kind, which a watch registered later receives as its first batch.
+     *
+     * @param change The change
+     */
+    @Internal
+    @Experimental
+    public void notifyResourceChange(ResourceChange change) {
+        ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
+        watches.resourcesChanged(change);
+    }
+
+    /**
+     * Delivers a class change to the class change watches. The event publisher calls this for every
+     * {@link ClassChangeEvent} it publishes, ahead of the listeners of the event.
+     *
+     * @param change The change
+     */
+    @Internal
+    @Experimental
+    public void notifyClassChange(ClassChangeEvent change) {
+        ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
+        watches.classesChanged(change);
+    }
+
+    /**
+     * @return Whether a class change watch is registered and active, so that a publisher of class changes is not empty
+     */
+    @Internal
+    @Experimental
+    public boolean hasClassChangeWatches() {
+        return watches.hasClassChangeWatches();
+    }
+
+    /**
+     * The processors fed through an adapter, which see additions only and cannot follow a reload.
+     *
+     * @return The adapted processors
+     */
+    @Internal
+    @Experimental
+    public Collection<Object> adaptedProcessors() {
+        return watches.adaptedProcessors();
+    }
+
+    @Override
+    public boolean recreate(Object bean) {
+        Objects.requireNonNull(bean, "bean");
+        // without the graph the dependents are unknown, and would keep the destroyed instance
+        return dependencyGraph != null && isRecreatable(singletonScope.findBeanRegistration(bean)) && recreateBean(bean);
+    }
+
+    @Override
+    public <T> boolean recreate(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        Objects.requireNonNull(beanType, "beanType");
+        if (dependencyGraph == null) {
+            return false;
+        }
+        BeanDefinition<T> definition = findBeanDefinition(beanType, qualifier).orElse(null);
+        if (definition == null) {
+            return false;
+        }
+        BeanRegistration<T> held = singletonScope.findBeanRegistration(definition);
+        if (held == null || !isRecreatable(held)) {
+            return false;
+        }
+        return recreateBean(held.bean);
+    }
+
+    /**
+     * Whether a registration is a singleton of the singleton scope that its definition can create anew: a bean of a
+     * custom scope stays with its scope, and the definition of a singleton registered at runtime may only hand back the
+     * instance it was given, which would be destroyed and returned again.
+     */
+    private static boolean isRecreatable(@Nullable BeanRegistration<?> registration) {
+        return registration != null && registration.bean != null && !(registration.getBeanDefinition() instanceof RuntimeBeanDefinition<?>);
+    }
+
+    /**
+     * Replaces a singleton with a new instance of its definition, destroying first the beans that received
+     * it, as the dependency graph records, so that they are created again on top of the new instance.
+     *
+     * <p>An {@link ExecutableMethodProcessor} among them is created again at once, as the startup pass created it,
+     * since nothing else would ask for it, and is given the methods the startup pass gave it.</p>
+     *
+     * @param bean The bean to recreate
+     * @return Whether the context held the bean and replaced it; a prototype is nobody's to replace
+     */
+    boolean recreateBean(Object bean) {
+        BeanRegistration<Object> registration = findBeanRegistration(bean).orElse(null);
+        if (registration == null) {
+            return false;
+        }
+        BeanDefinition<Object> definition = registration.getBeanDefinition();
+        List<BeanDefinition<Object>> processors = new ArrayList<>(2);
+        if (dependencyGraph != null) {
+            List<BeanDefinition<?>> dependents = new ArrayList<>(dependencyGraph.transitiveDependentsOf(definition));
+            Collections.reverse(dependents);
+            for (BeanDefinition<?> dependent : dependents) {
+                BeanRegistration<Object> held = singletonScope.findBeanRegistration((BeanDefinition<Object>) dependent);
+                if (held != null) {
+                    if (held.bean instanceof ExecutableMethodProcessor<?> && !processors.contains(held.getBeanDefinition())) {
+                        processors.add(held.getBeanDefinition());
+                    }
+                    destroyBean(held);
+                }
+            }
+        }
+        destroyBean(registration);
+        Object recreated = getBean(definition);
+        if (recreated instanceof ExecutableMethodProcessor<?> processor) {
+            processRecreated(definition, processor);
+        }
+        // in the order they were created, the reverse of the order they were destroyed in
+        Collections.reverse(processors);
+        for (BeanDefinition<Object> processorDefinition : processors) {
+            if (processorDefinition != definition && getBean(processorDefinition) instanceof ExecutableMethodProcessor<?> processor) {
+                processRecreated(processorDefinition, processor);
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Gives a processor created again by {@link #recreateBean(Object)} the methods the startup pass gives a
+     * processor of its annotation: those of the processed definitions whose executable stereotypes include it. The
+     * adapter the processor was given as it was created sees later additions only, so nothing is given twice.
+     *
+     * <p>A deprecated processor, one whose annotation is not processed on startup, was also given, as it was created,
+     * every method of the definitions whose class carries its annotation, by the legacy
+     * {@link ExecutableMethodProcessorListener}. Those definitions, selected as the listener selects them, are skipped
+     * here, so that the processor is given only what the listener did not give it, such as methods carrying the
+     * annotation in a class that does not.</p>
+     *
+     * @param processorDefinition The definition of the processor
+     * @param processor The new processor
+     */
+    @SuppressWarnings({"java:S3776", "unchecked", "rawtypes"})
+    private void processRecreated(BeanDefinition<?> processorDefinition, ExecutableMethodProcessor<?> processor) {
+        if (!startupMethodsProcessed) {
+            // the startup pass has not run yet, and gives the processor its methods when it does, or never runs, without
+            // eager beans
+            return;
+        }
+        List<Argument<?>> typeArguments = processorDefinition.getTypeArguments(ExecutableMethodProcessor.class);
+        if (typeArguments.size() != 1) {
+            return;
+        }
+        Class<?> annotationType = typeArguments.get(0).getType();
+        Set<BeanDefinition<?>> givenAsCreated = processorDefinition.hasAnnotation(Deprecated.class)
+            ? new HashSet<>(getBeanDefinitions(Qualifiers.byStereotype((Class) annotationType)))
+            : Set.of();
+        boolean started = false;
+        try {
+            for (BeanDefinition<Object> processed : processedBeanDefinitions()) {
+                if (givenAsCreated.contains(processed)) {
+                    // the legacy listener gave the new processor every method of this definition as it created it
+                    continue;
+                }
+                for (ExecutableMethod<Object, ?> method : processed.getExecutableMethodsForProcessing()) {
+                    if (!method.getAnnotationMetadata().getAnnotationTypesByStereotype(Executable.class).contains(annotationType)) {
+                        continue;
+                    }
+                    if (!started) {
+                        started = true;
+                        if (processor instanceof LifeCycle<?> cycle) {
+                            cycle.start();
+                        }
+                    }
+                    processor.process(processed, method);
+                }
+            }
+        } finally {
+            if (started && processor instanceof LifeCycle<?> cycle) {
+                cycle.stop();
+            }
+        }
     }
 
     @Override
@@ -1426,7 +1699,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         if (registration.beanDefinition instanceof ProxyBeanDefinition) {
             if (registration.bean instanceof InterceptedBeanProxy) {
-                // Ignore the proxy and destroy the target
+                // Ignore the proxy and destroy the target; a watch registered while the proxy was created goes with it
+                watches.closeOwnedBy(registration.bean);
                 destroyProxyTargetBean(registration, dependent);
                 return;
             }
@@ -1441,6 +1715,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (definition.isSingleton()) {
                 singletonScope.purgeCacheForBeanInstance(definition, beanToDestroy);
             }
+            watches.closeOwnedBy(beanToDestroy);
         }
         if (dependencyGraph != null) {
             // what a destroyed bean held is released with it; what held the bean stays recorded until that is destroyed.
@@ -2232,6 +2507,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             // a bean of this scope resolved earlier left the scope's absence recorded in the registry
             customScopeRegistry.invalidate();
         }
+        watches.definitionsChanged(List.of(), List.of(definition));
         return this;
     }
 
@@ -2505,6 +2781,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private void initializeContext() {
+        // the startup batch: every watch registered so far learns what the context holds, before any
+        // processor or eager bean runs, since those may register watches of their own and get theirs at once
+        watches.start();
         if (!eagerBeansEnabled) {
             return;
         }
@@ -2560,13 +2839,74 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
         }
 
-        for (Collection<ExecutableMethodProcessor> processors : processorsByAnnotation.values()) {
-            for (ExecutableMethodProcessor<?> processor : processors) {
+        for (Map.Entry<Class<? extends Annotation>, Collection<ExecutableMethodProcessor>> entry : processorsByAnnotation.entrySet()) {
+            for (ExecutableMethodProcessor<?> processor : entry.getValue()) {
                 if (processor instanceof LifeCycle<?> cycle) {
                     cycle.stop();
                 }
+                // what is registered after startup reaches the processor through an adapter that sees additions only
+                adaptProcessor(entry.getKey(), processor);
             }
         }
+        startupMethodsProcessed = true;
+    }
+
+    /**
+     * The definitions with methods marked for processing at startup, replaced beans filtered out.
+     *
+     * @return The definitions
+     */
+    List<BeanDefinition<Object>> processedBeanDefinitions() {
+        List<BeanDefinition<Object>> processedBeans = new ArrayList<>();
+        beanDefinitionProvider.getProcessedBeans(this).forEach(processedBeans::add);
+        filterReplacedBeans(processedBeans);
+        return processedBeans;
+    }
+
+    /**
+     * The enabled definitions with an executable method annotated with the given annotation. Only their conditions are
+     * evaluated: the provider caches a definition whose conditions fail as disabled, so evaluating those of every
+     * definition, as {@link #getAllBeanDefinitions()} does, would disable for good a definition whose
+     * {@code @Requires(beans = ...)} fails only until its bean is registered.
+     *
+     * @param annotationType The annotation
+     * @param runtimeOnly Whether only the definitions registered at runtime are read, which the index of the
+     * definitions processed at startup leaves out
+     * @return The definitions
+     */
+    List<BeanDefinition<Object>> definitionsWithMethodsAnnotated(Class<? extends Annotation> annotationType, boolean runtimeOnly) {
+        return beanDefinitionProvider.getBeanDefinitions(this, runtimeOnly ? RuntimeBeanDefinition.class::isInstance : null, definition -> {
+            for (ExecutableMethod<Object, ?> method : definition.getExecutableMethods()) {
+                if (method.getAnnotationMetadata().hasStereotype(annotationType)) {
+                    return true;
+                }
+            }
+            return false;
+        });
+    }
+
+    /**
+     * Feeds a processor the methods of definitions added after startup.
+     *
+     * @param annotationType The annotation the processor handles
+     * @param processor The processor
+     * @param <A> The annotation type
+     */
+    @Internal
+    @SuppressWarnings("unchecked")
+    <A extends Annotation> void adaptProcessor(Class<A> annotationType, ExecutableMethodProcessor<?> processor) {
+        watches.adapt(annotationType, (ExecutableMethodProcessor<A>) processor);
+    }
+
+    /**
+     * Feeds a processor the definitions added after startup.
+     *
+     * @param annotationType The annotation the processor handles
+     * @param processor The processor
+     */
+    @Internal
+    void adaptProcessor(Class<? extends Annotation> annotationType, BeanDefinitionProcessor<?> processor) {
+        watches.adapt(annotationType, processor);
     }
 
     private void initializeEagerBeans() {
@@ -2774,6 +3114,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                        @Nullable Map<String, Object> argumentValues) {
         Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
         Qualifier<?> prevQualifier = resolutionContext.getCurrentQualifier();
+        // the creation, including the listeners and validation that follow in postBeanCreated, owns the
+        // watches registered meanwhile; a failure anywhere in it closes them
+        watches.beginCreation(beanDefinition);
+        boolean created = false;
         DefaultBeanDependencyGraph graph = dependencyGraph;
         // what the instance receives is counted once however many injection points receive it
         DefaultBeanDependencyGraph.Creation creation = graph == null ? null : graph.beginCreation(beanDefinition);
@@ -2796,6 +3140,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (bean instanceof Qualified qualified && declaredQualifier != null) {
                 qualified.$withBeanQualifier(declaredQualifier);
             }
+            created = true;
             return bean;
         } catch (ConstructorAdviceException e) {
             // Advice around the constructor rejected the construction. An exception thrown by advice reaches
@@ -2810,6 +3155,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
             throw new BeanInstantiationException(beanDefinition, e);
         } finally {
+            if (!created) {
+                watches.endCreation(beanDefinition, null);
+            }
             resolutionContext.setCurrentQualifier(prevQualifier);
             if (creation != null) {
                 creation.end();
@@ -2841,16 +3189,22 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                   @Nullable Qualifier<T> qualifier,
                                   T bean) {
         Qualifier<T> finalQualifier = qualifier != null ? qualifier : beanDefinition.getDeclaredQualifier();
+        T settled = null;
+        try {
+            bean = triggerBeanCreatedEventListener(resolutionContext, beanDefinition, bean, beanType, finalQualifier);
 
-        bean = triggerBeanCreatedEventListener(resolutionContext, beanDefinition, bean, beanType, finalQualifier);
-
-        if (beanDefinition instanceof ValidatedBeanDefinition<T> validatedBeanDefinition) {
-            bean = validatedBeanDefinition.validate(resolutionContext, bean);
+            if (beanDefinition instanceof ValidatedBeanDefinition<T> validatedBeanDefinition) {
+                bean = validatedBeanDefinition.validate(resolutionContext, bean);
+            }
+            if (LOG_LIFECYCLE.isDebugEnabled()) {
+                LOG_LIFECYCLE.debug("Created bean [{}] from definition [{}] with qualifier [{}]", bean, beanDefinition, finalQualifier);
+            }
+            settled = bean;
+            return bean;
+        } finally {
+            // the instance the listeners settled on owns the watches registered since the creation began
+            watches.endCreation(beanDefinition, settled);
         }
-        if (LOG_LIFECYCLE.isDebugEnabled()) {
-            LOG_LIFECYCLE.debug("Created bean [{}] from definition [{}] with qualifier [{}]", bean, beanDefinition, finalQualifier);
-        }
-        return bean;
     }
 
     private <T> T triggerBeanCreatedEventListener(BeanResolutionContext resolutionContext,

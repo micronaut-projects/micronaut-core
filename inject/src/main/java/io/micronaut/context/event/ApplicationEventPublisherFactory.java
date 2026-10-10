@@ -17,8 +17,10 @@ package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Indexes;
 import io.micronaut.core.annotation.Internal;
@@ -249,6 +251,7 @@ public final class ApplicationEventPublisherFactory<T>
                     if (EventLogger.LOG.isDebugEnabled()) {
                         EventLogger.LOG.debug("Publishing event: {}", event);
                     }
+                    notifyClassChangeWatches(event);
                     notifyEventListeners(event, lazyListeners.get());
                 }
             }
@@ -256,6 +259,7 @@ public final class ApplicationEventPublisherFactory<T>
             @Override
             public Future<Void> publishEventAsync(Object event) {
                 Objects.requireNonNull(event, "Event cannot be null");
+                notifyClassChangeWatches(event);
                 CompletableFuture<Void> future = new CompletableFuture<>();
                 ApplicationEventListener[] eventListeners = lazyListeners.get();
                 executor.get().execute(() -> {
@@ -271,7 +275,23 @@ public final class ApplicationEventPublisherFactory<T>
 
             @Override
             public boolean isEmpty() {
-                return lazyListeners.get().length == 0;
+                // a class change reaches the context's class change watches too, which a caller skipping an empty publisher would miss
+                return lazyListeners.get().length == 0 && !hasClassChangeWatches();
+            }
+
+            private boolean hasClassChangeWatches() {
+                return ClassChangeEvent.class.isAssignableFrom(eventType.getType())
+                    && beanContext instanceof DefaultBeanContext context && context.hasClassChangeWatches();
+            }
+
+            /**
+             * A class change reaches the class change watches of the context ahead of the listeners of the event,
+             * whoever publishes it.
+             */
+            private void notifyClassChangeWatches(Object event) {
+                if (event instanceof ClassChangeEvent change && beanContext instanceof DefaultBeanContext context) {
+                    context.notifyClassChange(change);
+                }
             }
         };
     }
