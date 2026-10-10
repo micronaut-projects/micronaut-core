@@ -6,6 +6,7 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.async.propagation.ReactorPropagation
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.execution.CompletableFutureExecutionFlow
+import io.micronaut.core.execution.DelayedExecutionFlow
 import io.micronaut.core.execution.ExecutionFlow
 import io.micronaut.core.execution.ImperativeExecutionFlow
 import io.micronaut.core.propagation.PropagatedContext
@@ -17,6 +18,7 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.bind.DefaultRequestBinderRegistry
+import io.micronaut.http.body.BodyElements
 import io.micronaut.http.context.ServerHttpRequestContext
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
@@ -27,6 +29,7 @@ import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 import java.time.Duration
+import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.ExecutionException
@@ -1415,6 +1418,298 @@ class FilterRunnerSpec extends Specification {
         then:
         result != null
         result.value == resp1
+    }
+
+    def 'a void method with a continuation that produces the response later is rejected'(Class<?> continuationType) {
+        when:
+        before(ReturnType.of(void), [Argument.of(FilterContinuation, continuationType)]) { FilterContinuation<?> continuation ->
+            continuation.proceed()
+        }
+
+        then:
+        def ex = thrown(IllegalArgumentException)
+        ex.message.contains("A filter method with a FilterContinuation<" + continuationType.simpleName + "<HttpResponse<?>>> must return the response")
+
+        where:
+        continuationType << [ExecutionFlow, CompletionStage, CompletableFuture]
+    }
+
+    def 'a void method with a blocking or reactive continuation is accepted'(Argument<?> continuation) {
+        when:
+        def filter = before(ReturnType.of(void), [continuation]) { FilterContinuation<?> c -> }
+
+        then:
+        filter != null
+
+        where:
+        continuation << [Argument.of(FilterContinuation, HttpResponse), Argument.of(FilterContinuation, Publisher)]
+    }
+
+    def 'cancelling the future of a completion stage continuation cancels the downstream'() {
+        given:
+        DelayedExecutionFlow<HttpResponse<?>> downstream = DelayedExecutionFlow.create()
+        boolean downstreamCancelled = false
+        downstream.onCancel { downstreamCancelled = true }
+        CompletableFuture<HttpResponse<?>> proceeded = null
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(CompletionStage, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, CompletableFuture)]) { FilterContinuation<CompletableFuture<HttpResponse<?>>> continuation ->
+                    proceeded = continuation.proceed()
+                    proceeded
+                }
+        ]
+
+        when:
+        def result = filterRunner(filters, { downstream }).run(HttpRequest.GET("/"))
+        then:
+        proceeded != null
+        !proceeded.isDone()
+        !downstreamCancelled
+
+        when:
+        proceeded.cancel(false)
+        then:
+        downstreamCancelled
+        downstream.isCancelled()
+        result.tryCompleteError() instanceof CancellationException
+    }
+
+    def 'cancelling a stage derived from a completion stage continuation cancels the downstream'() {
+        given:
+        DelayedExecutionFlow<HttpResponse<?>> downstream = DelayedExecutionFlow.create()
+        boolean downstreamCancelled = false
+        downstream.onCancel { downstreamCancelled = true }
+        CompletableFuture<HttpResponse<?>> derived = null
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(CompletionStage, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, CompletionStage)]) { FilterContinuation<CompletionStage<HttpResponse<?>>> continuation ->
+                    derived = continuation.proceed().thenApply { it }.toCompletableFuture()
+                    derived
+                }
+        ]
+
+        when:
+        filterRunner(filters, { downstream }).run(HttpRequest.GET("/"))
+        derived.cancel(false)
+        then:
+        downstreamCancelled
+    }
+
+    def 'cancelling the filter chain cancels the downstream of a completion stage continuation'() {
+        given:
+        DelayedExecutionFlow<HttpResponse<?>> downstream = DelayedExecutionFlow.create()
+        boolean downstreamCancelled = false
+        downstream.onCancel { downstreamCancelled = true }
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(CompletionStage, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, CompletionStage)]) { FilterContinuation<CompletionStage<HttpResponse<?>>> continuation ->
+                    continuation.proceed().thenApply { it }
+                }
+        ]
+
+        when:
+        def result = filterRunner(filters, { downstream }).run(HttpRequest.GET("/"))
+        result.cancel()
+        then:
+        downstreamCancelled
+    }
+
+    def 'a completion stage continuation proceeds once'() {
+        given:
+        def events = []
+        Throwable secondProceed = null
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(CompletionStage, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, CompletionStage)]) { FilterContinuation<CompletionStage<HttpResponse<?>>> continuation ->
+                    continuation.proceed().thenApply { response ->
+                        try {
+                            continuation.proceed()
+                        } catch (IllegalStateException e) {
+                            secondProceed = e
+                        }
+                        response
+                    }
+                },
+                before(ReturnType.of(void), [Argument.of(HttpRequest)]) { HttpRequest<?> request ->
+                    events.add("downstream filter")
+                    null
+                }
+        ]
+
+        when:
+        def result = filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/"))
+        then:
+        result.tryCompleteValue().status() == HttpStatus.OK
+        secondProceed.message == "A FilterContinuation<CompletionStage<HttpResponse<?>>> can only proceed once"
+        events == ["downstream filter", "terminal"]
+    }
+
+    def 'a continuation of another completion stage type is rejected'() {
+        when:
+        before(ReturnType.of(CompletionStage, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, MinimalFuture)]) { FilterContinuation<?> continuation ->
+            null
+        }
+
+        then:
+        def ex = thrown(IllegalArgumentException)
+        ex.message.contains("Unsupported continuation type")
+    }
+
+    static class MinimalFuture<T> extends CompletableFuture<T> {
+    }
+
+    def 'the response filters see the request a completion stage continuation proceeded with'(Class stageType) {
+        given:
+        def req1 = HttpRequest.GET("/req1")
+        def req2 = HttpRequest.GET("/req2")
+        HttpRequest<?> seenByResponseFilter = null
+        DelayedExecutionFlow<HttpResponse<?>> downstream = DelayedExecutionFlow.create()
+        List<GenericHttpFilter> filters = [
+                after(ReturnType.of(void), [Argument.of(HttpRequest)]) { HttpRequest<?> request ->
+                    seenByResponseFilter = request
+                    null
+                },
+                before(ReturnType.of(stageType, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, CompletionStage)]) { FilterContinuation<CompletionStage<HttpResponse<?>>> continuation ->
+                    def returned = new MinimalFuture<HttpResponse<?>>()
+                    continuation.request(req2).proceed().whenComplete { response, error ->
+                        if (error != null) {
+                            returned.completeExceptionally(error)
+                        } else {
+                            returned.complete(response)
+                        }
+                    }
+                    returned
+                }
+        ]
+
+        when:
+        def result = filterRunner(filters, { downstream }).run(req1)
+        downstream.complete(HttpResponse.ok())
+        then:
+        result.tryCompleteValue().status() == HttpStatus.OK
+        seenByResponseFilter.is(req2)
+
+        where:
+        stageType << [CompletionStage, CompletableFuture, MinimalFuture]
+    }
+
+    def 'the stages of a completion stage continuation complete with the propagated context'() {
+        given:
+        def element = new TestContextElement()
+        DelayedExecutionFlow<HttpResponse<?>> downstream = DelayedExecutionFlow.create()
+        Object seen = null
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(CompletionStage, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, CompletionStage)]) { FilterContinuation<CompletionStage<HttpResponse<?>>> continuation ->
+                    continuation.proceed().thenApply { response ->
+                        seen = PropagatedContext.find().flatMap { it.find(TestContextElement) }.orElse(null)
+                        response
+                    }
+                }
+        ]
+
+        when:
+        def result = filterRunner(filters, { downstream }).run(HttpRequest.GET("/"), PropagatedContext.empty().plus(element))
+        // completed without the context of the request bound
+        downstream.complete(HttpResponse.ok())
+        then:
+        result.tryCompleteValue().status() == HttpStatus.OK
+        seen.is(element)
+    }
+
+    def 'continuation callbacks see context mutations made downstream'() {
+        given:
+        def initial = new TestContextElement()
+        def changed = new TestContextElement()
+        DelayedExecutionFlow<HttpResponse<?>> downstream = DelayedExecutionFlow.create()
+        Object seen = null
+        List<GenericHttpFilter> filters = [
+            before(ReturnType.of(CompletionStage, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, CompletionStage)]) { FilterContinuation<CompletionStage<HttpResponse<?>>> continuation ->
+                continuation.proceed().thenApply { response ->
+                    seen = PropagatedContext.getOrEmpty().find(TestContextElement).orElse(null)
+                    response
+                }
+            },
+            before(ReturnType.of(void), [Argument.of(io.micronaut.core.propagation.MutablePropagatedContext)]) { mutable ->
+                mutable.replace(initial, changed)
+                null
+            }
+        ]
+
+        when:
+        def result = filterRunner(filters, { downstream }).run(HttpRequest.GET('/'), PropagatedContext.empty().plus(initial))
+        downstream.complete(HttpResponse.ok())
+
+        then:
+        result.tryCompleteValue().status() == HttpStatus.OK
+        seen.is(changed)
+    }
+
+    def 'elements dropped by a response filter are closed by the runner'() {
+        given:
+        boolean closed = false
+        def elements = BodyElements.of({ CompletableFuture.completedFuture(Optional.empty()) }, { closed = true })
+        List<BodyElements<?>> closedByRunner = []
+        List<GenericHttpFilter> filters = [
+                after(ReturnType.of(MutableHttpResponse), [Argument.of(MutableHttpResponse)]) { MutableHttpResponse<?> response ->
+                    response.body("replaced")
+                }
+        ]
+        def runner = new FilterRunner(filters, (req, ctx) -> ExecutionFlow.just(HttpResponse.ok(elements))) {
+            @Override
+            protected void closeElements(HttpRequest<?> request, BodyElements<?> dropped) {
+                closedByRunner.add(dropped)
+                super.closeElements(request, dropped)
+            }
+        }
+
+        when:
+        def response = runner.run(HttpRequest.GET("/")).tryCompleteValue()
+        then:
+        response.body() == "replaced"
+        closedByRunner == [elements]
+        closed
+    }
+
+    def 'elements replaced by unrelated elements are closed after them'() {
+        given:
+        boolean oldClosed = false
+        boolean newClosed = false
+        def elements = BodyElements.of({ CompletableFuture.completedFuture(Optional.empty()) }, { oldClosed = true })
+        def replacement = BodyElements.of({ CompletableFuture.completedFuture(Optional.empty()) }, { newClosed = true })
+        List<GenericHttpFilter> filters = [
+                after(ReturnType.of(MutableHttpResponse), [Argument.of(MutableHttpResponse)]) { MutableHttpResponse<?> response ->
+                    response.body(replacement)
+                }
+        ]
+
+        when:
+        def response = filterRunner(filters, { ExecutionFlow.just(HttpResponse.ok(elements)) }).run(HttpRequest.GET("/")).tryCompleteValue()
+        then:
+        !oldClosed
+        def body = (BodyElements<?>) ((MutableHttpResponse<?>) response).body()
+
+        when:
+        // the server closes the elements of the response
+        body.close()
+        then:
+        newClosed
+        oldClosed
+    }
+
+    def 'elements a response filter keeps are not closed'() {
+        given:
+        boolean closed = false
+        def elements = BodyElements.of({ CompletableFuture.completedFuture(Optional.empty()) }, { closed = true })
+        List<GenericHttpFilter> filters = [
+                after(ReturnType.of(MutableHttpResponse), [Argument.of(MutableHttpResponse)]) { MutableHttpResponse<?> response ->
+                    response.header("X-Filtered", "true")
+                }
+        ]
+
+        when:
+        def response = filterRunner(filters, { ExecutionFlow.just(HttpResponse.ok(elements)) }).run(HttpRequest.GET("/")).tryCompleteValue()
+        then:
+        ((MutableHttpResponse<?>) response).body().is(elements)
+        !closed
     }
 
     private static Argument<?> nullableArgument(Class<?> type) {

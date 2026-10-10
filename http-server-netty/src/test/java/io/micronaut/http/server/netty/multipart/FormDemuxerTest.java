@@ -23,6 +23,7 @@ import io.netty.contrib.multipart.FormDecoderException;
 import io.netty.contrib.multipart.PostBodyDecoder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
@@ -57,10 +58,10 @@ public class FormDemuxerTest {
         return new FormDemuxer(PostBodyDecoder.builder().forMultipartBoundary(boundary), channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, body);
     }
 
-    private static <T> Queue<T> toQueue(Flux<T> flux) {
+    private static <T> Queue<T> toQueue(Publisher<T> publisher) {
         QueueSubscriber<T> subscriber = new QueueSubscriber<>();
         subscriber.noBackpressure();
-        flux.subscribe(subscriber);
+        publisher.subscribe(subscriber);
         return subscriber.queue;
     }
 
