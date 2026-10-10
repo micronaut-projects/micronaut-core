@@ -47,3 +47,45 @@ The application does what it always does, `Micronaut.run(Application.class, args
 * the beans retained from the previous generation.
 
 TIP: Everything under the manifest's `micronaut.dev.` keys can be set as a system property. api:context.env.DevelopmentMode[] answers whether the application runs this way, so a bean can be conditioned on it with `@DevelopmentActive` (or `@DevelopmentInactive` for the opposite).
+
+== The dev endpoint
+
+With `micronaut-management` on the classpath, the application has a `dev` endpoint:
+
+* `GET /dev` reports the generation, the reload strategy, the watched roots and the last compilation failure.
+* `POST /dev/reload` compiles everything and restarts if anything changed. It is the way to recover when the watcher missed an edit, and the gate that answers requests with a compilation failure lets it through.
+
+The endpoint moves with `endpoints.all.path` and `endpoints.dev.path`, like any other.
+
+The endpoint is sensitive: its status holds absolute paths of the machine, and its reload compiles and restarts the application. It therefore answers 401 until Micronaut Security protects it, or until a development configuration opts out:
+
+[configuration]
+----
+endpoints:
+  dev:
+    sensitive: false
+----
+
+The reload is a JSON request. It is refused with a 403 when a browser marks it as coming from another site, or when its `Origin` is not the server's own as its host resolution gives it (behind a proxy, from the forwarding headers). A page the developer visits therefore cannot trigger it with a form:
+
+[source,bash]
+----
+curl -X POST -H 'Content-Type: application/json' http://localhost:8080/dev/reload
+----
+
+== LiveReload
+
+Add `micronaut-dev-livereload` to the development runtime classpath and the launcher starts a LiveReload server on port 35729 (`micronaut.dev.livereload.port`). Adding the module is the switch: there is no other setting to turn it on. Browsers then:
+
+* reload when the application restarted or a template changed;
+* swap a stylesheet in place when only a stylesheet changed.
+
+Pages get the client script appended before their closing body tag; set `micronaut.dev.livereload.inject-script=false` if you use a browser extension. A api:dev.livereload.LiveReloadTrigger[] bean lets a module ask for a refresh.
+
+The server listens on the loopback address only, and its socket accepts the clients LiveReload is made for:
+
+* native clients, which send no `Origin`;
+* the browser extensions (`chrome-extension:`, `moz-extension:` and `safari-web-extension:` origins);
+* pages served by `localhost`, a `*.localhost` name or the loopback address, on any port.
+
+A page of any other site is refused, so that a site the developer visits cannot follow the reloads. This holds for the script a browser extension injects too, since it runs in the page and connects with the page's origin. Open the application through `localhost`, the loopback address or a name under `.localhost`, such as `myapp.localhost`, which browsers resolve to the loopback address.
