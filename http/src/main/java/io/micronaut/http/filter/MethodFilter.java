@@ -52,6 +52,7 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.NonBlocking;
+import reactor.util.context.ContextView;
 
 import java.util.Arrays;
 import java.util.List;
@@ -441,12 +442,22 @@ record MethodFilter<T>(FilterOrder order,
             throw new IllegalStateException("Downstream method shouldn't be called when continuation is missing!");
         }
         MutablePropagatedContext mutablePropagatedContext = MutablePropagatedContext.of(context.propagatedContext());
+        InternalFilterContinuation<?> continuation = createContinuation(downstream, context, mutablePropagatedContext);
         FilterMethodContext filterMethodContext = new FilterMethodContext(
             mutablePropagatedContext,
             context.request(),
             context.response(),
             null,
-            createContinuation(downstream, context, mutablePropagatedContext));
+            continuation);
+        if (context.reactive() && continuation instanceof CompletionStageContinuationImpl stageContinuation) {
+            // proceed() of a stage continuation subscribes to the downstream: the method runs when
+            // the upstream reactive filter subscribes, so that the downstream filters and the route
+            // see the Reactor context of that subscription
+            return ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
+                stageContinuation.contextView = contextView;
+                return Mono.from(ReactiveExecutionFlow.toPublisher(() -> filter(context, filterMethodContext, null, false)));
+            }));
+        }
         return filter(context, filterMethodContext, null, false);
     }
 
@@ -1138,6 +1149,11 @@ record MethodFilter<T>(FilterOrder order,
          * The downstream, once {@link #proceed()} was called.
          */
         private final AtomicReference<@Nullable ExecutionFlow<?>> downstreamFlow = new AtomicReference<>();
+        /**
+         * The Reactor context of the upstream reactive filter that subscribed to the method, if any.
+         */
+        @Nullable
+        private volatile ContextView contextView;
 
         private CompletionStageContinuationImpl(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
                                                 FilterContext filterContext,
@@ -1174,6 +1190,12 @@ record MethodFilter<T>(FilterOrder order,
                 flow = downstream.apply(context);
             } catch (Exception e) {
                 return CompletableFuture.failedFuture(e);
+            }
+            ContextView upstreamContextView = contextView;
+            if (upstreamContextView != null && !upstreamContextView.isEmpty() && flow instanceof ReactiveExecutionFlow<FilterContext> reactiveFlow) {
+                // the downstream is subscribed to here, not by the upstream reactive filter: it
+                // gets the Reactor context of that filter's subscription
+                flow = ReactiveExecutionFlow.fromPublisher(Mono.from(reactiveFlow.toPublisher()).contextWrite(upstreamContextView));
             }
             ExecutionFlow<HttpResponse<?>> responseFlow = flow.map(newFilterContext -> {
                 filterContext.set(newFilterContext);
