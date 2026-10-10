@@ -16,6 +16,7 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.python.annotation.processing.test.javabases.OverloadedBase
+import io.micronaut.python.annotation.processing.test.javabases.RoutingBase
 
 /**
  * A Python method overriding a Java base class method whose name carries several same-arity
@@ -75,5 +76,44 @@ class AnyRenderer(OverloadedBase):
         e.message.contains('render(java.lang.String)')
         e.message.contains('render(java.util.List)')
         e.message.contains('type hint')
+    }
+
+    void 'a base method named with $ is left out and a Python class selects the overload taking a Class'() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from io.micronaut.python.annotation.processing.test.javabases import RoutingBase
+
+
+@Singleton
+class LoginView:
+    pass
+
+
+@Singleton
+class PythonRouter(RoutingBase):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def route(self) -> None:
+        self.open("login", LoginView)
+        self.open("base", RoutingBase)
+        self.open("text", "fallback")
+''')
+        RoutingBase router = getBean(context, "python.PythonRouter") as RoutingBase
+
+        when:
+        router.route()
+
+        then: 'a Python class and a Java class reach the Class overload, a str the String one'
+        router.routes == ['login->LoginView', 'base->RoutingBase', 'text~fallback']
+
+        and: 'the method named with $ still runs its Java implementation from Java'
+        router.$("button").routes.last() == '$button'
+
+        cleanup:
+        context?.close()
     }
 }
