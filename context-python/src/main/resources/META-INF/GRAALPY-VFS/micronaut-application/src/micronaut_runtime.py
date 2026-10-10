@@ -84,7 +84,7 @@ def __micronaut_python_dict(keys, values):
     return dict(zip(keys, values))
 
 
-def __micronaut_to_python_standard_type(kind, value, nanos=0):
+def __micronaut_to_python_standard_type(kind, value, nanos=0, zone=None):
     if kind == "decimal":
         # imported on first use: importing decimal with this module made the imports of a nested
         # application's context walk into the frames of the enclosing context (Truffle rejects the
@@ -97,6 +97,16 @@ def __micronaut_to_python_standard_type(kind, value, nanos=0):
         return datetime.time.fromisoformat(value)
     if kind == "datetime":
         return datetime.datetime.fromisoformat(value)
+    if kind == "zoned_datetime":
+        result = datetime.datetime.fromisoformat(value)
+        if zone is not None:
+            try:
+                import zoneinfo
+                result = result.astimezone(zoneinfo.ZoneInfo(zone))
+            except Exception:
+                # no time zone data for the region here: the fixed offset still names the same instant
+                pass
+        return result
     if kind == "duration":
         return datetime.timedelta(seconds=value, microseconds=nanos // 1000)
     if kind == "zone_offset":

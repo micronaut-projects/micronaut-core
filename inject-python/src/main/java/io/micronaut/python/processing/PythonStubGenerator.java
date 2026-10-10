@@ -185,6 +185,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String INVOKE_JAVA_BASE_METHOD = "micronautInvokeJavaBaseMethod";
     public static final ClassTypeDef PYTHON_CLASS_REFERENCE = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime.PythonClassReference");
     public static final ClassTypeDef PYTHON_CLASS_ANNOTATION = ClassTypeDef.of("io.micronaut.context.python.annotation.PythonClass");
+    /**
+     * Marks an element whose Python type is {@code datetime} and whose Java type is an instant type.
+     */
+    private static final String PYTHON_DATE_TIME_ANNOTATION = "io.micronaut.context.python.annotation.PythonDateTime";
     public static final ClassTypeDef PYTHON_MODULE_ANNOTATION = ClassTypeDef.of("io.micronaut.context.python.annotation.PythonModule");
     public static final ClassTypeDef POLYGLOT_VALUE_CONVERTER = ClassTypeDef.of("io.micronaut.context.python.PolyglotValueConverter");
     /**
@@ -3918,7 +3922,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 parameter = PYTHON_COERCION.invokeStatic(
                     "coerceToContext",
                     TypeDef.OBJECT,
-                    methodParam,
+                    asPythonDateTime(param, methodParam),
                     targetContext,
                     classLiteral(param.getGenericType())
                 );
@@ -3932,7 +3936,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         } else if (listOfPython) {
             parameter = PYTHON_COERCION.invokeStatic(COERCE_LIST, TypeDef.of(List.class), methodParam);
         } else {
-            parameter = methodParam;
+            parameter = asPythonDateTime(param, methodParam);
         }
         parameters.add(parameter);
     }
@@ -3958,14 +3962,26 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         } else if (genericType instanceof PythonClassElement) {
             return PYTHON_COERCION.invokeStatic("coerceValue", TypeDef.OBJECT, expr);
         } else {
-            return expr;
+            return asPythonDateTime(element, expr);
         }
+    }
+
+    /**
+     * The value of an element declared {@code Annotated[datetime, Instant]} (marked {@code PythonDateTime}),
+     * tagged so that it reaches Python as an aware {@code datetime}; any other value as it is. An element
+     * declared with the Java type itself keeps passing the Java object, which Python code hands to Java APIs.
+     */
+    private static ExpressionDef asPythonDateTime(TypedElement element, ExpressionDef expr) {
+        if (element.hasAnnotation(PYTHON_DATE_TIME_ANNOTATION) || element.getType().hasAnnotation(PYTHON_DATE_TIME_ANNOTATION)) {
+            return PYTHON_COERCION.invokeStatic("pythonDateTime", TypeDef.OBJECT, expr);
+        }
+        return expr;
     }
 
     private static ExpressionDef coerceTypedElementToPolyglotValue(TypedElement element,
                                                                     ExpressionDef expr,
                                                                     ExpressionDef targetContext) {
-        return PYTHON_COERCION.invokeStatic("coerceToContext", TypeDef.OBJECT, expr, targetContext, classLiteral(element.getGenericType()));
+        return PYTHON_COERCION.invokeStatic("coerceToContext", TypeDef.OBJECT, asPythonDateTime(element, expr), targetContext, classLiteral(element.getGenericType()));
     }
 
     /**
