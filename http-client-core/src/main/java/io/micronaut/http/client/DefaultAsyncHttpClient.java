@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.netty;
+package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -21,9 +21,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.BodyElements;
-import io.micronaut.http.client.AsyncHttpClient;
-import io.micronaut.http.client.AsyncStreamingHttpClient;
-import io.micronaut.http.client.ElementsStages;
 import io.micronaut.http.sse.Event;
 import org.jspecify.annotations.Nullable;
 
@@ -31,10 +28,10 @@ import java.util.concurrent.CompletionStage;
 
 /**
  * Default implementation of {@link AsyncHttpClient} and {@link AsyncStreamingHttpClient} backed by
- * {@link NettyHttpClient}. The exchanges run without Reactor; the elements of a JSON stream are
+ * {@link AbstractHttpClient}. The exchanges run without Reactor; the elements of a JSON stream are
  * decoded by the chunked JSON reader, and server-sent events by the event stream decoder.
- * Cancelling the future of a streaming exchange before the response arrived cancels the
- * exchange, and closes the elements of a response that arrives anyway.
+ * Cancelling the future of an exchange before the response arrived cancels the exchange, and
+ * closes the elements of a streaming response that arrives anyway.
  *
  * @author Denis Stepanov
  * @since 5.0
@@ -42,64 +39,65 @@ import java.util.concurrent.CompletionStage;
 @Internal
 final class DefaultAsyncHttpClient implements AsyncStreamingHttpClient {
 
-    private final NettyHttpClient nettyHttpClient;
+    private final AbstractHttpClient<?> client;
 
     /**
-     * Constructor used to wrap an existing {@link NettyHttpClient} instance.
+     * Constructor used to wrap an existing {@link AbstractHttpClient} instance.
      *
-     * @param nettyHttpClient The delegate client
+     * @param client The delegate client
      */
-    DefaultAsyncHttpClient(NettyHttpClient nettyHttpClient) {
-        this.nettyHttpClient = nettyHttpClient;
+    DefaultAsyncHttpClient(AbstractHttpClient<?> client) {
+        this.client = client;
     }
 
     @Override
     public <I, O, E> CompletionStage<HttpResponse<O>> exchange(HttpRequest<I> request,
                                                                @Nullable Argument<O> bodyType,
                                                                Argument<E> errorType) {
-        return nettyHttpClient.exchangeFlow(request, bodyType, errorType).toCompletableFuture();
+        // cancelling the future cancels the exchange, as the future of a reactive exchange does
+        return ElementsStages.result(client.exchangeFlow(request, bodyType, errorType));
     }
 
     @Override
     public <I> CompletionStage<HttpResponse<BodyElements<ByteBuffer<?>>>> exchangeStream(HttpRequest<I> request, Argument<?> errorType) {
-        return ElementsStages.response(nettyHttpClient.exchangeStreamFlow(request, errorType));
+        return ElementsStages.response(client.exchangeStreamFlow(request, errorType));
     }
 
     @Override
     public <I, O> CompletionStage<BodyElements<O>> jsonStream(HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
-        return ElementsStages.elements(nettyHttpClient.jsonStreamFlow(request, type, errorType));
+        return ElementsStages.elements(client.jsonStreamFlow(request, type, errorType));
     }
 
     @Override
     public <I, O> CompletionStage<HttpResponse<BodyElements<O>>> exchangeJsonStream(HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
-        return ElementsStages.response(nettyHttpClient.jsonStreamFlow(request, type, errorType));
+        return ElementsStages.response(client.jsonStreamFlow(request, type, errorType));
     }
 
     @Override
     public <I, B> CompletionStage<HttpResponse<BodyElements<Event<B>>>> exchangeEventStream(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
-        return ElementsStages.response(nettyHttpClient.exchangeEventStreamFlow(request, eventType, errorType));
+        return ElementsStages.response(client.exchangeEventStreamFlow(request, eventType, errorType));
     }
 
     @Override
     public DefaultAsyncHttpClient start() {
-        nettyHttpClient.start();
+        client.start();
         return this;
     }
 
     @Override
     public DefaultAsyncHttpClient stop() {
-        nettyHttpClient.stop();
+        client.stop();
         return this;
     }
 
     @Override
     public boolean isRunning() {
-        return nettyHttpClient.isRunning();
+        return client.isRunning();
     }
 
     @Override
     public void close() {
-        nettyHttpClient.close();
+        client.close();
     }
 
 }

@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.Internal;
+
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -131,6 +133,15 @@ class AsyncElementsReleaseTest {
     }
 
     @Test
+    void aThrowingResponseFilterReleasesTheConnection() throws Exception {
+        cancelled = new CountDownLatch(1);
+        CompletableFuture<BodyElements<ByteBuffer<?>>> stage = client().dataStream(HttpRequest.GET("/release-elements/throwing")).toCompletableFuture();
+        ExecutionException failure = assertThrows(ExecutionException.class, () -> stage.get(WAIT, TimeUnit.SECONDS));
+        assertInstanceOf(IllegalStateException.class, failure.getCause());
+        assertTrue(cancelled.await(WAIT, TimeUnit.SECONDS), "the throwing response filter leaked the server stream");
+    }
+
+    @Test
     void closingTheEventOfASingleBodyCancelsIt() throws Exception {
         cancelled = new CountDownLatch(1);
         HttpResponse<BodyElements<Event<String>>> response = client()
@@ -181,6 +192,16 @@ class AsyncElementsReleaseTest {
         CompletionStage<HttpResponse<BodyElements<ByteBuffer<?>>>> exchangeMissing();
     }
 
+    @Internal
+    @Requires(property = "spec.name", value = SPEC)
+    @ClientFilter("/release-elements/throwing")
+    static class ThrowingFilter {
+        @ResponseFilter
+        void fail(HttpResponse<?> response) {
+            throw new IllegalStateException("response filter");
+        }
+    }
+
     @Requires(property = "spec.name", value = SPEC)
     @ClientFilter("/release-elements/replaced")
     static class ReplacingFilter {
@@ -207,6 +228,11 @@ class AsyncElementsReleaseTest {
 
         @Get(value = "/replaced", produces = MediaType.APPLICATION_OCTET_STREAM)
         Publisher<byte[]> replaced() {
+            return endless();
+        }
+
+        @Get(value = "/throwing", produces = MediaType.APPLICATION_OCTET_STREAM)
+        Publisher<byte[]> throwing() {
             return endless();
         }
 
