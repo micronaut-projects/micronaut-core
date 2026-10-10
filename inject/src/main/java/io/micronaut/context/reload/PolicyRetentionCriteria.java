@@ -20,7 +20,6 @@ import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.OrderUtil;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -42,7 +41,6 @@ import java.util.function.Predicate;
  */
 @Internal
 @Experimental
-@NullMarked
 public final class PolicyRetentionCriteria implements DefaultBeanContext.RetentionCriteria {
 
     private final List<BeanRetentionPolicy> policies;
