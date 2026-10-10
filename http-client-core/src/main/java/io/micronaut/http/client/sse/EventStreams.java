@@ -53,6 +53,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 /**
@@ -102,7 +103,6 @@ public final class EventStreams {
      * @param <B>             The event data type
      * @return The response, whose body is the events
      */
-    @SuppressWarnings("java:S2095") // the elements own the event reader, and close it
     public static <B> HttpResponse<BodyElements<Event<B>>> response(ByteBodyHttpResponse<?> response,
                                                                    MessageBodyHandlerRegistry handlerRegistry,
                                                                    Argument<B> eventType,
@@ -139,49 +139,54 @@ public final class EventStreams {
         if (!(request instanceof MutableHttpRequest<?> mutableRequest)) {
             return;
         }
-        for (MediaType accepted : mutableRequest.getHeaders().accept()) {
+        var headers = mutableRequest.getHeaders();
+        for (MediaType accepted : headers.accept()) {
             if (accepted.matches(MediaType.TEXT_EVENT_STREAM_TYPE)) {
                 return;
             }
         }
         // keep what the caller accepts, such as application/json, and accept an event stream too
-        mutableRequest.getHeaders().add(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
+        headers.add(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
     }
 
     /**
      * The response of an exchange whose body is read as its pieces: the events of an event
      * stream, decoded as the pieces are read, or a body of another type, decoded whole as one
-     * event. The data is decoded with the default {@link JsonMapper}; a {@code String} or a
+     * event. The data is decoded with the supplied {@link JsonMapper}; a {@code String} or a
      * {@code byte[]} is taken as it is. The events take over the pieces of the response.
      *
      * @param response      The response, with a status that is not an error
      * @param eventType     The event data type
      * @param maxBufferSize The maximum size of a line, of the data of one event, and of a body
      *                      that is not an event stream
+     * @param jsonMapper    Supplies the mapper when the event type needs JSON decoding
      * @param <B>           The event data type
      * @return The response, whose body is the events
      */
     public static <B> HttpResponse<BodyElements<Event<B>>> response(HttpResponse<BodyElements<ByteBuffer<?>>> response,
                                                                    Argument<B> eventType,
-                                                                   long maxBufferSize) {
+                                                                   long maxBufferSize,
+                                                                   Supplier<JsonMapper> jsonMapper) {
         BodyElements<ByteBuffer<?>> pieces = Objects.requireNonNull(response.body(), "The response has no elements");
         MediaType contentType = response.getContentType().orElse(null);
         boolean events = contentType != null && MediaType.TEXT_EVENT_STREAM_TYPE.matches(contentType);
-        return ElementsResponse.of(response, new PieceEvents<>(pieces, events ? new EventStreamDecoder(maxBufferSize) : null, defaultReader(eventType), maxBufferSize));
+        return ElementsResponse.of(response, new PieceEvents<>(pieces, events ? new EventStreamDecoder(maxBufferSize) : null, defaultReader(eventType, jsonMapper), maxBufferSize));
     }
 
     @SuppressWarnings("unchecked")
-    private static <B> Function<byte[], B> defaultReader(Argument<B> eventType) {
-        if (eventType.getType() == String.class) {
+    private static <B> Function<byte[], B> defaultReader(Argument<B> eventType, Supplier<JsonMapper> jsonMapper) {
+        Class<B> type = eventType.getType();
+        if (type == String.class) {
             return data -> (B) new String(data, StandardCharsets.UTF_8);
         }
-        if (eventType.getType() == byte[].class) {
+        if (type == byte[].class) {
             return data -> (B) data;
         }
+        JsonMapper mapper = jsonMapper.get();
         return data -> {
             B decoded;
             try {
-                decoded = DefaultJsonMapper.INSTANCE.readValue(data, eventType);
+                decoded = mapper.readValue(data, eventType);
             } catch (IOException e) {
                 throw new HttpClientException("Error decoding the data of an event: " + e.getMessage(), e);
             }
@@ -245,13 +250,6 @@ public final class EventStreams {
             }
             return decoded;
         };
-    }
-
-    /**
-     * The default mapper, created when it is first needed.
-     */
-    private static final class DefaultJsonMapper {
-        static final JsonMapper INSTANCE = JsonMapper.createDefault();
     }
 
     /**
