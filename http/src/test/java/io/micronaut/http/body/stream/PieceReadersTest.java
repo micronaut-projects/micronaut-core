@@ -1,0 +1,537 @@
+package io.micronaut.http.body.stream;
+
+import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.Headers;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.body.BodyElements;
+import io.micronaut.http.body.ChunkedMessageBodyReader;
+import io.micronaut.http.body.PieceReader;
+import io.micronaut.http.codec.CodecException;
+import io.micronaut.http.simple.SimpleHttpHeaders;
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
+import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * The publisher bridge over a piece reader, the piece reader over a reactive reader, the default
+ * {@code readChunked} over a piece reader, and the publisher of {@link BodyElements}.
+ */
+class PieceReadersTest {
+
+    private static final Headers HEADERS = new SimpleHttpHeaders();
+
+    @Test
+    void theBridgeDecodesAnElementWhenItIsRequested() {
+        AtomicInteger decoded = new AtomicInteger();
+        Publisher<String> lines = PieceReaders.publisher(pieces("a\nb", "\nc\n"), new LineReader(decoded));
+        Recorder<String> recorder = new Recorder<>();
+        lines.subscribe(recorder);
+
+        recorder.request(1);
+        assertEquals(List.of("a"), recorder.elements);
+        assertEquals(1, decoded.get());
+        recorder.request(2);
+        assertEquals(List.of("a", "b", "c"), recorder.elements);
+        assertEquals(3, decoded.get());
+        // the end without more demand
+        assertTrue(recorder.complete);
+    }
+
+    @Test
+    void theBridgeCompletesWhenTheLastRequestedElementIsTheLast() {
+        Recorder<String> recorder = new Recorder<>();
+        PieceReaders.publisher(pieces("a\nb\n"), new LineReader(new AtomicInteger())).subscribe(recorder);
+
+        recorder.request(2);
+        assertEquals(List.of("a", "b"), recorder.elements);
+        assertTrue(recorder.complete);
+    }
+
+    @Test
+    void cancellingTheBridgeClosesTheReader() {
+        LineReader reader = new LineReader(new AtomicInteger());
+        Recorder<String> recorder = new Recorder<>();
+        PieceReaders.publisher(pieces("a\nb\n", "c\n"), reader).subscribe(recorder);
+
+        recorder.request(1);
+        recorder.subscription.cancel();
+        assertTrue(reader.closed);
+    }
+
+    @Test
+    void aFailureOfTheReaderFailsTheBridge() {
+        Recorder<String> recorder = new Recorder<>();
+        PieceReaders.publisher(pieces("a\n", "boom\n"), new LineReader(new AtomicInteger())).subscribe(recorder);
+
+        recorder.request(Long.MAX_VALUE);
+        assertEquals(List.of("a"), recorder.elements);
+        assertInstanceOf(CodecException.class, recorder.failure);
+    }
+
+    @Test
+    void aFailureOfTheInputFailsTheBridge() {
+        Recorder<String> recorder = new Recorder<>();
+        Publisher<ReadBuffer> input = Flux.concat(pieces("a\n"), Flux.error(new IOException("connection reset")));
+        PieceReaders.publisher(input, new LineReader(new AtomicInteger())).subscribe(recorder);
+
+        recorder.request(Long.MAX_VALUE);
+        assertInstanceOf(IOException.class, recorder.failure);
+    }
+
+    @Test
+    void theBridgeHasOneSubscriber() {
+        Publisher<String> lines = PieceReaders.publisher(pieces("a\n"), new LineReader(new AtomicInteger()));
+        lines.subscribe(new Recorder<>());
+        Recorder<String> second = new Recorder<>();
+        lines.subscribe(second);
+        assertInstanceOf(IllegalStateException.class, second.failure);
+    }
+
+    @Test
+    void aReaderOfAPublisherIsReadAsPieces() throws IOException {
+        PieceReader<String> reader = PieceReaders.open(new FluxLineReader(false), Argument.STRING, MediaType.TEXT_PLAIN_TYPE, HEADERS, 1024);
+
+        reader.read(piece("one"));
+        assertEquals("one", reader.poll());
+        reader.read(piece("two"));
+        reader.complete();
+        assertEquals("two", reader.poll());
+        assertNull(reader.poll());
+        reader.close();
+    }
+
+    @Test
+    void aReaderOfAPublisherThatEmitsAsynchronouslyFailsLoudly() throws IOException {
+        PieceReader<String> reader = PieceReaders.open(new FluxLineReader(true), Argument.STRING, MediaType.TEXT_PLAIN_TYPE, HEADERS, 1024);
+
+        reader.read(piece("one"));
+        reader.complete();
+        assertThrows(IllegalStateException.class, reader::poll);
+        reader.close();
+    }
+
+    @Test
+    void eachPieceIsDecodedInOrderAndClosingDiscardsQueuedPieces() throws IOException {
+        try (PieceReader<String> reader = PieceReaders.eachPiece(buffer -> buffer.toString(StandardCharsets.UTF_8))) {
+            assertNull(reader.poll());
+            reader.read(piece("one"));
+            reader.read(piece("two"));
+            reader.read(piece("three"));
+            reader.complete();
+            assertEquals("one", reader.poll());
+            assertEquals("two", reader.poll());
+            reader.close();
+            assertNull(reader.poll());
+            reader.read(piece("after close"));
+            assertNull(reader.poll());
+        }
+    }
+
+    @Test
+    void eachPieceRejectsANullDecodedElement() throws IOException {
+        try (PieceReader<String> reader = PieceReaders.eachPiece(buffer -> null)) {
+            reader.read(piece("one"));
+            assertThrows(NullPointerException.class, reader::poll);
+        }
+    }
+
+    @Test
+    void readChunkedIsDerivedFromThePieceReader() {
+        ChunkedMessageBodyReader<String> onlyPieces = new OnlyPiecesReader();
+        List<String> lines = Flux.<String>from(onlyPieces.readChunked(Argument.STRING, MediaType.TEXT_PLAIN_TYPE, HEADERS,
+                Flux.just(buffer("a\nb"), buffer("\n"))))
+            .collectList()
+            .block();
+        assertEquals(List.of("a", "b"), lines);
+    }
+
+    @Test
+    void boundedReadChunkedPreservesTheLegacyBufferAdapter() {
+        ChunkedMessageBodyReader<String> reader = new ChunkedMessageBodyReader<>() {
+            @Override
+            public Publisher<? extends String> readChunked(Argument<String> type, @Nullable MediaType mediaType,
+                                                          Headers headers, Publisher<ByteBuffer<?>> input) {
+                return Flux.from(input).map(buffer -> buffer.toString(StandardCharsets.UTF_8));
+            }
+
+            @Override
+            public PieceReader<String> openPieceReader(Argument<String> type, @Nullable MediaType mediaType,
+                                                       Headers headers, long maxElementSize) {
+                throw new AssertionError("The legacy adapter must be used");
+            }
+
+            @Override
+            public String read(Argument<String> type, @Nullable MediaType mediaType, Headers headers, InputStream input) {
+                throw new UnsupportedOperationException();
+            }
+        };
+        assertEquals(List.of("one", "two"), Flux.from(reader.readChunked(Argument.STRING,
+            MediaType.TEXT_PLAIN_TYPE, HEADERS, Flux.just(buffer("one"), buffer("two")), 10)).collectList().block());
+    }
+
+    @Test
+    void aReaderWithNeitherMethodFails() {
+        ChunkedMessageBodyReader<String> neither = new ChunkedMessageBodyReader<>() {
+            @Override
+            public String read(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) {
+                return "";
+            }
+        };
+        Flux<ByteBuffer<?>> empty = Flux.empty();
+        assertThrows(UnsupportedOperationException.class, () -> neither.readChunked(Argument.STRING, MediaType.TEXT_PLAIN_TYPE, HEADERS, empty));
+    }
+
+    @Test
+    void elementsAsAPublisher() {
+        AtomicBoolean closed = new AtomicBoolean();
+        BodyElements<Integer> numbers = new CountingElements(3, closed);
+        Recorder<Integer> recorder = new Recorder<>();
+        new BodyElementsPublisher<>(numbers).subscribe(recorder);
+
+        recorder.request(2);
+        assertEquals(List.of(0, 1), recorder.elements);
+        recorder.request(5);
+        assertEquals(List.of(0, 1, 2), recorder.elements);
+        assertTrue(recorder.complete);
+        assertTrue(closed.get());
+    }
+
+    @Test
+    void thePublisherCompletesAndClosesWithoutExtraDemand() {
+        AtomicInteger closes = new AtomicInteger();
+        BodyElements<Integer> elements = new BodyElements<>() {
+            private boolean taken;
+
+            @Override
+            public CompletionStage<Optional<Integer>> next() {
+                throw new AssertionError("The element is available without a stage");
+            }
+
+            @Override
+            public Integer poll() {
+                taken = true;
+                return 1;
+            }
+
+            @Override
+            public State state() {
+                return taken ? State.COMPLETED : State.AVAILABLE;
+            }
+
+            @Override
+            public void close() {
+                closes.incrementAndGet();
+            }
+        };
+        Recorder<Integer> recorder = new Recorder<>();
+        new BodyElementsPublisher<>(elements).subscribe(recorder);
+        recorder.request(1);
+        assertEquals(List.of(1), recorder.elements);
+        assertTrue(recorder.complete);
+        recorder.subscription.cancel();
+        assertEquals(1, closes.get());
+    }
+
+    @Test
+    void failingElementsAreClosedAndKeepTheOriginalFailure() {
+        RuntimeException failure = new IllegalStateException("read failed");
+        RuntimeException closeFailure = new IllegalStateException("close failed");
+        Recorder<Integer> recorder = new Recorder<>();
+        new BodyElementsPublisher<Integer>(BodyElements.of(() -> CompletableFuture.failedStage(failure), () -> {
+            throw closeFailure;
+        })).subscribe(recorder);
+        recorder.request(1);
+        assertEquals(failure, recorder.failure);
+        assertEquals(List.of(closeFailure), List.of(failure.getSuppressed()));
+    }
+
+    @Test
+    void cancellingThePublisherOfElementsClosesThem() {
+        AtomicBoolean closed = new AtomicBoolean();
+        Recorder<Integer> recorder = new Recorder<>();
+        new BodyElementsPublisher<>(new CountingElements(3, closed)).subscribe(recorder);
+
+        recorder.request(1);
+        recorder.subscription.cancel();
+        assertTrue(closed.get());
+    }
+
+    @Test
+    void thePublisherOfElementsEmitsTheAvailableElementsWithoutAStage() {
+        AtomicInteger reads = new AtomicInteger();
+        List<Integer> available = new ArrayList<>(List.of(1, 2, 3));
+        BodyElements<Integer> elements = new BodyElements<>() {
+            @Override
+            public @Nullable Integer poll() {
+                return available.isEmpty() ? null : available.remove(0);
+            }
+
+            @Override
+            public CompletionStage<Optional<Integer>> next() {
+                reads.incrementAndGet();
+                return CompletableFuture.completedStage(Optional.empty());
+            }
+        };
+        Recorder<Integer> recorder = new Recorder<>();
+        new BodyElementsPublisher<>(elements).subscribe(recorder);
+
+        recorder.request(Long.MAX_VALUE);
+        assertEquals(List.of(1, 2, 3), recorder.elements);
+        assertTrue(recorder.complete);
+        assertEquals(1, reads.get());
+    }
+
+    @Test
+    void aRequestThatIsNotPositiveFailsThePublisherOfElementsOnce() {
+        AtomicBoolean closed = new AtomicBoolean();
+        Recorder<Integer> recorder = new Recorder<>();
+        new BodyElementsPublisher<>(new CountingElements(3, closed)).subscribe(recorder);
+
+        recorder.request(0);
+        assertInstanceOf(IllegalArgumentException.class, recorder.failure);
+        assertTrue(closed.get());
+        recorder.failure = null;
+        recorder.request(-1);
+        assertNull(recorder.failure);
+    }
+
+    @Test
+    void anInputThatEmitsMoreThanRequestedIsCancelled() {
+        AtomicBoolean cancelled = new AtomicBoolean();
+        Publisher<ReadBuffer> eager = subscriber -> subscriber.onSubscribe(new Subscription() {
+            @Override
+            public void request(long n) {
+                // ignores the demand
+                subscriber.onNext(piece("a\n"));
+                subscriber.onNext(piece("b\n"));
+            }
+
+            @Override
+            public void cancel() {
+                cancelled.set(true);
+            }
+        });
+        Recorder<String> recorder = new Recorder<>();
+        PieceReaders.publisher(eager, new LineReader(new AtomicInteger())).subscribe(recorder);
+
+        recorder.request(1);
+        assertInstanceOf(IllegalStateException.class, recorder.failure);
+        assertTrue(cancelled.get());
+    }
+
+    @Test
+    void anInputFailureAfterCancellingIsNotSignalled() {
+        AtomicReference<Subscriber<? super ReadBuffer>> input = new AtomicReference<>();
+        Publisher<ReadBuffer> pieces = subscriber -> {
+            input.set(subscriber);
+            subscriber.onSubscribe(new Subscription() {
+                @Override
+                public void request(long n) {
+                    // the test signals
+                }
+
+                @Override
+                public void cancel() {
+                    // the test signals
+                }
+            });
+        };
+        Recorder<String> recorder = new Recorder<>();
+        PieceReaders.publisher(pieces, new LineReader(new AtomicInteger())).subscribe(recorder);
+
+        recorder.request(1);
+        recorder.subscription.cancel();
+        input.get().onError(new IllegalArgumentException("late"));
+        assertNull(recorder.failure);
+    }
+
+    private static Flux<ReadBuffer> pieces(String... pieces) {
+        return Flux.fromArray(pieces).map(PieceReadersTest::piece);
+    }
+
+    private static ReadBuffer piece(String text) {
+        return ReadBufferFactory.getJdkFactory().adapt(text.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static ByteBuffer<?> buffer(String text) {
+        return piece(text).toByteBuffer();
+    }
+
+    /**
+     * Lines, decoded when they are polled; "boom" does not decode.
+     */
+    private static final class LineReader implements PieceReader<String> {
+        private final AtomicInteger decoded;
+        private final StringBuilder pending = new StringBuilder();
+        private final List<String> lines = new ArrayList<>();
+        boolean closed;
+
+        LineReader(AtomicInteger decoded) {
+            this.decoded = decoded;
+        }
+
+        @Override
+        public void read(ReadBuffer piece) {
+            try (piece) {
+                pending.append(piece.toString(StandardCharsets.UTF_8));
+            }
+            int end;
+            while ((end = pending.indexOf("\n")) >= 0) {
+                lines.add(pending.substring(0, end));
+                pending.delete(0, end + 1);
+            }
+        }
+
+        @Override
+        public void complete() {
+            // nothing to do in this test
+        }
+
+        @Override
+        public @Nullable String poll() {
+            if (lines.isEmpty()) {
+                return null;
+            }
+            String line = lines.remove(0);
+            if (line.equals("boom")) {
+                throw new CodecException("Cannot decode " + line);
+            }
+            decoded.incrementAndGet();
+            return line;
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+        }
+    }
+
+    /**
+     * A reader of a publisher only: one string per buffer, emitted at once or on another thread.
+     */
+    private static final class FluxLineReader implements ChunkedMessageBodyReader<String> {
+        private final boolean async;
+
+        FluxLineReader(boolean async) {
+            this.async = async;
+        }
+
+        @Override
+        public Publisher<? extends String> readChunked(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+            Flux<String> strings = Flux.from(input).map(buffer -> buffer.toString(StandardCharsets.UTF_8));
+            return async ? strings.publishOn(Schedulers.single()) : strings;
+        }
+
+        @Override
+        public String read(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) {
+            return "";
+        }
+    }
+
+    /**
+     * A reader that implements only the piece reader: lines.
+     */
+    private static final class OnlyPiecesReader implements ChunkedMessageBodyReader<String> {
+        @Override
+        public PieceReader<String> openPieceReader(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
+            return new LineReader(new AtomicInteger());
+        }
+
+        @Override
+        public String read(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) {
+            return "";
+        }
+    }
+
+    /**
+     * The numbers below a count.
+     */
+    private static final class CountingElements implements BodyElements<Integer> {
+        private final int count;
+        private final AtomicBoolean closed;
+        private int next;
+
+        CountingElements(int count, AtomicBoolean closed) {
+            this.count = count;
+            this.closed = closed;
+        }
+
+        @Override
+        public CompletionStage<Optional<Integer>> next() {
+            return CompletableFuture.completedStage(next < count ? Optional.of(next++) : Optional.empty());
+        }
+
+        @Override
+        public CompletionStage<Void> forEach(Function<? super Integer, ? extends CompletionStage<?>> consumer) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public CompletionStage<Void> closeAsync() {
+            close();
+            return CompletableFuture.completedStage(null);
+        }
+
+        @Override
+        public void close() {
+            closed.set(true);
+        }
+    }
+
+    private static final class Recorder<T> implements Subscriber<T> {
+        final List<T> elements = new ArrayList<>();
+        Subscription subscription;
+        boolean complete;
+        Throwable failure;
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            subscription = s;
+        }
+
+        void request(long n) {
+            subscription.request(n);
+        }
+
+        @Override
+        public void onNext(T t) {
+            elements.add(t);
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            failure = t;
+        }
+
+        @Override
+        public void onComplete() {
+            complete = true;
+        }
+    }
+}
