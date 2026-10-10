@@ -100,6 +100,10 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     @Nullable
     private ScheduledFuture<?> handshakeTimeoutTask;
     /**
+     * Whether the stages the handlers return are awaited, see {@link #awaitCompletionStages()}.
+     */
+    private volatile boolean awaitCompletionStages;
+    /**
      * What the handshake says about the instance, see {@link #getHandshakeOutcome()}: empty when
      * it says nothing, {@code null} until it is known. The first outcome wins.
      */
@@ -402,6 +406,23 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
      */
     public final T getClientEndpoint() {
         return genericWebSocketBean.getTarget();
+    }
+
+    /**
+     * Await the {@link java.util.concurrent.CompletionStage} the open and message handlers of the
+     * endpoint return, like a publisher: the connect completes once the stage of the open handler
+     * completed, and a failed stage reaches the error handler. Used by the connections of an
+     * {@link io.micronaut.websocket.AsyncWebSocketClient}; call it before the handler is added.
+     *
+     * @since 5.3.0
+     */
+    public final void awaitCompletionStages() {
+        awaitCompletionStages = true;
+    }
+
+    @Override
+    protected boolean awaitsCompletionStages() {
+        return awaitCompletionStages;
     }
 
     /**
