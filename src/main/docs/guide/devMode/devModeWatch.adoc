@@ -88,6 +88,8 @@ When a change cannot be applied to a bean in place, the watcher asks the context
 
 This is more than destroying the bean and getting it again, which would leave its dependents holding the destroyed instance.
 
+A controller, a server filter or a `LocatedRoutes` bean that is recreated serves the next request: the development router rebuilds its route table, whose routes would otherwise hold the destroyed instance.
+
 Both methods return whether anything was recreated, which a prototype, a bean of a custom scope or a singleton registered at runtime never is.
 
 They are meant for development-time watches. The dependents are known only when the context tracks bean dependencies, which by default only a context in development mode does; `ApplicationContextBuilder.beanDependencyTrackingEnabled(true)` turns it on elsewhere. A context that does not track them recreates nothing and returns false.
@@ -99,6 +101,8 @@ snippet::io.micronaut.docs.devmode.watch.SerializerLookup[tags="imports,class", 
 == Resources
 
 Resources are watched the same way: a template engine registers `resources(ResourceKind.VIEWS).include("**/*.html").watch(change -> ...)` and clears what the change affects, rather than filtering an event every engine receives.
+
+The build tools give `src/main/resources` as the configuration root, so a file kept there, such as a GraphQL schema, is watched with `resources(ResourceKind.CONFIG).include("**/*.graphqls")`. Every change under that root reaches the watches of `CONFIG`, the configuration files among them. Only a configuration file refreshes the configuration: an `application` or `bootstrap` file, plain or for an environment such as `application-dev.yml`, at the root, in a format a property source loader reads.
 
 NOTE: Existing api:context.processor.ExecutableMethodProcessor[] and api:context.processor.BeanDefinitionProcessor[] beans keep working. The context feeds them what is added after startup, through an adapter that sees additions only, which is also how the launcher tells that such a processor cannot follow a reload.
 
