@@ -138,7 +138,8 @@ public final class CompletionStagePublishers {
     /**
      * A future of the value of a stage transformed by a function. The future fails with the
      * error of the stage, without the {@link CompletionException} wrapper, or with the error the
-     * function throws. Cancelling the future cancels the stage when it is a future of this class.
+     * function throws. Cancelling the future cancels the stage when it is a future of this class,
+     * and the function is not invoked once the future is cancelled, even when the stage completes.
      *
      * @param stage    The stage
      * @param function The function
@@ -150,6 +151,10 @@ public final class CompletionStagePublishers {
                                                                                                     Function<? super T, ? extends R> function) {
         CompletableFuture<R> result = future();
         stage.whenComplete((value, throwable) -> {
+            if (result.isDone()) {
+                // cancelled: a stage that is not owned completes anyway, and its value is not wanted
+                return;
+            }
             if (throwable != null) {
                 result.completeExceptionally(unwrap(throwable));
                 return;
@@ -171,7 +176,8 @@ public final class CompletionStagePublishers {
      * A future of the stage that a function returns for the value of a stage. The future fails
      * with the error of either stage, without the {@link CompletionException} wrapper, or with the
      * error the function throws. Cancelling the future cancels the stages that are futures of
-     * this class.
+     * this class, and the function is not invoked once the future is cancelled, even when the
+     * stage completes.
      *
      * @param stage    The stage
      * @param function The function
@@ -183,6 +189,11 @@ public final class CompletionStagePublishers {
                                                                                                         Function<? super T, ? extends CompletionStage<R>> function) {
         CompletableFuture<R> result = future();
         stage.whenComplete((value, throwable) -> {
+            if (result.isDone()) {
+                // cancelled: a stage that is not owned completes anyway, and the function must not
+                // start work, a request for example, that nobody waits for
+                return;
+            }
             if (throwable != null) {
                 result.completeExceptionally(unwrap(throwable));
                 return;
