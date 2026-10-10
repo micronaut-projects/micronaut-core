@@ -53,6 +53,7 @@ class DevManifestSpec extends Specification {
             micronaut.dev.build-tool.trigger=build/micronaut-dev/reload
             micronaut.dev.retain=javax.sql.DataSource, org.graalvm.polyglot.Engine
             micronaut.dev.livereload.port=36000
+            micronaut.dev.livereload.allowed-origins=http://devbox.lan:8080, app-container ,
         """.stripIndent())
 
         when:
@@ -82,6 +83,7 @@ class DevManifestSpec extends Specification {
         manifest.retain() == ["javax.sql.DataSource", "org.graalvm.polyglot.Engine"]
         manifest.liveReload().port() == 36000
         manifest.liveReload().injectScript()
+        manifest.liveReload().allowedOrigins() == ["http://devbox.lan:8080", "app-container"]
     }
 
     void "the defaults apply"() {
@@ -97,6 +99,7 @@ class DevManifestSpec extends Specification {
         manifest.strategy() == ReloadStrategy.AUTO
         manifest.compileMode(SourceKind.JAVA) == CompileMode.EMBEDDED
         manifest.liveReload().port() == 35729
+        manifest.liveReload().allowedOrigins().isEmpty()
     }
 
     void "a manifest without a main class or a reloadable root is refused"() {

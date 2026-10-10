@@ -130,9 +130,19 @@ The server listens on the loopback address only, and its socket accepts the clie
 
 * native clients, which send no `Origin`;
 * the browser extensions (`chrome-extension:`, `moz-extension:` and `safari-web-extension:` origins);
-* pages served by `localhost`, a `*.localhost` name or the loopback address, on any port.
+* pages served by `localhost`, a `*.localhost` name or the loopback address, on any port;
+* pages of the origins listed in `micronaut.dev.livereload.allowed-origins`, none by default.
 
 A page of any other site is refused, so that a site the developer visits cannot follow the reloads. This holds for the script a browser extension injects too, since it runs in the page and connects with the page's origin. Open the application through `localhost`, the loopback address or a name under `.localhost`, such as `myapp.localhost`, which browsers resolve to the loopback address.
+
+When the browser opens the application through another name, such as a LAN host or the name of a development container whose ports are forwarded, list that name in `micronaut.dev.livereload.allowed-origins`, comma-separated, in the manifest or as a system property of the launcher:
+
+[source,properties]
+----
+micronaut.dev.livereload.allowed-origins=http://devbox.lan:8080,app-container
+----
+
+An origin, `http://devbox.lan:8080`, allows pages of that scheme, host and port, the default port matching an origin that leaves it out; a host name alone, `app-container`, allows its pages over HTTP or HTTPS on any port. The loopback origins and the extensions stay allowed. No pattern is accepted: an entry with a `*`, or one that is neither an origin nor a host name, is ignored with a warning, so the socket never opens to every site. The setting only decides which pages may connect: the server still listens on the loopback address, so the LiveReload port must reach it from the browser, as forwarded ports or an SSH tunnel do. The event channel and the pages the server serves stay those of `localhost`.
 
 === Serving other pages
 

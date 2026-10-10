@@ -103,6 +103,44 @@ class NettyLiveReloadServerTest {
         }
     }
 
+    @Test
+    @Timeout(60)
+    void theOriginsConfiguredAreAcceptedBesideTheLoopbackOnesAndNoPattern() throws Exception {
+        // by default an application opened through a LAN host or a container's name is refused
+        try (LiveReloadServer server = NettyLiveReloadServer.start(0)) {
+            assertStatus(403, upgrade(server.port(), "/livereload", "http://devbox.lan:8080"));
+        }
+        LiveReloadServerFactory factory = ServiceLoader.load(LiveReloadServerFactory.class).findFirst().orElseThrow();
+        try (LiveReloadServer server = factory.start(0, java.util.List.of(" http://DevBox.lan:8080 ", "app-container", "*", "*.example", "http://other.lan/path", "ftp://files.lan"))) {
+            int port = server.port();
+            // an origin allows its scheme, host and port; a host name its pages on any port, over HTTP or HTTPS
+            assertStatus(101, upgrade(port, "/livereload", "http://devbox.lan:8080"));
+            assertStatus(403, upgrade(port, "/livereload", "http://devbox.lan:9090"));
+            assertStatus(403, upgrade(port, "/livereload", "https://devbox.lan:8080"));
+            assertStatus(101, upgrade(port, "/livereload", "http://app-container:3000"));
+            assertStatus(101, upgrade(port, "/livereload", "https://app-container"));
+            // the loopback ones and the extensions still are
+            assertStatus(101, upgrade(port, "/livereload", "http://localhost:8080"));
+            assertStatus(101, upgrade(port, "/livereload", "chrome-extension://jnihajbhpnppcggbcgedagnkighmdlei"));
+            // a wildcard is no pattern, nor is an origin with a path or of another scheme accepted
+            assertStatus(403, upgrade(port, "/livereload", "https://evil.example"));
+            assertStatus(403, upgrade(port, "/livereload", "https://sub.example"));
+            assertStatus(403, upgrade(port, "/livereload", "http://other.lan"));
+            assertStatus(403, upgrade(port, "/livereload", "null"));
+            // the event channel stays the server's own pages'
+            assertStatus(403, upgrade(port, "/micronaut-dev/events?topic=tests", "http://devbox.lan:8080"));
+        }
+    }
+
+    @Test
+    void anOriginWithTheDefaultPortMatchesOneThatLeavesItOut() {
+        AllowedOrigins allowed = AllowedOrigins.of(java.util.List.of("http://devbox.lan:80", "https://secure.lan"));
+        assertTrue(allowed.allows("http://devbox.lan"));
+        assertTrue(allowed.allows("https://secure.lan:443"));
+        org.junit.jupiter.api.Assertions.assertFalse(allowed.allows("http://secure.lan"));
+        assertEquals(AllowedOrigins.LOOPBACK, AllowedOrigins.of(java.util.List.of("*", " ")));
+    }
+
     private static void assertStatus(int expected, String statusLine) {
         assertTrue(statusLine.contains(" " + expected + " "), statusLine);
     }

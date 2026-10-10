@@ -961,7 +961,7 @@ public final class DevRuntime implements Closeable {
             return;
         }
         try {
-            liveReload = factory.start(manifest.liveReload().port());
+            liveReload = factory.start(manifest.liveReload().port(), manifest.liveReload().allowedOrigins());
         } catch (IOException e) {
             LOG.warn("LiveReload server could not bind port {}: {}", manifest.liveReload().port(), e.getMessage());
         }

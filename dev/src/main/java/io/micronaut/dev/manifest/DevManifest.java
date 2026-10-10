@@ -32,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
@@ -207,7 +208,8 @@ public final class DevManifest {
         this.generations = generationsDir == null ? projectDir.resolve("build").resolve("micronaut-dev").resolve("generations") : path(directory, generationsDir);
         this.liveReload = new LiveReload(
             Integer.parseInt(properties.getProperty(PREFIX + "livereload.port", "35729").trim()),
-            Boolean.parseBoolean(properties.getProperty(PREFIX + "livereload.inject-script", "true"))
+            Boolean.parseBoolean(properties.getProperty(PREFIX + "livereload.inject-script", "true")),
+            Arrays.stream(properties.getProperty(PREFIX + "livereload.allowed-origins", "").split(",")).map(String::trim).filter(origin -> !origin.isEmpty()).toList()
         );
         this.testSourceRoots = sourceRoots(directory, properties, TEST + "sources.");
         this.testResourceRoots = resourceRoots(directory, properties, TEST + "resources.");
@@ -867,7 +869,29 @@ public final class DevManifest {
      *
      * @param port The port the LiveReload server listens on
      * @param injectScript Whether the client script is added to HTML responses
+     * @param allowedOrigins The origins, or host names, whose pages the LiveReload socket accepts beside those of
+     *                       {@code localhost}, a {@code *.localhost} name and the loopback address, from
+     *                       {@code micronaut.dev.livereload.allowed-origins}; none by default
      */
-    public record LiveReload(int port, boolean injectScript) {
+    public record LiveReload(int port, boolean injectScript, List<String> allowedOrigins) {
+
+        /**
+         * The settings with no other origin allowed.
+         *
+         * @param port The port the LiveReload server listens on
+         * @param injectScript Whether the client script is added to HTML responses
+         */
+        public LiveReload(int port, boolean injectScript) {
+            this(port, injectScript, List.of());
+        }
+
+        /**
+         * @param port The port the LiveReload server listens on
+         * @param injectScript Whether the client script is added to HTML responses
+         * @param allowedOrigins The origins, or host names, the LiveReload socket accepts beside the loopback ones
+         */
+        public LiveReload {
+            allowedOrigins = List.copyOf(allowedOrigins);
+        }
     }
 }
