@@ -110,3 +110,12 @@ The server listens on the loopback address only, and its socket accepts the clie
 * pages served by `localhost`, a `*.localhost` name or the loopback address, on any port.
 
 A page of any other site is refused, so that a site the developer visits cannot follow the reloads. This holds for the script a browser extension injects too, since it runs in the page and connects with the page's origin. Open the application through `localhost`, the loopback address or a name under `.localhost`, such as `myapp.localhost`, which browsers resolve to the loopback address.
+
+=== Serving other pages
+
+The server also serves pages that are not the application's, such as a test report:
+
+* `LiveReloadServer.serve(prefix, directory)` mounts a directory at an `http://localhost:35729` address, with the client script in its HTML. Nothing outside the directory is served.
+* A page that follows something as it happens subscribes to a topic of the event channel, `ws://localhost:35729/micronaut-dev/events?topic=<topic>`, and receives the JSON that `LiveReloadServer.publish(topic, json)` sends. The channel is apart from the LiveReload socket, whose clients reject commands they do not know.
+
+A component reaches the server through `DevRuntime.current().liveReload()`, in test mode too.
