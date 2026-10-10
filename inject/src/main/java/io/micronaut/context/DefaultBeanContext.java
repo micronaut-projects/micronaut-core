@@ -2868,10 +2868,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * {@code @Requires(beans = ...)} fails only until its bean is registered.
      *
      * @param annotationType The annotation
+     * @param runtimeOnly Whether only the definitions registered at runtime are read, which the index of the
+     * definitions processed at startup leaves out
      * @return The definitions
      */
-    List<BeanDefinition<Object>> definitionsWithMethodsAnnotated(Class<? extends Annotation> annotationType) {
-        return beanDefinitionProvider.getBeanDefinitions(this, null, definition -> {
+    List<BeanDefinition<Object>> definitionsWithMethodsAnnotated(Class<? extends Annotation> annotationType, boolean runtimeOnly) {
+        return beanDefinitionProvider.getBeanDefinitions(this, runtimeOnly ? RuntimeBeanDefinition.class::isInstance : null, definition -> {
             for (ExecutableMethod<Object, ?> method : definition.getExecutableMethods()) {
                 if (method.getAnnotationMetadata().hasStereotype(annotationType)) {
                     return true;
