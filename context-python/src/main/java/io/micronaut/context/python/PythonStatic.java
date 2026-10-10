@@ -385,7 +385,7 @@ public final class PythonStatic {
             return number.longValue();
         }
         if (value instanceof Boolean bool) {
-            return bool ? 1 : 0;
+            return bool.booleanValue() ? 1 : 0;
         }
         throw new ClassCastException("not an int: " + str(value));
     }

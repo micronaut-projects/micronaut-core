@@ -204,6 +204,7 @@ public final class StaticBodyGenerator {
             case Ir.Helper helper -> helper.arguments().forEach(a -> collectNames(a, names));
             case Ir.Cast cast -> collectNames(cast.operand(), names);
             default -> {
+                // a constant, a this reference or a value without names of its own
             }
         }
     }
@@ -213,8 +214,9 @@ public final class StaticBodyGenerator {
      */
     private String fresh(String base) {
         String name = base;
+        int suffix = 0;
         while (!names.add(name)) {
-            name = name + "_";
+            name = base + "_".repeat(++suffix);
         }
         return name;
     }

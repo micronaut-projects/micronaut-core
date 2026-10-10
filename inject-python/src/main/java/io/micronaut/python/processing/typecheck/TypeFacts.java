@@ -120,7 +120,7 @@ public final class TypeFacts {
      * its classpath
      */
     public @Nullable TypeDescription describe(String qualifiedName, List<String> typeArguments) {
-        List<String> arguments = typeArguments == null ? List.of() : List.copyOf(typeArguments);
+        List<String> arguments = List.copyOf(typeArguments);
         String key = arguments.isEmpty() ? qualifiedName : qualifiedName + "<" + String.join(",", arguments) + ">";
         return types.computeIfAbsent(key, name -> Optional.ofNullable(complete(() -> loadType(qualifiedName, arguments)))).orElse(null);
     }
