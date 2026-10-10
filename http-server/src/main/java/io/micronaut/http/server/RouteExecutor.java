@@ -465,7 +465,7 @@ public final class RouteExecutor {
         } else {
             MutableHttpResponse<Object> mutableHttpResponse = forStatus(routeInfo, null);
             if (body != null) {
-                mutableHttpResponse = mutableHttpResponse.body(body);
+                mutableHttpResponse = routeBody(request, routeInfo, mutableHttpResponse, body);
             }
             return ExecutionFlow.just(mutableHttpResponse);
         }
@@ -868,7 +868,7 @@ public final class RouteExecutor {
                 } else {
                     response = forStatus(routeInfo, null);
                     if (!isKotlinFunctionReturnTypeUnit) {
-                        response = response.body(obj);
+                        response = routeBody(request, routeInfo, response, obj);
                     }
                 }
                 return ExecutionFlow.just(response);
@@ -909,8 +909,7 @@ public final class RouteExecutor {
                     } else if (o instanceof HttpStatus status) {
                         singleResponse = forStatus(routeInfo, status);
                     } else {
-                        singleResponse = forStatus(routeInfo, null)
-                            .body(o);
+                        singleResponse = routeBody(request, routeInfo, forStatus(routeInfo, null), o);
                     }
                     return ExecutionFlow.just(singleResponse);
                 });
@@ -1033,8 +1032,7 @@ public final class RouteExecutor {
             } else if (asyncBody instanceof HttpStatus status) {
                 mutableResponse = forStatus(routeInfo, status);
             } else {
-                mutableResponse = forStatus(routeInfo, null)
-                    .body(asyncBody);
+                mutableResponse = routeBody(request, routeInfo, forStatus(routeInfo, null), asyncBody);
             }
             if (mutableResponse.body() == null && !explicitResponse) {
                 if (routeInfo.isVoid()) {
@@ -1075,7 +1073,7 @@ public final class RouteExecutor {
         if (isSinglePublisher) {
             // the single value is the body, an empty publisher is a missing body
             return subscribeSingle(propagatedContext, request, bodyPublisher, routeInfo)
-                .map(b -> b == EMPTY ? emptyResponse(request, routeInfo) : response.body(b));
+                .map(b -> b == EMPTY ? emptyResponse(request, routeInfo) : routeBody(request, routeInfo, response, b));
         }
         MediaType mediaType = response.getContentType().orElseGet(() -> resolveDefaultResponseContentType(request, routeInfo));
 
@@ -1101,6 +1099,32 @@ public final class RouteExecutor {
             serverConfiguration.getServerHeader()
                 .ifPresent(header -> headers.add(HttpHeaders.SERVER, header));
         }
+    }
+
+    /**
+     * Sets a body the route returned. A {@link io.micronaut.http.annotation.Produces} on the body type
+     * only supplies the default content type: when the route declares that type and the first
+     * {@code Accept} type is another type the route declares, the accepted type is used.
+     */
+    private static <T> MutableHttpResponse<T> routeBody(HttpRequest<?> request,
+                                                        RouteInfo<?> routeInfo,
+                                                        MutableHttpResponse<?> response,
+                                                        @Nullable T body) {
+        List<MediaType> produces = routeInfo.getProduces();
+        if (body != null && produces != null && produces.size() > 1 && response.getContentType().isEmpty()) {
+            Iterator<MediaType> accept = request.accept().iterator();
+            if (accept.hasNext()) {
+                MediaType accepted = accept.next();
+                int index = produces.indexOf(accepted);
+                if (index != -1 && !MediaType.ALL_TYPE.equals(accepted)) {
+                    MediaType bodyType = MediaType.fromType(body.getClass()).orElse(null);
+                    if (bodyType != null && !bodyType.equals(accepted) && produces.contains(bodyType)) {
+                        response.contentType(produces.get(index));
+                    }
+                }
+            }
+        }
+        return response.body(body);
     }
 
     private MutableHttpResponse<Object> forStatus(RouteInfo<?> routeMatch) {
