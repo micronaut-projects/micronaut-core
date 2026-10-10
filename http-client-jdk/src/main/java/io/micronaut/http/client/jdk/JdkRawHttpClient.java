@@ -27,7 +27,7 @@ import io.micronaut.http.client.AsyncProxyHttpClient;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
 import io.micronaut.http.client.RawHttpClientSupport;
-import io.micronaut.http.client.RawHttpRequestWrapper;
+import io.micronaut.http.client.internal.RawHttpRequestWrapper;
 import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.RawResponseFuture;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
