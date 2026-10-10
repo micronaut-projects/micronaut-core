@@ -152,7 +152,8 @@ class StaticPlanner:
         if rules.problems:
             return None, list(rules.problems)
         class_model = self.checker.python_classes.of(class_def)
-        lowering = Lowering(self.checker, module, class_def, function_def, node, rules, class_model)
+        lowering = Lowering(self.checker, module, class_def, function_def, node, rules, class_model,
+                            advised=lambda sibling: self._advice(class_def, sibling) is not None)
         body = lowering.lower()
         return body, lowering.reasons
 
