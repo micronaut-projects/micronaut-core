@@ -111,7 +111,7 @@ public interface BeanDependencyResolver {
 
     /**
      * Resolves a registration using the same ownership rules as {@link #getBean(Argument, Qualifier)}.
-     * Shared registrations remain scope-owned; use {@link BeanDependencyGroup#destroy(BeanRegistration)}
+     * Shared registrations remain scope-owned; use {@link #destroy(BeanRegistration)}
      * for early destruction of owned instances rather than closing a shared registration.
      * @param type The requested type, including generic arguments
      * @param qualifier The qualifier, or {@code null}
@@ -151,6 +151,16 @@ public interface BeanDependencyResolver {
      * @since 5.3.0
      */
     <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type);
+
+    /**
+     * Destroys and forgets a registration this resolver owns, before its owner is destroyed. A shared registration
+     * is never destroyed. Registration identity, rather than equality of bean definitions or instances, identifies
+     * ownership.
+     * @param registration The registration, as returned by one of the registration lookups of this resolver
+     * @return Whether this resolver owned the registration
+     * @since 5.3.0
+     */
+    boolean destroy(BeanRegistration<?> registration);
 
     /**
      * Creates a child group. The consumer closes it automatically, but the caller may close it earlier.
