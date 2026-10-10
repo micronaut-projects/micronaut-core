@@ -24,6 +24,12 @@ import io.micronaut.core.annotation.Experimental;
  * <p>Only the type itself is described. The constructors a proxy is created through and the methods it overrides
  * are not, since what a proxy needs of them depends on the kind of proxy.</p>
  *
+ * <p>Whether the proxy can access the type is not described either, since that depends on where the proxy is
+ * generated: a private nested class has no restriction, though a proxy generated as a top level class cannot extend
+ * it, and a package private type can only be extended by a proxy generated in its own package. These are separate
+ * checks, so a type without a restriction is one that none of the listed restrictions applies to, not one that every
+ * proxy can extend.</p>
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */
