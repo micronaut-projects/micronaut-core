@@ -409,6 +409,18 @@ final class GraalPyHostAccessFactory {
     }
 
     /**
+     * The Java counterpart of a Python standard library value ({@code uuid.UUID}, {@code decimal.Decimal},
+     * a naive {@code datetime}, ...), the value {@link PythonCoercion} materialises it from.
+     *
+     * @param value a Python value
+     * @return the Java value, or {@code null} when the value is not a convertible standard library value
+     */
+    static @Nullable Object standardLibraryValue(@Nullable Value value) {
+        StandardLibraryType<?> standardType = findStandardLibraryType(value);
+        return standardType != null ? standardType.converter().apply(value) : null;
+    }
+
+    /**
      * @param value a Python value bound for an {@code Object} parameter
      * @return the standard library type to convert it as, or {@code null} to leave it alone
      */

@@ -17,7 +17,6 @@ package io.micronaut.context.reload;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.atomic.AtomicReference;
@@ -32,7 +31,6 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 @Internal
 @Experimental
-@NullMarked
 public final class RequestAdmissionHolder {
 
     private static final AtomicReference<@Nullable RequestAdmission> CURRENT = new AtomicReference<>();
