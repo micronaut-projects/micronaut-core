@@ -1154,7 +1154,7 @@ public final class DevRuntime implements Closeable {
         TestSession session = tests;
         if (session != null) {
             // the next run covers what the run under way covers and this change too
-            session.cancelRun();
+            session.cancelRun(batch);
         }
         return sequence;
     }

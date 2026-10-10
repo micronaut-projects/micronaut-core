@@ -110,6 +110,8 @@ final class TestSession {
     private boolean compileFailed;
     private volatile boolean watching = true;
     private volatile @Nullable Cancellation current;
+    // the state of each file reported, as the batch that named it last found it
+    private final HandledFiles handledFiles = new HandledFiles();
     // on the reload thread: the loader of the last run, whether every change since it was made is in it, patched in,
     // and whether one was patched in, which makes the next run use it again
     private @Nullable ClassLoader runLoader;
@@ -157,8 +159,12 @@ final class TestSession {
     /**
      * Compiles a batch's changes and runs the tests they affect, or those asked for.
      */
-    void handle(Map<SourceKind, SourceChanges> sources, Map<SourceKind, SourceChanges> testSources,
-                Map<ResourceKind, SourceChanges> resources, boolean full, @Nullable TestRequest requested) {
+    void handle(Map<SourceKind, SourceChanges> reportedSources, Map<SourceKind, SourceChanges> reportedTestSources,
+                Map<ResourceKind, SourceChanges> reportedResources, boolean full, @Nullable TestRequest requested) {
+        // the watcher's late report of a write a batch already handled, from a harness or an IDE, changes nothing
+        Map<SourceKind, SourceChanges> sources = handledFiles.fresh(reportedSources);
+        Map<SourceKind, SourceChanges> testSources = handledFiles.fresh(reportedTestSources);
+        Map<ResourceKind, SourceChanges> resources = handledFiles.fresh(reportedResources);
         // the sources of a batch that did not compile are compiled again with the next one, a request included
         Map<SourceKind, SourceChanges> allSources;
         Map<SourceKind, SourceChanges> allTestSources;
@@ -649,6 +655,18 @@ final class TestSession {
                     LOG.error("The test report {} failed: {}", report.getClass().getName(), e.getMessage(), e);
                 }
             }
+        }
+    }
+
+    /**
+     * Asks the run under way, if any, to stop for a batch that arrived, unless the batch only reports again files in
+     * the state a batch already handled found them: the watcher's late report of a write the run covers.
+     *
+     * @param batch The batch
+     */
+    void cancelRun(Pending batch) {
+        if (current != null && !handledFiles.isHandled(batch)) {
+            cancelRun();
         }
     }
 
