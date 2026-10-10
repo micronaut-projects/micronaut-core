@@ -246,6 +246,8 @@ final class ResponsePieces<T> implements Subscriber<T>, Publisher<ByteBody>, Sub
                 if (error != null) {
                     if (failure == null) {
                         failure = error;
+                    } else if (failure != error) {
+                        failure.addSuppressed(error);
                     }
                 } else {
                     ready = piece;
@@ -273,6 +275,8 @@ final class ResponsePieces<T> implements Subscriber<T>, Publisher<ByteBody>, Sub
             requested = false;
             if (failure == null) {
                 failure = t;
+            } else if (failure != t) {
+                failure.addSuppressed(t);
             }
         }
         drain();

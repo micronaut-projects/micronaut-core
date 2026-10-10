@@ -92,7 +92,8 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         CloseableByteBody body = requestBody == null ? AvailableByteArrayBody.create(ReadBufferFactory.getJdkFactory().createEmpty()) : requestBody;
         MutableHttpRequest<?> rawRequest;
         try {
-            rawRequest = new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body);
+            rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request,
+                RawRequestOptions.builder().retainHostHeader(true).build()), body);
         } catch (RuntimeException | Error e) {
             // building the exchange failed, so nothing else releases the body
             body.close();

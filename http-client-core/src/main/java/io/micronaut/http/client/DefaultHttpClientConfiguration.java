@@ -118,6 +118,12 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
         return http2Configuration;
     }
 
+    /** @param configuration JDK-specific settings for this client */
+    @Inject
+    void configureJdk(DefaultJdkConfiguration configuration) {
+        setJdk(configuration);
+    }
+
     /**
      * The default connection pool configuration.
      */
@@ -144,4 +150,12 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     @Primary
     public static class DefaultHttp2ClientConfiguration extends Http2ClientConfiguration {
     }
+
+    /** JDK-specific client settings. */
+    @ConfigurationProperties("jdk")
+    @BootstrapContextCompatible
+    @Primary
+    public static class DefaultJdkConfiguration extends JdkConfiguration {
+    }
+
 }
