@@ -3580,7 +3580,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             return getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, beanType, definition, heldRegistration);
         }
         // Unknown scope, prototype scope etc
-        return createRegistration(resolutionContext, beanType, qualifier, definition, true);
+        return createRegistration(resolutionContext, beanType, qualifier, definition, true, false, true);
     }
 
     private <T> BeanRegistration<T> intializeEagerBean(@Nullable BeanResolutionContext resolutionContext,
@@ -3723,13 +3723,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                      @Nullable Qualifier<T> qualifier,
                                                      BeanDefinition<T> definition,
                                                      boolean dependent) {
-        return createRegistration(resolutionContext, beanType, qualifier, definition, dependent, false);
+        return createRegistration(resolutionContext, beanType, qualifier, definition, dependent, false, false);
     }
 
     final <T> BeanRegistration<T> createFreshRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                          BeanDefinition<T> definition) {
         return createRegistration(resolutionContext, definition.asArgument(), definition.getDeclaredQualifier(),
-            definition, resolutionContext != null, true);
+            definition, resolutionContext != null, true, true);
     }
 
     @SuppressWarnings({"unchecked", "NullAway"}) // Nullable factory definitions may produce a registration without an instance.
@@ -3738,7 +3738,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                       @Nullable Qualifier<T> qualifier,
                                                       BeanDefinition<T> definition,
                                                       boolean dependent,
-                                                      boolean customizeNull) {
+                                                      boolean customizeNull,
+                                                      boolean ownLifecycle) {
         if (resolutionContext instanceof AbstractBeanResolutionContext abstractContext && abstractContext.isLazyProxyTarget()) {
             // The context is retained by a lazy proxy, which resolves its target through it on every call. Create
             // the bean in a copy, so that the created bean is not recorded as a dependent of the retained context
@@ -3800,7 +3801,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
                         List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
                         beanRegistration = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
-                            dependentBeans, interceptorCandidates, creation.dependencies);
+                            dependentBeans, interceptorCandidates, creation.dependencies, ownLifecycle);
                     } catch (RuntimeException | Error e) {
                         destroyDependentsOfFailedBean(context, e);
                         destroyCreatedBeans(creation.dependencies.takeDependents(), e);
