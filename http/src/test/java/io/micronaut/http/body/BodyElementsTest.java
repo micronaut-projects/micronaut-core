@@ -166,7 +166,8 @@ class BodyElementsTest {
         CompletionStage<Void> closed = elements.closeAsync();
         IllegalStateException failure = new IllegalStateException("cleanup failed");
         cleanup.completeExceptionally(failure);
-        assertSame(failure, assertThrows(CompletionException.class, () -> closed.toCompletableFuture().join()).getCause());
+        CompletableFuture<Void> closedFuture = closed.toCompletableFuture();
+        assertSame(failure, assertThrows(CompletionException.class, closedFuture::join).getCause());
         assertSame(failure, assertThrows(IllegalStateException.class, elements::close));
     }
 
@@ -176,9 +177,11 @@ class BodyElementsTest {
         BodyElements<String> elements = BodyElements.ofAsync(CompletableFuture::new, () -> {
             throw failure;
         });
-        assertSame(failure, assertThrows(CompletionException.class, () -> elements.closeAsync().toCompletableFuture().join()).getCause());
+        CompletableFuture<Void> closed = elements.closeAsync().toCompletableFuture();
+        assertSame(failure, assertThrows(CompletionException.class, closed::join).getCause());
         BodyElements<String> invalid = BodyElements.ofAsync(CompletableFuture::new, () -> null);
-        assertTrue(assertThrows(CompletionException.class, () -> invalid.closeAsync().toCompletableFuture().join()).getCause() instanceof NullPointerException);
+        CompletableFuture<Void> invalidClosed = invalid.closeAsync().toCompletableFuture();
+        assertTrue(assertThrows(CompletionException.class, invalidClosed::join).getCause() instanceof NullPointerException);
     }
 
     @Test

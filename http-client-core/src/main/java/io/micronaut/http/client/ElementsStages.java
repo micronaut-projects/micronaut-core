@@ -126,6 +126,7 @@ public final class ElementsStages {
         return future;
     }
 
+    @SuppressWarnings("java:S1181") // Mapper errors must fail the returned stage and release its response.
     static <S, R extends @Nullable Object> CompletionStage<R> map(CompletionStage<S> stage,
                                                  Function<? super S, ? extends R> mapper,
                                                  Consumer<S> discard) {
