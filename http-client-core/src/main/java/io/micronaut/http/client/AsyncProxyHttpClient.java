@@ -31,6 +31,10 @@ import java.util.concurrent.CompletionStage;
  * <p>Cancelling the future of a stage (see {@link CompletionStage#toCompletableFuture()}) before
  * the response arrives cancels the exchange; a response that arrives after that is closed.</p>
  *
+ * <p>Views share the delegate's lifecycle: closing a Netty proxy view stops its underlying
+ * HTTP client, including other views of that client. Closing a JDK proxy view does nothing;
+ * close the owning JDK HTTP client to release its resources.</p>
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */
