@@ -71,6 +71,9 @@ final class ExecutableMethodProcessorListener implements BeanCreatedEventListene
                     }
                 }
             }
+            if (beanContext instanceof DefaultBeanContext defaultBeanContext) {
+                defaultBeanContext.givenByLegacyListener(processor, beanDefinitions);
+            }
         }
         if (processor instanceof LifeCycle<?> cycle) {
             try {
