@@ -127,7 +127,7 @@ public final class BodyPieces implements PieceReader<ByteBuffer<?>> {
     private static final class Lines<T> implements PieceReader<T> {
         private final long maxLineLength;
         private final Function<byte[], T> factory;
-        private final ArrayDeque<byte[]> lines = new ArrayDeque<>(1);
+        private final ArrayDeque<byte[]> completedLines = new ArrayDeque<>(1);
         /**
          * The bytes of the line that is not ended yet: the first {@link #pendingLength}.
          */
@@ -162,7 +162,7 @@ public final class BodyPieces implements PieceReader<ByteBuffer<?>> {
                 afterCr = false;
                 if (b == '\n' || b == '\r') {
                     append(bytes, start, i);
-                    lines.add(Arrays.copyOf(pending, pendingLength));
+                    completedLines.add(Arrays.copyOf(pending, pendingLength));
                     pendingLength = 0;
                     afterCr = b == '\r';
                     start = i + 1;
@@ -199,13 +199,13 @@ public final class BodyPieces implements PieceReader<ByteBuffer<?>> {
 
         @Override
         public @Nullable T poll() {
-            byte[] line = lines.poll();
+            byte[] line = completedLines.poll();
             return line == null ? null : factory.apply(line);
         }
 
         @Override
         public void close() {
-            lines.clear();
+            completedLines.clear();
             pendingLength = 0;
             pending = new byte[0];
         }

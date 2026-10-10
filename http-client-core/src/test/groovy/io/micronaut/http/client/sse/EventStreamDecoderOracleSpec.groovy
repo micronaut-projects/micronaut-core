@@ -161,6 +161,7 @@ class EventStreamDecoderOracleSpec extends Specification {
         })
         try {
             while (reader.processNextEvent()) {
+                // The reader sends each event to the callback above.
             }
         } catch (java.io.EOFException | ArrayIndexOutOfBoundsException ignored) {
             // the last line is not ended: OkHttp fails where the specification discards it
