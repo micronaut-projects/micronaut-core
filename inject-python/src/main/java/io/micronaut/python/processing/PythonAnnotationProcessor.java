@@ -29,6 +29,7 @@ import io.micronaut.python.imports.PythonImportMappings;
 import io.micronaut.python.imports.ResolvedModule;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
+import io.micronaut.python.processing.model.ClassDef;
 import io.micronaut.python.processing.util.PythonAnnotationTypes;
 import io.micronaut.python.processing.util.VisitorContextClassIndex;
 import io.micronaut.python.processing.util.PythonKeywords;
@@ -95,6 +96,7 @@ import java.util.stream.Collectors;
 @SupportedAnnotationTypes(PythonAnnotationProcessor.PYTHON_APPLICATION_ANNOTATION)
 @SupportedOptions({
     PythonAnnotationProcessor.SOURCE_ROOT_OPTION,
+    PythonClassExclusions.OPTION,
     PythonReflectionGate.OPTION,
     PythonReflectionGate.WARNINGS_OPTION,
     PythonPooledStubGenerator.IGNORE_OPTION
@@ -739,10 +741,24 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                          String[] srcDirs,
                                          ClassElement originatingElement) {
         try (var _ = CompilationProfiler.span(profiler, "python.model")) {
-            return parser.parseTransformed(
+            PythonEnvironment environment = parser.parseTransformed(
                 transformedList,
                 Arrays.asList(srcDirs),
                 javaVisitorContext
+            );
+            Map<String, ClassDef> retained = PythonClassExclusions.retain(
+                environment.classes(),
+                processingEnv.getOptions().get(PythonClassExclusions.OPTION)
+            );
+            if (retained.size() == environment.classes().size()) {
+                return environment;
+            }
+            return new PythonEnvironment(
+                retained,
+                environment.scripts(),
+                environment.decorators(),
+                environment.shadowedTypes(),
+                environment.context()
             );
         } catch (Exception e) {
             throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
