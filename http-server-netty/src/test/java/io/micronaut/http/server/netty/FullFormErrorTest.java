@@ -81,9 +81,31 @@ class FullFormErrorTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void malformedMultipartDefaultsToBadRequest(boolean chunked) throws Exception {
+        try (ApplicationContext context = run(Map.of("spec.name", "FullFormErrorWithoutHandlerTest"));
+             HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()) {
+            EmbeddedServer server = context.getBean(EmbeddedServer.class).start();
+            var response = post(client, server, FIELD.replace("\r\n\r\n", "\r\nContent-Transfer-Encoding: invalid\r\n\r\n") + END, chunked);
+            assertEquals(400, response.statusCode(), response.body());
+        }
+    }
+
+    @Controller("/full-form-errors")
+    @Requires(property = "spec.name", value = "FullFormErrorWithoutHandlerTest")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Produces(MediaType.TEXT_PLAIN)
+    static class DefaultFormController {
+        @Post("/")
+        String form(@Body Map<String, String> body) {
+            return body.get("field");
+        }
+    }
+
     private static ApplicationContext run(Map<String, Object> limits) {
         Map<String, Object> properties = new LinkedHashMap<>(limits);
-        properties.put("spec.name", "FullFormErrorTest");
+        properties.putIfAbsent("spec.name", "FullFormErrorTest");
         properties.put("micronaut.server.port", -1);
         return ApplicationContext.run(properties);
     }
