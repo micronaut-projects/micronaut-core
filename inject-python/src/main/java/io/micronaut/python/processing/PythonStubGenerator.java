@@ -4828,10 +4828,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return convertValueForType(element.get().getGenericType(), member);
         }
         if (!(type instanceof TypeDef.Primitive) && !ClassTypeDef.STRING.equals(type)) {
-            // a Java or Python object: converted as a property of that type is converted
-            Optional<ClassElement> propertyType = context.getClassElement(typeName.replace('$', '.'));
+            // a Java or Python object: converted as a property of that type is converted; the IR may
+            // carry the type arguments (Map<String, Service>), the lookup takes the erased name
+            String erasedName = typeName.indexOf('<') < 0 ? typeName : typeName.substring(0, typeName.indexOf('<'));
+            Optional<ClassElement> propertyType = context.getClassElement(erasedName.replace('$', '.'));
             if (propertyType.isEmpty()) {
-                propertyType = context.getClassElement(typeName);
+                propertyType = context.getClassElement(erasedName);
             }
             if (propertyType.isPresent()) {
                 return convertValueForType(propertyType.get(), member);
