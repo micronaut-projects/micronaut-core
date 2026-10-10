@@ -100,7 +100,7 @@ import java.util.stream.Stream;
  * runtime's own thread: sources are compiled per language, the class output is compared with the
  * previous snapshot, and a difference in classes restarts the application while a difference in
  * resources only reaches the resource watches of the running context. A configuration file
- * change restarts as well, retaining nothing, until the configuration refresh lands. A failed
+ * change is refreshed in place, and restarts only when the refresh cannot apply it. A failed
  * compilation leaves the running generation as it is and is reported until the next success.</p>
  *
  * @author graemerocher
