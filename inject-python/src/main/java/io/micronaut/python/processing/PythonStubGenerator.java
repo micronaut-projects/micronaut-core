@@ -798,25 +798,49 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 List<StatementDef> statements = new ArrayList<>();
                 for (Map.Entry<String, List<MethodElement>> entry : baseMethods.entrySet()) {
                     List<StatementDef> overloads = new ArrayList<>();
-                    for (MethodElement method : entry.getValue()) {
+                    // as in Java, an overload taking the arguments as they are is selected before a varargs one
+                    List<MethodElement> methods = new ArrayList<>(entry.getValue());
+                    methods.sort(Comparator.comparing(MethodElement::isVarArgs));
+                    for (MethodElement method : methods) {
                         ParameterElement[] parameters = method.getParameters();
+                        boolean varArgs = method.isVarArgs() && parameters.length > 0;
+                        // the parameters taking one argument each: all but the varargs parameter
+                        int fixedParameters = varArgs ? parameters.length - 1 : parameters.length;
                         boolean sameArityOverloads = entry.getValue().stream()
-                            .filter(other -> other != method && other.getParameters().length == parameters.length)
+                            .filter(other -> other != method && (varArgs || other.isVarArgs() || other.getParameters().length == parameters.length))
                             .findAny()
                             .isPresent();
-                        ExpressionDef.ConditionExpressionDef condition = arity.compare(ExpressionDef.ComparisonOperation.OpType.EQUAL_TO, ExpressionDef.constant(parameters.length));
+                        ExpressionDef.ConditionExpressionDef condition = varArgs
+                            ? arity.compare(ExpressionDef.ComparisonOperation.OpType.GREATER_THAN_OR_EQUAL, ExpressionDef.constant(fixedParameters))
+                            : arity.compare(ExpressionDef.ComparisonOperation.OpType.EQUAL_TO, ExpressionDef.constant(parameters.length));
                         List<ExpressionDef> converted = new ArrayList<>(parameters.length);
-                        for (int i = 0; i < parameters.length; i++) {
+                        for (int i = 0; i < fixedParameters; i++) {
                             ExpressionDef argument = arguments.invoke("get", POLYGLOT_VALUE, ExpressionDef.constant(i));
                             if (sameArityOverloads) {
                                 condition = condition.and(VALUE_COERCIBLES.invokeStatic("matchesArgument", TypeDef.Primitive.BOOLEAN, argument, classLiteral(parameters[i].getType())).isTrue());
                             }
                             // a parameterized type is converted to its erasure: the type arguments of an
-                            // inherited signature are not always resolved against the extended type
+                            // inherited signature are not always resolved against the extended type. So is a
+                            // type variable a raw base (Composite<T extends Component>) leaves unresolved, which
+                            // renders as Object although super.label(T) takes the erased bound
                             ClassElement parameterType = parameters[i].getGenericType();
-                            converted.add(isParameterizedReference(parameterType)
+                            converted.add(isParameterizedReference(parameterType) || isUnresolvedBoundedTypeVariable(parameterType)
                                 ? PYTHON_CONVERSION.invokeStatic(CONVERT_VALUE, ClassTypeDef.OBJECT, argument, classLiteral(parameterType)).cast(erasedType(parameterType))
                                 : convertValueForType(parameterType, argument));
+                        }
+                        if (varArgs) {
+                            // the trailing arguments, any number of them, make up the array of the
+                            // component type; the inherited signature of an E... parameter does not
+                            // always keep its array shape, so the array type is built from the component
+                            ClassElement varArgsType = parameters[fixedParameters].getGenericType();
+                            ClassElement componentType = varArgsType.isArray() ? varArgsType.fromArray() : varArgsType;
+                            ExpressionDef componentClass = classLiteral(componentType);
+                            if (sameArityOverloads) {
+                                condition = condition.and(PYTHON_JAVA_BASES.invokeStatic("matchesVarargs", TypeDef.Primitive.BOOLEAN,
+                                    arguments, ExpressionDef.constant(fixedParameters), componentClass).isTrue());
+                            }
+                            converted.add(PYTHON_JAVA_BASES.invokeStatic("varargs", TypeDef.OBJECT,
+                                arguments, ExpressionDef.constant(fixedParameters), componentClass).cast(erasedType(componentType).array()));
                         }
                         ExpressionDef.InvokeInstanceMethod invocation = aThis.superRef().invoke(method.getName(), TypeDef.OBJECT, converted);
                         StatementDef result = method.getReturnType().isVoid()
@@ -831,6 +855,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 return StatementDef.multi(statements);
             }));
         addedMethodNames.add(INVOKE_JAVA_BASE_METHOD + "(" + String.class.getName() + ";" + List.class.getName() + ";)");
+    }
+
+    /**
+     * Whether a type is a type variable of a Java base that the extended type leaves unresolved, as a raw base
+     * does, and whose bound is not {@code Object}: its erasure is the bound, not the {@code Object} it renders as.
+     */
+    private static boolean isUnresolvedBoundedTypeVariable(ClassElement type) {
+        return type instanceof GenericPlaceholderElement placeholder
+            && placeholder.getResolved().isEmpty()
+            && !(placeholder.getDeclaringElement().orElse(null) instanceof AbstractPythonClassElement)
+            && erasedBound(placeholder) != null;
     }
 
     private static boolean isParameterizedReference(ClassElement type) {
@@ -1098,11 +1133,73 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         Map<String, ClassElement> typeArguments = resolvedInterfaceMethodTypeArguments(superType, hostMethod);
         boolean bound = typeArguments.values().stream()
             .anyMatch(typeArgument -> !(typeArgument instanceof GenericPlaceholderElement) && !isObjectType(typeArgument));
-        if (!bound) {
-            // a raw or unbound base (MyMap(HashMap)) keeps the plain bridge of its erased signature
+        if (bound) {
+            return BridgeMethodSpec.of(hostMethod, element).signature(hostMethod, hostMethod, typeArguments);
+        }
+        // a raw base declares its methods with the erasure of their type variables, the bound
+        // (Composite<T extends Component> declares Component initContent()), while the element model resolves
+        // them to Object; the bridge of an unbounded raw base (MyMap(HashMap)) keeps that erased signature
+        boolean raw = typeArguments.values().stream()
+            .noneMatch(typeArgument -> typeArgument instanceof GenericPlaceholderElement placeholder
+                && placeholder.getDeclaringElement().orElse(null) instanceof AbstractPythonClassElement);
+        Map<String, ClassElement> erasedTypeArguments = raw ? erasedBounds(hostMethod.getDeclaringType()) : Map.of();
+        if (erasedTypeArguments.isEmpty()) {
             return BridgeMethodSpec.of(hostMethod, element);
         }
-        return BridgeMethodSpec.of(hostMethod, element).signature(hostMethod, hostMethod, typeArguments);
+        return BridgeMethodSpec.of(hostMethod, element)
+            .returnType(rawHostReturnType(hostMethod, element))
+            .signature(hostMethod, hostMethod, erasedTypeArguments);
+    }
+
+    /**
+     * The erasure of each bounded type variable of a class: its first bound without type arguments.
+     */
+    private static Map<String, ClassElement> erasedBounds(ClassElement classElement) {
+        Map<String, ClassElement> erasedBounds = new LinkedHashMap<>();
+        for (GenericPlaceholderElement placeholder : classElement.getDeclaredGenericPlaceholders()) {
+            ClassElement erasedBound = erasedBound(placeholder);
+            if (erasedBound != null) {
+                erasedBounds.put(placeholder.getVariableName(), erasedBound);
+            }
+        }
+        return erasedBounds;
+    }
+
+    private static @Nullable ClassElement erasedBound(GenericPlaceholderElement placeholder) {
+        ClassElement bound = firstBound(placeholder);
+        if (bound instanceof GenericPlaceholderElement || isObjectType(bound)) {
+            return null;
+        }
+        return bound.getTypeArguments().isEmpty() ? bound : bound.getRawClassElement();
+    }
+
+    /**
+     * The return type of the bridge of a raw base method returning a type variable of the base
+     * ({@code protected T initContent()} of {@code Composite<T extends Component>}): the Python return hint
+     * when it is within the bound ({@code -> VerticalLayout}), else the bound.
+     *
+     * @param hostMethod The method of the raw base
+     * @param element    The Python class
+     * @return The return type, or {@code null} to keep the erased one of the host method
+     */
+    private static @Nullable ClassElement rawHostReturnType(MethodElement hostMethod, ClassElement element) {
+        if (!(hostMethod.getReturnType() instanceof GenericPlaceholderElement placeholder)) {
+            return null;
+        }
+        ClassElement erasedBound = erasedBound(placeholder);
+        if (erasedBound == null) {
+            return null;
+        }
+        return element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance().onlyDeclared().named(hostMethod.getName()))
+            .stream()
+            .filter(method -> method instanceof PythonMethodElement pythonMethod
+                && method.getParameters().length == hostMethod.getParameters().length
+                && pythonMethod.getNativeType().returnType() != null
+                && pythonMethod.getNativeType().returnType().typeAnnotation() != null)
+            .map(MethodElement::getGenericReturnType)
+            .filter(hint -> !hint.isPrimitive() && !(hint instanceof GenericPlaceholderElement) && hint.isAssignable(erasedBound))
+            .findFirst()
+            .orElse(erasedBound);
     }
 
     /**
@@ -1898,7 +1995,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ClassTypeDef thisType = javaClassType(element);
 
         boolean extendsJavaBase = model.extendsJavaBase();
-        if (!isJunit5Test && (!extendsHostClass || extendsJavaBase)) {
+        // a Python exception class is wrapped through its Value constructor too: a method returning
+        // or accepting one is bridged like any other method of a generated type
+        if (!isJunit5Test && (!extendsHostClass || extendsJavaBase || extendsThrowable)) {
             builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .addParameter(POLYGLOT_VALUE)
@@ -6532,13 +6631,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     } else if (returnType.isAssignable(HTTP_RESPONSE)) {
                         ClassElement bodyType = returnType.getFirstTypeArgument().orElse(null);
                         if (bodyType == null || Object.class.getName().equals(bodyType.getName())) {
-                            yield PYTHON_HTTP_CONVERSION.invokeStatic("convertHttpResponse", ClassTypeDef.OBJECT,
-                                    invokedValue, CLASS_OBJECT)
-                                .cast(ClassTypeDef.of(returnType));
+                            yield uncheckedCast(PYTHON_HTTP_CONVERSION.invokeStatic("convertHttpResponse", ClassTypeDef.OBJECT,
+                                    invokedValue, CLASS_OBJECT), returnType);
                         }
-                        yield PYTHON_HTTP_CONVERSION.invokeStatic("convertHttpResponse", ClassTypeDef.OBJECT,
-                                invokedValue, toClassExpression(bodyType))
-                            .cast(ClassTypeDef.of(returnType));
+                        // The body class is erased, so a nested generic body type is cast unchecked
+                        yield uncheckedCast(PYTHON_HTTP_CONVERSION.invokeStatic("convertHttpResponse", ClassTypeDef.OBJECT,
+                                invokedValue, toClassExpression(bodyType)), returnType);
                     } else {
                         if (isGeneratedWrapperType(allClasses, returnType)) {
                             yield javaClassType(returnType)
