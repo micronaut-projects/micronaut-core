@@ -16,7 +16,6 @@
 package io.micronaut.context.reload;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
@@ -45,7 +44,6 @@ import java.util.concurrent.TimeoutException;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public interface RequestAdmission {
 
     /**
