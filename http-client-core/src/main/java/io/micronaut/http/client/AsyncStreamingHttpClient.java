@@ -264,7 +264,9 @@ public interface AsyncStreamingHttpClient extends AsyncHttpClient {
      * </ul>
      *
      * <p>The default implementation reads the pieces of {@link #exchangeStream(HttpRequest, Argument)}
-     * and decodes them as server-sent events, the data with the default {@link JsonMapper}.</p>
+     * and decodes them as server-sent events, the data with the default {@link JsonMapper}.
+     * This fallback has no bean context; implementations with an injected message body handler
+     * registry override it to use their configured readers.</p>
      *
      * @param request   The {@link HttpRequest} to execute
      * @param eventType The event data type
@@ -277,7 +279,7 @@ public interface AsyncStreamingHttpClient extends AsyncHttpClient {
     default <I, B> CompletionStage<HttpResponse<BodyElements<Event<B>>>> exchangeEventStream(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
         EventStreams.acceptEvents(request);
         return ElementsStages.mapResponse(exchangeStream(request, errorType),
-            response -> EventStreams.response(response, eventType, HttpClientConfiguration.DEFAULT_MAX_CONTENT_LENGTH));
+            response -> EventStreams.response(response, eventType, HttpClientConfiguration.DEFAULT_MAX_CONTENT_LENGTH, JsonMapper::createDefault));
     }
 
     /**
