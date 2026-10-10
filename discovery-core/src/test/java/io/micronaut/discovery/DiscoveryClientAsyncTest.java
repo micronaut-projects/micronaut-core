@@ -144,7 +144,8 @@ class DiscoveryClientAsyncTest {
         // the publisher fails too
         PublisherClient failing = new PublisherClient("failing", Mono.error(error), Mono.error(error));
         DiscoveryClient publishers = new DefaultCompositeDiscoveryClient(new PublisherClient("ok", Publishers.just(List.of(A)), Publishers.just(List.of())), failing);
-        assertSame(error, assertThrows(IllegalStateException.class, () -> Mono.from(publishers.getInstances("my-service")).block()));
+        Mono<List<ServiceInstance>> publisherInstances = Mono.from(publishers.getInstances("my-service"));
+        assertSame(error, assertThrows(IllegalStateException.class, publisherInstances::block));
         e = assertThrows(ExecutionException.class, () -> publishers.getInstancesAsync("my-service").toCompletableFuture().get());
         assertSame(error, e.getCause());
     }

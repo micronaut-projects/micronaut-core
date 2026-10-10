@@ -132,6 +132,7 @@ class LoadBalancerSelectAsyncClientSpec extends Specification {
 
         @Override
         void close() {
+            // The fixture has no resources; the application context owns its client.
         }
     }
 

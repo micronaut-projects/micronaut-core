@@ -139,13 +139,16 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
      */
     private CompletableFuture<@Nullable Object> invokeFnAsync(@Nullable Object body, String functionName, Argument<?> valueType) {
         return CompletionStagePublishers.compose(functionDefinition(functionName), def -> {
-            FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
+            FunctionInvoker<Object, Publisher<Object>> functionInvoker = functionInvokerChooser.<Object, Publisher<Object>>choose(def)
+                .orElseThrow(() -> new FunctionNotFoundException(def.getName()));
+            @SuppressWarnings("unchecked")
+            Argument<Publisher<Object>> publisherType = (Argument<Publisher<Object>>) (Argument<?>) Argument.of(Publisher.class, valueType);
             // an invoker that only returns publishers is adapted by the default invokeAsync
             CompletionStage<@Nullable Object> result = CompletionStagePublishers.orElse(
                 (CompletionStage<@Nullable Object>) functionInvoker.invokeAsync(def, body, valueType),
                 // a mock invoker that only stubs invoke returns no stage
                 () -> CompletionStagePublishers.first(Objects.requireNonNull(
-                    (Publisher<Object>) functionInvoker.invoke(def, body, Argument.of(Publisher.class, valueType)),
+                    functionInvoker.invoke(def, body, publisherType),
                     "The function invoker returned no publisher"
                 ), null)
             );

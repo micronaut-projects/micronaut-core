@@ -112,10 +112,11 @@ class ConfigurationClientAsyncTest {
         // the stage of a client may be shared: it is not cancelled
         assertFalse(first.futures.get(0).isDone());
         // like the publisher
-        assertSame(error, assertThrows(IllegalStateException.class, () -> Flux.from(new DefaultCompositeConfigurationClient(new ConfigurationClient[] {
+        Mono<List<PropertySource>> propertySources = Flux.from(new DefaultCompositeConfigurationClient(new ConfigurationClient[] {
             new PublisherClient(Flux.just(ONE)),
             new PublisherClient(Mono.error(error))
-        }).getPropertySources(environment)).collectList().block()));
+        }).getPropertySources(environment)).collectList();
+        assertSame(error, assertThrows(IllegalStateException.class, propertySources::block));
     }
 
     @Test

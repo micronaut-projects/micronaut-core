@@ -167,7 +167,8 @@ public final class CompletionStagePublishers {
     /**
      * A future of the value of a stage transformed by a function. The future fails with the
      * error of the stage, without the {@link CompletionException} wrapper, or with the error the
-     * function throws. Cancelling the future cancels the stage when it is a future of this class.
+     * function throws. Cancelling the future cancels the stage when it is a future of this class,
+     * and the function is not invoked once the future is cancelled, even when the stage completes.
      *
      * @param stage    The stage
      * @param function The function
@@ -175,10 +176,15 @@ public final class CompletionStagePublishers {
      * @param <R>      The type of the result
      * @return The future
      */
+    @SuppressWarnings("java:S1181") // an error of the function fails the future, as thenApply does, instead of leaving it incomplete
     public static <T extends @Nullable Object, R extends @Nullable Object> CompletableFuture<R> map(CompletionStage<T> stage,
                                                                                                     Function<? super T, ? extends R> function) {
         CompletableFuture<R> result = future();
         stage.whenComplete((value, throwable) -> {
+            if (result.isDone()) {
+                // cancelled: a stage that is not owned completes anyway, and its value is not wanted
+                return;
+            }
             if (throwable != null) {
                 result.completeExceptionally(unwrap(throwable));
                 return;
@@ -200,7 +206,8 @@ public final class CompletionStagePublishers {
      * A future of the stage that a function returns for the value of a stage. The future fails
      * with the error of either stage, without the {@link CompletionException} wrapper, or with the
      * error the function throws. Cancelling the future cancels the stages that are futures of
-     * this class.
+     * this class, and the function is not invoked once the future is cancelled, even when the
+     * stage completes.
      *
      * @param stage    The stage
      * @param function The function
@@ -208,10 +215,16 @@ public final class CompletionStagePublishers {
      * @param <R>      The type of the result
      * @return The future
      */
+    @SuppressWarnings("java:S1181") // an error of the function fails the future, as thenCompose does, instead of leaving it incomplete
     public static <T extends @Nullable Object, R extends @Nullable Object> CompletableFuture<R> compose(CompletionStage<T> stage,
                                                                                                         Function<? super T, ? extends CompletionStage<R>> function) {
         CompletableFuture<R> result = future();
         stage.whenComplete((value, throwable) -> {
+            if (result.isDone()) {
+                // cancelled: a stage that is not owned completes anyway, and the function must not
+                // start work, a request for example, that nobody waits for
+                return;
+            }
             if (throwable != null) {
                 result.completeExceptionally(unwrap(throwable));
                 return;
@@ -344,6 +357,7 @@ public final class CompletionStagePublishers {
         }
     }
 
+    @SuppressWarnings("java:S1181") // a publisher that throws on subscribe fails the future, as it would signal the error with onError
     private static <T> void subscribe(Publisher<T> publisher, AbstractSubscriber<T> subscriber, CompletableFuture<?> future) {
         future.whenComplete((value, throwable) -> {
             if (throwable instanceof CancellationException) {

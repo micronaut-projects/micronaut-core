@@ -272,6 +272,81 @@ class CompletionStagePublishersSpec extends Specification {
         done.getNow(null) == 3
     }
 
+    void 'compose does not invoke the function once the result is cancelled before a plain stage completes'() {
+        given:
+        def source = new CompletableFuture<String>()
+        def calls = new AtomicInteger()
+        def composed = CompletionStagePublishers.compose(source, {
+            calls.incrementAndGet()
+            CompletableFuture.completedFuture(it.length())
+        })
+
+        when:
+        composed.cancel(false)
+
+        then: 'the plain stage may be shared, so it is not cancelled'
+        composed.isCancelled()
+        !source.isDone()
+
+        when:
+        source.complete('abc')
+
+        then:
+        calls.get() == 0
+        source.getNow(null) == 'abc'
+        composed.isCancelled()
+    }
+
+    void 'map does not invoke the function once the result is cancelled before a plain stage completes'() {
+        given:
+        def source = new CompletableFuture<String>()
+        def calls = new AtomicInteger()
+        def mapped = CompletionStagePublishers.map(source, {
+            calls.incrementAndGet()
+            it.length()
+        })
+
+        when:
+        mapped.cancel(false)
+
+        then: 'the plain stage may be shared, so it is not cancelled'
+        mapped.isCancelled()
+        !source.isDone()
+
+        when:
+        source.complete('abc')
+
+        then:
+        calls.get() == 0
+        source.getNow(null) == 'abc'
+        mapped.isCancelled()
+    }
+
+    void 'orElseIfNull does not call the fallback once the result is cancelled before a plain stage completes with null'() {
+        given:
+        def pending = new CompletableFuture<String>()
+        def calls = new AtomicInteger()
+        def result = CompletionStagePublishers.orElseIfNull(pending, {
+            calls.incrementAndGet()
+            CompletableFuture.completedFuture('fallback')
+        }).toCompletableFuture()
+
+        when:
+        result.cancel(false)
+
+        then: 'the plain stage may be shared, so it is not cancelled'
+        result.isCancelled()
+        !pending.isDone()
+
+        when:
+        pending.complete(null)
+
+        then:
+        calls.get() == 0
+        pending.isDone()
+        !pending.isCancelled()
+    }
+
     void 'orElse uses the fallback when the stage is null'() {
         given:
         def stage = CompletableFuture.completedFuture('value')
