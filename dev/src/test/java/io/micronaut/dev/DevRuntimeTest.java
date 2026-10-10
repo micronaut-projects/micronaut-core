@@ -616,8 +616,16 @@ class DevRuntimeTest {
             runtime.sourcesChanged(SourceKind.JAVA, Set.of(greeter), Set.of());
             assertTrue(runtime.lastFailure().isPresent());
 
-            // a restart compiles nothing: it runs the output that compiled last
-            runtime.restart();
+            // a restart compiles nothing: it runs the output that compiled last, also when the watcher's late report
+            // of the broken edit comes with it and fails to compile again
+            Pending restart = new Pending(Map.of(), Map.of(), false) {
+                @Override
+                boolean forcesRestart() {
+                    return true;
+                }
+            };
+            Pending late = new Pending(Map.of(SourceKind.JAVA, new SourceChanges(Set.of(greeter), Set.of())), Map.of(), false);
+            runtime.awaitBatch(runtime.enqueue(Pending.merge(List.of(restart, late))));
             ApplicationContext restarted = runtime.awaitGeneration(2, Duration.ofMinutes(2));
             assertEquals("one", greet(runtime, restarted));
             assertTrue(runtime.lastFailure().isPresent());
