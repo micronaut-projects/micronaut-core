@@ -147,6 +147,7 @@ public final class CompletionStagePublishers {
      * @param <R>      The type of the result
      * @return The future
      */
+    @SuppressWarnings("java:S1181") // an error of the function fails the future, as thenApply does, instead of leaving it incomplete
     public static <T extends @Nullable Object, R extends @Nullable Object> CompletableFuture<R> map(CompletionStage<T> stage,
                                                                                                     Function<? super T, ? extends R> function) {
         CompletableFuture<R> result = future();
@@ -185,6 +186,7 @@ public final class CompletionStagePublishers {
      * @param <R>      The type of the result
      * @return The future
      */
+    @SuppressWarnings("java:S1181") // an error of the function fails the future, as thenCompose does, instead of leaving it incomplete
     public static <T extends @Nullable Object, R extends @Nullable Object> CompletableFuture<R> compose(CompletionStage<T> stage,
                                                                                                         Function<? super T, ? extends CompletionStage<R>> function) {
         CompletableFuture<R> result = future();
@@ -326,6 +328,7 @@ public final class CompletionStagePublishers {
         }
     }
 
+    @SuppressWarnings("java:S1181") // a publisher that throws on subscribe fails the future, as it would signal the error with onError
     private static <T> void subscribe(Publisher<T> publisher, AbstractSubscriber<T> subscriber, CompletableFuture<?> future) {
         future.whenComplete((value, throwable) -> {
             if (throwable instanceof CancellationException) {
