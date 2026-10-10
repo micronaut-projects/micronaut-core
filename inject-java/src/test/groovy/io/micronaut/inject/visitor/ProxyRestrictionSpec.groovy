@@ -33,7 +33,7 @@ class ProxyRestrictionSpec extends AbstractTypeElementSpec {
         expect:
         buildClassElement(source) { ClassElement element ->
             assert element.name == 'test.MyBean'
-            element.findProxyRestriction().orElse(null)
+            element.getProxyRestriction().orElse(null)
         } == restriction
 
         where:
@@ -52,15 +52,15 @@ class ProxyRestrictionSpec extends AbstractTypeElementSpec {
     void "an array and a primitive cannot be proxied"() {
         expect:
         buildClassElement('package test; class MyBean {}') { ClassElement element ->
-            element.toArray().findProxyRestriction().orElse(null)
+            element.toArray().getProxyRestriction().orElse(null)
         } == ProxyRestriction.ARRAY
-        PrimitiveElement.INT.findProxyRestriction().orElse(null) == ProxyRestriction.PRIMITIVE
+        PrimitiveElement.INT.getProxyRestriction().orElse(null) == ProxyRestriction.PRIMITIVE
     }
 
     @Unroll
     void "an array of primitives is an array: #description"() {
         expect:
-        type.findProxyRestriction().orElse(null) == ProxyRestriction.ARRAY
+        type.getProxyRestriction().orElse(null) == ProxyRestriction.ARRAY
 
         where:
         description     | type
@@ -73,7 +73,7 @@ class ProxyRestrictionSpec extends AbstractTypeElementSpec {
         expect:
         buildClassElement('package test; class MyBean { int[] values; long[][] grid; MyBean[][] beans; }') { ClassElement element ->
             ['values', 'grid', 'beans'].collect { String name ->
-                element.findField(name).get().type.findProxyRestriction().orElse(null)
+                element.findField(name).get().type.getProxyRestriction().orElse(null)
             }
         } == [ProxyRestriction.ARRAY, ProxyRestriction.ARRAY, ProxyRestriction.ARRAY]
     }

@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 
 /**
  * Why a type cannot be extended or implemented by a build time generated proxy, as
- * {@link ClassElement#findProxyRestriction()} reports it.
+ * {@link ClassElement#getProxyRestriction()} reports it.
  *
  * <p>Only the type itself is described. The constructors a proxy is created through and the methods it overrides
  * are not, since what a proxy needs of them depends on the kind of proxy.</p>

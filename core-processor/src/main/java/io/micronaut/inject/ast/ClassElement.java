@@ -252,7 +252,7 @@ public interface ClassElement extends TypedElement {
      * @since 5.3.0
      */
     @Experimental
-    default Optional<ProxyRestriction> findProxyRestriction() {
+    default Optional<ProxyRestriction> getProxyRestriction() {
         // An array of primitives is primitive too, so the array is checked first
         if (isArray()) {
             return Optional.of(ProxyRestriction.ARRAY);

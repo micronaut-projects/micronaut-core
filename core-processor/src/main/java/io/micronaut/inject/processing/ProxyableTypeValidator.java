@@ -26,7 +26,7 @@ import io.micronaut.inject.ast.ProxyRestriction;
  * <p>Every proxy writer generates a type that extends or implements the proxied one, so a type that cannot be
  * extended cannot carry advice. The checks live here rather than at each proxy creation path so that the paths
  * stay consistent with each other. An integration that generates or requires its own proxies asks
- * {@link ClassElement#findProxyRestriction()} instead.</p>
+ * {@link ClassElement#getProxyRestriction()} instead.</p>
  *
  * @author Denis Stepanov
  * @since 5.2.0
@@ -45,7 +45,7 @@ public final class ProxyableTypeValidator {
      * @throws ProcessingException if the type cannot be extended by a generated proxy
      */
     public static void validateProxyable(ClassElement type, Element errorElement) {
-        ProxyRestriction restriction = type.findProxyRestriction().orElse(null);
+        ProxyRestriction restriction = type.getProxyRestriction().orElse(null);
         if (restriction != null) {
             throw new ProcessingException(errorElement, message(restriction, type));
         }
