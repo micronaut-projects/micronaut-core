@@ -21,8 +21,10 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.form.FormData;
+import io.micronaut.web.router.websocket.WebSocketEndpointSpec;
 
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
@@ -245,6 +247,39 @@ public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits D
      * @since 5.3.0
      */
     void respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response);
+
+    /**
+     * End a {@code GET} route with WebSocket handler functions, the functional counterpart of a
+     * {@link io.micronaut.websocket.annotation.ServerWebSocket} bean: the server upgrades a
+     * {@code GET} request to the URI template to a WebSocket connection, and calls the handlers
+     * the lambda declares, see {@link WebSocketEndpointSpec}. Requires {@code micronaut-websocket}.
+     *
+     * <pre>{@code
+     * routes.GET("/chat/{room}")
+     *     .beforeReplacing(request -> authorized(request) ? null : HttpResponse.forbidden()).and()
+     *     .webSocket(ws -> ws
+     *         .onOpen((session, request) -> session.sendAsync("joined " + session.getUriVariables().get("room", String.class).orElseThrow()))
+     *         .onMessage(Argument.of(ChatMessage.class), (session, message) -> session.sendAsync(reply(message))));
+     * }</pre>
+     *
+     * <p>The route is a route of the upgrade request: its conditions, filters, groups, order, port
+     * and attributes apply to the upgrade request, e.g. a filter that answers with a response
+     * rejects the upgrade, and a request that is not an upgrade is answered with an error. Of the
+     * WebSocket routes that match an upgrade, the closest one is upgraded, then the one of the
+     * lowest order, like the route of any other request. Its executor, see
+     * {@link RouteSpec#executeOn(String)}, or the executor of its group, runs the handlers of the
+     * connections: by default the event loop, so a handler that blocks, e.g. on I/O, needs another
+     * executor, e.g. {@code executeOn(TaskExecutors.BLOCKING)}. A WebSocket route has no media
+     * types and no response type: the media types of its group do not apply to it, and its own,
+     * e.g. {@link RouteSpec#produces(io.micronaut.http.MediaType...)}, are an error.</p>
+     *
+     * @param endpoint Declares the handlers of the WebSocket connections
+     * @throws IllegalStateException if the route was already ended, is not a route of {@code GET}
+     *                               only, has media types or a response type, or
+     *                               {@code micronaut-websocket} is missing
+     * @since 5.3.0
+     */
+    void webSocket(Consumer<WebSocketEndpointSpec> endpoint);
 
     /**
      * End the route with a server-sent events handler: the response is a

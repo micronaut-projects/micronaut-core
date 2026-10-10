@@ -50,7 +50,16 @@ final class PendingRoute {
      */
     private final Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes;
     private final String description;
+    /**
+     * The URI template of a route of {@code GET} only, which may be a WebSocket route, or {@code null}.
+     */
+    private final @Nullable String getTemplate;
     private final List<Consumer<HandlerRoutes>> settings = new ArrayList<>();
+    /**
+     * The first setting of the route about its bodies, e.g. {@code produces}, which a WebSocket
+     * route does not have, or {@code null}.
+     */
+    private @Nullable String bodySetting;
     /**
      * The media types of the last {@code produces}, or {@code null}.
      */
@@ -63,9 +72,52 @@ final class PendingRoute {
      * @param description Describes the route for the messages, e.g. {@code GET /items/{id} declared by ItemRoutes}
      */
     PendingRoute(AbstractHttpRouteBuilder builder, Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes, String description) {
+        this(builder, routes, description, null);
+    }
+
+    /**
+     * @param builder     The builder that declared the route
+     * @param routes      Adds the routes of the handler
+     * @param description Describes the route for the messages, e.g. {@code GET /items/{id} declared by ItemRoutes}
+     * @param getTemplate The URI template of a route of {@code GET} only, or {@code null}
+     */
+    PendingRoute(AbstractHttpRouteBuilder builder, Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes,
+                 String description, @Nullable String getTemplate) {
         this.builder = builder;
         this.routes = routes;
         this.description = description;
+        this.getTemplate = getTemplate;
+    }
+
+    /**
+     * The URI template of a WebSocket route: only a route of {@code GET} only is upgraded. Any
+     * other route is dropped and the terminal fails.
+     *
+     * @return The URI template, under the prefix
+     * @throws IllegalStateException if the route is not a route of {@code GET} only, is a located
+     *                               route, or has media types or a response type
+     */
+    String webSocketTemplate() {
+        if (builder.located()) {
+            // the server finds the WebSocket route of an upgrade request among the routes it
+            // knows when it starts, not among the routes of the targets located per request
+            drop();
+            throw new IllegalStateException("The route " + description
+                + " is a located route: a WebSocket route is a route of an HttpRoutes bean");
+        }
+        String template = getTemplate;
+        if (template == null) {
+            drop();
+            throw new IllegalStateException("The route " + description
+                + " is not a WebSocket route: a WebSocket route is a GET route, e.g. GET(uri).webSocket(...)");
+        }
+        String setting = bodySetting;
+        if (setting != null) {
+            drop();
+            throw new IllegalStateException("The WebSocket route " + description + " has " + setting
+                + ": the upgrade request and the messages of a WebSocket route have no media types or response type");
+        }
+        return template;
     }
 
     /**
@@ -157,7 +209,7 @@ final class PendingRoute {
      * Drop the route: its terminal failed, so the startup does not fail again for a route with
      * no terminal.
      */
-    private void drop() {
+    void drop() {
         ended = true;
         builder.dropPending(this);
     }
@@ -165,6 +217,13 @@ final class PendingRoute {
     private void addSetting(Consumer<HandlerRoutes> setting) {
         checkPending();
         settings.add(setting);
+    }
+
+    private void addBodySetting(String name, Consumer<HandlerRoutes> setting) {
+        addSetting(setting);
+        if (bodySetting == null) {
+            bodySetting = name;
+        }
     }
 
     private void checkPending() {
@@ -176,16 +235,16 @@ final class PendingRoute {
 
     void consumes(MediaType[] mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
-        addSetting(added -> added.consumes(checked));
+        addBodySetting("consumes", added -> added.consumes(checked));
     }
 
     void consumesAll() {
-        addSetting(HandlerRoutes::consumesAll);
+        addBodySetting("consumesAll", HandlerRoutes::consumesAll);
     }
 
     void produces(MediaType[] mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
-        addSetting(added -> added.produces(checked));
+        addBodySetting("produces", added -> added.produces(checked));
         produces = checked;
     }
 
@@ -201,7 +260,7 @@ final class PendingRoute {
 
     void responseType(Argument<?> responseType) {
         Objects.requireNonNull(responseType, "responseType");
-        addSetting(added -> added.responseType(responseType));
+        addBodySetting("responseType", added -> added.responseType(responseType));
     }
 
     void executeOn(String executorName) {

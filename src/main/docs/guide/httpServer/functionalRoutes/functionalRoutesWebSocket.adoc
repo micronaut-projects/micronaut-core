@@ -1,0 +1,63 @@
+A `GET` route ends with `webSocket(...)` instead of a handler: the server upgrades the requests to the route to WebSocket connections and calls the handler functions the lambda declares, the functional counterpart of a ann:websocket.annotation.ServerWebSocket[] bean. The route stays a route of the route builder: its path variables, groups, filters, conditions, order, port and attributes apply to the upgrade request. WebSocket routes need the `micronaut-websocket` dependency:
+
+dependency::micronaut-websocket[]
+
+The types of the WebSocket routes are in the package pkg:web.router.websocket[], experimental like the other functional routes.
+
+=== Handlers
+
+snippet::io.micronaut.docs.server.functional.WebSocketRoutes[tags="echo", indent=0, title="A WebSocket route"]
+
+<1> A `GET` route ends with `webSocket(...)`: the lambda declares the handlers of its connections, each at most once.
+<2> The open handler receives the api:websocket.WebSocketSession[] and the upgrade request. The path variables of the route are the URI variables of the session.
+<3> The message handler receives each message decoded to the type it declares: `String` and `byte[]` as they are, other types from JSON, like the message parameter of an `@OnMessage` method.
+<4> The error handler receives the error of a handler, or of a message that cannot be decoded. Without one, the connection is closed with `1011`.
+<5> A handler with nothing to wait for returns `null`: it is done.
+
+Each handler receives the session first, like the JDK `java.net.http.WebSocket.Listener`, and returns a `CompletionStage` that completes when it is done, or `null` when it is done at once: it sends with `session.sendAsync(...)` and returns the stage of the send. The handlers are `onOpen`, `onMessage`, `onMessageStream` (see below), `onPing`, `onPong`, `onClose` and `onError`; `subprotocols(...)` and `maxPayloadLength(...)` are like the members of `@ServerWebSocket` and `@OnMessage`. A message handler may be declared for a supertype of the messages, e.g. a `WebSocketMessageHandler<Object>` for `String` messages.
+
+The handlers run on the event loop by default, like a controller method that returns a stage: a handler must not block. A route whose handlers block, e.g. on I/O, runs them on another executor with `executeOn(...)`, e.g. `executeOn(TaskExecutors.BLOCKING)`, see below.
+
+The sessions are the sessions of the `@ServerWebSocket` beans: `session.getOpenSessions()` and the api:websocket.WebSocketBroadcaster[] reach both, and the upgrade request is the current request in the handlers. The handlers are shared by the connections of the route: the state of a connection belongs in the attributes of its session. A bean that declares routes injects the broadcaster as a `BeanProvider<WebSocketBroadcaster>`, since the broadcaster depends on the server, which depends on the routes.
+
+=== The upgrade request
+
+The filters of the route and of its groups, and the application's filters, run on the upgrade request: a filter that answers with a response rejects the upgrade.
+
+snippet::io.micronaut.docs.server.functional.WebSocketRoutes[tags="filter", indent=0, title="A filter that rejects the upgrade"]
+
+<1> A request without the header is answered with `403`, and the connection is not upgraded.
+
+The conditions of `where(...)`, the order and the port select the route like for any other request: of the WebSocket routes that match an upgrade request, the closest one is upgraded, then the one of the lowest order. A WebSocket route of the route builder is preferred to a `@ServerWebSocket` bean, whose routes are selected as before: the first one whose URI template matches the path. A `GET` request to a WebSocket route that is not an upgrade is answered with `400`.
+
+A WebSocket route is a route of an `HttpRoutes` bean: the server finds the route of an upgrade request among the routes it knows when it starts, so a located route, see <<functionalRoutesLocators, Locator Routes>>, cannot be a WebSocket route, and declaring one fails with an `IllegalStateException`.
+
+A WebSocket route has no media types and no response type: the media types of its groups do not apply to it, and `consumes(...)`, `produces(...)` or `responseType(...)` on the route itself fail with an `IllegalStateException`. A message handler declares the type of its messages instead.
+
+=== Streams
+
+`session.sendAllAsync(publisher)` sends the messages of a Reactive Streams `Publisher`, no faster than the connection writes them. Its stage completes with `true` when the publisher completed and its messages were sent, and with `false` when the session closed first: the session closing cancels the publisher. `onMessageStream(...)` receives the messages of a connection as a `Publisher`, at the pace its subscriber requests them.
+
+snippet::io.micronaut.docs.server.functional.WebSocketRoutes[tags="streams", indent=0, title="Streams of messages"]
+
+<1> The open handler sends a stream of messages.
+<2> The message stream handler is called once for each connection, after the open handler, with the messages of the connection in the order they are read. It subscribes to them before it is done: the messages of a handler that is done without a subscriber, or that fails, are discarded.
+<3> The replies are a stream too: the next message is read once a reply was sent. The publisher of the messages completes when the connection closes: on a close, before the close handler runs, so that the close handler can wait for the stream.
+
+A route has `onMessage` or `onMessageStream`. A message stream receives its messages one after the other, so it has no `maxConcurrentMessages`. The handler and the subscriber run on the executor of the route, with the upgrade request as the current request.
+
+=== Delivery and backpressure
+
+The handlers of a connection run one after the other: the first message is handled once the open handler is done, and each next message once the handler of the previous one is done, i.e. once the stage it returned completed. The connection reads at most `maxPendingMessages(...)` messages ahead of its handlers, `16` by default, so a client cannot send messages faster than they are handled. A message sent in fragments counts each of its fragments, so that the messages that wait take a bounded amount of memory.
+
+snippet::io.micronaut.docs.server.functional.WebSocketRoutes[tags="delivery", indent=0, title="Concurrent handlers"]
+
+<1> The executor of the route runs its handlers: here the executor for blocking work. By default they run on the event loop.
+<2> Up to 4 messages of a connection are handled at the same time, in any order.
+<3> Up to 32 messages are read ahead of the handlers.
+
+The pings are answered as they are read, and a close is handled as soon as it is read, while the handlers that run go on: the messages read before it that still wait for their turn are discarded, except for a message stream, which receives them before it completes. Once `maxPendingMessages` messages wait, the connection decodes nothing until a handler is done, the pings and the close included, even when many frames arrive at once. It still reads up to 64 KiB more, undecoded, so that a client that drops the connection without a close is noticed at once, with an abnormal closure (`1006`). `maxPendingMessages(0)` reads all the time, without backpressure.
+
+IMPORTANT: A handler that returns a stage that does not complete, e.g. the stage of `sendAllAsync` for a stream that does not end, holds the next messages of its connection back. A handler that streams while the connection receives starts the stream and returns `null`.
+
+The `@ServerWebSocket` beans keep their behavior: their connections read all the time, and their messages are handled as they are read.
