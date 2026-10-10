@@ -462,4 +462,115 @@ class Foo {
         def ex = thrown(RuntimeException)
         ex.message.contains("can only be bound in a filter method of a @ServerFilter")
     }
+
+    def 'void method with a continuation that produces the response later'(String continuationType, String importName) {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import ${importName};
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.filter.FilterContinuation;
+
+@ServerFilter
+class Foo {
+    @RequestFilter
+    public void continuation(HttpRequest<?> request, FilterContinuation<${continuationType}<HttpResponse<?>>> continuation) {
+        continuation.proceed();
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("A filter method with a FilterContinuation<${continuationType}<HttpResponse<?>>> must return the response")
+
+        where:
+        continuationType    | importName
+        "ExecutionFlow"     | "io.micronaut.core.execution.ExecutionFlow"
+        "CompletionStage"   | "java.util.concurrent.CompletionStage"
+        "CompletableFuture" | "java.util.concurrent.CompletableFuture"
+    }
+
+    def 'void method with a reactive continuation'() {
+        expect:
+        buildTypeElement("""
+
+package test;
+
+import org.reactivestreams.Publisher;
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.filter.FilterContinuation;
+
+@ServerFilter
+class Foo {
+    @RequestFilter
+    public void continuation(HttpRequest<?> request, FilterContinuation<Publisher<HttpResponse<?>>> continuation) {
+    }
+}
+
+""")
+    }
+
+    def 'completion stage return and continuation types'() {
+        expect:
+        buildTypeElement("""
+
+package test;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.filter.FilterContinuation;
+
+@ServerFilter
+class Foo {
+    @RequestFilter
+    public CompletionStage<HttpResponse<?>> stage(HttpRequest<?> request, FilterContinuation<CompletionStage<HttpResponse<?>>> continuation) {
+        return continuation.proceed();
+    }
+
+    @RequestFilter
+    public CompletableFuture<HttpResponse<?>> future(HttpRequest<?> request, FilterContinuation<CompletableFuture<HttpResponse<?>>> continuation) {
+        return continuation.proceed();
+    }
+}
+
+""")
+    }
+
+    def 'a continuation of another completion stage type is rejected'() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.filter.FilterContinuation;
+
+class MyFuture<T> extends CompletableFuture<T> {
+}
+
+@ServerFilter
+class Foo {
+    @RequestFilter
+    public CompletionStage<HttpResponse<?>> stage(HttpRequest<?> request, FilterContinuation<MyFuture<HttpResponse<?>>> continuation) {
+        return continuation.proceed();
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("Unsupported continuation type: test.MyFuture, declare it as CompletionStage or CompletableFuture")
+    }
 }
