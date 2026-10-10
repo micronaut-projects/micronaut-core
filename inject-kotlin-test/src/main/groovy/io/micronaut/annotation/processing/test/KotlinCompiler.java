@@ -25,6 +25,7 @@ import com.tschuchort.compiletesting.Ksp2Kt;
 import com.tschuchort.compiletesting.KspKt;
 import com.tschuchort.compiletesting.SourceFile;
 import io.micronaut.aop.internal.InterceptorChainFactoryBean;
+import io.micronaut.aop.internal.ProxyTargetHandlerBean;
 import io.micronaut.aop.internal.InterceptorRegistryBean;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
@@ -368,6 +369,10 @@ public class KotlinCompiler {
                     beanDefinitions.addAll(new DefaultBeanDefinitionsProvider().provide(classLoader));
                 } else {
                     beanDefinitions.add(new InterceptorChainFactoryBean());
+                    beanDefinitions.add(new ProxyTargetHandlerBean.Fixed());
+                    beanDefinitions.add(new ProxyTargetHandlerBean.Lazy());
+                    beanDefinitions.add(new ProxyTargetHandlerBean.Cached());
+                    beanDefinitions.add(new ProxyTargetHandlerBean.HotSwap());
                     beanDefinitions.add(new InterceptorRegistryBean());
                     beanDefinitions.add(new BeanProviderDefinition());
                     beanDefinitions.add(new ApplicationEventPublisherFactory<>());
