@@ -1316,12 +1316,19 @@ public final class DevRuntime implements Closeable {
             failedBatch = batch;
             if (batch.forcesRestart()) {
                 // a restart asked for runs the output that compiled last, as it does alone, though a late report of
-                // the broken source came with it; the failed changes wait for the next compilation without it
-                failedBatch = new Pending(batch.sources, batch.testSources, batch.resources, batch.full, batch.requested);
+                // the broken source came with it; the failed changes wait for the next compilation without it. The
+                // batch's resources reach the watches first, and its configuration change releases what it touched
+                failedBatch = new Pending(batch.sources, batch.testSources, Map.of(), batch.full, batch.requested);
+                ApplicationContext current = context;
+                ConfigurationChange configurationChange = null;
+                if (ResourceNotifier.notify(current, settledResources(batch.resources), this::rootsOf, this::refreshBrowsers)) {
+                    RefreshResult refresh = refreshConfiguration(current);
+                    configurationChange = refresh == null ? ConfigurationChange.ofAll() : refresh.change();
+                }
                 OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
                 ChangeSet changeSet = snapshot.diff(latest);
                 snapshot = latest;
-                restart(changeSet, null, start);
+                restart(changeSet, configurationChange, start);
             }
             return;
         }
