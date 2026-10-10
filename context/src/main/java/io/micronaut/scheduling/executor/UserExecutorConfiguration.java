@@ -58,7 +58,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      * @param name The name
      */
     private UserExecutorConfiguration(@Nullable @Parameter String name) {
-        this(name, null, null, null, null, false, null, null);
+        this(name, null, null, null, null, false, null);
     }
 
     /**
@@ -71,29 +71,6 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      * @param corePoolSize the core pool size
      * @param virtual whether to use virtual threads
      * @param threadFactoryClass the thread factory class
-     */
-    protected UserExecutorConfiguration(@Nullable @Parameter String name,
-                                        @Nullable Integer nThreads,
-                                        @Nullable ExecutorType type,
-                                        @Nullable Integer parallelism,
-                                        @Nullable Integer corePoolSize,
-                                        @Nullable Boolean virtual,
-                                        @Nullable Class<? extends ThreadFactory> threadFactoryClass) {
-        this(name, nThreads, type, parallelism, corePoolSize, virtual, threadFactoryClass, null);
-    }
-
-    /**
-     * Default Constructor.
-     *
-     * @param name the name
-     * @param nThreads number of threads
-     * @param type the type
-     * @param parallelism the parallelism
-     * @param corePoolSize the core pool size
-     * @param virtual whether to use virtual threads
-     * @param threadFactoryClass the thread factory class
-     * @param propagateContext whether submitted tasks run with the caller's propagated context
-     * @since 5.3.0
      */
     @ConfigurationInject
     protected UserExecutorConfiguration(@Nullable @Parameter String name,
@@ -102,8 +79,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
                                         @Nullable Integer parallelism,
                                         @Nullable Integer corePoolSize,
                                         @Nullable Boolean virtual,
-                                        @Nullable Class<? extends ThreadFactory> threadFactoryClass,
-                                        @Nullable Boolean propagateContext) {
+                                        @Nullable Class<? extends ThreadFactory> threadFactoryClass) {
         this.name = name;
         this.nThreads = nThreads == null ? AVAILABLE_PROCESSORS * 2 : nThreads;
         this.type = type == null ? ExecutorType.SCHEDULED : type;
@@ -111,7 +87,6 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
         this.corePoolSize = corePoolSize == null ? AVAILABLE_PROCESSORS * 2 : corePoolSize;
         this.virtual = virtual == null ? false : virtual;
         this.threadFactoryClass = threadFactoryClass;
-        this.propagateContext = propagateContext == null || propagateContext;
     }
 
     @Override
