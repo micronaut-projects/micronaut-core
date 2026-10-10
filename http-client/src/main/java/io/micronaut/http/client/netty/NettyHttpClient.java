@@ -62,6 +62,7 @@ import io.micronaut.http.client.AsyncProxyHttpClient;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawHttpClientSupport;
+import io.micronaut.http.client.internal.RawHttpRequestWrapper;
 import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.RawResponseFuture;
 import io.micronaut.http.client.StreamingHttpClient;
@@ -706,7 +707,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         MutableHttpRequest<?> mutableRequest = toMutableRequest(request);
         CloseableByteBody serverBody = RawHttpClientSupport.claimServerRequestBody(request);
         if (serverBody != null) {
-            return new RawHttpRequestWrapper<>(conversionService, mutableRequest, serverBody);
+            return new NettyRawHttpRequestWrapper<>(conversionService, mutableRequest, serverBody);
         }
         return mutableRequest;
     }
@@ -841,10 +842,10 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     ExecutionFlow<HttpResponse<?>> rawExchangeFlow(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, CloseableByteBody requestBody, @Nullable Thread blockedThread, @Nullable RawRequestOptions options) {
         try {
             if (options == null) {
-                RawHttpRequestWrapper<?> rawRequest = new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody);
+                NettyRawHttpRequestWrapper<?> rawRequest = new NettyRawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody);
                 return rawRequest.keepReplacedBody(sendRawExchange(propagatedContext, blockedThread, rawRequest));
             }
-            RawHttpRequestWrapper<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
+            NettyRawHttpRequestWrapper<Object> rawRequest = new NettyRawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
             applyOptions(rawRequest, options);
             // the response timeout does not count the upload of the body: a slow upload does not time out
             CompletableFuture<@Nullable Void> uploadStarted = new CompletableFuture<>();

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.netty;
+package io.micronaut.http.client.internal;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -31,22 +31,22 @@ import io.micronaut.http.MutableHttpRequestWrapper;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
-import io.micronaut.http.netty.NettyHttpRequestBuilder;
-import io.netty.handler.codec.http.HttpRequest;
 
 import java.io.Closeable;
 import java.util.Optional;
 
 /**
- * This is a combination of a {@link HttpRequest} with a {@link ByteBody}. It implements
- * {@link MutableHttpRequest} so that it can be used unchanged in the client,
- * {@link NettyHttpRequestBuilder} so that the bytes are
+ * The request of a raw or proxied exchange: a request with the raw bytes of its body, which the
+ * clients send as they are unless a filter {@link #body(Object) replaced} them. It implements
+ * {@link MutableHttpRequest} so that it can be used unchanged in the client, and
+ * {@link ServerHttpRequest} so that its bytes are found like those of a server request.
  *
  * @param <B> The body type, mostly unused
- * @since 4.7.0
+ * @author Jonas Konrad
+ * @since 5.3.0
  */
 @Internal
-final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implements MutableHttpRequest<B>, NettyHttpRequestBuilder, ServerHttpRequest<B>, Closeable {
+public class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implements MutableHttpRequest<B>, ServerHttpRequest<B>, Closeable {
     private final ConversionService conversionService;
     private final CloseableByteBody byteBody;
     /**
@@ -67,9 +67,11 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
         return byteBody;
     }
 
-    @Override
-    public @Nullable ByteBody byteBodyDirect() {
-        return bodyReplaced ? null : byteBody;
+    /**
+     * @return Whether {@link #body(Object)} replaced the raw bytes, which are then not sent
+     */
+    public boolean isBodyReplaced() {
+        return bodyReplaced;
     }
 
     @Override
@@ -125,23 +127,13 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
      * @param <T>  The response type
      * @return The flow
      */
-    <T> ExecutionFlow<T> keepReplacedBody(ExecutionFlow<T> flow) {
+    public <T> ExecutionFlow<T> keepReplacedBody(ExecutionFlow<T> flow) {
         return flow.onErrorResume(e -> {
             if (bodyReplaced && e instanceof UnprocessedRequestException unprocessed) {
                 unprocessed.markBodySent();
             }
             return ExecutionFlow.error(e);
         });
-    }
-
-    @Override
-    public HttpRequest toHttpRequestWithoutBody() {
-        return NettyHttpRequestBuilder.asBuilder(getDelegate()).toHttpRequestWithoutBody();
-    }
-
-    @Override
-    public HttpRequest toHttpRequestWithoutBody(String requestTarget) {
-        return NettyHttpRequestBuilder.asBuilder(getDelegate()).toHttpRequestWithoutBody(requestTarget);
     }
 
     @Override
