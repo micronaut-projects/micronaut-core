@@ -17,7 +17,9 @@ package io.micronaut.python.annotation.processing.test.javabases;
 
 /**
  * An interface declaring a default varargs method next to a same-arity overload, the shape of
- * Vaadin's {@code HasComponents.add(Component...)}.
+ * Vaadin's {@code HasComponents.add(Component...)}. Its {@code addFirst(T)} takes the type variable that an
+ * implementing class resolves, as Vaadin's {@code HasComponentsOfType<T>.addComponentAsFirst(T)} does through
+ * {@code HasComponents extends HasComponentsOfType<Component>}, and its {@code addEach(T[])} an array of it.
  *
  * @param <T> The item type
  */
@@ -33,5 +35,15 @@ public interface HasItems<T> {
 
     default void addAll(String text) {
         addItem("t:" + text);
+    }
+
+    default void addFirst(T item) {
+        addItem("f:" + item);
+    }
+
+    default void addEach(T[] items) {
+        for (T item : items) {
+            addItem("e:" + item);
+        }
     }
 }
