@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
 import io.micronaut.core.annotation.Order;
+import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
@@ -35,6 +36,8 @@ import org.graalvm.polyglot.PolyglotAccess;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.io.FileSystem;
+import org.graalvm.polyglot.io.IOAccess;
 import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.jspecify.annotations.Nullable;
@@ -65,6 +68,8 @@ import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
  */
 @Factory
 @Experimental
+// HostMoveFileSystem reads the filesystem GraalPy builds for the virtual filesystem
+@ReflectionConfig(type = VirtualFileSystem.class, fields = @ReflectionConfig.ReflectiveFieldConfig(name = "delegatingFileSystem"))
 public class GraalPyContextFactory implements BeanDestroyedEventListener<org.graalvm.polyglot.Context>, GracefulShutdownCapable, Ordered {
     public static final String APPLICATION_PATH = "META-INF/GRAALPY-VFS/micronaut-application";
     public static final String APPLICATION_SRC_PATH = APPLICATION_PATH + "/src/";
@@ -73,6 +78,11 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     public static final String PYRONAUT_MAIN_CLASS = "pyronaut_application.PyronautMain";
     /** Enables the per-context Python builtin used by context-reuse tests. */
     public static final String CONTEXT_ID_PROPERTY = "micronaut.python.context-id.enabled";
+    /** The environment variable {@code zoneinfo} reads its search path of time zone databases from. */
+    static final String PYTHON_TZ_PATH = "PYTHONTZPATH";
+    /** The system time zone databases CPython searches by default ({@code --with-tzpath}); GraalPy searches none. */
+    static final List<String> SYSTEM_TZ_PATH = List.of(
+        "/usr/share/zoneinfo", "/usr/lib/zoneinfo", "/usr/share/lib/zoneinfo", "/etc/zoneinfo");
     private static final Logger LOG = LoggerFactory.getLogger(GraalPyContextFactory.class);
     private static final Source LOAD_VFS_MODULE_SOURCE = Source.newBuilder(PYTHON, """
         import importlib.util as __micronaut_importlib_util
@@ -359,7 +369,15 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             .resourceDirectory(APPLICATION_PATH)
             .resourceClassLoader(classLoader).build();
         Context.Builder builder = contextConfiguration.getBuilder()
-            .apply(GraalPyResources.forVirtualFileSystem(vfs))
+            .apply(GraalPyResources.forVirtualFileSystem(vfs));
+        // os.rename and os.replace of host files: the filesystem GraalPy builds rejects every atomic move
+        FileSystem fileSystem = HostMoveFileSystem.of(vfs);
+        if (fileSystem != null) {
+            builder.extendIO(IOAccess.NONE, io -> io.fileSystem(fileSystem));
+        }
+        defaultTzPath(System.getenv(), contextConfiguration.environment(), System.getProperty("os.name", ""))
+            .ifPresent(tzPath -> builder.environment(PYTHON_TZ_PATH, tzPath));
+        builder
             .logHandler(new GraalPySlf4jLogHandler())
             .allowExperimentalOptions(true)
             .allowCreateProcess(true)
@@ -427,6 +445,27 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 closeQuietly(context);
             }
         }
+    }
+
+    /**
+     * The time zone search path of the guest {@code zoneinfo} module when nothing configures one.
+     * GraalPy is built without a default {@code TZPATH}, so {@code zoneinfo} finds no system time zone
+     * and needs the {@code tzdata} package; the context searches the locations CPython searches.
+     *
+     * @param hostEnvironment The environment of the process, inherited by the context
+     * @param contextEnvironment The environment configured for the context
+     * @param osName The name of the host operating system
+     * @return The default search path, empty when one is configured or the host is Windows
+     */
+    static Optional<String> defaultTzPath(Map<String, String> hostEnvironment,
+                                          Map<String, String> contextEnvironment,
+                                          String osName) {
+        if (hostEnvironment.containsKey(PYTHON_TZ_PATH)
+            || contextEnvironment.containsKey(PYTHON_TZ_PATH)
+            || osName.startsWith("Windows")) {
+            return Optional.empty();
+        }
+        return Optional.of(String.join(java.io.File.pathSeparator, SYSTEM_TZ_PATH));
     }
 
     static Optional<Path> resolveVirtualEnvExecutable(Map<String, String> environment) {
