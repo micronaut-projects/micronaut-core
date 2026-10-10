@@ -40,6 +40,17 @@ public class RequestArgumentSatisfier {
         this.binderRegistry = requestBinderRegistry;
     }
 
+    /** @param requestBinderRegistry The registry selected for server routes */
+    public RequestArgumentSatisfier(io.micronaut.http.bind.ServerRequestBinderRegistry requestBinderRegistry) {
+        this((RequestBinderRegistry) requestBinderRegistry);
+    }
+
+    /** @param context The context containing transport defaults and custom registries */
+    @jakarta.inject.Inject
+    public RequestArgumentSatisfier(io.micronaut.context.BeanContext context) {
+        this(io.micronaut.http.bind.ServerRequestBinderRegistry.find(context).orElseThrow());
+    }
+
     /**
      * @return The request binder registry
      */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2023 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,76 +19,64 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.bind.ArgumentBinder;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.ServerRequestBinderRegistry;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.server.binding.DefaultServerRequestBinderRegistry;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
-import jakarta.inject.Singleton;
 
 import java.util.List;
 import java.util.Optional;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 /**
- * A Netty request binder registry.
+ * Compatibility facade for the shared server binder registry.
  *
- * @author Denis Stepanov
+ * @deprecated Use {@link DefaultServerRequestBinderRegistry}.
  * @since 4.0.0
  */
 @Internal
 @Singleton
-@Order(100) // Prefer default implementation
+@io.micronaut.context.annotation.Secondary
+@Order(200)
+@Deprecated(since = "5.3.0", forRemoval = true)
 public final class NettyServerRequestBinderRegistry implements ServerRequestBinderRegistry {
+    private final DefaultServerRequestBinderRegistry delegate;
 
-    private final DefaultRequestBinderRegistry internalRequestBinderRegistry;
+    /** @param registry The registry used by the request lifecycle */
+    @Inject
+    public NettyServerRequestBinderRegistry(DefaultServerRequestBinderRegistry registry) {
+        this.delegate = registry;
+    }
 
+    /**
+     * @param conversionService Conversion service
+     * @param binders Custom binders
+     * @param httpServerConfiguration Legacy configuration provider
+     * @param bodyHandlerRegistry Body readers
+     * @param formFactory Form utilities
+     */
     public NettyServerRequestBinderRegistry(ConversionService conversionService,
-                                            List<RequestArgumentBinder> binders,
-                                            BeanProvider<NettyHttpServerConfiguration> httpServerConfiguration,
-                                            MessageBodyHandlerRegistry bodyHandlerRegistry,
-                                            BeanProvider<FormFactory> formFactory) {
-
-        NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder = new NettyBodyAnnotationBinder<>(conversionService, httpServerConfiguration.get(), bodyHandlerRegistry, formFactory);
-
-        internalRequestBinderRegistry = new DefaultRequestBinderRegistry(conversionService, binders, nettyBodyAnnotationBinder);
-
-        internalRequestBinderRegistry.addArgumentBinder(new NettyCompletableFutureBodyBinder(
-            nettyBodyAnnotationBinder));
-        internalRequestBinderRegistry.addArgumentBinder(new NettyPublisherBodyBinder(
-            nettyBodyAnnotationBinder));
-        internalRequestBinderRegistry.addArgumentBinder(new MultipartBodyArgumentBinder(
-            formFactory
-        ));
-        internalRequestBinderRegistry.addArgumentBinder(new NettyInputStreamBodyBinder());
-        internalRequestBinderRegistry.addArgumentBinder(new NettyStreamingFileUploadBinder(formFactory));
-        NettyCompletedFileUploadBinder completedFileUploadBinder = new NettyCompletedFileUploadBinder(formFactory);
-        internalRequestBinderRegistry.addArgumentBinder(completedFileUploadBinder);
-        NettyPublisherPartUploadBinder publisherPartUploadBinder = new NettyPublisherPartUploadBinder(conversionService, formFactory);
-        internalRequestBinderRegistry.addArgumentBinder(publisherPartUploadBinder);
-        NettyPartUploadAnnotationBinder<Object> partUploadAnnotationBinder = new NettyPartUploadAnnotationBinder<>(
-            conversionService,
-            completedFileUploadBinder,
-            publisherPartUploadBinder,
-            formFactory
-        );
-        internalRequestBinderRegistry.addArgumentBinder(partUploadAnnotationBinder);
-
-        internalRequestBinderRegistry.addUnmatchedRequestArgumentBinder(partUploadAnnotationBinder);
+                                          List<RequestArgumentBinder> binders,
+                                          BeanProvider<NettyHttpServerConfiguration> httpServerConfiguration,
+                                          MessageBodyHandlerRegistry bodyHandlerRegistry,
+                                          BeanProvider<FormFactory> formFactory) {
+        this.delegate = new DefaultServerRequestBinderRegistry(conversionService, binders,
+            new NettyBodyAnnotationBinder<>(conversionService, bodyHandlerRegistry, formFactory), formFactory);
     }
 
     @Override
     public <T> void addArgumentBinder(ArgumentBinder<T, HttpRequest<?>> binder) {
-        internalRequestBinderRegistry.addArgumentBinder(binder);
+        delegate.addArgumentBinder(binder);
     }
 
     @Override
     public <T> Optional<ArgumentBinder<T, HttpRequest<?>>> findArgumentBinder(Argument<T> argument) {
-        return internalRequestBinderRegistry.findArgumentBinder(argument);
+        return delegate.findArgumentBinder(argument);
     }
-
 }

@@ -16,6 +16,9 @@
 package io.micronaut.http.bind;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.context.BeanContext;
+
+import java.util.Optional;
 
 /**
  * The {@link RequestBinderRegistry} a server binds the arguments of its routes with, e.g. with the
@@ -27,4 +30,17 @@ import io.micronaut.core.annotation.Internal;
  */
 @Internal
 public interface ServerRequestBinderRegistry extends RequestBinderRegistry {
+    /**
+     * Select the server default while retaining a transport's legacy registry replacement.
+     *
+     * @param context The bean context
+     * @return The registry selected for server routes and filters
+     */
+    static Optional<RequestBinderRegistry> find(BeanContext context) {
+        Optional<RequestBinderRegistry> legacy = context.findBean(RequestBinderRegistry.class);
+        if (legacy.isPresent() && legacy.get().getClass() != DefaultRequestBinderRegistry.class) {
+            return legacy;
+        }
+        return context.findBean(ServerRequestBinderRegistry.class).map(RequestBinderRegistry.class::cast).or(() -> legacy);
+    }
 }
