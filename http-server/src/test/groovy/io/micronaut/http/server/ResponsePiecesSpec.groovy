@@ -93,6 +93,21 @@ class ResponsePiecesSpec extends Specification {
         cancelled
     }
 
+    def 'a pending write failure is retained after the body fails'() {
+        given:
+        def bodyFailure = new IllegalStateException('body failed')
+        def writeFailure = new IllegalStateException('write failed')
+        def pending = DelayedExecutionFlow.<CloseableByteBody>create()
+        def result = ResponsePieces.write(Flux.concat(Flux.just(1), Flux.error(bodyFailure)), { pending }, {})
+
+        when:
+        pending.completeExceptionally(writeFailure)
+
+        then:
+        result.tryCompleteError().is(bodyFailure)
+        bodyFailure.suppressed.toList() == [writeFailure]
+    }
+
     def 'cancelling the flow before the first piece cancels the body and ends the pieces'() {
         given:
         def flow = DelayedExecutionFlow.<CloseableByteBody> create()

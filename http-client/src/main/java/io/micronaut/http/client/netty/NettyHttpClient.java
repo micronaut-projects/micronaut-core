@@ -62,7 +62,7 @@ import io.micronaut.http.client.AsyncProxyHttpClient;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawHttpClientSupport;
-import io.micronaut.http.client.RawHttpRequestWrapper;
+import io.micronaut.http.client.internal.RawHttpRequestWrapper;
 import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.internal.RawResponseFuture;
 import io.micronaut.http.client.StreamingHttpClient;
@@ -86,6 +86,7 @@ import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
+import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
 import io.micronaut.http.netty.body.NettyForeignBufferReleaser;
@@ -477,6 +478,20 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
 
     @Override
     protected <O, E> ExecutionFlow<FullNettyClientHttpResponse<O>> fullResponse(@Nullable Argument<O> bodyType, Argument<E> errorType, NettyClientByteBodyResponse resp, CloseableAvailableByteBody av) {
+        return fullResponse(bodyType, errorType, resp, av, false);
+    }
+
+    @Override
+    protected ExecutionFlow<? extends HttpResponse<?>> streamingErrorResponse(Argument<?> errorType, NettyClientByteBodyResponse response, CloseableAvailableByteBody body) {
+        return fullResponse(errorType, errorType, response, body, true);
+    }
+
+    @Override
+    protected Publisher<ByteBuffer<?>> replacementResponsePieces(HttpResponse<?> response) {
+        return new NettyPiecesPublisher(Flux.from(NettyHttpResponseBuilder.toStreamResponse(response)).map(HttpContent::content));
+    }
+
+    private <O, E> ExecutionFlow<FullNettyClientHttpResponse<O>> fullResponse(@Nullable Argument<O> bodyType, Argument<E> errorType, NettyClientByteBodyResponse resp, CloseableAvailableByteBody av, boolean streamingError) {
         ByteBuf buf = NettyByteBodyFactory.toByteBuf(av);
         FullHttpResponse fullHttpResponse;
         try {
@@ -492,7 +507,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
 
         try {
             boolean convertBodyWithBodyType = convertsWithBodyType(fullHttpResponse.status().code(), bodyType, errorType);
-            FullNettyClientHttpResponse<O> response = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, bodyType, convertBodyWithBodyType, conversionService);
+            FullNettyClientHttpResponse<O> response = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, bodyType, convertBodyWithBodyType || streamingError, conversionService);
 
             if (convertBodyWithBodyType) {
                 return ExecutionFlow.just(response);

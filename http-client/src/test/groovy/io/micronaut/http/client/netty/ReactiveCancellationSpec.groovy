@@ -96,21 +96,25 @@ class ReactiveCancellationSpec extends Specification {
 
         when:
         if (phase == 'while the body arrives') {
-            connection.write('HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 100\r\n\r\n0123456789')
+            connection.write('HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 100\r\nConnection: close\r\n\r\n0123456789')
             Thread.sleep(500)
         }
         if (received.get() instanceof ByteBodyHttpResponse) {
             // the response arrived: its body is let go
             ((ByteBodyHttpResponse) received.get()).close()
         }
-        cancelled.set(true)
         subscription.get().cancel()
+        cancelled.set(true)
 
-        then: 'the request is aborted'
-        phase == 'while the body arrives' && !false || connection.awaitClosed(5)
+        if (phase == 'while the body arrives') {
+            connection.writeQuietly('x' * 90)
+        }
+
+        then: 'the connection closes after aborting or draining the response'
+        connection.awaitClosed(5)
 
         and: 'its body is released'
-        api != 'raw with a body' || phase != 'before the response' || bodyReleased.await(5, TimeUnit.SECONDS)
+        api != 'raw with a body' || bodyReleased.await(5, TimeUnit.SECONDS)
 
         when: 'the client goes on'
         def next = Mono.from(client.exchange(HttpRequest.GET('/next'), String)).toFuture()

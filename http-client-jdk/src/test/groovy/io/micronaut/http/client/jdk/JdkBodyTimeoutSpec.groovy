@@ -80,7 +80,7 @@ class JdkBodyTimeoutSpec extends Specification {
         ApplicationContext ctx = ApplicationContext.run([
                 'micronaut.http.client.read-timeout'             : '30s',
                 'micronaut.http.client.request-timeout'          : '1s',
-                'micronaut.http.client.jdk-apply-request-timeout': true,
+                'micronaut.http.client.jdk.apply-request-timeout': true,
         ])
         HttpClient client = ctx.createBean(HttpClient, upstream.uri('/').toURL())
 

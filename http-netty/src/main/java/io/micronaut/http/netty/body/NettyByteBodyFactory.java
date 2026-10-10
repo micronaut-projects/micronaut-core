@@ -137,7 +137,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
         }
         // the length first: for an available body it is a claiming operation, like the publisher
         OptionalLong expectedLength = body.expectedLength();
-        if (body instanceof AvailableByteBody available) {
+        if (loop.inEventLoop() && body instanceof AvailableByteBody available) {
             StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(BodySizeLimits.UNLIMITED, bytesConsumed -> {
                 // All bytes have arrived; there is no producer to notify about demand.
             });
