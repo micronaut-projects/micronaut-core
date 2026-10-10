@@ -62,6 +62,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -209,22 +210,19 @@ class ReactiveStreamOperatorsTest {
         String clientTerminal = null;
         switch (operator) {
             case CANCEL_BEFORE_REQUEST -> {
-                Thread.sleep(500);
-                assertEquals(List.of(), elements, "no element without demand");
+                await().during(Duration.ofMillis(500)).atMost(TIMEOUT)
+                    .untilAsserted(() -> assertEquals(List.of(), elements, "no element without demand"));
             }
             case TAKE_ONE -> assertEquals(1, elements.size());
             case REQUEST_ONE -> {
-                long deadline = System.nanoTime() + TIMEOUT.toNanos();
-                while (elements.isEmpty() && System.nanoTime() < deadline) {
-                    Thread.sleep(10);
-                }
+                await().atMost(TIMEOUT).until(() -> !elements.isEmpty());
                 // the server goes on producing: no element beyond the demand
-                Thread.sleep(300);
-                assertEquals(1, elements.size(), () -> "elements beyond the demand: " + elements);
+                await().during(Duration.ofMillis(300)).atMost(TIMEOUT)
+                    .untilAsserted(() -> assertEquals(1, elements.size(), () -> "elements beyond the demand: " + elements));
                 cancelled.set(true);
                 subscription.get().cancel();
-                Thread.sleep(300);
-                assertEquals(1, elements.size(), () -> "elements after cancel: " + elements);
+                await().during(Duration.ofMillis(300)).atMost(TIMEOUT)
+                    .untilAsserted(() -> assertEquals(1, elements.size(), () -> "elements after cancel: " + elements));
             }
             case ERROR_MID_STREAM -> {
                 clientTerminal = terminal.get(TIMEOUT.toSeconds(), TimeUnit.SECONDS);
@@ -248,7 +246,7 @@ class ReactiveStreamOperatorsTest {
         assertEquals(List.of(), afterCancel, "signals after cancel");
         assertEquals(expectedServerSignal(operator), signal, "what the server observed");
         if (operator == Operator.ERROR_MID_STREAM) {
-            assertEquals(expectedClientTerminal(api), clientTerminal, "how the subscriber learns of the failure");
+            assertEquals("error", clientTerminal, "how the subscriber learns of the failure");
         }
         assertNoLeak();
     }
@@ -265,21 +263,17 @@ class ReactiveStreamOperatorsTest {
         };
     }
 
-    static String expectedClientTerminal(Api api) {
-        return "error";
-    }
-
-    private static void assertNoLeak() throws InterruptedException {
-        for (int i = 0; i < 3; i++) {
-            System.gc();
-            ByteBuf probe = ByteBufAllocator.DEFAULT.buffer(16);
-            probe.release();
-            Thread.sleep(20);
-        }
-        List<String> reported = leaks.list.stream().map(ILoggingEvent::getFormattedMessage)
-            .filter(m -> m.contains("LEAK") && m.contains("io.micronaut.http.client"))
-            .toList();
-        assertTrue(reported.isEmpty(), () -> "leaks: " + reported);
+    private static void assertNoLeak() {
+        await().during(Duration.ofMillis(60)).pollInterval(Duration.ofMillis(20)).atMost(TIMEOUT)
+            .untilAsserted(() -> {
+                System.gc();
+                ByteBuf probe = ByteBufAllocator.DEFAULT.buffer(16);
+                probe.release();
+                List<String> reported = leaks.list.stream().map(ILoggingEvent::getFormattedMessage)
+                    .filter(m -> m.contains("LEAK") && m.contains("io.micronaut.http.client"))
+                    .toList();
+                assertTrue(reported.isEmpty(), () -> "leaks: " + reported);
+            });
     }
 
     @Requires(property = "spec.name", value = SPEC)
