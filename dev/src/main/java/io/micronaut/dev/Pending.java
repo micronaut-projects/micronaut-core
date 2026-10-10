@@ -18,7 +18,6 @@ package io.micronaut.dev;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.dev.DevRuntime.SourceChanges;
 import io.micronaut.dev.compile.SourceKind;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.EnumMap;
@@ -31,7 +30,6 @@ import java.util.Map;
  * @author graemerocher
  * @since 5.3.0
  */
-@NullMarked
 class Pending {
     final Map<SourceKind, SourceChanges> sources;
     final Map<SourceKind, SourceChanges> testSources;
