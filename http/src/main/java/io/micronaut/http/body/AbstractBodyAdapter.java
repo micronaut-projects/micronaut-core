@@ -48,6 +48,7 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
     private final Runnable onDiscard;
     private boolean started;
     private volatile boolean cancelled;
+    private boolean incorrectLength;
     @Nullable
     private CompletionStage<? extends HttpHeaders> trailers;
 
@@ -127,8 +128,17 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
 
     @Override
     public void onNext(ReadBuffer buffer) {
+        if (incorrectLength) {
+            buffer.close();
+            return;
+        }
         long newDemand = demand.addAndGet(-buffer.readable());
-        java.util.Objects.requireNonNull(sharedBuffer).add(buffer);
+        try {
+            java.util.Objects.requireNonNull(sharedBuffer).add(buffer);
+        } catch (BaseSharedBuffer.IncorrectContentLengthException e) {
+            failIncorrectLength(e);
+            return;
+        }
         if (newDemand > 0) {
             if (subscription != null) {
                 subscription.request(1);
@@ -138,16 +148,41 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
 
     @Override
     public void onError(Throwable t) {
+        if (incorrectLength) {
+            return;
+        }
         java.util.Objects.requireNonNull(sharedBuffer).error(t);
     }
 
     @Override
     public void onComplete() {
-        BaseSharedBuffer buffer = java.util.Objects.requireNonNull(sharedBuffer);
-        if (trailers == null) {
-            buffer.complete();
-        } else {
-            buffer.complete(trailers);
+        if (incorrectLength) {
+            return;
         }
+        BaseSharedBuffer buffer = java.util.Objects.requireNonNull(sharedBuffer);
+        try {
+            if (trailers == null) {
+                buffer.complete();
+            } else {
+                buffer.complete(trailers);
+            }
+        } catch (BaseSharedBuffer.IncorrectContentLengthException e) {
+            failIncorrectLength(e);
+        }
+    }
+
+    /**
+     * The source published more or fewer bytes than the expected length of the body: the body
+     * fails, rather than waiting for bytes that never come, and the source is cancelled.
+     *
+     * @param e The failure of the shared buffer
+     */
+    private void failIncorrectLength(BaseSharedBuffer.IncorrectContentLengthException e) {
+        incorrectLength = true;
+        Subscription s = subscription;
+        if (s != null) {
+            s.cancel();
+        }
+        java.util.Objects.requireNonNull(sharedBuffer).error(e);
     }
 }

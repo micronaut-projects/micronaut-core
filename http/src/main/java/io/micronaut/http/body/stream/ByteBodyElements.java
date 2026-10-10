@@ -89,6 +89,18 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
     }
 
     /**
+     * The pieces of a body as they are received, pulled one at a time, see
+     * {@link io.micronaut.http.body.ByteBody#toReadBufferElements()}.
+     *
+     * @param body The body, which the elements take over
+     * @return The pieces, each of which its consumer closes
+     */
+    @SuppressWarnings("java:S2095") // the elements own the piece reader, and close it
+    public static ByteBodyElements<ReadBuffer> readBuffers(CloseableByteBody body) {
+        return new ByteBodyElements<>(body, new ReadBufferPieces(), Function.identity());
+    }
+
+    /**
      * The elements as a publisher for the reactive API: the elements are pushed as the pieces of
      * the body are read, by a lock-free publisher without a future per element. These elements
      * can no longer be pulled.
