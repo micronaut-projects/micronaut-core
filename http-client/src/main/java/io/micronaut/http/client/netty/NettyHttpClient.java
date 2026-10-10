@@ -62,6 +62,8 @@ import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.PieceReader;
+import io.micronaut.http.body.stream.ByteBodyElements;
 import io.micronaut.http.body.WritableBodyWriter;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.BlockingHttpClient;
@@ -98,7 +100,7 @@ import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.ElementsStages;
-import io.micronaut.http.client.ByteBodyElements;
+import io.micronaut.http.client.BodyPieces;
 import io.micronaut.http.client.ElementsResponse;
 import io.micronaut.http.client.SubscriberBodyElements;
 import io.micronaut.http.client.sse.EventStreams;
@@ -896,12 +898,13 @@ final class NettyHttpClient implements
      */
     <I> ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> exchangeStreamFlow(io.micronaut.http.HttpRequest<I> request, Argument<?> errorType) {
         return exchangeElementsFlow(request, errorType, false,
-            response -> ElementsResponse.of(response, ByteBodyElements.pieces(response.byteBody().move())));
+            response -> ElementsResponse.of(response, BodyPieces.elements(response.byteBody().move())));
     }
 
     /**
-     * The {@link #jsonStream} of {@link DefaultAsyncHttpClient}: the exchange runs without Reactor,
-     * and the elements are decoded by the chunked JSON reader as they are pulled.
+     * The {@link #jsonStream} of {@link DefaultAsyncHttpClient}, without Reactor: the elements are
+     * split from the pieces of the body and decoded by the piece reader of the JSON reader as they
+     * are pulled.
      *
      * @param request   The request
      * @param type      The type of an element
@@ -919,9 +922,15 @@ final class NettyHttpClient implements
             }
             CloseableByteBody body = response.byteBody().move();
             io.micronaut.http.HttpHeaders headers = response.getHeaders();
+            // an element is decoded in memory: it is limited like buffered content
             long maxElementSize = sizeLimits().maxBufferSize();
+            PieceReader<O> pieceReader = reader.openPieceReader(type, mediaType, headers, maxElementSize);
+            if (pieceReader != null) {
+                // without Reactor: the pieces are split into elements as they are pulled
+                return ElementsResponse.of(response, new ByteBodyElements<>(body, pieceReader, Function.identity()));
+            }
             return ElementsResponse.of(response, SubscriberBodyElements.of(() -> {
-                // an element is decoded in memory: it is limited like buffered content
+                // a reader that only reads a publisher
                 Publisher<ByteBuffer<?>> bytes = Flux.from(InternalByteBody.toUnbufferedReadBufferPublisher(body))
                     .doOnDiscard(ReadBuffer.class, ReadBuffer::close)
                     .map(rb -> {

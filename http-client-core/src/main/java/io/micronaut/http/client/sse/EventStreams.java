@@ -17,6 +17,7 @@ package io.micronaut.http.client.sse;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
@@ -30,8 +31,9 @@ import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.PieceReader;
+import io.micronaut.http.body.stream.ByteBodyElements;
 import io.micronaut.http.body.stream.PulledBodyElements;
-import io.micronaut.http.client.ByteBodyElements;
 import io.micronaut.http.client.ElementsResponse;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientException;
@@ -42,6 +44,7 @@ import org.jspecify.annotations.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -113,16 +116,7 @@ public final class EventStreams {
             BodyElements<Event<B>> elements;
             if (contentType != null && MediaType.TEXT_EVENT_STREAM_TYPE.matches(contentType)) {
                 // the data of each event is JSON
-                Function<byte[], B> reader = dataReader(handlerRegistry, eventType, MediaType.APPLICATION_JSON_TYPE, headers);
-                EventStreamDecoder decoder = new EventStreamDecoder(maxBufferSize);
-                elements = new ByteBodyElements<>(body, piece -> {
-                    List<Event<byte[]>> events = decoder.decode(piece.toArray());
-                    List<Event<B>> decoded = new ArrayList<>(events.size());
-                    for (Event<byte[]> event : events) {
-                        decoded.add(Event.of(event, reader.apply(event.getData())));
-                    }
-                    return decoded;
-                }, wrap);
+                elements = new ByteBodyElements<>(body, new EventReader<>(new EventStreamDecoder(maxBufferSize), dataReader(handlerRegistry, eventType, MediaType.APPLICATION_JSON_TYPE, headers)), wrap);
             } else {
                 // a single body, such as JSON, is one event
                 MediaType mediaType = contentType == null ? MediaType.APPLICATION_JSON_TYPE : contentType;
@@ -374,6 +368,48 @@ public final class EventStreams {
         @Override
         protected void release() {
             pieces.close();
+        }
+    }
+
+    /**
+     * Reads the events of the pieces of an event stream. The lines are split as the pieces are
+     * read, and the data of an event is decoded when the event is polled.
+     *
+     * @param <B> The event data type
+     */
+    private static final class EventReader<B> implements PieceReader<Event<B>> {
+        private final EventStreamDecoder decoder;
+        private final Function<byte[], B> dataReader;
+        private final ArrayDeque<Event<byte[]>> events = new ArrayDeque<>(1);
+
+        EventReader(EventStreamDecoder decoder, Function<byte[], B> dataReader) {
+            this.decoder = decoder;
+            this.dataReader = dataReader;
+        }
+
+        @Override
+        public void read(ReadBuffer piece) {
+            try (piece) {
+                byte[] bytes = piece.toArray();
+                // the events before a line that exceeds the limit are delivered before the failure
+                decoder.decode(bytes, 0, bytes.length, events::add);
+            }
+        }
+
+        @Override
+        public void complete() {
+            // an event not terminated by a blank line is discarded
+        }
+
+        @Override
+        public @Nullable Event<B> poll() {
+            Event<byte[]> event = events.poll();
+            return event == null ? null : Event.of(event, dataReader.apply(event.getData()));
+        }
+
+        @Override
+        public void close() {
+            events.clear();
         }
     }
 }
