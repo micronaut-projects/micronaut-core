@@ -33,3 +33,4 @@ None.
 | --- | --- |
 | `io.micronaut.docs.ioc.introspection.pck.foobar.package-info` | Python cannot support Java package-level `@Introspected` on `package-info`; leave this target absent. |
 | `io.micronaut.docs.aop.lifecycle.pertarget.*` | An advised Python bean is a runtime proxy (`PythonProxyCreator`), which keeps the interceptors it was created with, so `@Around(lazyInterceptorsPerTarget = true)` has no effect: a refreshed target counts on from the previous one. The guide shows a Python note instead; leave these targets absent. |
+| `io.micronaut.docs.devmode.tck.*` | `micronaut-dev-tck` is a harness for JVM modules: it writes Java sources, compiles them with `javac` and the Java annotation processor, and reloads them on new class loaders, so a test in Python would only drive the same Java fixture. The guide shows Java, Groovy and Kotlin; leave these targets absent. |
