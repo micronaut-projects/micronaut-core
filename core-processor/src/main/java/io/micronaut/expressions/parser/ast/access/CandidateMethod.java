@@ -22,9 +22,11 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.sourcegen.model.TypeDef;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.isAssignable;
 
@@ -180,7 +182,7 @@ final class CandidateMethod {
 
                 // check whether all remaining arguments match parameter type
                 for (int argIndex = paramIndex; argIndex < argumentTypes.size(); argIndex++) {
-                    ClassElement argumentType = argumentTypes.get(paramIndex);
+                    ClassElement argumentType = argumentTypes.get(argIndex);
                     if (!isAssignable(parameterType, argumentType)) {
                         return false;
                     }
@@ -201,6 +203,185 @@ final class CandidateMethod {
         }
 
         return false;
+    }
+
+    /**
+     * Selects the most specific of the matching candidate methods, following the rules of
+     * JLS 15.12.2. Candidates applicable without boxing or varargs expansion are preferred over
+     * candidates applicable with boxing, which are preferred over candidates that need varargs
+     * expansion. Among the candidates of the same phase, the method whose parameter types are all
+     * subtypes of the parameter types of the other candidates is selected.
+     *
+     * @param candidates the matching candidates, see {@link #isMatching()}
+     * @return the most specific candidate or an empty optional if the call is ambiguous
+     */
+    static Optional<CandidateMethod> selectMostSpecific(List<CandidateMethod> candidates) {
+        if (candidates.size() == 1) {
+            return Optional.of(candidates.getFirst());
+        }
+        List<CandidateMethod> applicable = candidates.stream().filter(CandidateMethod::isStrictMatch).toList();
+        if (applicable.isEmpty()) {
+            applicable = candidates.stream().filter(candidate -> !candidate.isVarArgs()).toList();
+        }
+        if (applicable.isEmpty()) {
+            applicable = candidates;
+        }
+
+        List<CandidateMethod> maximallySpecific = new ArrayList<>();
+        for (CandidateMethod candidate : applicable) {
+            boolean mostSpecific = true;
+            for (CandidateMethod other : applicable) {
+                if (candidate != other && !candidate.isMoreSpecificThan(other)) {
+                    mostSpecific = false;
+                    break;
+                }
+            }
+            if (mostSpecific) {
+                maximallySpecific.add(candidate);
+            }
+        }
+        if (maximallySpecific.isEmpty()) {
+            return Optional.empty();
+        }
+        // several methods with the same signature, for example the same method inherited from
+        // several interfaces: prefer the one owned and declared by the most specific type.
+        // Methods owned by unrelated types, such as two expression evaluation context beans, stay ambiguous
+        CandidateMethod selected = maximallySpecific.getFirst();
+        for (CandidateMethod candidate : maximallySpecific) {
+            if (!candidate.hasSameParameterTypes(selected)) {
+                return Optional.empty();
+            }
+            ClassElement owningType = candidate.methodElement.getOwningType();
+            ClassElement selectedOwningType = selected.methodElement.getOwningType();
+            if (!owningType.getName().equals(selectedOwningType.getName())) {
+                if (owningType.isAssignable(selectedOwningType)) {
+                    selected = candidate;
+                } else if (!selectedOwningType.isAssignable(owningType)) {
+                    return Optional.empty();
+                }
+            } else if (candidate.isMoreSpecificDeclarationThan(selected)) {
+                selected = candidate;
+            }
+        }
+        return Optional.of(selected);
+    }
+
+    /**
+     * Whether the arguments match the parameters of this method without boxing, unboxing or
+     * varargs expansion.
+     *
+     * @return true if they do
+     */
+    private boolean isStrictMatch() {
+        if (isVarArgs() || argumentTypes.size() != parameterTypes.size()) {
+            return false;
+        }
+        for (int i = 0; i < parameterTypes.size(); i++) {
+            if (!isSubtype(argumentTypes.get(i), parameterTypes.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether this method is at least as specific as the other method for the arguments of
+     * the invocation: each parameter type of this method is a subtype of the corresponding
+     * parameter type of the other method.
+     *
+     * @param other the other candidate
+     * @return true if this method is at least as specific
+     */
+    private boolean isMoreSpecificThan(CandidateMethod other) {
+        int arity = Math.max(argumentTypes.size(), Math.max(parameterTypes.size(), other.parameterTypes.size()));
+        if (!isVarArgs() && !other.isVarArgs()) {
+            if (parameterTypes.size() != other.parameterTypes.size()) {
+                return false;
+            }
+            arity = parameterTypes.size();
+        }
+        for (int i = 0; i < arity; i++) {
+            if (!isSubtype(getParameterType(i), other.getParameterType(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether this method is a more specific declaration than the other method with the same signature:
+     * it has a more specific (covariant) return type or is declared by a more specific type.
+     *
+     * @param other the other candidate
+     * @return true if it is
+     */
+    private boolean isMoreSpecificDeclarationThan(CandidateMethod other) {
+        ClassElement returnType = methodElement.getReturnType();
+        ClassElement otherReturnType = other.methodElement.getReturnType();
+        if (!returnType.getName().equals(otherReturnType.getName())) {
+            return isSubtype(returnType, otherReturnType);
+        }
+        return methodElement.getDeclaringType().isAssignable(other.methodElement.getDeclaringType());
+    }
+
+    private ClassElement getParameterType(int index) {
+        if (isVarArgs() && index >= varargsIndex) {
+            return getLastParameter().fromArray();
+        }
+        return parameterTypes.get(index);
+    }
+
+    private boolean hasSameParameterTypes(CandidateMethod other) {
+        if (isVarArgs() != other.isVarArgs() || parameterTypes.size() != other.parameterTypes.size()) {
+            return false;
+        }
+        for (int i = 0; i < parameterTypes.size(); i++) {
+            ClassElement type = parameterTypes.get(i);
+            ClassElement otherType = other.parameterTypes.get(i);
+            if (!type.getName().equals(otherType.getName()) || type.getArrayDimensions() != otherType.getArrayDimensions()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether the type is a subtype of the super type without boxing or unboxing conversions.
+     *
+     * @param type the type
+     * @param superType the super type
+     * @return true if it is
+     */
+    private static boolean isSubtype(ClassElement type, ClassElement superType) {
+        if (type.getArrayDimensions() != superType.getArrayDimensions()) {
+            // arrays are only assignable to arrays of the same dimension here, which matches isAssignable
+            return false;
+        }
+        if (type.isPrimitive() || superType.isPrimitive()) {
+            return type.isPrimitive() && superType.isPrimitive() && isPrimitiveSubtype(type.getName(), superType.getName());
+        }
+        return type.isAssignable(superType);
+    }
+
+    /**
+     * Whether a primitive type is a subtype of another primitive type, which includes widening primitive conversions (JLS 4.10.1).
+     *
+     * @param type the primitive type name
+     * @param superType the primitive super type name
+     * @return true if it is
+     */
+    private static boolean isPrimitiveSubtype(String type, String superType) {
+        if (type.equals(superType)) {
+            return true;
+        }
+        return switch (type) {
+            case "byte" -> isPrimitiveSubtype("short", superType);
+            case "short", "char" -> isPrimitiveSubtype("int", superType);
+            case "int" -> isPrimitiveSubtype("long", superType);
+            case "long" -> isPrimitiveSubtype("float", superType);
+            case "float" -> "double".equals(superType);
+            default -> false;
+        };
     }
 
     private int calculateVarargsIndex() {
