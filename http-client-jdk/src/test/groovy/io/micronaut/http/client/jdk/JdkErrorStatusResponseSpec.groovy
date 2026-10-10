@@ -158,9 +158,9 @@ class JdkErrorStatusResponseSpec extends Specification {
         ctx.close()
     }
 
-    void "the error body is decoded into the error type when jdk-decode-error-type is enabled"() {
+    void "the error body is decoded into the error type when jdk.decode-error-type is enabled"() {
         given:
-        ApplicationContext ctx = ApplicationContext.run(['micronaut.http.client.jdk-decode-error-type': true])
+        ApplicationContext ctx = ApplicationContext.run(['micronaut.http.client.jdk.decode-error-type': true])
         HttpClient client = ctx.createBean(HttpClient, server.URL)
 
         when:

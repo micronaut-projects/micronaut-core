@@ -38,7 +38,10 @@ import java.io.IOException;
  * pieces it was fed, and, when it is {@link #close() closed}, the bytes of the elements it holds
  * that were not polled.</p>
  *
- * <p>The methods are called one at a time, never concurrently.</p>
+ * <p>The methods are called one at a time, never concurrently, but successive calls may
+ * come from different threads. Input pieces are byte buffers; decoded elements are values
+ * returned by {@link #poll()} and must never be {@code null}. Elements completed before
+ * {@link #read} or {@link #complete} fails remain available to {@link #poll()}.</p>
  *
  * @param <T> The type of an element
  * @author Denis Stepanov
@@ -55,6 +58,8 @@ public interface PieceReader<T> extends Closeable {
      * @throws IOException    If the input is malformed, e.g. a
      *                        {@code io.micronaut.json.JsonSyntaxException}
      * @throws CodecException If the piece cannot be read
+     * @throws io.micronaut.http.exceptions.ContentLengthExceededException If an element exceeds
+     *                        the limit supplied when opening the reader
      */
     void read(ReadBuffer piece) throws IOException;
 

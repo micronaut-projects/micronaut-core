@@ -24,7 +24,7 @@ import spock.lang.Specification
 
 /**
  * The redirects of the JDK client are followed by the JDK client itself, as they always were,
- * unless {@code jdk-micronaut-redirects} is enabled: then the pipeline it shares with the Netty
+ * unless {@code jdk.use-micronaut-redirects} is enabled: then the pipeline it shares with the Netty
  * client follows them, with the same behavior.
  */
 class JdkRedirectSpec extends Specification {
@@ -44,7 +44,7 @@ class JdkRedirectSpec extends Specification {
     @AutoCleanup
     ApplicationContext clientContext = ApplicationContext.run([
             'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
-            'micronaut.http.client.jdk-micronaut-redirects'            : true,
+            'micronaut.http.client.jdk.use-micronaut-redirects'            : true,
     ])
 
     @Shared

@@ -79,9 +79,9 @@ public interface ChunkedMessageBodyReader<T> extends MessageBodyReader<T> {
      * {@link #readChunked(Argument, MediaType, Headers, Publisher)}, which reads a JSON array
      * as one piece of a collection type.</p>
      *
-     * <p>The default implementation reads the input with the reader of {@link #openPieceReader},
-     * or, for a reader that only reads a publisher, ignores the limit, for a reader that does not
-     * buffer the input to decode it.</p>
+     * <p>The default implementation delegates to the four-argument method, preserving its
+     * buffer adaptation and ignoring the limit. Readers that buffer elements must override
+     * this method to enforce the limit.</p>
      *
      * @param type            The type of a piece
      * @param mediaType       The media type
@@ -98,10 +98,6 @@ public interface ChunkedMessageBodyReader<T> extends MessageBodyReader<T> {
         Publisher<ByteBuffer<?>> input,
         long maxElementSize
     ) {
-        PieceReader<T> reader = openPieceReader(type, mediaType, httpHeaders, maxElementSize);
-        if (reader != null) {
-            return PieceReaders.publisherOfBuffers(input, reader, PieceReaders::adapt);
-        }
         return readChunked(type, mediaType, httpHeaders, input);
     }
 

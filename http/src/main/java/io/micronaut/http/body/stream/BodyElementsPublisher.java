@@ -37,7 +37,7 @@ import java.util.function.Consumer;
 /**
  * {@link BodyElements} as a publisher, without Reactor: the requested elements that are
  * available at once ({@link BodyElements#poll()}) are emitted in a loop, the others with one
- * {@link BodyElements#next()} at a time. Cancelling closes the elements.
+ * {@link BodyElements#next()} at a time. Cancellation and terminal signals close the elements.
  *
  * <p>One subscriber.</p>
  *
@@ -169,15 +169,13 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
         if (arrival != null) {
             reading = false;
             if (arrival.error != null) {
-                done = true;
                 Throwable error = arrival.error;
-                subscriber.onError(error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
+                finish(subscriber, error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
                 return;
             }
             Optional<T> element = arrival.element;
             if (element.isEmpty()) {
-                done = true;
-                subscriber.onComplete();
+                finish(subscriber, null);
                 return;
             }
             produced();
@@ -188,8 +186,7 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
             try {
                 available = elements.poll();
             } catch (Exception | Error e) {
-                done = true;
-                subscriber.onError(e);
+                finish(subscriber, e);
                 return;
             }
             if (available != null) {
@@ -209,6 +206,38 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
                 arrived.set(new Arrival<>(Objects.requireNonNullElse(element, Optional.empty()), error));
                 drain();
             });
+        }
+        if (!reading && !cancelled && !done) {
+            try {
+                BodyElements.State state = elements.state();
+                if (state == BodyElements.State.COMPLETED) {
+                    finish(subscriber, null);
+                } else if (state == BodyElements.State.FAILED) {
+                    finish(subscriber, Objects.requireNonNull(elements.failure(), "Failed elements must expose their failure"));
+                }
+            } catch (Exception | Error e) {
+                finish(subscriber, e);
+            }
+        }
+    }
+
+    @SuppressWarnings("java:S1181") // Closing user-supplied elements must preserve the terminal failure.
+    private void finish(Subscriber<? super T> subscriber, @Nullable Throwable failure) {
+        done = true;
+        closed = true;
+        try {
+            elements.close();
+        } catch (Exception | Error e) {
+            if (failure == null) {
+                failure = e;
+            } else if (failure != e) {
+                failure.addSuppressed(e);
+            }
+        }
+        if (failure == null) {
+            subscriber.onComplete();
+        } else {
+            subscriber.onError(failure);
         }
     }
 
