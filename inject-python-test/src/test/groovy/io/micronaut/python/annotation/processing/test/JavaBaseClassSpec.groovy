@@ -18,6 +18,7 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.python.ValueCoercible
 import io.micronaut.python.annotation.processing.test.javabases.AbstractCounter
+import io.micronaut.python.annotation.processing.test.javabases.ContentComposite
 import io.micronaut.python.annotation.processing.test.javabases.CtorHookBase
 import io.micronaut.python.annotation.processing.test.javabases.GenericHolder
 import io.micronaut.python.annotation.processing.test.javabases.GreetingBase
@@ -353,6 +354,59 @@ class StrHolder(GenericHolder[str]):
         holder.apply('abc') == 'ABC'
         holder.value() == 'ABC'
         holder.transform('x') == 'X'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "a Python class overrides a method returning the bounded type variable of a raw or parameterized Java base"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from micronaut.python.annotation.processing.test.javabases import ContentComposite
+from micronaut.python.annotation.processing.test.javabases.ContentComposite import Panel
+
+
+class RawView(ContentComposite):
+    def initContent(self) -> Panel:
+        return Panel("raw")
+
+    def label(self, part: ContentComposite.Part) -> str:
+        return "label:" + part.describe()
+
+
+class UnhintedView(ContentComposite):
+    def initContent(self):
+        return Panel("unhinted")
+
+
+class BoundHintView(ContentComposite):
+    def initContent(self) -> ContentComposite.Part:
+        return Panel("bound")
+
+
+class ParameterizedView(ContentComposite[Panel]):
+    def initContent(self) -> Panel:
+        return Panel("parameterized")
+''', true)
+
+        when:
+        def view = { String name -> (ContentComposite) ctx.classLoader.loadClass("python.$name").getConstructor().newInstance() }
+        def initContent = { String name -> ctx.classLoader.loadClass("python.$name").getDeclaredMethod('initContent') }
+
+        then: 'the Java base reaches each Python override through its own call of the protected hook'
+        view('RawView').content.describe() == 'panel:raw'
+        view('RawView').describeContent() == 'label:panel:raw'
+        view('UnhintedView').content.describe() == 'panel:unhinted'
+        view('BoundHintView').content.describe() == 'panel:bound'
+        view('ParameterizedView').content.describe() == 'panel:parameterized'
+
+        and: 'the override of a raw base returns the hint when it is within the bound, or else the bound'
+        initContent('RawView').returnType == ContentComposite.Panel
+        initContent('UnhintedView').returnType == ContentComposite.Part
+        initContent('BoundHintView').returnType == ContentComposite.Part
+
+        and: 'the override of a parameterized base returns the type argument'
+        initContent('ParameterizedView').returnType == ContentComposite.Panel
 
         cleanup:
         ctx?.close()
