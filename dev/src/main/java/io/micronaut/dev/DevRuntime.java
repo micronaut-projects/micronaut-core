@@ -666,7 +666,17 @@ public final class DevRuntime implements Closeable {
                 lastFailure = failure;
                 LOG.error("{}", failure.describe().strip());
                 // nothing of the batch reached the application: its sources compile again with the next one
-                failedBatch = withoutSources(batch, compiledKinds);
+                Pending remaining = withoutSources(batch, compiledKinds);
+                failedBatch = remaining;
+                if (batch.forcesRestart()) {
+                    // a restart asked for runs the output that compiled last, as it does alone, though a watcher's late
+                    // report of the broken source came with it; the failed changes wait for the next compilation without it
+                    failedBatch = new Pending(remaining.sources, remaining.resources, remaining.full);
+                    OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
+                    ChangeSet changeSet = snapshot.diff(latest);
+                    snapshot = latest;
+                    restart(changeSet, true, start);
+                }
                 return;
             }
             compiled = true;
