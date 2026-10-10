@@ -318,12 +318,14 @@ class PieceReaderPublisherConcurrencyTest {
      * Lines.
      */
     private static final class LineReader implements PieceReader<String> {
+        private boolean completed;
         private final StringBuilder pending = new StringBuilder();
         private final ArrayDeque<String> lines = new ArrayDeque<>();
 
         @Override
         public void read(ReadBuffer piece) {
             try (piece) {
+                assertFalse(completed, "A piece was read after the end of input");
                 pending.append(piece.toString(StandardCharsets.UTF_8));
             }
             int end;
@@ -335,7 +337,7 @@ class PieceReaderPublisherConcurrencyTest {
 
         @Override
         public void complete() {
-            // nothing to do in this test
+            completed = true;
         }
 
         @Override
