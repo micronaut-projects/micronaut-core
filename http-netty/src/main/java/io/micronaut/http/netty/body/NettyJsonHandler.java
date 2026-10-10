@@ -31,7 +31,8 @@ import jakarta.inject.Singleton;
  * Compatibility bean for applications replacing the former Netty JSON handler.
  *
  * @param <T> The body type
- * @deprecated JSON streaming is provided by {@link JsonMessageHandler}; replace that type in new applications.
+ * @deprecated JSON streaming is provided by {@link JsonMessageHandler}. Existing custom Netty
+ * handlers should continue replacing this type until it is removed.
  */
 @Deprecated(since = "5.3.0", forRemoval = true)
 @Internal

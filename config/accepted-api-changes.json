@@ -1611,15 +1611,5 @@
     "type": "io.micronaut.http.netty.body.JsonCounter$BufferRegion",
     "member": "Constructor io.micronaut.http.netty.body.JsonCounter$BufferRegion(long,long)",
     "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
-  },
-  {
-    "type": "io.micronaut.http.netty.body.NettyJsonHandler",
-    "member": "Constructor io.micronaut.http.netty.body.NettyJsonHandler(io.micronaut.json.JsonMapper)",
-    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
-  },
-  {
-    "type": "io.micronaut.http.netty.body.NettyJsonStreamHandler",
-    "member": "Constructor io.micronaut.http.netty.body.NettyJsonStreamHandler(io.micronaut.json.JsonMapper)",
-    "reason": "The internal Netty JSON handlers are removed: the JSON handlers of json-core read streamed JSON without Netty"
   }
 ]

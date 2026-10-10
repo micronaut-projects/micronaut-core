@@ -27,11 +27,15 @@ import io.micronaut.http.client.AsyncProxyHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
+import jakarta.annotation.PreDestroy;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Function;
 
 /**
  * A route that relays its own request with an injected {@link AsyncProxyHttpClient}: the body
@@ -57,6 +61,13 @@ class AsyncProxyHttpClientRelayTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class RelayController {
         private final AsyncProxyHttpClient client;
+        // Keep response writing within this test's inherited leak-detection scope.
+        private final ExecutorService responses = Executors.newSingleThreadExecutor();
+
+        @PreDestroy
+        void close() {
+            responses.close();
+        }
 
         RelayController(@Client("/") AsyncProxyHttpClient client) {
             this.client = client;
@@ -66,7 +77,7 @@ class AsyncProxyHttpClientRelayTest {
         CompletionStage<MutableHttpResponse<?>> gateway(HttpRequest<?> request) {
             // the body bytes of this server request are relayed as they are, to a URI resolved
             // against the URL of the client
-            return client.proxy(request.mutate().uri(URI.create("/async-proxy-relay/echo")));
+            return client.proxy(request.mutate().uri(URI.create("/async-proxy-relay/echo"))).thenApplyAsync(Function.identity(), responses);
         }
 
         @Post(value = "/echo", consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)

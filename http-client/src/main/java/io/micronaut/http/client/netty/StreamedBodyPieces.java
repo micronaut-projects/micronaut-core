@@ -79,7 +79,7 @@ final class StreamedBodyPieces implements BodyElements<ByteBuffer<?>> {
         }
         Publisher<ByteBuf> buffers;
         if (lines) {
-            buffers = PieceReaders.publisher(body.toReadBufferPublisher(), BodyPieces.lineReader(maxLineLength, Unpooled::wrappedBuffer));
+            buffers = PieceReaders.publisher(body.toReadBufferPublisher(), BodyPieces.lineReader(maxLineLength, line -> line.length == 0 ? Unpooled.buffer(0) : Unpooled.wrappedBuffer(line)));
         } else {
             buffers = NettyByteBodyFactory.toByteBufs(body);
         }
