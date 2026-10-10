@@ -481,6 +481,21 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
     }
 
     /**
+     * The hierarchy of the bean type: its super classes and interfaces, with what each of them extends and
+     * implements, and the methods the bean type declares itself.
+     *
+     * <p>A generated introspection describes it when it is compiled with
+     * {@link io.micronaut.core.annotation.Introspected#hierarchy()}; by default it does not.</p>
+     *
+     * @return The hierarchy, or empty if the introspection does not describe it
+     * @since 5.3.0
+     */
+    @Experimental
+    default Optional<BeanTypeHierarchy> getTypeHierarchy() {
+        return Optional.empty();
+    }
+
+    /**
      * Obtains an introspection from the default {@link BeanIntrospector}.
      *
      * @param type The type
