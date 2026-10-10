@@ -57,6 +57,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.micronaut.http.server.tck.tests.routing.HandlerRouteServerSentEventsTest.connect;
 import static io.micronaut.http.server.tck.tests.routing.HandlerRouteServerSentEventsTest.count;
+import static io.micronaut.http.server.tck.tests.routing.HandlerRouteServerSentEventsTest.decodedBody;
 import static io.micronaut.http.server.tck.tests.routing.HandlerRouteServerSentEventsTest.readToEnd;
 import static io.micronaut.http.server.tck.tests.routing.HandlerRouteServerSentEventsTest.readUntil;
 import static io.micronaut.http.server.tck.tests.routing.HandlerRouteServerSentEventsTest.request;
@@ -206,7 +207,7 @@ public class HandlerRouteBodyElementsTest {
             int pulledWhileStalled = recorder.pulled.get();
             assertTrue(pulledWhileStalled < SLOW_ELEMENTS / 2, "The source was pulled without the client reading: " + pulledWhileStalled + " elements");
             String received = readToEnd(socket.getInputStream());
-            assertEquals(SLOW_ELEMENTS, count(received, KILOBYTE));
+            assertEquals(SLOW_ELEMENTS, count(decodedBody(received), KILOBYTE));
             assertClosed(server, "slow");
         }
     }
