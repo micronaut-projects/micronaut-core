@@ -21,6 +21,7 @@ import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
@@ -43,6 +44,7 @@ import java.util.stream.Stream;
 @Internal
 public final class DefaultExpressionCompilationContextFactory implements ExpressionCompilationContextFactory {
 
+    private static final String METHOD_ARGUMENTS_MEMBER = "methodArguments";
     private static final Collection<ClassElement> CONTEXT_TYPES = ConcurrentHashMap.newKeySet();
     private ExtensibleExpressionEvaluationContext sharedContext;
     private final VisitorContext visitorContext;
@@ -59,6 +61,11 @@ public final class DefaultExpressionCompilationContextFactory implements Express
     @Override
     public ExpressionEvaluationContext buildContextForMethod(EvaluatedExpressionReference expression,
                                                              MethodElement methodElement) {
+        if (excludesMethodArguments(expression)) {
+            // the expression is evaluated without the method arguments, so only the type of this is known
+            ClassElement thisElement = methodElement.isStatic() || methodElement instanceof ConstructorElement ? null : methodElement.getOwningType();
+            return buildForExpression(expression, thisElement);
+        }
         return buildForExpression(expression, null)
                  .extendWith(methodElement);
     }
@@ -91,6 +98,18 @@ public final class DefaultExpressionCompilationContextFactory implements Express
             return evaluationContext.withThis(thisElement);
         }
         return evaluationContext;
+    }
+
+    private boolean excludesMethodArguments(EvaluatedExpressionReference expression) {
+        ClassElement annotation = visitorContext.getClassElement(expression.annotationName()).orElse(null);
+        if (annotation == null) {
+            return false;
+        }
+        return Stream.concat(
+                annotation.findAnnotation(AnnotationExpressionContext.class).stream(),
+                findAnnotationMembers(annotation, expression.annotationMember())
+                    .flatMap(element -> Optional.ofNullable(element.getDeclaredAnnotation(AnnotationExpressionContext.class)).stream()))
+            .anyMatch(av -> !av.booleanValue(METHOD_ARGUMENTS_MEMBER).orElse(true));
     }
 
     private ExtensibleExpressionEvaluationContext addAnnotationEvaluationContext(

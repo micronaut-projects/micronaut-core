@@ -72,4 +72,73 @@ class AnnotationLevelContextExpressionsSpec extends AbstractEvaluatedExpressions
 
     }
 
+    void "test method parameters excluded from the annotation level context"() {
+        given:
+        Object result = evaluateSingle("test.Expr", """
+
+            package test;
+            import io.micronaut.context.annotation.AnnotationExpressionContext;
+            import io.micronaut.context.annotation.Executable;
+            import jakarta.inject.Singleton;
+
+            @Singleton
+            class Expr {
+                @Executable
+                @CustomAnnotation("#{ value }")
+                void method(String value) {
+                }
+            }
+
+            @Singleton
+            class CustomContext {
+                public String getValue() {
+                    return "contextValue";
+                }
+            }
+
+            @AnnotationExpressionContext(value = CustomContext.class, methodArguments = false)
+            @interface CustomAnnotation {
+                String value();
+            }
+
+        """)
+
+        expect:
+        result == "contextValue"
+    }
+
+    void "test method parameters excluded from the annotation member level context"() {
+        given:
+        Object result = evaluateSingle("test.Expr", """
+
+            package test;
+            import io.micronaut.context.annotation.AnnotationExpressionContext;
+            import io.micronaut.context.annotation.Executable;
+            import jakarta.inject.Singleton;
+
+            @Singleton
+            class Expr {
+                @Executable
+                @CustomAnnotation(customValue = "#{ value }")
+                void method(String value) {
+                }
+            }
+
+            @Singleton
+            class CustomContext {
+                public String getValue() {
+                    return "contextValue";
+                }
+            }
+
+            @interface CustomAnnotation {
+                @AnnotationExpressionContext(value = CustomContext.class, methodArguments = false)
+                String customValue();
+            }
+
+        """)
+
+        expect:
+        result == "contextValue"
+    }
 }
