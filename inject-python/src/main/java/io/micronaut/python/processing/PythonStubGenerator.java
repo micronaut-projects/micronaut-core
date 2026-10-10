@@ -147,6 +147,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String JAVA_LANG_DOUBLE = "java.lang.Double";
     private static final String JAVA_LANG_FLOAT = "java.lang.Float";
     private static final String AS_SHORT = "asShort";
+    private static final String AS_INT = "asInt";
+    private static final String AS_LONG = "asLong";
+    private static final String AS_BOOLEAN = "asBoolean";
+    private static final String AS_BYTE = "asByte";
+    private static final String CHAR_AT = "charAt";
     private static final String AS_DOUBLE = "asDouble";
     private static final String AS_FLOAT = "asFloat";
     private static final String JAVA_LANG_STRING = "java.lang.String";
@@ -195,6 +200,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final ClassTypeDef JAVA_BASE_CONSTRUCTION = ClassTypeDef.of("io.micronaut.context.python.PythonJavaBases.Construction");
     private static final ClassTypeDef JAVA_BASE_MEMBERS = ClassTypeDef.of("io.micronaut.context.python.ValueCoercible.JavaBaseMembers");
     private static final String INVOKE_JAVA_BASE_METHOD = "micronautInvokeJavaBaseMethod";
+    private static final String INVOKE_PYTHON_METHOD = "invokePythonMethod";
+    private static final String CONVERT_METHOD = "convert";
     public static final ClassTypeDef PYTHON_CLASS_REFERENCE = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime.PythonClassReference");
     public static final ClassTypeDef PYTHON_CLASS_ANNOTATION = ClassTypeDef.of("io.micronaut.context.python.annotation.PythonClass");
     public static final ClassTypeDef PYTHON_MODULE_ANNOTATION = ClassTypeDef.of("io.micronaut.context.python.annotation.PythonModule");
@@ -699,7 +706,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addModifiers(Modifier.PUBLIC)
             .returns(TypeDef.STRING)
             .build((aThis, methodParameters) -> PYTHON_INVOCATION.invokeStatic(
-                "invokePythonMethod",
+                INVOKE_PYTHON_METHOD,
                 POLYGLOT_VALUE,
                 aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE),
                 ExpressionDef.constant(PYTHON_STR_METHOD),
@@ -4521,7 +4528,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
             .addAnnotation(ClassTypeDef.of("jakarta.inject.Singleton"))
             .addSuperinterface(typeConverterType);
-        builder.addMethod(MethodDef.builder("convert")
+        builder.addMethod(MethodDef.builder(CONVERT_METHOD)
             .addAnnotation(Override.class)
             .addModifiers(Modifier.PUBLIC)
             .addParameter("object", ClassTypeDef.of(CharSequence.class))
@@ -4855,7 +4862,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
             @Override
             public StatementDef write(String property, TypeDef type, ExpressionDef value, boolean accessor) {
-                return (StatementDef) self.invoke(PUT_MEMBER, TypeDef.VOID, ExpressionDef.constant(property), value);
+                return self.invoke(PUT_MEMBER, TypeDef.VOID, ExpressionDef.constant(property), value);
             }
         };
     }
@@ -4908,7 +4915,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (element.isPresent()) {
             return convertValueForType(element.get().getGenericType(), member);
         }
-        if (!(type instanceof TypeDef.Primitive) && !ClassTypeDef.STRING.equals(type)) {
+        if (!(type instanceof TypeDef.Primitive) && !TypeDef.STRING.equals(type)) {
             // a Java or Python object: converted as a property of that type is converted
             Optional<ClassElement> propertyType = context.getClassElement(typeName.replace('$', '.'));
             if (propertyType.isEmpty()) {
@@ -4920,18 +4927,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         if (type instanceof TypeDef.Primitive primitive) {
             return switch (primitive.name()) {
-                case "int" -> member.invoke("asInt", TypeDef.Primitive.INT);
-                case "long" -> member.invoke("asLong", TypeDef.Primitive.LONG);
-                case "double" -> member.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE);
-                case "float" -> member.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT);
-                case "boolean" -> member.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
-                case "short" -> member.invoke(AS_SHORT, TypeDef.Primitive.SHORT);
-                case "byte" -> member.invoke("asByte", TypeDef.Primitive.BYTE);
-                default -> member.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
+                case "int" -> member.invoke(AS_INT, TypeDef.Primitive.INT);
+                case "long" -> member.invoke(AS_LONG, TypeDef.Primitive.LONG);
+                case DOUBLE_TYPE -> member.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE);
+                case FLOAT_TYPE -> member.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT);
+                case BOOLEAN_TYPE -> member.invoke(AS_BOOLEAN, TypeDef.Primitive.BOOLEAN);
+                case SHORT_TYPE -> member.invoke(AS_SHORT, TypeDef.Primitive.SHORT);
+                case "byte" -> member.invoke(AS_BYTE, TypeDef.Primitive.BYTE);
+                default -> member.invoke(AS_STRING_METHOD, TypeDef.STRING).invoke(CHAR_AT, TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
             };
         }
-        if (ClassTypeDef.STRING.equals(type)) {
-            return convertNullableValue(member, member.invoke("asString", ClassTypeDef.STRING));
+        if (TypeDef.STRING.equals(type)) {
+            return convertNullableValue(member, member.invoke(AS_STRING_METHOD, TypeDef.STRING));
         }
         return PYTHON_CONVERSION.invokeStatic(AS_OBJECT_METHOD, TypeDef.OBJECT, member).cast(type);
     }
@@ -4957,7 +4964,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return StatementDef.multi();
         }
         ExpressionDef delegate = compiledDelegateType(model).instantiate(aThis, value);
-        return value.isNonNull().doIf((StatementDef) PYTHON_STATIC.invokeStatic("bindCompiled", TypeDef.VOID, value, delegate));
+        return value.isNonNull().doIf(PYTHON_STATIC.invokeStatic("bindCompiled", TypeDef.VOID, value, delegate));
     }
 
     /**
@@ -5262,7 +5269,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         );
                     } else {
                         invokedValue = PYTHON_INVOCATION.invokeStatic(
-                            "invokePythonMethod",
+                            INVOKE_PYTHON_METHOD,
                             POLYGLOT_VALUE,
                             targetValue,
                             ExpressionDef.constant(pythonFunctionName),
@@ -6548,22 +6555,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             String referenceTypeName = returnType.getName();
             return switch (referenceTypeName) {
                 case "java.lang.Integer" ->
-                    convertNullableValue(invokedValue, invokedValue.invoke("asInt", TypeDef.Primitive.INT));
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_INT, TypeDef.Primitive.INT));
                 case "java.lang.Boolean" ->
-                    convertNullableValue(invokedValue, invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN));
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_BOOLEAN, TypeDef.Primitive.BOOLEAN));
                 case JAVA_LANG_DOUBLE ->
                     convertNullableValue(invokedValue, invokedValue.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE));
                 case JAVA_LANG_FLOAT ->
                     convertNullableValue(invokedValue, invokedValue.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT));
                 case "java.lang.Long" ->
-                    convertNullableValue(invokedValue, invokedValue.invoke("asLong", TypeDef.Primitive.LONG));
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_LONG, TypeDef.Primitive.LONG));
                 case JAVA_LANG_SHORT ->
                     convertNullableValue(invokedValue, invokedValue.invoke(AS_SHORT, TypeDef.Primitive.SHORT));
                 case "java.lang.Byte" ->
-                    convertNullableValue(invokedValue, invokedValue.invoke("asByte", TypeDef.Primitive.BYTE));
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_BYTE, TypeDef.Primitive.BYTE));
                 case "java.lang.Character" ->
                     convertNullableValue(invokedValue, invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING)
-                        .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
+                        .invoke(CHAR_AT, TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
                 case JAVA_LANG_STRING ->
                     convertNullableValue(invokedValue, invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING));
                 case "java.lang.Object" ->
@@ -7067,22 +7074,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         String primitiveTypeName = returnType.getName();
         return switch (primitiveTypeName) {
             case "int", "java.lang.Integer" ->
-                invokedValue.invoke("asInt", TypeDef.Primitive.INT);
+                invokedValue.invoke(AS_INT, TypeDef.Primitive.INT);
             case BOOLEAN_TYPE, "java.lang.Boolean" ->
-                invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
+                invokedValue.invoke(AS_BOOLEAN, TypeDef.Primitive.BOOLEAN);
             case DOUBLE_TYPE, JAVA_LANG_DOUBLE ->
                 invokedValue.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE);
             case FLOAT_TYPE, JAVA_LANG_FLOAT ->
                 invokedValue.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT);
             case "long", "java.lang.Long" ->
-                invokedValue.invoke("asLong", TypeDef.Primitive.LONG);
+                invokedValue.invoke(AS_LONG, TypeDef.Primitive.LONG);
             case SHORT_TYPE, JAVA_LANG_SHORT ->
                 invokedValue.invoke(AS_SHORT, TypeDef.Primitive.SHORT);
             case "byte", "java.lang.Byte" ->
-                invokedValue.invoke("asByte", TypeDef.Primitive.BYTE);
+                invokedValue.invoke(AS_BYTE, TypeDef.Primitive.BYTE);
             case "char", "java.lang.Character" ->
                 invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING)
-                    .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
+                    .invoke(CHAR_AT, TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
             default -> invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING);
         };
     }
@@ -7122,35 +7129,35 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return convertRuntimeValue(type, member);
         } else if (type.isPrimitive()) {
             return switch (type.getName()) {
-                case "int" -> member.invoke("asInt", TypeDef.Primitive.INT);
-                case BOOLEAN_TYPE -> member.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
+                case "int" -> member.invoke(AS_INT, TypeDef.Primitive.INT);
+                case BOOLEAN_TYPE -> member.invoke(AS_BOOLEAN, TypeDef.Primitive.BOOLEAN);
                 case DOUBLE_TYPE -> member.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE);
                 case FLOAT_TYPE -> member.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT);
-                case "long" -> member.invoke("asLong", TypeDef.Primitive.LONG);
+                case "long" -> member.invoke(AS_LONG, TypeDef.Primitive.LONG);
                 case SHORT_TYPE -> member.invoke(AS_SHORT, TypeDef.Primitive.SHORT);
-                case "byte" -> member.invoke("asByte", TypeDef.Primitive.BYTE);
-                case "char" -> member.invoke(AS_STRING_METHOD, TypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
+                case "byte" -> member.invoke(AS_BYTE, TypeDef.Primitive.BYTE);
+                case "char" -> member.invoke(AS_STRING_METHOD, TypeDef.STRING).invoke(CHAR_AT, TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
                 default -> member.invoke(AS_STRING_METHOD, TypeDef.STRING);
             };
         } else {
             String referenceTypeName = type.getName();
             switch (referenceTypeName) {
                 case "java.lang.Integer":
-                    return convertNullableValue(member, member.invoke("asInt", TypeDef.Primitive.INT));
+                    return convertNullableValue(member, member.invoke(AS_INT, TypeDef.Primitive.INT));
                 case "java.lang.Boolean":
-                    return convertNullableValue(member, member.invoke("asBoolean", TypeDef.Primitive.BOOLEAN));
+                    return convertNullableValue(member, member.invoke(AS_BOOLEAN, TypeDef.Primitive.BOOLEAN));
                 case JAVA_LANG_DOUBLE:
                     return convertNullableValue(member, member.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE));
                 case JAVA_LANG_FLOAT:
                     return convertNullableValue(member, member.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT));
                 case "java.lang.Long":
-                    return convertNullableValue(member, member.invoke("asLong", TypeDef.Primitive.LONG));
+                    return convertNullableValue(member, member.invoke(AS_LONG, TypeDef.Primitive.LONG));
                 case JAVA_LANG_SHORT:
                     return convertNullableValue(member, member.invoke(AS_SHORT, TypeDef.Primitive.SHORT));
                 case "java.lang.Byte":
-                    return convertNullableValue(member, member.invoke("asByte", TypeDef.Primitive.BYTE));
+                    return convertNullableValue(member, member.invoke(AS_BYTE, TypeDef.Primitive.BYTE));
                 case "java.lang.Character":
-                    return convertNullableValue(member, member.invoke(AS_STRING_METHOD, TypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
+                    return convertNullableValue(member, member.invoke(AS_STRING_METHOD, TypeDef.STRING).invoke(CHAR_AT, TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
                 case JAVA_LANG_STRING:
                     return convertNullableValue(member, member.invoke(AS_STRING_METHOD, TypeDef.STRING));
                 default:
@@ -7190,7 +7197,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static ExpressionDef generatedWrapperConverter(ClassElement componentType) {
-        MethodDef convertMethod = MethodDef.builder("convert")
+        MethodDef convertMethod = MethodDef.builder(CONVERT_METHOD)
             .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
             .addParameter(ParameterDef.of("element", POLYGLOT_VALUE))
             .returns(TypeDef.OBJECT)
