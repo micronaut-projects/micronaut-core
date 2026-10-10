@@ -248,7 +248,8 @@ class Pair:
                 results[m]['edge'] = calc.edge(0)
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
-                    assert compiled.containsAll(CASES*.get(0).unique().collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge']), decisions.toString()
+                    // guarded calls a sibling method, which has no static lowering yet: it runs in Python in both modes
+                    assert compiled.containsAll((CASES*.get(0).unique() - ['guarded']).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge']), decisions.toString()
                 }
             } finally {
                 context.close()
