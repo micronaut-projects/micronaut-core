@@ -4880,14 +4880,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ExpressionDef pythonArguments = TypeDef.OBJECT.array().instantiate(boxed);
         if (TypeDef.VOID.equals(type) || type instanceof TypeDef.Primitive) {
             // converted by one call on the result: the invocation is evaluated once
-            ExpressionDef result = PYTHON_INVOCATION.invokeStatic("invokePythonMethod", POLYGLOT_VALUE, target, ExpressionDef.constant(name), pythonArguments);
+            ExpressionDef result = PYTHON_INVOCATION.invokeStatic(INVOKE_PYTHON_METHOD, POLYGLOT_VALUE, target, ExpressionDef.constant(name), pythonArguments);
             return TypeDef.VOID.equals(type) ? result : convertPythonValue(context, result, typeName, type, Optional.empty());
         }
         // a reference conversion reads its value more than once (a null check first): the
         // result is handed to a converter, so the method is invoked once
-        MethodDef convertMethod = MethodDef.builder("convert")
+        MethodDef convertMethod = MethodDef.builder(CONVERT_METHOD)
             .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
-            .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+            .addParameter(ParameterDef.of(VALUE_PARAMETER, POLYGLOT_VALUE))
             .returns(TypeDef.OBJECT)
             .build();
         MethodDef implementation = MethodDef.override(convertMethod)
