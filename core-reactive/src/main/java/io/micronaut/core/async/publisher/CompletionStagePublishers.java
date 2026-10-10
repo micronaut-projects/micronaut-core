@@ -33,6 +33,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -133,6 +134,34 @@ public final class CompletionStagePublishers {
             }
         });
         return result;
+    }
+
+    /**
+     * A publisher of the value of a stage, the reverse of {@link #first(Publisher, Object)} for
+     * the publisher methods that delegate to their {@link CompletionStage} counterparts. The
+     * stage is obtained once per subscription, when an item is first requested, the publisher emits its value, or completes
+     * without an item when the value is {@code null}, and fails with the error of the stage
+     * without the {@link CompletionException} wrapper. Cancelling the subscription cancels the
+     * stage when it is a future of this class.
+     *
+     * @param stageSupplier The supplier of the stage, called for each subscription
+     * @param <T>           The value type
+     * @return A publisher of the value of the stage
+     */
+    public static <T> Publisher<T> toPublisher(Supplier<? extends CompletionStage<? extends @Nullable T>> stageSupplier) {
+        return new StagePublisher<>(stageSupplier);
+    }
+
+    /**
+     * A publisher of the items of a list, for the publisher methods of the SPIs that take the
+     * items a caller already holds.
+     *
+     * @param items The items
+     * @param <T>   The item type
+     * @return A publisher of the items
+     */
+    public static <T> Publisher<T> fromList(List<T> items) {
+        return new ListPublisher<>(items);
     }
 
     /**
@@ -403,6 +432,183 @@ public final class CompletionStagePublishers {
                 signal.run();
             } else {
                 propagatedContext.propagate(signal);
+            }
+        }
+    }
+
+    /**
+     * The publisher of {@link #fromList(List)}.
+     *
+     * @param items The items
+     * @param <T>   The item type
+     */
+    private record ListPublisher<T>(List<T> items) implements Publishers.MicronautPublisher<T> {
+
+        @Override
+        public void subscribe(Subscriber<? super T> subscriber) {
+            Objects.requireNonNull(subscriber, "Subscriber cannot be null");
+            subscriber.onSubscribe(new ListSubscription<>(items, subscriber));
+        }
+    }
+
+    /**
+     * Emits the items of a list as they are requested.
+     *
+     * @param <T> The item type
+     */
+    private static final class ListSubscription<T> implements Subscription {
+        private final List<T> items;
+        private final Subscriber<? super T> subscriber;
+        private final AtomicLong requested = new AtomicLong();
+        private volatile boolean cancelled;
+        private int index;
+
+        ListSubscription(List<T> items, Subscriber<? super T> subscriber) {
+            this.items = items;
+            this.subscriber = subscriber;
+        }
+
+        @Override
+        public void request(long n) {
+            if (n <= 0) {
+                cancelled = true;
+                subscriber.onError(new IllegalArgumentException("Cannot request a non-positive number"));
+                return;
+            }
+            // the thread that raises the demand from zero emits, a reentrant request only adds to it
+            if (addDemand(n) != 0) {
+                return;
+            }
+            long demand = n;
+            while (true) {
+                long emitted = 0;
+                while (emitted < demand && index < items.size()) {
+                    if (cancelled) {
+                        return;
+                    }
+                    subscriber.onNext(items.get(index++));
+                    emitted++;
+                }
+                if (cancelled) {
+                    return;
+                }
+                if (index == items.size()) {
+                    cancelled = true;
+                    subscriber.onComplete();
+                    return;
+                }
+                demand = requested.addAndGet(-emitted);
+                if (demand == 0) {
+                    return;
+                }
+            }
+        }
+
+        private long addDemand(long n) {
+            while (true) {
+                long current = requested.get();
+                long next = current + n;
+                if (next < 0) {
+                    next = Long.MAX_VALUE;
+                }
+                if (requested.compareAndSet(current, next)) {
+                    return current;
+                }
+            }
+        }
+
+        @Override
+        public void cancel() {
+            cancelled = true;
+        }
+    }
+
+    /**
+     * The publisher of {@link #toPublisher(Supplier)}.
+     *
+     * @param stageSupplier The supplier of the stage, called once per subscription
+     * @param <T>           The value type
+     */
+    private record StagePublisher<T>(
+        Supplier<? extends CompletionStage<? extends @Nullable T>> stageSupplier) implements Publishers.MicronautPublisher<T> {
+
+        @Override
+        public void subscribe(Subscriber<? super T> subscriber) {
+            Objects.requireNonNull(subscriber, "Subscriber cannot be null");
+            subscriber.onSubscribe(new StageSubscription<>(stageSupplier, subscriber));
+        }
+    }
+
+    /**
+     * The subscription to the value of a stage. The stage is obtained on the first request, and
+     * its value is emitted once.
+     *
+     * @param <T> The value type
+     */
+    private static final class StageSubscription<T> implements Subscription {
+        private static final int NEW = 0;
+        private static final int REQUESTED = 1;
+        private static final int DONE = 2;
+
+        private final Supplier<? extends CompletionStage<? extends @Nullable T>> stageSupplier;
+        private final Subscriber<? super T> subscriber;
+        private final AtomicInteger state = new AtomicInteger(NEW);
+        @Nullable
+        @SuppressWarnings("java:S3077") // the future is not modified, volatile only publishes it to cancel()
+        private volatile CompletableFuture<? extends @Nullable T> future;
+
+        StageSubscription(Supplier<? extends CompletionStage<? extends @Nullable T>> stageSupplier, Subscriber<? super T> subscriber) {
+            this.stageSupplier = stageSupplier;
+            this.subscriber = subscriber;
+        }
+
+        @Override
+        public void request(long n) {
+            if (n <= 0) {
+                if (state.getAndSet(DONE) != DONE) {
+                    CompletionStagePublishers.cancel(future);
+                    subscriber.onError(new IllegalArgumentException("Cannot request a non-positive number"));
+                }
+                return;
+            }
+            if (!state.compareAndSet(NEW, REQUESTED)) {
+                // the stage is obtained once, whatever the requests
+                return;
+            }
+            CompletableFuture<? extends @Nullable T> source;
+            try {
+                source = Objects.requireNonNull(stageSupplier.get(), "The stage supplier returned null").toCompletableFuture();
+            } catch (Throwable e) {
+                if (state.compareAndSet(REQUESTED, DONE)) {
+                    subscriber.onError(e);
+                }
+                return;
+            }
+            future = source;
+            if (state.get() == DONE) {
+                // cancelled while the stage was obtained
+                CompletionStagePublishers.cancel(source);
+                return;
+            }
+            source.whenComplete((value, throwable) -> {
+                if (!state.compareAndSet(REQUESTED, DONE)) {
+                    return;
+                }
+                if (throwable != null) {
+                    subscriber.onError(unwrap(throwable));
+                } else {
+                    if (value != null) {
+                        subscriber.onNext(value);
+                    }
+                    subscriber.onComplete();
+                }
+            });
+        }
+
+        @Override
+        public void cancel() {
+            if (state.getAndSet(DONE) != DONE) {
+                CompletionStagePublishers.cancel(future);
             }
         }
     }

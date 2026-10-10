@@ -16,6 +16,7 @@
 package io.micronaut.management.health.monitor;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.CurrentHealthStatus;
 import io.micronaut.health.HealthStatus;
@@ -26,15 +27,15 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.annotation.Scheduled;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * A continuous health monitor that that updates the {@link CurrentHealthStatus} in a background thread.
@@ -81,35 +82,64 @@ public class HealthMonitorTask {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Starting health monitor check");
         }
-        List<Publisher<HealthResult>> resultPublishers = healthIndicators
-            .stream()
-            .map(HealthIndicator::getResult)
-            .collect(Collectors.toList());
+        List<CompletionStage<List<HealthResult>>> results = new ArrayList<>(healthIndicators.size());
+        for (HealthIndicator healthIndicator : healthIndicators) {
+            results.add(resultOf(healthIndicator));
+        }
 
-        Flux.merge(resultPublishers)
-            .collectList()
-            .subscribe(healthResults -> {
-                if (LOG.isTraceEnabled() || LOG.isDebugEnabled()) {
-                    healthResults.forEach(healthResult -> {
-                        var status = healthResult.getStatus();
-                        var name = healthResult.getName();
-                        if (LOG.isTraceEnabled()) {
-                            var detail = healthResult.getDetails();
-                            LOG.trace("Health monitor result for {}: status {}, details {}", name, status, detail != null ? detail : "{}");
-                        } else if (LOG.isDebugEnabled()) {
-                            LOG.debug("Health monitor result for {}: status {}", name, status);
-                        }
-                    });
+        CompletionStagePublishers.<HealthResult>concat(results)
+            .whenComplete((healthResults, throwable) -> {
+                if (throwable != null) {
+                    onError(CompletionStagePublishers.unwrap(throwable));
+                    return;
                 }
-                Optional<HealthResult> firstDown = healthResults.stream()
-                    .filter(r -> r.getStatus().equals(HealthStatus.DOWN) || !r.getStatus().getOperational().orElse(true))
-                    .findFirst();
-                if (firstDown.isPresent()) {
-                    currentHealthStatus.update(firstDown.get().getStatus());
-                } else {
-                    currentHealthStatus.update(HealthStatus.UP);
+                try {
+                    update(healthResults);
+                } catch (RuntimeException e) {
+                    onError(e);
                 }
-            }, this::onError);
+            });
+    }
+
+    private void update(List<HealthResult> healthResults) {
+        if (LOG.isTraceEnabled() || LOG.isDebugEnabled()) {
+            healthResults.forEach(healthResult -> {
+                var status = healthResult.getStatus();
+                var name = healthResult.getName();
+                if (LOG.isTraceEnabled()) {
+                    var detail = healthResult.getDetails();
+                    LOG.trace("Health monitor result for {}: status {}, details {}", name, status, detail != null ? detail : "{}");
+                } else if (LOG.isDebugEnabled()) {
+                    LOG.debug("Health monitor result for {}: status {}", name, status);
+                }
+            });
+        }
+        Optional<HealthResult> firstDown = healthResults.stream()
+            .filter(r -> r.getStatus().equals(HealthStatus.DOWN) || !r.getStatus().getOperational().orElse(true))
+            .findFirst();
+        if (firstDown.isPresent()) {
+            currentHealthStatus.update(firstDown.get().getStatus());
+        } else {
+            currentHealthStatus.update(HealthStatus.UP);
+        }
+    }
+
+    /**
+     * Collects the results of an indicator from {@link HealthIndicator#getResult()}, all of them
+     * as the monitor always did. The monitor keeps the publisher rather than
+     * {@link HealthIndicator#getResultAsync()}, so that a test double of an indicator that only
+     * stubs {@link HealthIndicator#getResult()} keeps working; the built-in indicators adapt
+     * their {@link HealthIndicator#getResultAsync()} to the publisher without a reactive library.
+     *
+     * @param healthIndicator The indicator
+     * @return The results of the indicator
+     */
+    private static CompletableFuture<List<HealthResult>> resultOf(HealthIndicator healthIndicator) {
+        try {
+            return CompletionStagePublishers.collect(healthIndicator.getResult());
+        } catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     private void onError(Throwable e) {

@@ -5,6 +5,15 @@ This section documents breaking changes between Micronaut versions
 
 The built-in load balancers and composite clients implement the new experimental `AsyncLoadBalancer`, `AsyncDiscoveryClient` and `AsyncConfigurationClient` interfaces, and `DefaultAsyncFunctionDiscoveryClient` serves the `@FunctionClient` methods that return a `CompletionStage` or a value. They call the `DiscoveryClient` beans that do not implement `AsyncDiscoveryClient` through their publishers, with a plain subscriber. When such a publisher is a Reactor publisher, its Reactor context holds the propagated context of the request, but no longer the other entries of the Reactor context of the caller. The `LoadBalancer`, `DiscoveryClient`, `ConfigurationClient` and `FunctionDiscoveryClient` interfaces are unchanged, and a load balancer that does not implement `AsyncLoadBalancer` is selected through its publisher as before.
 
+=== The management endpoints call the `CompletionStage` methods of their SPIs (5.3)
+
+`HealthIndicator`, `HealthAggregator`, `InfoSource`, `InfoAggregator` and `LoggersManager` have experimental `CompletionStage` counterparts of their publisher methods (`getResultAsync`, `aggregateAsync`, `getSourceAsync`, `getLoggersAsync` and `getLoggerAsync`), which adapt the publisher methods by default. The health, info and loggers endpoints call them, and still return a single result `Publisher`.
+
+* `DefaultHealthAggregator`, `ReactiveInfoAggregator`, `DiscoveryClientHealthIndicator` and `JdbcIndicator` combine the stages without a publisher. A subclass of them is called through its publisher methods, including `aggregateResults`, so that its overrides keep working.
+* The results of the indicators are aggregated in the order of the indicators rather than in the order they complete. When two results have the same name, the one of the later indicator is kept.
+* A mock indicator, source, aggregator or loggers manager that stubs only the publisher methods is called through them, as for the discovery SPIs above.
+* An indicator that throws from `getResult()` fails the aggregation, rather than throwing out of `aggregate(..)`.
+
 === Refreshing the Logback configuration follows Logback's own lookup (5.3)
 
 When any `logger.*` property is set, the Micronaut framework resets Logback and configures it again. Previously that refresh used the first `Configurator` service regardless of its rank and of the status it returned, and otherwise the file set with `logback.configurationFile` or `logger.config`, or `logback.xml`. Now, unless a Logback XML configuration file is set in Micronaut configuration, the refresh configures Logback the same way Logback configures itself at startup:
