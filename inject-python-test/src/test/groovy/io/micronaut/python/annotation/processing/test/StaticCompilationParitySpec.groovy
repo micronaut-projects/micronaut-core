@@ -65,6 +65,9 @@ class Calc:
     def choose(self, flag: bool, a: str, b: str) -> str:
         return a if flag else b
 
+    def grouped(self, flag: bool, a: str, n: int) -> str:
+        return (a if flag else "none") + "!" + str((n if flag else 0) + 1) + str(not (flag if n > 0 else False))
+
     def same(self, a: str, b: str) -> bool:
         return a == b and a is not None
 
@@ -115,6 +118,7 @@ class Pair:
         ["build", "ab", 7],
         ["empty", ""], ["empty", "x"],
         ["choose", false, "a", "b"], ["choose", true, "a", "b"],
+        ["grouped", true, "x", 2], ["grouped", false, "x", 0],
         ["same", "a", "a"], ["same", "a", "b"],
         ["rated", 2.0d],
         ["branches", true, 4], ["branches", false, 4],
