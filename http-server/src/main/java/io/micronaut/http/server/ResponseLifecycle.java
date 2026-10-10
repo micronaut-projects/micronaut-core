@@ -797,7 +797,7 @@ public abstract class ResponseLifecycle {
                     // whether the pieces are framed as a JSON array is settled by the time the first
                     // piece is written, see mapToHttpContent
                     separators = isJson.getAsBoolean() ? jsonSeparators() :
-                        MediaType.APPLICATION_JSON_STREAM_TYPE.matches(mediaType) && isJsonFormattable(type) ? JSON_STREAM_SEPARATORS : null;
+                        MediaType.APPLICATION_JSON_STREAM_TYPE.matches(mediaType) && isJsonFormattable(type) && !(object instanceof CharSequence) ? JSON_STREAM_SEPARATORS : null;
                     if (separators != null) {
                         separator = separators.beforeFirst();
                     }
