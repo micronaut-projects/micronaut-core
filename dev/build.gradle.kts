@@ -107,6 +107,8 @@ noReflection {
     allowIn("io.micronaut.dev.compile.GroovySourceCompiler", "CLASS_NAMES")
     allowIn("io.micronaut.dev.compile.GroovySourceCompiler", "CLASS_LOADING")
     allowIn("io.micronaut.dev.compile.GroovyCompilation", "CLASS_LOADING")
+    // the processors of an embedded Java compilation load from the processor path first
+    allowIn("io.micronaut.dev.compile.JavacSourceCompiler", "CLASS_LOADING")
     allowIn("io.micronaut.dev.compile.KotlinSourceCompiler", "CLASS_NAMES")
     allowIn("io.micronaut.dev.compile.KotlinSourceCompiler", "CLASS_LOADING")
     allowIn("io.micronaut.dev.compile.KotlinCompilation", "CLASS_LOADING")

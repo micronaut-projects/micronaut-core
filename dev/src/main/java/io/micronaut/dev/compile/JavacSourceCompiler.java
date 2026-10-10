@@ -27,6 +27,9 @@ import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -83,7 +86,7 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
             throw new IllegalStateException("No Java compiler in this JVM: development mode needs a JDK, not a JRE");
         }
         try (StandardJavaFileManager standard = javac.getStandardFileManager(null, null, StandardCharsets.UTF_8);
-             StagingFileManager fileManager = new StagingFileManager(standard, hiddenClasses)) {
+             StagingFileManager fileManager = new StagingFileManager(standard, hiddenClasses, request.processorPath())) {
             List<Path> classPath = new ArrayList<>(request.compileClasspath());
             if (Files.isDirectory(request.classOutput())) {
                 // the unchanged classes, and what another language wrote into a shared output, resolve from the
@@ -132,19 +135,94 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
     }
 
     /**
+     * The loader of the processor path, isolated from the launcher's, which holds the application's runtime: the
+     * processors and what they depend on load from the processor path alone, the Java SE API from the platform loader,
+     * and the compiler's own API, {@code com.sun.source} for one, from the JDK module that has it. The service files the
+     * processors are discovered from come from the processor path only, so no provider of the runtime is constructed
+     * against the processors' copy of its interface.
+     */
+    private static final class ProcessorPathLoader extends URLClassLoader {
+
+        /**
+         * The loaders of the packages of the JDK's modules that the platform loader does not define, by package.
+         */
+        private static final Map<String, ClassLoader> JDK_PACKAGES = jdkPackages();
+
+        static {
+            registerAsParallelCapable();
+        }
+
+        ProcessorPathLoader(URL[] urls) {
+            super(urls, ClassLoader.getPlatformClassLoader());
+        }
+
+        @Override
+        protected Class<?> findClass(String name) throws ClassNotFoundException {
+            try {
+                return super.findClass(name);
+            } catch (ClassNotFoundException e) {
+                int lastDot = name.lastIndexOf('.');
+                ClassLoader jdk = lastDot > 0 ? JDK_PACKAGES.get(name.substring(0, lastDot)) : null;
+                if (jdk == null) {
+                    throw e;
+                }
+                return jdk.loadClass(name);
+            }
+        }
+
+        private static Map<String, ClassLoader> jdkPackages() {
+            ClassLoader platform = ClassLoader.getPlatformClassLoader();
+            Map<String, ClassLoader> packages = new HashMap<>();
+            for (Module module : ModuleLayer.boot().modules()) {
+                ClassLoader loader = module.getClassLoader();
+                if (loader != null && loader != platform) {
+                    for (String packageName : module.getPackages()) {
+                        packages.put(packageName, loader);
+                    }
+                }
+            }
+            return packages;
+        }
+    }
+
+    /**
      * The file manager of a compilation: hides the classes of deleted sources from the class path, so
      * that nothing links against them, and notes which source each class file written was compiled from.
      */
     private static final class StagingFileManager extends ForwardingJavaFileManager<StandardJavaFileManager> {
 
         private final Set<String> hiddenTopLevelClasses;
+        private final List<Path> processorPath;
         private final Map<Path, Set<String>> produced = new HashMap<>();
         private final Map<Path, Set<Path>> producedSources = new HashMap<>();
         private final Map<Path, Set<Path>> producedResources = new HashMap<>();
 
-        StagingFileManager(StandardJavaFileManager fileManager, Set<String> hiddenTopLevelClasses) {
+        StagingFileManager(StandardJavaFileManager fileManager, Set<String> hiddenTopLevelClasses, List<Path> processorPath) {
             super(fileManager);
             this.hiddenTopLevelClasses = hiddenTopLevelClasses;
+            this.processorPath = processorPath;
+        }
+
+        @Override
+        @Nullable
+        public ClassLoader getClassLoader(Location location) {
+            if (location != StandardLocation.ANNOTATION_PROCESSOR_PATH || processorPath.isEmpty()) {
+                return super.getClassLoader(location);
+            }
+            // javac would load the processors through a loader over the processor path whose parent is the launcher's,
+            // which holds the application's runtime: a processor's class found there, micronaut-inject's among them,
+            // would not see the package-private members of the same package on the processor path, and a provider of
+            // the runtime would be discovered by the processors' service lookups. javac closes the loader when the
+            // compilation ends
+            URL[] urls = new URL[processorPath.size()];
+            for (int i = 0; i < urls.length; i++) {
+                try {
+                    urls[i] = processorPath.get(i).toUri().toURL();
+                } catch (MalformedURLException e) {
+                    throw new IllegalStateException("Invalid processor path entry: " + processorPath.get(i), e);
+                }
+            }
+            return new ProcessorPathLoader(urls);
         }
 
         /**
