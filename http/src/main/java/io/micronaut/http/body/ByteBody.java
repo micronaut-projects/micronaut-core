@@ -138,6 +138,9 @@ public sealed interface ByteBody permits AvailableByteBody, CloseableByteBody, I
      * <p>This is a primary operation. After this operation, no other primary operation or
      * {@link #split()} may be done.
      *
+     * <p>Once a requested piece is delivered, one additional piece may be received ahead of
+     * the next read. This prefetch never decodes an element ahead of the caller.</p>
+     *
      * @return The pieces of the body
      * @since 5.3.0
      */
