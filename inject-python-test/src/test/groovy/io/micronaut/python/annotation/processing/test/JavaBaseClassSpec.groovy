@@ -356,6 +356,40 @@ class PythonCollector(VarargsBase):
         ctx?.close()
     }
 
+    void "Python calls an inherited method taking a type variable that the base resolves through an interface"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+import java
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import VarargsBase
+
+
+@Singleton
+class PythonFirst(VarargsBase):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def first(self) -> None:
+        self.addFirst(VarargsBase.Item("first"))
+        items = java.type("io.micronaut.python.annotation.processing.test.javabases.VarargsBase$Item[]")(2)
+        items[0] = VarargsBase.Item("a")
+        items[1] = VarargsBase.Item("b")
+        self.addEach(items)
+''', true)
+
+        when: 'addFirst(T) and addEach(T[]) of HasItems<T>, which VarargsBase resolves to Item'
+        VarargsBase collector = ctx.getBean(VarargsBase)
+        collector.first()
+
+        then: 'the dispatcher passes the argument as an Item, the resolution of T, not as Object, and an array as an Item[]'
+        collector.items == ['f:i:first', 'e:i:a', 'e:i:b']
+
+        cleanup:
+        ctx?.close()
+    }
+
     void "Python number literals reach boxed constructor parameters by widening"() {
         given:
         ApplicationContext ctx = buildContext('''

@@ -791,12 +791,24 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             }
                             // a parameterized type is converted to its erasure: the type arguments of an
                             // inherited signature are not always resolved against the extended type. So is a
-                            // type variable a raw base (Composite<T extends Component>) leaves unresolved, which
-                            // renders as Object although super.label(T) takes the erased bound
+                            // type variable of a Java base, which renders as Object: one a raw base
+                            // (Composite<T extends Component>) leaves unresolved takes the erased bound in
+                            // super.label(T), and one an inherited interface resolves (HasComponents extends
+                            // HasComponentsOfType<Component>) takes its resolution in super.addComponentAsFirst(T).
+                            // The erasure of a type variable drops its array dimensions (addEach(T[])), so they
+                            // are put back
                             ClassElement parameterType = parameters[i].getGenericType();
-                            converted.add(isParameterizedReference(parameterType) || isUnresolvedBoundedTypeVariable(parameterType)
-                                ? PYTHON_CONVERSION.invokeStatic(CONVERT_VALUE, ClassTypeDef.OBJECT, argument, classLiteral(parameterType)).cast(erasedType(parameterType))
-                                : convertValueForType(parameterType, argument));
+                            if (isJavaTypeVariable(parameterType)) {
+                                TypeDef erased = erasedType(parameterType);
+                                if (parameterType.isArray()) {
+                                    erased = erased.array(parameterType.getArrayDimensions());
+                                }
+                                converted.add(PYTHON_CONVERSION.invokeStatic(CONVERT_VALUE, ClassTypeDef.OBJECT, argument, ExpressionDef.constant(erased)).cast(erased));
+                            } else {
+                                converted.add(isParameterizedReference(parameterType)
+                                    ? PYTHON_CONVERSION.invokeStatic(CONVERT_VALUE, ClassTypeDef.OBJECT, argument, classLiteral(parameterType)).cast(erasedType(parameterType))
+                                    : convertValueForType(parameterType, argument));
+                            }
                         }
                         if (varArgs) {
                             // the trailing arguments, any number of them, make up the array of the
@@ -828,14 +840,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
-     * Whether a type is a type variable of a Java base that the extended type leaves unresolved, as a raw base
-     * does, and whose bound is not {@code Object}: its erasure is the bound, not the {@code Object} it renders as.
+     * Whether a type is a type variable of a Java base, resolved or not: it renders as {@code Object}, while the
+     * method of the base takes its resolution, or its erased bound. So does an array of one.
      */
-    private static boolean isUnresolvedBoundedTypeVariable(ClassElement type) {
+    private static boolean isJavaTypeVariable(ClassElement type) {
         return type instanceof GenericPlaceholderElement placeholder
-            && placeholder.getResolved().isEmpty()
-            && !(placeholder.getDeclaringElement().orElse(null) instanceof AbstractPythonClassElement)
-            && erasedBound(placeholder) != null;
+            && !(placeholder.getDeclaringElement().orElse(null) instanceof AbstractPythonClassElement);
     }
 
     private static boolean isParameterizedReference(ClassElement type) {
