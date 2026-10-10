@@ -35,7 +35,6 @@ import io.micronaut.json.JsonMapper;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * The {@link StreamingHttpClient} with {@link CompletionStage} results and the body pulled one
