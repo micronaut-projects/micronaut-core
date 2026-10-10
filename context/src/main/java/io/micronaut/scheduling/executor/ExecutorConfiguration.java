@@ -81,6 +81,17 @@ public interface ExecutorConfiguration {
     boolean isVirtual();
 
     /**
+     * Whether tasks submitted to the executor capture the
+     * {@link io.micronaut.core.propagation.PropagatedContext} of the submitting thread and run with it.
+     *
+     * @return Whether to propagate the context to submitted tasks
+     * @since 5.3.0
+     */
+    default boolean isPropagateContext() {
+        return true;
+    }
+
+    /**
      * @return The class to use as the {@link ThreadFactory}
      */
     Optional<Class<? extends ThreadFactory>> getThreadFactoryClass();

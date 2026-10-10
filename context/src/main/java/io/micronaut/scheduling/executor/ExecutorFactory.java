@@ -19,6 +19,7 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
@@ -86,12 +87,23 @@ public class ExecutorFactory implements GracefulShutdownCapable {
     /**
      * Create the ExecutorService with the given configuration.
      *
+     * <p>Unless {@link ExecutorConfiguration#isPropagateContext()} is {@code false}, the executor runs submitted tasks
+     * with the {@link io.micronaut.core.propagation.PropagatedContext} of the submitting thread.</p>
+     *
      * @param executorConfiguration The configuration to create a thread pool that creates new threads as needed
      * @return A thread pool that creates new threads as needed
      */
     @EachBean(ExecutorConfiguration.class)
     @Bean(preDestroy = "shutdown")
     public ExecutorService executorService(ExecutorConfiguration executorConfiguration) {
+        ExecutorService executorService = newExecutorService(executorConfiguration);
+        if (executorConfiguration.isPropagateContext()) {
+            return ContextPropagatingExecutorService.instrument(executorService);
+        }
+        return executorService;
+    }
+
+    private ExecutorService newExecutorService(ExecutorConfiguration executorConfiguration) {
         ExecutorType executorType = executorConfiguration.getType();
         switch (executorType) {
             case FIXED:

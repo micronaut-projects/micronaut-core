@@ -68,6 +68,14 @@ The name of a `META-INF/services` entry is now read without the whitespace aroun
 
 Callers of the `load` methods without a condition are otherwise not affected.
 
+=== Executor beans propagate the context without `micronaut-context-propagation` (5.3)
+
+The instrumentation that makes `ExecutorService` beans run submitted tasks with the api:core.propagation.PropagatedContext[] of the submitting thread moved from `micronaut-context-propagation` to `micronaut-context`. Applications that use `micronaut-runtime` or `micronaut-http` already had it. Applications that only depend on `micronaut-context`, for example messaging applications, now get it too. It covers the `io`, `blocking`, `virtual` and `scheduled` executors, executors configured under `micronaut.executors.*`, and `@Async` and `@ExecuteOn` methods. See <<contextPropagation, Context propagation>>.
+
+A task captures the context when it is submitted, so a task that submits or schedules more work on an executor bean passes its context on. To keep the previous behaviour for one executor, set `propagate-context: false` on it, for example `micronaut.executors.scheduled.propagate-context: false`.
+
+Executors created from `micronaut.executors.*` are now instrumented when they are created, before any `BeanCreatedEventListener` of `ExecutorService` runs. The context propagation is therefore the innermost wrapper, and other executor instrumentations run with the context on the worker thread. Previously, an instrumentation ordered before the context propagation instrumentation ran without it. The listener still instruments other `ExecutorService` beans.
+
 === A reflectively dispatched executable method propagates the method's exception
 
 An executable method that generated code cannot call directly, for example a `private` method annotated with `@Executable` and `@ReflectiveAccess`, is dispatched through reflection. Previously `ExecutableMethod.invoke` wrapped whatever such a method threw in an api:core.reflect.exception.InvocationException[], with the `java.lang.reflect.InvocationTargetException` as its cause, while the same method declared package-private or public threw its own exception.
