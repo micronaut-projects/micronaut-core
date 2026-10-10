@@ -20,8 +20,9 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.BodyElements;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Objects;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
@@ -32,7 +33,7 @@ import java.util.function.Function;
  * Maps the stages of the streaming exchanges of the async clients without losing the elements:
  * when the mapping fails, or the mapped stage was cancelled before the result arrived, the
  * elements are closed, so that the connection is not reserved until the read timeout. Cancelling
- * the mapped stage cancels the stage it maps.
+ * or externally failing the mapped stage cancels the stage it maps.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -110,7 +111,7 @@ public final class ElementsStages {
     private static <R> CompletableFuture<R> toFuture(ExecutionFlow<R> flow, Consumer<R> discard) {
         CompletableFuture<R> future = new CompletableFuture<>();
         future.whenComplete((result, error) -> {
-            if (error instanceof CancellationException) {
+            if (error != null) {
                 flow.cancel();
             }
         });
@@ -125,12 +126,12 @@ public final class ElementsStages {
         return future;
     }
 
-    private static <S, R> CompletionStage<R> map(CompletionStage<S> stage,
+    static <S, R extends @Nullable Object> CompletionStage<R> map(CompletionStage<S> stage,
                                                  Function<? super S, ? extends R> mapper,
                                                  Consumer<S> discard) {
         CompletableFuture<R> mapped = new CompletableFuture<>();
         mapped.whenComplete((result, error) -> {
-            if (error instanceof CancellationException) {
+            if (error != null) {
                 // cancels the exchange, if the result has not arrived yet
                 try {
                     stage.toCompletableFuture().cancel(false);
@@ -145,10 +146,14 @@ public final class ElementsStages {
                 mapped.completeExceptionally(error instanceof CompletionException ? error : new CompletionException(error));
                 return;
             }
+            if (mapped.isDone()) {
+                discard.accept(value);
+                return;
+            }
             R result;
             try {
                 result = mapper.apply(value);
-            } catch (Throwable e) {
+            } catch (Exception | Error e) {
                 discard.accept(value);
                 mapped.completeExceptionally(new CompletionException(e));
                 return;

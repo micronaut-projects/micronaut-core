@@ -48,7 +48,7 @@ public class DefaultAsyncOverReactiveHttpClient implements AsyncHttpClient {
     public <I, O, E> CompletionStage<HttpResponse<O>> exchange(HttpRequest<I> request,
                                                                @Nullable Argument<O> bodyType,
                                                                Argument<E> errorType) {
-        return AsyncClientFuture.map(Mono.from(httpClient.exchange(request, bodyType, errorType)).toFuture(), Function.identity());
+        return ElementsStages.map(Mono.from(httpClient.exchange(request, bodyType, errorType)).toFuture(), Function.identity(), ignored -> { });
     }
 
     @Override

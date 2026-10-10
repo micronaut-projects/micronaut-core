@@ -134,7 +134,7 @@ public interface AsyncHttpClient extends Closeable, LifeCycle<AsyncHttpClient> {
      * @return A {@link CompletionStage} that completes with the converted response body
      */
     default <I, O, E> CompletionStage<@Nullable O> retrieve(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
-        return AsyncClientFuture.map(exchange(request, bodyType, errorType), response -> extractBody(response, bodyType));
+        return ElementsStages.map(exchange(request, bodyType, errorType), response -> extractBody(response, bodyType), ignored -> { });
     }
 
     /**
