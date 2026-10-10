@@ -47,6 +47,7 @@ import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.http.server.websocket.WebSocketUpgradeCondition;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -609,20 +610,6 @@ public class RequestLifecycle {
             }
             declaringType = anyRoute.getDeclaringType();
         }
-        // the route of a WebSocket only matches an upgrade request, see ServerWebSocketProcessor:
-        // with no other route for the request, a plain request to its path is still answered for it
-        UriRouteMatch<Object, Object> webSocketRoute = findWebSocketRoute(httpRequest);
-        if (webSocketRoute != null) {
-            if (httpMethod == HttpMethod.GET || httpMethod == HttpMethod.HEAD) {
-                return onStatusError(
-                    httpRequest,
-                    new NotWebSocketRequestException(),
-                    webSocketRoute.getDeclaringType(),
-                    propagatedContext);
-            }
-            allowedMethods.add(HttpMethod.GET.name());
-            declaringType = webSocketRoute.getDeclaringType();
-        }
 
         if (CollectionUtils.isNotEmpty(acceptableContentTypes)) {
             if (LOG.isDebugEnabled()) {
@@ -647,6 +634,20 @@ public class RequestLifecycle {
                 declaringType,
                 propagatedContext);
         }
+        // the route of a WebSocket only matches an upgrade request, see ServerWebSocketProcessor:
+        // with no other route for the request, a plain request to its path is still answered for it
+        UriRouteMatch<Object, Object> webSocketRoute = findWebSocketRoute(httpRequest);
+        if (webSocketRoute != null) {
+            if (httpMethod == HttpMethod.GET || httpMethod == HttpMethod.HEAD) {
+                return onStatusError(
+                    httpRequest,
+                    new NotWebSocketRequestException(),
+                    webSocketRoute.getDeclaringType(),
+                    propagatedContext);
+            }
+            allowedMethods.add(HttpMethod.GET.name());
+            declaringType = webSocketRoute.getDeclaringType();
+        }
         if (!allowedMethods.isEmpty()) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Method not allowed for URI {} and method {}", httpRequest.getUri(), requestMethodName);
@@ -666,16 +667,18 @@ public class RequestLifecycle {
 
     /**
      * The route of a WebSocket at the path of a request that is not an upgrade request, which
-     * the route does not match.
+     * the route does not match, and whose other conditions the request meets.
      *
      * @param httpRequest The request
      * @return The match of the route, or {@code null}
      */
     private @Nullable UriRouteMatch<Object, Object> findWebSocketRoute(HttpRequest<?> httpRequest) {
-        return routeExecutor.router.<Object, Object>findAny(httpRequest.getPath(), null)
-            .filter(match -> match.getRouteInfo().isWebSocketRoute())
-            .findFirst()
-            .orElse(null);
+        for (UriRouteMatch<Object, Object> match : routeExecutor.router.<Object, Object>findAny(WebSocketUpgradeCondition.assumeUpgrade(httpRequest))) {
+            if (match.getRouteInfo().isWebSocketRoute()) {
+                return match;
+            }
+        }
+        return null;
     }
 
     /**

@@ -20,6 +20,9 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.RouteCondition;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.BodyAssertion;
 import io.micronaut.http.tck.HttpResponseAssertion;
@@ -65,6 +68,8 @@ public class WebSocketRoutingTest {
                 .toList();
             assertEquals(List.of(
                 "GET /ws-push/push onOpen",
+                "GET /ws-routing/conditional onOpen",
+                "GET /ws-routing/csv onMessage",
                 "GET /ws-routing/message-only onMessage",
                 "GET /ws-routing/open-and-message onOpen",
                 "GET /ws-routing/open-only onOpen"
@@ -103,6 +108,32 @@ public class WebSocketRoutingTest {
         }
     }
 
+    @Test
+    void aPlainGetToAWebSocketWhoseOtherConditionsItDoesNotMeetIsNotFound() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/ws-routing/conditional"), HttpResponseAssertion.builder()
+                .status(HttpStatus.NOT_FOUND)
+                .build());
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/ws-routing/conditional").header("X-WebSocket", "yes"), HttpResponseAssertion.builder()
+                .status(HttpStatus.BAD_REQUEST)
+                .body(BodyAssertion.builder().body("Not a WebSocket request").contains())
+                .build());
+        }
+    }
+
+    @Test
+    void theMediaTypesOfAnotherRouteAtTheWebSocketPathStillApply() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/ws-routing/csv").accept(MediaType.APPLICATION_JSON_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.NOT_ACCEPTABLE)
+                .build());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/ws-routing/csv").accept(MediaType.TEXT_CSV_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("a,b")
+                .build());
+        }
+    }
+
     private static ServerUnderTest server() {
         return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
     }
@@ -124,6 +155,36 @@ public class WebSocketRoutingTest {
     static class OpenOnlyWebSocket {
         @OnOpen
         void onOpen() {
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    @ServerWebSocket("/ws-routing/conditional")
+    static class ConditionalWebSocket {
+        @OnOpen
+        @RouteCondition("#{request.headers.getFirst('X-WebSocket').orElse(null) == 'yes'}")
+        void onOpen() {
+        }
+
+        @OnMessage
+        void onMessage(String message) {
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    @ServerWebSocket("/ws-routing/csv")
+    static class CsvWebSocket {
+        @OnMessage
+        void onMessage(String message) {
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    @Controller("/ws-routing/csv")
+    static class CsvController {
+        @Get(produces = "text/csv")
+        String csv() {
+            return "a,b";
         }
     }
 
