@@ -30,6 +30,9 @@ import reactor.core.publisher.Flux;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 /**
@@ -53,7 +56,12 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
     private final PieceReader<T> reader;
     private final Function<Throwable, Throwable> wrap;
 
-    // guarded by this, as are the calls of the reader
+    private final ConcurrentLinkedQueue<ReadBuffer> incoming = new ConcurrentLinkedQueue<>();
+    private final AtomicInteger draining = new AtomicInteger();
+    private final AtomicReference<@Nullable Throwable> upstreamFailure = new AtomicReference<>();
+    private volatile boolean upstreamEnded;
+
+    // guarded by this; reader calls are serialized by draining
     private boolean subscribed;
     private @Nullable Subscription subscription;
     private boolean requested;
@@ -138,7 +146,18 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
 
     @Override
     protected @Nullable T pollSource() {
-        // under the lock of these elements, which guards the reader too, while no read waits
+        if (!draining.compareAndSet(0, 1)) {
+            return null;
+        }
+        try {
+            readIncoming();
+            return pollReader();
+        } finally {
+            drainOwned();
+        }
+    }
+
+    private @Nullable T pollReader() {
         if (done) {
             return null;
         }
@@ -172,6 +191,20 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
      * the elements, or by requesting the next piece.
      */
     private void drain() {
+        if (draining.getAndIncrement() == 0) {
+            drainOwned();
+        }
+    }
+
+    private void drainOwned() {
+        int missed = 1;
+        do {
+            drainOnce();
+            missed = draining.addAndGet(-missed);
+        } while (missed != 0);
+    }
+
+    private void drainOnce() {
         T element = null;
         CompletableFuture<Optional<T>> read = null;
         Throwable failure = null;
@@ -180,6 +213,7 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
         Subscription s = null;
         Subscription ahead = null;
         synchronized (this) {
+            readIncoming();
             if (done || !isWaiting()) {
                 return;
             }
@@ -281,12 +315,33 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
 
     @Override
     public void onNext(ReadBuffer piece) {
-        Subscription s = null;
-        synchronized (this) {
+        incoming.add(piece);
+        drain();
+    }
+
+    @Override
+    public void onError(Throwable t) {
+        upstreamFailure.compareAndSet(null, t);
+        drain();
+    }
+
+    @Override
+    public void onComplete() {
+        upstreamEnded = true;
+        drain();
+    }
+
+    /** Apply queued input signals only while this thread owns the reader. */
+    private void readIncoming() {
+        // Completion is observed before taking the last piece published before it.
+        boolean ended = upstreamEnded;
+        Throwable failure = upstreamFailure.get();
+        ReadBuffer piece;
+        while ((piece = incoming.poll()) != null) {
             requested = false;
-            if (done || inputEnded) {
+            if (done || inputEnded || failure != null) {
                 piece.close();
-                return;
+                continue;
             }
             if (!isWaiting()) {
                 aheadReceived = true;
@@ -294,45 +349,27 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
             try {
                 reader.read(piece);
             } catch (Throwable e) {
-                // the values the piece completed before the failure are delivered first, as
-                // the reactive readers deliver them
                 inputFailure = e;
                 inputEnded = true;
-                s = subscription;
+                if (subscription != null) {
+                    subscription.cancel();
+                }
             }
         }
-        if (s != null) {
-            s.cancel();
+        if (done || inputEnded) {
+            return;
         }
-        drain();
-    }
-
-    @Override
-    public void onError(Throwable t) {
-        synchronized (this) {
-            if (done || inputEnded) {
-                return;
-            }
+        if (failure != null) {
             done = true;
             reader.close();
-        }
-        fail(wrap.apply(t));
-    }
-
-    @Override
-    public void onComplete() {
-        synchronized (this) {
-            if (done || inputEnded) {
-                return;
-            }
+            fail(wrap.apply(failure));
+        } else if (ended) {
             inputEnded = true;
             try {
                 reader.complete();
             } catch (Throwable e) {
-                // e.g. the input ends inside a value: the values before it are delivered first
                 inputFailure = e;
             }
         }
-        drain();
     }
 }

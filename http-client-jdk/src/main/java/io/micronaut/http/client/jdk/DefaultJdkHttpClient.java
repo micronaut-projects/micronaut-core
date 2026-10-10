@@ -301,19 +301,19 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
      * {@link HttpRequestFactory}, and a body that keeps coming is read to its end, as before
      * the JDK client shared the pipeline: no overall timeout is derived from the read timeout,
      * and the request timeout only applies when the configuration opts in, see
-     * {@link HttpClientConfiguration#isJdkApplyRequestTimeout()}.
+     * {@link HttpClientConfiguration.JdkConfiguration#isApplyRequestTimeout()}.
      *
      * @return The request timeout, or {@code null}
      */
     @Override
     protected @Nullable Duration requestTimeout() {
-        return configuration.isJdkApplyRequestTimeout() ? configuration.getRequestTimeout() : null;
+        return configuration.getJdk().isApplyRequestTimeout() ? configuration.getRequestTimeout() : null;
     }
 
     /**
      * The JDK client follows the redirects itself, as it always did, unless the configuration
      * opts in to the redirects of the pipeline, see
-     * {@link HttpClientConfiguration#isJdkMicronautRedirects()}.
+     * {@link HttpClientConfiguration.JdkConfiguration#isUseMicronautRedirects()}.
      *
      * @param request The request
      * @return Whether its redirects are followed by the pipeline
@@ -354,7 +354,7 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
         // the JDK client returns the response of an error status, decoded into the body type, when
         // it does not fail on an error status
         boolean error = response.code() >= 400 && configuration.isExceptionOnErrorStatus();
-        boolean decodeErrorType = configuration.isJdkDecodeErrorType();
+        boolean decodeErrorType = configuration.getJdk().isDecodeErrorType();
         HttpResponseAdapter<O> full = new HttpResponseAdapter<>(
             new BufferedJdkResponse(response.jdkResponse(), bytes),
             error && decodeErrorType ? null : bodyType,

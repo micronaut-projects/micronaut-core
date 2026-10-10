@@ -27,7 +27,7 @@ import io.micronaut.http.client.AsyncProxyHttpClient;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
 import io.micronaut.http.client.RawHttpClientSupport;
-import io.micronaut.http.client.RawHttpRequestWrapper;
+import io.micronaut.http.client.internal.RawHttpRequestWrapper;
 import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.internal.RawResponseFuture;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
@@ -92,7 +92,8 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         CloseableByteBody body = requestBody == null ? AvailableByteArrayBody.create(ReadBufferFactory.getJdkFactory().createEmpty()) : requestBody;
         MutableHttpRequest<?> rawRequest;
         try {
-            rawRequest = new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body);
+            rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request,
+                RawRequestOptions.builder().retainHostHeader(true).build()), body);
         } catch (RuntimeException | Error e) {
             // building the exchange failed, so nothing else releases the body
             body.close();

@@ -31,7 +31,8 @@ import jakarta.inject.Singleton;
  * Compatibility bean delegating JSON streams to json-core.
  *
  * @param <T> The body type
- * @deprecated Use {@link JsonStreamMessageHandler} instead.
+ * @deprecated JSON streaming is provided by the shared JSON body handlers. Existing custom
+ * Netty handlers should continue replacing this type until it is removed.
  * @since 4.0.0
  */
 @Deprecated(since = "5.3.0", forRemoval = true)

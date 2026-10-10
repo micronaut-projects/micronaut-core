@@ -20,7 +20,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
-import io.micronaut.http.client.RawHttpRequestWrapper;
+import io.micronaut.http.client.internal.RawHttpRequestWrapper;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.netty.handler.codec.http.HttpRequest;
 import org.jspecify.annotations.Nullable;

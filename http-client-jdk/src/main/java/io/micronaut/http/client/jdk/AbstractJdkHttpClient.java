@@ -116,7 +116,7 @@ abstract class AbstractJdkHttpClient {
     final BodySizeLimits sizeLimits;
     /**
      * Whether the redirects are followed by the client pipeline, see
-     * {@link HttpClientConfiguration#isJdkMicronautRedirects()}, else by the JDK client.
+     * {@link HttpClientConfiguration.JdkConfiguration#isUseMicronautRedirects()}, else by the JDK client.
      */
     final boolean micronautRedirects;
     /**
@@ -196,7 +196,7 @@ abstract class AbstractJdkHttpClient {
         // the redirects are followed by the JDK client, as they always were, unless the client
         // pipeline follows them, see AbstractHttpClient, with the configuration and the options
         // of an exchange
-        this.micronautRedirects = configuration.isJdkMicronautRedirects();
+        this.micronautRedirects = configuration.getJdk().isUseMicronautRedirects();
         HttpClient.Redirect redirect = configuration.isFollowRedirects() && !micronautRedirects ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER;
         this.client = buildClient(redirect, true);
         Supplier<HttpClient> rawNoRedirect = SupplierUtil.memoized(() -> buildClient(HttpClient.Redirect.NEVER, false));

@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== Buffered JSON stream responses require a list type (5.3)
+
+The JDK HTTP client now uses the shared JSON stream message body reader. For an `application/x-json-stream` response, `retrieve(request, Book.class)` no longer returns only the first JSON value. Retrieve `Argument.listOf(Book.class)` to read the complete stream, or use `jsonStream(request, Book.class)` to consume individual values as they arrive.
+
 === Refreshing the Logback configuration follows Logback's own lookup (5.3)
 
 When any `logger.*` property is set, the Micronaut framework resets Logback and configures it again. Previously that refresh used the first `Configurator` service regardless of its rank and of the status it returned, and otherwise the file set with `logback.configurationFile` or `logger.config`, or `logback.xml`. Now, unless a Logback XML configuration file is set in Micronaut configuration, the refresh configures Logback the same way Logback configures itself at startup:
@@ -564,12 +568,13 @@ If the previous behavior is desired, configure the retryable annotation explicit
 In Micronaut Framework 4, a Kotlin `suspend` route ignored ann:scheduling.annotation.ExecuteOn[] and the `micronaut.server.thread-selection` setting: the route ran on the event loop and resumed on `Dispatchers.Default`. In Micronaut 5 the selected executor is applied, and it is also the dispatcher the coroutine resumes on.
 
 This changes which thread a `suspend` route runs on for applications that annotate one with ann:scheduling.annotation.ExecuteOn[], or that set `micronaut.server.thread-selection` to `AUTO`, `IO` or `BLOCKING` (the default is `MANUAL`, which selects no executor and is unaffected). To keep a `suspend` route on the event loop under `AUTO`, annotate it with ann:core.annotation.NonBlocking[].
+
 ==== JDK HTTP client pipeline options
 
 The JDK HTTP client preserves its existing redirect, request-timeout, and error-body behaviour by default. The following experimental options enable the corresponding shared-pipeline behaviour:
 
-* `micronaut.http.client.jdk-apply-request-timeout`: applies the configured `request-timeout` to the entire exchange.
-* `micronaut.http.client.jdk-micronaut-redirects`: uses Micronaut redirect handling, including its redirect limit and method rewriting rules.
-* `micronaut.http.client.jdk-decode-error-type`: decodes error responses using the exchange's error type.
+* `micronaut.http.client.jdk.apply-request-timeout`: applies the configured `request-timeout` to the entire exchange.
+* `micronaut.http.client.jdk.use-micronaut-redirects`: uses Micronaut redirect handling, including its redirect limit and method rewriting rules.
+* `micronaut.http.client.jdk.decode-error-type`: decodes error responses using the exchange's error type.
 
 All three options default to `false`. The JDK client also exposes `toAsyncStreaming()` for pulled JSON, byte, and event streams.
