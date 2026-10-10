@@ -8,4 +8,9 @@ dependencies {
     api(projects.micronautHttpClient)
 
     implementation(libs.managed.reactor)
+
+    testAnnotationProcessor(projects.micronautInjectJava)
+    testImplementation(projects.micronautJacksonDatabind)
+    testImplementation(libs.junit.jupiter.api)
+    testRuntimeOnly(libs.junit.jupiter.engine)
 }

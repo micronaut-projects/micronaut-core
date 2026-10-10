@@ -9,6 +9,7 @@ dependencies {
     api(projects.micronautRetry)
     implementation(libs.managed.reactor)
     compileOnly(projects.micronautJacksonDatabind)
+    testAnnotationProcessor(projects.micronautInjectJava)
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)

@@ -17,16 +17,20 @@ package io.micronaut.http.client.loadbalance;
 
 import org.jspecify.annotations.Nullable;
 import io.micronaut.discovery.ServiceInstance;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.discovery.ServiceInstanceList;
+import io.micronaut.http.client.AsyncLoadBalancer;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobinLoadBalancer {
+public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobinLoadBalancer implements AsyncLoadBalancer {
     private final ServiceInstanceList serviceInstanceList;
 
     /**
@@ -49,6 +53,26 @@ public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobi
     @Override
     public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
         return Mono.fromCallable(() -> getNextAvailable(serviceInstanceList.getInstances(), discriminator));
+    }
+
+    /**
+     * Selects without a publisher. A subclass is selected through {@link #select(Object)}, so
+     * that its override keeps working.
+     *
+     * @param discriminator An object used to discriminate the server to select
+     * @return A completed stage
+     * @since 5.3.0
+     */
+    @Override
+    public CompletionStage<@Nullable ServiceInstance> selectAsync(@Nullable Object discriminator) {
+        if (getClass() != ServiceInstanceListRoundRobinLoadBalancer.class) {
+            return CompletionStagePublishers.first(select(discriminator), null);
+        }
+        try {
+            return CompletableFuture.completedFuture(getNextAvailable(serviceInstanceList.getInstances(), discriminator));
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Override

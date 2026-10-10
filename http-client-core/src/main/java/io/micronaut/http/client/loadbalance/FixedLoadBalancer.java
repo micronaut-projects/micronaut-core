@@ -17,8 +17,10 @@ package io.micronaut.http.client.loadbalance;
 
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.ServiceInstance;
+import io.micronaut.http.client.AsyncLoadBalancer;
 import io.micronaut.http.client.LoadBalancer;
 import org.reactivestreams.Publisher;
 
@@ -28,6 +30,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * A {@link LoadBalancer} that resolves a fixed URI.
@@ -35,7 +39,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class FixedLoadBalancer implements LoadBalancer  {
+public class FixedLoadBalancer implements LoadBalancer, AsyncLoadBalancer {
     private final Publisher<ServiceInstance> publisher;
     private final ServiceInstance serviceInstance;
     private final URI uri;
@@ -65,6 +69,22 @@ public class FixedLoadBalancer implements LoadBalancer  {
     @Override
     public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
         return publisher;
+    }
+
+    /**
+     * Selects the fixed instance without a publisher. A subclass is selected through
+     * {@link #select(Object)}, so that its override keeps working.
+     *
+     * @param discriminator An object used to discriminate the server to select
+     * @return A completed stage
+     * @since 5.3.0
+     */
+    @Override
+    public CompletionStage<@Nullable ServiceInstance> selectAsync(@Nullable Object discriminator) {
+        if (getClass() != FixedLoadBalancer.class) {
+            return CompletionStagePublishers.first(select(discriminator), null);
+        }
+        return CompletableFuture.completedFuture(serviceInstance);
     }
 
     /**
