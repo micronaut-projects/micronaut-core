@@ -241,6 +241,38 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Why this type cannot be extended or implemented by a build time generated proxy, if one of the restrictions
+     * {@link ProxyRestriction} lists applies to it.
+     *
+     * <p>Whether a proxy can access the type, and so where the proxy has to be generated, is not checked, nor are the
+     * constructors and methods of the type. An empty result means that none of the listed restrictions applies, not
+     * that a proxy can always be generated.</p>
+     *
+     * @return The restriction, or empty if none of the listed restrictions applies to this type
+     * @since 5.3.0
+     */
+    @Experimental
+    default Optional<ProxyRestriction> getProxyRestriction() {
+        // An array of primitives is primitive too, so the array is checked first
+        if (isArray()) {
+            return Optional.of(ProxyRestriction.ARRAY);
+        }
+        if (isPrimitive()) {
+            return Optional.of(ProxyRestriction.PRIMITIVE);
+        }
+        if (isEnum()) {
+            return Optional.of(ProxyRestriction.ENUM);
+        }
+        if (isFinal()) {
+            return Optional.of(ProxyRestriction.FINAL);
+        }
+        if (isSealed()) {
+            return Optional.of(ProxyRestriction.SEALED);
+        }
+        return Optional.empty();
+    }
+
+    /**
      * @return True if the class represents a proxy
      */
     default boolean isProxy() {
