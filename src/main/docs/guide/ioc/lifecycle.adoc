@@ -92,7 +92,7 @@ Singletons and custom-scoped beans remain owned by their scopes. Dynamically res
 
 The resolver can be used during construction and retained for later use. It must be injected into a managed consumer; it is unavailable through a standalone context lookup. As with other dependent resources, callers obtaining standalone prototypes should retain and close their api:context.BeanRegistration[]. Ordinary api:context.BeanContext[] and api:context.BeanProvider[] lookups keep their existing lifecycle behavior.
 
-Once destruction of the consumer begins, only its own destruction callbacks, such as a `@PreDestroy` method, can still look up, on the destroying thread and until they return; what they create is destroyed with the consumer, after the callbacks. Once context shutdown begins, lookups are only accepted on the thread running the shutdown, on behalf of a api:context.event.ShutdownEvent[] listener or a destruction callback, and what they create is destroyed before the shutdown completes. Other lookups are rejected. A lookup racing destruction releases newly created dependents if it cannot attach them to the consumer. The resolver does not retain the consumer's construction path; do not use it to resolve the consumer recursively during construction.
+Once destruction of the consumer begins, only its own destruction callbacks, such as a `@PreDestroy` method, can still look up, on the destroying thread and until they return; what they create is destroyed with the consumer, after the callbacks. Once context shutdown begins, lookups are accepted while the shutdown runs its callbacks, the api:context.event.ShutdownEvent[] listeners and the destruction callbacks, and what they create is destroyed before the shutdown completes. Once the last callback has returned, lookups are rejected. A lookup racing destruction releases newly created dependents if it cannot attach them to the consumer. The resolver does not retain the consumer's construction path; do not use it to resolve the consumer recursively during construction.
 
 ==== Explicit dependency ownership
 
@@ -107,18 +107,23 @@ Its lookups respect scopes, retain newly created dependents, and leave shared be
 Use `group.destroy(registration)` for early destruction: it removes only a registration owned by that group,
 using registration identity. `group.createBeanRegistration(definition)` creates a fresh owned instance.
 A group returned by an injected `BeanDependencyResolver.createGroup()` also belongs to the consumer and is
-closed automatically with it. Independent groups must be closed by their callers.
+closed automatically with it; closing it earlier detaches it from the consumer, so a long-lived consumer can open a
+child group per operation. Independent groups must be closed by their callers. `group.findRegistration(bean)` returns
+the registration a group owns for an instance, so a caller that only kept the instance can still destroy it early.
 
 For temporary method arguments, `BeanContext.withDependencies(group -> ...)` releases owned dependencies
 when the synchronous invocation ends, including when it fails. Cleanup attempts every dependent and suppresses
 cleanup failures on the invocation's exception.
 
-Once shutdown begins, new groups and fresh registrations can only be created by a `ShutdownEvent` listener, on the
-thread publishing the event. Groups created earlier, independent or owned by a consumer, stay usable by the listeners
-and destruction callbacks running on the shutdown thread. Whatever a group creates during shutdown is destroyed before
-the shutdown completes, even if the group is never closed; what it held before remains the caller's to release.
+Once shutdown begins, new groups, `withDependencies` invocations and fresh registrations remain available while
+`stop()` runs its callbacks: the `ShutdownEvent` listeners and the destruction callbacks of the beans, including the
+`@PreDestroy` method of a singleton destroyed after the event. Groups created earlier, independent or owned by a
+consumer, stay usable for as long. This holds on any thread, so work that a callback starts on another thread and
+waits for, such as an asynchronous event, can still resolve its dependencies. Whatever a group creates during shutdown
+is destroyed before the shutdown completes, even if the group is never closed; what it held before remains the
+caller's to release. Once the last callback has returned, creating groups and resolving through them fails with an
+`IllegalStateException`, so work a callback starts without waiting for it should not rely on them.
 
 A `BeanPreDestroyEventListener` that needs temporary dependencies while a bean is being destroyed calls
 `event.withDependencies(group -> ...)`. These lookups are allowed during shutdown, only on the destruction
-thread and until the listener returns; `BeanContext.withDependencies` itself is not available to a destruction
-listener during shutdown. Do not return an owned dependency from either invocation, since it has already been destroyed.
+thread and until the listener returns, and what they create is destroyed as the listener returns. Do not return an owned dependency from either invocation, since it has already been destroyed.
