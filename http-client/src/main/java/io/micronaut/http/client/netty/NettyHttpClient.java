@@ -114,6 +114,7 @@ import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
+import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
 import io.micronaut.http.netty.body.NettyJsonHandler;
@@ -657,6 +658,7 @@ final class NettyHttpClient implements
             PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
             return toMono(exchangeElementsFlow(propagatedContext, toMutableRequest(request), errorType == null ? DEFAULT_ERROR_TYPE : errorType, shouldBufferErrorBody(errorType),
                 (req, response) -> EventStreams.eventStreamResponse(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate)), propagatedContext)
+                .onErrorMap(t -> t instanceof HttpClientException ? t : decorate(new HttpClientException("Error consuming Server Sent Events: " + t.getMessage(), t)))
                 .flatMapMany(NettyHttpClient::elements);
         });
     }
@@ -736,10 +738,14 @@ final class NettyHttpClient implements
      * @param errorType         The error type
      * @return The flow of the response, whose body is the pieces of the response body
      */
-    private ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> dataStreamFlow(PropagatedContext propagatedContext, MutableHttpRequest<?> request, Argument<?> errorType) {
-        return exchangeElementsFlow(propagatedContext, request, errorType, shouldBufferErrorBody(errorType),
+    private ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> dataStreamFlow(PropagatedContext propagatedContext, MutableHttpRequest<?> request, @Nullable Argument<?> errorType) {
+        return dataStreamFlow(propagatedContext, request, errorType, false);
+    }
+
+    private ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> dataStreamFlow(PropagatedContext propagatedContext, MutableHttpRequest<?> request, @Nullable Argument<?> errorType, boolean allowReplacement) {
+        return exchangeElementsFlow(propagatedContext, request, errorType == null ? DEFAULT_ERROR_TYPE : errorType, shouldBufferErrorBody(errorType),
             (req, response) -> ElementsResponse.of(response,
-                new StreamedBodyPieces(response.byteBody().move(), isAcceptEvents(req), sizeLimits().maxBufferSize())));
+                new StreamedBodyPieces(response.byteBody().move(), isAcceptEvents(req), sizeLimits().maxBufferSize())), allowReplacement);
     }
 
     /**
@@ -805,6 +811,15 @@ final class NettyHttpClient implements
                                                                                 Argument<?> errorType,
                                                                                 boolean bufferErrorBody,
                                                                                 BiFunction<io.micronaut.http.HttpRequest<?>, NettyClientByteBodyResponse, HttpResponse<BodyElements<T>>> elements) {
+        return exchangeElementsFlow(propagatedContext, mutableRequest, errorType, bufferErrorBody, elements, false);
+    }
+
+    private <T> ExecutionFlow<HttpResponse<BodyElements<T>>> exchangeElementsFlow(PropagatedContext propagatedContext,
+                                                                                MutableHttpRequest<?> mutableRequest,
+                                                                                Argument<?> errorType,
+                                                                                boolean bufferErrorBody,
+                                                                                BiFunction<io.micronaut.http.HttpRequest<?>, NettyClientByteBodyResponse, HttpResponse<BodyElements<T>>> elements,
+                                                                                boolean allowReplacement) {
         // the last response with elements, closed if a filter replaces it
         AtomicReference<@Nullable HttpResponse<BodyElements<T>>> created = new AtomicReference<>();
         return resolveRequestURI(mutableRequest).flatMap(target -> sendRequestWithRedirects(
@@ -823,7 +838,7 @@ final class NettyHttpClient implements
                     // the error body is decoded into the error type, as for exchange
                     return InternalByteBody.bufferFlow(resp.byteBody())
                         .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t)))
-                        .flatMap(av -> handleExchangeResponse(null, errorType, resp, av));
+                        .flatMap(av -> handleExchangeResponse(errorType, errorType, resp, av, true));
                 }
                 if (!hasBody(resp)) {
                     // no element
@@ -848,6 +863,11 @@ final class NettyHttpClient implements
                     // nobody reads them: the connection is released
                     ElementsStages.closeElements(replaced);
                 }
+                if (allowReplacement) {
+                    @SuppressWarnings("unchecked")
+                    HttpResponse<BodyElements<T>> replacement = (HttpResponse<BodyElements<T>>) response;
+                    return ExecutionFlow.just(replacement);
+                }
                 return ExecutionFlow.error(new IllegalStateException("Response has been replaced by a response without elements. Do not replace the response in client filters for streaming requests"));
             }
             @SuppressWarnings("unchecked")
@@ -866,7 +886,7 @@ final class NettyHttpClient implements
         // the request is sent with the context of the caller, as it always was
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return afterSubscribe(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType == null ? DEFAULT_ERROR_TYPE : errorType), propagatedContext)
+        return afterSubscribe(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType), propagatedContext)
             .flatMapMany(response -> pieces(Objects.requireNonNull(response.body(), "The response has no body"))));
     }
 
@@ -894,10 +914,18 @@ final class NettyHttpClient implements
     public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request, Argument<?> errorType) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return afterSubscribe(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType), propagatedContext)
+        return afterSubscribe(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType, true), propagatedContext)
             .flatMapMany(response -> {
-                BodyElements<ByteBuffer<?>> pieces = Objects.requireNonNull(response.body(), "The response has no body");
-                return Flux.from(pieces(pieces))
+                Publisher<ByteBuffer<?>> body;
+                if (response.getBody().orElse(null) instanceof BodyElements<?> elements) {
+                    @SuppressWarnings("unchecked")
+                    BodyElements<ByteBuffer<?>> pieces = (BodyElements<ByteBuffer<?>>) elements;
+                    body = pieces(pieces);
+                } else {
+                    body = new NettyPiecesPublisher(Flux.from(NettyHttpResponseBuilder.toStreamResponse(response))
+                        .map(HttpContent::content));
+                }
+                return Flux.from(body)
                     .map(piece -> (HttpResponse<ByteBuffer<?>>) new ElementResponse<>(response, piece));
             }));
     }
@@ -1009,6 +1037,10 @@ final class NettyHttpClient implements
     }
 
     private <O, E> ExecutionFlow<FullNettyClientHttpResponse<O>> handleExchangeResponse(@Nullable Argument<O> bodyType, Argument<E> errorType, NettyClientByteBodyResponse resp, CloseableAvailableByteBody av) {
+        return handleExchangeResponse(bodyType, errorType, resp, av, false);
+    }
+
+    private <O, E> ExecutionFlow<FullNettyClientHttpResponse<O>> handleExchangeResponse(@Nullable Argument<O> bodyType, Argument<E> errorType, NettyClientByteBodyResponse resp, CloseableAvailableByteBody av, boolean streamingError) {
         ByteBuf buf = NettyByteBodyFactory.toByteBuf(av);
         FullHttpResponse fullHttpResponse;
         try {
@@ -1024,7 +1056,7 @@ final class NettyHttpClient implements
 
         try {
             boolean convertBodyWithBodyType = shouldConvertWithBodyType(fullHttpResponse, this.configuration, bodyType, errorType);
-            FullNettyClientHttpResponse<O> response = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, bodyType, convertBodyWithBodyType, conversionService);
+            FullNettyClientHttpResponse<O> response = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, bodyType, convertBodyWithBodyType || streamingError, conversionService);
 
             if (convertBodyWithBodyType) {
                 return ExecutionFlow.just(response);
