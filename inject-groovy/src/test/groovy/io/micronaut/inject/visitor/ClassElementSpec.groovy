@@ -1272,7 +1272,6 @@ final class TrackedSortedSet<T extends @io.micronaut.inject.visitor.TypeUseRunti
             typeArgument.getAnnotationNames().asList() == ['io.micronaut.inject.visitor.TypeUseRuntimeAnn']
     }
 
-    @PendingFeature
     void "test annotations on recursive generic type parameter 2"() {
         given:
             ClassElement ce = buildClassElement('''\
@@ -2223,7 +2222,7 @@ class MyBean {
             def saveAll2 = ce.findMethod("saveAll2").get()
             def listTypeArgument2 = saveAll2.getParameters()[0].getGenericType().getTypeArguments(List).get("E")
         then:
-            validateBookArgument(listTypeArgument2)
+            validateBookArgumentOfAnnotatedTypeParameter(listTypeArgument2)
 
 //        when:
 //            def saveAll3 = ce.findMethod("saveAll3").get()
@@ -2253,7 +2252,7 @@ class MyBean {
             def save3 = ce.findMethod("save3").get()
             def parameter3 = save3.getParameters()[0].getGenericType()
         then:
-            validateBookArgument(parameter3)
+            validateBookArgumentOfAnnotatedTypeParameter(parameter3)
 
         when:
             def save4 = ce.findMethod("save4").get()
@@ -2303,7 +2302,6 @@ class MyBean {
             validateBookArgument(listTypeArgument3)
     }
 
-    @PendingFeature
     void "test how the type annotations from the type are propagated 2"() {
         given:
             ClassElement ce = buildClassElement('''\
@@ -2428,6 +2426,14 @@ class MyBean {
             def type = method.parameters[0].getGenericType()
         then:
             type.hasAnnotation(Valid)
+    }
+
+    void validateBookArgumentOfAnnotatedTypeParameter(ClassElement classElement) {
+        // The annotations of the type parameter declaration don't apply to its uses
+        assert !classElement.hasAnnotation(TypeUseRuntimeAnn.class)
+        assert classElement.hasAnnotation(MyEntity.class)
+        assert classElement.hasAnnotation(Introspected.class)
+        assert !classElement.getTypeAnnotationMetadata().hasAnnotation(TypeUseRuntimeAnn.class)
     }
 
     void validateBookArgument(ClassElement classElement) {

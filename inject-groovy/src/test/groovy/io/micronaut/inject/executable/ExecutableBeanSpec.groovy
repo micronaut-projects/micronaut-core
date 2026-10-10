@@ -405,7 +405,7 @@ class MyBean {
             def saveAll2 = bd.findMethod("saveAll2", List).get()
             def listTypeArgument2 = saveAll2.getArguments()[0].getTypeParameters()[0]
         then:
-            validateBookArgument(listTypeArgument2)
+            validateBookArgumentOfAnnotatedTypeParameter(listTypeArgument2)
 
 //        when:
 //            def saveAll3 = bd.findMethod("saveAll3", List).get()
@@ -435,7 +435,7 @@ class MyBean {
             def save3 = bd.findMethod("save3", Book).get()
             def parameter3 = save3.getArguments()[0]
         then:
-            validateBookArgument(parameter3)
+            validateBookArgumentOfAnnotatedTypeParameter(parameter3)
 
         when:
             def save4 = bd.findMethod("save4", Book).get()
@@ -515,7 +515,6 @@ class MyBean {
             validateBookArgument(returnType)
     }
 
-    @PendingFeature // The actual placeholder with annotations is replaced by typeArguments one
     void "test how the type annotations from the type are preserved 3"() {
         given:
             BeanDefinition bd = buildBeanDefinition('test.MyBean', '''\
@@ -552,6 +551,14 @@ class MyBean {
             def parameter5 = save5.getArguments()[0]
         then:
             validateBookArgument(parameter5)
+    }
+
+    void validateBookArgumentOfAnnotatedTypeParameter(Argument argument) {
+        // The annotations of the type parameter declaration don't apply to its uses
+        def am = argument.getAnnotationMetadata()
+        assert !am.hasAnnotation(TypeUseRuntimeAnn.class)
+        assert !am.hasAnnotation(MyEntity.class)
+        assert !am.hasAnnotation(Introspected.class)
     }
 
     void validateBookArgument(Argument argument) {

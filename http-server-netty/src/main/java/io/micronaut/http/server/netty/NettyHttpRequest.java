@@ -101,7 +101,6 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 
 import javax.net.ssl.SSLSession;
 import java.net.InetSocketAddress;
@@ -854,7 +853,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     @Override
-    public @NonNull Flux<RawFormField> getRawFormFields(ByteBody byteBody) {
+    public @NonNull Publisher<RawFormField> getRawFormFields(ByteBody byteBody) {
         NettyHttpServerConfiguration nhsc = (NettyHttpServerConfiguration) serverConfiguration;
         long undecodedLimit = Math.min(nhsc.getFieldMaxBufferedBytes(), nhsc.getFormMaxBufferedBytes());
         PostBodyDecoder.Builder builder = PostBodyDecoder.builder()
