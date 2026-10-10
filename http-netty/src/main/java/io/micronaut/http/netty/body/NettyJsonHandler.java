@@ -34,6 +34,7 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandler;
+import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
@@ -102,6 +103,19 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
         JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
         processor.counter.unwrapTopLevelArray();
         return read(processor, type, mediaType, httpHeaders, input);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A top-level JSON array is unwrapped, like
+     * {@link #readChunked(Argument, MediaType, Headers, Publisher, long)}.</p>
+     */
+    @Override
+    public PieceReader<T> openPieceReader(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
+        JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
+        processor.counter.unwrapTopLevelArray();
+        return new JsonPieceReader<>(processor, value -> read(type, mediaType, httpHeaders, value));
     }
 
     private Flux<T> read(JsonChunkedProcessor processor, Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {

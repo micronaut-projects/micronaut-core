@@ -30,9 +30,10 @@ import java.util.function.Supplier;
  *
  * <h2>Reading a request body</h2>
  * <p>{@link AsyncRequestBody#elements} reads a JSON array or a JSON stream as elements, decoded
- * as they are asked for. Nothing is read ahead of the caller: the next element is received and
- * decoded when {@link #next()} is called, or when the stage the {@link #forEach} consumer
- * returned for the previous element completes.</p>
+ * as they are asked for. Nothing is decoded ahead of the caller: the next element is decoded
+ * when {@link #next()} or {@link #poll()} is called, or when the stage the {@link #forEach}
+ * consumer returned for the previous element completes, and at most one piece of the body is
+ * received before it is asked for.</p>
  *
  * <pre>{@code
  * request.elements(Person.class)

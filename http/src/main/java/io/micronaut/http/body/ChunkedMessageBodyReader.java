@@ -71,4 +71,29 @@ public interface ChunkedMessageBodyReader<T> extends MessageBodyReader<T> {
     ) {
         return readChunked(type, mediaType, httpHeaders, input);
     }
+
+    /**
+     * Open a reader of the pieces of one body that is fed the bytes of the body as they arrive,
+     * without Reactive Streams: like
+     * {@link #readChunked(Argument, MediaType, Headers, Publisher, long)}, each element of a
+     * top-level JSON array, or each value of a JSON stream, is one piece, limited to the given
+     * number of bytes.
+     *
+     * <p>The default implementation returns {@code null}: the reader only reads a publisher.</p>
+     *
+     * @param type           The type of a piece
+     * @param mediaType      The media type
+     * @param httpHeaders    The headers
+     * @param maxElementSize The maximum number of bytes of a piece
+     * @return The reader, or {@code null} if this reader does not read pieces without a publisher
+     * @since 5.3.0
+     */
+    default @Nullable PieceReader<T> openPieceReader(
+        Argument<T> type,
+        @Nullable MediaType mediaType,
+        Headers httpHeaders,
+        long maxElementSize
+    ) {
+        return null;
+    }
 }
