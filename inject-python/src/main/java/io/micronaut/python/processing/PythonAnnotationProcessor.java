@@ -536,7 +536,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         try {
             processAnnotationTimed(element, values);
         } finally {
-            PipelineTimings.record(PipelineTimings.PROCESSOR, started);
+            PipelineTimings.stop(PipelineTimings.PROCESSOR, started);
         }
     }
 
@@ -1176,7 +1176,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         try {
             compilePendingBytecodeTimed(processingEnvironment, originatingElement);
         } finally {
-            PipelineTimings.record(PipelineTimings.BYTECODE, started);
+            PipelineTimings.stop(PipelineTimings.BYTECODE, started);
         }
     }
 

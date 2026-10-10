@@ -153,7 +153,7 @@ public final class PythonAstParser {
         context.initialize(PYTHON);
         context.eval(COMPILE_RUNTIME_AST_SOURCE);
         runtimeAstCompiler = context.getBindings(PYTHON).getMember("_mn_compile_runtime_ast");
-        PipelineTimings.record(PipelineTimings.CONTEXT, started);
+        PipelineTimings.stop(PipelineTimings.CONTEXT, started);
     }
 
     /**
@@ -421,7 +421,7 @@ public final class PythonAstParser {
         try {
             return parseTransformedTimed(transformed, srcDirs, visitorContext, typeCheck, staticCompilation);
         } finally {
-            PipelineTimings.record(PipelineTimings.PARSE, started);
+            PipelineTimings.stop(PipelineTimings.PARSE, started);
         }
     }
 
@@ -478,7 +478,7 @@ public final class PythonAstParser {
         bindings.putMember("visitor_context", visitorContext);
         long started = PipelineTimings.start();
         context.eval(TYPE_CHECK_SOURCE);
-        PipelineTimings.record(PipelineTimings.TYPE_CHECK, started);
+        PipelineTimings.stop(PipelineTimings.TYPE_CHECK, started);
         Value diagnostics = bindings.getMember("diagnostics");
         return diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class));
     }
@@ -502,7 +502,7 @@ public final class PythonAstParser {
         bindings.putMember("visitor_context", visitorContext);
         long started = PipelineTimings.start();
         context.eval(STATIC_PLAN_SOURCE);
-        PipelineTimings.record(PipelineTimings.PLAN, started);
+        PipelineTimings.stop(PipelineTimings.PLAN, started);
         Value decisions = bindings.getMember("static_decisions");
         Value bodies = bindings.getMember("static_bodies");
         Value diagnostics = bindings.getMember("static_diagnostics");
@@ -814,7 +814,7 @@ public final class PythonAstParser {
             long started = PipelineTimings.start();
             try {
                 result = context.eval(TRANSFORM_SOURCE);
-                PipelineTimings.record(PipelineTimings.TRANSFORM, started);
+                PipelineTimings.stop(PipelineTimings.TRANSFORM, started);
             } catch (Exception e) {
                 StringWriter stack = new StringWriter();
                 e.printStackTrace(new PrintWriter(stack));

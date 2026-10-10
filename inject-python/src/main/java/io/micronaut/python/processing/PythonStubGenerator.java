@@ -336,7 +336,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         try {
             finishTimed(visitorContext);
         } finally {
-            PipelineTimings.record(PipelineTimings.STUBS, started);
+            PipelineTimings.stop(PipelineTimings.STUBS, started);
         }
     }
 
@@ -481,7 +481,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         try {
             visitClassTimed(element, context);
         } finally {
-            PipelineTimings.record(PipelineTimings.STUBS, started);
+            PipelineTimings.stop(PipelineTimings.STUBS, started);
         }
     }
 
