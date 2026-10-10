@@ -756,7 +756,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     public HttpClientException handleResponseError(HttpRequest<?> finalRequest, @Nullable ServiceInstance instance, Throwable cause) {
         String message = cause.getMessage();
         if (message == null) {
-            message = cause.getClass().getSimpleName();
+            message = cause.getClass().getName();
         }
         if (log.isTraceEnabled()) {
             log.trace("HTTP Client exception ({}) occurred for request : {} {}",
