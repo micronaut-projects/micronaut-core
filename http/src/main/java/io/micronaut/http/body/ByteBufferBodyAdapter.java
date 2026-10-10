@@ -19,8 +19,8 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.http.body.stream.BodyPublishers;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.nio.ByteBuffer;
 import java.util.OptionalLong;
@@ -39,8 +39,8 @@ public final class ByteBufferBodyAdapter {
         return ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
     }
 
-    private static Flux<ReadBuffer> toReadBuffers(Publisher<ByteBuffer> source) {
-        return Flux.from(source).map(ReadBufferFactory.getJdkFactory()::adapt);
+    private static Publisher<ReadBuffer> toReadBuffers(Publisher<ByteBuffer> source) {
+        return BodyPublishers.map(source, ReadBufferFactory.getJdkFactory()::adapt);
     }
 
     /**

@@ -24,7 +24,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import org.jspecify.annotations.Nullable;
-import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.util.function.Consumer;
@@ -104,32 +103,6 @@ final class JsonChunkedProcessor {
             release(value);
             throw e;
         }
-    }
-
-    public Flux<ByteBuffer<?>> process(Flux<ByteBuf> input) {
-        return Flux.concat(input
-                .concatMap(b -> Flux.<ByteBuffer<?>>create(s -> {
-                    try {
-                        countComponents(s::next, b);
-                        s.complete();
-                    } catch (IOException | ContentLengthExceededException e) {
-                        s.error(e);
-                    } finally {
-                        b.release();
-                    }
-                })), Flux.create(s -> {
-                try {
-                    complete(s::next);
-                    s.complete();
-                } catch (Throwable e) {
-                    s.error(e);
-                }
-            }))
-            // also when the subscriber cancels, e.g. a reader that stops before the last element:
-            // the partial element and the elements and input not delivered yet are released
-            .doFinally(signal -> releaseBuffers())
-            .doOnDiscard(ByteBuffer.class, JsonChunkedProcessor::release)
-            .doOnDiscard(ByteBuf.class, ByteBuf::release);
     }
 
     /**

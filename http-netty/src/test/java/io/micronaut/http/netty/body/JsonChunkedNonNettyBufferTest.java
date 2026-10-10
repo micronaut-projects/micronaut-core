@@ -58,7 +58,7 @@ class JsonChunkedNonNettyBufferTest {
         CountedBuffer first = buffer("{\"a\":1}\n{\"b\"");
         CountedBuffer second = buffer(":2}\n");
 
-        List<Map> values = handler.readChunked(Argument.of(Map.class), MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>just(first, second), 1024)
+        List<Map> values = Flux.from(handler.readChunked(Argument.of(Map.class), MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>just(first, second), 1024))
             .collectList()
             .block();
 
@@ -134,7 +134,7 @@ class JsonChunkedNonNettyBufferTest {
         }
         NettyJsonStreamHandler<Map> handler = new NettyJsonStreamHandler<>(MAPPER);
 
-        Map first = handler.readChunked(Argument.of(Map.class), MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>fromIterable(buffers), 1024)
+        Map first = Flux.from(handler.readChunked(Argument.of(Map.class), MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>fromIterable(buffers), 1024))
             .next()
             .block();
 

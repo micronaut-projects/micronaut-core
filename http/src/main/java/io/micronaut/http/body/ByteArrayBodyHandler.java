@@ -28,11 +28,11 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.codec.CodecException;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -116,7 +116,7 @@ final class ByteArrayBodyHandler implements TypedMessageBodyHandler<byte[]>, Chu
 
     @Override
     public Publisher<byte[]> readChunked(Argument<byte[]> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        return Flux.from(input).map(ByteArrayBodyHandler::read0);
+        return BodyPublishers.map(input, ByteArrayBodyHandler::read0);
     }
 
     @Override
