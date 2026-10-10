@@ -24,6 +24,12 @@ import io.micronaut.core.annotation.Experimental;
  * Use {@link BeanContext#createDependencyGroup()} for independent ownership or
  * {@link BeanDependencyResolver#createGroup()} to attach the group to a managed consumer.
  *
+ * <p>A group follows the lookup rules of {@link BeanDependencyResolver}: a group created before context shutdown
+ * remains usable by the {@link io.micronaut.context.event.ShutdownEvent} listeners and destruction callbacks that
+ * run on the thread performing the shutdown. What such a lookup creates is destroyed before the shutdown
+ * completes, even when the group is independent and never closed; what the group held before shutdown remains
+ * the caller's to release.</p>
+ *
  * @since 5.3.0
  */
 @Experimental

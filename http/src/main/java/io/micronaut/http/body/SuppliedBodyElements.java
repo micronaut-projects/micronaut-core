@@ -51,6 +51,9 @@ final class SuppliedBodyElements<T> implements BodyElements<T> {
      */
     private @Nullable CompletableFuture<@Nullable Void> closed;
 
+    private boolean completed;
+    private @Nullable Throwable failure;
+
     SuppliedBodyElements(Supplier<? extends CompletionStage<Optional<T>>> next, @Nullable Runnable close) {
         this.next = next;
         this.close = close;
@@ -62,8 +65,8 @@ final class SuppliedBodyElements<T> implements BodyElements<T> {
         start(result);
         CompletionStage<Optional<T>> element;
         try {
-            element = Objects.requireNonNull(next.get(), "The elements returned no stage");
-        } catch (Throwable e) {
+            element = read();
+        } catch (Exception | Error e) {
             end(result);
             result.completeExceptionally(e);
             return result;
@@ -91,9 +94,65 @@ final class SuppliedBodyElements<T> implements BodyElements<T> {
         CompletableFuture<@Nullable Void> result = new CompletableFuture<>();
         start(result);
         result.whenComplete((ignored, error) -> end(result));
+        BodyElementsLoop.closeOnFailure(this, result);
         // the loop reads the function directly: this operation spans the reads
-        BodyElementsLoop.run(next, consumer, result);
+        BodyElementsLoop.run(this::read, consumer, result);
         return result;
+    }
+
+    private CompletionStage<Optional<T>> read() {
+        synchronized (this) {
+            if (failure != null) {
+                return CompletableFuture.failedStage(failure);
+            }
+            if (completed) {
+                return CompletableFuture.completedStage(Optional.empty());
+            }
+        }
+        CompletionStage<Optional<T>> element;
+        try {
+            element = Objects.requireNonNull(next.get(), "The elements returned no stage");
+        } catch (Exception | Error e) {
+            return CompletableFuture.failedStage(recordFailure(e));
+        }
+        return element.whenComplete((value, error) -> {
+            if (error != null) {
+                recordFailure(error);
+            } else if (Objects.requireNonNullElse(value, Optional.empty()).isEmpty()) {
+                synchronized (this) {
+                    completed = true;
+                }
+            }
+        });
+    }
+
+    private synchronized Throwable recordFailure(Throwable error) {
+        if (failure == null) {
+            failure = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+        }
+        return failure;
+    }
+
+    @Override
+    public synchronized @Nullable T poll() {
+        checkOperation();
+        return null;
+    }
+
+    @Override
+    public synchronized State state() {
+        if (closed != null || failure != null) {
+            return State.FAILED;
+        }
+        return completed ? State.COMPLETED : State.PENDING;
+    }
+
+    @Override
+    public synchronized @Nullable Throwable failure() {
+        if (closed != null && failure == null) {
+            failure = new CancellationException("The elements of the body were closed");
+        }
+        return failure;
     }
 
     @Override
@@ -110,7 +169,9 @@ final class SuppliedBodyElements<T> implements BodyElements<T> {
             operation = null;
         }
         if (pending != null) {
-            pending.completeExceptionally(new CancellationException("The elements of the body were closed"));
+            CancellationException cancellation = new CancellationException("The elements of the body were closed");
+            recordFailure(cancellation);
+            pending.completeExceptionally(cancellation);
         }
         try {
             Runnable callback = close;
@@ -118,7 +179,7 @@ final class SuppliedBodyElements<T> implements BodyElements<T> {
                 callback.run();
             }
             stage.complete(null);
-        } catch (Throwable e) {
+        } catch (Exception | Error e) {
             stage.completeExceptionally(e);
         }
         return stage;
@@ -144,13 +205,17 @@ final class SuppliedBodyElements<T> implements BodyElements<T> {
         }
     }
 
-    private synchronized void start(CompletableFuture<?> result) {
+    private void checkOperation() {
         if (closed != null) {
             throw new IllegalStateException("The elements of the body were closed");
         }
         if (operation != null) {
             throw new IllegalStateException("Another operation on the elements of the body is in progress");
         }
+    }
+
+    private synchronized void start(CompletableFuture<?> result) {
+        checkOperation();
         operation = result;
     }
 

@@ -55,9 +55,9 @@ import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import io.netty.buffer.ByteBuf;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -260,7 +260,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         return converted;
     }
 
-    private static <T> List<T> toListNow(Flux<T> flux) {
+    private static <T> List<T> toListNow(Publisher<T> publisher) {
         var sub = new Subscriber<T>() {
             final List<T> list = new ArrayList<>();
             boolean complete = false;
@@ -288,7 +288,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                 complete = true;
             }
         };
-        flux.subscribe(sub);
+        publisher.subscribe(sub);
         if (!sub.complete) {
             throw new IllegalStateException("Flux did not finish immediately");
         }

@@ -170,6 +170,12 @@ public final class ArgumentExpUtils {
         Class[].class
     );
 
+    private static final Method METHOD_WITH_COMPONENT_TYPE = ReflectionUtils.getRequiredInternalMethod(
+        Argument.class,
+        "withComponentType",
+        Argument.class
+    );
+
     private static final Method METHOD_ARGUMENT_GET_TYPE = ReflectionUtils.getRequiredInternalMethod(
         TypeInformation.class,
         "getType"
@@ -277,6 +283,21 @@ public final class ArgumentExpUtils {
      * @return The expression
      */
     static ExpressionDef pushCreateArgument(
+        AnnotationMetadata annotationMetadataWithDefaults,
+        ClassElement declaringType,
+        ClassTypeDef owningType,
+        String argumentName,
+        TypedElement argumentType,
+        AnnotationMetadata annotationMetadata,
+        Map<String, ClassElement> typeArguments,
+        Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        ExpressionDef argument = pushCreateArgumentOfType(annotationMetadataWithDefaults, declaringType, owningType,
+            argumentName, argumentType, annotationMetadata, typeArguments, loadClassValueExpressionFn);
+        return withAnnotatedComponent(annotationMetadataWithDefaults, owningType, argument, argumentType,
+            new HashSet<>(5), loadClassValueExpressionFn);
+    }
+
+    private static ExpressionDef pushCreateArgumentOfType(
         AnnotationMetadata annotationMetadataWithDefaults,
         ClassElement declaringType,
         ClassTypeDef owningType,
@@ -393,6 +414,63 @@ public final class ArgumentExpUtils {
         }
     }
 
+    /**
+     * Gives an array the component it was written with when a component of it was annotated where the array was
+     * used, which the component rebuilt from the array at runtime would not carry.
+     *
+     * @param annotationMetadataWithDefaults The annotation metadata with defaults
+     * @param owningType                     The owning type
+     * @param argument                       The array argument
+     * @param argumentType                   The array as it was written
+     * @param visitedTypes                   The types visited around the array
+     * @param loadClassValueExpressionFn     The load type method fn
+     * @return The expression
+     */
+    private static ExpressionDef withAnnotatedComponent(AnnotationMetadata annotationMetadataWithDefaults,
+                                                        ClassTypeDef owningType,
+                                                        ExpressionDef argument,
+                                                        TypedElement argumentType,
+                                                        Set<Object> visitedTypes,
+                                                        Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        if (!(argumentType instanceof ClassElement array) || !hasAnnotatedComponent(array)) {
+            return argument;
+        }
+        ClassElement component = array.fromArray();
+        if (!TypeDef.erasure(resolveArgument(array)).equals(TypeDef.erasure(resolveArgument(component)).array())) {
+            // The array is not written as an array of the type its component is written as
+            return argument;
+        }
+        return argument.invoke(METHOD_WITH_COMPONENT_TYPE, buildArgumentWithGenerics(
+            annotationMetadataWithDefaults,
+            owningType,
+            null,
+            component,
+            component.getTypeArguments(),
+            new Visit(new HashSet<>(visitedTypes), false),
+            loadClassValueExpressionFn
+        ));
+    }
+
+    /**
+     * Whether a component of an array, or a component of that, was annotated where the array was used.
+     *
+     * @param type The type
+     * @return Whether it is an array with an annotated component
+     */
+    private static boolean hasAnnotatedComponent(ClassElement type) {
+        if (!type.isArray() || type instanceof WildcardElement) {
+            return false;
+        }
+        ClassElement component = type;
+        do {
+            component = component.fromArray();
+            if (!component.getTypeAnnotationMetadata().isEmpty()) {
+                return true;
+            }
+        } while (component.isArray());
+        return false;
+    }
+
     private static TypedElement resolveArgument(TypedElement argumentType) {
         if (argumentType instanceof GenericPlaceholderElement placeholderElement) {
             ClassElement resolved = placeholderElement.getResolved().orElse(
@@ -481,6 +559,7 @@ public final class ArgumentExpUtils {
             Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
             if (CollectionUtils.isNotEmpty(typeArguments)
                 || !classElement.getAnnotationMetadata().isEmpty()
+                || hasAnnotatedComponent(classElement)
                 || classElement instanceof WildcardElement
                 || isRawType(classElement)
                 || !boundsToRecord(classElement).isEmpty()) {
@@ -556,7 +635,7 @@ public final class ArgumentExpUtils {
         Set<Object> visitedTypes = visit.visitedTypes();
         Set<Object> visitedBefore = new HashSet<>(visitedTypes);
         try {
-            return buildVisitedArgumentWithGenerics(
+            ExpressionDef argument = buildVisitedArgumentWithGenerics(
                 annotationMetadataWithDefaults,
                 owningType,
                 argumentName,
@@ -565,6 +644,8 @@ public final class ArgumentExpUtils {
                 visit,
                 loadClassValueExpressionFn
             );
+            return withAnnotatedComponent(annotationMetadataWithDefaults, owningType, argument, argumentType,
+                visitedBefore, loadClassValueExpressionFn);
         } finally {
             visitedTypes.retainAll(visitedBefore);
         }
