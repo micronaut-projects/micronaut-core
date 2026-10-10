@@ -253,7 +253,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
      * Emit the elements that are requested and available, read the pieces that arrived, and
      * request the next piece when the pieces read so far complete no requested element.
      */
-    @SuppressWarnings("java:S135") // Each transition returns to the drain before touching the next owned piece.
+    @SuppressWarnings({"java:S135", "java:S1181"}) // Drain transitions preserve piece ownership; reader failures must reach onError.
     private void drainOnce() {
         Subscriber<? super T> subscriber = downstream.get();
         if (subscriber == null) {
@@ -344,6 +344,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
         }
     }
 
+    @SuppressWarnings("java:S1181") // Preserve decoded elements before signalling any reader failure.
     private void readPiece(I next) {
         try {
             reader.read(adapter.apply(next));
@@ -356,6 +357,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
         }
     }
 
+    @SuppressWarnings("java:S1181") // Report final reader failures through the subscriber.
     private void completeReader() {
         try {
             reader.complete();
