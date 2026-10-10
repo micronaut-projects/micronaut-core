@@ -116,16 +116,7 @@ public final class EventStreams {
             BodyElements<Event<B>> elements;
             if (contentType != null && MediaType.TEXT_EVENT_STREAM_TYPE.matches(contentType)) {
                 // the data of each event is JSON
-                Function<byte[], B> reader = dataReader(handlerRegistry, eventType, MediaType.APPLICATION_JSON_TYPE, headers);
-                EventStreamDecoder decoder = new EventStreamDecoder(maxBufferSize);
-                elements = new ByteBodyElements<>(body, piece -> {
-                    List<Event<byte[]>> events = decoder.decode(piece.toArray());
-                    List<Event<B>> decoded = new ArrayList<>(events.size());
-                    for (Event<byte[]> event : events) {
-                        decoded.add(Event.of(event, reader.apply(event.getData())));
-                    }
-                    return decoded;
-                }, wrap);
+                elements = new ByteBodyElements<>(body, new EventReader<>(new EventStreamDecoder(maxBufferSize), dataReader(handlerRegistry, eventType, MediaType.APPLICATION_JSON_TYPE, headers)), wrap);
             } else {
                 // a single body, such as JSON, is one event
                 MediaType mediaType = contentType == null ? MediaType.APPLICATION_JSON_TYPE : contentType;
