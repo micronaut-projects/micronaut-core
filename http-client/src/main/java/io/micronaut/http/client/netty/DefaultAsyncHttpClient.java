@@ -57,7 +57,14 @@ final class DefaultAsyncHttpClient implements AsyncStreamingHttpClient {
     public <I, O, E> CompletionStage<HttpResponse<O>> exchange(HttpRequest<I> request,
                                                                @Nullable Argument<O> bodyType,
                                                                Argument<E> errorType) {
-        return nettyHttpClient.exchangeFlow(request, bodyType, errorType).toCompletableFuture();
+        var flow = nettyHttpClient.exchangeFlow(request, bodyType, errorType);
+        var result = flow.toCompletableFuture();
+        result.whenComplete((response, error) -> {
+            if (error != null) {
+                flow.cancel();
+            }
+        });
+        return result;
     }
 
     @Override
