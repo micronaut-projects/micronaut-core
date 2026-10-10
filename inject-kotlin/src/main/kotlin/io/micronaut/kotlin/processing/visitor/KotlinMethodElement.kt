@@ -19,6 +19,8 @@ import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.inject.ast.beans.BeanElementBuilder
+import io.micronaut.kotlin.processing.isCompiledFromSource
 import java.util.stream.Collectors
 
 internal open class KotlinMethodElement(
@@ -166,6 +168,13 @@ internal open class KotlinMethodElement(
         )
         copyValues(newMethod)
         return newMethod
+    }
+
+    override fun addAssociatedBean(type: ClassElement): BeanElementBuilder {
+        if (!declaration.isCompiledFromSource()) {
+            throw UnsupportedOperationException("Element of type [$javaClass] does not support adding associated beans at compilation time: [$name] is not compiled from source")
+        }
+        return visitorContext.addAssociatedBean(this, type)
     }
 
     override fun copyThis(): KotlinMethodElement {

@@ -161,36 +161,6 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
         return qualifiedName?.asString()
     }
 
-    private fun write(outputObjectDef: OutputObjectDef, visitorContext: KotlinVisitorContext, environment: SymbolProcessorEnvironment) {
-        try {
-            val objectDef = outputObjectDef.objectDef
-            val serviceClass = outputObjectDef.serviceClass
-            val originatingElements = outputObjectDef.originatingElements
-            if (serviceClass != null) {
-                visitorContext.visitServiceDescriptor(
-                    serviceClass.name,
-                    objectDef.getName(),
-                    originatingElements.getOriginatingElements()[0],
-                    outputObjectDef.serviceContent
-                )
-            }
-            visitorContext.visitClass(objectDef.getName(), *originatingElements.getOriginatingElements())
-                .use { outputStream ->
-                    outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext))
-                }
-        } catch (e: Exception) {
-            // raise a compile error
-            val message = e.message
-            var kotlinElement: KSNode? = null
-            val astElement = outputObjectDef.originatingElements.getOriginatingElements()[0]
-            if (astElement.nativeType is KotlinNativeElement) {
-                val nativeElement: KotlinNativeElement = astElement.nativeType as KotlinNativeElement
-                kotlinElement = nativeElement.element
-            }
-            environment.logger.error("Unexpected error: " + (message ?: e.javaClass.getSimpleName()), kotlinElement)
-        }
-    }
-
     override fun finish() {
         if (processed.isNotEmpty()) {
             environment.logger.info("Created ${processed.size} bean definitions")
@@ -205,6 +175,39 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
     }
 
     companion object Helper {
+        /**
+         * Writes a bean definition class, and its service descriptor.
+         */
+        fun write(outputObjectDef: OutputObjectDef, visitorContext: KotlinVisitorContext, environment: SymbolProcessorEnvironment) {
+            try {
+                val objectDef = outputObjectDef.objectDef
+                val serviceClass = outputObjectDef.serviceClass
+                val originatingElements = outputObjectDef.originatingElements
+                if (serviceClass != null) {
+                    visitorContext.visitServiceDescriptor(
+                        serviceClass.name,
+                        objectDef.getName(),
+                        originatingElements.getOriginatingElements()[0],
+                        outputObjectDef.serviceContent
+                    )
+                }
+                visitorContext.visitClass(objectDef.getName(), *originatingElements.getOriginatingElements())
+                    .use { outputStream ->
+                        outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext))
+                    }
+            } catch (e: Exception) {
+                // raise a compile error
+                val message = e.message
+                var kotlinElement: KSNode? = null
+                val astElement = outputObjectDef.originatingElements.getOriginatingElements()[0]
+                if (astElement.nativeType is KotlinNativeElement) {
+                    val nativeElement: KotlinNativeElement = astElement.nativeType as KotlinNativeElement
+                    kotlinElement = nativeElement.element
+                }
+                environment.logger.error("Unexpected error: " + (message ?: e.javaClass.getSimpleName()), kotlinElement)
+            }
+        }
+
         fun handleProcessingException(environment: SymbolProcessorEnvironment, e: ProcessingException) {
             val message = e.message
             val originatingNode = (e.originatingElement as KotlinNativeElement).element

@@ -59,9 +59,11 @@ import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.PropertyElementQuery
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
+import io.micronaut.inject.ast.beans.BeanElementBuilder
 import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery
 import io.micronaut.inject.processing.ProcessingException
+import io.micronaut.kotlin.processing.isCompiledFromSource
 import java.util.Optional
 import java.util.function.Function
 import java.util.stream.Stream
@@ -688,6 +690,13 @@ internal open class KotlinClassElement(
         super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as ClassElement
 
     override fun isArray() = arrayDimensions > 0
+
+    override fun addAssociatedBean(type: ClassElement): BeanElementBuilder {
+        if (isArray || typeVariable || !declaration.isCompiledFromSource()) {
+            throw UnsupportedOperationException("Element of type [$javaClass] does not support adding associated beans at compilation time: [$name] is not compiled from source")
+        }
+        return visitorContext.addAssociatedBean(this, type)
+    }
 
     override fun getArrayDimensions() = internalArrayDimensions
 

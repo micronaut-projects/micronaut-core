@@ -21,3 +21,7 @@ io.micronaut.kotlin.processing.ast.visitor.AnnotatedPrimitiveElementSpec$Primiti
 io.micronaut.kotlin.processing.ast.visitor.KotlinAnnotationElementSpec$DeclarationVisitor
 io.micronaut.kotlin.processing.annotations.AnnotationMemberDefaultsSpec$DefaultsRecordingVisitor
 io.micronaut.kotlin.processing.annotations.NestedAnnotationDefaultsSpec$NestedDefaultsRecordingVisitor
+io.micronaut.inject.visitor.rounds.RoundsVisitor
+io.micronaut.kotlin.processing.beans.builder.AssociatedBeanSpec$ProducingVisitor
+io.micronaut.kotlin.processing.beans.builder.AssociatedBeanSpec$AggregatingVisitor
+io.micronaut.kotlin.processing.beans.builder.AssociatedBeanSpec$FailingRoundVisitor
