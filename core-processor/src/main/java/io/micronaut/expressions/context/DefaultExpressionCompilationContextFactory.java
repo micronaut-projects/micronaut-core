@@ -21,7 +21,6 @@ import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
@@ -61,13 +60,13 @@ public final class DefaultExpressionCompilationContextFactory implements Express
     @Override
     public ExpressionEvaluationContext buildContextForMethod(EvaluatedExpressionReference expression,
                                                              MethodElement methodElement) {
+        ExtensibleExpressionEvaluationContext methodContext = buildForExpression(expression, null)
+                 .extendWith(methodElement);
         if (excludesMethodArguments(expression)) {
             // the expression is evaluated without the method arguments, so only the type of this is known
-            ClassElement thisElement = methodElement.isStatic() || methodElement instanceof ConstructorElement ? null : methodElement.getOwningType();
-            return buildForExpression(expression, thisElement);
+            return buildForExpression(expression, methodContext.findThis());
         }
-        return buildForExpression(expression, null)
-                 .extendWith(methodElement);
+        return methodContext;
     }
 
     @Override
@@ -101,14 +100,12 @@ public final class DefaultExpressionCompilationContextFactory implements Express
     }
 
     private boolean excludesMethodArguments(EvaluatedExpressionReference expression) {
-        ClassElement annotation = visitorContext.getClassElement(expression.annotationName()).orElse(null);
-        if (annotation == null) {
-            return false;
-        }
-        return Stream.concat(
+        return visitorContext.getClassElement(expression.annotationName())
+            .stream()
+            .flatMap(annotation -> Stream.concat(
                 annotation.findAnnotation(AnnotationExpressionContext.class).stream(),
                 findAnnotationMembers(annotation, expression.annotationMember())
-                    .flatMap(element -> Optional.ofNullable(element.getDeclaredAnnotation(AnnotationExpressionContext.class)).stream()))
+                    .flatMap(element -> Optional.ofNullable(element.getDeclaredAnnotation(AnnotationExpressionContext.class)).stream())))
             .anyMatch(av -> !av.booleanValue(METHOD_ARGUMENTS_MEMBER).orElse(true));
     }
 
