@@ -17,11 +17,13 @@ package io.micronaut.management.health.aggregator;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.endpoint.health.HealthLevelOfDetail;
 import io.micronaut.management.health.indicator.HealthIndicator;
+import io.micronaut.management.health.indicator.HealthIndicatorStages;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Singleton;
@@ -33,9 +35,12 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
 /**
@@ -47,6 +52,11 @@ import java.util.stream.Collectors;
  * <p>
  * Example:
  * [status: "UP, details: [diskSpace: [status: UP, details: [:]], cpuUsage: ...]]</p>
+ * <p>{@link #aggregateAsync(HealthIndicator[], HealthLevelOfDetail)} combines the
+ * {@link HealthIndicator#getResultAsync()} stages of the indicators without a publisher. A
+ * subclass is called through its publisher methods instead, so that its overrides of
+ * {@link #aggregate(HealthIndicator[], HealthLevelOfDetail)} or
+ * {@link #aggregateResults(HealthIndicator[])} keep working.</p>
  *
  * @author James Kleeh
  * @author Graeme Rocher
@@ -87,6 +97,50 @@ public class DefaultHealthAggregator implements HealthAggregator<HealthResult> {
             return HealthResult.builder(name, overallStatus).details(details).build();
         });
         return result.flux();
+    }
+
+    /**
+     * Combines the {@link HealthIndicator#getResultAsync()} stages of the indicators, in the order
+     * of the indicators, without a publisher. The first indicator that fails, or that throws,
+     * fails the aggregation. A subclass is called through
+     * {@link #aggregate(HealthIndicator[], HealthLevelOfDetail)}.
+     *
+     * @param indicators          The health indicators to aggregate.
+     * @param healthLevelOfDetail The {@link HealthLevelOfDetail}
+     * @return A {@link CompletionStage} completed with the aggregated response
+     * @since 5.3.0
+     */
+    @Override
+    public CompletionStage<@Nullable HealthResult> aggregateAsync(HealthIndicator[] indicators, HealthLevelOfDetail healthLevelOfDetail) {
+        if (getClass() != DefaultHealthAggregator.class) {
+            return HealthAggregator.super.aggregateAsync(indicators, healthLevelOfDetail);
+        }
+        List<CompletionStage<List<HealthResult>>> stages = new ArrayList<>(indicators.length);
+        for (HealthIndicator indicator : indicators) {
+            stages.add(HealthIndicatorStages.getResult(indicator));
+        }
+        return CompletionStagePublishers.map(CompletionStagePublishers.<HealthResult>concat(stages), list ->
+            buildResult(calculateOverallStatus(list), aggregateDetails(list), healthLevelOfDetail)
+        );
+    }
+
+    /**
+     * Aggregates the results without a publisher. A subclass is called through
+     * {@link #aggregate(String, Publisher)}.
+     *
+     * @param name    The name of the new health result
+     * @param results The health results to aggregate.
+     * @return A completed {@link CompletionStage}
+     * @since 5.3.0
+     */
+    @Override
+    public CompletionStage<@Nullable HealthResult> aggregateAsync(String name, List<HealthResult> results) {
+        if (getClass() != DefaultHealthAggregator.class) {
+            return HealthAggregator.super.aggregateAsync(name, results);
+        }
+        return CompletableFuture.completedFuture(
+            HealthResult.builder(name, calculateOverallStatus(results)).details(aggregateDetails(results)).build()
+        );
     }
 
     /**

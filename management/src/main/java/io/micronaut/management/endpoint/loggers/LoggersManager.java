@@ -15,9 +15,14 @@
  */
 package io.micronaut.management.endpoint.loggers;
 
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
+
+import java.util.concurrent.CompletionStage;
 
 /**
  * Used to retrieve and update logger information for the {@link LoggersEndpoint}.
@@ -44,6 +49,37 @@ public interface LoggersManager<T> {
      * @return A {@link Publisher} of <code>T</code>
      */
     Publisher<T> getLogger(ManagedLoggingSystem loggingSystem, @NotBlank String name);
+
+    /**
+     * The {@link CompletionStage} counterpart of {@link #getLoggers(ManagedLoggingSystem)}, which
+     * the {@link LoggersEndpoint} calls. By default, it adapts the first item emitted by
+     * {@link #getLoggers(ManagedLoggingSystem)}, and completes with {@code null} when the
+     * publisher completes without one. Cancelling the stage cancels the subscription.
+     *
+     * @param loggingSystem The {@link ManagedLoggingSystem} in use
+     * @return A {@link CompletionStage} completed with <code>T</code>, or with {@code null} for none
+     * @since 5.3.0
+     */
+    @Experimental
+    default CompletionStage<@Nullable T> getLoggersAsync(ManagedLoggingSystem loggingSystem) {
+        return CompletionStagePublishers.first(getLoggers(loggingSystem), null);
+    }
+
+    /**
+     * The {@link CompletionStage} counterpart of {@link #getLogger(ManagedLoggingSystem, String)},
+     * which the {@link LoggersEndpoint} calls. By default, it adapts the first item emitted by
+     * {@link #getLogger(ManagedLoggingSystem, String)}, and completes with {@code null} when the
+     * publisher completes without one. Cancelling the stage cancels the subscription.
+     *
+     * @param loggingSystem The {@link ManagedLoggingSystem} in use
+     * @param name The name of the logger to find or create
+     * @return A {@link CompletionStage} completed with <code>T</code>, or with {@code null} for none
+     * @since 5.3.0
+     */
+    @Experimental
+    default CompletionStage<@Nullable T> getLoggerAsync(ManagedLoggingSystem loggingSystem, @NotBlank String name) {
+        return CompletionStagePublishers.first(getLogger(loggingSystem, name), null);
+    }
 
     /**
      * Set the log level for the named logger in the system.

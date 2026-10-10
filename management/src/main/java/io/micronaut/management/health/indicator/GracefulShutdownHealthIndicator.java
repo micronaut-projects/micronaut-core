@@ -18,14 +18,15 @@ package io.micronaut.management.health.indicator;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.health.indicator.annotation.Readiness;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.micronaut.runtime.graceful.GracefulShutdownManager;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -51,10 +52,19 @@ final class GracefulShutdownHealthIndicator implements HealthIndicator, Graceful
 
     @Override
     public Publisher<HealthResult> getResult() {
+        return Publishers.just(healthResult());
+    }
+
+    @Override
+    public CompletionStage<List<HealthResult>> getResultAsync() {
+        return CompletableFuture.completedFuture(List.of(healthResult()));
+    }
+
+    private HealthResult healthResult() {
         HealthResult.Builder builder = HealthResult.builder(NAME)
             .status(shuttingDown ? HealthStatus.DOWN : HealthStatus.UP);
         manager.get().reportActiveTasks().ifPresent(n -> builder.details(Map.of("activeTasks", n)));
-        return Mono.just(builder.build());
+        return builder.build();
     }
 
     @Override
