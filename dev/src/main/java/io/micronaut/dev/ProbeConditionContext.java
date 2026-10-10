@@ -25,7 +25,6 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -43,7 +42,6 @@ import java.util.stream.Stream;
  * @author graemerocher
  * @since 5.3.0
  */
-@NullMarked
 final class ProbeConditionContext implements ConditionContext<AnnotationMetadataProvider> {
 
     private final ApplicationContext context;
