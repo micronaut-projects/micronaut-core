@@ -32,6 +32,8 @@ import reactor.core.publisher.FluxSink;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -58,6 +60,18 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
         this.webSocketSessionRepository = webSocketSessionRepository;
     }
 
+    /**
+     * Broadcast and wait until the message is written to the matching sessions.
+     *
+     * <p>Do not call it on an event loop thread, e.g. in a handler that runs on the event loop:
+     * the writes it waits for may have to run on that thread, which then blocks for good. Use
+     * {@link #broadcastAsync(Object, MediaType, Predicate)} there.</p>
+     *
+     * @param message   The message
+     * @param mediaType The media type of the message
+     * @param filter    The filter
+     * @param <T>       The message type
+     */
     @Override
     public <T> void broadcastSync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
         WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
@@ -75,28 +89,77 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
 
     @Override
     public <T> Publisher<T> broadcast(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
-        return Flux.create(emitter -> {
-            try {
-                WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
-                webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, ch -> {
-                    Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
-                    NettyWebSocketSession s = attr.get();
-                    return s != null && s.isOpen() && filter.test(s);
-                }).addListener(future -> {
-                    if (!future.isSuccess()) {
-                        Throwable cause = extractBroadcastFailure(future.cause());
-                        if (cause != null) {
-                            emitter.error(new WebSocketSessionException("Broadcast Failure: " + cause.getMessage(), cause));
-                            return;
-                        }
-                    }
-                    emitter.next(message);
-                    emitter.complete();
-                });
-            } catch (Throwable e) {
-                emitter.error(new WebSocketSessionException("Broadcast Failure: " + e.getMessage(), e));
+        return Flux.create(emitter -> broadcastFrame(message, mediaType, filter, error -> {
+            if (error != null) {
+                emitter.error(error);
+            } else {
+                emitter.next(message);
+                emitter.complete();
             }
-        }, FluxSink.OverflowStrategy.BUFFER);
+        }), FluxSink.OverflowStrategy.BUFFER);
+    }
+
+    @Override
+    public <T> CompletableFuture<T> broadcastAsync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
+        if (getClass() != NettyServerWebSocketBroadcaster.class) {
+            // a subclass may change broadcast: broadcast through it, as before
+            return WebSocketBroadcaster.super.broadcastAsync(message, mediaType, filter);
+        }
+        CompletableFuture<T> broadcast = new CompletableFuture<>();
+        broadcastFrame(message, mediaType, filter, error -> {
+            if (error != null) {
+                broadcast.completeExceptionally(error);
+            } else {
+                broadcast.complete(message);
+            }
+        });
+        return broadcast;
+    }
+
+    /**
+     * Write the message to the matching sessions.
+     *
+     * @param message   The message
+     * @param mediaType The media type of the message
+     * @param filter    The filter of the sessions
+     * @param done      Called with the failure of the broadcast, or {@code null} once it is written
+     */
+    private void broadcastFrame(Object message, MediaType mediaType, Predicate<WebSocketSession> filter, Consumer<@Nullable Throwable> done) {
+        try {
+            WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
+            // a filter that throws must not stop the group half way: it would not release the frame
+            Throwable[] filterFailure = new Throwable[1];
+            webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, ch -> {
+                Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
+                NettyWebSocketSession s = attr.get();
+                if (s == null || !s.isOpen()) {
+                    return false;
+                }
+                try {
+                    return filter.test(s);
+                } catch (Throwable e) {
+                    if (filterFailure[0] == null) {
+                        filterFailure[0] = e;
+                    }
+                    return false;
+                }
+            }).addListener(future -> {
+                if (filterFailure[0] != null) {
+                    done.accept(new WebSocketSessionException("Broadcast Failure: " + filterFailure[0].getMessage(), filterFailure[0]));
+                    return;
+                }
+                if (!future.isSuccess()) {
+                    Throwable cause = extractBroadcastFailure(future.cause());
+                    if (cause != null) {
+                        done.accept(new WebSocketSessionException("Broadcast Failure: " + cause.getMessage(), cause));
+                        return;
+                    }
+                }
+                done.accept(null);
+            });
+        } catch (Throwable e) {
+            done.accept(new WebSocketSessionException("Broadcast Failure: " + e.getMessage(), e));
+        }
     }
 
     /**
