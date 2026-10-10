@@ -609,6 +609,20 @@ public class RequestLifecycle {
             }
             declaringType = anyRoute.getDeclaringType();
         }
+        // the route of a WebSocket only matches an upgrade request, see ServerWebSocketProcessor:
+        // with no other route for the request, a plain request to its path is still answered for it
+        UriRouteMatch<Object, Object> webSocketRoute = findWebSocketRoute(httpRequest);
+        if (webSocketRoute != null) {
+            if (httpMethod == HttpMethod.GET || httpMethod == HttpMethod.HEAD) {
+                return onStatusError(
+                    httpRequest,
+                    new NotWebSocketRequestException(),
+                    webSocketRoute.getDeclaringType(),
+                    propagatedContext);
+            }
+            allowedMethods.add(HttpMethod.GET.name());
+            declaringType = webSocketRoute.getDeclaringType();
+        }
 
         if (CollectionUtils.isNotEmpty(acceptableContentTypes)) {
             if (LOG.isDebugEnabled()) {
@@ -648,6 +662,20 @@ public class RequestLifecycle {
             new NotFoundException(),
             declaringType,
             propagatedContext);
+    }
+
+    /**
+     * The route of a WebSocket at the path of a request that is not an upgrade request, which
+     * the route does not match.
+     *
+     * @param httpRequest The request
+     * @return The match of the route, or {@code null}
+     */
+    private @Nullable UriRouteMatch<Object, Object> findWebSocketRoute(HttpRequest<?> httpRequest) {
+        return routeExecutor.router.<Object, Object>findAny(httpRequest.getPath(), null)
+            .filter(match -> match.getRouteInfo().isWebSocketRoute())
+            .findFirst()
+            .orElse(null);
     }
 
     /**

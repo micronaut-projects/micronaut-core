@@ -21,6 +21,9 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.DefaultRouteBuilder;
@@ -30,9 +33,11 @@ import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * A processor that exposes WebSocket URIs via the router.
@@ -45,7 +50,10 @@ import java.util.Set;
 @Requires(classes = {ServerWebSocket.class, WebSocketBeanRegistry.class})
 public class ServerWebSocketProcessor extends DefaultRouteBuilder implements BeanDefinitionProcessor<ServerWebSocket> {
 
-    private Set<Class<?>> mappedWebSockets = new HashSet<>(4);
+    private static final String UPGRADE = "upgrade";
+    private static final String WEBSOCKET = "websocket";
+
+    private final Set<Class<?>> mappedWebSockets = new HashSet<>(4);
 
     /**
      * Default constructor.
@@ -64,18 +72,81 @@ public class ServerWebSocketProcessor extends DefaultRouteBuilder implements Bea
         if (mappedWebSockets.contains(beanType)) {
             return;
         }
+        ExecutableMethod<?, ?> target = routeTarget(beanDefinition);
+        if (target == null) {
+            return;
+        }
+        mappedWebSockets.add(beanType);
+        String uri = beanDefinition.stringValue(ServerWebSocket.class).orElse("/ws");
 
+        // a single route per WebSocket, which only an upgrade request matches: a plain HTTP
+        // request to the same path is left to the other routes
+        UriRoute route = GET(uri, target).where(UpgradeRequest.INSTANCE);
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Created WebSocket: {}", route);
+        }
+    }
+
+    /**
+     * The method the route of a WebSocket targets: the {@link OnOpen} method, which the upgrade
+     * request opens the WebSocket with, or else the {@link OnMessage} method. Its annotations are
+     * the annotations of the route, e.g. for filters and route conditions.
+     *
+     * @param beanDefinition The bean definition of the WebSocket
+     * @return The method, or {@code null} if the WebSocket has neither
+     */
+    private static @Nullable ExecutableMethod<?, ?> routeTarget(BeanDefinition<?> beanDefinition) {
+        ExecutableMethod<?, ?> onMessage = null;
         for (ExecutableMethod<?, ?> method : beanDefinition.getExecutableMethods()) {
-            if (method.isAnnotationPresent(OnMessage.class) || method.isAnnotationPresent(OnOpen.class)) {
-                mappedWebSockets.add(beanType);
-                String uri = beanDefinition.stringValue(ServerWebSocket.class).orElse("/ws");
+            if (method.isAnnotationPresent(OnOpen.class)) {
+                return method;
+            }
+            if (onMessage == null && method.isAnnotationPresent(OnMessage.class)) {
+                onMessage = method;
+            }
+        }
+        return onMessage;
+    }
 
-                UriRoute route = GET(uri, method);
+    /**
+     * Whether a request is a WebSocket upgrade request: its {@code Connection} header has the
+     * {@code Upgrade} token and its {@code Upgrade} header has the {@code websocket} token.
+     *
+     * @param request The request
+     * @return Whether the request asks to upgrade to a WebSocket
+     */
+    private static boolean isWebSocketUpgrade(HttpRequest<?> request) {
+        HttpHeaders headers = request.getHeaders();
+        return hasToken(headers, HttpHeaders.CONNECTION, UPGRADE)
+            && hasToken(headers, HttpHeaders.UPGRADE, WEBSOCKET);
+    }
 
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Created WebSocket: {}", route);
+    private static boolean hasToken(HttpHeaders headers, String name, String token) {
+        for (String value : headers.getAll(name)) {
+            for (String part : StringUtils.splitOmitEmptyStrings(value, ',')) {
+                if (part.trim().equalsIgnoreCase(token)) {
+                    return true;
                 }
             }
+        }
+        return false;
+    }
+
+    /**
+     * The condition of the route of a WebSocket.
+     */
+    private enum UpgradeRequest implements Predicate<HttpRequest<?>> {
+        INSTANCE;
+
+        @Override
+        public boolean test(HttpRequest<?> request) {
+            return isWebSocketUpgrade(request);
+        }
+
+        @Override
+        public String toString() {
+            return "WebSocket upgrade request";
         }
     }
 }
