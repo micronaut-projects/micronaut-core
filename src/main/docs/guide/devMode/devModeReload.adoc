@@ -31,7 +31,15 @@ The agent is `micronaut-dev` itself, launched with `-javaagent`, which the build
 
 A changed template, static file or message bundle does not restart anything: it reaches the beans that watch resources of that kind (see the next section).
 
-A changed configuration file restarts the application, retaining nothing.
+A changed configuration file is applied in place, without a new generation. The configuration is refreshed: the configuration beans are bound again, the refreshable beans are disposed of, and the configuration watches are told.
+
+The application restarts only when the refresh cannot apply the change:
+
+* a configuration watch answers `REQUIRES_RESTART`;
+* a singleton received a changed property through `@Value` or `@Property` rather than a configuration bean;
+* a definition's `@Requires` names a changed property, whose presence the change may have flipped.
+
+A bean retained across restarts that watched a changed prefix is not kept when that restart comes.
 
 == Retaining a bean
 
