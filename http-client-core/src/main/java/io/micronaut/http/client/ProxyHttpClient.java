@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
@@ -54,6 +55,20 @@ public interface ProxyHttpClient {
         } else {
             throw new UnsupportedOperationException("Not implemented");
         }
+    }
+
+    /**
+     * The client whose responses complete a {@link java.util.concurrent.CompletionStage} instead
+     * of being emitted by a publisher. The default implementation adapts the reactive
+     * {@code proxy} methods.
+     * Closing this view closes the backing client when it is closeable.
+     *
+     * @return An {@link AsyncProxyHttpClient} backed by this client
+     * @since 5.3.0
+     */
+    @Experimental
+    default AsyncProxyHttpClient toAsyncProxy() {
+        return new AsyncOverReactiveProxyHttpClient(this);
     }
 
     /**

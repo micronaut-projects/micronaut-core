@@ -58,10 +58,12 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
+import io.micronaut.http.client.AsyncProxyHttpClient;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawHttpClientSupport;
 import io.micronaut.http.client.RawRequestOptions;
+import io.micronaut.http.client.RawResponseFuture;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.exceptions.HttpClientErrorDecoder;
 import io.micronaut.http.client.exceptions.HttpClientException;
@@ -151,6 +153,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
@@ -194,6 +197,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     /**
      * Default logger, use {@link #log} where possible.
      */
+    private static final String OPTIONS_PARAMETER = "options";
     private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(NettyHttpClient.class);
     /**
      * Set on a connection once a request was sent on it, to tell reused connections from new ones.
@@ -620,7 +624,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
 
     @Override
     public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http.HttpRequest<?> request, ProxyRequestOptions options) {
-        Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(options, OPTIONS_PARAMETER);
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return Mono.defer(() -> {
@@ -628,13 +632,46 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             // released when it ends, unless they were sent: e.g. when the upstream refuses the
             // connection, a streaming server request can then discard the rest of its body
             MutableHttpRequest<?> httpRequest = toProxyRequest(request);
-            Mono<MutableHttpResponse<?>> response = proxy(propagatedContext, request, httpRequest, options);
+            Mono<MutableHttpResponse<?>> response = toMono(proxyFlow(propagatedContext, request, httpRequest, options), propagatedContext);
             return httpRequest instanceof RawHttpRequestWrapper<?> claimed ? response.doFinally(signal -> claimed.close()) : response;
         });
     }
 
-    private Mono<MutableHttpResponse<?>> proxy(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<?> httpRequest, ProxyRequestOptions options) {
-        return toMono(resolveRequestURI(request)
+    @Override
+    public AsyncProxyHttpClient toAsyncProxy() {
+        return new NettyAsyncProxyHttpClient(this);
+    }
+
+    /**
+     * The proxied exchange of {@link NettyAsyncProxyHttpClient}: {@link #proxy} without
+     * Reactor. The claimed body of a server request is released once the flow completes or is
+     * cancelled.
+     *
+     * @param request The request to proxy
+     * @param options The options
+     * @return The future of the response
+     */
+    CompletionStage<MutableHttpResponse<?>> proxyAsync(io.micronaut.http.HttpRequest<?> request, ProxyRequestOptions options) {
+        Objects.requireNonNull(options, OPTIONS_PARAMETER);
+        setupConversionService(request);
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        MutableHttpRequest<?> httpRequest;
+        try {
+            httpRequest = toProxyRequest(request);
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+        ExecutionFlow<MutableHttpResponse<?>> flow;
+        try {
+            flow = proxyFlow(propagatedContext, request, httpRequest, options);
+        } catch (RuntimeException e) {
+            flow = ExecutionFlow.error(e);
+        }
+        return RawResponseFuture.ofMutable(flow, httpRequest instanceof RawHttpRequestWrapper<?> claimed ? claimed::close : null, propagatedContext);
+    }
+
+    private ExecutionFlow<MutableHttpResponse<?>> proxyFlow(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<?> httpRequest, ProxyRequestOptions options) {
+        return resolveRequestURI(request)
             .flatMap(target -> {
                 if (!options.isRetainHostHeader()) {
                     httpRequest.headers(headers -> headers.remove(HttpHeaderNames.HOST));
@@ -655,7 +692,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
                     }
                 );
             })
-            .map(HttpResponse::toMutableResponse), propagatedContext);
+            .map(HttpResponse::toMutableResponse);
     }
 
     /**
@@ -773,7 +810,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
 
     @Override
     public Publisher<? extends HttpResponse<?>> exchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread, RawRequestOptions options) {
-        Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(options, OPTIONS_PARAMETER);
         return rawExchange(request, requestBody, blockedThread, options);
     }
 

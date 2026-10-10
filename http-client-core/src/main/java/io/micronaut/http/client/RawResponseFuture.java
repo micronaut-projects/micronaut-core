@@ -17,8 +17,10 @@ package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import org.jspecify.annotations.Nullable;
@@ -27,6 +29,8 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -79,6 +83,65 @@ public final class RawResponseFuture extends CompletableFuture<HttpResponse<?>> 
             future.deliver(response, error);
         });
         return future;
+    }
+
+    /**
+     * The future of a proxied exchange flow, see {@link AsyncProxyHttpClient}. Cancelling the
+     * future cancels the flow. The given release runs once, when the flow completes or the future
+     * is cancelled, e.g. to release the claimed body of the proxied request.
+     *
+     * The future completes within the given context, as the publisher of a reactive proxy
+     * client does, so that the stages that depend on it see the context of the caller.
+     *
+     * @param flow    The exchange flow
+     * @param release Releases what the exchange holds, or {@code null}
+     * @param context The context propagated from the caller
+     * @return The future
+     * @since 5.3.0
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static CompletionStage<MutableHttpResponse<?>> ofMutable(ExecutionFlow<? extends MutableHttpResponse<?>> flow,
+                                                                    @Nullable Runnable release,
+                                                                    PropagatedContext context) {
+        RawResponseFuture future = new RawResponseFuture();
+        Runnable releaseOnce = release == null ? () -> { } : new Runnable() {
+            private final AtomicBoolean released = new AtomicBoolean();
+
+            @Override
+            public void run() {
+                if (released.compareAndSet(false, true)) {
+                    release.run();
+                }
+            }
+        };
+        future.onCancel.set(() -> {
+            flow.cancel();
+            releaseOnce.run();
+        });
+        flow.onComplete((response, error) -> {
+            releaseOnce.run();
+            if (context == PropagatedContext.empty()) {
+                future.deliver(response, error);
+            } else {
+                context.propagate(() -> future.deliver(response, error));
+            }
+        });
+        // it only completes with the mutable responses of the flow
+        return (CompletionStage) future;
+    }
+
+    /**
+     * The future of a proxied exchange publisher, e.g. of a {@link ProxyHttpClient}. Cancelling
+     * the future cancels the subscription.
+     *
+     * @param publisher The single response publisher
+     * @return The future
+     * @since 5.3.0
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static CompletionStage<MutableHttpResponse<?>> ofMutable(Publisher<? extends MutableHttpResponse<?>> publisher) {
+        // it only completes with the mutable responses of the publisher
+        return (CompletionStage) of(publisher);
     }
 
     /**
