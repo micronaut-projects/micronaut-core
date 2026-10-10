@@ -272,7 +272,7 @@ class DevRuntimeTest {
             ClassLoader loader = first.getClassLoader();
             assertEquals("<p>live</p>", read(loader, "views/index.html"));
             List<ResourceChange> changes = new CopyOnWriteArrayList<>();
-            ((DefaultBeanContext) first).watchResources(ResourceSelector.of(ResourceKind.VIEWS, "**/*.html"), changes::add);
+            ((DefaultBeanContext) first).resources(ResourceKind.VIEWS).include("**/*.html").watch(changes::add);
             changes.clear();
 
             // the template is deleted: the watch is told, and the build's stale copy is not served in its place
