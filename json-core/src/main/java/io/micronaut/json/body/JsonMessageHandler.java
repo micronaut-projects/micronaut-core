@@ -15,6 +15,7 @@
  */
 package io.micronaut.json.body;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Order;
@@ -120,6 +121,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Chunk
      * @since 5.3.0
      */
     @Inject
+    @Internal
     public JsonMessageHandler(JsonMapper jsonMapper, @Nullable ForeignBufferReleaser bufferReleaser) {
         this(jsonMapper, null, jsonMapper, bufferReleaser);
     }

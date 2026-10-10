@@ -20,6 +20,7 @@ import io.micronaut.http.client.internal.ElementsStages;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -67,13 +68,13 @@ import java.util.concurrent.CompletableFuture;
 public interface AsyncStreamingHttpClient extends AsyncHttpClient {
 
     /**
-     * Read response pieces without copying the transport buffers. The caller owns every
+     * Read response pieces as caller-owned buffers. The caller owns every
      * returned {@link ReadBuffer} and must close it, even when processing fails. Closing the
      * elements releases unread pieces, not pieces already handed to the caller.
      *
-     * <p>This optional operation is supported by the native Netty and JDK clients. The default
-     * implementation fails with {@link UnsupportedOperationException}. Unlike
-     * {@link #exchangeStream(HttpRequest, Argument)}, elements may be reference counted.</p>
+     * <p>The native Netty and JDK clients transfer their transport buffers without copying.
+     * The default implementation copies the pieces of {@link #exchangeStream(HttpRequest, Argument)}.
+     * Returned elements may be reference counted.</p>
      *
      * @param request The request
      * @param errorType The error body type
@@ -82,7 +83,12 @@ public interface AsyncStreamingHttpClient extends AsyncHttpClient {
      * @since 5.3.0
      */
     default <I> CompletionStage<HttpResponse<BodyElements<ReadBuffer>>> exchangeReadBuffers(HttpRequest<I> request, Argument<?> errorType) {
-        return CompletableFuture.failedStage(new UnsupportedOperationException("This client does not expose owned response buffers"));
+        return ElementsStages.mapResponse(exchangeStream(request, errorType), response -> {
+            BodyElements<ByteBuffer<?>> source = Objects.requireNonNull(response.body(), "The response has no elements");
+            BodyElements<ReadBuffer> owned = MappedBodyElements.map(source,
+                buffer -> ReadBufferFactory.getJdkFactory().adapt(buffer.toByteArray()));
+            return response.toMutableResponse().body(owned);
+        });
     }
 
     /**
