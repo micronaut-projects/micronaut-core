@@ -21,8 +21,11 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.CorePublisher;
+import reactor.core.scheduler.Schedulers;
 import reactor.core.CoreSubscriber;
 import reactor.core.publisher.Operators;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 
 import java.util.function.Consumer;
@@ -31,16 +34,61 @@ import java.util.function.Supplier;
 /**
  * Interop with Reactor sources, the only place the publishers of bodies refer to Reactor: a
  * Reactor source is subscribed to with the Reactor context of the downstream subscriber, and with
- * a discard hook, so that it releases the items it drops when it is cancelled. Any other source
- * is subscribed to directly, without a wrapper. Reactor operators are not used.
+ * a discard hook, so that it releases the items it drops when it is cancelled. Delegating sources
+ * also receive that context when a hook is needed, because they may hide a Reactor source.
+ * Without Reactor, sources are subscribed to directly. Declared Reactor argument types are
+ * adapted here without requiring Reactor converter beans.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
 public final class ReactorInterop {
+    private static final boolean REACTOR_PRESENT = reactorType() != null;
 
     private ReactorInterop() {
+    }
+
+    /**
+     * Preserve Reactor's non-blocking-thread rules without requiring Reactor for native bodies.
+     * This includes predicates registered with Reactor, not just its thread marker interface.
+     *
+     * @return Whether Reactor forbids blocking on the current thread
+     */
+    public static boolean isInNonBlockingThread() {
+        return REACTOR_PRESENT && Schedulers.isInNonBlockingThread();
+    }
+
+    /**
+     * Adapt a native publisher to a declared Reactor argument without requiring converter beans.
+     *
+     * @param source The source
+     * @param type The declared argument type
+     * @param <T> The element type
+     * @return The Reactor publisher, or the source for other argument types
+     * @since 5.3.0
+     */
+    public static <T> Publisher<T> adaptPublisher(Publisher<T> source, Class<?> type) {
+        if (REACTOR_PRESENT && !type.isInstance(source)) {
+            if (type == Flux.class) {
+                return Flux.from(source);
+            }
+            if (type == Mono.class) {
+                return Mono.from(source);
+            }
+        }
+        return source;
+    }
+
+    private static @Nullable Class<?> reactorType() {
+        try {
+            // Unlike ClassUtils.isPresent, this class literal does not use Class.forName
+            // or require reflection metadata in a native image. Catch missing linkage so
+            // native Reactive Streams publishers can also be used without Reactor.
+            return CorePublisher.class;
+        } catch (NoClassDefFoundError e) {
+            return null;
+        }
     }
 
     /**
@@ -57,7 +105,11 @@ public final class ReactorInterop {
                                      Subscriber<? super T> subscriber,
                                      @Nullable Supplier<? extends @Nullable Subscriber<?>> downstream,
                                      @Nullable Consumer<Object> discard) {
-        if (source instanceof CorePublisher<?>) {
+        // Resolve Reactor types only when the optional library is available. A native
+        // publisher used by an async form decoder must also work without Reactor.
+        // A delegating native publisher may subscribe to a Reactor source internally. Pass the
+        // subscriber context/discard hook across that boundary, not just direct CorePublishers.
+        if (REACTOR_PRESENT && (source instanceof CorePublisher<?> || downstream != null || discard != null)) {
             source.subscribe(new ContextSubscriber<>(subscriber, downstream, discard));
         } else {
             source.subscribe(subscriber);
