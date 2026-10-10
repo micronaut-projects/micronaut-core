@@ -187,6 +187,33 @@ snippet::io.micronaut.docs.aop.lifecycle.pertarget.AuditInterceptorSpec[tags="te
 <2> The refresh replaces the target
 <3> The new target is intercepted by an instance of its own
 
+[discrete]
+==== Knowing the Target
+
+A non-singleton interceptor created for one target can inject api:context.InterceptionTarget[] to learn which bean
+that target is. Its `definition()` is the definition of the intercepted bean, carrying the bean's qualifier, so two
+targets of one class, such as two beans of one ann:context.annotation.EachBean[], are told apart:
+
+snippet::io.micronaut.docs.aop.lifecycle.pertarget.labelled.Channel[tags="channel", indent=0, title="Two targets of one class"]
+
+<1> One `Channel` for each configured channel, each with the name of its configuration as qualifier
+
+snippet::io.micronaut.docs.aop.lifecycle.pertarget.labelled.LabelInterceptor[tags="imports,interceptor", indent=0, title="An interceptor that knows its target"]
+
+<1> The bean this instance is created for, injected like any other dependency
+<2> The qualifier of that bean, `@Named("sms")` for the `sms` channel
+
+snippet::io.micronaut.docs.aop.lifecycle.pertarget.labelled.LabelInterceptorTest[tags="test", indent=0, title="Each target is labelled with its own qualifier"]
+
+The target is known whenever the container creates the interceptor for a bean: while the bean itself is created, to
+intercept its construction or lifecycle, and when a proxy resolves the interceptors of a target on its first call. It
+is known only to the interceptor's own injection points, not to the beans the interceptor depends on. It is not known
+to a singleton or custom-scoped interceptor, which is shared, to an interceptor obtained by a plain lookup, or to the
+interceptors a proxy creates for a target the context holds no registration for; an injection point declared
+`@Nullable` receives `null` in those cases and any other fails with a `NoSuchBeanException`. Without
+`lazyInterceptorsPerTarget` the interceptors of a proxy are injected into the proxy as ordinary dependencies, and do not
+know the target either.
+
 For a scoped bean whose binding annotation carries no ann:aop.Around[] of its own, declare the member together with
 the settings of the scope's proxy, `@Around(proxyTarget = true, lazy = true, lazyInterceptorsPerTarget = true)`: an
 `@Around` declared on the bean replaces the one its scope contributes.
