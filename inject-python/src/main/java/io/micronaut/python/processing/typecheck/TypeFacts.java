@@ -83,6 +83,7 @@ public final class TypeFacts {
     private final Map<String, Optional<AnnotationDescription>> annotations = new HashMap<>();
     private final Map<String, Optional<TypeDescription>> types = new HashMap<>();
     private final Map<String, Boolean> assignable = new HashMap<>();
+    private final Map<String, Boolean> interfaces = new HashMap<>();
 
     /**
      * @param visitorContext The context resolving the Java and Python classes of the compilation
@@ -130,6 +131,23 @@ public final class TypeFacts {
         List<String> arguments = List.copyOf(typeArguments);
         String key = arguments.isEmpty() ? qualifiedName : qualifiedName + "<" + String.join(",", arguments) + ">";
         return types.computeIfAbsent(key, name -> Optional.ofNullable(complete(() -> loadType(qualifiedName, arguments)))).orElse(null);
+    }
+
+    /**
+     * Whether a type is an interface: the one fact the planner needs of a class of the compilation,
+     * answered without describing every member of the type.
+     *
+     * @param qualifiedName The type
+     * @return Whether it is an interface; {@code false} for an unknown or incomplete type
+     */
+    public boolean isInterface(String qualifiedName) {
+        return interfaces.computeIfAbsent(qualifiedName, name -> {
+            Boolean result = complete(() -> {
+                ClassElement element = resolveClass(name);
+                return element != null && element.isInterface();
+            });
+            return result != null && result;
+        });
     }
 
     /**

@@ -532,6 +532,15 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     }
 
     private void processAnnotation(TypeElement element, PythonApplicationValues values) {
+        long started = PipelineTimings.start();
+        try {
+            processAnnotationTimed(element, values);
+        } finally {
+            PipelineTimings.stop(PipelineTimings.PROCESSOR, started);
+        }
+    }
+
+    private void processAnnotationTimed(TypeElement element, PythonApplicationValues values) {
         writtenVfsPaths.clear();
         pendingBytecode.clear();
         try {
@@ -1163,6 +1172,15 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
      * compiles the bytecode of the sources that need it.
      */
     private void compilePendingBytecode(PythonProcessingEnvironment processingEnvironment, ClassElement originatingElement) {
+        long started = PipelineTimings.start();
+        try {
+            compilePendingBytecodeTimed(processingEnvironment, originatingElement);
+        } finally {
+            PipelineTimings.stop(PipelineTimings.BYTECODE, started);
+        }
+    }
+
+    private void compilePendingBytecodeTimed(PythonProcessingEnvironment processingEnvironment, ClassElement originatingElement) {
         StaticCompilationPlan plan = processingEnvironment.staticCompilationPlan().get();
         for (PendingBytecode pending : pendingBytecode) {
             if (plan != null && !plan.bodies().isEmpty()) {

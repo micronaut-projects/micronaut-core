@@ -339,6 +339,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     @Override
     public void finish(VisitorContext visitorContext) {
+        long started = PipelineTimings.start();
+        try {
+            finishTimed(visitorContext);
+        } finally {
+            PipelineTimings.stop(PipelineTimings.STUBS, started);
+        }
+    }
+
+    private void finishTimed(VisitorContext visitorContext) {
         if (reflectionGate != null) {
             reflectionGate.report(visitorContext);
         }
@@ -475,6 +484,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
+        long started = PipelineTimings.start();
+        try {
+            visitClassTimed(element, context);
+        } finally {
+            PipelineTimings.stop(PipelineTimings.STUBS, started);
+        }
+    }
+
+    private void visitClassTimed(ClassElement element, VisitorContext context) {
         if (context instanceof PythonVisitorContext pythonVisitorContext) {
 
             if (element instanceof PythonScriptElement scriptElement) {
