@@ -104,7 +104,7 @@ import java.util.stream.Stream;
  * that holds no class, such as a Python module whose generated classes stayed the same, is first offered to
  * the running context's {@link io.micronaut.context.reload.InPlaceResourceReloader}s, which patch it into the
  * running application without a restart. A configuration file
- * change restarts as well, retaining nothing, until the configuration refresh lands. A failed
+ * change is refreshed in place, and restarts only when the refresh cannot apply it. A failed
  * compilation leaves the running generation as it is and is reported until the next success.</p>
  *
  * @author graemerocher
