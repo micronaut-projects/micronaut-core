@@ -134,7 +134,8 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
          *     <li>Tasks submitted on one thread will not be reordered (local order). This is
          *     similar to {@code EventLoopFlow} semantics.</li>
          *     <li>Reentrant calls (calls to {@code submit} from inside a submitted task) will
-         *     run the task immediately (required by servlet).</li>
+         *     run the task immediately (required by servlet), except for the bytes, the
+         *     completion and the failure of the upstream, see {@link #submitUpstream}.</li>
          *     <li>There is no executor to run tasks. This ensures good locality when submissions
          *     have low contention (i.e. tasks are usually run immediately on the submitting
          *     thread).</li>
@@ -143,6 +144,12 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
          * @param task The task to run
          */
         private void submit(Runnable task) {
+            if (lock.isHeldByCurrentThread()) {
+                // reentrant: run it now, not the task at the head of the queue, which may be
+                // upstream data deferred by submitUpstream
+                task.run();
+                return;
+            }
             workQueue.add(task);
 
             while (!workQueue.isEmpty()) {
@@ -157,6 +164,24 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
                 } finally {
                     lock.unlock();
                 }
+            }
+        }
+
+        /**
+         * Run a task that passes on the bytes, the completion or the failure of the upstream. A
+         * reentrant call, e.g. from an upstream that emits the next bytes on the thread that
+         * asks for them while a subscriber is given the previous bytes, is run once the running
+         * task completed: run now, it would reach the subscribers that were not given the
+         * previous bytes yet before those, and complete them before they got them.
+         *
+         * @param task The task to run
+         */
+        private void submitUpstream(Runnable task) {
+            if (lock.isHeldByCurrentThread()) {
+                // the outermost submit on this thread runs it once the running task completed
+                workQueue.add(task);
+            } else {
+                submit(task);
             }
         }
 
@@ -176,32 +201,32 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
 
         @Override
         public void add(ReadBuffer rb) {
-            submit(() -> super.add(rb));
+            submitUpstream(() -> super.add(rb));
         }
 
         @Override
         public void addAndComplete(ReadBuffer rb) {
-            submit(() -> super.addAndComplete(rb));
+            submitUpstream(() -> super.addAndComplete(rb));
         }
 
         @Override
         public void error(Throwable e) {
-            submit(() -> super.error(e));
+            submitUpstream(() -> super.error(e));
         }
 
         @Override
         public void complete() {
-            submit(super::complete);
+            submitUpstream(super::complete);
         }
 
         @Override
         public void complete(HttpHeaders trailers) {
-            submit(() -> super.complete(trailers));
+            submitUpstream(() -> super.complete(trailers));
         }
 
         @Override
         protected void submitDeferred(Runnable task) {
-            submit(task);
+            submitUpstream(task);
         }
     }
 }
