@@ -50,8 +50,8 @@ class ThreadBoundPropagationTest {
         PropagatedContext first = PropagatedContext.empty().plus(new Element("first"));
         PropagatedContext second = PropagatedContext.empty().plus(new Element("second"));
 
-        try (PropagatedContext.Scope ignored = ThreadBoundPropagation.bind(first)) {
-            try (PropagatedContext.Scope ignored2 = ThreadBoundPropagation.bind(second)) {
+        try (PropagatedContext.Scope _ = ThreadBoundPropagation.bind(first)) {
+            try (PropagatedContext.Scope _ = ThreadBoundPropagation.bind(second)) {
                 assertSame(second, PropagatedContext.get());
                 assertEquals("second", THREAD_STATE.get());
             }
@@ -70,7 +70,7 @@ class ThreadBoundPropagationTest {
         PropagatedContext bound = PropagatedContext.empty().plus(new Element("bound"));
 
         outer.propagate(() -> {
-            try (PropagatedContext.Scope ignored = ThreadBoundPropagation.bind(bound)) {
+            try (PropagatedContext.Scope _ = ThreadBoundPropagation.bind(bound)) {
                 assertSame(bound, PropagatedContext.get());
                 assertEquals("bound", THREAD_STATE.get());
             }
@@ -87,7 +87,7 @@ class ThreadBoundPropagationTest {
         PropagatedContext bound = PropagatedContext.empty().plus(new Element("bound"));
         PropagatedContext nested = bound.plus(new Element("nested"));
 
-        try (PropagatedContext.Scope ignored = ThreadBoundPropagation.bind(bound)) {
+        try (PropagatedContext.Scope _ = ThreadBoundPropagation.bind(bound)) {
             nested.propagate(() -> {
                 assertSame(nested, PropagatedContext.get());
                 assertEquals("nested", THREAD_STATE.get());
@@ -109,7 +109,7 @@ class ThreadBoundPropagationTest {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
             Runnable check;
-            try (PropagatedContext.Scope ignored = ThreadBoundPropagation.bind(bound)) {
+            try (PropagatedContext.Scope _ = ThreadBoundPropagation.bind(bound)) {
                 check = PropagatedContext.wrapCurrent(() -> {
                     assertSame(bound, PropagatedContext.get());
                     assertEquals("bound", THREAD_STATE.get());
@@ -129,7 +129,7 @@ class ThreadBoundPropagationTest {
         PropagatedContextConfiguration.set(mode);
         PropagatedContext bound = PropagatedContext.empty().plus(new ScopedElement("value"));
 
-        try (PropagatedContext.Scope ignored = ThreadBoundPropagation.bind(bound)) {
+        try (PropagatedContext.Scope _ = ThreadBoundPropagation.bind(bound)) {
             assertSame(bound, PropagatedContext.get());
             if (mode == PropagatedContextConfiguration.Mode.SCOPED_VALUE) {
                 // A scoped value can only be bound by a callback
