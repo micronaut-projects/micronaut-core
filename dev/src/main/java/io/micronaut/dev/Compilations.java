@@ -23,7 +23,6 @@ import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
 import io.micronaut.dev.manifest.DevManifest;
-import org.jspecify.annotations.NullMarked;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +40,6 @@ import java.util.Set;
  * languages it compiles jointly, and which languages the runtime compiles at all.
  */
 @Internal
-@NullMarked
 final class Compilations {
 
     // the runtime's logger: what is logged here is logged as the runtime's

@@ -15,7 +15,6 @@
  */
 package io.micronaut.dev;
 
-import org.jspecify.annotations.NullMarked;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,7 +34,6 @@ import java.util.Set;
  * @author graemerocher
  * @since 5.3.0
  */
-@NullMarked
 record SourceChanges(Set<Path> changed, Set<Path> deleted) {
     static final SourceChanges NONE = new SourceChanges(Set.of(), Set.of());
 
