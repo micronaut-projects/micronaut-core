@@ -34,6 +34,8 @@ dependencies {
     compileOnly(libs.managed.methvin.directoryWatcher)
     // the threads of Reactor's schedulers get the parent tier's loader when Reactor is on the classpath
     compileOnly(libs.managed.reactor)
+    // Logback, when it is the application's SLF4J provider, is configured from the application's resources
+    compileOnly(libs.logback.classic)
 
     testImplementation(projects.micronautInjectJava)
     testImplementation(projects.micronautHttp)
@@ -129,6 +131,8 @@ noReflection {
     // the fast path redefines method bodies through the agent
     allowIn("io.micronaut.dev.DevRuntime", "INSTRUMENTATION")
     allowIn("io.micronaut.dev.DevWatchService", "CLASS_LOADING")
+    // Logback is configured from the application's resources when it is present
+    allowIn("io.micronaut.dev.DevLogging", "CLASS_LOADING")
     // the route-declaring classes include the superclasses and interfaces of a route bean
     allowIn("io.micronaut.dev.http.DevRouter", "INTERFACES")
     // a class redefined in place is checked for being, or declaring, located routes, whose tables the router keeps per instance

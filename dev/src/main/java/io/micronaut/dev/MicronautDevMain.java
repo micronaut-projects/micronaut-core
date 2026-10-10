@@ -147,6 +147,8 @@ public class MicronautDevMain {
      * @return The runtime, to close when done
      */
     public DevRuntime launch(DevManifest manifest, String[] args) {
+        // before the launcher logs anything: Logback, in the parent tier, does not see the application's logback.xml
+        DevLogging.beforeLaunch(manifest, parentClassLoader());
         Map<SourceKind, SourceCompiler> compilers = createCompilers(manifest);
         // a clean checkout has no class output yet: compile before the loader snapshots the roots
         DevRuntime.compileMissingOutputs(manifest, compilers);

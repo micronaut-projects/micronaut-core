@@ -21,14 +21,19 @@ import ch.qos.logback.classic.spi.Configurator;
 import ch.qos.logback.classic.util.ContextInitializer;
 import ch.qos.logback.classic.util.DefaultJoranConfigurator;
 import ch.qos.logback.core.joran.spi.JoranException;
+import ch.qos.logback.core.status.ErrorStatus;
 import ch.qos.logback.core.status.InfoStatus;
+import ch.qos.logback.core.status.StatusUtil;
 import ch.qos.logback.core.util.Loader;
+import ch.qos.logback.core.util.StatusPrinter;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.logging.LoggingSystemException;
 import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.util.List;
 import java.util.ServiceConfigurationError;
@@ -94,6 +99,146 @@ public final class LogbackUtils {
         // ContextInitializer.autoConfig(), which Logback's startup calls, uses this class loader
         configure(classLoader, Loader.getClassLoaderOfClass(Configurator.class), new File(ClassicConstants.AUTOCONFIG_FILE),
             context, configurationFile, loggerConfig);
+    }
+
+    /**
+     * Configures a Logger Context as {@link #configure(ClassLoader, LoggerContext, String, String)} does, except in
+     * development mode, where the application's resources are on a class loader of their own: the given one, whose
+     * parent loaded Logback. Logback's own lookup, which searches the loader that loaded Logback, does not see them,
+     * so {@link #configureFromResources(LoggerContext, ClassLoader, File)} looks them up in the same order.
+     *
+     * @param classLoader       The class loader to look up a location set in Micronaut configuration with
+     * @param resources         The loader of the application's resources in development mode, otherwise null
+     * @param context           The Logger Context
+     * @param configurationFile The {@code logback.configurationFile} property of the Micronaut configuration, if any
+     * @param loggerConfig      The {@code logger.config} property of the Micronaut configuration, if any
+     */
+    static void configure(ClassLoader classLoader,
+                          @Nullable ClassLoader resources,
+                          LoggerContext context,
+                          @Nullable String configurationFile,
+                          @Nullable String loggerConfig) {
+        if (resources == null) {
+            configure(classLoader, context, configurationFile, loggerConfig);
+            return;
+        }
+        String location = micronautOnlyLocation(configurationFile, loggerConfig);
+        if (location != null) {
+            configureByResource(context, location, findResource(resources, location));
+            return;
+        }
+        try {
+            configureFromResources(context, resources, new File(ClassicConstants.AUTOCONFIG_FILE));
+        } catch (Exception | ServiceConfigurationError e) {
+            throw new LoggingSystemException("Error while refreshing Logback", e);
+        }
+    }
+
+    /**
+     * Resets the Logger Context and configures it from the application's resources, for development mode, whose
+     * launcher keeps Logback in a parent tier that does not see them: the {@link Configurator} services of the
+     * resources' loader, the {@code logback.configurationFile} JVM system property, {@code logback-test.xml} or
+     * {@code logback.xml} among the resources, the {@code logback.xml} file of the working directory, then the basic
+     * console configuration. Errors are reported as Logback's startup reports them: printed, and not thrown.
+     *
+     * @param context   The Logger Context
+     * @param resources The loader of the application's resources
+     * @since 5.3.0
+     */
+    @Internal
+    public static void reconfigure(LoggerContext context, ClassLoader resources) {
+        long start = System.currentTimeMillis();
+        context.reset();
+        try {
+            configureFromResources(context, resources, new File(ClassicConstants.AUTOCONFIG_FILE));
+        } catch (Exception | ServiceConfigurationError e) {
+            context.getStatusManager().add(new ErrorStatus("Error while configuring Logback from " + resources, context, e));
+        }
+        if (!StatusUtil.contextHasStatusListener(context)) {
+            StatusPrinter.printInCaseOfErrorsOrWarnings(context, start);
+        }
+    }
+
+    /**
+     * The configuration file that {@link #reconfigure(LoggerContext, ClassLoader)} would configure a Logger Context
+     * from, for development mode to tell whether the one it has moved.
+     *
+     * @param resources The loader of the application's resources, or the one that loaded Logback
+     * @return The file, or null when a {@link Configurator} service configures Logback or no file exists
+     * @since 5.3.0
+     */
+    @Internal
+    public static @Nullable URL findConfiguration(ClassLoader resources) {
+        try {
+            return hasConfiguratorService(resources) ? null : findConfigurationFile(resources, new File(ClassicConstants.AUTOCONFIG_FILE));
+        } catch (MalformedURLException | ServiceConfigurationError e) {
+            return null;
+        }
+    }
+
+    /**
+     * Logback's lookup at startup, with the default files and a classpath location of the
+     * {@code logback.configurationFile} JVM system property looked up among the given resources, and the
+     * {@code logback.xml} file of the working directory after them, as {@link #findWorkingDirectoryFile} has it.
+     *
+     * @param context              The Logger Context
+     * @param resources            The loader of the application's resources
+     * @param workingDirectoryFile The {@code logback.xml} file of the working directory
+     * @throws JoranException if Logback's lookup fails
+     * @throws MalformedURLException if the working directory file cannot be converted to a URL
+     */
+    static void configureFromResources(LoggerContext context, ClassLoader resources, File workingDirectoryFile)
+        throws JoranException, MalformedURLException {
+        if (hasConfiguratorService(resources)) {
+            new ContextInitializer(context).autoConfig(resources);
+            return;
+        }
+        URL url = findConfigurationFile(resources, workingDirectoryFile);
+        if (url == null) {
+            // the basic console configuration, which Logback's startup reports as it does
+            new ContextInitializer(context).autoConfig(resources);
+            return;
+        }
+        context.getStatusManager().add(new InfoStatus("Found Logback configuration [" + url + "] among the application's resources", context));
+        try {
+            configureByUrl(context, url);
+        } catch (JoranException e) {
+            // as at Logback's startup, the error is a status of the context, printed rather than thrown
+            context.getStatusManager().add(new ErrorStatus("Failed to configure Logback from [" + url + "]", context, e));
+        }
+    }
+
+    /**
+     * @param resources            The loader of the application's resources
+     * @param workingDirectoryFile The {@code logback.xml} file of the working directory
+     * @return The configuration file Logback's startup would find, were the resources on its loader, if any
+     * @throws MalformedURLException if the working directory file cannot be converted to a URL
+     */
+    private static @Nullable URL findConfigurationFile(ClassLoader resources, File workingDirectoryFile) throws MalformedURLException {
+        String property = System.getProperty(ClassicConstants.CONFIG_FILE_PROPERTY);
+        if (property != null) {
+            // as Logback resolves it: a URL, then a classpath resource, then a file; otherwise the default files
+            try {
+                return URI.create(property).toURL();
+            } catch (IllegalArgumentException | MalformedURLException e) {
+                URL resource = resources.getResource(property);
+                if (resource != null) {
+                    return resource;
+                }
+                File file = new File(property);
+                if (file.isFile()) {
+                    return file.toURI().toURL();
+                }
+            }
+        }
+        URL url = resources.getResource(ClassicConstants.TEST_AUTOCONFIG_FILE);
+        if (url == null) {
+            url = resources.getResource(ClassicConstants.AUTOCONFIG_FILE);
+        }
+        if (url == null && workingDirectoryFile.isFile()) {
+            url = workingDirectoryFile.toURI().toURL();
+        }
+        return url;
     }
 
     /**
