@@ -64,7 +64,7 @@ import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawHttpClientSupport;
 import io.micronaut.http.client.internal.RawHttpRequestWrapper;
 import io.micronaut.http.client.RawRequestOptions;
-import io.micronaut.http.client.RawResponseFuture;
+import io.micronaut.http.client.internal.RawResponseFuture;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.exceptions.HttpClientErrorDecoder;
 import io.micronaut.http.client.exceptions.HttpClientException;
@@ -89,12 +89,13 @@ import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
-import io.micronaut.http.netty.body.NettyJsonHandler;
-import io.micronaut.http.netty.body.NettyJsonStreamHandler;
+import io.micronaut.http.netty.body.NettyForeignBufferReleaser;
 import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.json.body.JsonMessageHandler;
+import io.micronaut.json.body.JsonStreamMessageHandler;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
 import io.micronaut.json.codec.JsonStreamMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -1423,9 +1424,9 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             new WritableBodyWriter(applicationConfiguration)
         );
         JsonMapper mapper = JsonMapper.createDefault();
-        registry.add(MediaType.APPLICATION_JSON_TYPE, new NettyJsonHandler<>(mapper));
+        registry.add(MediaType.APPLICATION_JSON_TYPE, new JsonMessageHandler<>(mapper, NettyForeignBufferReleaser.INSTANCE));
         registry.add(MediaType.APPLICATION_JSON_TYPE, new CharSequenceBodyWriter(StandardCharsets.UTF_8));
-        registry.add(MediaType.APPLICATION_JSON_STREAM_TYPE, new NettyJsonStreamHandler<>(mapper));
+        registry.add(MediaType.APPLICATION_JSON_STREAM_TYPE, new JsonStreamMessageHandler<>(mapper, NettyForeignBufferReleaser.INSTANCE));
         return registry;
     }
 

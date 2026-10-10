@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== Buffered JSON stream responses require a list type (5.3)
+
+The JDK HTTP client now uses the shared JSON stream message body reader. For an `application/x-json-stream` response, `retrieve(request, Book.class)` no longer returns only the first JSON value. Retrieve `Argument.listOf(Book.class)` to read the complete stream, or use `jsonStream(request, Book.class)` to consume individual values as they arrive.
+
 === Refreshing the Logback configuration follows Logback's own lookup (5.3)
 
 When any `logger.*` property is set, the Micronaut framework resets Logback and configures it again. Previously that refresh used the first `Configurator` service regardless of its rank and of the status it returned, and otherwise the file set with `logback.configurationFile` or `logger.config`, or `logback.xml`. Now, unless a Logback XML configuration file is set in Micronaut configuration, the refresh configures Logback the same way Logback configures itself at startup:

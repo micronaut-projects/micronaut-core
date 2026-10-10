@@ -10,9 +10,9 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
 import io.micronaut.http.body.InternalByteBody;
-import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.PieceReaderBenchmarkSupport.Book;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.json.body.JsonMessageHandler;
 import io.micronaut.runtime.ApplicationConfiguration;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -61,7 +61,7 @@ public class StreamedResponseBenchmark {
     @Setup
     public void setup() {
         ContextlessMessageBodyHandlerRegistry registry = new ContextlessMessageBodyHandlerRegistry(new ApplicationConfiguration(), NettyByteBufferFactory.DEFAULT);
-        registry.add(MediaType.APPLICATION_JSON_TYPE, new NettyJsonHandler<>(JsonMapper.createDefault()));
+        registry.add(MediaType.APPLICATION_JSON_TYPE, new JsonMessageHandler<>(JsonMapper.createDefault()));
         lifecycle = new ResponseLifecycle(null, registry, ConversionService.SHARED, ByteBodyFactory.createDefault(NettyByteBufferFactory.DEFAULT)) {
             @Override
             protected Executor ioExecutor() {

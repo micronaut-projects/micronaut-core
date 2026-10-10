@@ -1,4 +1,4 @@
-package io.micronaut.http.netty.body;
+package io.micronaut.json.body;
 
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.netty.buffer.ByteBuf;
@@ -33,14 +33,7 @@ class JsonChunkedProcessorElementLimitTest {
         List<String> received = new ArrayList<>();
         JsonChunkedProcessor processor = new JsonChunkedProcessor(10);
         processor.counter.unwrapTopLevelArray();
-        Flux<String> values = JsonChunkedFlux.process(processor, Flux.just(input)).map(buffer -> {
-            ByteBuf buf = (ByteBuf) buffer.asNativeBuffer();
-            try {
-                return buf.toString(StandardCharsets.UTF_8);
-            } finally {
-                buf.release();
-            }
-        }).doOnNext(received::add);
+        Flux<String> values = JsonChunkedFlux.process(processor, Flux.just(input)).map(buffer -> buffer.toString(StandardCharsets.UTF_8)).doOnNext(received::add);
         assertThrows(ContentLengthExceededException.class, values::blockLast);
         assertEquals(List.of("{\"a\":1}"), received);
         assertEquals(0, input.refCnt());
@@ -67,9 +60,7 @@ class JsonChunkedProcessorElementLimitTest {
         processor.counter.unwrapTopLevelArray();
         List<String> received = new ArrayList<>();
         JsonChunkedFlux.process(processor, input).doOnNext(buffer -> {
-            ByteBuf buf = (ByteBuf) buffer.asNativeBuffer();
-            received.add(buf.toString(StandardCharsets.UTF_8));
-            buf.release();
+            received.add(buffer.toString(StandardCharsets.UTF_8));
         }).blockLast();
         return received;
     }

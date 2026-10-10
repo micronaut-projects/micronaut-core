@@ -1,8 +1,10 @@
-package io.micronaut.http.netty.body;
+package io.micronaut.json.body;
 
-import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.buffer.netty.NettyReadBufferFactory;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import reactor.core.publisher.Flux;
 
 import java.io.IOException;
@@ -12,19 +14,20 @@ import java.io.IOException;
  * readers, for the tests of the processor.
  */
 final class JsonChunkedFlux {
+    private static final NettyReadBufferFactory READ_BUFFERS = NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT);
+
     private JsonChunkedFlux() {
     }
 
-    static Flux<ByteBuffer<?>> process(JsonChunkedProcessor processor, Flux<ByteBuf> input) {
+    static Flux<ReadBuffer> process(JsonChunkedProcessor processor, Flux<ByteBuf> input) {
         return Flux.concat(input
-                .concatMap(b -> Flux.<ByteBuffer<?>>create(s -> {
+                .concatMap(b -> Flux.<ReadBuffer>create(s -> {
                     try {
-                        processor.feed(b, s::next);
+                        // the processor takes over the piece, and releases it
+                        processor.feed(READ_BUFFERS.adapt(b), s::next);
                         s.complete();
                     } catch (IOException | ContentLengthExceededException e) {
                         s.error(e);
-                    } finally {
-                        b.release();
                     }
                 })), Flux.create(s -> {
                 try {
@@ -37,7 +40,7 @@ final class JsonChunkedFlux {
             // also when the subscriber cancels, e.g. a reader that stops before the last element:
             // the partial element and the elements and input not delivered yet are released
             .doFinally(signal -> processor.discard())
-            .doOnDiscard(ByteBuffer.class, JsonChunkedProcessor::release)
+            .doOnDiscard(ReadBuffer.class, ReadBuffer::close)
             .doOnDiscard(ByteBuf.class, ByteBuf::release);
     }
 }

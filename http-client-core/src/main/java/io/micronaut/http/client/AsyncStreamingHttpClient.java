@@ -15,8 +15,12 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.http.client.internal.ElementsStages;
+
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -61,6 +65,42 @@ import java.util.concurrent.CompletionStage;
  */
 @Experimental
 public interface AsyncStreamingHttpClient extends AsyncHttpClient {
+
+    /**
+     * Read response pieces as caller-owned buffers. The caller owns every
+     * returned {@link ReadBuffer} and must close it, even when processing fails. Closing the
+     * elements releases unread pieces, not pieces already handed to the caller.
+     *
+     * <p>The native Netty and JDK clients transfer their transport buffers without copying.
+     * The default implementation copies the pieces of {@link #exchangeStream(HttpRequest, Argument)}.
+     * Returned elements may be reference counted.</p>
+     *
+     * @param request The request
+     * @param errorType The error body type
+     * @param <I> The request body type
+     * @return The response with caller-owned pieces
+     * @since 5.3.0
+     */
+    default <I> CompletionStage<HttpResponse<BodyElements<ReadBuffer>>> exchangeReadBuffers(HttpRequest<I> request, Argument<?> errorType) {
+        return ElementsStages.mapResponse(exchangeStream(request, errorType), response -> {
+            BodyElements<ByteBuffer<?>> source = Objects.requireNonNull(response.body(), "The response has no elements");
+            BodyElements<ReadBuffer> owned = MappedBodyElements.map(source,
+                buffer -> ReadBufferFactory.getJdkFactory().adapt(buffer.toByteArray()));
+            return response.toMutableResponse().body(owned);
+        });
+    }
+
+    /**
+     * Read caller-owned response pieces using the default error type.
+     *
+     * @param request The request
+     * @param <I> The request body type
+     * @return The response with pieces that the caller must close
+     * @since 5.3.0
+     */
+    default <I> CompletionStage<HttpResponse<BodyElements<ReadBuffer>>> exchangeReadBuffers(HttpRequest<I> request) {
+        return exchangeReadBuffers(request, HttpClient.DEFAULT_ERROR_TYPE);
+    }
 
     /**
      * Perform an HTTP request and read the response body as its bytes arrive, see

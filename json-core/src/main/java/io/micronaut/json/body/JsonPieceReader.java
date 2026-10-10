@@ -13,18 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.netty.body;
+package io.micronaut.json.body;
 
-import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.codec.CodecException;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.util.ReferenceCountUtil;
-import io.netty.util.ReferenceCounted;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -42,47 +36,22 @@ import java.util.function.Function;
 @Internal
 final class JsonPieceReader<T> implements PieceReader<T> {
 
-    private static final NettyReadBufferFactory READ_BUFFERS = NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT);
-
     private final JsonChunkedProcessor processor;
-    private final Function<ByteBuffer<?>, @Nullable T> valueReader;
+    private final Function<ReadBuffer, @Nullable T> valueReader;
     /**
      * The bytes of the values the pieces read so far complete, not polled yet.
      */
-    private final ArrayDeque<ByteBuffer<?>> values = new ArrayDeque<>(1);
+    private final ArrayDeque<ReadBuffer> values = new ArrayDeque<>(1);
     private boolean closed;
 
     /**
      * @param processor   The processor that splits the pieces into values, configured for the
      *                    JSON to read: a stream of values, or the elements of an array
-     * @param valueReader Decodes the bytes of a value, and releases them
+     * @param valueReader Decodes the bytes of a value, and closes them
      */
-    JsonPieceReader(JsonChunkedProcessor processor, Function<ByteBuffer<?>, @Nullable T> valueReader) {
+    JsonPieceReader(JsonChunkedProcessor processor, Function<ReadBuffer, @Nullable T> valueReader) {
         this.processor = processor;
         this.valueReader = valueReader;
-    }
-
-    /**
-     * The read buffer of a buffer of the input of a chunked reader, without copying a Netty
-     * buffer.
-     *
-     * @param buffer The buffer, which the read buffer takes over
-     * @return The read buffer
-     */
-    static ReadBuffer adapt(ByteBuffer<?> buffer) {
-        return READ_BUFFERS.adapt(buffer);
-    }
-
-    /**
-     * Releases a Netty object that a Reactor input of a chunked reader discards, e.g. a buffer
-     * it held before it was mapped to a piece.
-     *
-     * @param object The discarded object
-     */
-    static void discardForeign(Object object) {
-        if (object instanceof ReferenceCounted counted && counted.refCnt() > 0) {
-            ReferenceCountUtil.safeRelease(counted);
-        }
     }
 
     @Override
@@ -91,12 +60,7 @@ final class JsonPieceReader<T> implements PieceReader<T> {
             piece.close();
             return;
         }
-        ByteBuf content = NettyReadBufferFactory.toByteBuf(piece);
-        try {
-            processor.feed(content, values::add);
-        } finally {
-            content.release();
-        }
+        processor.feed(piece, values::add);
     }
 
     @Override
@@ -108,11 +72,17 @@ final class JsonPieceReader<T> implements PieceReader<T> {
 
     @Override
     public @Nullable T poll() {
-        ByteBuffer<?> value = values.poll();
+        ReadBuffer value = values.poll();
         if (value == null) {
             return null;
         }
-        @Nullable T element = JsonChunkedProcessor.<@Nullable T>readReleasing(value, valueReader);
+        @Nullable T element;
+        try {
+            element = valueReader.apply(value);
+        } finally {
+            // a no-op once the reader consumed it, else what a failed reading left
+            value.close();
+        }
         if (element == null) {
             // null means that no element is available: a JSON null is not an element, as the
             // reactive readers refuse it
@@ -128,9 +98,9 @@ final class JsonPieceReader<T> implements PieceReader<T> {
         }
         closed = true;
         processor.discard();
-        ByteBuffer<?> value;
+        ReadBuffer value;
         while ((value = values.poll()) != null) {
-            JsonChunkedProcessor.release(value);
+            value.close();
         }
     }
 }

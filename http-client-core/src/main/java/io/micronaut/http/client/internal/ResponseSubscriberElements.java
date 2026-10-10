@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client;
+package io.micronaut.http.client.internal;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpResponse;
@@ -39,7 +39,7 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Internal
-final class ResponseSubscriberElements<X, T> extends PulledBodyElements<T> implements Subscriber<HttpResponse<X>> {
+public final class ResponseSubscriberElements<X, T> extends PulledBodyElements<T> implements Subscriber<HttpResponse<X>> {
 
     private final CompletableFuture<HttpResponse<BodyElements<T>>> response = new CompletableFuture<>();
     private final Function<? super X, ? extends T> element;

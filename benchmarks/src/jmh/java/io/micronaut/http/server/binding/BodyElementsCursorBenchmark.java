@@ -1,20 +1,17 @@
 package io.micronaut.http.server.binding;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
-import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
-import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.stream.ByteBodyElements;
-import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.PieceReaderBenchmarkSupport;
 import io.micronaut.http.netty.body.PieceReaderBenchmarkSupport.Book;
 import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.json.body.JsonMessageHandler;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -26,7 +23,6 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -53,13 +49,13 @@ public class BodyElementsCursorBenchmark {
 
     private final SimpleHttpHeaders headers = new SimpleHttpHeaders();
     private final ByteBodyFactory factory = ByteBodyFactory.createDefault(NettyByteBufferFactory.DEFAULT);
-    private NettyJsonHandler<Book> handler;
+    private JsonMessageHandler<Book> handler;
     private byte[][] pieces;
     private int elements;
 
     @Setup
     public void setup() {
-        handler = new NettyJsonHandler<>(JsonMapper.createDefault());
+        handler = new JsonMessageHandler<>(JsonMapper.createDefault());
         List<String> values = PieceReaderBenchmarkSupport.values(shape);
         elements = values.size();
         pieces = PieceReaderBenchmarkSupport.pieces(PieceReaderBenchmarkSupport.array(values), 8192);
@@ -70,27 +66,10 @@ public class BodyElementsCursorBenchmark {
     }
 
     @Benchmark
-    public int legacyPublisherCursor() {
-        CloseableByteBody body = body();
-        BodyElements<Book> books = new PublisherBodyElements<>(() -> PieceReaderBenchmarkSupport.legacyArrayElements(handler, BOOK, headers, byteBuffers(body), Long.MAX_VALUE), body::close);
-        return read(books);
-    }
-
-    @Benchmark
     public int pieceReaderCursor() {
         CloseableByteBody body = body();
         BodyElements<Book> books = new ByteBodyElements<>(body, handler.openPieceReader(BOOK, MediaType.APPLICATION_JSON_TYPE, headers, Long.MAX_VALUE), Function.identity());
         return read(books);
-    }
-
-    private static Publisher<ByteBuffer<?>> byteBuffers(CloseableByteBody body) {
-        return Flux.from(InternalByteBody.toUnbufferedReadBufferPublisher(body))
-            .doOnDiscard(ReadBuffer.class, ReadBuffer::close)
-            .map(rb -> {
-                try (rb) {
-                    return rb.toByteBuffer();
-                }
-            });
     }
 
     private int read(BodyElements<Book> books) {

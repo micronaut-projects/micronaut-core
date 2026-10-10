@@ -722,9 +722,9 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         MessageBodyReader<T> elementReader = binder.bodyHandlerRegistry().findReader(type, List.of(contentType)).orElse(null);
         if (!(elementReader instanceof ChunkedMessageBodyReader<T> chunked)) {
             // a JSON body: the media type is supported, what is missing is the reader, e.g. on a
-            // server that is not the Netty server, without micronaut-http-netty
+            // server that is not the Netty server, without micronaut-json-core
             throw new UnsupportedOperationException("Reading the elements of a JSON body [" + contentType
-                + "] needs a chunked JSON message body reader, which micronaut-http-netty provides: add it to the runtime classpath");
+                + "] needs a chunked JSON message body reader, which micronaut-json-core provides: add it to the runtime classpath");
         }
         return chunked;
     }

@@ -1,4 +1,4 @@
-package io.micronaut.http.netty.body;
+package io.micronaut.json.body;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * The {@link PieceReader} of the Netty JSON handlers: the elements of a JSON array or a JSON
+ * The {@link PieceReader} of the JSON handlers: the elements of a JSON array or a JSON
  * stream, split from the pieces as they are read and decoded when they are polled, without
  * Reactive Streams.
  */
@@ -55,7 +55,7 @@ class JsonPieceReaderTest {
 
     @Test
     void theValuesOfAStream() throws IOException {
-        PieceReader<Book> reader = new NettyJsonStreamHandler<Book>(MAPPER)
+        PieceReader<Book> reader = new JsonStreamMessageHandler<Book>(MAPPER)
             .openPieceReader(BOOK, MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(), 1024);
 
         reader.read(piece("{\"title\":\"The Stand\"}\n{\"title\":"));
@@ -69,7 +69,7 @@ class JsonPieceReaderTest {
 
     @Test
     void aNumberAtTheEndOfAStreamIsCompletedByTheEnd() throws IOException {
-        PieceReader<Integer> reader = new NettyJsonStreamHandler<Integer>(MAPPER)
+        PieceReader<Integer> reader = new JsonStreamMessageHandler<Integer>(MAPPER)
             .openPieceReader(Argument.INT, MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(), 1024);
 
         reader.read(piece("1 2 3"));
@@ -104,7 +104,7 @@ class JsonPieceReaderTest {
 
     @Test
     void malformedInputFailsWithAJsonSyntaxException() {
-        PieceReader<Book> reader = new NettyJsonStreamHandler<Book>(MAPPER)
+        PieceReader<Book> reader = new JsonStreamMessageHandler<Book>(MAPPER)
             .openPieceReader(BOOK, MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(), 1024);
 
         assertThrows(JsonSyntaxException.class, () -> reader.read(piece("﻿{}")));
@@ -130,7 +130,7 @@ class JsonPieceReaderTest {
 
     @Test
     void aStreamBoundAsAListIsReadWithoutAPublisher() {
-        NettyJsonStreamHandler<List<Book>> handler = new NettyJsonStreamHandler<>(MAPPER);
+        JsonStreamMessageHandler<List<Book>> handler = new JsonStreamMessageHandler<>(MAPPER);
         ByteBuf input = buffer("{\"title\":\"The Stand\"}\n{\"title\":\"It\"}\n");
 
         List<Book> books = handler.read(Argument.listOf(Book.class), MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(),
@@ -142,7 +142,7 @@ class JsonPieceReaderTest {
 
     @Test
     void aMalformedStreamBoundAsAListFails() {
-        NettyJsonStreamHandler<List<Book>> handler = new NettyJsonStreamHandler<>(MAPPER);
+        JsonStreamMessageHandler<List<Book>> handler = new JsonStreamMessageHandler<>(MAPPER);
         ByteBuf input = buffer("{\"title\":\"It\"}\n{\"title\"");
 
         assertThrows(CodecException.class, () -> handler.read(Argument.listOf(Book.class), MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(),
@@ -151,7 +151,7 @@ class JsonPieceReaderTest {
     }
 
     private static <T> PieceReader<T> arrayReader(Argument<T> type, long maxElementSize) {
-        return new NettyJsonHandler<T>(MAPPER).openPieceReader(type, MediaType.APPLICATION_JSON_TYPE, new SimpleHttpHeaders(), maxElementSize);
+        return new JsonMessageHandler<T>(MAPPER).openPieceReader(type, MediaType.APPLICATION_JSON_TYPE, new SimpleHttpHeaders(), maxElementSize);
     }
 
     private static <T> List<T> drain(PieceReader<T> reader) throws IOException {

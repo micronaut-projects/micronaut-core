@@ -9,6 +9,8 @@ import io.micronaut.http.netty.body.PieceReaderBenchmarkSupport.Book;
 import io.micronaut.http.netty.body.PieceReaderBenchmarkSupport.CountingSubscriber;
 import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.json.body.JsonMessageHandler;
+import io.micronaut.json.body.JsonStreamMessageHandler;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -48,8 +50,8 @@ public class JsonPieceReaderBenchmark {
 
     private final SimpleHttpHeaders headers = new SimpleHttpHeaders();
     private JsonMapper mapper;
-    private NettyJsonHandler<Book> arrayHandler;
-    private NettyJsonStreamHandler<List<Book>> streamHandler;
+    private JsonMessageHandler<Book> arrayHandler;
+    private JsonStreamMessageHandler<List<Book>> streamHandler;
     private byte[][] arrayPieces;
     private byte[] stream;
     private int elements;
@@ -57,22 +59,12 @@ public class JsonPieceReaderBenchmark {
     @Setup
     public void setup() {
         mapper = JsonMapper.createDefault();
-        arrayHandler = new NettyJsonHandler<>(mapper);
-        streamHandler = new NettyJsonStreamHandler<>(mapper);
+        arrayHandler = new JsonMessageHandler<>(mapper);
+        streamHandler = new JsonStreamMessageHandler<>(mapper);
         List<String> values = PieceReaderBenchmarkSupport.values(shape);
         elements = values.size();
         arrayPieces = PieceReaderBenchmarkSupport.pieces(PieceReaderBenchmarkSupport.array(values), 8192);
         stream = PieceReaderBenchmarkSupport.stream(values);
-    }
-
-    @Benchmark
-    public int arrayLegacyFluxOneByOne() {
-        return subscribe(PieceReaderBenchmarkSupport.legacyArrayElements(arrayHandler, BOOK, headers, PieceReaderBenchmarkSupport.buffers(arrayPieces), Long.MAX_VALUE), true);
-    }
-
-    @Benchmark
-    public int arrayLegacyFluxUnbounded() {
-        return subscribe(PieceReaderBenchmarkSupport.legacyArrayElements(arrayHandler, BOOK, headers, PieceReaderBenchmarkSupport.buffers(arrayPieces), Long.MAX_VALUE), false);
     }
 
     @Benchmark
@@ -101,12 +93,6 @@ public class JsonPieceReaderBenchmark {
             }
         }
         return check(count);
-    }
-
-    @Benchmark
-    public int streamListLegacyBlock() {
-        return check(PieceReaderBenchmarkSupport.legacyStreamList(mapper, BOOK, headers,
-            NettyByteBufferFactory.DEFAULT.wrap(Unpooled.wrappedBuffer(stream))).size());
     }
 
     @Benchmark

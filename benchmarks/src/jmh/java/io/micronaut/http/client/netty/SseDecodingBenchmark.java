@@ -9,13 +9,13 @@ import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.client.sse.EventStreams;
-import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.PieceReaderBenchmarkSupport;
 import io.micronaut.http.netty.body.PieceReaderBenchmarkSupport.Book;
 import io.micronaut.http.netty.body.PieceReaderBenchmarkSupport.CountingSubscriber;
 import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.http.sse.Event;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.json.body.JsonMessageHandler;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
@@ -71,7 +71,7 @@ public class SseDecodingBenchmark {
     @Setup
     public void setup() {
         // the JSON handler for every type: an application context of this module starts GraalPy
-        NettyJsonHandler<Object> json = new NettyJsonHandler<>(JsonMapper.createDefault());
+        JsonMessageHandler<Object> json = new JsonMessageHandler<>(JsonMapper.createDefault());
         registry = new MessageBodyHandlerRegistry() {
             @SuppressWarnings("unchecked")
             @Override

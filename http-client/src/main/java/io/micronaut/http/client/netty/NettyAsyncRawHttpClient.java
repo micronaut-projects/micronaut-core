@@ -22,7 +22,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.RawRequestOptions;
-import io.micronaut.http.client.RawResponseFuture;
+import io.micronaut.http.client.internal.RawResponseFuture;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import org.jspecify.annotations.Nullable;
 
