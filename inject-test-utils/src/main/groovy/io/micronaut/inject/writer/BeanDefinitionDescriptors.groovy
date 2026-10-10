@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils
+import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.annotation.AnnotationMetadataSupport
@@ -183,7 +184,12 @@ class BeanDefinitionDescriptors {
         check("flags", flagNames(descriptor.flags()), flagNames(flags(reference)))
         check("beanType", descriptor.beanType(), typeName(reference.getBeanType()))
         check("exposedTypes", descriptor.exposedTypes(), reference.getExposedTypes().collect { Class<?> type -> typeName(type) }.sort())
-        check("indexes", descriptor.indexes(), reference.getIndexes().collect { Class<?> type -> typeName(type) })
+        // a definition answers no indexes at all when one of its @Indexed types is missing, so that the missing
+        // type does not fail the bean; the descriptor keeps the declared names, which the reference agrees with
+        // only on a class path that has every one of them, seen from the loader that defined the reference
+        ClassLoader definingLoader = reference.getClass().classLoader
+        List<String> indexes = descriptor.indexes().every { String type -> loads(definingLoader, type) } ? descriptor.indexes() : []
+        check("indexes", indexes, reference.getIndexes().collect { Class<?> type -> typeName(type) })
 
         AnnotationMetadata metadata = reference.getAnnotationMetadata()
         Set<String> names = new TreeSet<>(descriptor.annotations().keySet())
@@ -264,6 +270,30 @@ class BeanDefinitionDescriptors {
      * @param type The type
      * @return The name
      */
+    /**
+     * Whether a type loads on a class path, without initialising it.
+     *
+     * @param classLoader The class loader
+     * @param typeName The name of the type as a descriptor spells it: a primitive by its keyword, an array by its
+     * component type followed by {@code []}
+     * @return Whether the class loader finds and links it
+     */
+    private static boolean loads(ClassLoader classLoader, String typeName) {
+        String name = typeName
+        while (name.endsWith("[]")) {
+            name = name.substring(0, name.length() - 2)
+        }
+        if (ClassUtils.COMMON_CLASS_MAP.containsKey(name)) {
+            return true
+        }
+        try {
+            Class.forName(name, false, classLoader)
+            return true
+        } catch (ClassNotFoundException | LinkageError ignored) {
+            return false
+        }
+    }
+
     private static String typeName(Class<?> type) {
         type.isArray() ? typeName(type.componentType) + "[]" : type.name
     }
