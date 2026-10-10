@@ -71,6 +71,11 @@ class ExecutorContextPropagationTest {
             assertEquals("scheduled", future.get(5, TimeUnit.SECONDS));
 
             assertEquals("none", executor.schedule(ExecutorContextPropagationTest::currentValue, 1, TimeUnit.MILLISECONDS).get(5, TimeUnit.SECONDS));
+
+            // as documented, scheduling from an empty context doesn't keep the caller's context
+            Future<String> detached = propagatedContext.propagate(() -> PropagatedContext.empty().propagate(() ->
+                executor.schedule(ExecutorContextPropagationTest::currentValue, 1, TimeUnit.MILLISECONDS)));
+            assertEquals("none", detached.get(5, TimeUnit.SECONDS));
         }
     }
 

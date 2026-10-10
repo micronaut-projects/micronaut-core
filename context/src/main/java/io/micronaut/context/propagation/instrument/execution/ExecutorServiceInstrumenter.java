@@ -15,8 +15,6 @@
  */
 package io.micronaut.context.propagation.instrument.execution;
 
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
@@ -29,13 +27,12 @@ import io.micronaut.scheduling.executor.IOExecutorServiceConfig;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * Wraps {@link ExecutorService} to instrument {@link Callable} and {@link Runnable} to be aware of {@link PropagatedContext}.
  *
- * <p>Executors created by {@link ExecutorFactory} are not wrapped when
- * {@link ExecutorConfiguration#isPropagateContext()} is {@code false}.</p>
+ * <p>Executors created by {@link ExecutorFactory} are left as they are, because the factory instruments them itself
+ * unless {@link ExecutorConfiguration#isPropagateContext()} is {@code false}.</p>
  *
  * @author Denis Stepanov
  * @since 4.0.0
@@ -62,28 +59,12 @@ final class ExecutorServiceInstrumenter implements BeanCreatedEventListener<Exec
             return executorService;
         }
         Class<?> declaringType = beanDefinition.getDeclaringType().orElse(null);
-        if (declaringType == IOExecutorServiceConfig.class) {
-            // the blocking executor is the io or the virtual executor, which is already instrumented when enabled
+        if (declaringType != null
+            && (ExecutorFactory.class.isAssignableFrom(declaringType) || declaringType == IOExecutorServiceConfig.class)) {
+            // ExecutorFactory instruments its executors according to ExecutorConfiguration#isPropagateContext(),
+            // and the blocking executor is the io or the virtual executor
             return executorService;
         }
-        if (declaringType != null && ExecutorFactory.class.isAssignableFrom(declaringType)
-            && !isPropagateContext(event.getSource(), beanDefinition)) {
-            return executorService;
-        }
-        if (executorService instanceof ScheduledExecutorService service) {
-            return new ContextPropagatingScheduledExecutorService(service);
-        }
-        return new ContextPropagatingExecutorService(executorService);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static boolean isPropagateContext(BeanContext beanContext, BeanDefinition<ExecutorService> beanDefinition) {
-        Qualifier<?> qualifier = beanDefinition.getDeclaredQualifier();
-        if (qualifier == null) {
-            return true;
-        }
-        return beanContext.findBean(ExecutorConfiguration.class, (Qualifier<ExecutorConfiguration>) qualifier)
-            .map(ExecutorConfiguration::isPropagateContext)
-            .orElse(true);
+        return ContextPropagatingExecutorService.instrument(executorService);
     }
 }
