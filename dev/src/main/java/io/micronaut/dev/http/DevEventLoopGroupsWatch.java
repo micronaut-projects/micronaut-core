@@ -20,7 +20,7 @@ import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.watch.BeanWatch;
-import io.micronaut.context.watch.ConfigurationWatcher;
+import io.micronaut.context.watch.ReloadingConfigurationWatcher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.configuration.NettyGlobalConfiguration;
@@ -51,15 +51,15 @@ final class DevEventLoopGroupsWatch {
         if (!(context instanceof WatchableBeanContext watchable)) {
             return;
         }
-        ConfigurationWatcher watcher = change -> {
+        ReloadingConfigurationWatcher watcher = change -> {
             if (change.initial() || change.all() || groups.isEmpty()) {
                 // a refresh of everything names no key, and restarts nothing on its own
-                return ConfigurationWatcher.Outcome.IGNORED;
+                return ReloadingConfigurationWatcher.Outcome.IGNORED;
             }
-            return ConfigurationWatcher.Outcome.REQUIRES_RESTART;
+            return ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART;
         };
-        watches.add(watchable.watchConfiguration(EventLoopGroupConfiguration.EVENT_LOOPS, watcher));
-        watches.add(watchable.watchConfiguration(NettyGlobalConfiguration.PREFIX, watcher));
+        watches.add(watchable.configuration(EventLoopGroupConfiguration.EVENT_LOOPS).watchReloading(watcher));
+        watches.add(watchable.configuration(NettyGlobalConfiguration.PREFIX).watchReloading(watcher));
     }
 
     /**
