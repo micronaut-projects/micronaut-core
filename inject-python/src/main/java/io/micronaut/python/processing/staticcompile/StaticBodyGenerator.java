@@ -44,6 +44,7 @@ public final class StaticBodyGenerator {
     private static final TypeDef LONG = TypeDef.Primitive.LONG;
     private static final TypeDef DOUBLE = TypeDef.Primitive.DOUBLE;
     private static final TypeDef BOOLEAN = TypeDef.Primitive.BOOLEAN;
+    private static final String VALUE_OF = "valueOf";
 
     private final SelfAccess self;
     private final Map<String, VariableDef.MethodParameter> parameters = new HashMap<>();
@@ -267,7 +268,7 @@ public final class StaticBodyGenerator {
             case Ir.BOOLEAN -> value;
             case Ir.LONG -> value.compare(ExpressionDef.ComparisonOperation.OpType.NOT_EQUAL_TO, ExpressionDef.constant(0L));
             case Ir.DOUBLE -> value.compare(ExpressionDef.ComparisonOperation.OpType.NOT_EQUAL_TO, ExpressionDef.constant(0.0d));
-            case Ir.STRING -> PYTHON_STATIC.invokeStatic("truthy", List.of(ClassTypeDef.STRING), BOOLEAN, value);
+            case Ir.STRING -> PYTHON_STATIC.invokeStatic("truthy", List.of(TypeDef.STRING), BOOLEAN, value);
             default -> PYTHON_STATIC.invokeStatic("truthy", List.of(TypeDef.OBJECT), BOOLEAN, value);
         };
     }
@@ -291,10 +292,10 @@ public final class StaticBodyGenerator {
             return value;
         }
         return switch (part.type()) {
-            case Ir.LONG -> PYTHON_STATIC.invokeStatic("str", List.of(LONG), ClassTypeDef.STRING, value);
-            case Ir.DOUBLE -> PYTHON_STATIC.invokeStatic("str", List.of(DOUBLE), ClassTypeDef.STRING, value);
-            case Ir.BOOLEAN -> PYTHON_STATIC.invokeStatic("str", List.of(BOOLEAN), ClassTypeDef.STRING, value);
-            default -> PYTHON_STATIC.invokeStatic("str", List.of(TypeDef.OBJECT), ClassTypeDef.STRING, value);
+            case Ir.LONG -> PYTHON_STATIC.invokeStatic("str", List.of(LONG), TypeDef.STRING, value);
+            case Ir.DOUBLE -> PYTHON_STATIC.invokeStatic("str", List.of(DOUBLE), TypeDef.STRING, value);
+            case Ir.BOOLEAN -> PYTHON_STATIC.invokeStatic("str", List.of(BOOLEAN), TypeDef.STRING, value);
+            default -> PYTHON_STATIC.invokeStatic("str", List.of(TypeDef.OBJECT), TypeDef.STRING, value);
         };
     }
 
@@ -319,13 +320,13 @@ public final class StaticBodyGenerator {
             case "byte" -> Ir.LONG.equals(from) ? PYTHON_STATIC.invokeStatic("toByteExact", List.of(LONG), TypeDef.Primitive.BYTE, value) : value.cast(TypeDef.Primitive.BYTE);
             case "float" -> value.cast(TypeDef.Primitive.FLOAT);
             // a boxed number is boxed from its primitive, which javac converts from the narrowed value
-            case "java.lang.Integer" -> ClassTypeDef.of(Integer.class).invokeStatic("valueOf", List.of(TypeDef.Primitive.INT), ClassTypeDef.of(Integer.class), cast(value, from, "int"));
-            case "java.lang.Long" -> ClassTypeDef.of(Long.class).invokeStatic("valueOf", List.of(LONG), ClassTypeDef.of(Long.class), cast(value, from, Ir.LONG));
-            case "java.lang.Short" -> ClassTypeDef.of(Short.class).invokeStatic("valueOf", List.of(TypeDef.Primitive.SHORT), ClassTypeDef.of(Short.class), cast(value, from, "short"));
-            case "java.lang.Byte" -> ClassTypeDef.of(Byte.class).invokeStatic("valueOf", List.of(TypeDef.Primitive.BYTE), ClassTypeDef.of(Byte.class), cast(value, from, "byte"));
-            case "java.lang.Double" -> ClassTypeDef.of(Double.class).invokeStatic("valueOf", List.of(DOUBLE), ClassTypeDef.of(Double.class), cast(value, from, Ir.DOUBLE));
-            case "java.lang.Float" -> ClassTypeDef.of(Float.class).invokeStatic("valueOf", List.of(TypeDef.Primitive.FLOAT), ClassTypeDef.of(Float.class), cast(value, from, "float"));
-            case "java.lang.Boolean" -> ClassTypeDef.of(Boolean.class).invokeStatic("valueOf", List.of(BOOLEAN), ClassTypeDef.of(Boolean.class), value);
+            case "java.lang.Integer" -> ClassTypeDef.of(Integer.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.INT), ClassTypeDef.of(Integer.class), cast(value, from, "int"));
+            case "java.lang.Long" -> ClassTypeDef.of(Long.class).invokeStatic(VALUE_OF, List.of(LONG), ClassTypeDef.of(Long.class), cast(value, from, Ir.LONG));
+            case "java.lang.Short" -> ClassTypeDef.of(Short.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.SHORT), ClassTypeDef.of(Short.class), cast(value, from, "short"));
+            case "java.lang.Byte" -> ClassTypeDef.of(Byte.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.BYTE), ClassTypeDef.of(Byte.class), cast(value, from, "byte"));
+            case "java.lang.Double" -> ClassTypeDef.of(Double.class).invokeStatic(VALUE_OF, List.of(DOUBLE), ClassTypeDef.of(Double.class), cast(value, from, Ir.DOUBLE));
+            case "java.lang.Float" -> ClassTypeDef.of(Float.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.FLOAT), ClassTypeDef.of(Float.class), cast(value, from, "float"));
+            case "java.lang.Boolean" -> ClassTypeDef.of(Boolean.class).invokeStatic(VALUE_OF, List.of(BOOLEAN), ClassTypeDef.of(Boolean.class), value);
             default -> value.cast(type(to));
         };
     }
