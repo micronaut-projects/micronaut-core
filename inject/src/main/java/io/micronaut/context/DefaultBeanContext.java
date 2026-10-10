@@ -2862,6 +2862,26 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     }
 
     /**
+     * The enabled definitions with an executable method annotated with the given annotation. Only their conditions are
+     * evaluated: the provider caches a definition whose conditions fail as disabled, so evaluating those of every
+     * definition, as {@link #getAllBeanDefinitions()} does, would disable for good a definition whose
+     * {@code @Requires(beans = ...)} fails only until its bean is registered.
+     *
+     * @param annotationType The annotation
+     * @return The definitions
+     */
+    List<BeanDefinition<Object>> definitionsWithMethodsAnnotated(Class<? extends Annotation> annotationType) {
+        return beanDefinitionProvider.getBeanDefinitions(this, null, definition -> {
+            for (ExecutableMethod<Object, ?> method : definition.getExecutableMethods()) {
+                if (method.getAnnotationMetadata().hasStereotype(annotationType)) {
+                    return true;
+                }
+            }
+            return false;
+        });
+    }
+
+    /**
      * Feeds a processor the methods of definitions added after startup.
      *
      * @param annotationType The annotation the processor handles

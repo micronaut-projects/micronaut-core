@@ -1268,13 +1268,13 @@ final class BeanWatchRegistry {
         private List<BeanExecutableMethod<A>> current() {
             // an annotation processed at startup has every bean carrying it in the processed-beans index, which
             // costs nothing to read; any other annotation can sit on a method without marking its bean, and only
-            // a scan of the definitions finds those
+            // a scan of the definitions finds those, which decides the conditions of the definitions it finds only
             Set<BeanDefinition<?>> candidates = new LinkedHashSet<>();
             if (processedAtStartup) {
                 candidates.addAll(context.processedBeanDefinitions());
                 candidates.addAll(context.getBeanDefinitions(Qualifiers.byStereotype(annotationType)));
             } else {
-                candidates.addAll(context.getAllBeanDefinitions());
+                candidates.addAll(context.definitionsWithMethodsAnnotated(annotationType));
             }
             return entries(resolve(candidates, true));
         }
