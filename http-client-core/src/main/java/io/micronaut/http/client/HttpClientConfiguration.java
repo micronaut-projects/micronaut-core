@@ -247,9 +247,7 @@ public abstract class HttpClientConfiguration {
 
     private boolean exceptionOnErrorStatus = DEFAULT_EXCEPTION_ON_ERROR_STATUS;
     private boolean bufferErrorBodyForStreaming = DEFAULT_BUFFER_ERROR_BODY_FOR_STREAMING;
-    private boolean jdkApplyRequestTimeout;
-    private boolean jdkMicronautRedirects;
-    private boolean jdkDecodeErrorType;
+    private JdkConfiguration jdk = new JdkConfiguration();
     private boolean decompressionEnabled = true;
 
     private SslConfiguration sslConfiguration = new ClientSslConfiguration();
@@ -312,9 +310,7 @@ public abstract class HttpClientConfiguration {
             this.connectTimeout = copy.connectTimeout;
             this.connectTtl = copy.connectTtl;
             this.bufferErrorBodyForStreaming = copy.bufferErrorBodyForStreaming;
-            this.jdkApplyRequestTimeout = copy.jdkApplyRequestTimeout;
-            this.jdkMicronautRedirects = copy.jdkMicronautRedirects;
-            this.jdkDecodeErrorType = copy.jdkDecodeErrorType;
+            this.jdk = new JdkConfiguration(copy.jdk);
             this.defaultCharset = copy.defaultCharset;
             this.exceptionOnErrorStatus = copy.exceptionOnErrorStatus;
             this.decompressionEnabled = copy.decompressionEnabled;
@@ -486,78 +482,21 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Whether the JDK client applies the {@link #getRequestTimeout() request timeout} to an
-     * exchange, as the Netty client does. Configured by
-     * {@code micronaut.http.client.jdk-apply-request-timeout}. Default {@code false}: the JDK
-     * client only applies the {@link #getReadTimeout() read timeout}, until the response headers
-     * arrive. Only used by the JDK client.
-     *
-     * @return Whether the JDK client applies the request timeout
+     * @return Configuration specific to the JDK client
      * @since 5.3.0
      */
     @Experimental
-    public boolean isJdkApplyRequestTimeout() {
-        return jdkApplyRequestTimeout;
+    public JdkConfiguration getJdk() {
+        return jdk;
     }
 
     /**
-     * @param jdkApplyRequestTimeout Whether the JDK client applies the request timeout, see {@link #isJdkApplyRequestTimeout()}
+     * @param jdk Configuration specific to the JDK client
      * @since 5.3.0
      */
     @Experimental
-    public void setJdkApplyRequestTimeout(boolean jdkApplyRequestTimeout) {
-        this.jdkApplyRequestTimeout = jdkApplyRequestTimeout;
-    }
-
-    /**
-     * Whether the JDK client follows redirects as the Netty client does, instead of letting the
-     * JDK client follow them. Configured by {@code micronaut.http.client.jdk-micronaut-redirects}.
-     * Default {@code false}. When enabled, the client filters run for each redirect, the
-     * {@link #getMaxRedirects() maximum number of redirects} and the redirect header settings
-     * apply, a 301 or 302 redirect is followed with a GET without the body, a redirect from https
-     * to http is followed, and a redirect loop fails with an exception instead of returning the
-     * last redirect response. Only used by the JDK client.
-     *
-     * @return Whether the JDK client follows redirects as the Netty client does
-     * @since 5.3.0
-     */
-    @Experimental
-    public boolean isJdkMicronautRedirects() {
-        return jdkMicronautRedirects;
-    }
-
-    /**
-     * @param jdkMicronautRedirects Whether the JDK client follows redirects as the Netty client does, see {@link #isJdkMicronautRedirects()}
-     * @since 5.3.0
-     */
-    @Experimental
-    public void setJdkMicronautRedirects(boolean jdkMicronautRedirects) {
-        this.jdkMicronautRedirects = jdkMicronautRedirects;
-    }
-
-    /**
-     * Whether the {@link io.micronaut.http.client.exceptions.HttpClientResponseException} of an
-     * error status of an exchange of the JDK client decodes the error body into the error type of
-     * the exchange, as the Netty client does. Configured by
-     * {@code micronaut.http.client.jdk-decode-error-type}. Default {@code false}: the response of
-     * the exception decodes its body into the body type of the exchange, and the error type is not
-     * used. Only used by the JDK client.
-     *
-     * @return Whether the JDK client decodes the error body into the error type
-     * @since 5.3.0
-     */
-    @Experimental
-    public boolean isJdkDecodeErrorType() {
-        return jdkDecodeErrorType;
-    }
-
-    /**
-     * @param jdkDecodeErrorType Whether the JDK client decodes the error body into the error type, see {@link #isJdkDecodeErrorType()}
-     * @since 5.3.0
-     */
-    @Experimental
-    public void setJdkDecodeErrorType(boolean jdkDecodeErrorType) {
-        this.jdkDecodeErrorType = jdkDecodeErrorType;
+    public void setJdk(JdkConfiguration jdk) {
+        this.jdk = jdk;
     }
 
     /**
@@ -1329,6 +1268,100 @@ public abstract class HttpClientConfiguration {
     @Internal
     public void setPcapLoggingPathPattern(String pcapLoggingPathPattern) {
         this.pcapLoggingPathPattern = pcapLoggingPathPattern;
+    }
+
+    /** Configuration under the {@code jdk} namespace, used only by the JDK client. */
+    @Experimental
+    public static class JdkConfiguration {
+        private boolean applyRequestTimeout;
+        private boolean useMicronautRedirects;
+        private boolean decodeErrorType;
+
+        /** Default configuration, preserving legacy JDK behavior. */
+        public JdkConfiguration() {
+        }
+
+        /** @param copy The default settings to copy */
+        public JdkConfiguration(JdkConfiguration copy) {
+            applyRequestTimeout = copy.applyRequestTimeout;
+            useMicronautRedirects = copy.useMicronautRedirects;
+            decodeErrorType = copy.decodeErrorType;
+        }
+
+        /**
+         * Whether the JDK client applies the {@link HttpClientConfiguration#getRequestTimeout() request timeout} to an
+         * exchange, as the Netty client does. Configured by
+         * {@code micronaut.http.client.jdk.apply-request-timeout}. Default {@code false}: the JDK
+         * client only applies the {@link HttpClientConfiguration#getReadTimeout() read timeout}, until the response headers
+         * arrive. Only used by the JDK client.
+         *
+         * @return Whether the JDK client applies the request timeout
+         * @since 5.3.0
+         */
+        @Experimental
+        public boolean isApplyRequestTimeout() {
+            return applyRequestTimeout;
+        }
+    
+        /**
+         * @param applyRequestTimeout Whether the JDK client applies the request timeout, see {@link #isApplyRequestTimeout()}
+         * @since 5.3.0
+         */
+        @Experimental
+        public void setApplyRequestTimeout(boolean applyRequestTimeout) {
+            this.applyRequestTimeout = applyRequestTimeout;
+        }
+    
+        /**
+         * Whether the JDK client follows redirects as the Netty client does, instead of letting the
+         * JDK client follow them. Configured by {@code micronaut.http.client.jdk.use-micronaut-redirects}.
+         * Default {@code false}. When enabled, the client filters run for each redirect, the
+         * {@link HttpClientConfiguration#getMaxRedirects() maximum number of redirects} and the redirect header settings
+         * apply, a 301 or 302 redirect is followed with a GET without the body, a redirect from https
+         * to http is followed, and a redirect loop fails with an exception instead of returning the
+         * last redirect response. Only used by the JDK client.
+         *
+         * @return Whether the JDK client follows redirects as the Netty client does
+         * @since 5.3.0
+         */
+        @Experimental
+        public boolean isUseMicronautRedirects() {
+            return useMicronautRedirects;
+        }
+    
+        /**
+         * @param useMicronautRedirects Whether the JDK client follows redirects as the Netty client does, see {@link #isUseMicronautRedirects()}
+         * @since 5.3.0
+         */
+        @Experimental
+        public void setUseMicronautRedirects(boolean useMicronautRedirects) {
+            this.useMicronautRedirects = useMicronautRedirects;
+        }
+    
+        /**
+         * Whether the {@link io.micronaut.http.client.exceptions.HttpClientResponseException} of an
+         * error status of an exchange of the JDK client decodes the error body into the error type of
+         * the exchange, as the Netty client does. Configured by
+         * {@code micronaut.http.client.jdk.decode-error-type}. Default {@code false}: the response of
+         * the exception decodes its body into the body type of the exchange, and the error type is not
+         * used. Only used by the JDK client.
+         *
+         * @return Whether the JDK client decodes the error body into the error type
+         * @since 5.3.0
+         */
+        @Experimental
+        public boolean isDecodeErrorType() {
+            return decodeErrorType;
+        }
+    
+        /**
+         * @param decodeErrorType Whether the JDK client decodes the error body into the error type, see {@link #isDecodeErrorType()}
+         * @since 5.3.0
+         */
+        @Experimental
+        public void setDecodeErrorType(boolean decodeErrorType) {
+            this.decodeErrorType = decodeErrorType;
+        }
     }
 
     /**

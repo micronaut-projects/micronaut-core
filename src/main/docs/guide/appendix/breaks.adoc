@@ -569,8 +569,8 @@ This changes which thread a `suspend` route runs on for applications that annota
 
 The JDK HTTP client preserves its existing redirect, request-timeout, and error-body behaviour by default. The following experimental options enable the corresponding shared-pipeline behaviour:
 
-* `micronaut.http.client.jdk-apply-request-timeout`: applies the configured `request-timeout` to the entire exchange.
-* `micronaut.http.client.jdk-micronaut-redirects`: uses Micronaut redirect handling, including its redirect limit and method rewriting rules.
-* `micronaut.http.client.jdk-decode-error-type`: decodes error responses using the exchange's error type.
+* `micronaut.http.client.jdk.apply-request-timeout`: applies the configured `request-timeout` to the entire exchange.
+* `micronaut.http.client.jdk.use-micronaut-redirects`: uses Micronaut redirect handling, including its redirect limit and method rewriting rules.
+* `micronaut.http.client.jdk.decode-error-type`: decodes error responses using the exchange's error type.
 
 All three options default to `false`. The JDK client also exposes `toAsyncStreaming()` for pulled JSON, byte, and event streams.
