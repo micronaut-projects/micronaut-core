@@ -111,7 +111,24 @@ public final class AnnotationMetadataSupport {
     private static final Map<String, String> REPEATABLE_ANNOTATIONS_CONTAINERS = new ConcurrentHashMap<>(20);
     private static final Map<String, String> CORE_REPEATABLE_ANNOTATIONS_CONTAINERS;
 
-    private static final Map<Class<? extends Annotation>, Function<InvocationHandler, Object>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
+    /**
+     * A {@link ClassValue} rather than a map: it holds no strong reference to the annotation class, so an
+     * application classloader that defined an annotation can be collected once it is replaced.
+     */
+    private static final ClassValue<Function<InvocationHandler, Object>> ANNOTATION_PROXY_CACHE = new ClassValue<>() {
+        @Override
+        protected Function<InvocationHandler, Object> computeValue(Class<?> aClass) {
+            // Annotations loaded by the bootstrap or platform classloader (e.g. java.lang.Deprecated)
+            // cannot see Micronaut's AnnotationValueProvider; in that case fall back to the loader of
+            // AnnotationValueProvider, which still resolves the JDK annotation via parent delegation.
+            ClassLoader annotationLoader = aClass.getClassLoader();
+            ClassLoader proxyLoader = (annotationLoader == null || annotationLoader == ClassLoader.getPlatformClassLoader())
+                ? AnnotationValueProvider.class.getClassLoader()
+                : annotationLoader;
+            Class<?>[] interfaces = {aClass, AnnotationValueProvider.class};
+            return handler -> Proxy.newProxyInstance(proxyLoader, interfaces, handler);
+        }
+    };
     private static final Map<String, Class<? extends Annotation>> ANNOTATION_TYPES = new ConcurrentHashMap<>(20);
 
     /**
@@ -485,11 +502,15 @@ public final class AnnotationMetadataSupport {
     @SuppressWarnings("unchecked")
     static void registerAnnotationType(AnnotationClassValue<?> annotationClassValue) {
         final String name = annotationClassValue.getName();
-        if (!ANNOTATION_TYPES.containsKey(name)) {
-            Class<?> aClass = annotationClassValue.getType().orElse(null);
-            if (aClass != null && Annotation.class.isAssignableFrom(aClass)) {
-                ANNOTATION_TYPES.put(name, (Class<? extends Annotation>) aClass);
-            }
+        final Class<? extends Annotation> registered = ANNOTATION_TYPES.get(name);
+        Class<?> aClass = annotationClassValue.getType().orElse(null);
+        if (aClass == null || !Annotation.class.isAssignableFrom(aClass)) {
+            return;
+        }
+        // the first registration wins for the same loader; a registration by another loader replaces it,
+        // so a reloaded application (a new generation of its classloader) does not pin the retired class
+        if (registered == null || registered.getClassLoader() != aClass.getClassLoader()) {
+            ANNOTATION_TYPES.put(name, (Class<? extends Annotation>) aClass);
         }
     }
 
@@ -536,17 +557,7 @@ public final class AnnotationMetadataSupport {
      * @return The proxy factory
      */
     static Function<InvocationHandler, Object> getProxyFactory(Class<? extends Annotation> annotation) {
-        return ANNOTATION_PROXY_CACHE.computeIfAbsent(annotation, aClass -> {
-            // Annotations loaded by the bootstrap or platform classloader (e.g. java.lang.Deprecated)
-            // cannot see Micronaut's AnnotationValueProvider; in that case fall back to the loader of
-            // AnnotationValueProvider, which still resolves the JDK annotation via parent delegation.
-            ClassLoader annotationLoader = aClass.getClassLoader();
-            ClassLoader proxyLoader = (annotationLoader == null || annotationLoader == ClassLoader.getPlatformClassLoader())
-                ? AnnotationValueProvider.class.getClassLoader()
-                : annotationLoader;
-            Class<?>[] interfaces = {aClass, AnnotationValueProvider.class};
-            return handler -> Proxy.newProxyInstance(proxyLoader, interfaces, handler);
-        });
+        return ANNOTATION_PROXY_CACHE.get(annotation);
     }
 
     /**
