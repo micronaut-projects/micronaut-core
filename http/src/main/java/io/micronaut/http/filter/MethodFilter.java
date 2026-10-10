@@ -454,7 +454,7 @@ record MethodFilter<T>(FilterOrder order,
             // the upstream reactive filter subscribes, so that the downstream filters and the route
             // see the Reactor context of that subscription
             return ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
-                stageContinuation.contextView = contextView;
+                stageContinuation.contextView.set(contextView);
                 return Mono.from(ReactiveExecutionFlow.toPublisher(() -> filter(context, filterMethodContext, null, false)));
             }));
         }
@@ -1152,8 +1152,7 @@ record MethodFilter<T>(FilterOrder order,
         /**
          * The Reactor context of the upstream reactive filter that subscribed to the method, if any.
          */
-        @Nullable
-        private volatile ContextView contextView;
+        private final AtomicReference<@Nullable ContextView> contextView = new AtomicReference<>();
 
         private CompletionStageContinuationImpl(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
                                                 FilterContext filterContext,
@@ -1191,7 +1190,7 @@ record MethodFilter<T>(FilterOrder order,
             } catch (Exception e) {
                 return CompletableFuture.failedFuture(e);
             }
-            ContextView upstreamContextView = contextView;
+            ContextView upstreamContextView = contextView.get();
             if (upstreamContextView != null && !upstreamContextView.isEmpty() && flow instanceof ReactiveExecutionFlow<FilterContext> reactiveFlow) {
                 // the downstream is subscribed to here, not by the upstream reactive filter: it
                 // gets the Reactor context of that filter's subscription
