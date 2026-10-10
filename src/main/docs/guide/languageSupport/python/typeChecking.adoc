@@ -1,0 +1,129 @@
+The compiler can check Python code against the Java types it uses. Decorators are checked against the annotations they resolve to, and calls, attribute reads and constructions are checked against the Java classes and the Python classes of the compilation they are made on. Every problem is reported with its location and an excerpt of the source:
+
+[source]
+----
+error: [python:unknown-method] Java type [java.util.ArrayList] has no method named [ad]; did you mean [add]?
+  --> src/main/python/shop/service.py:14:16
+     |
+  14 |         values.ad(item.title)
+     |                ^^
+----
+
+The checker never guesses: anything it cannot type, such as a value of a third-party Python library, an untyped parameter or a local assigned different types, is left alone. It is experimental and off by default.
+
+== Enabling Type Checking
+
+The annotation processor option `micronaut.python.typecheck` selects the mode:
+
+[cols="1,3"]
+|===
+|Mode |Effect
+
+|`off`
+|Nothing is checked unless switched on by a decorator (the default).
+
+|`warn`
+|Problems are reported as warnings; the compilation succeeds.
+
+|`error`
+|Problems are reported as errors; the compilation fails once all of them are reported.
+|===
+
+Pass the option to `javac` as `-Amicronaut.python.typecheck=error`, or set it on the compiler API:
+
+[source,java]
+----
+PyronautCompiler.builder()
+    .pythonSrc("src/main/python")
+    .typeCheck(TypeCheckMode.ERROR)
+    .pythonDiagnosticCallback(diagnostic -> log.warn(diagnostic.toString()))
+    .build()
+    .compile();
+----
+
+The callback receives every diagnostic before the compiler reports it, with its rule, message, location and suggestions.
+
+== Switching Checking On or Off for a Scope
+
+The `TypeChecked` annotation switches checking for a class, a function or, applied as a bare statement, a module. The nearest declaration wins: a function over its class, a class over its module, a module over the compilation's mode. A scope switched on under mode `off` is checked at `error` severity.
+
+[source,python]
+----
+from jakarta.inject import Singleton
+from micronaut.context.python.annotation import TypeChecked
+
+@Singleton
+@TypeChecked(False)          # <1>
+class LegacyAdapter:
+    def convert(self, payload):
+        return payload.whatever()
+
+@Singleton
+class OrderService:
+    @TypeChecked              # <2>
+    def place(self, order: str) -> str:
+        return order.strip()
+----
+
+<1> The whole class is left unchecked
+<2> The function is checked even when the compilation does not check by default
+
+The annotation is kept in the source only and leaves no trace in the generated classes. The option `micronaut.python.typecheck.annotations` lists, comma separated, the qualified names of the decorators accepted as the switch; the default accepts `io.micronaut.context.python.annotation.TypeChecked` and `pyronaut.build.TypeChecked`. A name is matched by the resolved import, so an alias works without a class of that name on the classpath.
+
+== What Is Checked
+
+Each rule has a stable identifier, shown in the message as `[python:<rule>]`.
+
+[cols="1,3"]
+|===
+|Rule |Reported when
+
+|`unknown-decorator-member`
+|A keyword argument of a decorator names no member of the annotation it resolves to. The member most likely meant is suggested.
+
+|`decorator-member-type`
+|A literal cannot be the value of the annotation member: a number for a `String` member, a list for a member that is not an array, a string that is not a constant of an enum member.
+
+|`decorator-positional`
+|Positional arguments are given to an annotation without a `value` member, or more than one to a Java annotation. A decorator defined in Python takes its positional arguments in the order of its parameters.
+
+|`decorator-target`
+|An annotation is applied to a class or function its targets exclude. An around or introduction binding on a class advises every method of the class and is accepted.
+
+|`not-an-annotation`
+|A Java class that is not an annotation is used as a decorator.
+
+|`unknown-method`, `unknown-attribute`
+|A call or attribute read on a Java receiver names no method, field, nested type or enum constant. A getter is suggested for a missing attribute of its name. Every enum offers `values` and `valueOf` on the class and `name`, `ordinal` and `compareTo` on a constant, and every `Map` the Python mapping protocol.
+
+|`no-matching-overload`, `unknown-constructor`
+|No overload or constructor accepts the arguments, by their number or by the types the checker knows. The candidates are listed. `unknown-constructor` is also reported when an enum or a class without an accessible constructor is instantiated.
+
+|`abstract-instantiation`
+|An interface or an abstract class is instantiated.
+
+|`static-access`
+|An instance method or field is called, read or referenced on the class itself, such as an enum's `name()`.
+
+|`unknown-python-member`
+|A call or attribute read on a Python class of the compilation names nothing in the class, its Python bases, its Java bases or its subclasses in the compilation (the value may be any of them). A nested class is a member of its outer class, and a Java-style accessor of an attribute (`getName` for `name`) is accepted because the value may be the generated Java object. A class is never reported when it defines `__getattr__` or `__getattribute__`, names a metaclass, carries a decorator other than a Java annotation or `dataclass`, or extends a class outside the compilation: any of these can install members the compiler does not see.
+
+|`python-arity`
+|The arguments of a call to a Python function do not fit its signature: too many positional arguments, a missing required argument (positional or keyword-only), a keyword for a positional-only parameter, an unknown or repeated keyword, or arguments to a class without a constructor. A call on the class itself takes the receiver as its first argument unless the method is a class or static method. A construction uses the class's own `__init__`, else the nearest inherited one, else the implicit constructor that takes no arguments.
+
+|`argument-type`
+|An argument the checker can type does not fit the hinted parameter of a Python function.
+|===
+
+The types the checker knows are the Java classes imported into the module, bound with `java.type()` or written out in full after `import java`, the Python classes of the compilation, the hinted parameters of the function, and the locals assigned earlier in the function body. A call of a method of a class of the compilation has the type its return hint names, or the return type of the Java method it implements; an unhinted method has the one type its body returns, when the checker infers one, and an attribute `__init__` assigns a hinted parameter, a Java call or a construction has that type. A Java `String`, boxed number or boolean returned to Python is a Python value at run time, so its methods are never judged; only genuine Java receivers are. The values GraalPy presents as Python standard types, such as `java.time` dates and `UUID`, keep their Java type as they flow through hints, fields, arguments and returns, but their own members are never judged either. Nothing is known of `Object` (an erased type variable says nothing about the value) or of arrays. Only public members count, since the host exposes no others; a Python subclass reaches the protected methods of its Java base as well. A Java type that is not public, or has a supertype that is not public, can have members the compiler does not see; nothing is reported on it. A parameter hinted with an interface or an abstract class may hold any implementation, so a member the type lacks is not reported on it either; the members it declares are still checked. Conversions at the Java boundary are applied when arguments are matched: a Python `str` fits a `String`, `CharSequence`, `char`, `Class` or enum parameter, an `int` fits every numeric type, a `list` fits a `List`, `Collection`, `Iterable` or array, and `None` fits any reference type.
+
+Not checked: comprehensions, lambdas and nested functions, the methods of Python values, the Python classes of other compilations, and constructions involving a `__new__`, a base outside the compilation, a Java base or a decorator that may generate the constructor.
+
+== Running the Existing Tests with Checking On
+
+The tests of a project are the best measure of false positives. `inject-python-test` runs its whole suite at a mode given by a system property:
+
+[source,bash]
+----
+./gradlew :micronaut-inject-python-test:test -Ppython-ci -Dmicronaut.python.typecheck=error
+----
