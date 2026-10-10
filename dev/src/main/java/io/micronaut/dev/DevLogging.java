@@ -187,7 +187,7 @@ final class DevLogging {
     private static final class Logback {
 
         private static final String NONE = "";
-        // the configuration file Logback was configured from last, JVM-wide as Logback is
+        // what Logback was configured with last, JVM-wide as Logback is
         private static volatile @Nullable String configuredFrom;
 
         private Logback() {
@@ -196,15 +196,16 @@ final class DevLogging {
         static void configure(ClassLoader resources, boolean launcher, boolean changed) {
             try {
                 if (LoggerFactory.getILoggerFactory() instanceof LoggerContext context) {
-                    URL found = LogbackUtils.findConfiguration(resources);
-                    String file = found == null ? NONE : found.toExternalForm();
+                    String found = LogbackUtils.describeConfiguration(resources);
+                    String file = found == null ? NONE : found;
                     String current = configuredFrom;
                     if (current == null) {
                         // what Logback's own startup found, through the loader that loaded it
-                        URL own = LogbackUtils.findConfiguration(LoggerContext.class.getClassLoader());
-                        current = own == null ? NONE : own.toExternalForm();
+                        String own = LogbackUtils.describeConfiguration(LoggerContext.class.getClassLoader());
+                        current = own == null ? NONE : own;
                     }
-                    // the configuration Logback has is kept when it is the one found, and the appenders added to it with it
+                    // the configuration Logback has is kept when it is the one found, and the appenders added to it with
+                    // it; an application's Configurator service or file the launcher's loader does not see is applied
                     if (changed || !current.equals(file)) {
                         LogbackUtils.reconfigure(context, resources);
                     }

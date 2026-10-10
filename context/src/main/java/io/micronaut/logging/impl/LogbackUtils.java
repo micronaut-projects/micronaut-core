@@ -49,6 +49,12 @@ import static ch.qos.logback.classic.util.ClassicEnvUtil.loadFromServiceLoader;
  */
 public final class LogbackUtils {
 
+    /**
+     * What {@link #describeConfiguration(ClassLoader)} returns when {@link Configurator} services configure Logback.
+     */
+    @Internal
+    public static final String CONFIGURATOR_SERVICES = "Configurator services";
+
     private LogbackUtils() {
     }
 
@@ -160,17 +166,22 @@ public final class LogbackUtils {
     }
 
     /**
-     * The configuration file that {@link #reconfigure(LoggerContext, ClassLoader)} would configure a Logger Context
-     * from, for development mode to tell whether the one it has moved.
+     * What {@link #reconfigure(LoggerContext, ClassLoader)} would configure a Logger Context with, for development
+     * mode to tell whether it changed: the {@link Configurator} services, or the configuration file.
      *
      * @param resources The loader of the application's resources, or the one that loaded Logback
-     * @return The file, or null when a {@link Configurator} service configures Logback or no file exists
+     * @return {@value #CONFIGURATOR_SERVICES} when a {@link Configurator} service configures Logback, the URL of the
+     * configuration file otherwise, or null when there is neither and Logback falls back to its basic configuration
      * @since 5.3.0
      */
     @Internal
-    public static @Nullable URL findConfiguration(ClassLoader resources) {
+    public static @Nullable String describeConfiguration(ClassLoader resources) {
         try {
-            return hasConfiguratorService(resources) ? null : findConfigurationFile(resources, new File(ClassicConstants.AUTOCONFIG_FILE));
+            if (hasConfiguratorService(resources)) {
+                return CONFIGURATOR_SERVICES;
+            }
+            URL url = findConfigurationFile(resources, new File(ClassicConstants.AUTOCONFIG_FILE));
+            return url == null ? null : url.toExternalForm();
         } catch (MalformedURLException | ServiceConfigurationError e) {
             return null;
         }

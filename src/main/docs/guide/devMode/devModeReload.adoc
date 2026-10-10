@@ -56,7 +56,7 @@ A changed template, static file or message bundle does not restart anything: it 
 
 A changed configuration file restarts the application, retaining nothing.
 
-Logback is configured from the application's resources, in the order Logback's own startup follows: `logback-test.xml`, then `logback.xml`, and the file named by the `logback.configurationFile` system property ahead of both. The launcher does so before it logs anything; when the resources hold no Logback configuration, the launcher and the application log at INFO rather than at the DEBUG of Logback's basic configuration. A changed Logback configuration file applies at once, without a restart, and resets the levels set since, which `logger.levels` sets again at the next restart.
+Logback is configured from the application's resources, in the order Logback's own startup follows: `logback-test.xml`, then `logback.xml`, and the file named by the `logback.configurationFile` system property ahead of both. The launcher does so before it logs anything; when the resources hold no Logback configuration, the launcher and the application log at INFO rather than at the DEBUG of Logback's basic configuration. A changed Logback configuration file applies at once, without a restart, and resets the levels set since, which `logger.levels` sets again at the next restart. Logback itself stays on the launcher's classpath: an `<include resource="...">` and the appender classes a configuration names are looked up there, so a file included from the application's resources is not found, and an appender must come from a dependency rather than from the application's sources; `<include file="...">` works.
 
 == Retaining a bean
 
