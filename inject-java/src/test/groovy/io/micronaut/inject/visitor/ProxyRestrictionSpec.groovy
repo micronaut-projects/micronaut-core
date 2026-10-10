@@ -19,6 +19,8 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.ProxyRestriction
+import io.micronaut.inject.processing.ProcessingException
+import io.micronaut.inject.processing.ProxyableTypeValidator
 import spock.lang.Unroll
 
 /**
@@ -53,5 +55,35 @@ class ProxyRestrictionSpec extends AbstractTypeElementSpec {
             element.toArray().findProxyRestriction().orElse(null)
         } == ProxyRestriction.ARRAY
         PrimitiveElement.INT.findProxyRestriction().orElse(null) == ProxyRestriction.PRIMITIVE
+    }
+
+    @Unroll
+    void "an array of primitives is an array: #description"() {
+        expect:
+        type.findProxyRestriction().orElse(null) == ProxyRestriction.ARRAY
+
+        where:
+        description     | type
+        'int[]'         | PrimitiveElement.INT.toArray()
+        'int[][]'       | PrimitiveElement.INT.toArray().toArray()
+        'boolean[][][]' | PrimitiveElement.BOOLEAN.withArrayDimensions(3)
+    }
+
+    void "an array of primitives declared in the source is an array"() {
+        expect:
+        buildClassElement('package test; class MyBean { int[] values; long[][] grid; MyBean[][] beans; }') { ClassElement element ->
+            ['values', 'grid', 'beans'].collect { String name ->
+                element.findField(name).get().type.findProxyRestriction().orElse(null)
+            }
+        } == [ProxyRestriction.ARRAY, ProxyRestriction.ARRAY, ProxyRestriction.ARRAY]
+    }
+
+    void "the proxy validator rejects an array of primitives as an array"() {
+        when:
+        ProxyableTypeValidator.validateProxyable(PrimitiveElement.INT.toArray(), PrimitiveElement.INT)
+
+        then:
+        def e = thrown(ProcessingException)
+        e.message.startsWith('Cannot apply AOP advice to array type')
     }
 }

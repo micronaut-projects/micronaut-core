@@ -248,11 +248,12 @@ public interface ClassElement extends TypedElement {
      */
     @Experimental
     default Optional<ProxyRestriction> findProxyRestriction() {
-        if (isPrimitive()) {
-            return Optional.of(ProxyRestriction.PRIMITIVE);
-        }
+        // An array of primitives is primitive too, so the array is checked first
         if (isArray()) {
             return Optional.of(ProxyRestriction.ARRAY);
+        }
+        if (isPrimitive()) {
+            return Optional.of(ProxyRestriction.PRIMITIVE);
         }
         if (isEnum()) {
             return Optional.of(ProxyRestriction.ENUM);

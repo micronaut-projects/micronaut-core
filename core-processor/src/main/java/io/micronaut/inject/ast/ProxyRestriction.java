@@ -31,7 +31,7 @@ import io.micronaut.core.annotation.Experimental;
 public enum ProxyRestriction {
 
     /**
-     * A primitive type, which has no subtypes.
+     * A primitive type, which has no subtypes. An array of primitives is an {@link #ARRAY}.
      */
     PRIMITIVE,
 
