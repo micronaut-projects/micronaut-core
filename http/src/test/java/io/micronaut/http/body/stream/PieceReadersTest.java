@@ -132,13 +132,7 @@ class PieceReadersTest {
 
         reader.read(piece("one"));
         reader.complete();
-        assertThrows(IllegalStateException.class, () -> {
-            // the element arrives later on another thread, or not before the end is reported
-            for (int i = 0; i < 100; i++) {
-                reader.poll();
-                Thread.sleep(1);
-            }
-        });
+        assertThrows(IllegalStateException.class, reader::poll);
         reader.close();
     }
 
@@ -160,7 +154,8 @@ class PieceReadersTest {
                 return "";
             }
         };
-        assertThrows(UnsupportedOperationException.class, () -> neither.readChunked(Argument.STRING, MediaType.TEXT_PLAIN_TYPE, HEADERS, Flux.empty()));
+        Flux<ByteBuffer<?>> empty = Flux.empty();
+        assertThrows(UnsupportedOperationException.class, () -> neither.readChunked(Argument.STRING, MediaType.TEXT_PLAIN_TYPE, HEADERS, empty));
     }
 
     @Test
