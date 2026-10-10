@@ -44,7 +44,6 @@ import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanType;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.web.router.RouteBuilder;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
@@ -139,12 +138,12 @@ public final class DevRouter implements Router {
         this.context = context;
         if (context instanceof WatchableBeanContext watchable) {
             // registered while this bean is created: the watches belong to it and close when it is destroyed
-            watchable.watchDefinitions(Argument.of(RouteBuilder.class), null, this::onChange);
-            watchable.watchDefinitions(Argument.of(HttpRoutes.class), null, this::onChange);
-            watchable.watchDefinitions(Argument.OBJECT_ARGUMENT, Qualifiers.byStereotype(Controller.class), this::onChange);
-            watchable.watchDefinitions(Argument.OBJECT_ARGUMENT, Qualifiers.byStereotype(ServerFilter.class), this::onChange);
-            watchable.watchDefinitions(Argument.OBJECT_ARGUMENT, Qualifiers.byStereotype(Filter.class), this::onChange);
-            watchable.watchClassChanges(this::onClassChange);
+            watchable.definitions(RouteBuilder.class).watch(this::onChange);
+            watchable.definitions(HttpRoutes.class).watch(this::onChange);
+            watchable.definitions().stereotype(Controller.class).watch(this::onChange);
+            watchable.definitions().stereotype(ServerFilter.class).watch(this::onChange);
+            watchable.definitions().stereotype(Filter.class).watch(this::onChange);
+            watchable.classChanges().watch(this::onClassChange);
         }
     }
 
