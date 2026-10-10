@@ -430,6 +430,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 .ifPresent(message -> {
                     throw new ProcessingException(originatingElement, message);
                 });
+            for (PythonAstParser.TransformResult transformResult : transformedList) {
+                for (String message : transformResult.validationWarnings()) {
+                    javaVisitorContext.warn("Python source [" + transformResult.originalSource().getName() + "]: " + message, originatingElement);
+                }
+            }
 
             // Then parse the transformed code
             String[] srcDirs = values.src();
