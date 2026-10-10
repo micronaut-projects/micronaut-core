@@ -105,6 +105,7 @@ public final class PythonAstParser {
     // the class elements they hold belong to one javac task
     private static final Source TRANSFORM_CACHES_SOURCE = Source.newBuilder(PYTHON, "_mn_transform_caches = {}", "micronaut-transform-caches.py").cached(true).buildLiteral();
     private static final Source PROCESSOR_CACHES_SOURCE = Source.newBuilder(PYTHON, "_mn_processor_caches = {}", "micronaut-processor-caches.py").cached(true).buildLiteral();
+    private static final String VISITOR_CONTEXT_MEMBER = "visitor_context";
     private static final Source TYPE_CHECKER_SOURCE = Source.newBuilder(PYTHON, """
         if type_check_enabled:
             from micronaut_typecheck import TypeChecker
@@ -153,7 +154,7 @@ public final class PythonAstParser {
         context.initialize(PYTHON);
         context.eval(COMPILE_RUNTIME_AST_SOURCE);
         runtimeAstCompiler = context.getBindings(PYTHON).getMember("_mn_compile_runtime_ast");
-        PipelineTimings.record(PipelineTimings.CONTEXT, started);
+        PipelineTimings.stop(PipelineTimings.CONTEXT, started);
     }
 
     /**
@@ -301,7 +302,7 @@ public final class PythonAstParser {
         bindings.putMember("has_parsed_tree", tree != null);
         bindings.putMember("parsed_tree", tree != null ? tree : "");
         bindings.putMember("package_name", packageName);
-        bindings.putMember("visitor_context", visitorContext);
+        bindings.putMember(VISITOR_CONTEXT_MEMBER, visitorContext);
         bindings.putMember("file_name", fileName);
         bindings.putMember("source_path", sourcePath);
         bindings.putMember("src_root", srcRoot);
@@ -421,7 +422,7 @@ public final class PythonAstParser {
         try {
             return parseTransformedTimed(transformed, srcDirs, visitorContext, typeCheck, staticCompilation);
         } finally {
-            PipelineTimings.record(PipelineTimings.PARSE, started);
+            PipelineTimings.stop(PipelineTimings.PARSE, started);
         }
     }
 
@@ -475,10 +476,10 @@ public final class PythonAstParser {
         if (checker == null || checker.isNull()) {
             return List.of();
         }
-        bindings.putMember("visitor_context", visitorContext);
+        bindings.putMember(VISITOR_CONTEXT_MEMBER, visitorContext);
         long started = PipelineTimings.start();
         context.eval(TYPE_CHECK_SOURCE);
-        PipelineTimings.record(PipelineTimings.TYPE_CHECK, started);
+        PipelineTimings.stop(PipelineTimings.TYPE_CHECK, started);
         Value diagnostics = bindings.getMember("diagnostics");
         return diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class));
     }
@@ -499,10 +500,10 @@ public final class PythonAstParser {
         if (planner == null || planner.isNull()) {
             return StaticCompilationPlan.EMPTY;
         }
-        bindings.putMember("visitor_context", visitorContext);
+        bindings.putMember(VISITOR_CONTEXT_MEMBER, visitorContext);
         long started = PipelineTimings.start();
         context.eval(STATIC_PLAN_SOURCE);
-        PipelineTimings.record(PipelineTimings.PLAN, started);
+        PipelineTimings.stop(PipelineTimings.PLAN, started);
         Value decisions = bindings.getMember("static_decisions");
         Value bodies = bindings.getMember("static_bodies");
         Value diagnostics = bindings.getMember("static_diagnostics");
@@ -814,7 +815,7 @@ public final class PythonAstParser {
             long started = PipelineTimings.start();
             try {
                 result = context.eval(TRANSFORM_SOURCE);
-                PipelineTimings.record(PipelineTimings.TRANSFORM, started);
+                PipelineTimings.stop(PipelineTimings.TRANSFORM, started);
             } catch (Exception e) {
                 StringWriter stack = new StringWriter();
                 e.printStackTrace(new PrintWriter(stack));
