@@ -78,6 +78,7 @@ An engine accepts only one host access configuration for all its contexts. The P
 
 * The engine is kept with the host access of its generation. That host access is built from the target type mappings of the first context.
 * A context of a new generation retires both. The retired engine closes when its last context closes, so it does not keep the retired generation reachable.
+* When the launcher closes, it releases the engine of the last generation in the same way.
 * An application with a target type mapping that has instance fields does not share an engine. A shared host access would convert with the mapping instances of another context.
 * A change to the `graalpy.engine` configuration replaces the warm engine.
 

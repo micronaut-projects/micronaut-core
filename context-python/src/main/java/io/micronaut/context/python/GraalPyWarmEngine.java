@@ -16,6 +16,7 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.env.DevelopmentMode;
+import io.micronaut.context.reload.LauncherCloseActions;
 import io.micronaut.core.value.PropertyResolver;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.HostAccess;
@@ -117,6 +118,8 @@ final class GraalPyWarmEngine {
             } else {
                 retired = generation;
                 current = new Generation(classLoader, List.copyOf(mappingTypes), List.copyOf(functionalInterfaces), hostAccess);
+                // the last generation's engine is retired by no next one: the launcher releases it as it closes
+                LauncherCloseActions.register(GraalPyWarmEngine.class.getName(), GraalPyWarmEngine::reset);
             }
         }
         retire(retired);
@@ -171,7 +174,7 @@ final class GraalPyWarmEngine {
     }
 
     /**
-     * Forgets the warm generation and closes its engine once its contexts are closed.
+     * Forgets the warm generation and closes its engine once its contexts are closed: the launcher closes.
      */
     static void reset() {
         Generation retired;

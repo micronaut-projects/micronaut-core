@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Factory;
@@ -60,14 +61,15 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
      * generation start share one engine, which stays warm across them; see {@link GraalPyWarmEngine}.
      *
      * @param engineConfiguration The engine configuration
-     * @param hostAccess The host access of the contexts, which a warm engine is kept with
+     * @param hostAccess The host access of the contexts, which a warm engine is kept with, resolved only then: a
+     *                   target type mapping may depend on the engine
      * @param environment The environment
      * @return The shared Python polyglot engine.
      */
     @Singleton
     @Named(PythonContextRuntime.PYTHON)
     Engine pythonEngine(GraalPyEngineConfiguration engineConfiguration,
-                        @Named(PythonContextRuntime.PYTHON) HostAccess hostAccess,
+                        @Named(PythonContextRuntime.PYTHON) BeanProvider<HostAccess> hostAccess,
                         Environment environment) {
         if (PythonContextRuntime.isInitialized() && PythonContextRuntime.isReuseContext()) {
             // A reusable bootstrap context brings its own engine. Sharing it keeps compiled code
@@ -79,7 +81,7 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
         }
         if (GraalPyWarmEngine.isEnabled(environment)) {
             // test mode: the contexts the tests of the generation start share an engine, which stays warm across them
-            return GraalPyWarmEngine.engine(hostAccess, environment.getProperties(GraalPyEngineConfiguration.PREFIX, StringConvention.RAW),
+            return GraalPyWarmEngine.engine(hostAccess.get(), environment.getProperties(GraalPyEngineConfiguration.PREFIX, StringConvention.RAW),
                 () -> createPythonEngine(engineConfiguration));
         }
         return createPythonEngine(engineConfiguration);

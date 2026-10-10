@@ -26,6 +26,7 @@ import io.micronaut.context.reload.InPlaceResourceReloader;
 import io.micronaut.context.reload.ReloadCompletedEvent;
 import io.micronaut.context.reload.ReloadStrategy;
 import io.micronaut.context.reload.RequestAdmission;
+import io.micronaut.context.reload.LauncherCloseActions;
 import io.micronaut.context.reload.RequestAdmissionHolder;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.watch.ConfigurationChange;
@@ -902,6 +903,8 @@ public final class DevRuntime implements Closeable {
             // whatever failed to stop: the threads of the shared schedulers end with them, and the schedule hook
             // keeps this runtime's loader no longer
             memory.releaseReactorThreads();
+            // what modules kept across this runtime's contexts, such as a warm GraalPy engine, and the generation it holds
+            LauncherCloseActions.runAll();
             // whatever failed to stop, whoever waits for the runtime to close is released
             RequestAdmissionHolder.uninstall(requests);
             CURRENT.compareAndSet(this, null);

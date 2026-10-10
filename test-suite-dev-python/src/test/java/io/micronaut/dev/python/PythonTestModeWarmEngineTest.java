@@ -96,6 +96,12 @@ class PythonTestModeWarmEngineTest {
         assertNotEquals(firstRun.get(0).engineId(), last.engineId(), "the new generation kept the retired generation's engine");
 
         awaitCollected(retired, "the warm engine of the retired generation");
+
+        // no generation retires the last one: the launcher releases it as it closes
+        WeakReference<Engine> lastEngine = last.engine();
+        runtime.close();
+        runtime = null;
+        awaitCollected(lastEngine, "the warm engine of the last generation, after the launcher closed");
         System.out.println("PYW warm: " + timings(firstRun) + " then " + timings(secondRun));
     }
 
