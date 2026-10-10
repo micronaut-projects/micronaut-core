@@ -161,16 +161,14 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
 
         @Override
         protected Class<?> findClass(String name) throws ClassNotFoundException {
-            try {
-                return super.findClass(name);
-            } catch (ClassNotFoundException e) {
-                int lastDot = name.lastIndexOf('.');
-                ClassLoader jdk = lastDot > 0 ? JDK_PACKAGES.get(name.substring(0, lastDot)) : null;
-                if (jdk == null) {
-                    throw e;
-                }
+            // a package of the JDK's modules comes from the JDK first, as javac's own loader would delegate it, so that
+            // a copy of the compiler's classes bundled on the processor path does not replace them
+            int lastDot = name.lastIndexOf('.');
+            ClassLoader jdk = lastDot > 0 ? JDK_PACKAGES.get(name.substring(0, lastDot)) : null;
+            if (jdk != null) {
                 return jdk.loadClass(name);
             }
+            return super.findClass(name);
         }
 
         private static Map<String, ClassLoader> jdkPackages() {
