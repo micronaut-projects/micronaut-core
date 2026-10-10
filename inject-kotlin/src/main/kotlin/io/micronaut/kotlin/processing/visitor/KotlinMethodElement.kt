@@ -139,18 +139,21 @@ internal open class KotlinMethodElement(
         var type: ClassElement? = owningType
         while (type != null && type.name != declaringType.name) {
             for (anInterface in type.interfaces) {
-                if (declaringType.isAssignable(anInterface)) {
-                    continue
-                }
-                for (candidate in anInterface.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance().named(name))) {
-                    if (!candidate.isPrivate && isSubSignature(candidate) && !implementedMethods.contains(candidate)) {
-                        implementedMethods.add(candidate)
-                    }
+                if (!declaringType.isAssignable(anInterface)) {
+                    addImplementedMethods(anInterface, implementedMethods)
                 }
             }
             type = type.superType.orElse(null)
         }
         return implementedMethods
+    }
+
+    private fun addImplementedMethods(anInterface: ClassElement, implementedMethods: MutableList<MethodElement>) {
+        for (candidate in anInterface.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance().named(name))) {
+            if (!candidate.isPrivate && isSubSignature(candidate) && !implementedMethods.contains(candidate)) {
+                implementedMethods.add(candidate)
+            }
+        }
     }
 
     override fun withNewOwningType(owningType: ClassElement): MethodElement {
