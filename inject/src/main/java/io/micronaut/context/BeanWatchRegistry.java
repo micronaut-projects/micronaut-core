@@ -1175,8 +1175,7 @@ final class BeanWatchRegistry {
             this.qualifier = qualifier;
             this.watcher = watcher;
             this.handlers = handlers;
-            this.processedAtStartup = context.resolveMetadata(annotationType)
-                .booleanValue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP).orElse(false);
+            this.processedAtStartup = isProcessedOnStartup(annotationType);
         }
 
         @Override
@@ -1272,15 +1271,17 @@ final class BeanWatchRegistry {
         }
 
         private List<BeanExecutableMethod<A>> current() {
-            // an annotation processed at startup has every bean carrying it in the processed-beans index, which
-            // costs nothing to read; any other annotation can sit on a method without marking its bean, and only
-            // a scan of the definitions finds those
+            // an annotation processed at startup has every compiled bean carrying it in the processed-beans index,
+            // which costs nothing to read, and a definition registered at runtime is outside that index; any other
+            // annotation can sit on a method without marking its bean, and only a scan of the definitions finds
+            // those, which decides the conditions of the definitions it finds only
             Set<BeanDefinition<?>> candidates = new LinkedHashSet<>();
             if (processedAtStartup) {
                 candidates.addAll(context.processedBeanDefinitions());
                 candidates.addAll(context.getBeanDefinitions(Qualifiers.byStereotype(annotationType)));
+                candidates.addAll(context.definitionsWithMethodsAnnotated(annotationType, true));
             } else {
-                candidates.addAll(context.getAllBeanDefinitions());
+                candidates.addAll(context.definitionsWithMethodsAnnotated(annotationType, false));
             }
             return entries(resolve(candidates, true));
         }
@@ -1475,6 +1476,44 @@ final class BeanWatchRegistry {
         Set<BeanDefinition<T>> resolved = new LinkedHashSet<>();
         context.collectIterableBeans(null, definition, resolved, beanType != null ? beanType : (Argument<T>) Argument.OBJECT_ARGUMENT);
         return resolved;
+    }
+
+    /**
+     * Whether the methods annotated with an annotation are processed at startup: whether the annotation is annotated
+     * {@code @Executable(processOnStartup = true)}, directly or through one of its stereotypes, as the compiler reads
+     * it. An annotation type has no bean whose metadata could be resolved and no compiled metadata of its own, so
+     * its declared annotations are read; where they cannot be, it is not, and a watch scans the definitions for it
+     * instead.
+     *
+     * @param annotationType The annotation
+     * @return Whether its methods are processed at startup
+     */
+    static boolean isProcessedOnStartup(Class<? extends Annotation> annotationType) {
+        try {
+            return isProcessedOnStartup(annotationType, Collections.newSetFromMap(new IdentityHashMap<>()));
+        } catch (RuntimeException | LinkageError e) {
+            // a meta-annotation, or a class one of them names, is missing from the class path
+            return false;
+        }
+    }
+
+    private static boolean isProcessedOnStartup(Class<? extends Annotation> annotationType, Set<Class<?>> visited) {
+        if (!visited.add(annotationType)) {
+            return false;
+        }
+        Executable executable = annotationType.getAnnotation(Executable.class);
+        if (executable != null && executable.processOnStartup()) {
+            return true;
+        }
+        for (Annotation stereotype : annotationType.getAnnotations()) {
+            Class<? extends Annotation> stereotypeType = stereotype.annotationType();
+            if (stereotypeType != Executable.class
+                && !stereotypeType.getName().startsWith("java.lang.annotation.")
+                && isProcessedOnStartup(stereotypeType, visited)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
