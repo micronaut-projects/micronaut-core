@@ -356,6 +356,99 @@ class PythonCollector(VarargsBase):
         ctx?.close()
     }
 
+    void "Python calls inherited methods of a Java base from its constructor"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.python.annotation.processing.test.javabases import VarargsBase
+
+
+@Singleton
+class PythonBuilt(VarargsBase):
+    def __init__(self):
+        self.add("before")
+        super().__init__()
+        self.add(VarargsBase.Item("built"))
+        self.addAll(VarargsBase.Item("first"))
+
+
+class Labelled(VarargsBase):
+    def __init__(self, label: str, suffix: str = "!"):
+        super().__init__()
+        self.add(label + suffix)
+
+
+class LabelledChild(Labelled):
+    def __init__(self):
+        super().__init__("child")
+        self.add("after")
+
+
+class Allocated(VarargsBase):
+    def __new__(cls, label: str):
+        instance = super().__new__(cls)
+        instance.allocated = "new:" + label
+        return instance
+
+    def __init__(self, label: str):
+        super().__init__()
+        self.add(self.allocated)
+
+
+class Returning(VarargsBase):
+    def __init__(self):
+        super().__init__()
+        return 1
+''', true)
+
+        when:
+        VarargsBase built = ctx.getBean(VarargsBase)
+
+        then: 'the Java instance the context holds is the one the constructor added to'
+        built.items == ['t:before', 'built', 'i:first']
+        ((ValueCoercible) built).asPolyglotValue().as(VarargsBase).is(built)
+
+        when: 'an instance is created from Java with constructor arguments, with and without the defaulted one'
+        Class<?> labelled = ctx.classLoader.loadClass('python.Labelled')
+        VarargsBase fromJava = labelled.getConstructor(String, String).newInstance('java', '?')
+        VarargsBase defaulted = labelled.getConstructor(String, String).newInstance('defaulted', null)
+
+        then:
+        fromJava.items == ['t:java?']
+        ((ValueCoercible) fromJava).asPolyglotValue().as(VarargsBase).is(fromJava)
+        defaulted.items == ['t:defaulted!']
+
+        when: 'an instance is created in Python'
+        Context polyglot = ctx.getBean(Context)
+        VarargsBase fromPython = polyglot.eval('python', 'Labelled("python")').as(VarargsBase)
+
+        then:
+        fromPython.items == ['t:python!']
+
+        when: 'a subclass of the Python class is created from Java'
+        VarargsBase child = ctx.classLoader.loadClass('python.LabelledChild').getConstructor().newInstance()
+
+        then:
+        child.items == ['t:child!', 't:after']
+        ((ValueCoercible) child).asPolyglotValue().as(VarargsBase).is(child)
+
+        when: 'a class allocating its instances in __new__ is created from Java'
+        VarargsBase allocated = ctx.classLoader.loadClass('python.Allocated').getConstructor(String).newInstance('java')
+
+        then: '__new__ receives the constructor arguments before __init__ runs'
+        allocated.items == ['t:new:java']
+
+        when: 'the __init__ of a class returns a value'
+        ctx.classLoader.loadClass('python.Returning').getConstructor().newInstance()
+
+        then: 'it is the error a call of the class raises'
+        Throwable error = thrown()
+        (error instanceof java.lang.reflect.InvocationTargetException ? error.cause : error).message.contains('__init__() should return None')
+
+        cleanup:
+        ctx?.close()
+    }
+
     void "Python number literals reach boxed constructor parameters by widening"() {
         given:
         ApplicationContext ctx = buildContext('''

@@ -19,6 +19,29 @@ def __micronaut_new_uninitialized_instance(cls):
     return object.__new__(cls)
 
 
+def __micronaut_allocate_instance(cls, *args):
+    """Allocates an instance as cls(*args) would, through the __new__ of the class, without __init__.
+
+    Returns the instance and whether it is initialized already: a metaclass customizing __call__
+    creates it, so the class is called as it is.
+    """
+    if type(cls).__call__ is not type.__call__:
+        return [cls(*args), True]
+    new = cls.__new__
+    if new is object.__new__:
+        return [object.__new__(cls), False]
+    return [new(cls, *args), False]
+
+
+def __micronaut_initialize_instance(instance, cls, *args):
+    """Runs __init__ on an instance __micronaut_allocate_instance returned, as cls(*args) would: only
+    when the instance is one of the class, and __init__ has to return None."""
+    if isinstance(instance, cls):
+        result = type(instance).__init__(instance, *args)
+        if result is not None:
+            raise TypeError(f"__init__() should return None, not '{type(result).__name__}'")
+
+
 def __micronaut_set_instance_property(instance, name, value):
     object.__setattr__(instance, name, value)
     return instance

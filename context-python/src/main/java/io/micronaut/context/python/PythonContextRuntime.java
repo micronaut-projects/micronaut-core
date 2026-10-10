@@ -66,6 +66,8 @@ public final class PythonContextRuntime {
     public static final String PYTHON = "python";
 
     private static final String NEW_UNINITIALIZED_INSTANCE = "__micronaut_new_uninitialized_instance";
+    private static final String ALLOCATE_INSTANCE = "__micronaut_allocate_instance";
+    private static final String INITIALIZE_INSTANCE = "__micronaut_initialize_instance";
     private static final String SET_INSTANCE_PROPERTY = "__micronaut_set_instance_property";
     private static final String SET_INSTANCE_PROPERTIES = "__micronaut_set_instance_properties";
     private static final String PREPARE_INTRODUCTION = "__micronaut_prepare_introduction";
@@ -1160,6 +1162,102 @@ public final class PythonContextRuntime {
             populateProperties(instance, props);
             return instance;
         });
+    }
+
+    /**
+     * Allocate an instance of a class as {@link #newInstance(PythonClassReference, Object...)} would,
+     * through the {@code __new__} of the class with the constructor arguments, without running
+     * {@code __init__}, which {@link #initializeInstance(AllocatedInstance)} runs next with the same
+     * arguments. A Python class extending a Java class whose super constructor takes no argument is
+     * created this way: the generated Java instance is constructed and bound to the Python object in
+     * between, so that the inherited Java methods {@code __init__} calls run on it. A class whose
+     * metaclass customizes {@code __call__} is created by calling it, as before.
+     *
+     * @param classReference The Python class reference
+     * @param args The args
+     * @return The allocated instance
+     * @since 5.2.16
+     */
+    @UsedByGeneratedCode
+    public static AllocatedInstance allocateInstance(PythonClassReference classReference, Object... args) {
+        Context context = getContext();
+        return PythonContextRegistry.withExecutionFrame(context, () -> {
+            Value pythonClass = findClass(classReference, context);
+            Object[] arguments = PythonCoercion.coerceArgumentsToContext(context, constructorArguments(context, classReference, pythonClass, args));
+            Object[] helperArguments = new Object[arguments.length + 1];
+            helperArguments[0] = pythonClass;
+            System.arraycopy(arguments, 0, helperArguments, 1, arguments.length);
+            Value allocation = withContextClassLoader(() -> helper(context, ALLOCATE_INSTANCE).execute(helperArguments));
+            return new AllocatedInstance(allocation.getArrayElement(0), pythonClass, arguments, allocation.getArrayElement(1).asBoolean());
+        });
+    }
+
+    /**
+     * Allocate an instance of a class without {@code __init__}, omitting trailing null arguments that
+     * correspond to Python constructor defaults.
+     *
+     * @param classReference The Python class reference
+     * @param requiredArgCount The number of non-defaulted positional constructor arguments
+     * @param args The arguments
+     * @return The allocated instance
+     * @since 5.2.16
+     */
+    @UsedByGeneratedCode
+    public static AllocatedInstance allocateInstanceWithDefaultedTrailingNulls(PythonClassReference classReference,
+                                                                               int requiredArgCount,
+                                                                               Object... args) {
+        return allocateInstance(classReference, trimDefaultedTrailingNulls(requiredArgCount, args));
+    }
+
+    /**
+     * Run {@code __init__} on an instance {@link #allocateInstance} returned, with the arguments
+     * {@code __new__} received, as a call of the class would: only when the instance is one of the
+     * class and was not created by a customized metaclass {@code __call__} already.
+     *
+     * @param allocated The allocated instance
+     * @since 5.2.16
+     */
+    @UsedByGeneratedCode
+    public static void initializeInstance(AllocatedInstance allocated) {
+        if (allocated.initialized) {
+            return;
+        }
+        Context context = allocated.instance.getContext();
+        PythonContextRegistry.withExecutionFrame(context, () -> {
+            Object[] helperArguments = new Object[allocated.arguments.length + 2];
+            helperArguments[0] = allocated.instance;
+            helperArguments[1] = allocated.pythonClass;
+            System.arraycopy(allocated.arguments, 0, helperArguments, 2, allocated.arguments.length);
+            return withContextClassLoader(() -> helper(context, INITIALIZE_INSTANCE).execute(helperArguments));
+        });
+    }
+
+    /**
+     * An instance allocated by {@link #allocateInstance}, with the arguments its {@code __init__}
+     * receives from {@link #initializeInstance(AllocatedInstance)}.
+     *
+     * @since 5.2.16
+     */
+    public static final class AllocatedInstance {
+        private final Value instance;
+        private final Value pythonClass;
+        private final Object[] arguments;
+        private final boolean initialized;
+
+        private AllocatedInstance(Value instance, Value pythonClass, Object[] arguments, boolean initialized) {
+            this.instance = instance;
+            this.pythonClass = pythonClass;
+            this.arguments = arguments;
+            this.initialized = initialized;
+        }
+
+        /**
+         * @return The instance, not initialized yet
+         */
+        @UsedByGeneratedCode
+        public Value instance() {
+            return instance;
+        }
     }
 
     /**
