@@ -53,6 +53,9 @@ public final class ReactorAbsentBinderProbe {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static void main(String[] args) throws Exception {
+        if (args.length != 0) {
+            throw new IllegalArgumentException("This probe takes no arguments");
+        }
         if (ReactorAbsentBinderProbe.class.getClassLoader().getResource("reactor/core/publisher/Mono.class") != null) {
             throw new AssertionError("Reactor must be absent for this probe");
         }

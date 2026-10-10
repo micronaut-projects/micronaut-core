@@ -93,8 +93,8 @@ class SharedFormBindersTest {
              var bytes = BODIES.copyOf("form", StandardCharsets.UTF_8)) {
             request.failDecoderCreation = true;
             ServerBodyAnnotationBinder<Map> binder = context.getBean(ServerBodyAnnotationBinder.class);
-            assertThrows(UnsupportedOperationException.class, () -> binder.transform(request, request,
-                ConversionContext.of(Map.class), bytes));
+            var conversion = ConversionContext.of(Map.class);
+            assertThrows(UnsupportedOperationException.class, () -> binder.transform(request, request, conversion, bytes));
             assertThrows(IllegalStateException.class, bytes::move);
         }
     }
@@ -226,7 +226,8 @@ class SharedFormBindersTest {
             request.delayed.tryEmitNext(queued);
             future.cancel(false);
             assertEquals(0, request.delayed.currentSubscriberCount());
-            assertThrows(IllegalStateException.class, () -> ((AvailableByteBody) queued.byteBody()).toReadBuffer());
+            AvailableByteBody queuedBody = (AvailableByteBody) queued.byteBody();
+            assertThrows(IllegalStateException.class, queuedBody::toReadBuffer);
             streaming.sharedBuffer().complete();
         }
     }
@@ -407,7 +408,7 @@ class SharedFormBindersTest {
             }
             ((CloseableByteBody) bytes).close();
             Publisher<RawFormField> source = delayed == null ? Flux.just(field) : delayed.asFlux();
-            return wrapPublisher ? subscriber -> source.subscribe(subscriber) : source;
+            return wrapPublisher ? source::subscribe : source;
         }
 
         @Override

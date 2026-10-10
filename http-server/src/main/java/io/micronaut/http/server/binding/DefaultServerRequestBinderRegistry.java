@@ -51,6 +51,7 @@ public class DefaultServerRequestBinderRegistry implements ServerRequestBinderRe
      * @param formFactory Form utilities
      */
     @Inject
+    @SuppressWarnings({"rawtypes", "java:S3740"}) // Match the legacy registry constructor that accepts raw binders.
     public DefaultServerRequestBinderRegistry(ConversionService conversionService,
                                             List<RequestArgumentBinder> binders,
                                             ServerBodyAnnotationBinder<Object> bodyBinder,

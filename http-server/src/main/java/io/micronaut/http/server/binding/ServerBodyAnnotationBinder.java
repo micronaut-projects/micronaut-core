@@ -176,7 +176,7 @@ public class ServerBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T
                         pending.completed = true;
                         return null;
                     });
-                } catch (Throwable e) {
+                } catch (Exception | Error e) {
                     return ExecutionFlow.error(e);
                 }
             })));
