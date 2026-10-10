@@ -39,7 +39,7 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Internal
-public final class ResponseSubscriberElements<X, T> extends PulledBodyElements<T> implements Subscriber<HttpResponse<X>> {
+final class ResponseSubscriberElements<X, T> extends PulledBodyElements<T> implements Subscriber<HttpResponse<X>> {
 
     private final CompletableFuture<HttpResponse<BodyElements<T>>> response = new CompletableFuture<>();
     private final Function<? super X, ? extends T> element;

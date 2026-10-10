@@ -1004,9 +1004,33 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @param errorType         The error type
      * @return The flow of the response, whose body is the pieces of the response body
      */
-    private ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> dataStreamFlow(PropagatedContext propagatedContext, MutableHttpRequest<?> request, Argument<?> errorType) {
-        return exchangeElementsFlow(propagatedContext, request, errorType, shouldBufferErrorBody(errorType),
-            (req, response) -> ElementsResponse.of(response, streamPieces(response.byteBody().move(), isAcceptEvents(req))));
+    private ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> dataStreamFlow(PropagatedContext propagatedContext, MutableHttpRequest<?> request, @Nullable Argument<?> errorType) {
+        return dataStreamFlow(propagatedContext, request, errorType, false);
+    }
+
+    private ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> dataStreamFlow(PropagatedContext propagatedContext, MutableHttpRequest<?> request, @Nullable Argument<?> errorType, boolean allowReplacement) {
+        return exchangeElementsFlow(propagatedContext, request, errorType == null ? DEFAULT_ERROR_TYPE : errorType, shouldBufferErrorBody(errorType),
+            (req, response) -> ElementsResponse.of(response, streamPieces(response.byteBody().move(), isAcceptEvents(req))), allowReplacement);
+    }
+
+    /**
+     * Decode a buffered streaming error response.
+     * @param errorType The error body type
+     * @param response The response
+     * @param body The buffered body
+     * @return The failed response flow
+     */
+    protected ExecutionFlow<? extends HttpResponse<?>> streamingErrorResponse(Argument<?> errorType, R response, CloseableAvailableByteBody body) {
+        return fullResponse(null, errorType, response, body);
+    }
+
+    /**
+     * Adapt a full response supplied by a filter for a streaming exchange.
+     * @param response The replacement response
+     * @return The body pieces
+     */
+    protected Publisher<ByteBuffer<?>> replacementResponsePieces(HttpResponse<?> response) {
+        return Flux.fromIterable(response.getBody(ByteBuffer.class).stream().toList()).map(buffer -> (ByteBuffer<?>) buffer);
     }
 
     /**
@@ -1095,12 +1119,21 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                                                                                 Argument<?> errorType,
                                                                                 boolean bufferErrorBody,
                                                                                  BiFunction<HttpRequest<?>, R, HttpResponse<BodyElements<T>>> elements) {
+        return exchangeElementsFlow(propagatedContext, mutableRequest, errorType, bufferErrorBody, elements, false);
+    }
+
+    private <T> ExecutionFlow<HttpResponse<BodyElements<T>>> exchangeElementsFlow(PropagatedContext propagatedContext,
+                                                                                MutableHttpRequest<?> mutableRequest,
+                                                                                Argument<?> errorType,
+                                                                                boolean bufferErrorBody,
+                                                                                BiFunction<HttpRequest<?>, R, HttpResponse<BodyElements<T>>> elements,
+                                                                                boolean allowReplacement) {
         return exchangeStreamingFlow(propagatedContext, mutableRequest, errorType, bufferErrorBody, elements,
             BodyElements.class, () -> {
                 @SuppressWarnings("unchecked")
                 BodyElements<T> none = (BodyElements<T>) (BodyElements<?>) BodyPieces.elements(AvailableByteArrayBody.create(ByteArrayBufferFactory.INSTANCE, new byte[0]));
                 return none;
-            }, ElementsStages::closeElements);
+            }, ElementsStages::closeElements, allowReplacement);
     }
 
     private <T> ExecutionFlow<HttpResponse<T>> exchangeStreamingFlow(PropagatedContext propagatedContext,
@@ -1111,6 +1144,18 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                                                                     Class<?> bodyType,
                                                                     Supplier<T> empty,
                                                                     java.util.function.Consumer<HttpResponse<T>> close) {
+        return exchangeStreamingFlow(propagatedContext, mutableRequest, errorType, bufferErrorBody, elements, bodyType, empty, close, false);
+    }
+
+    private <T> ExecutionFlow<HttpResponse<T>> exchangeStreamingFlow(PropagatedContext propagatedContext,
+                                                                    MutableHttpRequest<?> mutableRequest,
+                                                                    Argument<?> errorType,
+                                                                    boolean bufferErrorBody,
+                                                                    BiFunction<HttpRequest<?>, R, HttpResponse<T>> elements,
+                                                                    Class<?> bodyType,
+                                                                    Supplier<T> empty,
+                                                                    java.util.function.Consumer<HttpResponse<T>> close,
+                                                                    boolean allowReplacement) {
         // the last response with elements, closed if a filter replaces it
         AtomicReference<@Nullable HttpResponse<T>> created = new AtomicReference<>();
         return resolveRequestURI(mutableRequest).flatMap(target -> sendRequestWithRedirects(
@@ -1129,7 +1174,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                     // the error body is decoded into the error type, as for exchange
                     return InternalByteBody.bufferFlow(resp.byteBody())
                         .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t)))
-                        .flatMap(av -> fullResponse(null, errorType, resp, av));
+                        .flatMap(av -> streamingErrorResponse(errorType, resp, av));
                 }
                 if (!hasBody(resp)) {
                     // no element
@@ -1151,6 +1196,11 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 if (replaced != null) {
                     // nobody reads them: the connection is released
                     close.accept(replaced);
+                }
+                if (allowReplacement) {
+                    @SuppressWarnings("unchecked")
+                    HttpResponse<T> replacement = (HttpResponse<T>) response;
+                    return ExecutionFlow.just(replacement);
                 }
                 return ExecutionFlow.error(new IllegalStateException("Response has been replaced by a response without elements. Do not replace the response in client filters for streaming requests"));
             }
@@ -1239,6 +1289,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
             return toMono(exchangeElementsFlow(propagatedContext, toMutableRequest(request), errorType == null ? DEFAULT_ERROR_TYPE : errorType, shouldBufferErrorBody(errorType),
                 (req, response) -> EventStreams.eventStreamResponse(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate)), propagatedContext)
+                .onErrorMap(t -> t instanceof HttpClientException ? t : decorate(new HttpClientException("Error consuming Server Sent Events: " + t.getMessage(), t)))
                 .flatMapMany(AbstractHttpClient::elements);
         });
     }
@@ -1255,7 +1306,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         // the request is sent with the context of the caller, as it always was
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return afterSubscribe(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType == null ? DEFAULT_ERROR_TYPE : errorType), propagatedContext)
+        return afterSubscribe(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType), propagatedContext)
             .flatMapMany(response -> streamPiecesPublisher(Objects.requireNonNull(response.body(), "The response has no body"))));
     }
 
@@ -1268,10 +1319,17 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(HttpRequest<I> request, Argument<?> errorType) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return afterSubscribe(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType), propagatedContext)
+        return afterSubscribe(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType, true), propagatedContext)
             .flatMapMany(response -> {
-                BodyElements<ByteBuffer<?>> pieces = Objects.requireNonNull(response.body(), "The response has no body");
-                return Flux.from(streamPiecesPublisher(pieces))
+                Publisher<ByteBuffer<?>> body;
+                if (response.getBody().orElse(null) instanceof BodyElements<?> elements) {
+                    @SuppressWarnings("unchecked")
+                    BodyElements<ByteBuffer<?>> pieces = (BodyElements<ByteBuffer<?>>) elements;
+                    body = streamPiecesPublisher(pieces);
+                } else {
+                    body = replacementResponsePieces(response);
+                }
+                return Flux.from(body)
                     .map(piece -> (HttpResponse<ByteBuffer<?>>) new ElementResponse<>(response, piece));
             }));
     }

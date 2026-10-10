@@ -37,6 +37,7 @@ import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,7 +92,8 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
                         .flatMap(NettyPublisherBodyBinder::chunked));
                 if (reader.isPresent()) {
                     Publisher<?> pub = reader.get().readChunked(targetType, mediaType, source.getHeaders(), rootBody.toByteBufferPublisher());
-                    return () -> Optional.of(pub);
+                    Publisher<?> bound = context.getArgument().getType().equals(Flux.class) ? Flux.from(pub) : pub;
+                    return () -> Optional.of(bound);
                 }
             }
             // bind a single result

@@ -72,9 +72,10 @@ final class DefaultPieceWriter<T> implements PieceWriter<T> {
         if (piece instanceof AvailableByteBody available) {
             return bodyFactory.adapt(bodyFactory.readBufferFactory().compose(List.of(separator.duplicate(), available.toReadBuffer())));
         }
-        // the separator goes in front of the one piece, the concatenation duplicates it
-        return ConcatenatingSubscriber.concatenate(bodyFactory, BodyPublishers.<ByteBody>just(piece, ignored -> piece.close()),
-            new ConcatenatingSubscriber.Separators(separator, null, null, null));
+        CloseableByteBody prefix = bodyFactory.adapt(separator.duplicate());
+        return ConcatenatingSubscriber.concatenate(bodyFactory,
+            BodyPublishers.append(BodyPublishers.<ByteBody>just(prefix, ignored -> prefix.close()), piece, ignored -> piece.close()),
+            ConcatenatingSubscriber.Separators.NONE);
     }
 
     @Override
