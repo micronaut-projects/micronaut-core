@@ -55,6 +55,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -229,7 +230,7 @@ public class HandlerRouteServerSentEventsTest {
             int sentWhileStalled = recorder.sent.get();
             assertTrue(sentWhileStalled < FLOOD_EVENTS / 2, "The sender did not wait for the client, it sent " + sentWhileStalled + " events");
             String received = readToEnd(socket.getInputStream());
-            assertEquals(FLOOD_EVENTS, count(received, "data: "), "all the events arrive once the client reads");
+            assertEquals(FLOOD_EVENTS, count(decodedBody(received), "data: "), "all the events arrive once the client reads");
             assertTrue(received.contains("id: " + (FLOOD_EVENTS - 1) + "\n"), "the last event");
             assertNull(recorder.closed("flood").get(20, TimeUnit.SECONDS));
         }
@@ -439,6 +440,46 @@ public class HandlerRouteServerSentEventsTest {
 
     private static ServerUnderTest server() {
         return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
+    }
+
+    /**
+     * The body of a raw HTTP/1.1 response, with the chunked transfer encoding decoded: a
+     * container may split the body into chunks anywhere, so a chunk header can fall inside the
+     * text a test counts.
+     *
+     * @param response The raw response, status line and headers included
+     * @return The body
+     */
+    static String decodedBody(String response) {
+        int headersEnd = response.indexOf("\r\n\r\n");
+        assertTrue(headersEnd >= 0, "No end of the headers: " + response);
+        String headers = response.substring(0, headersEnd).toLowerCase(Locale.ROOT);
+        String body = response.substring(headersEnd + 4);
+        if (!headers.contains("transfer-encoding: chunked")) {
+            return body;
+        }
+        StringBuilder decoded = new StringBuilder(body.length());
+        int i = 0;
+        while (true) {
+            int lineEnd = body.indexOf("\r\n", i);
+            if (lineEnd < 0) {
+                // the response was cut off inside a chunk header
+                return decoded.toString();
+            }
+            String size = body.substring(i, lineEnd);
+            int extension = size.indexOf(';');
+            int length = Integer.parseInt((extension >= 0 ? size.substring(0, extension) : size).trim(), 16);
+            if (length == 0) {
+                return decoded.toString();
+            }
+            int start = lineEnd + 2;
+            int end = Math.min(start + length, body.length());
+            decoded.append(body, start, end);
+            i = end + 2;
+            if (i > body.length()) {
+                return decoded.toString();
+            }
+        }
     }
 
     static int count(String text, String part) {
