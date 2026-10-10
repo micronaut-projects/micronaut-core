@@ -206,6 +206,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     context
                 );
 
+                describeHierarchy(writer, ce, introspected);
                 processElement(
                     metadata,
                     members,
@@ -241,6 +242,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         );
 
 
+                        describeHierarchy(writer, classElement, introspected);
                         processElement(metadata,
                             members,
                             indexedAnnotations,
@@ -275,12 +277,22 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     context
                 );
             }
+            describeHierarchy(writer, element, introspected);
             processElement(metadata, members, indexedAnnotations, element, writer, ignoreSettersWithDifferingType, isDescribeConstructors(element, introspected), context);
         }
     }
 
     private static boolean isDescribeConstructors(ClassElement ce, AnnotationValue<Introspected> introspected) {
         return ce.findAnnotation(Introspected.class).orElse(introspected).booleanValue("constructors").orElse(false);
+    }
+
+    /**
+     * Has the introspection describe the hierarchy of the type when the type asks for it.
+     */
+    private static void describeHierarchy(BeanIntrospectionWriter writer, ClassElement ce, AnnotationValue<Introspected> introspected) {
+        if (ce.findAnnotation(Introspected.class).orElse(introspected).booleanValue("hierarchy").orElse(false)) {
+            writer.describeHierarchy();
+        }
     }
 
     private void processBuilderDefinition(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected, int index, String targetPackage, boolean useLongBuilderName) {
