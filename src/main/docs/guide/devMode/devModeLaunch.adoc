@@ -1,4 +1,12 @@
-The launcher reads a manifest, a `java.util.Properties` file the build tool writes, that names the main class, the directories holding the compiled classes and resources (the reloadable tier), the compile and annotation processor classpaths, the source directories by language, and the resource directories by kind:
+== The manifest
+
+The launcher reads a manifest, a `java.util.Properties` file the build tool writes. The manifest names:
+
+* the main class;
+* the directories holding the compiled classes and resources, which form the reloadable tier;
+* the compile and annotation processor classpaths;
+* the source directories, by language;
+* the resource directories, by kind.
 
 [source,properties]
 ----
@@ -14,13 +22,28 @@ micronaut.dev.compile.java.output=build/classes/java/main
 micronaut.dev.retain=javax.sql.DataSource
 ----
 
-Relative paths resolve against the manifest's directory, `@file` reads a list from an argument file, and a system property of the same name overrides an entry. The launcher is started with the runtime classpath, which holds the framework, the libraries and `micronaut-dev` itself, but not the project's own class directories: those belong to the reloadable tier.
+The launcher reads the entries as follows:
+
+* Relative paths resolve against the manifest's directory.
+* `@file` reads a list from an argument file.
+* A system property of the same name overrides an entry.
+
+== Starting the launcher
+
+The launcher is started with the runtime classpath, which holds the framework, the libraries and `micronaut-dev` itself. It does not hold the project's own class directories: those belong to the reloadable tier.
 
 [source,bash]
 ----
 java -cp @build/micronaut-dev/runtime.argfile io.micronaut.dev.MicronautDevMain --manifest build/micronaut-dev/dev.properties
 ----
 
-The launcher compiles every language whose class output does not exist yet, so it works from a clean checkout, then runs the application's own `main` on a thread of its own. The application does what it always does, `Micronaut.run(Application.class, args)`; an `ApplicationContextConfigurer` the module ships gives the context the reloadable loader, the `dev` environment, `micronaut.dev.enabled=true`, and the beans retained from the previous generation.
+The launcher compiles every language whose class output does not exist yet, so it works from a clean checkout. It then runs the application's own `main` on a thread of its own.
 
-TIP: Everything under the manifest's `micronaut.dev.` keys can be set as a system property, and api:context.env.DevelopmentMode[] answers whether the application runs this way, so a bean can be conditioned on it with `@DevelopmentActive` (or `@DevelopmentInactive` for the opposite).
+The application does what it always does, `Micronaut.run(Application.class, args)`. An `ApplicationContextConfigurer` the module ships gives the context:
+
+* the reloadable loader;
+* the `dev` environment;
+* `micronaut.dev.enabled=true`;
+* the beans retained from the previous generation.
+
+TIP: Everything under the manifest's `micronaut.dev.` keys can be set as a system property. api:context.env.DevelopmentMode[] answers whether the application runs this way, so a bean can be conditioned on it with `@DevelopmentActive` (or `@DevelopmentInactive` for the opposite).
