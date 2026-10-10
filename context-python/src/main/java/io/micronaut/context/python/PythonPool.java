@@ -16,8 +16,11 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.env.Environment;
+import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
+import io.micronaut.context.event.StartupEvent;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
@@ -50,6 +53,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
@@ -59,13 +63,28 @@ import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
  * <p>
  * The first context (primary) is created synchronously and is not part of the pool. It is exposed
  * via {@link PythonContextRuntime#getContext()} and used for non-pooled operations. Remaining pooled
- * contexts are created lazily by generated bridge calls that borrow from the pool.
+ * contexts are created lazily by generated bridge calls that borrow from the pool, except for the
+ * {@link PythonPoolConfiguration#prestart() pre-started} ones, which a background thread creates once
+ * the application has started.
  */
 @Singleton
 @io.micronaut.context.annotation.Context
 @Internal
-final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListener<Context>, GracefulShutdownCapable, Ordered {
+final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListener<Context>, GracefulShutdownCapable, Ordered,
+    ApplicationEventListener<StartupEvent> {
+    /**
+     * The name of the thread that pre-starts pooled contexts.
+     */
+    static final String PRESTART_THREAD_NAME = "python-pool-prestart";
+
     private static final Logger LOG = LoggerFactory.getLogger(PythonPool.class);
+
+    /**
+     * Contexts to pre-start when none is configured, outside the test environment: enough for the
+     * first request not to wait for a context to initialize, without making an idle application
+     * pay for a pool it may never fill.
+     */
+    private static final int DEFAULT_PRESTART = 1;
 
     /**
      * Processors per pooled context when no size is configured. See {@link #computeDefaultSize()}.
@@ -112,7 +131,11 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     private final AtomicBoolean gracefulShutdownStarted = new AtomicBoolean();
     private final CompletableFuture<Void> gracefulShutdown = new CompletableFuture<>();
     private final int targetSize;
+    private final int prestart;
     private volatile boolean closed;
+    /** Set once the application stops: no context is pre-started after it; guarded by this. */
+    private boolean prestartStopped;
+    private final AtomicReference<@Nullable Thread> prestartThread = new AtomicReference<>();
 
     /**
      * Create the pool coordinator around the primary context and shared engine.
@@ -144,6 +167,30 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         int configuredPoolSize = configuration.size();
         this.warnThreshold = configuration.warnWait();
         this.targetSize = configuration.enabled() ? (configuredPoolSize > 0 ? configuredPoolSize : computeDefaultSize()) : 0;
+        this.prestart = prestartCount(configuration.prestart(), targetSize,
+            applicationContext.getEnvironment().getActiveNames().contains(Environment.TEST));
+    }
+
+    /**
+     * The number of pooled contexts to create once the application has started.
+     * <p>
+     * Unless configured, one outside the test environment and none in it: a test suite starts and stops
+     * many applications, most of which never borrow a pooled context, and a context being built competes
+     * with the tests for processors.
+     *
+     * @param configured The configured number, or {@code null} for the default
+     * @param targetSize The pool size, {@code 0} when pooling is disabled
+     * @param testEnvironment Whether the test environment is active
+     * @return The number of contexts to pre-start, at most the pool size
+     */
+    static int prestartCount(@Nullable Integer configured, int targetSize, boolean testEnvironment) {
+        int requested;
+        if (configured != null) {
+            requested = configured;
+        } else {
+            requested = testEnvironment ? 0 : DEFAULT_PRESTART;
+        }
+        return Math.clamp(requested, 0, Math.max(targetSize, 0));
     }
 
     /**
@@ -246,6 +293,133 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         }
         runtime.pool(this);
         cache.put(primaryContext, new ConcurrentHashMap<>());
+    }
+
+    /**
+     * Pre-start the configured number of pooled contexts on a background thread once the application
+     * has started, so the first requests find a context ready rather than paying for its initialization.
+     *
+     * @param event The startup event
+     */
+    @Override
+    public void onApplicationEvent(StartupEvent event) {
+        if (prestart <= 0 || runtime.pool() != this) {
+            // pre-starting is off, or there is no pool: pooling is disabled or the context is reused
+            return;
+        }
+        Thread thread = Thread.ofPlatform()
+            .name(PRESTART_THREAD_NAME)
+            .daemon(true)
+            .unstarted(this::prestartContexts);
+        thread.setContextClassLoader(applicationContext.getClassLoader());
+        prestartThread.set(thread);
+        thread.start();
+    }
+
+    /**
+     * The thread pre-starting contexts, while it runs or after it finished.
+     *
+     * @return The thread, or {@code null} when nothing was pre-started
+     */
+    @Nullable Thread prestartThread() {
+        return prestartThread.get();
+    }
+
+    private void prestartContexts() {
+        long start = System.nanoTime();
+        int created = 0;
+        try {
+            // bounded: an event loop that takes a pooled context lowers the count again
+            while (created < prestart && prestartContext()) {
+                created++;
+            }
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Pre-started {} pooled Python context(s) in {}ms", created, Duration.ofNanos(System.nanoTime() - start).toMillis());
+            }
+        } catch (RuntimeException e) {
+            if (isPrestartStopped()) {
+                LOG.debug("Pre-starting pooled Python contexts stopped by shutdown", e);
+            } else {
+                // not fatal: requests create the contexts they need on demand, as without pre-starting
+                LOG.warn("Failed to pre-start a pooled Python context; contexts are created on demand instead", e);
+            }
+        }
+    }
+
+    /**
+     * Create one pooled context and make it available, unless the pool already holds as many as are
+     * pre-started (a request may have created one first) or the application is stopping.
+     * <p>
+     * The context is created through the same single creation slot as a borrow, so a request that
+     * arrives while it is being created waits for it and then borrows it, rather than creating another.
+     *
+     * @return Whether a context was created
+     */
+    private boolean prestartContext() {
+        synchronized (this) {
+            while (true) {
+                if (prestartStopped || closed || gracefulShutdownStarted.get() || size.get() >= prestart) {
+                    return false;
+                }
+                if (creatingContext == null) {
+                    creatingContext = Thread.currentThread();
+                    break;
+                }
+                try {
+                    // a request is creating a context; it may be all the pool needs
+                    wait();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+        }
+        Context created = null;
+        try {
+            created = createBorrowedPooledContext(true);
+            if (created != null) {
+                warmUp(created);
+            }
+        } finally {
+            synchronized (this) {
+                creatingContext = null;
+                // a closing pool has the context in its snapshot and closes it
+                if (created != null && !closed) {
+                    pooledQueue.add(created);
+                }
+                notifyAll();
+            }
+        }
+        return created != null;
+    }
+
+    /**
+     * Do the work every context does on its first borrow, ahead of it: import the runtime module the
+     * bridge calls go through, which imports {@code asyncio} and other modules that are slow to load.
+     * Measured on a small application this was most of the first request, far more than building the
+     * context. A failure leaves the context as a borrow would find it, so the borrow imports it again.
+     *
+     * @param context The pre-started context, not yet available to borrowers
+     */
+    private void warmUp(Context context) {
+        long start = System.nanoTime();
+        try {
+            PythonContextRegistry.withExecutionFrame(context, () -> PythonContextRuntime.helper(context, "__micronaut_import_module"));
+        } catch (RuntimeException e) {
+            if (isPrestartStopped()) {
+                LOG.debug("Warming up a pre-started Python context stopped by shutdown", e);
+            } else {
+                LOG.warn("Failed to warm up a pre-started Python context; its first borrow does instead", e);
+            }
+            return;
+        }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Warmed up pre-started Python context in {}ms", Duration.ofNanos(System.nanoTime() - start).toMillis());
+        }
+    }
+
+    private synchronized boolean isPrestartStopped() {
+        return prestartStopped || closed;
     }
 
     /**
@@ -899,6 +1073,11 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
 
     @Override
     public void onDestroyed(BeanDestroyedEvent<Context> event) {
+        synchronized (this) {
+            // none is pre-started from now on; one being built is closed by the pool once it is
+            prestartStopped = true;
+            notifyAll();
+        }
         if (PythonContextRuntime.isReuseContext()) {
             return;
         }
