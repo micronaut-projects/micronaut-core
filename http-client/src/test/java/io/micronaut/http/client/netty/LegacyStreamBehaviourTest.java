@@ -19,7 +19,6 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
-import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
@@ -92,7 +91,7 @@ class LegacyStreamBehaviourTest {
      */
     private static <T> T withRawServer(@io.micronaut.core.annotation.Nullable String contentType, String body, java.util.function.Function<HttpClient, T> call) throws Exception {
         try (java.net.ServerSocket socket = new java.net.ServerSocket(0, 50, java.net.InetAddress.getLoopbackAddress());
-             HttpClient rawClient = HttpClient.create(new java.net.URL("http://127.0.0.1:" + socket.getLocalPort()))) {
+             HttpClient rawClient = HttpClient.create(java.net.URI.create("http://127.0.0.1:" + socket.getLocalPort()).toURL())) {
             Thread thread = new Thread(() -> {
                 while (!socket.isClosed()) {
                     try (java.net.Socket connection = socket.accept()) {
