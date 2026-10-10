@@ -113,7 +113,9 @@ class ConfigurationStalenessTest {
     @Test
     void aCustomConditionTheContextDecidedWithoutBeingAskedStillCounts() {
         try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", SPEC))) {
-            // never asked for by the test, the bean was decided at startup and that decision is kept
+            // never asked for by name, the bean is decided by a scan of every definition, as an application's own
+            // lookup of every bean runs, and that decision is kept: startup itself no longer decides every definition
+            context.getAllBeanDefinitions();
             assertTrue(context.getDisabledBeans().stream().anyMatch(d -> d.getBeanType().equals(LazyFlaggedBean.class)));
             ConfigurationStaleness.Requirements before = ConfigurationStaleness.beforeRefresh(context);
             context.getEnvironment().addPropertySource(PropertySource.of("lazy", Map.of("staleness.lazy-flag", true)));
