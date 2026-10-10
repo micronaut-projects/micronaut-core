@@ -589,7 +589,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (beanType == null) {
             return Collections.emptyList();
         }
-        return getBeanRegistrations(null, Argument.of(beanType), null);
+        return getBeanRegistrations(null, Argument.of(beanType), qualifier);
     }
 
     @Override
