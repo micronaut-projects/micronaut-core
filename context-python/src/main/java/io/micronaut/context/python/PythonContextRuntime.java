@@ -159,6 +159,17 @@ public final class PythonContextRuntime {
     }
 
     /**
+     * The context a generated class creates the Python object it owns in: the primary context of the
+     * installed runtime, or, before any application context started, one the next application
+     * context adopts (see {@link PythonApplicationRuntime#requireForNewInstance()}).
+     *
+     * @return The context
+     */
+    private static Context newInstanceContext() {
+        return PythonApplicationRuntime.requireForNewInstance().context();
+    }
+
+    /**
      * Install the runtime of an application: its primary context and the class loader that should be
      * active when generated bridge classes enter Python from arbitrary runtime threads. This is
      * called by {@link GraalPyContextFactory} during application startup.
@@ -1012,7 +1023,7 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value newInstance(PythonClassReference classReference, Object... args) {
-        return newInstance(getContext(), classReference, args);
+        return newInstance(newInstanceContext(), classReference, args);
     }
 
     /**
@@ -1172,7 +1183,7 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value newInstance(PythonClassReference classReference, @Nullable Map<String, Object> props) {
-        return newInstance(getContext(), classReference, props);
+        return newInstance(newInstanceContext(), classReference, props);
     }
 
     /**

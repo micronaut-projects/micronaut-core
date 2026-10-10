@@ -254,7 +254,9 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * Create and initialize the GraalPy context.
      * This bean loads on startup due to the @Context annotation; generated Python code that runs
      * before the eager beans are initialized (type converters, beans of {@code processOnStartup}
-     * executable methods) creates it earlier through {@link PythonRuntimeBootstrapConfigurer}.
+     * executable methods) creates it earlier through {@link PythonRuntimeBootstrapConfigurer}. A
+     * context generated code built before the application context started (see
+     * {@link PythonApplicationRuntime#requireForNewInstance()}) is adopted instead of building one.
      *
      * @param engine The engine
      * @param hostAccess The host access
@@ -273,6 +275,20 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             providedContext = true;
             // Reuse context: this is an optimization for reloading
             return PythonContextRuntime.getContext();
+        }
+        PythonApplicationRuntime unclaimed = PythonApplicationRuntime.claimUnclaimed();
+        if (unclaimed != null) {
+            // generated code created a Python object before this application context started (the
+            // instance of a test that provides the properties of the context): the context it built
+            // becomes the primary context of this application, which owns it from now on
+            if (!contextConfiguration.getOptions().isEmpty() || !contextConfiguration.getHostClassLookup().isEmpty()) {
+                LOG.warn("The GraalPy context was created before the application context started, from the default " +
+                    "configuration: the configured {}.options and {}.host-class-lookup do not apply to it",
+                    GraalPyContextConfiguration.PREFIX, GraalPyContextConfiguration.PREFIX);
+            }
+            LOG.debug("Adopting the GraalPy context created before the application context started");
+            runtime.set(unclaimed);
+            return unclaimed.context();
         }
 
         try {
@@ -331,6 +347,26 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         if (PythonContextRuntime.isInitialized() && PythonContextRuntime.isReuseContext()) {
             return PythonContextRuntime.getContext();
         }
+        Context context = buildStandaloneContext(classLoader, options, applicationMain);
+        PythonContextRuntime.setReuseContext(true);
+        PythonContextRuntime.setContext(context, classLoader);
+        return context;
+    }
+
+    /**
+     * Build a primary context without an application context: from the default configuration, the
+     * {@link TargetTypeMapping} and {@link GraalPyContextCustomizer} services of the class loader, and
+     * an engine of its own, which {@link Context#getEngine()} returns.
+     *
+     * @param classLoader The application class loader
+     * @param options Additional GraalPy context options
+     * @param applicationMain The Python source resource to evaluate after the generated launcher
+     * @return The initialized GraalPy context
+     * @throws IOException If the context cannot load application resources
+     */
+    static Context buildStandaloneContext(ClassLoader classLoader,
+                                          Map<String, String> options,
+                                          String applicationMain) throws IOException {
         GraalPyContextConfiguration contextConfiguration = new GraalPyContextConfiguration();
         contextConfiguration.getBuilder().options(options);
         Engine engine = GraalPyEngineFactory.buildPythonEngine();
@@ -343,8 +379,6 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 closeQuietly(engine);
             }
         }
-        PythonContextRuntime.setReuseContext(true);
-        PythonContextRuntime.setContext(context, classLoader);
         return context;
     }
 
