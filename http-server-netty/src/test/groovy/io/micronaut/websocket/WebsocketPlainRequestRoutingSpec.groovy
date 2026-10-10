@@ -6,6 +6,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.RouteCondition
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -17,6 +18,7 @@ import io.micronaut.websocket.annotation.ClientWebSocket
 import io.micronaut.websocket.annotation.OnMessage
 import io.micronaut.websocket.annotation.OnOpen
 import io.micronaut.websocket.annotation.ServerWebSocket
+import io.micronaut.websocket.exceptions.WebSocketClientException
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import reactor.core.publisher.Flux
@@ -80,6 +82,29 @@ class WebsocketPlainRequestRoutingSpec extends Specification {
         socket?.close()
     }
 
+    void "the conditions of the route of a WebSocket apply to the upgrade request"() {
+        given:
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURL())
+
+        when:
+        Flux.from(wsClient.connect(RecordingClientWebSocket, HttpRequest.GET("/plain-only/conditional"))).blockFirst()
+
+        then:
+        WebSocketClientException e = thrown()
+        e.message.contains("404 Not Found")
+
+        when:
+        RecordingClientWebSocket socket = Flux.from(wsClient.connect(RecordingClientWebSocket, HttpRequest.GET("/plain-only/conditional").header("X-WebSocket", "yes"))).blockFirst()
+
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            socket.messages == ["open"]
+        }
+
+        cleanup:
+        socket?.close()
+    }
+
     void "a plain request to a WebSocket without another route is a bad request"() {
         when:
         httpClient.toBlocking().exchange(HttpRequest.GET("/plain-only/message-only"), String)
@@ -109,6 +134,20 @@ class WebsocketPlainRequestRoutingSpec extends Specification {
         @OnMessage
         void onMessage(String message, WebSocketSession session) {
             session.sendSync("echo " + message)
+        }
+    }
+
+    @Requires(property = "spec.name", value = "WebsocketPlainRequestRoutingSpec")
+    @ServerWebSocket("/plain-only/conditional")
+    static class ConditionalServerWebSocket {
+        @OnOpen
+        @RouteCondition("#{request.headers.getFirst('X-WebSocket').orElse(null) == 'yes'}")
+        void onOpen(WebSocketSession session) {
+            session.sendSync("open")
+        }
+
+        @OnMessage
+        void onMessage(String message, WebSocketSession session) {
         }
     }
 
