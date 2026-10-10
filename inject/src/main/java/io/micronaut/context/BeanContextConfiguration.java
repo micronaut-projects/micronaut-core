@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.BeanConfiguration;
 import org.jspecify.annotations.NullMarked;
@@ -108,6 +109,21 @@ public interface BeanContextConfiguration {
      */
     default boolean eventsEnabled() {
         return true;
+    }
+
+    /**
+     * Whether the context records which bean received which other bean, as a
+     * {@link BeanDependencyGraph}. On by default only when {@link DevelopmentMode development mode}
+     * is switched on by system property, since a production run has no use for the graph. An application
+     * context whose configuration switches development mode on ({@value DevelopmentMode#PROPERTY}) tracks
+     * dependencies too, deciding so as it starts and before it creates any bean, unless its builder switched
+     * tracking off with {@link ApplicationContextBuilder#beanDependencyTrackingEnabled(boolean)}.
+     *
+     * @return True to record the graph
+     * @since 5.3.0
+     */
+    default boolean beanDependencyTrackingEnabled() {
+        return DevelopmentMode.isEnabledBySystemProperty();
     }
 
     /**

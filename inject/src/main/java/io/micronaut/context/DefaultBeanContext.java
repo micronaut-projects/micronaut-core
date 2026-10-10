@@ -270,6 +270,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private final boolean eventsEnabled;
     private final boolean eagerBeansEnabled;
+    /**
+     * The recorded dependency graph, null when the context does not track dependencies. Decided by the configuration
+     * as the context is constructed, or by its environment as it starts (see {@link #isBeanDependencyTrackingEnabledOnStart()}),
+     * in both cases before the context creates a bean; it only ever goes from null to a graph.
+     */
+    @Nullable
+    private DefaultBeanDependencyGraph dependencyGraph;
 
     private @Nullable ForkJoinTask<?> checkEnabledBeans;
 
@@ -358,6 +365,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         this.tracePatterns = traceConfiguration.classPatterns();
         this.eventsEnabled = contextConfiguration.eventsEnabled();
         this.eagerBeansEnabled = contextConfiguration.eagerBeansEnabled();
+        this.dependencyGraph = contextConfiguration.beanDependencyTrackingEnabled() ? new DefaultBeanDependencyGraph() : null;
         this.conversionService = MutableConversionService.create();
         beanDefinitionProvider = new DefaultBeanDefinitionService(beanContextConfiguration);
     }
@@ -411,6 +419,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Starting BeanContext");
                 }
+                if (dependencyGraph == null && isBeanDependencyTrackingEnabledOnStart()) {
+                    // development mode was switched on by configuration rather than by system property: the
+                    // environment is started and no bean has been created yet, so the graph sees every bean
+                    dependencyGraph = new DefaultBeanDependencyGraph();
+                }
                 configureAndStartContext();
                 if (LOG.isDebugEnabled()) {
                     String activeConfigurations = beanConfigurations
@@ -432,6 +445,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             initializing.set(false);
         }
         return this;
+    }
+
+    /**
+     * Whether the context, which was not configured to track bean dependencies, tracks them after all as it
+     * starts, before it reads its definitions and creates any bean. An application context does so when its
+     * environment switches development mode on by configuration.
+     *
+     * @return True to start recording the dependency graph
+     */
+    boolean isBeanDependencyTrackingEnabledOnStart() {
+        return false;
     }
 
     /**
@@ -549,6 +573,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             // a restarted context reads its configurations and validator again, as it does its definitions
             beanConfigurationsList = null;
             beanValidator = null;
+            if (dependencyGraph != null) {
+                dependencyGraph.clear();
+            }
         }
         return this;
     }
@@ -583,6 +610,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (bean != null) {
             BeanDefinition<T> definition = beanRegistration.definition();
             if (definition instanceof InjectableBeanDefinition<T> injectableBeanDefinition) {
+                if (dependencyGraph != null) {
+                    // the injections about to run replace the ones recorded, they do not join them
+                    dependencyGraph.removeReinjectable(definition);
+                }
                 injectableBeanDefinition.inject(this, bean);
             }
         }
@@ -1363,6 +1394,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (definition.isSingleton()) {
                 singletonScope.purgeCacheForBeanInstance(definition, beanToDestroy);
             }
+        }
+        if (dependencyGraph != null) {
+            // what a destroyed bean held is released with it; what held the bean stays recorded until that is destroyed.
+            // A singleton definition may have a fresh registration beside the scoped instance, and both record under it
+            dependencyGraph.destroyed(registration, definition.isSingleton() && singletonScope.findBeanRegistration(definition) != null);
         }
         try {
             beanToDestroy = triggerPreDestroyListeners(resolutionContext, definition, beanToDestroy);
@@ -2340,6 +2376,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return Optional.empty();
     }
 
+    @Override
+    public Optional<BeanDependencyGraph> findDependencyGraph() {
+        return Optional.ofNullable(dependencyGraph);
+    }
+
     /**
      * Invalidates the bean caches. For testing only.
      */
@@ -2686,6 +2727,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                        @Nullable Map<String, Object> argumentValues) {
         Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
         Qualifier<?> prevQualifier = resolutionContext.getCurrentQualifier();
+        DefaultBeanDependencyGraph graph = dependencyGraph;
+        // what the instance receives is counted once however many injection points receive it
+        DefaultBeanDependencyGraph.Creation creation = graph == null ? null : graph.beginCreation(beanDefinition);
         try {
             resolutionContext.setCurrentQualifier(declaredQualifier != null && !AnyQualifier.INSTANCE.equals(declaredQualifier) ? declaredQualifier : qualifier);
             createDependsOnBeans(resolutionContext, beanDefinition);
@@ -2720,6 +2764,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             throw new BeanInstantiationException(beanDefinition, e);
         } finally {
             resolutionContext.setCurrentQualifier(prevQualifier);
+            if (creation != null) {
+                creation.end();
+            }
         }
     }
 
@@ -3218,6 +3265,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             @SuppressWarnings("unchecked")
             BeanRegistration<T> resolver = (BeanRegistration<T>) createRegistration(resolutionContext,
                 Argument.of(BeanDependencyResolver.class), null, dependencyResolverDefinition, true);
+            if (dependencyGraph != null && resolver.bean() instanceof DefaultBeanDependencyResolver dependencyResolver) {
+                // what the bean later resolves or creates through the resolver is the bean's, as an injection would be
+                dependencyResolver.owner(dependencyGraph.ownerOf(resolutionContext), true);
+            }
             return resolver;
         }
         if (InjectionPoint.class.isAssignableFrom(beanClass)) {
@@ -3555,10 +3606,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
         if (definition.isSingleton() && !isScopedProxyDefinition) {
             BeanRegistration<T> beanRegistration = singletonScope.findBeanRegistration(definition, beanType, qualifier);
-            if (beanRegistration != null) {
-                return beanRegistration;
+            if (beanRegistration == null) {
+                beanRegistration = singletonScope.getOrCreate(this, resolutionContext, definition, beanType, qualifier);
             }
-            return singletonScope.getOrCreate(this, resolutionContext, definition, beanType, qualifier);
+            recordDependency(resolutionContext, beanRegistration.beanDefinition, qualifier);
+            return beanRegistration;
         }
 
         final boolean isProxy = definition.isProxy();
@@ -3576,6 +3628,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     ((Qualified<T>) bean).$withBeanQualifier(q);
                 }
             }
+            // the receiving bean holds the scoped proxy, which is what a reload must know
+            recordDependency(resolutionContext, registration.beanDefinition, q);
             return registration;
         }
 
@@ -3584,10 +3638,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (isProxy) {
                 definition = getProxyTargetBeanDefinition(beanType, qualifier);
             }
-            return getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, beanType, definition, heldRegistration);
+            BeanRegistration<T> scoped = getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, beanType, definition, heldRegistration);
+            recordDependency(resolutionContext, scoped.beanDefinition, qualifier);
+            return scoped;
         }
         // Unknown scope, prototype scope etc
-        return createRegistration(resolutionContext, beanType, qualifier, definition, true);
+        BeanRegistration<T> prototype = createRegistration(resolutionContext, beanType, qualifier, definition, true);
+        // a prototype belongs to the bean that received it, and what the prototype received is recorded
+        // under the prototype's definition, so a path through it is not lost
+        recordDependency(resolutionContext, prototype.beanDefinition, qualifier);
+        return prototype;
     }
 
     private <T> BeanRegistration<T> intializeEagerBean(@Nullable BeanResolutionContext resolutionContext,
@@ -3735,8 +3795,79 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     final <T> BeanRegistration<T> createFreshRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                          BeanDefinition<T> definition) {
-        return createRegistration(resolutionContext, definition.asArgument(), definition.getDeclaredQualifier(),
+        BeanRegistration<T> registration = createRegistration(resolutionContext, definition.asArgument(), definition.getDeclaredQualifier(),
             definition, resolutionContext != null, true);
+        if (dependencyGraph != null) {
+            // what the fresh instance received is recorded under its definition as it is created; a singleton's
+            // fresh instance shares those edges with the scoped one, so destroying either must not forget them
+            dependencyGraph.freshCreated(registration);
+        }
+        return registration;
+    }
+
+    /**
+     * Records that the owner of a resolver received a bean through it, as the bean's injection would have been.
+     *
+     * @param owner The owner, or null when the graph is not recorded or the resolver has none
+     * @param registration The received registration
+     */
+    final void recordOwnedDependency(DefaultBeanDependencyGraph.@Nullable Owner owner, BeanRegistration<?> registration) {
+        if (dependencyGraph != null && owner != null) {
+            dependencyGraph.recordOwned(owner, registration.getBeanDefinition());
+        }
+    }
+
+    /**
+     * Whether the context records a {@link BeanDependencyGraph}.
+     *
+     * @return True when bean dependencies are tracked
+     */
+    final boolean isTrackingBeanDependencies() {
+        return dependencyGraph != null;
+    }
+
+    /**
+     * Records, when the graph is recorded, that the bean being created received the given bean at the current
+     * injection point. A provider is recorded as what it resolves: an edge, marked lazy, to each definition its type
+     * argument and qualifier select, since every provider of a kind shares one definition that names no target.
+     *
+     * @param resolutionContext The resolution context of the receiving bean
+     * @param received The definition of the received bean
+     * @param qualifier The qualifier the bean was resolved with
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void recordDependency(@Nullable BeanResolutionContext resolutionContext, BeanDefinition<?> received, @Nullable Qualifier<?> qualifier) {
+        DefaultBeanDependencyGraph graph = dependencyGraph;
+        if (graph == null || resolutionContext == null) {
+            return;
+        }
+        BeanDefinition<?> target = received instanceof BeanDefinitionDelegate<?> delegate ? delegate.getDelegate() : received;
+        if (target instanceof AbstractProviderDefinition<?>) {
+            Argument provided = DefaultBeanDependencyGraph.providedArgument(resolutionContext);
+            // a provider of Object names no target: every bean would be a candidate
+            if (provided != null && provided.getType() != Object.class) {
+                graph.recordProvided(resolutionContext, getBeanDefinitions(provided, (Qualifier) providerQualifier(resolutionContext, qualifier)));
+            }
+            return;
+        }
+        graph.record(resolutionContext, received);
+    }
+
+    /**
+     * The qualifier a provider resolves under, as {@link AbstractProviderDefinition} decides it: the qualifier it was
+     * looked up with, or for a provider injected into an iterable bean without one, the name the resolution carries.
+     *
+     * @param resolutionContext The resolution context injecting the provider
+     * @param qualifier The qualifier the provider was looked up with
+     * @return The qualifier the provider resolves under
+     */
+    private static @Nullable Qualifier<?> providerQualifier(BeanResolutionContext resolutionContext, @Nullable Qualifier<?> qualifier) {
+        if (qualifier != null) {
+            return qualifier;
+        }
+        BeanResolutionContext.Segment<?, ?> segment = resolutionContext.getPath().currentSegment().orElse(null);
+        Object name = resolutionContext.getAttribute(Named.class.getName());
+        return name != null && segment != null && segment.getDeclaringType().isIterable() ? Qualifiers.byName(name.toString()) : null;
     }
 
     @SuppressWarnings({"unchecked", "NullAway"}) // Nullable factory definitions may produce a registration without an instance.
@@ -4590,6 +4721,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                           Set<BeanRegistration<?>> visited) {
         if (!visited.add(registration)) {
             return;
+        }
+        if (dependencyGraph != null && registration.getBean() instanceof DefaultBeanDependencyResolver resolver) {
+            // the owner of the resolver is being destroyed: what it received through the resolver goes, and a lookup
+            // racing the destruction records nothing
+            resolver.releaseOwner(dependencyGraph);
         }
         DefaultBeanDependencies dependencies = registration.getDependencies();
         if (dependencies != null) {

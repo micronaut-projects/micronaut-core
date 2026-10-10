@@ -473,6 +473,35 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
+     * Resolves the factory bean a produced bean is instantiated from, and marks it as the dependent
+     * factory, as {@link #markDependentAsFactory()} does. Generated definitions call this rather than
+     * {@code getBean} followed by {@link #markDependentAsFactory()}.
+     *
+     * <p>When the context records a {@link BeanDependencyGraph}, the lookup is attributed to the produced
+     * definition: the factory is a dependency of the bean it produces, not of whatever bean happened to be
+     * resolving the produced one, which is what a lookup with no segment of its own would record. A context
+     * that records no graph does nothing more than the {@code getBean} and {@link #markDependentAsFactory()}
+     * it replaces.</p>
+     *
+     * <p>Definitions compiled against an earlier version keep calling {@code getBean} and
+     * {@link #markDependentAsFactory()}: in development mode, their factory is recorded as a dependency of the
+     * bean resolving the product rather than of the product, until they are compiled again.</p>
+     *
+     * @param producedDefinition The definition of the bean the factory produces
+     * @param factoryType The factory type
+     * @param qualifier The factory's qualifier, if any
+     * @param <F> The factory type
+     * @return The factory bean
+     * @since 5.3.0
+     */
+    @UsedByGeneratedCode
+    default <F> F getFactoryBean(BeanDefinition<?> producedDefinition, Class<F> factoryType, @Nullable Qualifier<F> qualifier) {
+        F factory = getBean(factoryType, qualifier);
+        markDependentAsFactory();
+        return factory;
+    }
+
+    /**
      * @return The dependent factory beans that was used to create the bean in context
      * @since 3.5.0
      */

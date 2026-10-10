@@ -650,6 +650,30 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Only a context that records a {@link BeanDependencyGraph} attributes the lookup to the produced definition,
+     * by pushing a segment for it; any other context looks the factory up as generated code used to, with no
+     * segment, allocation or circular dependency check of its own.</p>
+     */
+    @Override
+    public <F> F getFactoryBean(BeanDefinition<?> producedDefinition, Class<F> factoryType, @Nullable Qualifier<F> qualifier) {
+        if (!context.isTrackingBeanDependencies()) {
+            F factory = getBean(factoryType, qualifier);
+            markDependentAsFactory();
+            return factory;
+        }
+        path.push(new FactorySegment(producedDefinition, getCurrentQualifier(), factoryType));
+        try {
+            F factory = getBean(factoryType, qualifier);
+            markDependentAsFactory();
+            return factory;
+        } finally {
+            path.pop();
+        }
+    }
+
     @Override
     public void markDependentAsFactory() {
         if (dependentBeans != null) {
@@ -1655,6 +1679,50 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @Override
         @Nullable
         public Qualifier<B> getDeclaringBeanQualifier() {
+            return getDeclaringTypeQualifier();
+        }
+    }
+
+    /**
+     * The lookup of the factory a produced bean is created from, which the dependency graph records as a constructor
+     * dependency of the produced bean. Pushed only while the graph is recorded, and never checked for circularity:
+     * the factory's own construction is.
+     */
+    static final class FactorySegment extends AbstractSegment<Object, Object> implements InjectionPoint<Object> {
+
+        /**
+         * @param producedDefinition The definition of the produced bean
+         * @param qualifier          The qualifier the produced bean is resolved under
+         * @param factoryType        The factory type
+         */
+        @SuppressWarnings("unchecked")
+        FactorySegment(BeanDefinition<?> producedDefinition, @Nullable Qualifier<?> qualifier, Class<?> factoryType) {
+            super((BeanDefinition<Object>) producedDefinition, (Qualifier<Object>) qualifier, "factory", (Argument<Object>) Argument.of(factoryType, "factory"));
+        }
+
+        @Override
+        public String toString() {
+            return getTypeName(getDeclaringType().getBeanType()) + " from factory " + getTypeName(getArgument().getType());
+        }
+
+        @Override
+        public InjectionPoint<Object> getInjectionPoint() {
+            return this;
+        }
+
+        @Override
+        public BeanDefinition<Object> getDeclaringBean() {
+            return getDeclaringType();
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return AnnotationMetadata.EMPTY_METADATA;
+        }
+
+        @Override
+        @Nullable
+        public Qualifier<Object> getDeclaringBeanQualifier() {
             return getDeclaringTypeQualifier();
         }
     }
