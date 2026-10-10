@@ -9,10 +9,9 @@ from micronaut.http.client import StreamingHttpClient
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from org.junit.jupiter.api import Test
 
-CompletableFuture = java.type("java.util.concurrent.CompletableFuture")
-CopyOnWriteArrayList = java.type("java.util.concurrent.CopyOnWriteArrayList")
 String = java.type("java.lang.String")
 TimeUnit = java.type("java.util.concurrent.TimeUnit")
+PythonAsyncioRuntime = java.type("io.micronaut.context.python.PythonAsyncioRuntime")
 
 
 @Property(name="spec.name", value="AsyncEventStreamSpec")
@@ -22,22 +21,32 @@ class AsyncEventStreamSpec:
 
     @Test
     def readEventsAsTheyArrive(self):
-        # tag::async[]
+        result = PythonAsyncioRuntime.toCompletionStage(self.readEvents())
+        assert result.toCompletableFuture().get(10, TimeUnit.SECONDS) == "abc-123"
+
+    # tag::async[]
+    async def readEvents(self) -> str:
         client = self.httpClient.toAsyncStreaming()  # <1>
         request = HttpRequest.POST("/mcp", '{"method":"ping"}') \
             .contentType(MediaType.APPLICATION_JSON_TYPE) \
             .accept(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_EVENT_STREAM_TYPE)
-        messages = CopyOnWriteArrayList()
+        response = await client.exchangeEventStream(request, String)  # <2>
+        elements = response.body()  # <3>
 
-        def collect(event):  # <4>
-            messages.add(event.getData())
-            return CompletableFuture.completedStage(None)
+        async def events():
+            try:
+                while True:
+                    event = await elements.next()
+                    if event.isEmpty():
+                        break
+                    yield event.get()
+            finally:
+                elements.close()
 
-        session_id = client.exchangeEventStream(request, String).thenCompose(  # <2>
-            lambda response: response.body()  # <3>
-            .forEach(collect)
-            .thenApply(lambda done: response.getHeaders().get("Mcp-Session-Id")))  # <5>
+        messages = []
+        async for event in events():  # <4>
+            messages.append(event.getData())
+        session_id = response.getHeaders().get("Mcp-Session-Id")  # <5>
         # end::async[]
-
-        assert session_id.toCompletableFuture().get(10, TimeUnit.SECONDS) == "abc-123"
-        assert list(messages) == ["progress", "done"]
+        assert messages == ["progress", "done"]
+        return session_id
