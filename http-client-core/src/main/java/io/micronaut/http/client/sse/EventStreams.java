@@ -116,7 +116,7 @@ public final class EventStreams {
             BodyElements<Event<B>> elements;
             if (contentType != null && MediaType.TEXT_EVENT_STREAM_TYPE.matches(contentType)) {
                 // the data of each event is JSON
-                elements = new ByteBodyElements<>(body, new EventReader<>(new EventStreamDecoder(maxBufferSize), dataReader(handlerRegistry, eventType, MediaType.APPLICATION_JSON_TYPE, headers)), wrap);
+                elements = new ByteBodyElements<>(body, EventReader.of(new EventStreamDecoder(maxBufferSize), dataReader(handlerRegistry, eventType, MediaType.APPLICATION_JSON_TYPE, headers)), wrap);
             } else {
                 // a single body, such as JSON, is one event
                 MediaType mediaType = contentType == null ? MediaType.APPLICATION_JSON_TYPE : contentType;
@@ -382,7 +382,14 @@ public final class EventStreams {
         private final Function<byte[], B> dataReader;
         private final ArrayDeque<Event<byte[]>> events = new ArrayDeque<>(1);
 
-        EventReader(EventStreamDecoder decoder, Function<byte[], B> dataReader) {
+        /**
+         * A reader whose ownership passes to the caller, which closes it.
+         */
+        static <B> EventReader<B> of(EventStreamDecoder decoder, Function<byte[], B> dataReader) {
+            return new EventReader<>(decoder, dataReader);
+        }
+
+        private EventReader(EventStreamDecoder decoder, Function<byte[], B> dataReader) {
             this.decoder = decoder;
             this.dataReader = dataReader;
         }
