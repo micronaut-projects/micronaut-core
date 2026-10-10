@@ -154,6 +154,12 @@ final class ArgumentStructure {
         return rebuild(array, component);
     }
 
+    static void checkComponentType(Argument<?> array, Argument<?> component) {
+        if (array instanceof WildcardArgument<?> || array.getType().getComponentType() != component.getType()) {
+            throw new IllegalArgumentException(component + " is not the component of " + array);
+        }
+    }
+
     static Argument<?> arrayType(Argument<?> component) {
         if (component instanceof WildcardArgument<?> || component.getType() == void.class) {
             throw new IllegalStateException("There is no array of a wildcard or of void: " + component);

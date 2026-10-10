@@ -65,6 +65,7 @@ public interface BeanContext extends
      * Creates a fresh instance of the exact definition, bypassing its scope, and retains its complete
      * dependency tree in the returned registration. Dependencies still obey their own scope rules.
      * For a contextual target behind a proxy, supply the target definition. The caller owns the result.
+     * The same shutdown rule as {@link #createDependencyGroup()} applies.
      * @param definition The definition to instantiate
      * @param <T> The bean type
      * @return The created instance and its lifecycle
@@ -77,8 +78,14 @@ public interface BeanContext extends
 
     /**
      * Creates an independent dependency group. The caller must close it; context shutdown does not take ownership.
-     * New lookups are rejected during shutdown. A destruction listener that needs temporary dependencies uses
-     * {@link io.micronaut.context.event.BeanPreDestroyEvent#withDependencies(Function)}.
+     *
+     * <p>Once shutdown begins, a group can only be created by a {@link io.micronaut.context.event.ShutdownEvent}
+     * listener, on the thread publishing the event. Lookups through it, and through groups created earlier, are only
+     * accepted on the thread performing the shutdown, and what they create is destroyed before the shutdown completes.
+     * A destruction listener that needs temporary dependencies uses
+     * {@link io.micronaut.context.event.BeanPreDestroyEvent#withDependencies(Function)}. Groups are also rejected
+     * before the context is configured.</p>
+     *
      * @return The group
      * @since 5.3.0
      */
@@ -89,7 +96,8 @@ public interface BeanContext extends
 
     /**
      * Resolves dependencies for a synchronous invocation and always releases them afterwards. Cleanup failures
-     * are suppressed on an invocation failure. New groups and lookups are rejected once shutdown begins;
+     * are suppressed on an invocation failure. Once shutdown begins, it is only available to a
+     * {@link io.micronaut.context.event.ShutdownEvent} listener, see {@link #createDependencyGroup()};
      * a destruction listener uses {@link io.micronaut.context.event.BeanPreDestroyEvent#withDependencies(Function)}.
      * @param action The invocation
      * @param <R> The result type

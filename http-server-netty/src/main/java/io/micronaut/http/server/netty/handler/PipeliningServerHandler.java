@@ -1284,6 +1284,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (body instanceof AvailableByteBody available) {
                 writeFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), NettyByteBodyFactory.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE), false);
             } else {
+                EventLoop eventLoop = requiredCtx().channel().eventLoop();
+                if (!eventLoop.inEventLoop()) {
+                    // e.g. a relayed response completed on a thread of another client. The body
+                    // is claimed here, the streaming buffer of the connection is created on its
+                    // event loop, where it is written
+                    CloseableByteBody claimed = body.move();
+                    eventLoop.execute(() -> write(response, claimed));
+                    return;
+                }
                 // a body whose trailers are known, e.g. a relayed body that was received fully
                 // before it is written, may have a known length. The trailers need the chunked
                 // transfer coding: a Content-Length response would drop them
@@ -1617,9 +1626,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         public void fail(Throwable t) {
             if (LOG.isWarnEnabled()) {
                 if (initialMessage == null) {
-                    LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
+                    LOG.warn("The streamed response body failed after some of it was written. The error cannot be forwarded to the client, and the response ends abruptly.", t);
                 } else {
-                    LOG.warn("Reactive response received an error before the response was written. This error cannot be forwarded to the client.", t);
+                    LOG.warn("The streamed response body failed before the response was written. The error cannot be forwarded to the client.", t);
                 }
             }
             // detach the handler before discarding it, so that the discard does not happen a
