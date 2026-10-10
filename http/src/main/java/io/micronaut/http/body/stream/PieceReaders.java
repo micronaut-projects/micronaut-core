@@ -124,7 +124,7 @@ public final class PieceReaders {
                                           @Nullable MediaType mediaType,
                                           Headers headers,
                                           long maxElementSize) {
-        PieceReader<T> own = reader.openPieceReader(type, mediaType, headers, maxElementSize);
+        @Nullable PieceReader<T> own = reader.openPieceReader(type, mediaType, headers, maxElementSize);
         if (own != null) {
             return own;
         }
