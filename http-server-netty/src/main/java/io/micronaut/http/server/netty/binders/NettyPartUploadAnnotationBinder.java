@@ -51,15 +51,18 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
     private final ConversionService conversionService;
     private final NettyCompletedFileUploadBinder completedFileUploadBinder;
     private final NettyPublisherPartUploadBinder publisherPartUploadBinder;
+    private final NettyStreamingFileUploadBinder streamingFileUploadBinder;
     private final BeanProvider<FormFactory> formFactory;
 
     NettyPartUploadAnnotationBinder(ConversionService conversionService,
                                     NettyCompletedFileUploadBinder completedFileUploadBinder,
                                     NettyPublisherPartUploadBinder publisherPartUploadBinder,
+                                    NettyStreamingFileUploadBinder streamingFileUploadBinder,
                                     BeanProvider<FormFactory> formFactory) {
         this.conversionService = conversionService;
         this.completedFileUploadBinder = completedFileUploadBinder;
         this.publisherPartUploadBinder = publisherPartUploadBinder;
+        this.streamingFileUploadBinder = streamingFileUploadBinder;
         this.formFactory = formFactory;
     }
 
@@ -75,6 +78,9 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
         }
         if (publisherPartUploadBinder.matches(context.getArgument().getType())) {
             return publisherPartUploadBinder.bind((ArgumentConversionContext) context, request);
+        }
+        if (streamingFileUploadBinder.matches(context.getArgument().getType())) {
+            return streamingFileUploadBinder.bind((ArgumentConversionContext) context, request);
         }
 
         Argument<T> argument = context.getArgument();
