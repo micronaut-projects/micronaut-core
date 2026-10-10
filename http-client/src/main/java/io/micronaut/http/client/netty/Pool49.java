@@ -225,6 +225,24 @@ final class Pool49 implements Pool {
         }
     }
 
+    @Override
+    public boolean openConnection(EventLoop eventLoop) {
+        LocalPoolPair pool = localPoolsByLoop.get(eventLoop);
+        if (pool == null || !openConnectionStep1()) {
+            return false;
+        }
+        if (eventLoop.inEventLoop()) {
+            pool.openConnectionStep2();
+            pool.openConnectionStep3();
+        } else {
+            eventLoop.execute(() -> {
+                pool.openConnectionStep2();
+                pool.openConnectionStep3();
+            });
+        }
+        return true;
+    }
+
     /**
      * Pick a preferred local pool for the current thread. This considers the
      * {@link HttpClientConfiguration.ConnectionPoolConfiguration#getConnectionLocality()} to try

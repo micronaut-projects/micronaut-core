@@ -538,7 +538,9 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             .informationalServiceId(clientId)
             .conversionService(beanContext.getBean(ConversionService.class))
             .resolverGroup(addressResolverGroupName == null ? null : beanContext.getBean(AddressResolverGroup.class, Qualifiers.byName(addressResolverGroupName)))
-            .blockingExecutor(blockingExecutor);
+            .blockingExecutor(blockingExecutor)
+            // development mode keeps the idle connections of a client across restarts
+            .retainedConnections(this.beanContext.findBean(RetainedClientConnections.class).orElse(null));
     }
 
     private EventLoopGroup resolveEventLoopGroup(HttpClientConfiguration configuration, BeanContext beanContext) {
