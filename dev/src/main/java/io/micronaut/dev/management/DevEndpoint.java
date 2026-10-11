@@ -174,7 +174,7 @@ public class DevEndpoint {
         return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
     }
 
-    private static Map<String, Object> describe(CompileFailure failure) {
+    static Map<String, Object> describe(CompileFailure failure) {
         Map<String, Object> description = new LinkedHashMap<>();
         description.put("kind", failure.kind().name().toLowerCase(java.util.Locale.ROOT));
         description.put("at", failure.at().toString());
