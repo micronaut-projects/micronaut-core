@@ -23,6 +23,8 @@ dependencies {
     api(projects.micronautCoreProcessor)
 
     testImplementation(projects.micronautContext)
+    // the reload harness of the development mode guide
+    testImplementation(projects.micronautDevTck)
     testImplementation(libs.managed.netty.codec.http)
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(projects.micronautJacksonDatabind)

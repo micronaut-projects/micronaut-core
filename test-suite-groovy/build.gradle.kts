@@ -26,6 +26,9 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     testImplementation(projects.micronautInject)
+    // the reload harness of the development mode guide, which compiles its Java fixture with the Java annotation processor
+    testImplementation(projects.micronautDevTck)
+    testImplementation(projects.micronautInjectJava)
     testImplementation(projects.micronautManagement)
     testImplementation(libs.micronaut.session) {
         exclude(group = "io.micronaut")
