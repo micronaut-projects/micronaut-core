@@ -55,6 +55,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -157,6 +158,10 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
             // the IPv4 loopback explicitly: "localhost" in the script tag reaches it whatever the JVM prefers, and a
             // client that only speaks IPv4 is not left out when the JVM prefers IPv6 addresses
             channel = bootstrap.bind(new InetSocketAddress(InetAddress.getByAddress("localhost", new byte[] {127, 0, 0, 1}), port)).sync().channel();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            group.shutdownGracefully(0, 0, TimeUnit.MILLISECONDS);
+            throw new InterruptedIOException("Interrupted while binding the LiveReload port " + port);
         } catch (Exception e) {
             group.shutdownGracefully(0, 0, TimeUnit.MILLISECONDS);
             throw new IOException("Cannot bind the LiveReload port " + port + ": " + e.getMessage(), e);
