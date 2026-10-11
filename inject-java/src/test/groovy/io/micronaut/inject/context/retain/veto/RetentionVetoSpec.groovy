@@ -202,6 +202,7 @@ class RetentionVetoSpec extends Specification {
     static class Dual implements Runnable, Callable<Object> {
         @Override
         void run() {
+            // never run: the bean is registered under both of its types
         }
 
         @Override
