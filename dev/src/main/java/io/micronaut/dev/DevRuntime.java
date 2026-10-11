@@ -300,7 +300,6 @@ public final class DevRuntime implements Closeable {
             }
             startLiveReload();
             startWatching();
-            reconcileOutputs();
             Thread thread = new Thread(this::processBatches, "micronaut-dev-reload");
             thread.setDaemon(true);
             thread.start();
@@ -326,6 +325,8 @@ public final class DevRuntime implements Closeable {
             close();
             throw e;
         }
+        // once the first generation launched, not to race it
+        reconcileOutputs();
         if (notRunning != null) {
             // as after a failed reload: the runtime keeps watching, and the next change launches a generation
             LOG.error("Development mode: {}; a change restarts it", notRunning.getMessage(), notRunning.getCause());
@@ -821,9 +822,21 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
-     * Another process of the project may have compiled between the first generation's copy and the watches, for an
-     * edit no watch saw: what it wrote is applied as a build tool's output would be.
+     * Another process of the project may have compiled since the outputs were last compared, between the first
+     * generation's copy and the watches, for an edit no watch saw, or before a new generation's copy: what it wrote is
+     * applied as a build tool's output would be.
      */
+    private GenerationClassLoader swapGeneration() {
+        GenerationClassLoader retired;
+        try (OutputLock.Hold hold = outputLock.lock()) {
+            retired = classLoader.swap();
+        }
+        // what another process compiled since the outputs were compared is in the new generation, not in what it was
+        // told changed: the next batch tells it, as it would a build tool's output
+        reconcileOutputs();
+        return retired;
+    }
+
     private void reconcileOutputs() {
         if (!snapshot.diff(outputSnapshot()).isEmpty()) {
             enqueue(outputsChanged());
@@ -861,9 +874,7 @@ public final class DevRuntime implements Closeable {
      * @return The new generation's loader
      */
     ClassLoader newGeneration() {
-        try (OutputLock.Hold hold = outputLock.lock()) {
-            classLoader.swap();
-        }
+        swapGeneration();
         logging.beforeGeneration(classLoader.current());
         return classLoader.current();
     }
@@ -1619,10 +1630,7 @@ public final class DevRuntime implements Closeable {
                 return;
             }
         }
-        GenerationClassLoader retired;
-        try (OutputLock.Hold hold = outputLock.lock()) {
-            retired = classLoader.swap();
-        }
+        GenerationClassLoader retired = swapGeneration();
         Collection<BeanRegistration<?>> retained = List.of();
         if (old != null) {
             ClassChangeEvent event = new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART);
