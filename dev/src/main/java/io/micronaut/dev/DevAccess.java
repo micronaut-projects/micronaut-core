@@ -78,7 +78,7 @@ public final class DevAccess {
     private final byte[] tokenBytes;
     private final String cookieName;
     private final @Nullable DevManifest manifest;
-    private volatile Set<String> allowedHosts;
+    private volatile Set<String> allowedHosts = Set.of(); // NOSONAR java:S3077 an unmodifiable set, replaced whole
     private volatile boolean tokenEnabled;
 
     /**

@@ -153,10 +153,9 @@ class DevServerSocketsTest {
             sockets.serveUnavailable();
 
             // a peer opens many connections and sends nothing: each would hold a thread until the read times out
-            List<Socket> idle = new ArrayList<>();
-            try {
+            try (IdleConnections idle = new IdleConnections()) {
                 for (int i = 0; i < DevServerSockets.MAX_ANSWERING * 5; i++) {
-                    idle.add(new Socket("localhost", port));
+                    idle.sockets.add(new Socket("localhost", port));
                 }
                 Thread.sleep(500);
                 long answering = Thread.getAllStackTraces().keySet().stream()
@@ -164,10 +163,6 @@ class DevServerSocketsTest {
                     .count();
                 assertTrue(answering <= DevServerSockets.MAX_ANSWERING, answering + " threads answer");
                 assertTrue(answering > 0, "no thread answers");
-            } finally {
-                for (Socket socket : idle) {
-                    socket.close();
-                }
             }
 
             // once those are gone, a request is answered again
@@ -200,6 +195,20 @@ class DevServerSocketsTest {
         } catch (java.net.SocketException e) {
             // closed without an answer: the responder is at capacity
             return "";
+        }
+    }
+
+    /**
+     * Connections a peer opened and sends nothing on, closed together.
+     */
+    private static final class IdleConnections implements AutoCloseable {
+        final List<Socket> sockets = new ArrayList<>();
+
+        @Override
+        public void close() throws IOException {
+            for (Socket socket : sockets) {
+                socket.close();
+            }
         }
     }
 }
