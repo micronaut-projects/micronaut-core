@@ -79,8 +79,7 @@ class PythonBodyEditOutputTest {
             structural("a route added", "app/hello.py", "    @Get(\"/untyped\")", "    @Get(\"/added\")\n    def added_route(self) -> str:\n        return \"added\"\n\n    @Get(\"/untyped\")")
         );
         List<String> unexpected = new ArrayList<>();
-        PythonSourceCompiler compiler = new PythonSourceCompiler();
-        try {
+        try (PythonSourceCompiler compiler = new PythonSourceCompiler()) {
             CompilationResult full = compiler.compile(fixture.request(Set.of(), Set.of()).asFull());
             assertTrue(full.isSuccess(), full.diagnostics().toString());
             for (Edit edit : edits) {
@@ -99,8 +98,6 @@ class PythonBodyEditOutputTest {
                     unexpected.add(edit.description() + ": " + changes);
                 }
             }
-        } finally {
-            compiler.close();
         }
         assertEquals(List.of(), unexpected);
     }

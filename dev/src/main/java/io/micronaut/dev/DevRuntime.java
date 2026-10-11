@@ -340,7 +340,7 @@ public final class DevRuntime implements Closeable {
      *         {@link InPlaceResourceReloader}, without a restart, since the start
      */
     public int inPlacePatches() {
-        return inPlacePatches;
+        return inPlacePatches.get();
     }
 
     /**
