@@ -81,7 +81,7 @@ class DevRuntimeTest {
             assertEquals(1, runtime.generation());
             assertTrue(first.getEnvironment().getActiveNames().contains(Environment.DEVELOPMENT));
             assertSame(runtime.classLoader().current(), first.getClassLoader());
-            assertEquals("one", greet(runtime, first));
+            assertEquals("one", greet(first));
             RetainedPool pool = first.getBean(RetainedPool.class);
             assertEquals(1, RetainedPool.CREATED.get());
             assertSame(runtime, first.getBean(DevRuntime.class));
@@ -103,7 +103,7 @@ class DevRuntimeTest {
             assertNotSame(first, second);
             assertFalse(first.isRunning());
             assertTrue(second.isRunning());
-            assertEquals("two", greet(runtime, second));
+            assertEquals("two", greet(second));
             assertEquals("!", second.getEnvironment().getProperty("greeting.suffix", String.class).orElse(null));
             assertSame(pool, second.getBean(RetainedPool.class));
             assertEquals(1, RetainedPool.CREATED.get());
@@ -125,7 +125,7 @@ class DevRuntimeTest {
             runtime.reload();
             ApplicationContext third = runtime.awaitGeneration(3, Duration.ofMinutes(2));
             assertTrue(runtime.lastFailure().isEmpty());
-            assertEquals("three", greet(runtime, third));
+            assertEquals("three", greet(third));
             assertSame(pool, third.getBean(RetainedPool.class));
 
             // an edit that changes no class does not restart
@@ -223,7 +223,7 @@ class DevRuntimeTest {
             runtime.reload();
             ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));
             assertNotSame(first, second);
-            assertEquals("three", greet(runtime, second));
+            assertEquals("three", greet(second));
             assertEquals(1, runtime.redefinitions());
         } finally {
             runtime.close();
@@ -627,7 +627,7 @@ class DevRuntimeTest {
             Pending late = new Pending(Map.of(SourceKind.JAVA, new SourceChanges(Set.of(greeter), Set.of())), Map.of(), false);
             runtime.awaitBatch(runtime.enqueue(Pending.merge(List.of(restart, late))));
             ApplicationContext restarted = runtime.awaitGeneration(2, Duration.ofMinutes(2));
-            assertEquals("one", greet(runtime, restarted));
+            assertEquals("one", greet(restarted));
             assertTrue(runtime.lastFailure().isPresent());
 
             // a valid edit of an unrelated file compiles the broken one with it: the failure stays, nothing reloads
@@ -642,7 +642,7 @@ class DevRuntimeTest {
             runtime.sourcesChanged(SourceKind.JAVA, Set.of(greeter), Set.of());
             ApplicationContext fixed = runtime.context().orElseThrow();
             assertTrue(runtime.lastFailure().isEmpty());
-            assertEquals("three", greet(runtime, fixed));
+            assertEquals("three", greet(fixed));
             Class<?> otherType = fixed.getClassLoader().loadClass("app.Other");
             assertEquals("two", otherType.getMethod("value").invoke(null));
         } finally {
@@ -658,7 +658,7 @@ class DevRuntimeTest {
         return "package app; @jakarta.inject.Singleton public class Greeter { public String greet() { return \"" + greeting + "\"; } }";
     }
 
-    private static String greet(DevRuntime runtime, ApplicationContext context) throws Exception {
+    private static String greet(ApplicationContext context) throws Exception {
         Class<?> type = context.getClassLoader().loadClass("app.Greeter");
         Object bean = context.getBean(type);
         return (String) type.getMethod("greet").invoke(bean);

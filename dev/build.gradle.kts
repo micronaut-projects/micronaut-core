@@ -63,6 +63,8 @@ dependencies {
     testImplementation(libs.ksp.aaEmbeddable)
     testImplementation(libs.managed.ksp.api)
     testImplementation(projects.micronautInjectKotlin)
+    // the compile-error page
+    testImplementation(projects.micronautHttpServer)
     testAnnotationProcessor(projects.micronautInjectJava)
 }
 
