@@ -533,6 +533,14 @@ class TestModeTest {
         assertEquals(patches, PatchingTestRunner.PATCHES.size());
         assertNotSame(beforeAdded, PatchingTestRunner.RUN_LOADERS.get(7));
         assertEquals("seven", PatchingTestRunner.RUN_MESSAGES.get(7));
+
+        // and one whose runner fails to offer a reloader
+        PatchingTestRunner.broken = true;
+        Files.writeString(message, "eight");
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(9, TIMEOUT);
+        assertNotSame(PatchingTestRunner.RUN_LOADERS.get(7), PatchingTestRunner.RUN_LOADERS.get(8));
+        assertEquals("eight", PatchingTestRunner.RUN_MESSAGES.get(8));
     }
 
     @Test
