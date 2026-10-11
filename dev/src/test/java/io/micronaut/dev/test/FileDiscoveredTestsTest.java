@@ -117,6 +117,25 @@ class FileDiscoveredTestsTest {
     }
 
     @Test
+    void aFileNamedByItsRealPathIsReportedRelativeToTheRootItsLinkedRootLeadsTo() throws Exception {
+        Path tests = Files.createDirectories(directory.resolve("project/tests"));
+        Files.writeString(tests.resolve("test_a.py"), "ok");
+        // the test source root is a link, as /var is on macOS, and the engine names each file by its real path
+        Path linked = Files.createSymbolicLink(directory.resolve("project/linked"), tests);
+        Path classes = Files.createDirectories(directory.resolve("project/test-classes"));
+        Path services = Files.createDirectories(directory.resolve("services/META-INF/services"));
+        Files.writeString(services.resolve("org.junit.platform.engine.TestEngine"), FileTestEngine.class.getName());
+        Map<String, String> real = Map.of("junit.jupiter.extensions.autodetection.enabled", "false", FileTestEngine.REAL, "true");
+
+        try (URLClassLoader loader = new URLClassLoader(new URL[] {directory.resolve("services").toUri().toURL()}, getClass().getClassLoader())) {
+            RecordingListener named = new RecordingListener();
+            new JUnitPlatformTestRunner().run(new TestRunRequest("run-1", loader, List.of(classes), List.of(new SourceRoot(SourceKind.PYTHON, linked)),
+                TestSelection.all(), real), named, new Cancellation());
+            assertEquals(Set.of("test_a.py.test_a.py"), named.outcomes.keySet());
+        }
+    }
+
+    @Test
     void aFileIsSelectedByItsPathRelativeToItsRootOrAbsoluteAndNothingElse() throws Exception {
         Path tests = Files.createDirectories(directory.resolve("project/tests"));
         Files.writeString(tests.resolve("test_a.py"), "ok");
