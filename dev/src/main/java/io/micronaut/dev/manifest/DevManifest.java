@@ -696,13 +696,35 @@ public final class DevManifest {
         if (!path.endsWith("/")) {
             path = path + "/";
         }
-        if (!path.matches("(/[A-Za-z0-9._~-]+)+/") || path.contains("/./") || path.contains("/../")) {
+        if (!isPlainSegments(path) || path.contains("/./") || path.contains("/../")) {
             throw new IllegalArgumentException("Not a path to serve the test report at: " + value + " (as /tests/, of plain segments)");
         }
         if (path.startsWith("/livereload/") || path.startsWith("/livereload.js") || path.startsWith("/micronaut-dev/")) {
             throw new IllegalArgumentException("The path " + value + " is the LiveReload server's own: choose another for the test report");
         }
         return path;
+    }
+
+    /**
+     * Whether a path of a leading and a trailing slash is of one or more non-empty segments of unreserved characters.
+     */
+    private static boolean isPlainSegments(String path) {
+        if (path.length() < 3) {
+            return false;
+        }
+        char previous = '/';
+        for (int i = 1; i < path.length(); i++) {
+            char c = path.charAt(i);
+            if (c == '/') {
+                if (previous == '/') {
+                    return false;
+                }
+            } else if (!(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '.' || c == '_' || c == '~' || c == '-')) {
+                return false;
+            }
+            previous = c;
+        }
+        return true;
     }
 
     private static Path path(Path directory, String value) {
