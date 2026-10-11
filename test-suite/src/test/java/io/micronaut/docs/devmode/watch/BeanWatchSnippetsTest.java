@@ -36,7 +36,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BeanWatchSnippetsTest {
 
@@ -134,7 +133,7 @@ class BeanWatchSnippetsTest {
             assertNotSame(lookup, recreated.lookup());
             assertSame(recreated.lookup(), context.getBean(SerializerLookup.class));
             assertFalse(recreated.write("b").isEmpty());
-            assertTrue(context.getBean(SerializerLookup.class) != lookup);
+            assertNotSame(lookup, context.getBean(SerializerLookup.class));
         }
     }
 }

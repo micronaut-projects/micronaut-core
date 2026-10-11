@@ -25,6 +25,8 @@ dependencies {
     testCompileOnly(projects.micronautManagement)
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.bytebuddy.agent)
+    // the compile-error page
+    testImplementation(projects.micronautHttpServer)
     testAnnotationProcessor(projects.micronautInjectJava)
 }
 
