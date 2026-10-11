@@ -67,6 +67,7 @@ final class RestartRequests implements RequestAdmission {
     private volatile Duration holdTimeout;
     private volatile Duration drainTimeout;
     private final @Nullable DevServerSockets serverSockets;
+    private final DevAccess access;
     /**
      * Completes when the requests the gate holds may proceed: when the batch is done, or when a restart drains the
      * generation they arrived on, which serves them before it stops.
@@ -81,7 +82,9 @@ final class RestartRequests implements RequestAdmission {
         this.manifest = manifest;
         this.holdTimeout = manifest.requestHoldTimeout();
         this.drainTimeout = manifest.requestDrainTimeout();
-        this.serverSockets = retainSockets ? new DevServerSockets() : null;
+        this.access = DevAccess.of(manifest);
+        // what answers while no generation runs answers the same hosts as the generations do
+        this.serverSockets = retainSockets ? new DevServerSockets(access::allowsHost) : null;
     }
 
     /**
@@ -110,6 +113,13 @@ final class RestartRequests implements RequestAdmission {
     @Override
     public Duration drainTimeout() {
         return drainTimeout;
+    }
+
+    /**
+     * @return Who may reach the development pages of this launch
+     */
+    DevAccess access() {
+        return access;
     }
 
     /**
@@ -166,14 +176,12 @@ final class RestartRequests implements RequestAdmission {
 
     /**
      * The next generation failed to start: no generation runs until the next batch, so a request is answered at once
-     * rather than left waiting.
-     *
-     * @param failure Why it failed
+     * rather than left waiting, with a generic 503: why it failed is in the console, not in a response.
      */
-    void startFailed(RuntimeException failure) {
+    void startFailed() {
         DevServerSockets sockets = serverSockets;
         if (sockets != null) {
-            sockets.serveUnavailable(failure.getMessage() == null ? failure.getClass().getName() : failure.getMessage());
+            sockets.serveUnavailable();
         }
     }
 
@@ -231,6 +239,7 @@ final class RestartRequests implements RequestAdmission {
         if (generation == null) {
             return;
         }
+        access.configure(generation);
         holdTimeout = configured(generation, DevManifest.REQUESTS_HOLD_TIMEOUT, manifest.requestHoldTimeout());
         drainTimeout = configured(generation, DevManifest.REQUESTS_DRAIN_TIMEOUT, manifest.requestDrainTimeout());
     }

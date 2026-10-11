@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.CompileFailure;
+import io.micronaut.dev.DevAccess;
 import io.micronaut.dev.DevRuntime;
 import io.micronaut.dev.compile.CompileDiagnostic;
 import io.micronaut.http.HttpHeaders;
@@ -26,7 +27,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.endpoint.annotation.Selector;
@@ -46,15 +46,16 @@ import java.util.Map;
  * <p>The endpoint is sensitive, as the management endpoints that act on the application are: it reports absolute paths
  * of the machine and its reload compiles and restarts the application, so it answers 401 until security is configured
  * or {@code endpoints.dev.sensitive} is set to false. The reload is accepted only as a JSON request from no page or
- * from a page of the server's own origin, as the host resolver gives it through a proxy too, so that a page of another
- * site cannot trigger it with a form or a simple request.
+ * from a page of the server's own origin: a host the development runtime answers, see {@link DevAccess}, on the port the
+ * request arrived on, so that a page of another site cannot trigger it with a form or a simple request. The origin is
+ * compared with what the runtime allows, never with a host the request itself names.
  *
  * @author graemerocher
  * @since 5.3.0
  */
 @Internal
 @Endpoint(id = DevEndpoint.NAME)
-@Requires(classes = {Endpoint.class, HttpHostResolver.class})
+@Requires(classes = {Endpoint.class, HttpRequest.class})
 @DevelopmentActive
 @Requires(beans = DevRuntime.class)
 public class DevEndpoint {
@@ -78,15 +79,12 @@ public class DevEndpoint {
     static final String HEADER_FETCH_SITE = "Sec-Fetch-Site";
 
     private final DevRuntime runtime;
-    private final HttpHostResolver hostResolver;
 
     /**
      * @param runtime The runtime
-     * @param hostResolver Resolves the origin the server is reached at, through a proxy too
      */
-    public DevEndpoint(DevRuntime runtime, HttpHostResolver hostResolver) {
+    public DevEndpoint(DevRuntime runtime) {
         this.runtime = runtime;
-        this.hostResolver = hostResolver;
     }
 
     /**
@@ -115,7 +113,7 @@ public class DevEndpoint {
      */
     @Write
     public HttpResponse<Map<String, Object>> act(@Selector String action, HttpRequest<?> request) {
-        String refusal = refusal(request, hostResolver.resolve(request));
+        String refusal = refusal(request, runtime.access());
         if (refusal != null) {
             return HttpResponse.<Map<String, Object>>status(HttpStatus.FORBIDDEN).body(Map.of(KEY_ACCEPTED, false, KEY_ACTION, action, KEY_REASON, refusal));
         }
@@ -132,12 +130,15 @@ public class DevEndpoint {
      * preflight the server does not grant, and a request a browser marks as coming from another site, or whose origin
      * is not the server's own, is refused. A client that is no page, such as curl or an IDE, sends neither header.
      *
+     * <p>The server's own origin is one whose scheme is the request's, whose host the development runtime answers and
+     * whose port is the one the request arrived on. A page of a site whose name was made to resolve to this machine sends
+     * a {@code Host} of that name, which is why the request's own host is not trusted.</p>
+     *
      * @param request The request
-     * @param ownOrigin The origin the server is reached at, as {@link HttpHostResolver} resolves it from the request
-     *                  and the forwarding headers of a proxy
+     * @param access The hosts the development runtime answers
      * @return The reason, or null
      */
-    static @Nullable String refusal(HttpRequest<?> request, String ownOrigin) {
+    static @Nullable String refusal(HttpRequest<?> request, DevAccess access) {
         boolean json = request.getContentType().map(type -> type.getName().equalsIgnoreCase(MediaType.APPLICATION_JSON)).orElse(false);
         if (!json) {
             return "The action needs a request with the content type " + MediaType.APPLICATION_JSON;
@@ -147,21 +148,22 @@ public class DevEndpoint {
             return "The action is not accepted from another site";
         }
         String origin = request.getHeaders().get(HttpHeaders.ORIGIN);
-        if (origin != null && !sameOrigin(origin, ownOrigin)) {
+        if (origin != null && !sameOrigin(origin, request, access)) {
             return "The action is not accepted from another origin";
         }
         return null;
     }
 
     /**
-     * Whether two origins have the same scheme, host and port, a default port written or left out.
+     * Whether an origin is the server's own: the request's scheme, a host the runtime answers and the port the request
+     * arrived on, a default port written or left out.
      */
-    private static boolean sameOrigin(String origin, String ownOrigin) {
+    private static boolean sameOrigin(String origin, HttpRequest<?> request, DevAccess access) {
         try {
-            URI a = new URI(origin.trim());
-            URI b = new URI(ownOrigin.trim());
-            return a.getScheme() != null && a.getHost() != null && a.getScheme().equalsIgnoreCase(b.getScheme())
-                && a.getHost().equalsIgnoreCase(b.getHost()) && port(a) == port(b);
+            URI uri = new URI(origin.trim());
+            String scheme = request.isSecure() ? "https" : "http";
+            return uri.getScheme() != null && uri.getHost() != null && uri.getScheme().equalsIgnoreCase(scheme)
+                && access.allowsHost(uri.getHost()) && port(uri) == request.getServerAddress().getPort();
         } catch (URISyntaxException e) {
             return false;
         }

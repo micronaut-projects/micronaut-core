@@ -35,9 +35,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.Semaphore;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * The listening sockets of the application's HTTP servers, bound once and kept for the life of the
@@ -47,14 +50,25 @@ import java.util.function.Consumer;
  *
  * <p>While a batch is processed, the servers stop accepting, so that a new connection is served by
  * whichever generation runs once the batch is done. While no generation runs because the last one failed
- * to start, the sockets answer every connection with a 503 and a {@code Retry-After}, rather than
- * leaving it waiting.</p>
+ * to start, the sockets answer every connection with a generic 503 and a {@code Retry-After}, rather than
+ * leaving it waiting; why it failed is in the console only. A request for a host the development runtime does not
+ * answer is refused with a 403, and only a few connections are answered at once, each on a thread of its own: others
+ * are closed.</p>
  *
  * @author graemerocher
  * @since 5.3.0
  */
 @Internal
 public final class DevServerSockets implements AutoCloseable {
+
+    /**
+     * How many connections are answered at once while no generation runs: each is read on a thread of its own, for up
+     * to two seconds, and a peer opening connections must not exhaust the process's threads.
+     */
+    static final int MAX_ANSWERING = 8;
+    static final String UNAVAILABLE_THREAD = "micronaut-dev-unavailable-connection";
+    static final String UNAVAILABLE_BODY = "The application is not running: its last start failed. See the console for why; the next change restarts it.\n";
+    static final String FORBIDDEN_BODY = "Development mode: this host is not allowed.\n";
 
     private static final Logger LOG = LoggerFactory.getLogger(DevServerSockets.class);
     private static final int BACKLOG = 1024;
@@ -66,6 +80,7 @@ public final class DevServerSockets implements AutoCloseable {
     private static final int TLS_HANDSHAKE = 0x16;
 
     private final Map<String, ServerSocketChannel> sockets = new LinkedHashMap<>();
+    private final Predicate<@Nullable String> allowsHost;
     private final List<Accepting> accepting = new ArrayList<>();
     /**
      * The sockets handed to a server that has not accepted on them yet, with the number of that handout: its
@@ -75,6 +90,23 @@ public final class DevServerSockets implements AutoCloseable {
     private long handouts;
     private boolean closed;
     private @Nullable Responder responder;
+
+    /**
+     * Sockets whose 503 answers only {@code localhost}, its subdomains and the loopback addresses.
+     */
+    public DevServerSockets() {
+        this(host -> {
+            String name = host == null ? null : io.micronaut.dev.DevAccess.hostName(host);
+            return name != null && io.micronaut.dev.DevAccess.isLoopback(name);
+        });
+    }
+
+    /**
+     * @param allowsHost Whether the 503 answers a request's {@code Host}, null when it has none
+     */
+    public DevServerSockets(Predicate<@Nullable String> allowsHost) {
+        this.allowsHost = allowsHost;
+    }
 
     /**
      * The socket for a listener on a fixed port: bound the first time it is asked for, the same one afterwards. None
@@ -236,10 +268,8 @@ public final class DevServerSockets implements AutoCloseable {
 
     /**
      * Answers every connection with a 503 until a server accepts on the sockets again: no generation runs.
-     *
-     * @param reason Why, the body of the response
      */
-    public synchronized void serveUnavailable(String reason) {
+    public synchronized void serveUnavailable() {
         if (closed || sockets.isEmpty()) {
             return;
         }
@@ -250,7 +280,7 @@ public final class DevServerSockets implements AutoCloseable {
             return;
         }
         try {
-            Responder started = new Responder(new ArrayList<>(sockets.values()), reason);
+            Responder started = new Responder(new ArrayList<>(sockets.values()), allowsHost);
             started.start();
             responder = started;
         } catch (IOException e) {
@@ -304,6 +334,26 @@ public final class DevServerSockets implements AutoCloseable {
         }
     }
 
+    /**
+     * The {@code Host} of a request head, read as ISO-8859-1, or null when it has none or more than one.
+     */
+    static @Nullable String host(CharSequence head) {
+        String host = null;
+        String[] lines = head.toString().split("\r\n");
+        // the first line is the request line
+        for (int i = 1; i < lines.length; i++) {
+            String line = lines[i];
+            int colon = line.indexOf(':');
+            if (colon > 0 && line.substring(0, colon).trim().toLowerCase(Locale.ROOT).equals("host")) {
+                if (host != null) {
+                    return null;
+                }
+                host = line.substring(colon + 1).trim();
+            }
+        }
+        return host;
+    }
+
     private record Accepting(ServerSocketChannel socket, Consumer<Boolean> autoRead, BooleanSupplier open) {
     }
 
@@ -312,12 +362,17 @@ public final class DevServerSockets implements AutoCloseable {
      * once its request head is read, so that closing it does not reset the response the client is reading.
      */
     private static final class Responder implements Runnable {
+        private static final byte[] UNAVAILABLE = response("503 Service Unavailable", "Retry-After: 1\r\n", UNAVAILABLE_BODY);
+        private static final byte[] FORBIDDEN = response("403 Forbidden", "", FORBIDDEN_BODY);
+
         private final Selector selector;
-        private final byte[] response;
+        private final Predicate<@Nullable String> allowsHost;
+        private final Semaphore answering = new Semaphore(MAX_ANSWERING);
         private final Thread thread;
         private volatile boolean stopped;
 
-        Responder(List<ServerSocketChannel> sockets, String reason) throws IOException {
+        Responder(List<ServerSocketChannel> sockets, Predicate<@Nullable String> allowsHost) throws IOException {
+            this.allowsHost = allowsHost;
             selector = Selector.open();
             try {
                 for (ServerSocketChannel socket : sockets) {
@@ -327,11 +382,14 @@ public final class DevServerSockets implements AutoCloseable {
                 selector.close();
                 throw e;
             }
-            byte[] body = ("The application is not running: " + reason + "\n").getBytes(StandardCharsets.UTF_8);
-            response = ("HTTP/1.1 503 Service Unavailable\r\nRetry-After: 1\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: "
-                + body.length + "\r\nConnection: close\r\n\r\n" + new String(body, StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8);
             thread = new Thread(this, "micronaut-dev-unavailable");
             thread.setDaemon(true);
+        }
+
+        private static byte[] response(String status, String headers, String text) {
+            byte[] body = text.getBytes(StandardCharsets.UTF_8);
+            return ("HTTP/1.1 " + status + "\r\n" + headers + "Content-Type: text/plain; charset=utf-8\r\nContent-Length: "
+                + body.length + "\r\nConnection: close\r\n\r\n" + text).getBytes(StandardCharsets.UTF_8);
         }
 
         void start() {
@@ -366,9 +424,7 @@ public final class DevServerSockets implements AutoCloseable {
                         if (key.isValid() && key.isAcceptable()) {
                             SocketChannel connection = ((ServerSocketChannel) key.channel()).accept();
                             if (connection != null) {
-                                Thread answer = new Thread(() -> answer(connection), "micronaut-dev-unavailable-connection");
-                                answer.setDaemon(true);
-                                answer.start();
+                                answerLater(connection);
                             }
                         }
                     }
@@ -378,6 +434,40 @@ public final class DevServerSockets implements AutoCloseable {
                 if (!stopped) {
                     LOG.debug("Stopped answering requests while no generation runs", e);
                 }
+            }
+        }
+
+        /**
+         * Answers a connection on a thread of its own, when fewer than {@link #MAX_ANSWERING} are being answered;
+         * otherwise closes it: the client retries, as it would a refused connection.
+         */
+        private void answerLater(SocketChannel connection) {
+            if (!answering.tryAcquire()) {
+                close(connection);
+                return;
+            }
+            try {
+                Thread answer = new Thread(() -> {
+                    try {
+                        answer(connection);
+                    } finally {
+                        answering.release();
+                    }
+                }, UNAVAILABLE_THREAD);
+                answer.setDaemon(true);
+                answer.start();
+            } catch (RuntimeException | Error e) {
+                answering.release();
+                close(connection);
+                throw e;
+            }
+        }
+
+        private static void close(SocketChannel connection) {
+            try {
+                connection.close();
+            } catch (IOException e) {
+                LOG.debug("Cannot close a connection", e);
             }
         }
 
@@ -392,15 +482,24 @@ public final class DevServerSockets implements AutoCloseable {
                     return;
                 }
                 // the request head, so that closing the connection does not discard unread bytes and reset the response
+                StringBuilder head = new StringBuilder();
+                if (first >= 0) {
+                    head.append((char) first);
+                }
                 int matched = first == '\r' ? 1 : 0;
                 for (int read = 1; first >= 0 && read < MAX_REQUEST_HEAD && matched < 4; read++) {
                     int b = in.read();
                     if (b < 0) {
                         break;
                     }
+                    head.append((char) b);
                     matched = b == (matched % 2 == 0 ? '\r' : '\n') ? matched + 1 : (b == '\r' ? 1 : 0);
                 }
-                connection.write(ByteBuffer.wrap(response));
+                byte[] response = allowsHost.test(host(head)) ? UNAVAILABLE : FORBIDDEN;
+                ByteBuffer buffer = ByteBuffer.wrap(response);
+                while (buffer.hasRemaining()) {
+                    connection.write(buffer);
+                }
                 connection.shutdownOutput();
             } catch (IOException e) {
                 LOG.debug("Cannot answer a request while no generation runs", e);

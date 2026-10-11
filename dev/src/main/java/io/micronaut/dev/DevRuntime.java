@@ -58,7 +58,6 @@ import io.micronaut.dev.test.TestRunSummary;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher;
 import io.micronaut.runtime.context.scope.refresh.RefreshResult;
-import io.micronaut.runtime.EmbeddedApplication;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import io.micronaut.scheduling.io.watch.FileChange;
 import io.micronaut.scheduling.io.watch.FileChangeBatch;
@@ -315,7 +314,7 @@ public final class DevRuntime implements Closeable {
             notRunning = notRunning(launched, launching, failure, definesServer, "first start");
             if (notRunning == null) {
                 // of the generation that ran; when it did not, the first reload that runs one logs the note
-                notice.logOnce(LOG, strategy(), liveReload, definesServer, definesServer && manifest.liveReload().injectScript());
+                notice.logOnce(LOG, strategy(), liveReload, definesServer, definesServer && manifest.liveReload().injectScript(), launched, access());
             }
             if (notRunning != null && !markStartFailed(launched, notRunning)) {
                 // a change launched the next generation meanwhile: it is the one that runs, or not
@@ -372,6 +371,13 @@ public final class DevRuntime implements Closeable {
      */
     public DevManifest manifest() {
         return manifest;
+    }
+
+    /**
+     * @return Who may reach the development pages of this launch: the hosts answered and the launch's access token
+     */
+    public DevAccess access() {
+        return requests.access();
     }
 
     /**
@@ -901,7 +907,7 @@ public final class DevRuntime implements Closeable {
             }
             ApplicationContext current = context;
             if (current != null && current.isRunning()) {
-                stopGeneration(current);
+                GenerationStop.stop(current);
             }
             requests.close();
             for (SourceCompiler compiler : new LinkedHashSet<>(compilers.values())) {
@@ -928,25 +934,6 @@ public final class DevRuntime implements Closeable {
      */
     public void awaitClose() throws InterruptedException {
         closedLatch.await();
-    }
-
-    /**
-     * Stops a generation as the shutdown hook {@code Micronaut.run} registers does: through the embedded
-     * applications it started, then the context. The HTTP server's {@code stop()} holds the server's lock
-     * while it stops the context, so stopping the context first, which stops the server bean under the
-     * context's lock, takes the two locks in the opposite order; when the JVM exits, both hooks run at once
-     * and would deadlock.
-     */
-    private static void stopGeneration(ApplicationContext generation) {
-        // only the applications already created: looking one up must not create it while stopping. Each is stopped
-        // whether it reports running or not, as the hook does: the hook's stop clears the flag before it stops the
-        // context, and stopping the application waits for it, where stopping the context would deadlock with it
-        for (BeanRegistration<EmbeddedApplication> registration : generation.getActiveBeanRegistrations(EmbeddedApplication.class)) {
-            registration.getBean().stop();
-        }
-        if (generation.isRunning()) {
-            generation.stop();
-        }
     }
 
     /**
@@ -1681,7 +1668,7 @@ public final class DevRuntime implements Closeable {
             fresh = launch("reload");
         } catch (RuntimeException e) {
             startFailed = true;
-            requests.startFailed(e);
+            requests.startFailed();
             // the retained beans belong to nobody now: the old context, stopped, still knows how to dispose them
             for (BeanRegistration<?> registration : takeRetainedRegistrations()) {
                 try {
@@ -1708,7 +1695,7 @@ public final class DevRuntime implements Closeable {
         fresh.publishEvent(new ReloadCompletedEvent(this, new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));
         LOG.info("Reloaded: generation {} started in {} ms ({} class(es) changed, {} bean(s) retained)", classLoader.generation(), elapsed.toMillis(), changeSet.classes().size(), retainedCount);
         // when the first generation did not run, the first that does logs the note
-        notice.logOnce(LOG, strategy(), liveReload, definesServer, definesServer && manifest.liveReload().injectScript());
+        notice.logOnce(LOG, strategy(), liveReload, definesServer, definesServer && manifest.liveReload().injectScript(), fresh, access());
         LiveReloadServer server = liveReload;
         if (server != null) {
             // the new generation serves: the browsers see the new code
@@ -1902,7 +1889,7 @@ public final class DevRuntime implements Closeable {
         }
         started = CompletableFuture.failedFuture(failure);
         startFailed = true;
-        requests.startFailed(failure);
+        requests.startFailed();
         return true;
     }
 

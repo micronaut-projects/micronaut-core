@@ -144,6 +144,9 @@ class DevRestartRequestsTest {
             String unavailable = get("/hello");
             assertTrue(unavailable.startsWith("503 "), unavailable);
             assertTrue(unavailable.contains("The application is not running"), unavailable);
+            // why it failed is in the console, not in a response a peer on the network can read
+            assertFalse(unavailable.contains("boom"), unavailable);
+            assertFalse(unavailable.contains("IllegalStateException"), unavailable);
             assertTrue(rawGet("/hello").contains("\r\nRetry-After: 1\r\n"));
 
             // the fix: the next generation accepts on the same socket

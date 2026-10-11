@@ -15,11 +15,14 @@
  */
 package io.micronaut.dev;
 
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.reload.ReloadStrategy;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.dev.http.DevAccessLinks;
 import io.micronaut.dev.livereload.LiveReloadServer;
+import io.micronaut.dev.manifest.DevManifest;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -29,7 +32,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * The note the launcher logs once, when a generation of the application first runs: the process runs with development
- * settings, not production ones. It lists only what is true of this launch.
+ * settings, not production ones. It lists only what is true of this launch, and, for an HTTP server, the link that
+ * opens the development pages with the launch's access token and the address the server listens on.
  *
  * @since 5.3.0
  */
@@ -51,11 +55,15 @@ final class DevModeNotice {
      * @param liveReload The LiveReload server, when it runs
      * @param http       Whether the application defines an HTTP server, whose requests the gate filter answers
      * @param script     Whether the LiveReload script is added to the server's HTML pages
+     * @param generation The generation that runs
+     * @param access     The access of the launch, whose token the link carries
      */
-    void logOnce(Logger log, ReloadStrategy strategy, @Nullable LiveReloadServer liveReload, boolean http, boolean script) {
+    void logOnce(Logger log, ReloadStrategy strategy, @Nullable LiveReloadServer liveReload, boolean http, boolean script,
+                 ApplicationContext generation, DevAccess access) {
         if (logged.compareAndSet(false, true) && log.isInfoEnabled()) {
             OptionalInt port = liveReload == null ? OptionalInt.empty() : OptionalInt.of(liveReload.port());
-            log.info("{}", text(strategy, port, http, script));
+            DevAccessLinks.Link link = http ? DevAccessLinks.of(generation, access) : null;
+            log.info("{}", text(strategy, port, http, script, link));
         }
     }
 
@@ -66,9 +74,10 @@ final class DevModeNotice {
      * @param liveReload The port the LiveReload server listens on, when it runs
      * @param http       Whether the application defines an HTTP server, whose requests the gate filter answers
      * @param script     Whether the LiveReload script is added to the server's HTML pages
+     * @param link       The link to the development pages and the server's address, when a server runs
      * @return The note: a framed block of lines that starts on a line of its own
      */
-    static String text(ReloadStrategy strategy, OptionalInt liveReload, boolean http, boolean script) {
+    static String text(ReloadStrategy strategy, OptionalInt liveReload, boolean http, boolean script, DevAccessLinks.@Nullable Link link) {
         StringBuilder text = new StringBuilder(System.lineSeparator());
         line(text, RULE);
         line(text, "  " + HEADLINE);
@@ -82,6 +91,20 @@ final class DevModeNotice {
         }
         if (liveReload.isPresent()) {
             line(text, "    - a LiveReload server listens on port " + liveReload.getAsInt() + (script ? ", and HTML pages load its script" : ""));
+        }
+        if (link != null) {
+            if (link.allInterfaces()) {
+                line(text, "    - the HTTP server listens on " + link.bindAddress() + ": other machines can reach it;");
+                line(text, "      set micronaut.server.host=localhost to keep it to this one");
+            } else {
+                line(text, "    - the HTTP server listens on " + link.bindAddress());
+            }
+            if (link.tokenEnabled()) {
+                line(text, "    - the development pages need this launch's access token; open:");
+            } else {
+                line(text, "    - the development pages need no access token (" + DevManifest.ACCESS_TOKEN_ENABLED + "=false); open:");
+            }
+            line(text, "      " + link.url());
         }
         line(text, "  Run the packaged application, without the launcher, in production.");
         return text.append(RULE).toString();

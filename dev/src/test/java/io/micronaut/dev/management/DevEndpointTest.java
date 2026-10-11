@@ -16,6 +16,7 @@
 package io.micronaut.dev.management;
 
 import io.micronaut.dev.CompileFailure;
+import io.micronaut.dev.DevAccess;
 import io.micronaut.dev.DevRuntime;
 import io.micronaut.dev.DevRuntimes;
 import io.micronaut.dev.compile.CompileDiagnostic;
@@ -47,7 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DevEndpointTest {
 
-    private static final String OWN = "http://localhost:8080";
+    private static final DevAccess ACCESS = new DevAccess(List.of("workspace.example.test"), true);
 
     @TempDir
     Path project;
@@ -55,7 +56,7 @@ class DevEndpointTest {
     @Test
     void theStatusOfARuntimeThatDidNotStart() throws Exception {
         try (DevRuntime runtime = DevRuntimes.unstarted(project)) {
-            Map<String, Object> status = new DevEndpoint(runtime, request -> OWN).status();
+            Map<String, Object> status = new DevEndpoint(runtime).status();
             assertEquals(runtime.generation(), status.get(DevEndpoint.KEY_GENERATION));
             assertEquals(runtime.strategy().name(), status.get(DevEndpoint.KEY_STRATEGY));
             assertEquals(false, status.get(DevEndpoint.KEY_RELOADING));
@@ -70,7 +71,7 @@ class DevEndpointTest {
     @Test
     void theEndpointReloadsOnlyForTheReloadActionOfAnAcceptedRequest() throws Exception {
         try (DevRuntime runtime = DevRuntimes.unstarted(project)) {
-            DevEndpoint endpoint = new DevEndpoint(runtime, request -> OWN);
+            DevEndpoint endpoint = new DevEndpoint(runtime);
 
             HttpResponse<Map<String, Object>> refused = endpoint.act(DevEndpoint.ACTION_RELOAD, reload().header(HttpHeaders.ORIGIN, "https://evil.example"));
             assertEquals(HttpStatus.FORBIDDEN, refused.getStatus());
@@ -125,41 +126,60 @@ class DevEndpointTest {
 
     @Test
     void aClientThatIsNoPageReloadsWithAJsonRequest() {
-        assertNull(DevEndpoint.refusal(reload(), OWN));
+        assertNull(DevEndpoint.refusal(reload(), ACCESS));
     }
 
     @Test
     void aPageOfTheServersOwnOriginReloads() {
-        assertNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "http://localhost:8080").header(DevEndpoint.HEADER_FETCH_SITE, "same-origin"), OWN));
+        assertNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "http://localhost:8080").header(DevEndpoint.HEADER_FETCH_SITE, "same-origin"), ACCESS));
+        // the loopback names and addresses, on the port the request arrived on
+        assertNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "http://127.0.0.1:8080"), ACCESS));
+        assertNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "http://[::1]:8080"), ACCESS));
+        assertNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "http://app.localhost:8080"), ACCESS));
+        // a name of micronaut.dev.allowed-hosts
+        assertNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "http://workspace.example.test:8080"), ACCESS));
         // a default port written or left out
-        assertNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "http://localhost"), "http://localhost:80"));
-        assertNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "http://localhost:80"), "http://localhost"));
-        assertNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "http://[::1]:8080"), "http://[::1]:8080"));
-        // behind a proxy terminating TLS, the origin the host resolver gives from the forwarding headers
-        assertNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "https://workspace.example"), "https://workspace.example"));
+        assertNull(DevEndpoint.refusal(reload("http://localhost/dev/reload").header(HttpHeaders.ORIGIN, "http://localhost"), ACCESS));
+        assertNull(DevEndpoint.refusal(reload("http://localhost/dev/reload").header(HttpHeaders.ORIGIN, "http://localhost:80"), ACCESS));
     }
 
     @Test
     void aFormOrASimpleRequestCannotReload() {
         // what a page of any site can send without a preflight
-        assertNotNull(DevEndpoint.refusal(HttpRequest.POST("/dev/reload", ""), OWN));
-        assertNotNull(DevEndpoint.refusal(HttpRequest.POST("/dev/reload", "").contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), OWN));
-        assertNotNull(DevEndpoint.refusal(HttpRequest.POST("/dev/reload", "").contentType(MediaType.TEXT_PLAIN_TYPE), OWN));
+        assertNotNull(DevEndpoint.refusal(HttpRequest.POST("http://localhost:8080/dev/reload", ""), ACCESS));
+        assertNotNull(DevEndpoint.refusal(HttpRequest.POST("http://localhost:8080/dev/reload", "").contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), ACCESS));
+        assertNotNull(DevEndpoint.refusal(HttpRequest.POST("http://localhost:8080/dev/reload", "").contentType(MediaType.TEXT_PLAIN_TYPE), ACCESS));
     }
 
     @Test
     void aRequestFromAnotherOriginCannotReload() {
-        assertNotNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "https://evil.example"), OWN));
-        assertNotNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "http://localhost:9090"), OWN));
-        assertNotNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "https://localhost:8080"), OWN));
-        assertNotNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "null"), OWN));
-        assertNotNull(DevEndpoint.refusal(reload().header(DevEndpoint.HEADER_FETCH_SITE, "cross-site"), OWN));
-        assertNotNull(DevEndpoint.refusal(reload().header(DevEndpoint.HEADER_FETCH_SITE, "same-site"), OWN));
+        assertNotNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "https://evil.example"), ACCESS));
+        assertNotNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "http://localhost:9090"), ACCESS));
+        assertNotNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "https://localhost:8080"), ACCESS));
+        assertNotNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "null"), ACCESS));
+        assertNotNull(DevEndpoint.refusal(reload().header(DevEndpoint.HEADER_FETCH_SITE, "cross-site"), ACCESS));
+        assertNotNull(DevEndpoint.refusal(reload().header(DevEndpoint.HEADER_FETCH_SITE, "same-site"), ACCESS));
         // another host on the same port
-        assertNotNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "http://other.example:8080"), OWN));
+        assertNotNull(DevEndpoint.refusal(reload().header(HttpHeaders.ORIGIN, "http://other.example:8080"), ACCESS));
+    }
+
+    @Test
+    void anOriginMatchingTheHostARequestNamesIsNotEnough() {
+        // a page of a site whose name was made to resolve to this machine: its request names that host, and its origin
+        // matches it, as a resolver of the request's own host would conclude; the origin is compared with what the
+        // runtime allows instead
+        MutableHttpRequest<?> rebound = reload()
+            .header(HttpHeaders.HOST, "rebind.attacker.example:8080")
+            .header(HttpHeaders.ORIGIN, "http://rebind.attacker.example:8080")
+            .header(DevEndpoint.HEADER_FETCH_SITE, "same-origin");
+        assertNotNull(DevEndpoint.refusal(rebound, ACCESS));
     }
 
     private static MutableHttpRequest<?> reload() {
-        return HttpRequest.POST("/dev/reload", "{}").contentType(MediaType.APPLICATION_JSON_TYPE);
+        return reload("http://localhost:8080/dev/reload");
+    }
+
+    private static MutableHttpRequest<?> reload(String uri) {
+        return HttpRequest.POST(uri, "{}").contentType(MediaType.APPLICATION_JSON_TYPE);
     }
 }

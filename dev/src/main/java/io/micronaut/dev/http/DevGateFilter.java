@@ -20,9 +20,9 @@ import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.context.reload.RequestAdmission;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.CompileFailure;
+import io.micronaut.dev.DevAccess;
 import io.micronaut.dev.DevRuntime;
 import io.micronaut.dev.compile.CompileDiagnostic;
-import io.micronaut.dev.management.DevEndpoint;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -30,8 +30,6 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ServerFilter;
-import io.micronaut.web.router.MethodBasedRouteMatch;
-import io.micronaut.web.router.RouteAttributes;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
@@ -50,6 +48,10 @@ import java.util.function.Supplier;
  * compilation failed: a page for a browser, a structured 503 for anything else. The stale generation
  * keeps serving what compiles. The development endpoint is never answered with the failure: reloading through it is
  * how to recover when the watcher missed the corrected edit.
+ *
+ * <p>The diagnostics name the machine's source paths: only a request that {@link DevAccessFilter} would let through to
+ * the development pages sees them, one with an allowed host and the launch's access token. Another request with an
+ * allowed host is told that the compilation failed and to look at the console; one with another host is refused.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -78,6 +80,12 @@ public final class DevGateFilter {
      */
     static final String RETRY_AFTER_SECONDS = "1";
 
+    /**
+     * What a request that may not see the diagnostics is told.
+     */
+    static final String GENERIC_MESSAGE = "Compilation failed; see the console for the diagnostics. The previous version "
+        + "keeps running. Open the link the launcher logged at startup to see them here.";
+
     private final DevRuntime runtime;
     @Nullable
     private final DevErrorPage errorPage;
@@ -96,7 +104,7 @@ public final class DevGateFilter {
     @RequestFilter
     public CompletableFuture<@Nullable HttpResponse<?>> gate(HttpRequest<?> request) {
         RequestAdmission admission = runtime.requestAdmission();
-        Supplier<@Nullable HttpResponse<?>> then = () -> answer(request, runtime.lastFailure().orElse(null), errorPage);
+        Supplier<@Nullable HttpResponse<?>> then = () -> answer(request, runtime.lastFailure().orElse(null), errorPage, runtime.access());
         if (admission.isAdmitted()) {
             return CompletableFuture.completedFuture(then.get());
         }
@@ -140,25 +148,19 @@ public final class DevGateFilter {
      * @param request The request
      * @param failure The last compilation failure, null when the last compilation succeeded
      * @param errorPage The server's error page, if there is one
+     * @param access The access of the launch, which decides whether the diagnostics are shown
      * @return The failure response, or null to proceed
      */
-    static @Nullable HttpResponse<?> answer(HttpRequest<?> request, @Nullable CompileFailure failure, @Nullable DevErrorPage errorPage) {
-        if (failure == null || isDevEndpoint(request)) {
+    static @Nullable HttpResponse<?> answer(HttpRequest<?> request, @Nullable CompileFailure failure, @Nullable DevErrorPage errorPage, DevAccess access) {
+        // the route decides rather than the path, so the endpoint is recognised wherever endpoints.all.path or
+        // endpoints.dev.path put it, and an application route that happens to live under /dev keeps the gate
+        if (failure == null || DevAccessFilter.isDevEndpoint(request)) {
             return null;
         }
-        return respond(request, failure, errorPage);
-    }
-
-    /**
-     * Whether the request was routed to the development endpoint. The route decides rather than the path, so the
-     * endpoint is recognised wherever {@code endpoints.all.path} or {@code endpoints.dev.path} put it, and an
-     * application route that happens to live under {@code /dev} keeps the gate.
-     */
-    private static boolean isDevEndpoint(HttpRequest<?> request) {
-        return RouteAttributes.getRouteMatch(request)
-            .filter(MethodBasedRouteMatch.class::isInstance)
-            .map(match -> ((MethodBasedRouteMatch<?, ?>) match).getDeclaringType() == DevEndpoint.class)
-            .orElse(false);
+        if (!DevAccessFilter.allowsHost(request, access)) {
+            return HttpResponse.status(HttpStatus.FORBIDDEN).contentType(MediaType.TEXT_PLAIN_TYPE).body(DevAccessFilter.HOST_REFUSED);
+        }
+        return respond(request, failure, errorPage, DevAccessFilter.isAuthorized(request, access));
     }
 
     /**
@@ -167,20 +169,29 @@ public final class DevGateFilter {
      * @param request The request
      * @param failure The failure
      * @param errorPage The server's error page, if there is one
+     * @param detailed Whether the request may see the diagnostics, which name the machine's source paths
      * @return The response
      */
-    static HttpResponse<?> respond(HttpRequest<?> request, CompileFailure failure, @Nullable DevErrorPage errorPage) {
+    static HttpResponse<?> respond(HttpRequest<?> request, CompileFailure failure, @Nullable DevErrorPage errorPage, boolean detailed) {
         boolean html = request.getHeaders().accept().stream().anyMatch(type -> type.getName().equals(MediaType.TEXT_HTML));
         if (html) {
             HttpResponse<?> unavailable = HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE);
             // the page the server shows for any other error, when the server is here to render it
-            String body = errorPage != null ? errorPage.render(request, unavailable, failure) : page(failure);
+            String body;
+            if (detailed) {
+                body = errorPage != null ? errorPage.render(request, unavailable, failure) : page(failure);
+            } else {
+                body = errorPage != null ? errorPage.renderGeneric(request, unavailable) : genericPage();
+            }
             return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE).contentType(MediaType.TEXT_HTML_TYPE).body(body);
         }
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put(KEY_MESSAGE, "Compilation failed");
+        body.put(KEY_MESSAGE, detailed ? "Compilation failed" : GENERIC_MESSAGE);
         body.put(KEY_KIND, failure.kind().name().toLowerCase(java.util.Locale.ROOT));
         body.put(KEY_AT, failure.at().toString());
+        if (!detailed) {
+            return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE).contentType(MediaType.APPLICATION_JSON_TYPE).body(body);
+        }
         List<Map<String, Object>> diagnostics = new ArrayList<>();
         for (CompileDiagnostic diagnostic : failure.diagnostics()) {
             Map<String, Object> entry = new LinkedHashMap<>();
@@ -195,6 +206,15 @@ public final class DevGateFilter {
         }
         body.put(KEY_DIAGNOSTICS, diagnostics);
         return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE).contentType(MediaType.APPLICATION_JSON_TYPE).body(body);
+    }
+
+    /**
+     * The page, without the diagnostics, used when no server-side error page provider is available.
+     */
+    static String genericPage() {
+        return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Compilation failed</title>"
+            + "<style>body{font-family:ui-monospace,Menlo,monospace;margin:2rem;background:#1e1e1e;color:#ddd}h1{color:#f66}</style>"
+            + "</head><body><h1>Compilation failed</h1><p>" + escape(GENERIC_MESSAGE) + "</p></body></html>";
     }
 
     /**

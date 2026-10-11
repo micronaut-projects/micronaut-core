@@ -119,6 +119,20 @@ public final class DevManifest {
     public static final String REQUESTS_RETAIN_SOCKETS = PREFIX + "requests.retain-sockets";
 
     /**
+     * The key of the host names, besides {@code localhost}, its subdomains and the loopback addresses, that the
+     * development pages and responses answer: a comma separated list, a name such as {@code dev.example.test} or an
+     * address. A request for any other host is refused, so that a page of another site whose name resolves to this
+     * machine cannot read them.
+     */
+    public static final String ALLOWED_HOSTS = PREFIX + "allowed-hosts";
+
+    /**
+     * The key of whether the development pages need the access token generated for each launch, which the launcher
+     * logs at startup as a link. On by default.
+     */
+    public static final String ACCESS_TOKEN_ENABLED = PREFIX + "access-token.enabled";
+
+    /**
      * The generation budget in a native image, where the classes of a retired generation are never unloaded: GraalVM's
      * runtime class loading keeps every class it defines, in a metaspace whose size is fixed when the image is built, and
      * the interpreter's data for them on the heap, for the life of the process.
@@ -178,6 +192,8 @@ public final class DevManifest {
     private final Duration requestHoldTimeout;
     private final Duration requestDrainTimeout;
     private final boolean retainServerSockets;
+    private final List<String> allowedHosts;
+    private final boolean accessTokenEnabled;
 
     private DevManifest(Path directory, Properties properties) {
         this.directory = directory;
@@ -211,6 +227,8 @@ public final class DevManifest {
         this.requestHoldTimeout = duration(REQUESTS_HOLD_TIMEOUT, properties.getProperty(REQUESTS_HOLD_TIMEOUT), DEFAULT_HOLD_TIMEOUT);
         this.requestDrainTimeout = duration(REQUESTS_DRAIN_TIMEOUT, properties.getProperty(REQUESTS_DRAIN_TIMEOUT), DEFAULT_DRAIN_TIMEOUT);
         this.retainServerSockets = Boolean.parseBoolean(properties.getProperty(REQUESTS_RETAIN_SOCKETS, "true").trim());
+        this.allowedHosts = Arrays.stream(properties.getProperty(ALLOWED_HOSTS, "").split(",")).map(String::trim).filter(host -> !host.isEmpty()).toList();
+        this.accessTokenEnabled = Boolean.parseBoolean(properties.getProperty(ACCESS_TOKEN_ENABLED, "true").trim());
         String generationsDir = properties.getProperty(PREFIX + "generations");
         this.generations = generationsDir == null ? projectDir.resolve("build").resolve("micronaut-dev").resolve("generations") : path(directory, generationsDir);
         this.liveReload = new LiveReload(
@@ -565,6 +583,26 @@ public final class DevManifest {
      */
     public boolean retainServerSockets() {
         return retainServerSockets;
+    }
+
+    /**
+     * The host names the development pages answer besides the loopback ones, {@value #ALLOWED_HOSTS}. The application's
+     * configuration may set them when the manifest does not (see {@link #sets(String)}).
+     *
+     * @return The names, empty by default
+     */
+    public List<String> allowedHosts() {
+        return allowedHosts;
+    }
+
+    /**
+     * Whether the development pages need the access token of the launch, {@value #ACCESS_TOKEN_ENABLED}. The
+     * application's configuration may turn it off when the manifest does not set it (see {@link #sets(String)}).
+     *
+     * @return True unless turned off
+     */
+    public boolean accessTokenEnabled() {
+        return accessTokenEnabled;
     }
 
     /**

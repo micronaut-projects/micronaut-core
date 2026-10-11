@@ -75,12 +75,52 @@ endpoints:
     sensitive: false
 ----
 
-The reload is a JSON request. It is refused with a 403 when a browser marks it as coming from another site, or when its `Origin` is not the server's own as its host resolution gives it (behind a proxy, from the forwarding headers). A page the developer visits therefore cannot trigger it with a form:
+The reload is a JSON request. It is refused with a 403 when a browser marks it as coming from another site, or when its `Origin` is not the server's own: a host the development runtime answers (see <<devModeSecurity, Security>>) on the port the request arrived on. The `Host` the request names plays no part, since a page of another site can make its own name resolve to the machine. A page the developer visits therefore cannot trigger it with a form. Like every development page, it also needs the launch's access token:
 
 [source,bash]
 ----
-curl -X POST -H 'Content-Type: application/json' http://localhost:8080/dev/reload
+curl -X POST -H 'Content-Type: application/json' -H "X-Micronaut-Dev-Token: $TOKEN" http://localhost:8080/dev/reload
 ----
+
+[[devModeSecurity]]
+== Security
+
+The development runtime reveals the machine: the `dev` endpoint reports absolute paths and reloads the application, the Control Panel shows its beans and configuration, and a failed compilation names the source files. The launcher therefore guards these development pages, and only in development mode: a packaged application has none of it.
+
+=== The access token
+
+Each start of the launcher generates a random token of 256 bits, which reloads keep and a relaunch replaces. Once the application first runs, the startup note prints a link with it, to the Control Panel when the application has one (at `micronaut.control-panel.path`, `/control-panel` by default) and to the `dev` endpoint otherwise, along with the address the HTTP server listens on:
+
+----
+    - the HTTP server listens on localhost:8080
+    - the development pages need this launch's access token; open:
+      http://localhost:8080/control-panel?token=8RkV...
+----
+
+Opening the link sets a cookie, `HttpOnly`, `SameSite=Strict` and of path `/`, and redirects to the same page without the token, so that it leaves the address bar and the history. From then on the browser reaches the development pages: everything under the `dev` endpoint, wherever `endpoints.dev.path` puts it, and under `/dev` and the Control Panel's path. A client that is not a browser, such as curl or an IDE, sends the token in the `X-Micronaut-Dev-Token` header. A request with neither is answered 401 with a hint to open the link. The token is compared in constant time.
+
+A compilation failure answered to the application's own routes shows the compiler's diagnostics, source paths included, only to a request that carries the token. Any other request is told that the compilation failed and to look at the console.
+
+=== Allowed hosts
+
+A development page, and a compilation failure, answer only a request whose `Host` is `localhost`, a name under `.localhost`, `127.0.0.1` or `[::1]`, on any port. Any other host is refused with a 403: a page of another site whose name was made to resolve to the machine, as DNS rebinding does, cannot read them. The same holds for the 503 the launcher answers while no generation runs, which says only that the application is not running; why is in the console. The responder answers a few connections at a time and closes the others.
+
+To open the application through another name, such as a LAN host or a development container whose ports are forwarded, list it in `micronaut.dev.allowed-hosts`, comma-separated, in the manifest, as a system property of the launcher or in the application's configuration. The host the server is bound to with `micronaut.server.host` is allowed too.
+
+[source,bash]
+----
+-Dmicronaut.dev.allowed-hosts=devbox.lan,app-container
+----
+
+=== Binding to the loopback address
+
+The build plugins start the application with `micronaut.server.host=localhost`, so that other machines on the network cannot reach the development server at all. The startup note prints the address the server listens on, and warns when it listens on every interface.
+
+=== Opting out
+
+* `micronaut.dev.access-token.enabled=false` turns the token off: the development pages answer an allowed host without it, and the compilation failures show their diagnostics. Set it in the manifest, as a system property of the launcher or in the application's configuration.
+* `micronaut.dev.allowed-hosts` adds the hosts to answer. There is no wildcard: the loopback names stay allowed and every other name is listed.
+* Setting `micronaut.server.host`, to `0.0.0.0` for instance, makes the server reachable from other machines; the token still guards the development pages.
 
 == Compilers
 
