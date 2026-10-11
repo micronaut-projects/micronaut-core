@@ -157,6 +157,42 @@ class HtmlTestReportTest {
     }
 
     @Test
+    void aBrandsSvgLogoIsInlinedAndOtherImagesEmbedded(@TempDir Path directory) throws Exception {
+        Path brand = Files.createDirectories(directory.resolve("META-INF/micronaut-dev/test-report"));
+        Files.createDirectories(directory.resolve("brand"));
+        Files.writeString(directory.resolve("brand/logo.svg"), "<?xml version=\"1.0\"?>\n<svg aria-label=\"Brand\"></svg>\n");
+        Files.write(directory.resolve("brand/logo.webp"), new byte[] {1, 2, 3});
+        Files.write(directory.resolve("brand/logo.jpg"), new byte[] {1, 2, 3});
+
+        Files.writeString(brand.resolve("brand.properties"), "logo=brand/logo.svg\n");
+        assertEquals("<svg aria-label=\"Brand\"></svg>", logo(directory));
+        Files.writeString(brand.resolve("brand.properties"), "logo=brand/logo.webp\n");
+        assertEquals("<img src=\"data:image/webp;base64,AQID\" alt=\"Logo\">", logo(directory));
+        Files.writeString(brand.resolve("brand.properties"), "name=<Brand>\nlogo=brand/logo.jpg\n");
+        assertEquals("<img src=\"data:image/jpeg;base64,AQID\" alt=\"&lt;Brand&gt;\">", logo(directory));
+    }
+
+    @Test
+    void aBrandThatCannotBeReadKeepsTheMicronautLogo(@TempDir Path directory) throws Exception {
+        Path brand = Files.createDirectories(directory.resolve("META-INF/micronaut-dev/test-report"));
+        // a logo that is not there
+        Files.writeString(brand.resolve("brand.properties"), "name=Brand\nlogo=brand/missing.svg\n");
+        assertTrue(logo(directory).contains("aria-label=\"Micronaut\""));
+        // a malformed escape
+        Files.writeString(brand.resolve("brand.properties"), "name=\\uZZZZ\nlogo=brand/logo.svg\n");
+        assertTrue(logo(directory).contains("aria-label=\"Micronaut\""));
+        // a brand naming no logo
+        Files.writeString(brand.resolve("brand.properties"), "name=Brand\n");
+        assertTrue(logo(directory).contains("aria-label=\"Micronaut\""));
+    }
+
+    private static String logo(Path directory) throws Exception {
+        try (java.net.URLClassLoader loader = new java.net.URLClassLoader(new java.net.URL[] {directory.toUri().toURL()}, HtmlTestReport.class.getClassLoader())) {
+            return HtmlTestReport.logo(loader);
+        }
+    }
+
+    @Test
     void stringsAreEscapedForJsonInsideAPage() {
         String json = new Json().beginObject()
             .field("text", "a\"b\\c\n</script><!-- & \u2028 \u0001 \ud800")
