@@ -124,6 +124,60 @@ class TestModeTest {
     }
 
     @Test
+    void aContextATestRunsSeesTheGenerationAndATestResourceTheBuildCopiedOnce() throws Exception {
+        Path test = Files.createDirectories(project.resolve("src/test/java/app"));
+        Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(project.resolve("src/main/java/app/Greeter.java"), greeter("one"));
+        Files.writeString(test.resolve("ContextTest.java"), """
+            package app;
+            import io.micronaut.context.ApplicationContext;
+            import org.junit.jupiter.api.Test;
+            import static org.junit.jupiter.api.Assertions.assertEquals;
+            public class ContextTest {
+                @Test
+                void runs() {
+                    try (ApplicationContext context = ApplicationContext.run()) {
+                        assertEquals("io.micronaut.dev.loader.GenerationClassLoader", context.getEnvironment().getClassLoader().getClass().getName());
+                        assertEquals("hello", context.getProperty("greeting", String.class).orElseThrow());
+                    }
+                }
+            }
+            """);
+        Path config = Files.createDirectories(project.resolve("src/test/resources")).resolve("application-test.properties");
+        Files.writeString(config, "greeting=hi\n");
+
+        runtime = new MicronautDevMain().launch(manifest("micronaut.dev.generations=target/micronaut-dev/generations\n"), new String[0]);
+
+        TestRunSummary first = runtime.lastTestRun().orElseThrow();
+        Path report = project.resolve("build/test-results/TEST-app.ContextTest.xml");
+        assertEquals(1, first.failed(), Files.readString(report));
+
+        // the build copies the test configuration into the test output, as Maven does: the copy, which is stale, is
+        // the same resource as the one read live, not a duplicate
+        Files.copy(config, project.resolve("build/test-classes/application-test.properties"));
+        Files.writeString(config, "greeting=hello\n");
+        runtime.changed(List.of(config), List.of());
+        TestRunSummary second = runtime.awaitTestRun(2, TIMEOUT);
+        assertTrue(second.isSuccess(), Files.readString(report));
+        // the generations go where the manifest says, a Maven build's target directory, marked as the launcher's
+        assertTrue(Files.isRegularFile(project.resolve("target/micronaut-dev/generations/.micronaut-dev-generations")));
+        assertFalse(Files.exists(project.resolve("build/micronaut-dev")));
+    }
+
+    @Test
+    void aGenerationsDirectoryHoldingFilesTheLauncherDidNotWriteIsNotEmptied() throws Exception {
+        Path precious = Files.createDirectories(project.resolve("generations")).resolve("notes.txt");
+        Files.writeString(precious, "mine");
+        Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(project.resolve("src/main/java/app/Greeter.java"), greeter("one"));
+
+        IllegalStateException failure = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+            () -> runtime = new MicronautDevMain().launch(manifest("micronaut.dev.generations=generations\n"), new String[0]));
+        assertTrue(failure.getMessage().contains("did not write"), failure.getMessage());
+        assertEquals("mine", Files.readString(precious));
+    }
+
+    @Test
     void aBrokenChangeStaysBrokenUntilFixedAnInlinedConstantRunsEveryTestAndADeletedTestTakesItsReport() throws Exception {
         Path main = Files.createDirectories(project.resolve("src/main/java/app"));
         Path test = Files.createDirectories(project.resolve("src/test/java/app"));

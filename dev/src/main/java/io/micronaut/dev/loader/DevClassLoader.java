@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.ref.WeakReference;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
 /**
  * The application's classloader for the life of the development JVM: one stable identity that
@@ -61,6 +63,9 @@ public final class DevClassLoader extends ClassLoader {
     static {
         registerAsParallelCapable();
     }
+
+    // the file marking a generations directory as the launcher's, which it may empty
+    private static final String MARKER = ".micronaut-dev-generations";
 
     private final List<Path> liveRoots;
     private final List<Path> sources;
@@ -93,7 +98,12 @@ public final class DevClassLoader extends ClassLoader {
         this.sources = List.copyOf(roots);
         this.generationsDir = generationsDir;
         try {
+            if (!isOwnDirectory(generationsDir)) {
+                throw new IllegalStateException("Not emptying " + generationsDir + " for the generations: it holds files the launcher did not write");
+            }
             GenerationClassLoader.deleteRecursively(generationsDir);
+            Files.createDirectories(generationsDir);
+            Files.writeString(generationsDir.resolve(MARKER), "Snapshots of the reloadable classes, by generation: emptied each time development mode starts\n");
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot empty the generations directory " + generationsDir, e);
         }
@@ -105,6 +115,25 @@ public final class DevClassLoader extends ClassLoader {
      */
     private GenerationClassLoader generationNow() {
         return Objects.requireNonNull(current.get());
+    }
+
+    /**
+     * Whether a directory is one the launcher may empty: missing, empty, marked as the launcher's, or holding nothing
+     * but the numbered snapshots of generations, as a launcher that wrote no marker left it.
+     */
+    private static boolean isOwnDirectory(Path directory) throws IOException {
+        if (!Files.exists(directory)) {
+            return true;
+        }
+        if (!Files.isDirectory(directory)) {
+            return false;
+        }
+        if (Files.isRegularFile(directory.resolve(MARKER))) {
+            return true;
+        }
+        try (Stream<Path> children = Files.list(directory)) {
+            return children.allMatch(child -> Files.isDirectory(child) && child.getFileName().toString().matches("\\d+"));
+        }
     }
 
     private GenerationClassLoader snapshot(int generation, List<Path> roots) {
