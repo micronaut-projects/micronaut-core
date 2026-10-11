@@ -99,6 +99,36 @@ class DevManifestSpec extends Specification {
         manifest.liveReload().port() == 35729
     }
 
+    void "a test manifest reads the test settings, and compiles a test language without an output beside the application's"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.mode", "test")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes")
+        properties.setProperty("micronaut.dev.compile.java.output", "build/classes/java/main")
+        properties.setProperty("micronaut.dev.test.sources.java", "src/test/java")
+        properties.setProperty("micronaut.dev.test.sources.kotlin", "src/test/kotlin")
+        properties.setProperty("micronaut.dev.test.selection", "All")
+        properties.setProperty("micronaut.dev.test.parameters.junit.jupiter.execution.parallel.enabled", " true ")
+
+        when:
+        DevManifest manifest = DevManifest.of(dir, properties)
+
+        then: "the tests load ahead of the application, the Kotlin tests from beside the first reloadable root"
+        manifest.mainClass() == ""
+        manifest.reloadableRoots() == [dir.resolve("build/classes/java/main-test"), dir.resolve("build/classes-test"), dir.resolve("build/classes")]
+        manifest.testClassOutput(SourceKind.JAVA) == dir.resolve("build/classes/java/main-test")
+        !manifest.testSettings().affectedOnly()
+        manifest.testSettings().parameters() == ["junit.jupiter.execution.parallel.enabled": "true"]
+
+        when:
+        properties.setProperty("micronaut.dev.test.selection", "some")
+        DevManifest.of(dir, properties)
+
+        then:
+        IllegalArgumentException e = thrown()
+        e.message.contains("Unknown test selection some")
+    }
+
     void "a manifest without a main class or a reloadable root is refused"() {
         when:
         DevManifest.of(dir, new Properties())
