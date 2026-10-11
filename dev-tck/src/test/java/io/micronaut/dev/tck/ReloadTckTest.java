@@ -140,7 +140,7 @@ class ReloadTckTest {
 
     private static boolean hasExtra(ApplicationContext context) {
         return context.getBeanDefinitions(io.micronaut.inject.qualifiers.Qualifiers.any()).stream()
-            .anyMatch(definition -> definition.getBeanType().getName().equals("example.Extra"));
+            .anyMatch(definition -> definition.getBeanType().getName().equals("example.Extra")); // NOSONAR java:S1872 the class is compiled at runtime into a generation loader the test cannot reference
     }
 
     /**
