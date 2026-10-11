@@ -285,6 +285,12 @@ public final class HtmlTestReport implements TestReportListener {
             .field("project", project)
             .field("generatedAt", Instant.now().toString())
             .field("live", url != null);
+        // what tells a reader, the Control Panel for one, whether continuous testing still runs: the process, the
+        // instant it started (so a reused pid is told apart) and the served report, when there is one
+        ProcessHandle process = ProcessHandle.current();
+        json.field("pid", process.pid());
+        process.info().startInstant().ifPresent(started -> json.field("pidStartedAt", started.toString()));
+        json.field("url", url);
         json.name("running");
         rawOrNull(json, running);
         json.field("finished", finished);
