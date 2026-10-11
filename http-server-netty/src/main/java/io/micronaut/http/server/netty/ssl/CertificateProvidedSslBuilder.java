@@ -47,9 +47,9 @@ public class CertificateProvidedSslBuilder extends AbstractServerSslBuilder impl
 
     private final ServerSslConfiguration ssl;
     @Nullable
-    private volatile CachedStore keyStoreCache = null;
+    private volatile CachedStore keyStoreCache = null; // NOSONAR java:S3077 immutable record, replaced whole
     @Nullable
-    private volatile CachedStore trustStoreCache = null;
+    private volatile CachedStore trustStoreCache = null; // NOSONAR java:S3077 immutable record, replaced whole
 
     /**
      * @param httpServerConfiguration The HTTP server configuration

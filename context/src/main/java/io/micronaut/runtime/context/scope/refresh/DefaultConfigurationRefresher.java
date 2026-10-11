@@ -55,7 +55,7 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
 
     private final ApplicationContext context;
     private final Environment environment;
-    private final ThreadLocal<Boolean> applying = ThreadLocal.withInitial(() -> Boolean.FALSE);
+    private final ThreadLocal<Boolean> applying = new ThreadLocal<>();
     /**
      * The properties as resolved at the last refresh, or at creation: the side a refresh compares the
      * sources against, which is what tells a removed key from one that never existed.
@@ -175,7 +175,7 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
      *         legacy event the refresh publishes to the listeners that expect it
      */
     boolean isApplying() {
-        return applying.get();
+        return Boolean.TRUE.equals(applying.get());
     }
 
     /**
@@ -220,7 +220,7 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
             }
             return result;
         } finally {
-            applying.set(Boolean.FALSE);
+            applying.remove();
         }
     }
 
