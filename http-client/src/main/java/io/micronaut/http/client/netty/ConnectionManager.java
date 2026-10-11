@@ -33,6 +33,7 @@ import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.client.netty.ssl.NettyClientSslFactory;
+import io.micronaut.http.netty.AbstractCompositeCustomizer;
 import io.micronaut.http.netty.NettySslContextBuilder;
 import io.micronaut.http.netty.SslContextAutoLoader;
 import io.micronaut.http.netty.SslContextHolder;
@@ -123,6 +124,7 @@ import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.ScheduledFuture;
+import io.netty.util.internal.ThreadExecutorMap;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -137,6 +139,7 @@ import java.net.SocketAddress;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
@@ -146,6 +149,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadLocalRandom;
@@ -162,6 +166,27 @@ import java.util.function.Supplier;
  */
 @Internal
 public class ConnectionManager {
+
+    private static final String HANDLER_CONNECTION_CLEANER = "connection-cleaner";
+    /**
+     * The handlers an idle HTTP/1.1 connection may carry to be offered to {@link RetainedClientConnections}: those this
+     * class adds, and no others, such as a customizer's, a proxy's or a capture's.
+     */
+    private static final Set<String> RETAINABLE_HANDLERS = Set.of(
+        TransportWriteTracker.NAME,
+        ChannelPipelineCustomizer.HANDLER_SSL,
+        ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC,
+        ChannelPipelineCustomizer.HANDLER_HTTP_DECODER,
+        ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
+        ChannelPipelineCustomizer.HANDLER_IDLE_STATE,
+        HANDLER_CONNECTION_CLEANER,
+        ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE
+    );
+    /**
+     * How long a client waits, when it starts, for the connections it takes back from {@link RetainedClientConnections}
+     * to be pooled.
+     */
+    private static final long ADOPTION_TIMEOUT_MILLIS = 2000;
 
     final NettyClientCustomizer clientCustomizer;
 
@@ -198,6 +223,14 @@ public class ConnectionManager {
     private boolean wsContextLoaded;
     @Nullable
     private final String informationalServiceId;
+    @Nullable
+    private final RetainedClientConnections retainedConnections;
+    /**
+     * The identity of this client's configuration among the clients that may take back each other's idle connections,
+     * or {@code null} when its connections are not offered to {@link #retainedConnections}.
+     */
+    @Nullable
+    private final String retainedClient;
 
     /**
      * Copy constructor used by the test suite to patch this manager.
@@ -218,6 +251,8 @@ public class ConnectionManager {
         this.configuration = from.configuration;
         this.clientCustomizer = from.clientCustomizer;
         this.informationalServiceId = from.informationalServiceId;
+        this.retainedConnections = from.retainedConnections;
+        this.retainedClient = from.retainedClient;
         this.nettyClientSslBuilder = from.nettyClientSslBuilder;
         this.sslFactory = from.sslFactory;
         this.certificateProviders = from.certificateProviders;
@@ -271,6 +306,57 @@ public class ConnectionManager {
         this.resolverGroup = builder.resolverGroup == null ? getResolver(configuration.getDnsResolutionMode()) : builder.resolverGroup;
 
         refresh();
+
+        RetainedClientConnections retained = builder.retainedConnections;
+        this.retainedConnections = retained;
+        this.retainedClient = retained == null ? null : retainedClient(retained);
+        if (retained != null && retainedClient != null) {
+            adoptRetained(retained, retainedClient);
+        }
+    }
+
+    /**
+     * The identity of this client's configuration, when its idle connections may outlive it: they run on event loops
+     * it does not shut down, carry no handler of a customizer, a capture or HTTP/3, and their TLS sessions were made
+     * from the configuration alone, without certificate providers. A pool that picks the loops of its connections
+     * itself cannot take them back, and a connection whose lifetime is limited would start it again.
+     */
+    @Nullable
+    private String retainedClient(RetainedClientConnections retained) {
+        SslConfiguration ssl = configuration.getSslConfiguration();
+        if (shutdownGroup || httpVersion.isHttp3() || configuration.getPcapLoggingPathPattern() != null
+            || configuration.getConnectTtl().isPresent()
+            || configuration.getConnectionPoolConfiguration().getVersion() != HttpClientConfiguration.ConnectionPoolConfiguration.PoolVersion.V4_9
+            || ssl.getKeyName() != null || ssl.getTrustName() != null || !customizersEmpty()
+            || !retained.isRetainable(Arrays.asList(configuration, nettyClientSslBuilder, sslFactory, socketChannelFactory))) {
+            return null;
+        }
+        return informationalServiceId + '|' + configuration.getClass().getName() + '|' + httpVersion.getPlaintextMode()
+            + '|' + String.join(",", httpVersion.getAlpnSupportedProtocols());
+    }
+
+    private boolean customizersEmpty() {
+        return clientCustomizer instanceof AbstractCompositeCustomizer<?, ?> composite && composite.isEmpty();
+    }
+
+    /**
+     * Pools the connections kept for this client's configuration, each on its event loop, as connections opened ahead
+     * of the first requests, and waits for them unless the caller runs on an event loop.
+     */
+    private void adoptRetained(RetainedClientConnections retained, String client) {
+        boolean onEventLoop = ThreadExecutorMap.currentExecutor() != null;
+        List<Future<?>> adopting = new ArrayList<>();
+        for (Map.Entry<Object, EventLoop> entry : retained.retained(client)) {
+            EventLoop eventLoop = entry.getValue();
+            PoolHolder pool = pools.computeIfAbsent((NettyHttpClient.RequestKey) entry.getKey(), rk -> createPool(rk, group));
+            if (pool.pool.openConnection(eventLoop) && !onEventLoop && !eventLoop.inEventLoop()) {
+                // runs after the opening the pool queued on that loop
+                adopting.add(eventLoop.submit(() -> { }));
+            }
+        }
+        for (Future<?> future : adopting) {
+            future.awaitUninterruptibly(ADOPTION_TIMEOUT_MILLIS);
+        }
     }
 
     final void refresh() {
@@ -443,8 +529,15 @@ public class ConnectionManager {
     public final void shutdown() {
         if (running.compareAndSet(true, false)) {
 
+            List<Future<?>> retaining = new ArrayList<>();
             for (PoolHolder pool : pools.values()) {
-                pool.shutdown();
+                pool.shutdown(retaining);
+            }
+            if (!retaining.isEmpty() && ThreadExecutorMap.currentExecutor() == null) {
+                // offered before this client is gone, so that the next one finds them
+                for (Future<?> future : retaining) {
+                    future.awaitUninterruptibly(ADOPTION_TIMEOUT_MILLIS);
+                }
             }
             pools.clear();
             if (shutdownGroup) {
@@ -1436,6 +1529,37 @@ public class ConnectionManager {
 
         @Override
         public void openNewConnection(EventLoop eventLoop) {
+            if (retainedClient != null) {
+                Channel retained = Objects.requireNonNull(retainedConnections).adopt(retainedClient, requestKey, eventLoop);
+                if (retained != null) {
+                    if (eventLoop.inEventLoop()) {
+                        adoptOrConnect(retained, eventLoop);
+                    } else {
+                        eventLoop.execute(() -> adoptOrConnect(retained, eventLoop));
+                    }
+                    return;
+                }
+            }
+            connectNew(eventLoop);
+        }
+
+        /**
+         * Pools an idle connection of a client of the same configuration, which {@link RetainedClientConnections} kept
+         * with the transport's handlers only, after adding this client's: the connection the pool asked for. A
+         * connection closed meanwhile is replaced by a new one.
+         */
+        private void adoptOrConnect(Channel channel, EventLoop eventLoop) {
+            if (!channel.isActive() || channel.eventLoop() != eventLoop) {
+                channel.close();
+                connectNew(eventLoop);
+                return;
+            }
+            TransportWriteTracker.addFirst(channel.pipeline());
+            initHttp1(channel);
+            new Http1ConnectionHolder(channel, clientCustomizer.specializeForChannel(channel, NettyClientCustomizer.ChannelRole.CONNECTION)).init(true);
+        }
+
+        private void connectNew(EventLoop eventLoop) {
             ChannelFuture channelFuture = openConnectionFuture(eventLoop);
             withPropagation(channelFuture, future -> {
                 if (!future.isSuccess()) {
@@ -1489,7 +1613,26 @@ public class ConnectionManager {
         }
 
         public void shutdown() {
-            pool.forEachConnection(c -> ((ConnectionHolder) c).channel.close());
+            shutdown(new ArrayList<>());
+        }
+
+        /**
+         * Closes the connections, or offers the idle ones to {@link RetainedClientConnections}.
+         *
+         * @param retaining Receives the tasks that offer them, on their event loops
+         */
+        void shutdown(List<Future<?>> retaining) {
+            boolean retain = retainedClient != null && customizersEmpty();
+            pool.forEachConnection(c -> {
+                if (retain && c instanceof Http1ConnectionHolder http1) {
+                    Future<?> offered = http1.retainOrClose();
+                    if (offered != null) {
+                        retaining.add(offered);
+                    }
+                } else {
+                    ((ConnectionHolder) c).channel.close();
+                }
+            });
         }
 
         /**
@@ -1562,7 +1705,7 @@ public class ConnectionManager {
                     }));
                 configuration.getConnectTtl().ifPresent(ttl ->
                     ttlFuture = channel.eventLoop().schedule(this::windDownConnection, ttl.toNanos(), TimeUnit.NANOSECONDS));
-                channel.pipeline().addBefore(before, "connection-cleaner", new ChannelInboundHandlerAdapter() {
+                channel.pipeline().addBefore(before, HANDLER_CONNECTION_CLEANER, new ChannelInboundHandlerAdapter() {
                     boolean inactiveCalled = false;
 
                     @Override
@@ -1788,6 +1931,50 @@ public class ConnectionManager {
             void onInactive() {
                 super.onInactive();
                 poolEntry.onConnectionInactive();
+            }
+
+            /**
+             * As the client shuts down: offers the connection to {@link RetainedClientConnections} if it is idle and
+             * carries only this class's handlers, which are taken off first, or closes it.
+             *
+             * @return The task that does it on the connection's event loop, or {@code null} if it is closed already
+             */
+            @Nullable
+            Future<?> retainOrClose() {
+                try {
+                    return channel.eventLoop().submit(() -> {
+                        if (hasLiveRequest || windDownConnection || !channel.isActive() || !detachHandlers()
+                            || !Objects.requireNonNull(retainedConnections).retain(Objects.requireNonNull(retainedClient), requestKey, channel)) {
+                            channel.close();
+                        }
+                    });
+                } catch (RejectedExecutionException e) {
+                    channel.close();
+                    return null;
+                }
+            }
+
+            /**
+             * Takes this client's handlers off the pipeline, but the transport's and TLS's: the connection leaves the
+             * pool as its cleaner goes.
+             *
+             * @return {@code false}, with nothing taken off, if the pipeline holds a handler of another
+             */
+            private boolean detachHandlers() {
+                ChannelPipeline pipeline = channel.pipeline();
+                List<String> names = pipeline.names();
+                for (String name : names) {
+                    ChannelHandler handler = pipeline.get(name);
+                    if (handler != null && !RETAINABLE_HANDLERS.contains(name) && handler.getClass() != LoggingHandler.class) {
+                        return false;
+                    }
+                }
+                for (String name : names) {
+                    if (!TransportWriteTracker.NAME.equals(name) && !ChannelPipelineCustomizer.HANDLER_SSL.equals(name) && pipeline.context(name) != null) {
+                        pipeline.remove(name);
+                    }
+                }
+                return true;
             }
         }
 

@@ -69,6 +69,16 @@ public abstract class AbstractCompositeCustomizer<C, R> {
         members.add(insertionIndex, customizer);
     }
 
+    /**
+     * Whether no customizer is a member of this composite.
+     *
+     * @return True if it customizes nothing
+     * @since 5.3.0
+     */
+    public final boolean isEmpty() {
+        return members.isEmpty();
+    }
+
     protected abstract C specializeForChannel(C member, Channel channel, R role);
 
     protected abstract C makeNewComposite(List<C> members);

@@ -98,6 +98,25 @@ An `@EachProperty` entry counts under its own prefix, so a change of one entry r
 
 A configuration bean in the closure does not keep the bean from being retained, and is not retained with it. Each generation binds it again, so the retained bean must copy the values it needs rather than keep the configuration bean.
 
+=== HTTP client connections
+
+A restart keeps the idle connections of the Netty HTTP clients, so that the TCP connection, and the TLS handshake of a secure one, are not made again. Each generation still gets its own client objects, codecs, filters and pipeline handlers:
+
+. As a client stops with its generation, it takes its own handlers off each idle HTTP/1.1 connection. What is left is the transport, and the TLS session of a secure connection.
+. The next generation's client with the same configuration takes those connections back before its first request, adds its own handlers and pools them.
+
+A connection is kept only when all of these hold:
+
+* It runs on the event loops that are retained across the restart.
+* It carries no handler of a `NettyClientCustomizer`, a proxy or a packet capture.
+* Its client's configuration, TLS builders and channel factory are not classes of the application.
+* Its TLS session comes from the configuration alone, not from certificate providers.
+* Its client sets no `connect-ttl`, which a restart would start again, and uses the default connection pool.
+
+HTTP/2 and HTTP/3 connections are not kept: their multiplexing handlers and streams belong to the client that opened them.
+
+A change under `micronaut.http.client`, `micronaut.http.services`, `micronaut.ssl` or the event loops' configuration closes the kept connections. A connection that no client of the next generation takes back is closed when that generation stops.
+
 == What the console shows
 
 The console shows what each reload did: the generation started, the time it took, the classes changed and the beans retained.

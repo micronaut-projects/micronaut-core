@@ -77,6 +77,16 @@ sealed interface Pool permits Pool49, Pool40 {
     void forEachConnection(Consumer<ResizerConnection> c);
 
     /**
+     * Open a connection on the given event loop ahead of any request, as if one had asked for it, if the limits
+     * permit: {@link Listener#openNewConnection} is called for it on that loop. Used for the connections a client
+     * takes back from {@link RetainedClientConnections}, so that the first requests find them pooled.
+     *
+     * @param eventLoop The event loop of the connection
+     * @return {@code true} if the connection is opened, {@code false} if this pool does not open one there
+     */
+    boolean openConnection(EventLoop eventLoop);
+
+    /**
      * Hooks called by this pool.
      */
     sealed interface Listener permits ConnectionManager.PoolHolder {
