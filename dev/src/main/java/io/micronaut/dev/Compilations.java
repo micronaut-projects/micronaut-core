@@ -24,6 +24,7 @@ import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
 import io.micronaut.dev.manifest.DevManifest;
+import io.micronaut.dev.manifest.DevMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,8 +114,8 @@ final class Compilations {
     /**
      * The lock of the application's class outputs, which every development process of the project takes, development
      * mode and test mode alike: a file beside the first of the outputs its compilers write, by name, so that each
-     * process finds the same one from its own manifest, whose application part is the same. None when the build tool
-     * compiles every language, and nothing here writes the outputs.
+     * process finds the same one from its own manifest, whose application part is the same. In test mode with no
+     * application output compiled here, that of the tests' outputs; none when the build tool compiles every language.
      *
      * @param manifest The manifest, the application's and not its tests' view
      * @return The lock
@@ -127,7 +128,8 @@ final class Compilations {
             }
         }
         if (outputs.isEmpty()) {
-            return OutputLock.none();
+            // the build tool compiles the application: two test mode processes may still share the tests' outputs
+            return manifest.mode() == DevMode.TEST ? outputLock(manifest.testView()) : OutputLock.none();
         }
         Path first = outputs.first();
         return OutputLock.at(first.resolveSibling(first.getFileName() + ".micronaut-dev.lock"));
