@@ -17,6 +17,7 @@ package io.micronaut.dev;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.loader.DevClassLoader;
+import org.jspecify.annotations.Nullable;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
@@ -142,7 +143,7 @@ final class ReactorThreads {
     private record ParentTierThreads(ThreadFactory delegate, ClassLoader parentTier) implements ThreadFactory {
 
         @Override
-        public Thread newThread(Runnable runnable) {
+        public @Nullable Thread newThread(Runnable runnable) {
             Thread thread = delegate.newThread(runnable);
             if (thread != null) {
                 thread.setContextClassLoader(parentTier);

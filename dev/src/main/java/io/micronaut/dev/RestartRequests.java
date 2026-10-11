@@ -71,7 +71,7 @@ final class RestartRequests implements RequestAdmission {
      * Completes when the requests the gate holds may proceed: when the batch is done, or when a restart drains the
      * generation they arrived on, which serves them before it stops.
      */
-    private volatile CompletableFuture<Void> admitted = CompletableFuture.completedFuture(null);
+    private volatile CompletableFuture<Void> admitted = CompletableFuture.completedFuture(null); // NOSONAR java:S3077 replaced whole per batch; the future is thread-safe
 
     /**
      * @param manifest The manifest
@@ -202,10 +202,11 @@ final class RestartRequests implements RequestAdmission {
         // cannot bind stops again, and then no longer tells
         boolean definesServer = definesServer(fresh);
         DevServerSockets sockets = serverSockets;
-        if (sockets != null && !sockets.stopServingUnavailable(current)) {
-            return definesServer;
-        }
-        if (sockets != null && (definesServer || sockets.isBound())) {
+        if (sockets == null) {
+            if (definesServer) {
+                awaitServers(fresh, launching);
+            }
+        } else if (sockets.stopServingUnavailable(current) && (definesServer || sockets.isBound())) {
             // a newer generation can start while this one's servers are awaited, when a change is taken at once:
             // the sockets handed to it after this mark are its own, and are kept
             long mark = sockets.handoutMark();
@@ -213,8 +214,6 @@ final class RestartRequests implements RequestAdmission {
             if (fresh.isRunning()) {
                 sockets.releaseUnclaimed(mark, current);
             }
-        } else if (definesServer) {
-            awaitServers(fresh, launching);
         }
         return definesServer;
     }

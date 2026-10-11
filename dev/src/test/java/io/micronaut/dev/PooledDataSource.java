@@ -60,10 +60,12 @@ public final class PooledDataSource implements DataSource, AutoCloseable {
 
     @Override
     public void setLogWriter(PrintWriter out) {
+        // the test pool logs nothing
     }
 
     @Override
     public void setLoginTimeout(int seconds) {
+        // the test pool's connections never wait to log in
     }
 
     @Override
