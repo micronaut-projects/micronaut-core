@@ -15,18 +15,32 @@
  */
 package io.micronaut.dev.management;
 
+import io.micronaut.dev.CompileFailure;
+import io.micronaut.dev.DevRuntime;
+import io.micronaut.dev.DevRuntimes;
+import io.micronaut.dev.compile.CompileDiagnostic;
+import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.InputStream;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.lang.classfile.Annotation;
 import java.lang.classfile.AnnotationValue;
 import java.lang.classfile.Attributes;
 import java.lang.classfile.ClassFile;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -34,6 +48,59 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DevEndpointTest {
 
     private static final String OWN = "http://localhost:8080";
+
+    @TempDir
+    Path project;
+
+    @Test
+    void theStatusOfARuntimeThatDidNotStart() throws Exception {
+        try (DevRuntime runtime = DevRuntimes.unstarted(project)) {
+            Map<String, Object> status = new DevEndpoint(runtime, request -> OWN).status();
+            assertEquals(runtime.generation(), status.get(DevEndpoint.KEY_GENERATION));
+            assertEquals(runtime.strategy().name(), status.get(DevEndpoint.KEY_STRATEGY));
+            assertEquals(false, status.get(DevEndpoint.KEY_RELOADING));
+            assertEquals(0, status.get(DevEndpoint.KEY_RETAINED));
+            assertEquals(List.of(), status.get(DevEndpoint.KEY_WATCHED));
+            assertTrue(status.containsKey(DevEndpoint.KEY_LIVERELOAD));
+            assertNull(status.get(DevEndpoint.KEY_LIVERELOAD));
+            assertNull(status.get(DevEndpoint.KEY_FAILURE));
+        }
+    }
+
+    @Test
+    void theEndpointReloadsOnlyForTheReloadActionOfAnAcceptedRequest() throws Exception {
+        try (DevRuntime runtime = DevRuntimes.unstarted(project)) {
+            DevEndpoint endpoint = new DevEndpoint(runtime, request -> OWN);
+
+            HttpResponse<Map<String, Object>> refused = endpoint.act(DevEndpoint.ACTION_RELOAD, reload().header(HttpHeaders.ORIGIN, "https://evil.example"));
+            assertEquals(HttpStatus.FORBIDDEN, refused.getStatus());
+            assertEquals(false, refused.body().get(DevEndpoint.KEY_ACCEPTED));
+            assertNotNull(refused.body().get(DevEndpoint.KEY_REASON));
+
+            HttpResponse<Map<String, Object>> unknown = endpoint.act("explode", reload());
+            assertEquals(HttpStatus.OK, unknown.getStatus());
+            assertEquals(Map.of(DevEndpoint.KEY_ACCEPTED, false, DevEndpoint.KEY_ACTION, "explode"), unknown.body());
+
+            HttpResponse<Map<String, Object>> accepted = endpoint.act(DevEndpoint.ACTION_RELOAD, reload());
+            assertEquals(HttpStatus.OK, accepted.getStatus());
+            assertEquals(Map.of(DevEndpoint.KEY_ACCEPTED, true, DevEndpoint.KEY_ACTION, DevEndpoint.ACTION_RELOAD), accepted.body());
+        }
+    }
+
+    @Test
+    void aFailureIsDescribedByItsErrorsAndHowManyWarningsItHad() {
+        Instant at = Instant.parse("2026-10-11T00:00:00Z");
+        CompileFailure failure = new CompileFailure(SourceKind.JAVA, List.of(
+            new CompileDiagnostic(CompileDiagnostic.Severity.ERROR, "cannot find symbol", Path.of("src/main/java/app/A.java"), 3, 7),
+            new CompileDiagnostic(CompileDiagnostic.Severity.ERROR, "no source", null, 0, 0),
+            new CompileDiagnostic(CompileDiagnostic.Severity.WARNING, "deprecated", null, 0, 0)), at);
+        Map<String, Object> description = DevEndpoint.describe(failure);
+        assertEquals("java", description.get("kind"));
+        assertEquals(at.toString(), description.get("at"));
+        assertEquals(List.of(Path.of("src/main/java/app/A.java") + ":3: cannot find symbol", "no source"), description.get("errors"));
+        assertEquals(1L, description.get("warnings"));
+        assertFalse(description.containsKey("diagnostics"));
+    }
 
     @Test
     void theEndpointIsSensitiveUnlessConfiguredOtherwise() throws Exception {
