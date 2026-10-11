@@ -160,21 +160,41 @@ final class GenerationMemory {
             // a native image never unloads a class it defined at runtime: every retired generation stays, as the budget expects
             return;
         }
+        if (oldRetiredGenerations().isEmpty()) {
+            // nothing older than the tolerance is reachable even before a collection: there is nothing to collect for
+            return;
+        }
         Thread thread = new Thread(() -> {
             try {
                 Thread.sleep(2000);
             } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 return;
             }
-            System.gc();
-            int current = classLoader.generation();
-            List<GenerationClassLoader> live = classLoader.liveRetiredGenerations();
-            List<Integer> old = live.stream().map(GenerationClassLoader::generation).filter(generation -> generation < current - LEAK_TOLERANCE).toList();
+            // only a collection tells a retired generation the collector has yet to reach from one the application keeps;
+            // it runs on this thread, a moment after the reload, and only while an old generation is still reachable
+            System.gc(); // NOSONAR leak detection: a retired generation's loader is unreachable only once it is collected
+            List<Integer> old = oldRetiredGenerations();
             if (!old.isEmpty()) {
                 LOG.warn("{} retired generation(s) {} are still reachable after the reload: a static cache or a thread of the application keeps old classes alive", old.size(), old);
             }
         }, "micronaut-dev-leak-detector");
         thread.setDaemon(true);
         thread.start();
+    }
+
+    private List<Integer> oldRetiredGenerations() {
+        return olderThanTolerance(classLoader.liveRetiredGenerations().stream().map(GenerationClassLoader::generation).toList(), classLoader.generation());
+    }
+
+    /**
+     * The retired generations that a reload should have released: those older than the tolerance.
+     *
+     * @param retired The generations of the retired loaders still reachable
+     * @param current The current generation
+     * @return The retired generations older than the tolerance
+     */
+    static List<Integer> olderThanTolerance(List<Integer> retired, int current) {
+        return retired.stream().filter(generation -> generation < current - LEAK_TOLERANCE).toList();
     }
 }
