@@ -151,7 +151,6 @@ public final class DevRuntime implements Closeable {
     private volatile Collection<BeanRegistration<?>> retainedForNext = List.of();
     private volatile String[] arguments = new String[0];
     private volatile int retainedCount;
-    private volatile long generationStartedNanos;
     private volatile boolean closed;
     private final GenerationMemory memory;
     /**
@@ -759,13 +758,14 @@ public final class DevRuntime implements Closeable {
      */
     ClassLoader newGeneration() {
         classLoader.swap();
-        generationStartedNanos = System.nanoTime();
         return classLoader.current();
     }
 
     void compilationFailed(CompileFailure failure) {
         lastFailure = failure;
-        LOG.error("{}", failure.describe().strip());
+        if (LOG.isErrorEnabled()) {
+            LOG.error("{}", failure.describe().strip());
+        }
     }
 
     void compilationRecovered() {
@@ -1102,6 +1102,7 @@ public final class DevRuntime implements Closeable {
             try {
                 first = pending.take();
             } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 return;
             }
             // the gate closes as soon as a batch is taken, so a caller waiting for the reload sees it in progress, and
@@ -1119,9 +1120,10 @@ public final class DevRuntime implements Closeable {
                 handle(Pending.merge(batches));
             } catch (InterruptedException e) {
                 admission.complete(null);
+                Thread.currentThread().interrupt();
                 gate.complete(null);
                 return;
-            } catch (Throwable e) {
+            } catch (Throwable e) { // NOSONAR a reload that fails, with a LinkageError of the edited code too, leaves the reload thread running
                 LOG.error("Reload failed: {}", e.getMessage(), e);
             } finally {
                 long last = 0;
@@ -1700,7 +1702,7 @@ public final class DevRuntime implements Closeable {
             return true;
         }
         Object bean = registration.getBean();
-        return bean != null && bean.getClass().getClassLoader() instanceof GenerationClassLoader;
+        return bean.getClass().getClassLoader() instanceof GenerationClassLoader;
     }
 
     private ApplicationContext launch(String reason) {
@@ -1708,7 +1710,6 @@ public final class DevRuntime implements Closeable {
         CompletableFuture<ApplicationContext> future = started;
         AtomicReference<@Nullable Throwable> failure = new AtomicReference<>();
         applicationFailure = failure;
-        generationStartedNanos = System.nanoTime();
         // the generation loader, not the facade: a class the JVM resolved through the facade once would be
         // handed out again, from the retired generation, for as long as the facade lives
         GenerationClassLoader generation = classLoader.current();
@@ -1720,7 +1721,7 @@ public final class DevRuntime implements Closeable {
                     // main returned without a context starting: a startup failure the application logged itself
                     future.completeExceptionally(new IllegalStateException("The application's main returned without starting a context"));
                 }
-            } catch (Throwable e) {
+            } catch (Throwable e) { // NOSONAR an Error from main fails the start at once, rather than when the start times out
                 failure.set(e);
                 future.completeExceptionally(e);
             }
@@ -1905,7 +1906,7 @@ public final class DevRuntime implements Closeable {
          * @param args The arguments
          * @throws Exception if main throws
          */
-        void launch(ClassLoader classLoader, String mainClass, String[] args) throws Exception;
+        void launch(ClassLoader classLoader, String mainClass, String[] args) throws Exception; // NOSONAR the application's main may throw any exception
     }
 
     /**

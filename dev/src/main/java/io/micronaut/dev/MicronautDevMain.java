@@ -23,6 +23,7 @@ import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.dev.manifest.DevMode;
 import io.micronaut.dev.manifest.ResourceRoot;
 import io.micronaut.dev.test.TestRunSummary;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -30,6 +31,7 @@ import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -84,7 +86,7 @@ public class MicronautDevMain {
      * @param args The arguments
      * @throws Exception if the launch fails
      */
-    public void run(String[] args) throws Exception {
+    public void run(String[] args) throws Exception { // NOSONAR a launcher that overrides the template methods may fail with any exception, as main does
         runForStatus(args);
     }
 
@@ -99,23 +101,10 @@ public class MicronautDevMain {
      * @return The status to exit with, or {@link #RUNNING} while the runtime runs in the background
      * @throws Exception if the launch fails
      */
-    public int runForStatus(String[] args) throws Exception {
-        List<String> remaining = new ArrayList<>();
-        String manifestPath = System.getProperty(DevManifest.MANIFEST_PROPERTY);
-        for (int i = 0; i < args.length; i++) {
-            if (MANIFEST_OPTION.equals(args[i]) && i + 1 < args.length) {
-                manifestPath = args[++i];
-            } else if (args[i].startsWith(MANIFEST_OPTION + "=")) {
-                manifestPath = args[i].substring(MANIFEST_OPTION.length() + 1);
-            } else {
-                remaining.add(args[i]);
-            }
-        }
-        if (manifestPath == null) {
-            throw new IllegalArgumentException("No manifest: pass " + MANIFEST_OPTION + " <file> or set -D" + DevManifest.MANIFEST_PROPERTY);
-        }
-        DevManifest manifest = DevManifest.load(Path.of(manifestPath));
-        DevRuntime runtime = launch(manifest, remaining.toArray(new String[0]));
+    public int runForStatus(String[] args) throws Exception { // NOSONAR a launcher that overrides the template methods may fail with any exception, as main does
+        LaunchArguments arguments = LaunchArguments.parse(args, System.getProperty(DevManifest.MANIFEST_PROPERTY));
+        DevManifest manifest = DevManifest.load(Path.of(arguments.manifestPath()));
+        DevRuntime runtime = launch(manifest, arguments.applicationArguments().toArray(new String[0]));
         if (manifest.mode() == DevMode.TEST && manifest.testSettings().once()) {
             TestRunSummary summary = runtime.lastTestRun().orElse(null);
             runtime.close();
@@ -224,7 +213,7 @@ public class MicronautDevMain {
      * @param args The arguments
      * @throws Exception if main throws
      */
-    protected void launchApplication(ClassLoader classLoader, String mainClass, String[] args) throws Exception {
+    protected void launchApplication(ClassLoader classLoader, String mainClass, String[] args) throws Exception { // NOSONAR the application's main may throw any exception
         Class<?> type = Class.forName(mainClass, true, classLoader);
         Method main = type.getMethod("main", String[].class);
         if (!Modifier.isPublic(type.getModifiers())) {
@@ -242,4 +231,41 @@ public class MicronautDevMain {
         }
     }
 
+    /**
+     * The launcher's arguments: the manifest, and the application's arguments that remain.
+     *
+     * @param manifestPath The manifest file
+     * @param applicationArguments The application's arguments
+     */
+    record LaunchArguments(String manifestPath, List<String> applicationArguments) {
+
+        /**
+         * Reads {@code --manifest <file>} or {@code --manifest=<file>} from the arguments, passing the others on to the
+         * application.
+         *
+         * @param args The arguments
+         * @param defaultManifest The manifest when the arguments name none, from the {@code micronaut.dev.manifest} system property
+         * @return The arguments
+         * @throws IllegalArgumentException if no manifest is named
+         */
+        static LaunchArguments parse(String[] args, @Nullable String defaultManifest) {
+            List<String> remaining = new ArrayList<>();
+            String manifestPath = defaultManifest;
+            Iterator<String> arguments = List.of(args).iterator();
+            while (arguments.hasNext()) {
+                String argument = arguments.next();
+                if (MANIFEST_OPTION.equals(argument) && arguments.hasNext()) {
+                    manifestPath = arguments.next();
+                } else if (argument.startsWith(MANIFEST_OPTION + "=")) {
+                    manifestPath = argument.substring(MANIFEST_OPTION.length() + 1);
+                } else {
+                    remaining.add(argument);
+                }
+            }
+            if (manifestPath == null) {
+                throw new IllegalArgumentException("No manifest: pass " + MANIFEST_OPTION + " <file> or set -D" + DevManifest.MANIFEST_PROPERTY);
+            }
+            return new LaunchArguments(manifestPath, List.copyOf(remaining));
+        }
+    }
 }
