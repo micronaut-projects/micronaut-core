@@ -124,7 +124,6 @@ public final class DevRuntime implements Closeable {
     private static final Duration COALESCE = Duration.ofMillis(150);
     private static final Duration APP_STOP_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration START_TIMEOUT = Duration.ofMinutes(5);
-    private static final int LEAK_TOLERANCE = 2;
     private static final int MAX_PROPAGATION_PASSES = 5;
 
     private final DevManifest manifest;
@@ -147,6 +146,7 @@ public final class DevRuntime implements Closeable {
     private volatile String[] arguments = new String[0];
     private volatile int retainedCount;
     private volatile boolean closed;
+    private final GenerationMemory memory;
     /**
      * Whether the runtime closed because its generation budget was spent, for its launcher to relaunch the process.
      */
@@ -197,10 +197,11 @@ public final class DevRuntime implements Closeable {
         this.relaunch = relaunch;
         this.manifest = manifest;
         this.classLoader = classLoader;
+        this.memory = new GenerationMemory(classLoader);
         this.launcher = launcher;
         this.compilers = new EnumMap<>(SourceKind.class);
         this.compilers.putAll(compilers);
-        this.jointOwners = jointOwners(manifest, this.compilers);
+        this.jointOwners = Compilations.jointOwners(manifest, this.compilers);
         for (ResourceRoot root : manifest.resourceRoots()) {
             resourceRootKinds.put(root.path().toAbsolutePath().normalize(), root.kind());
         }
@@ -264,6 +265,7 @@ public final class DevRuntime implements Closeable {
         arguments = args.clone();
         ApplicationContext first;
         try {
+            memory.initializeParentTierStatics();
             snapshot = OutputSnapshot.of(manifest.reloadableRoots());
             if (manifest.strategy() != ReloadStrategy.RESTART && !NativeImageUtils.inImageRuntimeCode()) {
                 // the fast path needs an agent: the launcher's, or one attached now. A native image has none: its
@@ -581,6 +583,7 @@ public final class DevRuntime implements Closeable {
             throw new IllegalStateException("A development runtime already runs this process");
         }
         try {
+            memory.initializeParentTierStatics();
             snapshot = OutputSnapshot.of(manifest.reloadableRoots());
             // what the class files depend on and which are tests, before any change comes: a first change that removes a
             // constant, or deletes a test, needs to know the state it changes
@@ -791,6 +794,9 @@ public final class DevRuntime implements Closeable {
                 compiler.close();
             }
         } finally {
+            // whatever failed to stop: the threads of the shared schedulers end with them, and the schedule hook
+            // keeps this runtime's loader no longer
+            memory.releaseReactorThreads();
             // whatever failed to stop, whoever waits for the runtime to close is released
             CURRENT.compareAndSet(this, null);
             closedLatch.countDown();
@@ -827,68 +833,6 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
-     * The roots a compilation of a language reads: its own, and for Kotlin the Java roots too, since kotlinc
-     * resolves the Java sources of a mixed module and KSP processes them, and those of the languages it compiles
-     * jointly; the index of a request takes only the roots of its own language as its sources.
-     */
-    private static List<SourceRoot> compilationRoots(DevManifest manifest, SourceKind kind, Map<SourceKind, SourceKind> jointOwners) {
-        List<SourceRoot> roots = new ArrayList<>(manifest.sourceRoots(kind));
-        if (kind == SourceKind.KOTLIN) {
-            roots.addAll(manifest.sourceRoots(SourceKind.JAVA));
-        }
-        jointOwners.forEach((joint, owner) -> {
-            if (owner == kind) {
-                roots.addAll(manifest.sourceRoots(joint));
-            }
-        });
-        return roots;
-    }
-
-    /**
-     * The options of a compilation of a language: its own, then those of each language it compiles jointly,
-     * since one compiler run compiles them all. A language's options are kept whole, a flag with its value,
-     * and are not repeated when they are the same as the owner's.
-     */
-    private static List<String> compileOptions(DevManifest manifest, SourceKind kind, Map<SourceKind, SourceKind> jointOwners) {
-        List<String> own = manifest.compileOptions(kind);
-        List<String> options = new ArrayList<>(own);
-        jointOwners.forEach((joint, owner) -> {
-            List<String> jointOptions = manifest.compileOptions(joint);
-            if (owner == kind && !jointOptions.equals(own)) {
-                options.addAll(jointOptions);
-            }
-        });
-        return options;
-    }
-
-    /**
-     * The languages a compiler of another language compiles jointly (see {@link SourceCompiler#jointKinds()}):
-     * those it names that have sources, are compiled in this JVM and share its class output.
-     *
-     * @param manifest The manifest
-     * @param compilers The compilers by language
-     * @return The owning language, by jointly compiled language
-     */
-    static Map<SourceKind, SourceKind> jointOwners(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
-        Map<SourceKind, SourceKind> owners = new EnumMap<>(SourceKind.class);
-        compilers.forEach((kind, compiler) -> {
-            if (!embedded(manifest, kind)) {
-                return;
-            }
-            for (SourceKind joint : compiler.jointKinds()) {
-                if (joint != kind && embedded(manifest, joint) && manifest.classOutput(joint).equals(manifest.classOutput(kind))) {
-                    owners.putIfAbsent(joint, kind);
-                }
-            }
-        });
-        return owners;
-    }
-
-    private static boolean embedded(DevManifest manifest, SourceKind kind) {
-        return !manifest.sourceRoots(kind).isEmpty() && manifest.compileMode(kind) != CompileMode.BUILD_TOOL;
-    }
-
-    /**
      * Compiles in full every language whose class output does not exist yet, so that the launcher
      * works from a clean checkout as well as after a build. Runs before the loader takes its first
      * snapshot.
@@ -898,28 +842,7 @@ public final class DevRuntime implements Closeable {
      * @throws IllegalStateException if a compilation fails
      */
     public static void compileMissingOutputs(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
-        Map<SourceKind, SourceKind> jointOwners = jointOwners(manifest, compilers);
-        // decided before anything is compiled: two languages sharing one output are both missing, or neither
-        Set<SourceKind> missing = new LinkedHashSet<>();
-        for (SourceKind kind : compilers.keySet()) {
-            if (!jointOwners.containsKey(kind) && embedded(manifest, kind) && !Files.isDirectory(manifest.classOutput(kind))) {
-                missing.add(kind);
-            }
-        }
-        for (Map.Entry<SourceKind, SourceCompiler> entry : compilers.entrySet()) {
-            SourceKind kind = entry.getKey();
-            if (!missing.contains(kind)) {
-                continue;
-            }
-            CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind, jointOwners), Set.of(), Set.of(), true, manifest.compileClasspath(),
-                manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), compileOptions(manifest, kind, jointOwners)).asFull();
-            CompilationResult result = entry.getValue().compile(request);
-            if (!result.isSuccess()) {
-                CompileFailure failure = new CompileFailure(kind, result.diagnostics(), Instant.now());
-                throw new IllegalStateException(failure.describe());
-            }
-            LOG.info("Compiled {} {} source(s) in {} ms", result.compiledSources().size(), kind, result.duration().toMillis());
-        }
+        Compilations.compileMissingOutputs(manifest, compilers);
     }
 
     /**
@@ -1175,13 +1098,13 @@ public final class DevRuntime implements Closeable {
         Set<String> affectedClasses = new LinkedHashSet<>();
         for (SourceKind kind : kinds) {
             SourceCompiler compiler = compilers.get(kind);
-            if (compiler == null || joint.containsKey(kind) || !embedded(target, kind)) {
+            if (compiler == null || joint.containsKey(kind) || !Compilations.embedded(target, kind)) {
                 continue;
             }
             SourceChanges change = sources.getOrDefault(kind, SourceChanges.NONE);
-            CompilationRequest request = new CompilationRequest(kind, compilationRoots(target, kind, joint), change.changed(), change.deleted(),
+            CompilationRequest request = new CompilationRequest(kind, Compilations.compilationRoots(target, kind, joint), change.changed(), change.deleted(),
                 full || !target.isIncremental(), target.compileClasspath(), target.processorPath(),
-                target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint));
+                target.classOutput(kind), target.generatedSources(kind), Compilations.compileOptions(target, kind, joint));
             if (!seed.isEmpty()) {
                 request = request.withAffectedClasses(seed);
             }
@@ -1207,11 +1130,11 @@ public final class DevRuntime implements Closeable {
                 SourceKind kind = entry.getKey();
                 // a language compiled in this batch for its own changes is visited again: an unchanged source of
                 // it that references what another language changed was not selected the first time
-                if (joint.containsKey(kind) || !embedded(target, kind)) {
+                if (joint.containsKey(kind) || !Compilations.embedded(target, kind)) {
                     continue;
                 }
-                CompilationRequest request = new CompilationRequest(kind, compilationRoots(target, kind, joint), Set.of(), Set.of(), false, target.compileClasspath(),
-                    target.processorPath(), target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint)).withAffectedClasses(fresh);
+                CompilationRequest request = new CompilationRequest(kind, Compilations.compilationRoots(target, kind, joint), Set.of(), Set.of(), false, target.compileClasspath(),
+                    target.processorPath(), target.classOutput(kind), target.generatedSources(kind), Compilations.compileOptions(target, kind, joint)).withAffectedClasses(fresh);
                 CompilationResult result = entry.getValue().compile(request);
                 if (!result.isSuccess()) {
                     return CompileRound.failed(new CompileFailure(kind, result.diagnostics(), Instant.now()));
@@ -1662,7 +1585,7 @@ public final class DevRuntime implements Closeable {
             return;
         }
         ApplicationContext old = context;
-        classLoader.swap();
+        GenerationClassLoader retired = classLoader.swap();
         Collection<BeanRegistration<?>> retained = List.of();
         if (old != null) {
             ClassChangeEvent event = new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART);
@@ -1677,7 +1600,13 @@ public final class DevRuntime implements Closeable {
                 old.stop();
             }
             awaitApplicationThread();
+            // the swap emptied the shared caches, but what read the retired generation since, a restart watcher or
+            // the stopping context, filled them again with its classes: forgotten again now that it no longer runs
+            GenerationMemory.forgetRetired(retired);
         }
+        // a thread a retained bean started in a retired generation took that generation's loader as its context
+        // class loader, and keeps it as long as the bean lives
+        memory.releaseThreads(Thread.currentThread(), applicationThread);
         retainedForNext = retained;
         started = new CompletableFuture<>();
         ApplicationContext fresh;
@@ -1903,46 +1832,7 @@ public final class DevRuntime implements Closeable {
     }
 
     void detectLeaks() {
-        if (NativeImageUtils.inImageRuntimeCode()) {
-            // a native image never unloads a class it defined at runtime: every retired generation stays, as the budget expects
-            return;
-        }
-        if (oldRetiredGenerations().isEmpty()) {
-            // nothing older than the tolerance is reachable even before a collection: there is nothing to collect for
-            return;
-        }
-        Thread thread = new Thread(() -> {
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-            // only a collection tells a retired generation the collector has yet to reach from one the application keeps;
-            // it runs on this thread, a moment after the reload, and only while an old generation is still reachable
-            System.gc(); // NOSONAR leak detection: a retired generation's loader is unreachable only once it is collected
-            List<Integer> old = oldRetiredGenerations();
-            if (!old.isEmpty()) {
-                LOG.warn("{} retired generation(s) {} are still reachable after the reload: a static cache or a thread of the application keeps old classes alive", old.size(), old);
-            }
-        }, "micronaut-dev-leak-detector");
-        thread.setDaemon(true);
-        thread.start();
-    }
-
-    private List<Integer> oldRetiredGenerations() {
-        return olderThanTolerance(classLoader.liveRetiredGenerations().stream().map(GenerationClassLoader::generation).toList(), classLoader.generation());
-    }
-
-    /**
-     * The retired generations that a reload should have released: those older than the tolerance.
-     *
-     * @param retired The generations of the retired loaders still reachable
-     * @param current The current generation
-     * @return The retired generations older than the tolerance
-     */
-    static List<Integer> olderThanTolerance(List<Integer> retired, int current) {
-        return retired.stream().filter(generation -> generation < current - LEAK_TOLERANCE).toList();
+        memory.detectLeaks();
     }
 
     /**

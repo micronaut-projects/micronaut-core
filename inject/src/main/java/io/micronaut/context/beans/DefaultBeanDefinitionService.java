@@ -15,12 +15,14 @@
  */
 package io.micronaut.context.beans;
 
+import io.micronaut.context.AbstractInitializableBeanDefinition;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanContextConfiguration;
 import io.micronaut.context.BeanDefinitionsProvider;
 import io.micronaut.context.BeanResolutionCustomizer;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DisabledBean;
+import io.micronaut.context.env.Environment;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.event.ApplicationEventListener;
@@ -399,6 +401,17 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             return List.of();
         }
         return producers;
+    }
+
+    @Override
+    public void releaseExecutableMethods(Environment environment, BeanContext beanContext) {
+        Beans loaded = beans;
+        if (loaded == null) {
+            return;
+        }
+        for (BeanDefinitionProducer producer : loaded.all) {
+            producer.releaseExecutableMethods(environment, beanContext);
+        }
     }
 
     @Override
@@ -833,6 +846,19 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                 }
             }
             return false;
+        }
+
+        /**
+         * Releases the configuration of the executable methods of the definition class: through the definition when it
+         * was loaded, or else through the reference, as a definition loaded and then discarded, such as one its own
+         * conditions disabled, configured them all the same.
+         */
+        void releaseExecutableMethods(Environment environment, BeanContext beanContext) {
+            if (definition instanceof AbstractInitializableBeanDefinition<?> loaded) {
+                loaded.releaseExecutableMethods(environment, beanContext);
+            } else if (reference instanceof AbstractInitializableBeanDefinition<?> definitionAndReference) {
+                definitionAndReference.releaseExecutableMethods(environment, beanContext);
+            }
         }
 
         void disableIfMatch(BeanDefinitionReference<?> toDisable) {

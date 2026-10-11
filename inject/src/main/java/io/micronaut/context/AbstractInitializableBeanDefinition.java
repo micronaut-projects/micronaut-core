@@ -794,6 +794,23 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     /**
+     * Releases what a context configured the executable methods of this definition class with, its environment and
+     * itself, if they still are. The methods are held statically by the definition class, which a development launcher
+     * loads in its parent tier, for every context and generation: a context calls this as it stops, so that it is not
+     * kept by them. Any instance of the class releases them, such as the reference of a definition the context loaded and
+     * then discarded.
+     *
+     * @param environment The environment of the context that stops
+     * @param beanContext The context that stops
+     */
+    @Internal
+    public final void releaseExecutableMethods(Environment environment, BeanContext beanContext) {
+        if (executableMethodsDefinition instanceof AbstractExecutableMethodsDefinition<T> methods) {
+            methods.release(environment, beanContext);
+        }
+    }
+
+    /**
      * Allows printing warning messages produced by the compiler.
      *
      * @param message The message

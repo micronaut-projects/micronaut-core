@@ -30,6 +30,7 @@ import io.micronaut.context.condition.Failure;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.env.DevelopmentMode;
+import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.event.BeanCreatedEvent;
@@ -552,6 +553,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Stopping BeanContext");
             }
+            // read while the environment still answers
+            Environment releasing = environmentToReleaseOnStop();
             shutdownThread = Thread.currentThread();
             try {
                 shutdownEventThread = Thread.currentThread();
@@ -629,6 +632,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
                     tracer.traceContextShutdown(this);
                 });
             }
+            if (releasing != null) {
+                // the executable methods of a definition loaded by a parent tier are shared by every context, generations
+                // included, and would keep this one reachable from the last configuration it gave them
+                beanDefinitionProvider.releaseExecutableMethods(releasing, this);
+            }
             beanDefinitionProvider.reset();
             // a restarted context reads its configurations and validator again, as it does its definitions
             beanConfigurationsList = null;
@@ -682,6 +690,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     @Override
     public ClassChangeWatchRequest classChanges() {
         return new BeanWatchRequests.ClassChangeRequest(watches, this::isDevelopmentMode);
+    }
+
+    /**
+     * The environment whose configuration of the executable methods, which every context that loads a definition class
+     * shares, this context releases as it stops: none, but for an application context in development mode.
+     *
+     * @return The environment, or null
+     */
+    @Nullable
+    Environment environmentToReleaseOnStop() {
+        return null;
     }
 
     /**

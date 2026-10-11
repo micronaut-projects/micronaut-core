@@ -43,7 +43,7 @@ class DevRuntimeTest {
             public class Application {
                 public static void main(String[] args) {
                     io.micronaut.runtime.Micronaut.build(args)
-                        .properties(java.util.Map.of("spec.name", "DevRuntimeTest", "greeting.suffix", args.length > 0 ? args[0] : "none"))
+                        .properties(java.util.Map.of("spec.name", "DevRuntimeTest", "greeting.suffix", args.length > 0 ? args[0] : "none", "micronaut.server.port", "-1"))
                         .mainClass(Application.class)
                         .start();
                 }
@@ -180,7 +180,7 @@ class DevRuntimeTest {
             package app;
             public class Application {
                 public static void main(String[] args) {
-                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest")).mainClass(Application.class).start();
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1")).mainClass(Application.class).start();
                 }
             }
             """);
@@ -234,7 +234,7 @@ class DevRuntimeTest {
             public class Application {
                 public static void main(String[] args) {
                     io.micronaut.runtime.Micronaut.build(args)
-                        .properties(java.util.Map.of("spec.name", "DevRuntimeTest"))
+                        .properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1"))
                         .mainClass(Application.class)
                         .start();
                 }

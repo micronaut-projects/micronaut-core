@@ -34,9 +34,9 @@ class DevRuntimeLifecycleTest {
 
     @Test
     void onlyTheGenerationsOlderThanTheToleranceCountAsLeaked() {
-        assertEquals(List.of(), DevRuntime.olderThanTolerance(List.of(), 5));
-        assertEquals(List.of(1, 2), DevRuntime.olderThanTolerance(List.of(1, 2, 3, 4), 5));
-        assertEquals(List.of(), DevRuntime.olderThanTolerance(List.of(1, 2), 3));
+        assertEquals(List.of(), GenerationMemory.olderThanTolerance(List.of(), 5));
+        assertEquals(List.of(1, 2), GenerationMemory.olderThanTolerance(List.of(1, 2, 3, 4), 5));
+        assertEquals(List.of(), GenerationMemory.olderThanTolerance(List.of(1, 2), 3));
     }
 
     @Test

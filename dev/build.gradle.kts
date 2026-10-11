@@ -28,6 +28,8 @@ dependencies {
     compileOnly(libs.bytebuddy.agent)
     // the native macOS watch service, when micronaut-runtime-osx is on the development runtime classpath
     compileOnly(libs.managed.methvin.directoryWatcher)
+    // the threads of Reactor's schedulers get the parent tier's loader when Reactor is on the classpath
+    compileOnly(libs.managed.reactor)
 
     testImplementation(projects.micronautInjectJava)
     testImplementation(projects.micronautHttp)
@@ -35,6 +37,16 @@ dependencies {
     // classpath, whose endpoints would start with every application the tests launch
     testImplementation(projects.micronautRouter)
     testCompileOnly(projects.micronautManagement)
+    // a Netty application in development mode, run in a JVM of its own, to see what Netty keeps from its first use
+    testImplementation(projects.micronautHttpServerNetty)
+    testImplementation(projects.micronautJacksonDatabind)
+    // a Reactor application in development mode, run in a JVM of its own, to see what the shared schedulers' threads keep
+    testImplementation(libs.managed.reactor)
+    // an H2 data source retained across generations, in a JVM of its own, to see what H2 keeps from its first use
+    testImplementation(libs.h2)
+    // a UCP pool of H2 retained across generations, in a JVM of its own, to see what UCP's JVM-wide threads keep
+    testImplementation(libs.ucp)
+    testImplementation(libs.ojdbc)
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.bytebuddy.agent)
     testImplementation(libs.junit.platform.launcher)
@@ -104,6 +116,9 @@ noReflection {
     allowIn("io.micronaut.dev.test.JUnitPlatformExecution", "CLASS_LOADING")
     allowIn("io.micronaut.dev.test.TestEventListeners", "SERVICE_LOADING")
     allowIn("io.micronaut.dev.TestSession", "SERVICE_LOADING")
+    // the parent tier statics are initialized, and the compiled languages listed, for the runtime
+    allowIn("io.micronaut.dev.GenerationMemory", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.Compilations", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.agent.DynamicAttach", "CLASS_LOADING")
     // the fast path redefines method bodies through the agent
     allowIn("io.micronaut.dev.DevRuntime", "INSTRUMENTATION")

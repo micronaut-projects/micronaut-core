@@ -92,6 +92,28 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         }
     }
 
+    /**
+     * Releases the environment and the context that the methods were configured with last, if they still are: a
+     * definition of the parent tier holds these methods statically, for every context that loads it, and a stopped
+     * context must not stay reachable from them. A context that configured them since keeps them.
+     *
+     * @param environment The environment of the context that stops
+     * @param beanContext The context that stops
+     */
+    final void release(Environment environment, BeanContext beanContext) {
+        BeanContext configuredContext = this.beanContext;
+        if (this.environment != environment || configuredContext != null && configuredContext != beanContext) {
+            return;
+        }
+        this.environment = null;
+        this.beanContext = null;
+        for (DispatchedExecutableMethod<T, ?> executableMethod : executableMethods) {
+            if (executableMethod != null) {
+                executableMethod.release();
+            }
+        }
+    }
+
     @Override
     public List<ExecutableMethod<T, ?>> getExecutableMethods() {
         if (executableMethodsList == null) {
@@ -424,7 +446,14 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private final AbstractExecutableMethodsDefinition dispatcher;
         private final int index;
         private final MethodReference methodReference;
+        // the generated metadata: each configuration wraps this, never the metadata a previous context configured,
+        // which would nest one layer per context, each holding its environment, for as long as the definition lives
+        private final AnnotationMetadata sourceAnnotationMetadata;
         private AnnotationMetadata annotationMetadata;
+        @Nullable
+        private Environment environment;
+        @Nullable
+        private BeanContext beanContext;
         @Nullable
         private ReturnType<R> returnType;
         private final Argument<?>[] arguments;
@@ -440,6 +469,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             this.dispatcher = dispatcher;
             this.index = index;
             this.methodReference = methodReference;
+            this.sourceAnnotationMetadata = annotationMetadata;
             this.annotationMetadata = annotationMetadata;
             MethodArguments methodArguments = methodArguments(methodReference);
             this.arguments = methodArguments.arguments;
@@ -448,17 +478,14 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public void configure(Environment environment) {
-            if (annotationMetadata.hasPropertyExpressions()) {
-                annotationMetadata = new MethodAnnotationMetadata(annotationMetadata, environment);
-            }
+            this.environment = environment;
+            configureAnnotationMetadata();
         }
 
         @Override
         public void configure(BeanContext beanContext) {
-            annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
-            if (annotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
-                eam.configure(beanContext);
-            }
+            this.beanContext = beanContext;
+            configureAnnotationMetadata();
             if (argumentsAnnotationsWithExpressions) {
                 for (Argument<?> argument : arguments) {
                     AnnotationMetadata argumentAnnotationMetadata = argument.getAnnotationMetadata();
@@ -466,6 +493,48 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                         eam.configure(beanContext);
                     }
                 }
+            }
+        }
+
+        /**
+         * Forgets the environment and the bean context configured last, and the metadata wrapped for them.
+         */
+        @SuppressWarnings("NullAway") // an evaluation context takes a null bean context, which is what it starts with
+        void release() {
+            environment = null;
+            beanContext = null;
+            annotationMetadata = sourceAnnotationMetadata;
+            returnType = null;
+            if (argumentsAnnotationsWithExpressions) {
+                for (Argument<?> argument : arguments) {
+                    if (argument.getAnnotationMetadata() instanceof EvaluatedAnnotationMetadata eam) {
+                        eam.configure(null);
+                    }
+                }
+            }
+        }
+
+        /**
+         * Wraps the generated metadata for the environment and the bean context last configured: placeholders
+         * resolve against the environment, and expressions are evaluated in the context.
+         */
+        private void configureAnnotationMetadata() {
+            AnnotationMetadata metadata = sourceAnnotationMetadata;
+            Environment env = environment;
+            if (env != null && metadata.hasPropertyExpressions()) {
+                metadata = new MethodAnnotationMetadata(metadata, env);
+            }
+            BeanContext context = beanContext;
+            if (context != null) {
+                metadata = EvaluatedAnnotationMetadata.wrapIfNecessary(metadata);
+                if (metadata instanceof EvaluatedAnnotationMetadata eam) {
+                    eam.configure(context);
+                }
+            }
+            if (metadata != annotationMetadata) {
+                annotationMetadata = metadata;
+                // the return type carries the method's metadata
+                returnType = null;
             }
         }
 
