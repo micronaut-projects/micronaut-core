@@ -815,7 +815,7 @@ final class PythonContextRegistry {
         /** Whether the runtime created the context and unregisters it when closing it. */
         volatile boolean registered;
         /** The file system the runtime built the context over, closed when the context is unregistered. */
-        volatile @Nullable AutoCloseable fileSystem;
+        volatile @Nullable AutoCloseable fileSystem; // NOSONAR java:S3077 only the reference is published; the file system is closed once, by the unregistration that takes it
         /** Whether entering was probed on an instance that cannot be entered. */
         volatile boolean enterUnsupported;
         /** Whether a Python class declares coroutine methods, keyed by its class cache key. */
