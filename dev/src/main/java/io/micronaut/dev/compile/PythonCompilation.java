@@ -131,7 +131,7 @@ final class PythonCompilation implements AutoCloseable {
      * Copies into the class output what the compiler produced and the class output does not hold as
      * it is, and removes what the previous compilations copied and this one did not produce.
      */
-    private static Mirrored mirror(Path work, Path classOutput, Path generatedSources) throws IOException {
+    static Mirrored mirror(Path work, Path classOutput, Path generatedSources) throws IOException {
         Path ledger = sibling(classOutput, LEDGER_SUFFIX);
         Path staging = sibling(classOutput, STAGING_SUFFIX);
         Path sourcesStaging = sibling(classOutput, SOURCES_STAGING_SUFFIX);
@@ -293,7 +293,7 @@ final class PythonCompilation implements AutoCloseable {
         return classes;
     }
 
-    private static List<String> roots(CompilationRequest request, SourceKind kind) {
+    static List<String> roots(CompilationRequest request, SourceKind kind) {
         List<String> roots = new ArrayList<>();
         for (SourceRoot root : request.sourceRoots()) {
             if (root.kind() == kind && Files.isDirectory(root.path())) {
@@ -308,7 +308,7 @@ final class PythonCompilation implements AutoCloseable {
      * be resolved in place of the sources being compiled; the compiler adds its own output itself. What
      * another tool wrote into a shared class output is resolvable through the foreign classes instead.
      */
-    private static List<Path> classpath(CompilationRequest request, Path work, @Nullable Path foreign) {
+    static List<Path> classpath(CompilationRequest request, Path work, @Nullable Path foreign) {
         Path classOutput = request.classOutput();
         List<Path> classpath = new ArrayList<>();
         for (Path entry : request.compileClasspath()) {
@@ -332,7 +332,7 @@ final class PythonCompilation implements AutoCloseable {
      * @return The directory, null when the class output holds no such class
      */
     @Nullable
-    private static Path foreignClasses(Path classOutput) throws IOException {
+    static Path foreignClasses(Path classOutput) throws IOException {
         Path foreign = sibling(classOutput, FOREIGN_SUFFIX);
         OutputTransaction.deleteRecursively(foreign);
         Set<String> owned = owned(classOutput);
@@ -381,6 +381,6 @@ final class PythonCompilation implements AutoCloseable {
      * @param removed The files removed, relative to the class output
      * @param removedOutputs The files removed, absolute
      */
-    private record Mirrored(List<String> changed, List<String> removed, Set<Path> removedOutputs) {
+    record Mirrored(List<String> changed, List<String> removed, Set<Path> removedOutputs) {
     }
 }
