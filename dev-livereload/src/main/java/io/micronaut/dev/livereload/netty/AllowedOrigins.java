@@ -54,6 +54,8 @@ record AllowedOrigins(Set<String> origins, Set<String> hosts) {
     static final AllowedOrigins LOOPBACK = new AllowedOrigins(Set.of(), Set.of());
 
     private static final Logger LOG = LoggerFactory.getLogger(AllowedOrigins.class);
+    private static final String HTTP = "http";
+    private static final String HTTPS = "https";
     // the origins of the LiveReload browser extensions
     private static final Set<String> EXTENSION_SCHEMES = Set.of("chrome-extension", "moz-extension", "safari-web-extension");
 
@@ -108,7 +110,7 @@ record AllowedOrigins(Set<String> origins, Set<String> hosts) {
                 return true;
             }
             String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-            if (!scheme.equals("http") && !scheme.equals("https") || host.isEmpty()) {
+            if (!scheme.equals(HTTP) && !scheme.equals(HTTPS) || host.isEmpty()) {
                 return false;
             }
             if (host.equals("localhost") || host.endsWith(".localhost") || host.equals("127.0.0.1") || host.equals("[::1]")) {
@@ -138,11 +140,11 @@ record AllowedOrigins(Set<String> origins, Set<String> hosts) {
     private static String canonical(URI uri) {
         String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
         String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-        if (!scheme.equals("http") && !scheme.equals("https") || host.isEmpty()) {
+        if (!scheme.equals(HTTP) && !scheme.equals(HTTPS) || host.isEmpty()) {
             return null;
         }
         // a browser leaves the default port out of an origin
-        int port = uri.getPort() >= 0 ? uri.getPort() : scheme.equals("https") ? 443 : 80;
+        int port = uri.getPort() >= 0 ? uri.getPort() : scheme.equals(HTTPS) ? 443 : 80;
         return scheme + "://" + host + ":" + port;
     }
 
