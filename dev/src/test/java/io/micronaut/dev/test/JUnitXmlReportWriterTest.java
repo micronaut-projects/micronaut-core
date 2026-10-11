@@ -17,6 +17,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JUnitXmlReportWriterTest {
@@ -227,5 +228,19 @@ class JUnitXmlReportWriterTest {
             }
         }
         throw new AssertionError("No test case " + name + " in " + suite.getAttribute("name"));
+    }
+
+    @Test
+    void theReportOfADeepTestFileHasAFileNameTheFileSystemAccepts(@org.junit.jupiter.api.io.TempDir Path reports) throws Exception {
+        JUnitXmlReportWriter writer = new JUnitXmlReportWriter(reports);
+        String deep = "/private/tmp/" + "nested-directory/".repeat(12) + "tests/test_application.py";
+        String other = "/private/tmp/" + "nested-directory/".repeat(12) + "tests/test_controller.py";
+        Path report = writer.reportOf(deep);
+        assertTrue(report.getFileName().toString().length() <= 220, report.getFileName().toString());
+        assertTrue(report.getFileName().toString().endsWith("test_application.py.xml"), report.getFileName().toString());
+        assertNotEquals(report, writer.reportOf(other));
+        assertEquals(report, writer.reportOf(deep));
+        Files.writeString(report, "<testsuite/>");
+        assertTrue(Files.isRegularFile(report));
     }
 }
