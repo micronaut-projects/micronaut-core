@@ -141,11 +141,12 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
         return CompletionStagePublishers.compose(functionDefinition(functionName), def -> {
             FunctionInvoker functionInvoker = functionInvokerChooser.choose(def)
                 .orElseThrow(() -> new FunctionNotFoundException(def.getName()));
-            // an invoker that only returns publishers is adapted by the default invokeAsync
+            // an invoker that only returns publishers is adapted by the default invokeAsync;
+            // a stage-less invoker, like a mock that only stubs invoke, is called through its publisher
             @SuppressWarnings("unchecked")
-            CompletionStage<@Nullable Object> result = (CompletionStage<@Nullable Object>) Objects.requireNonNull(
-                functionInvoker.invokeAsync(def, body, valueType),
-                "The function invoker returned no stage"
+            CompletionStage<@Nullable Object> result = CompletionStagePublishers.orElse(
+                (CompletionStage<@Nullable Object>) functionInvoker.invokeAsync(def, body, valueType),
+                () -> invokePublisher(functionInvoker, def, body, valueType)
             );
             return CompletionStagePublishers.map(result, value -> {
                 if (value == null && !valueType.isVoid() && valueType.getType() != Void.class) {
@@ -154,6 +155,17 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
                 return value;
             });
         });
+    }
+
+    @SuppressWarnings("unchecked")
+    private static CompletionStage<@Nullable Object> invokePublisher(FunctionInvoker functionInvoker, FunctionDefinition def,
+                                                                      @Nullable Object body, Argument<?> valueType) {
+        Argument<Publisher<Object>> publisherType = (Argument<Publisher<Object>>) (Argument<?>) Argument.of(Publisher.class, valueType);
+        Publisher<Object> result = Objects.requireNonNull(
+            (Publisher<Object>) functionInvoker.invoke(def, body, publisherType),
+            "The function invoker returned no publisher"
+        );
+        return CompletionStagePublishers.first(result, null);
     }
 
     /**
