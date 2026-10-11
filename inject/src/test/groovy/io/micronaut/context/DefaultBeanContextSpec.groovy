@@ -107,6 +107,22 @@ class DefaultBeanContextSpec extends Specification {
             e.message == "Cannot resolve beans until the context is running"
     }
 
+    def "looking up a bean definition in a closed context throws IllegalStateException, not a null pointer"() {
+        given:
+            ApplicationContext context = ApplicationContext.run()
+
+        expect:
+            context.findBeanDefinition(ApplicationConfiguration).isPresent()
+
+        when: 'a lookup races the stop, as a request still in flight does'
+            context.close()
+            context.findBeanDefinition(ApplicationConfiguration)
+
+        then:
+            IllegalStateException e = thrown()
+            e.message == "Cannot resolve bean definitions until the context is running"
+    }
+
     def "container conversion only expands arrays and containers convertible to Iterable"() {
         given:
             DefaultBeanContext beanContext = new DefaultBeanContext()

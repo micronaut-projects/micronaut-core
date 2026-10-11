@@ -283,6 +283,14 @@ public class RequestLifecycle {
         }
         final Throwable cause = t;
 
+        if (!routeExecutor.beanContext.isRunning()) {
+            // the context stopped while the request was in flight, as in a shutdown or a development restart: the error
+            // routes and exception handlers stopped with it, and resolving them from a stopped context would fail in turn
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Request {} {} failed after the context stopped: {}", request.getMethodName(), request.getUri(), cause.toString(), cause);
+            }
+            return ExecutionFlow.just(HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE));
+        }
         RouteMatch<?> errorRoute = routeExecutor.findErrorRoute(cause, findDeclaringType(request), request);
         if (errorRoute != null) {
             return handleErrorRoute(request, propagatedContext, errorRoute, cause);
