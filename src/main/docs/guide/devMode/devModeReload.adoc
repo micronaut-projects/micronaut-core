@@ -21,6 +21,12 @@ The retained singletons are adopted by the new context under their definitions, 
 
 Two events frame the restart: api:context.reload.ClassChangeEvent[] is published to the old context before it stops, and api:context.reload.ReloadCompletedEvent[] to the new one once it started.
 
+== Method bodies
+
+With `micronaut.dev.strategy=auto` (the default) or `reload`, an edit that changes only method bodies is applied in place, without a restart. An edit qualifies when the structure of every changed class is the same and no generated class changed. The JVM redefines the loaded classes through the agent, and the running beans see the new bodies, in tens of milliseconds.
+
+The agent is `micronaut-dev` itself, launched with `-javaagent`, which the build plugins add. Without it, or with `strategy=restart`, every change restarts.
+
 == Resources
 
 A changed template, static file or message bundle does not restart anything: it reaches the beans that watch resources of that kind (see the next section).
