@@ -24,6 +24,7 @@ import spock.lang.TempDir
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Duration
 
 class DevManifestSpec extends Specification {
 
@@ -127,6 +128,33 @@ class DevManifestSpec extends Specification {
         then:
         IllegalArgumentException e = thrown()
         e.message.contains("Unknown test selection some")
+    }
+
+    void "a duration reads in milliseconds, seconds or minutes, seconds without a unit, and defaults when blank"() {
+        expect:
+        DevManifest.duration(DevManifest.REQUESTS_DRAIN_TIMEOUT, value, Duration.ofSeconds(30)) == expected
+
+        where:
+        value     | expected
+        null      | Duration.ofSeconds(30)
+        " "       | Duration.ofSeconds(30)
+        "500ms"   | Duration.ofMillis(500)
+        " 2 S "   | Duration.ofSeconds(2)
+        "1m"      | Duration.ofMinutes(1)
+        "7"       | Duration.ofSeconds(7)
+        "0"       | Duration.ZERO
+    }
+
+    void "a duration that is negative or not a number is refused"() {
+        when:
+        DevManifest.duration(DevManifest.REQUESTS_DRAIN_TIMEOUT, value, Duration.ofSeconds(30))
+
+        then:
+        IllegalArgumentException e = thrown()
+        e.message == "Invalid micronaut.dev.requests.drain-timeout: " + value.trim() + ", a duration such as 30s or 500ms"
+
+        where:
+        value << ["-1s", "soon", "5h"]
     }
 
     void "a manifest without a main class or a reloadable root is refused"() {
