@@ -127,4 +127,9 @@ noReflection {
     // the fast path redefines method bodies through the agent
     allowIn("io.micronaut.dev.DevRuntime", "INSTRUMENTATION")
     allowIn("io.micronaut.dev.DevWatchService", "CLASS_LOADING")
+    // the route-declaring classes include the superclasses and interfaces of a route bean
+    allowIn("io.micronaut.dev.http.DevRouter", "INTERFACES")
+    // a class redefined in place is checked for being, or declaring, located routes, whose tables the router keeps per instance
+    allowIn("io.micronaut.dev.http.DevRouter", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.http.DevRouter", "CLASS_MEMBERS")
 }
