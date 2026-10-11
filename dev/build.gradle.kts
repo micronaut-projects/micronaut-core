@@ -22,6 +22,8 @@ dependencies {
     testImplementation(projects.micronautRouter)
     testCompileOnly(projects.micronautManagement)
     testImplementation(projects.micronautInjectGroovy)
+    // the compile-error page
+    testImplementation(projects.micronautHttpServer)
     testAnnotationProcessor(projects.micronautInjectJava)
 }
 
