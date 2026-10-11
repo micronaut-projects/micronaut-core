@@ -289,7 +289,7 @@ public final class DevRuntime implements Closeable {
         RuntimeException notRunning;
         try {
             memory.initializeParentTierStatics();
-            snapshot = outputSnapshot();
+            snapshot = generationSnapshot();
             if (manifest.strategy() != ReloadStrategy.RESTART && !NativeImageUtils.inImageRuntimeCode()) {
                 // the fast path needs an agent: the launcher's, or one attached now. A native image has none: its
                 // Instrumentation cannot redefine a class, and it cannot attach one
@@ -300,6 +300,7 @@ public final class DevRuntime implements Closeable {
             }
             startLiveReload();
             startWatching();
+            reconcileOutputs();
             Thread thread = new Thread(this::processBatches, "micronaut-dev-reload");
             thread.setDaemon(true);
             thread.start();
@@ -702,12 +703,13 @@ public final class DevRuntime implements Closeable {
         }
         try {
             memory.initializeParentTierStatics();
-            snapshot = outputSnapshot();
+            snapshot = generationSnapshot();
             // what the class files depend on and which are tests, before any change comes: a first change that removes a
             // constant, or deletes a test, needs to know the state it changes
             session.prime();
             startLiveReload();
             startWatching();
+            reconcileOutputs();
             Thread thread = new Thread(this::processBatches, "micronaut-dev-reload");
             thread.setDaemon(true);
             thread.start();
@@ -807,6 +809,25 @@ public final class DevRuntime implements Closeable {
      */
     OutputLock outputLock() {
         return outputLock;
+    }
+
+    /**
+     * What the current generation loads: the copy of the reloadable roots it was created over, the baseline the first
+     * change is told from even when another process of the project compiled after the copy was made.
+     */
+    private OutputSnapshot generationSnapshot() {
+        List<Path> roots = classLoader.current().roots();
+        return OutputSnapshot.of(roots.subList(classLoader.liveRoots().size(), roots.size()));
+    }
+
+    /**
+     * Another process of the project may have compiled between the first generation's copy and the watches, for an
+     * edit no watch saw: what it wrote is applied as a build tool's output would be.
+     */
+    private void reconcileOutputs() {
+        if (!snapshot.diff(outputSnapshot()).isEmpty()) {
+            enqueue(outputsChanged());
+        }
     }
 
     private OutputSnapshot outputSnapshot() {

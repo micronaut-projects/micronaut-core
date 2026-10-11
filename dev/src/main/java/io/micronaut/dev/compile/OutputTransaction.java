@@ -99,12 +99,12 @@ final class OutputTransaction {
             Files.createDirectories(parent);
         }
         try {
-            Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE);
+            Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (AtomicMoveNotSupportedException e) {
             // staging and output on different file systems: a copy beside the target, then a rename
             Path temporary = target.resolveSibling(target.getFileName() + ".tmp");
             Files.copy(staged, temporary, StandardCopyOption.REPLACE_EXISTING);
-            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
+            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             Files.delete(staged);
         }
         moves.push(new Move(staged, target));
