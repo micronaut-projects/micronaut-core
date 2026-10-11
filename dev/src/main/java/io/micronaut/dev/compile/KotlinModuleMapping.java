@@ -132,13 +132,30 @@ final class KotlinModuleMapping {
     /**
      * A parsed module file.
      *
-     * @param header The version header
-     * @param body The message as written
-     * @param otherFields The fields of the message other than the package parts and the JVM package names, as written
-     * @param jvmPackages The JVM package names it declares
-     * @param parts Its parts
+     * <p>A class rather than a record: its arrays are compared by content nowhere, and a record would compare them by
+     * identity.</p>
      */
-    private record Module(byte[] header, byte[] body, byte[] otherFields, List<String> jvmPackages, List<Part> parts) {
+    private static final class Module {
+        private final byte[] header;
+        private final byte[] body;
+        private final byte[] otherFields;
+        private final List<String> jvmPackages;
+        private final List<Part> parts;
+
+        /**
+         * @param header The version header
+         * @param body The message as written
+         * @param otherFields The fields of the message other than the package parts and the JVM package names, as written
+         * @param jvmPackages The JVM package names it declares
+         * @param parts Its parts
+         */
+        Module(byte[] header, byte[] body, byte[] otherFields, List<String> jvmPackages, List<Part> parts) {
+            this.header = header;
+            this.body = body;
+            this.otherFields = otherFields;
+            this.jvmPackages = jvmPackages;
+            this.parts = parts;
+        }
 
         /**
          * @return This module with no package parts and no JVM package names: what else it holds stays
