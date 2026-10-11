@@ -689,7 +689,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @since 5.3.0
      */
     protected boolean isExitAllowed(Environment environment) {
-        return !environment.getActiveNames().contains(Environment.TEST) && !DevelopmentMode.isEnabled(environment);
+        return !environment.getActiveNames().contains(Environment.TEST) && !environment.isDevelopmentMode();
     }
 
     private boolean mayExit(Environment environment) {
