@@ -16,6 +16,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TestModeTest {
@@ -322,6 +323,56 @@ class TestModeTest {
         DevRuntime.current().close();
         launcher.join(TIMEOUT.toMillis());
         assertEquals(0, status[0]);
+    }
+
+    @Test
+    void theRunThatSpendsTheGenerationBudgetCompletesThenTheRuntimeClosesForARelaunch() throws Exception {
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Path test = Files.createDirectories(project.resolve("src/test/java/app"));
+        Path greeter = main.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        Files.writeString(test.resolve("GreeterTest.java"), greeterTest("one"));
+        // the first run takes the second generation: a budget of two would relaunch after it, and the relaunched process
+        // would run it again, without end
+        assertThrows(IllegalArgumentException.class, () -> manifest("micronaut.dev.max-generations=1\n"));
+        assertThrows(IllegalArgumentException.class, () -> manifest("micronaut.dev.max-generations=2\n"));
+        // without a first run, the first run is a change's: two suffice; run once, the budget does not matter
+        assertThrows(IllegalArgumentException.class, () -> manifest("micronaut.dev.max-generations=1\nmicronaut.dev.test.initial-run=false\n"));
+        assertEquals(2, manifest("micronaut.dev.max-generations=2\nmicronaut.dev.test.initial-run=false\n").maxGenerations());
+        assertEquals(1, manifest("micronaut.dev.max-generations=1\nmicronaut.dev.test.once=true\n").maxGenerations());
+
+        writeManifest("micronaut.dev.max-generations=3\n");
+        int[] status = {-2};
+        Thread launcher = new Thread(() -> {
+            try {
+                status[0] = new MicronautDevMain().runForStatus(new String[] {"--manifest", project.resolve("dev.properties").toString()});
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        launcher.start();
+        long deadline = System.nanoTime() + TIMEOUT.toNanos();
+        while ((DevRuntime.current() == null || DevRuntime.current().testRuns() < 1) && System.nanoTime() < deadline) {
+            Thread.sleep(50);
+        }
+        DevRuntime current = DevRuntime.current();
+        assertFalse(current.isGenerationBudgetSpent());
+
+        // a change runs its tests on generation three, the last of the budget: they run, then the runtime closes
+        Files.writeString(greeter, greeter("two"));
+        Files.writeString(test.resolve("GreeterTest.java"), greeterTest("two"));
+        current.changed(List.of(greeter, test.resolve("GreeterTest.java")), List.of());
+        launcher.join(TIMEOUT.toMillis());
+        assertFalse(launcher.isAlive());
+        assertEquals(MicronautDevMain.RELAUNCH, status[0]);
+        assertEquals(2, current.testRuns());
+        assertTrue(current.lastTestRun().orElseThrow().isSuccess());
+        assertTrue(current.isRelaunchRequested());
+        assertNull(DevRuntime.current());
+
+        // run once, the budget does not matter: the status is the tests'
+        writeManifest("micronaut.dev.max-generations=3\nmicronaut.dev.test.once=true\n");
+        assertEquals(0, new MicronautDevMain().runForStatus(new String[] {"--manifest", project.resolve("dev.properties").toString()}));
     }
 
     @Test

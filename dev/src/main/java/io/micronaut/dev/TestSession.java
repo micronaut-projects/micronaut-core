@@ -516,6 +516,12 @@ final class TestSession {
         LOG.info("{} {}: {} passed, {} failed, {} errored, {} skipped in {} ms{}", selection.everything() ? "All tests" : "Tests " + selection.description(),
             summary.isSuccess() ? "passed" : "failed", summary.passed(), summary.failed(), summary.errored(), summary.skipped(), summary.duration().toMillis(),
             summary.cancelled() ? " (cancelled)" : "");
+        if (!settings.once() && runtime.isGenerationBudgetSpent()) {
+            // the run that spent the budget completed: the next one is the relaunched process's. Checked after a run,
+            // not before, so that what a change owes is tested before the process goes
+            runtime.requestRelaunch();
+            return;
+        }
         runtime.detectLeaks();
     }
 
