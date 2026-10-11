@@ -95,8 +95,7 @@ class LiveReloadScriptInjectionTest {
             micronaut.dev.livereload.port=0
             """);
 
-        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
-        try {
+        try (DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0])) {
             ApplicationContext context = runtime.context().orElseThrow();
             EmbeddedServer server = context.getBean(EmbeddedServer.class);
             long deadline = System.nanoTime() + java.time.Duration.ofSeconds(30).toNanos();
@@ -126,8 +125,6 @@ class LiveReloadScriptInjectionTest {
             }
             assertArrayEquals(PAGE.getBytes(StandardCharsets.UTF_8), page);
             assertTrue(gzip.headers().firstValue("cache-control").map(value -> !value.contains("no-store")).orElse(true));
-        } finally {
-            runtime.close();
         }
     }
 }
