@@ -182,6 +182,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
     private static final String ARGUMENT_DEFINITION = "definition";
     private static final String ARGUMENT_CHANGE = "change";
+    private static final String HELD_CONFIGURATION = "the configuration [";
     private static final String AROUND_TYPE = "io.micronaut.aop.Around";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     private static final String INTERCEPTOR_BEAN_TYPE = "io.micronaut.aop.InterceptorBean";
@@ -5998,7 +5999,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
                     continue;
                 }
                 if (edge.lazy() || dependency.isProxy()) {
-                    return "the configuration [" + held.getBeanType().getName() + "] it was made from holds a provider or a proxy, which are bound to this context";
+                    return HELD_CONFIGURATION + held.getBeanType().getName() + "] it was made from holds a provider or a proxy, which are bound to this context";
                 }
                 List<BeanRegistration<?>> received = new ArrayList<>();
                 BeanRegistration<?> bound = null;
@@ -6013,13 +6014,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
                 } else if (configuration.leavesOut(dependency, true)) {
                     continue;
                 } else if (isContextBound(dependency, configuration, Collections.newSetFromMap(new IdentityHashMap<>()))) {
-                    return "the configuration [" + held.getBeanType().getName() + "] it was made from holds a [" + dependency.getBeanType().getName() + "] bound to this context";
+                    return HELD_CONFIGURATION + held.getBeanType().getName() + "] it was made from holds a [" + dependency.getBeanType().getName() + "] bound to this context";
                 } else {
                     bound = collectRetentionClosure(dependency, configuration, received, visited);
                     replaced = replacedClassOf(dependency, criteria, configuration, examined);
                 }
                 if (bound != null) {
-                    return "the configuration [" + held.getBeanType().getName() + "] it was made from holds the bean [" + bound.bean
+                    return HELD_CONFIGURATION + held.getBeanType().getName() + "] it was made from holds the bean [" + bound.bean
                         + "], which holds a provider, a proxy, a scope or the context, which are bound to this context";
                 }
                 for (BeanRegistration<?> member : received) {
@@ -6029,7 +6030,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
                     replaced = replacedClassOf(member, criteria, configuration, examined);
                 }
                 if (replaced != null) {
-                    return "the configuration [" + held.getBeanType().getName() + "] it was made from holds what is bound to the class ["
+                    return HELD_CONFIGURATION + held.getBeanType().getName() + "] it was made from holds what is bound to the class ["
                         + replaced.getName() + "], which the restart replaces";
                 }
             }
@@ -6151,7 +6152,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * @return The prefix, or null when the definition is not of configuration or reads under no prefix
      */
     @Nullable
-    private static String configurationPrefixOf(BeanDefinition<?> definition) {
+    static String configurationPrefixOf(BeanDefinition<?> definition) {
         if (!definition.hasStereotype(ConfigurationReader.class)) {
             return null;
         }

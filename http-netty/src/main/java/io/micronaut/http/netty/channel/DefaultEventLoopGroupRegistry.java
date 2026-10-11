@@ -79,7 +79,7 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     /**
      * The groups that outlive this registry, development mode's, when this registry was handed any.
      */
-    private volatile @Nullable RetainedEventLoopGroups retainedGroups;
+    private volatile @Nullable RetainedEventLoopGroups retainedGroups; // NOSONAR java:S3077 only the reference is published; the retained groups are thread-safe
 
     /**
      * Default constructor.

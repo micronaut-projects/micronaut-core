@@ -82,6 +82,27 @@ class ConfigurationReceivedSpec extends Specification {
         start(retained).close()
     }
 
+    void "configuration that received a singleton or a prototype bound to the context refuses the bean made from it"() {
+        given:
+        ApplicationContext first = start(List.of())
+        HeldClient held = first.getBean(HeldClient)
+        ContextClient bound = first.getBean(ContextClient)
+        NestedClient nested = first.getBean(NestedClient)
+
+        when:
+        Collection<BeanRegistration<?>> retained = stopRetaining(first, { false })
+
+        then: "the singleton holds a provider, the prototype the context"
+        !retained*.bean.any { it.is(held) }
+        !retained*.bean.any { it.is(bound) }
+
+        and: "configuration received by configuration is examined in turn, and received nothing bound"
+        retained*.bean.any { it.is(nested) }
+
+        cleanup:
+        start(retained).close()
+    }
+
     private static Collection<BeanRegistration<?>> stopRetaining(ApplicationContext context, Predicate<Class<?>> replaced) {
         return ((DefaultBeanContext) context).stopRetaining(new PolicyRetentionCriteria(List.of(AnnotatedBeanRetentionPolicy.INSTANCE),
             { String prefix -> false }, replaced))
