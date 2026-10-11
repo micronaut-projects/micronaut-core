@@ -9,8 +9,10 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -93,6 +95,52 @@ class ReloadTckTest {
             assertTrue(failure.getMessage().contains("incompatible types"), failure.getMessage());
             assertEquals(1, harness.generation());
         }
+    }
+
+    @Test
+    void aSourceDeletedAndWrittenAgainAcrossReloadsComesAndGoesWhateverTheWatcherReportsLate() {
+        // the watcher reports each write and deletion again a moment after the harness did, and its report can be
+        // merged after the harness's next one: the file system, not the order of the reports, says what is there
+        try (ReloadHarness harness = ReloadHarness.inDirectory(project)) {
+            harness.source("example.Greeter", greeter("one"));
+            harness.start();
+            for (int i = 0; i < 4; i++) {
+                harness.source("example.Extra", EXTRA);
+                assertTrue(hasExtra(harness.reload()), "written again, round " + i);
+                harness.deleteSource("example.Extra");
+                harness.source("example.Greeter", greeter("round " + i));
+                ApplicationContext after = harness.reload();
+                assertFalse(hasExtra(after), "deleted, round " + i + ", generation " + harness.generation());
+            }
+        }
+    }
+
+    @Test
+    void aLateReportOfAnEarlierDeletionLeavesTheSourceWrittenSinceCompiled() throws Exception {
+        try (ReloadHarness harness = ReloadHarness.inDirectory(project)) {
+            harness.source("example.Greeter", greeter("one"));
+            assertFalse(hasExtra(harness.start()));
+            Path extra = harness.projectDirectory().resolve("src/main/java/example/Extra.java");
+
+            // written, and left to the watcher, so that no report of it is pending afterwards
+            harness.source("example.Extra", EXTRA);
+            long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+            while (!hasExtra(harness.runtime().awaitGeneration(harness.generation(), Duration.ofSeconds(30)))) {
+                assertTrue(System.nanoTime() < deadline, "the watcher did not report the new source");
+                Thread.sleep(50);
+            }
+
+            // a report of a deletion from before the write: the source is there, so it is compiled, not its classes removed
+            harness.runtime().changed(List.of(), List.of(extra));
+            assertTrue(hasExtra(harness.runtime().awaitGeneration(harness.generation(), Duration.ofSeconds(30))), "the classes of the existing source were removed");
+        }
+    }
+
+    private static final String EXTRA = "package example; @jakarta.inject.Singleton public class Extra { }";
+
+    private static boolean hasExtra(ApplicationContext context) {
+        return context.getBeanDefinitions(io.micronaut.inject.qualifiers.Qualifiers.any()).stream()
+            .anyMatch(definition -> definition.getBeanType().getName().equals("example.Extra"));
     }
 
     /**
