@@ -25,6 +25,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -143,6 +144,10 @@ public class MicronautDevMain {
     protected void launchApplication(ClassLoader classLoader, String mainClass, String[] args) throws Exception { // NOSONAR the application's main may throw any exception
         Class<?> type = Class.forName(mainClass, true, classLoader);
         Method main = type.getMethod("main", String[].class);
+        if (!Modifier.isPublic(type.getModifiers())) {
+            // the java launcher runs the public main of a class that is not public, as the Pyronaut compiler generates
+            main.setAccessible(true);
+        }
         try {
             main.invoke(null, (Object) args);
         } catch (InvocationTargetException e) {

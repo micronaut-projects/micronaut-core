@@ -85,6 +85,15 @@ The launcher compiles each language with a compiler of its own, all of them incr
 
 The build plugins put these artifacts on the launch classpath for the languages the project uses, so `micronaut-dev` itself depends on neither Kotlin nor Groovy.
 
+Python compiles through the Pyronaut compiler of `micronaut-inject-python` when it is on the launch classpath:
+
+* The compiler generates the Java stubs and bean definitions of the Python modules, and compiles them in one `javac` run with the module's Java sources, since each references the other. When the Java sources share the Python class output, the Python compiler compiles them too, with the options of both languages, and `javac` never runs on them alone.
+* The compiler plans its incremental work itself and keeps its state beside the class output. In one transaction, it then copies what changed into the class output and the generated stubs into the generated sources directory, and removes what it no longer produces.
+
+The Python modules are resources of the class output, so a Python edit starts a new generation, whose GraalPy context imports the new modules; the GraalPy engine stays loaded.
+
+Reloading needs a JVM: a native image can neither define the classes of a new generation nor redefine a class, so the native toolchain of Pyronaut restarts the process instead.
+
 == LiveReload
 
 Add `micronaut-dev-livereload` to the development runtime classpath and the launcher starts a LiveReload server on port 35729 (`micronaut.dev.livereload.port`). Adding the module is the switch: there is no other setting to turn it on. Browsers then:
