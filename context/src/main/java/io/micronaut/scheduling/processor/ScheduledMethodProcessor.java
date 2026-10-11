@@ -92,12 +92,12 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
      * same schedule keeps its running timers, and one that goes has its timers cancelled.
      */
     private final Map<BeanExecutableMethod<Scheduled>, ScheduledMethod> scheduledTasks = new ConcurrentHashMap<>();
-    private volatile @Nullable BeanWatch watch;
+    private volatile @Nullable BeanWatch watch; // NOSONAR java:S3077 only the handle is published; the watch is thread-safe
     /**
      * What scheduling the startup batch threw, if anything: the watch isolates a watcher's failure, and a
      * schedule that cannot be read must still fail the startup as it always has.
      */
-    private volatile @Nullable RuntimeException startupFailure;
+    private volatile @Nullable RuntimeException startupFailure; // NOSONAR java:S3077 only the reference is published, the exception is not mutated
     private final TaskExceptionHandler<?, ?> taskExceptionHandler;
 
     /**
