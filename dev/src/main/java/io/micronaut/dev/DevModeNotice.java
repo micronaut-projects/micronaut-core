@@ -87,7 +87,7 @@ final class DevModeNotice {
         line(text, "    - classes and resources reload as they change (strategy: " + strategy.name().toLowerCase(Locale.ROOT) + ")");
         if (http) {
             line(text, "    - while a compilation fails, requests are answered with the compiler's");
-            line(text, "      diagnostics, source paths included");
+            line(text, "      diagnostics, their source paths only with the access token");
         }
         if (liveReload.isPresent()) {
             line(text, "    - a LiveReload server listens on port " + liveReload.getAsInt() + (script ? ", and HTML pages load its script" : ""));
