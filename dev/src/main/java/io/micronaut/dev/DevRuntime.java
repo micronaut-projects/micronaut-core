@@ -119,13 +119,13 @@ public final class DevRuntime implements Closeable {
     private final AtomicLong submitted = new AtomicLong();
     private final AtomicLong completed = new AtomicLong();
     private final Object lifecycle = new Object();
-    private volatile CompletableFuture<ApplicationContext> started = new CompletableFuture<>();
-    private volatile CompletableFuture<Void> ready = CompletableFuture.completedFuture(null);
-    private volatile @Nullable ApplicationContext context;
-    private volatile @Nullable Thread applicationThread;
-    private volatile @Nullable CompileFailure lastFailure;
-    private volatile Collection<BeanRegistration<?>> retainedForNext = List.of();
-    private volatile String[] arguments = new String[0];
+    private volatile CompletableFuture<ApplicationContext> started = new CompletableFuture<>(); // NOSONAR java:S3077 swapped whole per generation; the future is thread-safe
+    private volatile CompletableFuture<Void> ready = CompletableFuture.completedFuture(null); // NOSONAR java:S3077 swapped whole per generation; the future is thread-safe
+    private volatile @Nullable ApplicationContext context; // NOSONAR java:S3077 only the reference is published; the context is thread-safe
+    private volatile @Nullable Thread applicationThread; // NOSONAR java:S3077 only the reference is published
+    private volatile @Nullable CompileFailure lastFailure; // NOSONAR java:S3077 immutable failure, replaced whole
+    private volatile Collection<BeanRegistration<?>> retainedForNext = List.of(); // NOSONAR java:S3077 replaced whole, never mutated once published
+    private volatile String[] arguments = new String[0]; // NOSONAR java:S3077 copied in and out, never mutated in place
     private volatile int retainedCount;
     private volatile boolean closed;
     /**
