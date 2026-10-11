@@ -76,6 +76,7 @@ public final class JUnitXmlReportWriter implements TestReportListener {
     // a file name holds at most 255 bytes, with TEST-, .xml and the .tmp of a report being written around the name
     private static final int MAX_ESCAPED_LENGTH = 200;
     private static final int HASH_LENGTH = 16;
+    private static final String INDENT = "\n    ";
     private static final String REPORT_SUFFIX = ".xml";
 
     private final Path directory;
@@ -254,7 +255,7 @@ public final class JUnitXmlReportWriter implements TestReportListener {
             xml.writeAttribute("time", seconds(time));
             xml.writeCharacters("\n  ");
             xml.writeStartElement("properties");
-            xml.writeCharacters("\n    ");
+            xml.writeCharacters(INDENT);
             xml.writeEmptyElement("property");
             xml.writeAttribute("name", SELECTION_PROPERTY);
             xml.writeAttribute("value", clean(results.selection().description()));
@@ -288,7 +289,7 @@ public final class JUnitXmlReportWriter implements TestReportListener {
         TestFailure failure = outcome.failure();
         switch (outcome.status()) {
             case FAILED, ERRORED -> {
-                xml.writeCharacters("\n    ");
+                xml.writeCharacters(INDENT);
                 xml.writeStartElement(outcome.status() == TestStatus.FAILED ? "failure" : "error");
                 if (failure != null) {
                     if (failure.message() != null) {
@@ -300,7 +301,7 @@ public final class JUnitXmlReportWriter implements TestReportListener {
                 xml.writeEndElement();
             }
             case SKIPPED -> {
-                xml.writeCharacters("\n    ");
+                xml.writeCharacters(INDENT);
                 xml.writeEmptyElement("skipped");
                 if (outcome.skipReason() != null) {
                     xml.writeAttribute("message", clean(outcome.skipReason()));
@@ -320,7 +321,7 @@ public final class JUnitXmlReportWriter implements TestReportListener {
         if (text.isEmpty()) {
             return;
         }
-        xml.writeCharacters("\n    ");
+        xml.writeCharacters(INDENT);
         xml.writeStartElement(element);
         xml.writeCharacters(clean(text));
         xml.writeEndElement();
