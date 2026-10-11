@@ -114,6 +114,9 @@ class DevAccessFilterTest {
         assertEquals("/dev?tokens=1", DevAccessFilter.withoutToken(URI.create("/dev?tokens=1&token")));
         // never a path that a browser would read as another host
         assertEquals("/x/y", DevAccessFilter.withoutToken(URI.create("/x//y?token=abc")));
+        // a name encoded is the same parameter as the request reads it
+        assertEquals("/dev?a=1", DevAccessFilter.withoutToken(URI.create("/dev?%74oken=abc&a=1")));
+        assertEquals("/dev", DevAccessFilter.withoutToken(URI.create("/dev?t%6Fken=abc&token=def")));
         // a request target that reads as another host is refused before any redirect
         assertEquals(HttpStatus.FORBIDDEN, DevAccessFilter.admit(local("//evil.example/dev?token=" + access.token(), "localhost"), access).getStatus());
     }

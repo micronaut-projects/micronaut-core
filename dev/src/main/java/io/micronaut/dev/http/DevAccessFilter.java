@@ -38,6 +38,8 @@ import io.micronaut.web.router.RouteAttributes;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -260,12 +262,21 @@ public final class DevAccessFilter implements Ordered {
             }
             int equals = parameter.indexOf('=');
             String name = equals < 0 ? parameter : parameter.substring(0, equals);
-            if (name.equals(DevAccess.TOKEN_PARAMETER)) {
+            // decoded as the request's parameters are, so that an encoded name such as %74oken goes too
+            if (decoded(name).equals(DevAccess.TOKEN_PARAMETER)) {
                 continue;
             }
             kept.append(kept.isEmpty() ? "" : "&").append(parameter);
         }
         return kept.isEmpty() ? path : path + "?" + kept;
+    }
+
+    private static String decoded(String name) {
+        try {
+            return URLDecoder.decode(name, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            return name;
+        }
     }
 
     private static HttpResponse<?> refusal(HttpStatus status, String message) {

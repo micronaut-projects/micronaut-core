@@ -75,6 +75,7 @@ public final class DevApplicationContextConfigurer implements ApplicationContext
             FileWatchConfiguration.RESTART, false,
             FileWatchConfiguration.ENABLED, false
         ));
+        // run mode only: test mode returned above and leaves the host as the tests configure it
         if (runtime.manifest().bindLoopback()) {
             builder.propertySources(loopback());
         }
