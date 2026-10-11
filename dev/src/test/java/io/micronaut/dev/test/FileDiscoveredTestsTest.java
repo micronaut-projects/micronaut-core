@@ -115,4 +115,32 @@ class FileDiscoveredTestsTest {
             assertEquals(Set.of("test_app.py.test_app.py"), single.outcomes.keySet());
         }
     }
+
+    @Test
+    void aFileIsSelectedByItsPathRelativeToItsRootOrAbsoluteAndNothingElse() throws Exception {
+        Path tests = Files.createDirectories(directory.resolve("project/tests"));
+        Files.writeString(tests.resolve("test_a.py"), "ok");
+        Path outside = Files.writeString(Files.createDirectories(directory.resolve("elsewhere")).resolve("test_x.py"), "ok");
+        Path classes = Files.createDirectories(directory.resolve("project/test-classes"));
+        Path services = Files.createDirectories(directory.resolve("services/META-INF/services"));
+        Files.writeString(services.resolve("org.junit.platform.engine.TestEngine"), FileTestEngine.class.getName());
+        JUnitPlatformTestRunner runner = new JUnitPlatformTestRunner();
+        Map<String, String> onlyFiles = Map.of("junit.jupiter.extensions.autodetection.enabled", "false");
+
+        try (URLClassLoader loader = new URLClassLoader(new URL[] {directory.resolve("services").toUri().toURL()}, getClass().getClassLoader())) {
+            List<SourceRoot> sources = List.of(new SourceRoot(SourceKind.JAVA, directory.resolve("project/java")), new SourceRoot(SourceKind.PYTHON, tests));
+            for (String name : List.of("test_a.py", tests.resolve("test_a.py").toString())) {
+                RecordingListener listener = new RecordingListener();
+                TestRunSummary summary = runner.run(new TestRunRequest("by-file", loader, List.of(classes), sources,
+                    TestSelection.ofClasses(Set.of(name), "failed"), onlyFiles), listener, new Cancellation());
+                assertEquals(1, summary.passed(), name);
+            }
+            // a file outside the test roots, or a name that is no path, runs nothing
+            for (String name : List.of(outside.toString(), "../elsewhere/test_x.py", "bad\0.py")) {
+                TestRunSummary summary = runner.run(new TestRunRequest("none", loader, List.of(classes), sources,
+                    TestSelection.ofClasses(Set.of(name), "failed"), onlyFiles), new RecordingListener(), new Cancellation());
+                assertEquals(0, summary.total(), name);
+            }
+        }
+    }
 }
