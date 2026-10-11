@@ -151,6 +151,7 @@ final class PollingWatchService implements WatchService {
             try {
                 Thread.sleep(intervalMillis);
             } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 return;
             }
             for (Key key : keys.values()) {
