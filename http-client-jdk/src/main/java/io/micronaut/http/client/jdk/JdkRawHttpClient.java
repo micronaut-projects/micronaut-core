@@ -52,6 +52,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
@@ -97,7 +98,8 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         }
         // the body is released however the exchange ends, also when the JDK client never reads
         // it, e.g. because the connection was refused or the request is a GET
-        return response.doFinally(signal -> body.close());
+        Runnable release = releaseOnce(body);
+        return response.doOnTerminate(release).doOnCancel(release);
     }
 
     @Override
@@ -186,9 +188,27 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         if (requestBody != null) {
             // released unless they were sent, e.g. when the connection is refused, also when the
             // exchange is cancelled
-            response = response.doFinally(signal -> requestBody.close());
+            Runnable release = releaseOnce(requestBody);
+            response = response.doOnTerminate(release).doOnCancel(release);
         }
         return response;
+    }
+
+    /**
+     * Releases the request body of an exchange at most once. It runs from {@code doOnTerminate}
+     * and {@code doOnCancel}, not {@code doFinally}, which Reactor runs after the terminal signal
+     * has reached the subscriber: the body is released before the subscriber sees the exchange end.
+     *
+     * @param body The request body
+     * @return The release action
+     */
+    private static Runnable releaseOnce(CloseableByteBody body) {
+        AtomicBoolean released = new AtomicBoolean();
+        return () -> {
+            if (released.compareAndSet(false, true)) {
+                body.close();
+            }
+        };
     }
 
     private static Set<String> allowedRestrictedHeaders() {
