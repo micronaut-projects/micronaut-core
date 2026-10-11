@@ -78,9 +78,10 @@ final class KotlinCompilation {
     private static final String PROVIDER_SERVICE = "META-INF/services/com.google.devtools.ksp.processing.SymbolProcessorProvider";
     private static final Pattern PACKAGE = Pattern.compile("^\\s*package\\s+([\\w.]+)", Pattern.MULTILINE);
     private static final String MODULE_NAME = "main";
+    private static final String CLASS_SUFFIX = ".class";
 
     @Nullable
-    private static volatile KotlinToolchains toolchains;
+    private static volatile KotlinToolchains toolchains; // NOSONAR java:S3077 loaded once and only the reference is published; the toolchains are thread-safe
 
     private KotlinCompilation() {
     }
@@ -207,7 +208,7 @@ final class KotlinCompilation {
         try (Stream<Path> files = Files.walk(classOutput)) {
             for (Path file : (Iterable<Path>) files.filter(Files::isRegularFile)::iterator) {
                 Path relative = classOutput.relativize(file);
-                if (relative.toString().endsWith(".class") && hiddenClasses.contains(ClassDependencyIndex.topLevelClassOf(relative))) {
+                if (relative.toString().endsWith(CLASS_SUFFIX) && hiddenClasses.contains(ClassDependencyIndex.topLevelClassOf(relative))) {
                     continue;
                 }
                 Path target = visible.resolve(relative);
@@ -342,7 +343,7 @@ final class KotlinCompilation {
         }
         Map<Path, Set<String>> classes = new LinkedHashMap<>();
         try (Stream<Path> files = Files.walk(staging)) {
-            for (Path file : (Iterable<Path>) files.filter(f -> f.getFileName().toString().endsWith(".class"))::iterator) {
+            for (Path file : (Iterable<Path>) files.filter(f -> f.getFileName().toString().endsWith(CLASS_SUFFIX))::iterator) {
                 Path relative = staging.relativize(file);
                 String topLevel = ClassDependencyIndex.topLevelClassOf(relative);
                 String packageName = topLevel.lastIndexOf('.') < 0 ? "" : topLevel.substring(0, topLevel.lastIndexOf('.'));
@@ -386,7 +387,7 @@ final class KotlinCompilation {
         for (Map.Entry<Path, Set<Path>> entry : ksp.under("classes").entrySet()) {
             Path relative = classOutput.relativize(entry.getKey());
             copy(entry.getKey(), staging.resolve(relative));
-            if (relative.toString().endsWith(".class")) {
+            if (relative.toString().endsWith(CLASS_SUFFIX)) {
                 for (Path origin : entry.getValue()) {
                     classes.computeIfAbsent(origin, s -> new LinkedHashSet<>()).add(ClassDependencyIndex.topLevelClassOf(relative));
                 }
