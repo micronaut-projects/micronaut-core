@@ -35,6 +35,7 @@ public final class PatchingTestRunner implements TestRunner {
     static final List<Set<String>> PATCHES = new CopyOnWriteArrayList<>();
     static volatile boolean refuse;
     static volatile boolean fail;
+    static volatile boolean broken;
 
     private volatile ClassLoader kept;
     private volatile String keptMessage;
@@ -45,6 +46,7 @@ public final class PatchingTestRunner implements TestRunner {
         PATCHES.clear();
         refuse = false;
         fail = false;
+        broken = false;
     }
 
     @Override
@@ -73,6 +75,9 @@ public final class PatchingTestRunner implements TestRunner {
 
     @Override
     public Optional<InPlaceResourceReloader> inPlaceReloader(ClassLoader classLoader) {
+        if (broken) {
+            throw new IllegalStateException("no reloader");
+        }
         if (classLoader != kept) {
             return Optional.empty();
         }
