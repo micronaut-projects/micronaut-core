@@ -28,7 +28,7 @@ final class ProbeJvm {
      * @param expected The line the probe prints when what it checks holds
      * @throws Exception if the probe cannot run
      */
-    static void run(Class<?> probe, Path project, String expected) throws Exception {
+    static void assertPasses(Class<?> probe, Path project, String expected) throws Exception {
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         Path argfile = project.resolve("jvm.argfile");
         Files.write(argfile, List.of("-cp", "\"" + System.getProperty("java.class.path").replace("\\", "\\\\") + "\""));
