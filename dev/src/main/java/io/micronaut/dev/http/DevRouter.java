@@ -125,14 +125,14 @@ public final class DevRouter implements Router {
 
     private final BeanContext context;
     private final Object lock = new Object();
-    private volatile @Nullable Router router;
-    private volatile @Nullable List<Integer> defaultPorts;
+    private volatile @Nullable Router router; // NOSONAR java:S3077 replaced whole by a rebuild; a built router is never changed through it
+    private volatile @Nullable List<Integer> defaultPorts; // NOSONAR java:S3077 an unmodifiable list, replaced whole
     private volatile int rebuilds;
     // how many filter, controller and located-routes beans were destroyed, other than by a rebuild, and how many the route table was
     // built after
     private final AtomicInteger routeBeansDestroyed = new AtomicInteger();
     private volatile int routeBeansSeen;
-    private volatile @Nullable Thread rebuilding;
+    private volatile @Nullable Thread rebuilding; // NOSONAR java:S3077 only compared with the current thread, to tell a rebuild from within it
 
     /**
      * @param context The context
