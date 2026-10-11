@@ -47,6 +47,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -806,6 +807,41 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
             LOG.warn("Unexpected error while closing Python pool context", e);
             throw e;
         }
+    }
+
+    /**
+     * Waits until no context of the pool is being created, so that every context that read the application's
+     * files before they changed is registered.
+     *
+     * @param deadlineNanos The {@link System#nanoTime()} to give up at
+     * @return Whether no context is being created
+     * @throws InterruptedException if the thread is interrupted
+     */
+    boolean awaitContextCreation(long deadlineNanos) throws InterruptedException {
+        synchronized (this) {
+            while (creatingContext != null) {
+                long remaining = deadlineNanos - System.nanoTime();
+                if (remaining <= 0) {
+                    return false;
+                }
+                TimeUnit.NANOSECONDS.timedWait(this, remaining);
+            }
+            return true;
+        }
+    }
+
+    /**
+     * @return The pooled contexts created so far, borrowed or idle
+     */
+    List<Context> pooledContextsSnapshot() {
+        return List.copyOf(pooledContexts);
+    }
+
+    /**
+     * @return The contexts of the asyncio event loops, by loop
+     */
+    Map<PythonEventLoop, Context> eventLoopContextsSnapshot() {
+        return Map.copyOf(eventLoopContexts);
     }
 
     private List<Context> snapshotIncludingPrimary() {
