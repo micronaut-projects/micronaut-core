@@ -23,8 +23,6 @@ import io.micronaut.scheduling.io.watch.FileWatcher;
 import io.micronaut.scheduling.io.watch.FileWatcherRegistration;
 
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -139,43 +137,39 @@ final class DevFileWatcher implements FileWatcher, LifeCycle<DevFileWatcher> {
     }
 
     /**
-     * Collects a request until its terminal operation, which registers it with the process's watcher.
+     * A request of the process's watcher, which only collects the options until its terminal operation: the view
+     * registers it, so that the registration leaves the view when it is closed.
      */
     private final class ViewRequest implements WatchRequest {
         private final Path root;
-        private boolean recursive = true;
-        private final Set<String> includes = new LinkedHashSet<>();
-        private final Set<String> excludes = new LinkedHashSet<>();
+        private final WatchRequest delegate;
 
         private ViewRequest(Path root) {
             this.root = root;
+            this.delegate = watcher.directory(root);
         }
 
         @Override
         public WatchRequest recursive(boolean recursive) {
-            this.recursive = recursive;
+            delegate.recursive(recursive);
             return this;
         }
 
         @Override
         public WatchRequest include(String... globs) {
-            includes.addAll(Arrays.asList(globs));
+            delegate.include(globs);
             return this;
         }
 
         @Override
         public WatchRequest exclude(String... globs) {
-            excludes.addAll(Arrays.asList(globs));
+            delegate.exclude(globs);
             return this;
         }
 
         @Override
         public FileWatcherRegistration watchAsync(Function<? super FileChangeBatch, ? extends CompletionStage<?>> listener) {
-            WatchRequest request = watcher.directory(root)
-                .recursive(recursive)
-                .include(includes.toArray(String[]::new))
-                .exclude(excludes.toArray(String[]::new));
-            return register(root, request, listener);
+            return register(root, delegate, listener);
         }
     }
 

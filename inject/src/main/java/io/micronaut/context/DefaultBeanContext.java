@@ -5998,7 +5998,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * @return The prefix, or null when the definition is not of configuration or reads under no prefix
      */
     @Nullable
-    private static String configurationPrefixOf(BeanDefinition<?> definition) {
+    static String configurationPrefixOf(BeanDefinition<?> definition) {
         if (!definition.hasStereotype(ConfigurationReader.class)) {
             return null;
         }
