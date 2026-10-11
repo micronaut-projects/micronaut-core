@@ -108,8 +108,16 @@ final class PythonCompilation implements AutoCloseable {
             diagnostics.add(error(e.getMessage() != null ? e.getMessage() : e.toString()));
             return new CompilationResult(CompilationResult.Status.FAILED, diagnostics, compiled, Set.of(), elapsed(start));
         }
+        return outcome(work, request, compiled, diagnostics, start);
+    }
+
+    /**
+     * The result of a compilation that produced its outputs in the work directory: they are mirrored into
+     * the class output, and a compilation that changed nothing there has nothing to do.
+     */
+    static CompilationResult outcome(Path work, CompilationRequest request, Set<Path> compiled, List<CompileDiagnostic> diagnostics, long start) {
         try {
-            Mirrored mirrored = mirror(work, classOutput, request.generatedSources());
+            Mirrored mirrored = mirror(work, request.classOutput(), request.generatedSources());
             CompilationResult.Status status = mirrored.changed().isEmpty() && mirrored.removed().isEmpty()
                 ? CompilationResult.Status.NOTHING_TO_DO
                 : CompilationResult.Status.SUCCESS;
@@ -246,9 +254,6 @@ final class PythonCompilation implements AutoCloseable {
     }
 
     private static Set<String> readLedger(Path ledger) throws IOException {
-        if (!Files.isRegularFile(ledger)) {
-            return Set.of();
-        }
         try (Stream<String> lines = Files.lines(ledger, StandardCharsets.UTF_8)) {
             return lines.map(String::strip).filter(line -> !line.isEmpty()).collect(Collectors.toCollection(TreeSet::new));
         }
@@ -355,11 +360,7 @@ final class PythonCompilation implements AutoCloseable {
     }
 
     private static List<File> files(List<Path> paths) {
-        List<File> files = new ArrayList<>(paths.size());
-        for (Path path : paths) {
-            files.add(path.toFile());
-        }
-        return files;
+        return paths.stream().map(Path::toFile).toList();
     }
 
     private static Path sibling(Path output, String suffix) {
