@@ -31,7 +31,15 @@ The agent is `micronaut-dev` itself, launched with `-javaagent`, which the build
 
 A changed template, static file or message bundle does not restart anything: it reaches the beans that watch resources of that kind (see the next section).
 
-A changed configuration file restarts the application, retaining nothing.
+A changed configuration file is applied in place, without a new generation. The configuration is refreshed: the configuration beans are bound again, the refreshable beans are disposed of, and the configuration watches are told.
+
+The application restarts only when the refresh cannot apply the change:
+
+* a configuration watch answers `REQUIRES_RESTART`;
+* a singleton received a changed property through `@Value` or `@Property` rather than a configuration bean;
+* a definition's `@Requires` names a changed property, whose presence the change may have flipped.
+
+A bean retained across restarts that watched a changed prefix is not kept when that restart comes.
 
 == Retaining a bean
 
@@ -43,6 +51,8 @@ Two mechanisms say which beans are kept across restarts:
 A bean is only retained when its class and everything it received, as the dependency graph records, come from the runtime classpath rather than the reloadable tier. A bean that holds an application class cannot survive a change to that class.
 
 A module declares which of its beans are retained with api:context.annotation.Retain[], on the bean's class or on the factory method that produces it. A module that defines a connection pool does so, so that a restart keeps the pool, and an in-memory database with it. The bean is dropped and created again when the configuration under one of the prefixes its `invalidatedBy` names changes.
+
+A configuration bean the retained bean received under one of those prefixes, such as its `@ConfigurationProperties`, does not keep it from being retained, and is not retained with it. Each generation binds it again, so the retained bean must copy the values it needs rather than keep the configuration bean.
 
 Set `micronaut.dev.retain-annotated=false` to retain only what `micronaut.dev.retain` names.
 

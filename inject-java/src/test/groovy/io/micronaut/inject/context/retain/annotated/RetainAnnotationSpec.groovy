@@ -109,6 +109,20 @@ class RetainAnnotationSpec extends Specification {
         context.close()
     }
 
+    void "the prefixes the annotation names are the ones whose change releases the bean"() {
+        given:
+        ApplicationContext context = start(List.of())
+        context.getBean(ProducedPool)
+        context.getBean(AnnotatedPool)
+
+        expect:
+        AnnotatedBeanRetentionPolicy.INSTANCE.observedConfigurationPrefixes(context.getBeanRegistration(ProducedPool, null)) == ["my.pool"] as Set
+        AnnotatedBeanRetentionPolicy.INSTANCE.observedConfigurationPrefixes(context.getBeanRegistration(AnnotatedPool, null)).isEmpty()
+
+        cleanup:
+        context.close()
+    }
+
     private static ApplicationContext start(Collection<BeanRegistration<?>> retained) {
         ApplicationContext.builder()
             .properties('spec.name': 'RetainAnnotationSpec')
