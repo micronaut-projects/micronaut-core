@@ -91,7 +91,7 @@ class KotlinSourceCompilerSpec extends Specification {
         given:
         write("example/Marked.kt", "package example\nannotation class Marked")
         Path widget = write("example/Widget.kt", "package example\n@Marked\nclass Widget")
-        Path gadget = write("example/Gadget.kt", "package example\n@Marked\nclass Gadget")
+        Path gadget = write("example/Gadget.kt", "package example\n@Marked\nclass Gadget { val size: Int = 1 }")
 
         when:
         def result = compiler.compile(request().asFull())
@@ -101,6 +101,7 @@ class KotlinSourceCompilerSpec extends Specification {
         Files.exists(out.resolve("example/WidgetGenerated.class"))
         Files.exists(out.resolve("example/WidgetSupport.class"))
         Files.exists(out.resolve("META-INF/generated/example.Widget"))
+        Files.readString(out.resolve("META-INF/generated/example.Gadget.members")) == "1 functions, 1 properties"
         Files.exists(project.resolve("build/generated/example/WidgetGenerated.kt"))
         loadAndCall("example.WidgetGenerated", "name") == "generated:Widget"
         loadAndCall("example.WidgetSupport", "name") == "java:Widget"
@@ -118,6 +119,8 @@ class KotlinSourceCompilerSpec extends Specification {
         !Files.exists(out.resolve("example/WidgetGenerated.class"))
         !Files.exists(out.resolve("example/WidgetSupport.class"))
         !Files.exists(out.resolve("META-INF/generated/example.Widget"))
+        !Files.exists(out.resolve("META-INF/generated/example.Widget.members"))
+        Files.exists(out.resolve("META-INF/generated/example.Gadget.members"))
         !Files.exists(project.resolve("build/generated/example/WidgetGenerated.kt"))
     }
 
@@ -169,6 +172,31 @@ class KotlinSourceCompilerSpec extends Specification {
         loadAndCall("demo.F", "name") == "b"
     }
 
+    void "a symbol processor's warnings and errors are diagnostics at the class they name, and it receives the processor options"() {
+        given:
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned")
+        List<String> options = ["-Aexample.flag=on", "-Aexample.bare", "-jvm-target", "21", "-api-version=2.0"]
+
+        when:
+        def result = compiler.compile(request([] as Set, [] as Set, options).asFull())
+
+        then: "the warning names the class's file, and the options other than the processors' went to kotlinc"
+        result.status == CompilationResult.Status.SUCCESS
+        result.diagnostics.any { it.severity() == CompileDiagnostic.Severity.WARNING && it.file() == warned && it.message().contains("Warned is warned") }
+        Files.readString(out.resolve("META-INF/generated/options")) == "example.bare=\nexample.flag=on\n"
+        Files.exists(out.resolve("example/WarnedGenerated.class"))
+
+        when:
+        Path refused = write("example/Refused.kt", "package example\n@Marked\nclass Refused")
+        result = compiler.compile(request([refused] as Set, [] as Set, options))
+
+        then:
+        result.status == CompilationResult.Status.FAILED
+        result.diagnostics.any { it.severity() == CompileDiagnostic.Severity.ERROR && it.file() == refused && it.message().contains("Refused is refused") }
+        !Files.exists(out.resolve("example/RefusedGenerated.class"))
+    }
+
     private Path write(String relative, String source) {
         Path file = src.resolve(relative)
         Files.createDirectories(file.parent)
@@ -183,9 +211,9 @@ class KotlinSourceCompilerSpec extends Specification {
         }
     }
 
-    private CompilationRequest request(Set<Path> changed = [] as Set, Set<Path> deleted = [] as Set) {
+    private CompilationRequest request(Set<Path> changed = [] as Set, Set<Path> deleted = [] as Set, List<String> options = []) {
         List<Path> classpath = System.getProperty("java.class.path").split(File.pathSeparator).collect { Path.of(it) }
-        new CompilationRequest(SourceKind.KOTLIN, [new SourceRoot(SourceKind.KOTLIN, src)], changed, deleted, false, classpath, processorPath(), out, project.resolve("build/generated"), [])
+        new CompilationRequest(SourceKind.KOTLIN, [new SourceRoot(SourceKind.KOTLIN, src)], changed, deleted, false, classpath, processorPath(), out, project.resolve("build/generated"), options)
     }
 
     /**
