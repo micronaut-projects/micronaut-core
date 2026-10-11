@@ -28,6 +28,8 @@ dependencies {
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.bytebuddy.agent)
     testImplementation(projects.micronautRuntimeOsx)
+    // the compile-error page
+    testImplementation(projects.micronautHttpServer)
     testAnnotationProcessor(projects.micronautInjectJava)
 }
 
