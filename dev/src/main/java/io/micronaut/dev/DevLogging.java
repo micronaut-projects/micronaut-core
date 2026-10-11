@@ -150,7 +150,7 @@ final class DevLogging {
         }
     }
 
-    private static boolean anyConfigurationFile(Collection<Path> files) {
+    static boolean anyConfigurationFile(Collection<Path> files) {
         for (Path file : files) {
             Path name = file.getFileName();
             if (name != null && isConfigurationName(name.toString())) {
@@ -160,7 +160,7 @@ final class DevLogging {
         return false;
     }
 
-    private static boolean anyConfigurationName(Set<String> resources) {
+    static boolean anyConfigurationName(Set<String> resources) {
         for (String resource : resources) {
             if (isConfigurationName(resource.substring(resource.lastIndexOf('/') + 1))) {
                 return true;
@@ -169,7 +169,7 @@ final class DevLogging {
         return false;
     }
 
-    private static boolean isConfigurationName(String name) {
+    static boolean isConfigurationName(String name) {
         if (name.equals(AUTOCONFIG_FILE) || name.equals(TEST_AUTOCONFIG_FILE)) {
             return true;
         }

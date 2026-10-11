@@ -71,6 +71,7 @@ final class TestConsole {
             int key;
             while ((key = input.read()) >= 0) {
                 if (!act((char) key)) {
+                    quit();
                     return;
                 }
             }
@@ -83,7 +84,7 @@ final class TestConsole {
      * Acts on a key.
      *
      * @param key The key
-     * @return Whether to go on reading
+     * @return Whether to go on reading, false for {@code q}
      */
     boolean act(char key) {
         switch (Character.toLowerCase(key)) {
@@ -102,10 +103,6 @@ final class TestConsole {
                 System.out.println(watching ? "Watching: a change runs the tests it affects." : "Not watching: changes compile, and no test runs until asked.");
             }
             case 'q' -> {
-                TestRunSummary last = runtime.lastTestRun().orElse(null);
-                runtime.close();
-                characterMode(false);
-                System.exit(last != null && last.isSuccess() ? 0 : 1);
                 return false;
             }
             default -> {
@@ -113,6 +110,16 @@ final class TestConsole {
             }
         }
         return true;
+    }
+
+    /**
+     * Closes the runtime and exits, with the status of the last test run.
+     */
+    private void quit() {
+        TestRunSummary last = runtime.lastTestRun().orElse(null);
+        runtime.close();
+        characterMode(false);
+        System.exit(last != null && last.isSuccess() ? 0 : 1);
     }
 
     /**

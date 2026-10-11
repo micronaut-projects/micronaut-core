@@ -7,7 +7,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -478,6 +480,12 @@ class TestModeTest {
         assertTrue(console.act('\n'));
         assertTrue(console.act('f'));
         assertEquals(2, runtime.testRuns());
+        assertFalse(console.act('q'));
+        assertFalse(console.act('Q'));
+
+        // the input ends: the console stops reading, without quitting
+        new TestConsole(runtime, new ByteArrayInputStream("w\n".getBytes(StandardCharsets.UTF_8))).read();
+        assertTrue(runtime.isWatchingTests());
     }
 
     @Test
