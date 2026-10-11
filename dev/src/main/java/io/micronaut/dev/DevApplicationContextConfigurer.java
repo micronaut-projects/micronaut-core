@@ -21,6 +21,7 @@ import io.micronaut.context.ApplicationContextConfigurer;
 import io.micronaut.context.BeanContextConfiguration;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.manifest.DevMode;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
@@ -31,7 +32,8 @@ import java.util.Map;
 
 /**
  * Configures every application context an application builds while a {@link DevRuntime} runs the
- * process: the reloadable class loader, the {@code dev} environment, the retained beans of the
+ * process: the reloadable class loader, the {@code dev} environment, the HTTP server on the loopback address unless
+ * configured otherwise, the retained beans of the
  * previous generation, the runtime itself as a bean, and a {@link FileWatcher} backed by the runtime's one
  * watcher. Service-loaded through the thread context loader, which the launcher points at the
  * reloadable tier; does nothing outside development mode.
@@ -41,6 +43,10 @@ import java.util.Map;
  */
 @Internal
 public final class DevApplicationContextConfigurer implements ApplicationContextConfigurer {
+
+    static final String LOOPBACK_SOURCE = "micronaut-dev-loopback";
+    private static final String SERVER_HOST = "micronaut.server.host";
+    private static final String LOCALHOST = "localhost";
 
     @Override
     public void configure(ApplicationContextBuilder builder) {
@@ -69,6 +75,9 @@ public final class DevApplicationContextConfigurer implements ApplicationContext
             FileWatchConfiguration.RESTART, false,
             FileWatchConfiguration.ENABLED, false
         ));
+        if (runtime.manifest().bindLoopback()) {
+            builder.propertySources(loopback());
+        }
         builder.beanDependencyTrackingEnabled(true);
         builder.retainedRegistrations(runtime.takeRetainedRegistrations());
         builder.singletons(runtime);
@@ -87,6 +96,16 @@ public final class DevApplicationContextConfigurer implements ApplicationContext
             // view that closes their registrations when this context stops
             applicationContext.registerSingleton(FileWatcher.class, new DevFileWatcher(watcher, runtime.pinnedWatches(), applicationContext.getClassLoader()));
         }
+    }
+
+    /**
+     * The server host of a development launch, {@code localhost}, at the lowest precedence: the application's
+     * configuration, an environment variable and a system property all win, so a developer who binds elsewhere does.
+     *
+     * @return The property source
+     */
+    static PropertySource loopback() {
+        return PropertySource.of(LOOPBACK_SOURCE, Map.<String, Object>of(SERVER_HOST, LOCALHOST), Integer.MIN_VALUE);
     }
 
     @Override

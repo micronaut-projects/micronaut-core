@@ -114,13 +114,13 @@ To open the application through another name, such as a LAN host or a developmen
 
 === Binding to the loopback address
 
-The build plugins start the application with `micronaut.server.host=localhost`, so that other machines on the network cannot reach the development server at all. The startup note prints the address the server listens on, and warns when it listens on every interface.
+In run mode, the launcher binds the HTTP server to `localhost`, so that other machines on the network cannot reach the development server at all. It sets `micronaut.server.host=localhost` at the lowest precedence: a `micronaut.server.host` in the application's configuration, an environment variable or a system property wins. The manifest entry `micronaut.dev.bind-loopback`, which the build plugins write, turns this off when false, as does `-Dmicronaut.dev.bind-loopback=false`. Test mode leaves the host alone. The startup note prints the address the server listens on, and warns when it listens on every interface.
 
 === Opting out
 
 * `micronaut.dev.access-token.enabled=false` turns the token off: the development pages answer an allowed host without it, and the compilation failures show their diagnostics. Set it in the manifest, as a system property of the launcher or in the application's configuration.
 * `micronaut.dev.allowed-hosts` adds the hosts to answer. There is no wildcard: the loopback names stay allowed and every other name is listed.
-* Setting `micronaut.server.host`, to `0.0.0.0` for instance, makes the server reachable from other machines; the token still guards the development pages.
+* `micronaut.dev.bind-loopback=false`, or setting `micronaut.server.host` to `0.0.0.0` for instance, makes the server reachable from other machines; the token still guards the development pages.
 
 == Compilers
 

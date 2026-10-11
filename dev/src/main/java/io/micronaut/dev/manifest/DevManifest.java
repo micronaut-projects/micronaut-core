@@ -133,6 +133,12 @@ public final class DevManifest {
     public static final String ACCESS_TOKEN_ENABLED = PREFIX + "access-token.enabled";
 
     /**
+     * The key of whether the application's HTTP server listens on the loopback address unless its configuration says
+     * otherwise, so that other machines cannot reach it. Written by the build plugins in run mode; on by default.
+     */
+    public static final String BIND_LOOPBACK = PREFIX + "bind-loopback";
+
+    /**
      * The generation budget in a native image, where the classes of a retired generation are never unloaded: GraalVM's
      * runtime class loading keeps every class it defines, in a metaspace whose size is fixed when the image is built, and
      * the interpreter's data for them on the heap, for the life of the process.
@@ -194,6 +200,7 @@ public final class DevManifest {
     private final boolean retainServerSockets;
     private final List<String> allowedHosts;
     private final boolean accessTokenEnabled;
+    private final boolean bindLoopback;
 
     private DevManifest(Path directory, Properties properties) {
         this.directory = directory;
@@ -229,6 +236,7 @@ public final class DevManifest {
         this.retainServerSockets = Boolean.parseBoolean(properties.getProperty(REQUESTS_RETAIN_SOCKETS, "true").trim());
         this.allowedHosts = Arrays.stream(properties.getProperty(ALLOWED_HOSTS, "").split(",")).map(String::trim).filter(host -> !host.isEmpty()).toList();
         this.accessTokenEnabled = Boolean.parseBoolean(properties.getProperty(ACCESS_TOKEN_ENABLED, "true").trim());
+        this.bindLoopback = Boolean.parseBoolean(properties.getProperty(BIND_LOOPBACK, "true").trim());
         String generationsDir = properties.getProperty(PREFIX + "generations");
         this.generations = generationsDir == null ? projectDir.resolve("build").resolve("micronaut-dev").resolve("generations") : path(directory, generationsDir);
         this.liveReload = new LiveReload(
@@ -603,6 +611,16 @@ public final class DevManifest {
      */
     public boolean accessTokenEnabled() {
         return accessTokenEnabled;
+    }
+
+    /**
+     * Whether the application's HTTP server listens on {@code localhost} unless its configuration, an environment
+     * variable or a system property sets {@code micronaut.server.host}, {@value #BIND_LOOPBACK}. Applies in run mode.
+     *
+     * @return True unless turned off
+     */
+    public boolean bindLoopback() {
+        return bindLoopback;
     }
 
     /**

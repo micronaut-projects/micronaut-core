@@ -89,7 +89,10 @@ class DevModeNoticeTest {
             // the link to the development pages with this launch's token: the endpoint, since there is no Control Panel
             int port = runtime.awaitGeneration(1, Duration.ofSeconds(1)).getBean(io.micronaut.runtime.server.EmbeddedServer.class).getPort();
             assertTrue(text.contains("      http://localhost:" + port + "/dev?token=" + runtime.access().token() + System.lineSeparator()), text);
-            assertTrue(text.contains("    - the HTTP server listens on all interfaces (*:" + port + ")"), text);
+            // the launcher binds the server to the loopback address unless told otherwise
+            assertTrue(text.contains("    - the HTTP server listens on localhost:" + port + System.lineSeparator()), text);
+            assertFalse(text.contains("other machines"), text);
+            assertEquals("localhost", runtime.awaitGeneration(1, Duration.ofSeconds(1)).getEnvironment().getProperty("micronaut.server.host", String.class).orElseThrow());
 
             // a reload starts generation two without logging the note again
             Files.writeString(greeter, greeter("two"));
@@ -149,5 +152,75 @@ class DevModeNoticeTest {
         assertTrue(everywhere.contains("set micronaut.server.host=localhost"), everywhere);
         assertTrue(everywhere.contains("need no access token (micronaut.dev.access-token.enabled=false)"), everywhere);
         assertTrue(everywhere.contains("      http://localhost:8080/dev" + System.lineSeparator()), everywhere);
+    }
+
+    @Test
+    void theServerListensOnEveryInterfaceWhenTheLauncherIsToldTo() throws Exception {
+        DevRuntime runtime = launch("micronaut.dev.bind-loopback=false\n", "");
+        try {
+            int port = runtime.awaitGeneration(1, Duration.ofSeconds(1)).getBean(io.micronaut.runtime.server.EmbeddedServer.class).getPort();
+            String text = notices().get(0).getFormattedMessage();
+            assertTrue(text.contains("    - the HTTP server listens on all interfaces (*:" + port + "): other machines can reach it;"), text);
+            assertTrue(runtime.awaitGeneration(1, Duration.ofSeconds(1)).getEnvironment().getProperty("micronaut.server.host", String.class).isEmpty());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void theApplicationsOwnServerHostWinsOverTheLoopbackDefault() throws Exception {
+        DevRuntime runtime = launch("", ", \"micronaut.server.host\", \"127.0.0.1\"");
+        try {
+            int port = runtime.awaitGeneration(1, Duration.ofSeconds(1)).getBean(io.micronaut.runtime.server.EmbeddedServer.class).getPort();
+            String text = notices().get(0).getFormattedMessage();
+            assertTrue(text.contains("    - the HTTP server listens on 127.0.0.1:" + port + System.lineSeparator()), text);
+            assertTrue(text.contains("      http://127.0.0.1:" + port + "/dev?token="), text);
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void theLoopbackDefaultHasTheLowestPrecedence() {
+        try (io.micronaut.context.ApplicationContext context = io.micronaut.context.ApplicationContext.builder()
+            .propertySources(DevApplicationContextConfigurer.loopback())
+            .start()) {
+            assertEquals("localhost", context.getProperty("micronaut.server.host", String.class).orElseThrow());
+        }
+        // the application's configuration, a system property or an environment variable wins
+        try (io.micronaut.context.ApplicationContext context = io.micronaut.context.ApplicationContext.builder()
+            .propertySources(DevApplicationContextConfigurer.loopback(),
+                io.micronaut.context.env.PropertySource.of("application", java.util.Map.of("micronaut.server.host", "0.0.0.0")))
+            .start()) {
+            assertEquals("0.0.0.0", context.getProperty("micronaut.server.host", String.class).orElseThrow());
+        }
+    }
+
+    private DevRuntime launch(String manifest, String properties) throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args)
+                        .properties(java.util.Map.of("spec.name", "DevModeNoticeTest", "micronaut.server.port", "-1"%s))
+                        .mainClass(Application.class)
+                        .start();
+                }
+            }
+            """.formatted(properties));
+        Files.writeString(src.resolve("Greeter.java"), greeter("one"));
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Path manifestFile = project.resolve("dev.properties");
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.java.output=build/classes
+            """ + manifest);
+        return new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
     }
 }

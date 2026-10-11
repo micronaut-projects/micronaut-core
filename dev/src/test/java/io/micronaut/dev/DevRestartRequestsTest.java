@@ -220,9 +220,9 @@ class DevRestartRequestsTest {
     void aFirstGenerationWhoseServerCannotBindIsReportedFailedNotStarted() throws Exception {
         DevRuntime runtime;
         // the port is taken before the application starts: its server cannot bind, and its context stops again.
-        // Netty binds the IPv6 wildcard, so the port is held dual stack
+        // The launcher binds the server to localhost, so the port is held on that address
         try (ServerSocket occupied = new ServerSocket()) {
-            occupied.bind(new InetSocketAddress(port));
+            occupied.bind(new InetSocketAddress("localhost", port));
             runtime = launch();
         }
         try {
