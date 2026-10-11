@@ -26,7 +26,7 @@ class IntrospectionGenerationMemoryTest {
 
     @Test
     void aRestartWatcherReadingAnIntrospectionOfTheRetiringGenerationDoesNotKeepIt() throws Exception {
-        ProbeJvm.run(Probe.class, project, COLLECTED);
+        ProbeJvm.assertPasses(Probe.class, project, COLLECTED);
     }
 
     /**
