@@ -182,6 +182,7 @@ public final class DevRuntime implements Closeable {
     private @Nullable Pending failedBatch;
     private final @Nullable TestSession tests;
     private final RestartRequests requests;
+    private final DevLogging logging = new DevLogging();
 
     /**
      * Creates the runtime; {@link #start(String[])} runs it.
@@ -807,6 +808,7 @@ public final class DevRuntime implements Closeable {
      */
     ClassLoader newGeneration() {
         classLoader.swap();
+        logging.beforeGeneration(classLoader.current());
         return classLoader.current();
     }
 
@@ -1119,10 +1121,12 @@ public final class DevRuntime implements Closeable {
      * The resource changes of a batch as the file system has them now, a late report of a write or a deletion settled.
      */
     private Map<ResourceKind, SourceChanges> settledResources(Map<ResourceKind, SourceChanges> resources) {
-        return ResourceNotifier.settle(resources, this::liveRemoved, file -> {
+        Map<ResourceKind, SourceChanges> settled = ResourceNotifier.settle(resources, this::liveRemoved, file -> {
             Path root = mostSpecificRoot(file);
             return root == null ? null : resourceRootKinds.get(root);
         });
+        logging.resourcesChanged(settled, classLoader.current());
+        return settled;
     }
 
     /**
@@ -1349,6 +1353,7 @@ public final class DevRuntime implements Closeable {
         OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
         ChangeSet changeSet = previous.diff(latest);
         snapshot = latest;
+        logging.outputChanged(changeSet);
         ConfigurationChange configurationChange = null;
         if (configurationChanged) {
             // the running context reads the file again and applies what it can: the configuration beans are
@@ -1781,6 +1786,7 @@ public final class DevRuntime implements Closeable {
         // the generation loader, not the facade: a class the JVM resolved through the facade once would be
         // handed out again, from the retired generation, for as long as the facade lives
         GenerationClassLoader generation = classLoader.current();
+        logging.beforeGeneration(generation);
         Thread thread = new Thread(() -> {
             Thread.currentThread().setContextClassLoader(generation);
             try {
