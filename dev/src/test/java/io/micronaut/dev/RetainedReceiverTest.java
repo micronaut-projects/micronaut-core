@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,7 +40,8 @@ class RetainedReceiverTest {
         try {
             ApplicationContext first = runtime.context().orElseThrow();
             AuthenticatedClient client = first.getBean(AuthenticatedClient.class);
-            WeakReference<ClientCredentials> firstCredentials = new WeakReference<>(client.credentials);
+            ReferenceQueue<ClientCredentials> queue = new ReferenceQueue<>();
+            WeakReference<ClientCredentials> firstCredentials = new WeakReference<>(client.credentials, queue);
             assertSame(first.getClassLoader(), client.credentials.getClass().getClassLoader());
             first = null;
             runtime.restart();
@@ -50,16 +52,17 @@ class RetainedReceiverTest {
             assertEquals(2, AuthenticatedClient.CREATED.get());
             assertEquals(1, AuthenticatedClient.DESTROYED.get());
             client = null;
-            assertTrue(collected(firstCredentials), "the first generation's credentials are still reachable");
+            assertTrue(collected(firstCredentials, queue), "the first generation's credentials are still reachable");
         } finally {
             runtime.close();
         }
     }
 
-    private static boolean collected(WeakReference<?> reference) throws InterruptedException {
+    private static <T> boolean collected(WeakReference<T> reference, ReferenceQueue<T> queue) throws InterruptedException {
         for (int i = 0; i < 50 && reference.get() != null; i++) {
             System.gc();
-            Thread.sleep(100);
+            // the reference is enqueued once it is cleared
+            queue.remove(100);
         }
         return reference.get() == null;
     }
