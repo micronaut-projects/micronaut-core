@@ -48,7 +48,7 @@ public class StaticResourceResolver {
 
     private static final String INDEX_PAGE = "index.html";
     private final AntPathMatcher pathMatcher = PathMatcher.ANT;
-    private volatile Map<String, List<ResourceLoader>> resourceMappings;
+    private volatile Map<String, List<ResourceLoader>> resourceMappings; // NOSONAR java:S3077 a fresh map per update, never mutated once published
 
     /**
      * Default constructor.
