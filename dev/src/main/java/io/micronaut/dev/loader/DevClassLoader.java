@@ -68,6 +68,7 @@ public final class DevClassLoader extends ClassLoader {
     private static final String MARKER = ".micronaut-dev-generations";
 
     private final List<Path> liveRoots;
+    private final LiveResources liveResources;
     private final List<Path> sources;
     private final Path generationsDir;
     private final AtomicReference<GenerationClassLoader> current;
@@ -95,6 +96,7 @@ public final class DevClassLoader extends ClassLoader {
     public DevClassLoader(@Nullable ClassLoader parent, List<Path> liveRoots, List<Path> roots, Path generationsDir) {
         super("micronaut-dev", parent);
         this.liveRoots = List.copyOf(liveRoots);
+        this.liveResources = new LiveResources(this.liveRoots);
         this.sources = List.copyOf(roots);
         this.generationsDir = generationsDir;
         try {
@@ -137,7 +139,7 @@ public final class DevClassLoader extends ClassLoader {
     }
 
     private GenerationClassLoader snapshot(int generation, List<Path> roots) {
-        return GenerationClassLoader.snapshot(generation, liveRoots, roots, generationsDir.resolve(String.valueOf(generation)), getParent());
+        return GenerationClassLoader.snapshot(generation, liveRoots, liveResources, roots, generationsDir.resolve(String.valueOf(generation)), getParent());
     }
 
     /**
@@ -152,6 +154,15 @@ public final class DevClassLoader extends ClassLoader {
      */
     public List<Path> liveRoots() {
         return liveRoots;
+    }
+
+    /**
+     * @return The resources known to belong to the live directories, shared by every generation: one of them deleted
+     * from its directory is not served from the build output's copy
+     * @since 5.3.0
+     */
+    public LiveResources liveResources() {
+        return liveResources;
     }
 
     /**

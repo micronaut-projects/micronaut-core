@@ -23,6 +23,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -223,6 +225,106 @@ class DevRuntimeTest {
             assertEquals(1, runtime.redefinitions());
         } finally {
             runtime.close();
+        }
+    }
+
+    @Test
+    void aViewDeletedFromItsRootIsGoneRatherThanServedFromTheBuildCopyAndTheWatchIsToldEachFile() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1")).mainClass(Application.class).start();
+                }
+            }
+            """);
+        Path views = Files.createDirectories(project.resolve("src/main/resources/views"));
+        Path index = views.resolve("index.html");
+        Files.writeString(index, "<p>live</p>");
+        Path partials = Files.createDirectories(views.resolve("partials"));
+        Files.writeString(partials.resolve("a.html"), "a");
+        Files.writeString(partials.resolve("b.html"), "b");
+        // the build copied the resource root into its output, and a processor generated a resource no root holds
+        Path output = Files.createDirectories(project.resolve("build/resources/main"));
+        Files.createDirectories(output.resolve("views/partials"));
+        Files.writeString(output.resolve("views/index.html"), "<p>stale</p>");
+        Files.writeString(output.resolve("views/partials/a.html"), "stale a");
+        Files.writeString(output.resolve("views/partials/b.html"), "stale b");
+        Files.writeString(output.resolve("views/generated.html"), "generated");
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes,build/resources/main
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.resources.views=src/main/resources/views
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            ClassLoader loader = first.getClassLoader();
+            assertEquals("<p>live</p>", read(loader, "views/index.html"));
+            List<ResourceChange> changes = new CopyOnWriteArrayList<>();
+            ((DefaultBeanContext) first).resources(ResourceKind.VIEWS).include("**/*.html").watch(changes::add);
+            changes.clear();
+
+            // the template is deleted: the watch is told, and the build's stale copy is not served in its place
+            Files.delete(index);
+            runtime.changed(List.of(), List.of(index));
+            assertTrue(removedIn(changes).contains(index.toAbsolutePath()), changes.toString());
+            assertNull(loader.getResource("views/index.html"));
+            assertFalse(loader.getResources("views/index.html").hasMoreElements());
+            // a resource only the build output holds is still served
+            assertEquals("generated", read(loader, "views/generated.html"));
+
+            // a directory deleted as a whole: the watch is told of each file it held
+            Files.delete(partials.resolve("a.html"));
+            Files.delete(partials.resolve("b.html"));
+            Files.delete(partials);
+            changes.clear();
+            runtime.changed(List.of(), List.of(partials));
+            List<Path> removed = removedIn(changes);
+            assertTrue(removed.contains(partials.resolve("a.html").toAbsolutePath()), removed.toString());
+            assertTrue(removed.contains(partials.resolve("b.html").toAbsolutePath()), removed.toString());
+            assertNull(loader.getResource("views/partials/a.html"));
+
+            // a template created, read, and deleted after startup is gone too, and a new generation keeps it gone
+            Path late = views.resolve("late.html");
+            Files.writeString(late, "late");
+            Files.writeString(output.resolve("views/late.html"), "stale late");
+            assertEquals("late", read(loader, "views/late.html"));
+            Files.delete(late);
+            assertNull(loader.getResource("views/late.html"));
+            runtime.restart();
+            ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));
+            assertNull(second.getClassLoader().getResource("views/index.html"));
+            assertNull(second.getClassLoader().getResource("views/late.html"));
+            assertEquals("generated", read(second.getClassLoader(), "views/generated.html"));
+
+            // written again, it is served live
+            Files.writeString(index, "<p>back</p>");
+            runtime.changed(List.of(index), List.of());
+            assertEquals("<p>back</p>", read(second.getClassLoader(), "views/index.html"));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    private static List<Path> removedIn(List<ResourceChange> changes) {
+        return changes.stream().flatMap(change -> change.removed().stream()).toList();
+    }
+
+    private static String read(ClassLoader loader, String name) throws IOException {
+        try (var in = loader.getResourceAsStream(name)) {
+            assertNotNull(in, name);
+            return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
         }
     }
 

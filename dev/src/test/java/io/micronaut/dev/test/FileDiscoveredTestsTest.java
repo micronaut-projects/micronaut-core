@@ -74,4 +74,45 @@ class FileDiscoveredTestsTest {
             assertEquals(TestStatus.FAILED, byRelativeName.status("test_b.py.test_b.py"));
         }
     }
+
+    @Test
+    void twoRootsHoldingAFileAtTheSameRelativePathNameItsResultsByTheRootOnlyForThatFile() throws Exception {
+        Path unit = Files.createDirectories(directory.resolve("project/src/test/python"));
+        Path integration = Files.createDirectories(directory.resolve("project/src/integration/python"));
+        Files.writeString(unit.resolve("test_app.py"), "ok");
+        Files.writeString(unit.resolve("test_only.py"), "ok");
+        Files.writeString(integration.resolve("test_app.py"), "fails");
+        Path classes = Files.createDirectories(directory.resolve("project/test-classes"));
+        Path services = Files.createDirectories(directory.resolve("services/META-INF/services"));
+        Files.writeString(services.resolve("org.junit.platform.engine.TestEngine"), FileTestEngine.class.getName());
+        JUnitPlatformTestRunner runner = new JUnitPlatformTestRunner();
+        // named by their absolute paths, as pytest's engine names them
+        Map<String, String> absolute = Map.of("junit.jupiter.extensions.autodetection.enabled", "false", FileTestEngine.ABSOLUTE, "true");
+
+        try (URLClassLoader loader = new URLClassLoader(new URL[] {directory.resolve("services").toUri().toURL()}, getClass().getClassLoader())) {
+            List<SourceRoot> sources = List.of(new SourceRoot(SourceKind.PYTHON, unit), new SourceRoot(SourceKind.PYTHON, integration));
+
+            // the two test_app.py are told apart by their roots' paths under the directory the roots share; a file only
+            // one root holds keeps its plain relative name
+            RecordingListener all = new RecordingListener();
+            TestRunSummary everything = runner.run(new TestRunRequest("run-1", loader, List.of(classes), sources, TestSelection.all(), absolute), all, new Cancellation());
+            assertEquals(3, everything.total());
+            assertEquals(Set.of("test/python/test_app.py.test_app.py", "integration/python/test_app.py.test_app.py", "test_only.py.test_only.py"),
+                all.outcomes.keySet());
+            assertEquals(TestStatus.FAILED, all.status("integration/python/test_app.py.test_app.py"));
+
+            // the failed file runs again by that name, and only it
+            RecordingListener again = new RecordingListener();
+            TestRunSummary rerun = runner.run(new TestRunRequest("run-2", loader, List.of(classes), sources,
+                TestSelection.ofClasses(Set.of("integration/python/test_app.py"), "failed"), absolute), again, new Cancellation());
+            assertEquals(1, rerun.total());
+            assertEquals(Set.of("integration/python/test_app.py.test_app.py"), again.outcomes.keySet());
+
+            // one root alone: the plain relative name
+            RecordingListener single = new RecordingListener();
+            runner.run(new TestRunRequest("run-3", loader, List.of(classes), List.of(new SourceRoot(SourceKind.PYTHON, integration)), TestSelection.all(), absolute),
+                single, new Cancellation());
+            assertEquals(Set.of("test_app.py.test_app.py"), single.outcomes.keySet());
+        }
+    }
 }

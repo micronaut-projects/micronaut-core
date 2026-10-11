@@ -168,6 +168,47 @@ class TestModeTest {
     }
 
     @Test
+    void aTestResourceDeletedFromItsRootIsGoneRatherThanReadFromTheBuildCopy() throws Exception {
+        Path test = Files.createDirectories(project.resolve("src/test/java/app"));
+        Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(project.resolve("src/main/java/app/Greeter.java"), greeter("one"));
+        Files.writeString(test.resolve("ContextTest.java"), """
+            package app;
+            import io.micronaut.context.ApplicationContext;
+            import org.junit.jupiter.api.Test;
+            import static org.junit.jupiter.api.Assertions.assertEquals;
+            public class ContextTest {
+                @Test
+                void runs() {
+                    try (ApplicationContext context = ApplicationContext.run()) {
+                        assertEquals("absent", context.getProperty("greeting", String.class).orElse("absent"));
+                        assertEquals("generated", context.getProperty("generated", String.class).orElse("absent"));
+                    }
+                }
+            }
+            """);
+        Path config = Files.createDirectories(project.resolve("src/test/resources")).resolve("application-test.properties");
+        Files.writeString(config, "greeting=hi\n");
+
+        runtime = new MicronautDevMain().launch(manifest(""), new String[0]);
+
+        TestRunSummary first = runtime.lastTestRun().orElseThrow();
+        Path report = project.resolve("build/test-results/TEST-app.ContextTest.xml");
+        assertEquals(1, first.failed(), Files.readString(report));
+
+        // a resource only the build output holds, as one a build generated or filtered, is read as before
+        Path testClasses = project.resolve("build/test-classes");
+        Files.writeString(testClasses.resolve("application.properties"), "generated=generated\n");
+        // the build copied the test configuration into the test output, as Maven does; the file is deleted, and the
+        // stale copy does not stand in for it
+        Files.copy(config, testClasses.resolve("application-test.properties"));
+        Files.delete(config);
+        runtime.changed(List.of(), List.of(config));
+        TestRunSummary second = runtime.awaitTestRun(2, TIMEOUT);
+        assertTrue(second.isSuccess(), Files.readString(report));
+    }
+
+    @Test
     void aGenerationsDirectoryHoldingFilesTheLauncherDidNotWriteIsNotEmptied() throws Exception {
         Path precious = Files.createDirectories(project.resolve("generations")).resolve("notes.txt");
         Files.writeString(precious, "mine");

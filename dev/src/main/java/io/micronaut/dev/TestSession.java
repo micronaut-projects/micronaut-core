@@ -29,6 +29,7 @@ import io.micronaut.dev.test.Cancellation;
 import io.micronaut.dev.test.JUnitXmlReportWriter;
 import io.micronaut.dev.test.TestEventListener;
 import io.micronaut.dev.test.TestEventListeners;
+import io.micronaut.dev.test.TestFileNames;
 import io.micronaut.dev.test.TestId;
 import io.micronaut.dev.test.TestOutcome;
 import io.micronaut.dev.test.TestReportListener;
@@ -438,9 +439,13 @@ final class TestSession {
             if (isJvmKind(kind)) {
                 continue;
             }
+            Path rootPath = root.path().toAbsolutePath().normalize();
+            // a file another root holds at the same relative path is named relative to the directory the roots share
+            Path shared = TestFileNames.base(tests.sourceRoots(), rootPath, false);
             for (String extension : kind.extensions()) {
                 if (name.endsWith("." + extension)
-                    && (Files.isRegularFile(root.path().resolve(name).normalize()) || Files.isRegularFile(root.path().resolveSibling(name).normalize()))) {
+                    && (Files.isRegularFile(root.path().resolve(name).normalize()) || Files.isRegularFile(root.path().resolveSibling(name).normalize())
+                    || shared != null && shared.resolve(name).normalize().startsWith(rootPath) && Files.isRegularFile(shared.resolve(name).normalize()))) {
                     return true;
                 }
             }
@@ -478,6 +483,12 @@ final class TestSession {
                 if (base.getParent() != null) {
                     names.add(base.getParent().relativize(absolute).toString().replace('\\', '/'));
                 }
+                Path shared = TestFileNames.base(tests.sourceRoots(), base, false);
+                if (shared != null) {
+                    // the name of a file another root holds at the same relative path
+                    names.add(TestFileNames.slashed(shared.relativize(absolute)));
+                }
+                names.add(TestFileNames.slashed(base) + "/" + TestFileNames.slashed(base.relativize(absolute)));
             }
         }
         return names;
