@@ -93,6 +93,11 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
     private static final String SCRIPT_RESOURCE = "META-INF/micronaut-dev/livereload.js";
     private static final AttributeKey<Boolean> GREETED = AttributeKey.valueOf("micronaut-dev-livereload-greeted");
     private static final int MAX_CONTENT_LENGTH = 64 * 1024;
+    private static final String TEXT_PLAIN = "text/plain; charset=utf-8";
+    private static final String LOCALHOST = "localhost";
+    private static final String LOOPBACK = "127.0.0.1";
+    private static final String LIVERELOAD = "LiveReload";
+    private static final String NOT_FOUND_BODY = "Not found";
     // the origins of the LiveReload browser extensions
     private static final Set<String> EXTENSION_SCHEMES = Set.of("chrome-extension", "moz-extension", "safari-web-extension");
     private static final long MAX_INJECTED_PAGE = 16L * 1024 * 1024;
@@ -105,8 +110,8 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
         Map.entry("json", "application/json"),
         Map.entry("ndjson", "application/x-ndjson"),
         Map.entry("xml", "application/xml"),
-        Map.entry("txt", "text/plain; charset=utf-8"),
-        Map.entry("log", "text/plain; charset=utf-8"),
+        Map.entry("txt", TEXT_PLAIN),
+        Map.entry("log", TEXT_PLAIN),
         Map.entry("svg", "image/svg+xml"),
         Map.entry("png", "image/png"),
         Map.entry("ico", "image/x-icon")
@@ -157,7 +162,7 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
         try {
             // the IPv4 loopback explicitly: "localhost" in the script tag reaches it whatever the JVM prefers, and a
             // client that only speaks IPv4 is not left out when the JVM prefers IPv6 addresses
-            channel = bootstrap.bind(new InetSocketAddress(InetAddress.getByAddress("localhost", new byte[] {127, 0, 0, 1}), port)).sync().channel();
+            channel = bootstrap.bind(new InetSocketAddress(InetAddress.getByAddress(LOCALHOST, new byte[] {127, 0, 0, 1}), port)).sync().channel();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             group.shutdownGracefully(0, 0, TimeUnit.MILLISECONDS);
@@ -273,7 +278,7 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
             }
             String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
             return (scheme.equals("http") || scheme.equals("https"))
-                && (host.equals("localhost") || host.endsWith(".localhost") || host.equals("127.0.0.1") || host.equals("[::1]"));
+                && (host.equals(LOCALHOST) || host.endsWith(".localhost") || host.equals(LOOPBACK) || host.equals("[::1]"));
         } catch (URISyntaxException e) {
             return false;
         }
@@ -347,7 +352,7 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
                     context.pipeline().addLast(new WebSocketServerProtocolHandler(EVENTS_PATH, null, true), new EventsHandler(state, topic));
                 } else if (!path.equals(WEBSOCKET_PATH)) {
                     // the handshake would pass an upgrade for another path on, and the connection would stay open
-                    refuse(context, HttpResponseStatus.NOT_FOUND, "LiveReload");
+                    refuse(context, HttpResponseStatus.NOT_FOUND, LIVERELOAD);
                     return;
                 } else if (!isAllowedOrigin(request.headers().get(HttpHeaderNames.ORIGIN))) {
                     forbidden(context);
@@ -362,7 +367,7 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
             }
             FullHttpResponse response;
             if (request.method() != HttpMethod.GET && request.method() != HttpMethod.HEAD) {
-                response = text(HttpResponseStatus.METHOD_NOT_ALLOWED, "LiveReload");
+                response = text(HttpResponseStatus.METHOD_NOT_ALLOWED, LIVERELOAD);
             } else if (path.startsWith(SCRIPT_PATH)) {
                 response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.wrappedBuffer(script()));
                 response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/javascript; charset=utf-8");
@@ -404,7 +409,7 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
             }
             Path root = prefix == null ? null : state.mounts.get(prefix);
             if (prefix == null || root == null) {
-                return text(HttpResponseStatus.NOT_FOUND, "LiveReload");
+                return text(HttpResponseStatus.NOT_FOUND, LIVERELOAD);
             }
             if (path.length() < prefix.length()) {
                 // relative links resolve against the directory only with the slash
@@ -418,7 +423,7 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
                 Path realRoot = root.toRealPath();
                 file = realRoot.resolve(relative).normalize().toRealPath();
                 if (!file.startsWith(realRoot)) {
-                    return text(HttpResponseStatus.NOT_FOUND, "Not found");
+                    return text(HttpResponseStatus.NOT_FOUND, NOT_FOUND_BODY);
                 }
                 if (Files.isDirectory(file)) {
                     if (!path.endsWith("/")) {
@@ -430,10 +435,10 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
                     file = file.resolve("index.html").toRealPath();
                 }
                 if (!file.startsWith(realRoot) || !Files.isRegularFile(file)) {
-                    return text(HttpResponseStatus.NOT_FOUND, "Not found");
+                    return text(HttpResponseStatus.NOT_FOUND, NOT_FOUND_BODY);
                 }
             } catch (IOException | java.nio.file.InvalidPathException e) {
-                return text(HttpResponseStatus.NOT_FOUND, "Not found");
+                return text(HttpResponseStatus.NOT_FOUND, NOT_FOUND_BODY);
             }
             String name = file.getFileName().toString();
             String extension = name.substring(name.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
@@ -477,7 +482,7 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
             }
             String name = host.startsWith("[") ? host.substring(0, host.indexOf(']') + 1) : host.contains(":") ? host.substring(0, host.lastIndexOf(':')) : host;
             name = name.toLowerCase(Locale.ROOT);
-            return name.equals("localhost") || name.endsWith(".localhost") || name.equals("127.0.0.1") || name.equals("[::1]");
+            return name.equals(LOCALHOST) || name.endsWith(".localhost") || name.equals(LOOPBACK) || name.equals("[::1]");
         }
 
         /**
@@ -493,7 +498,7 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
                 String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
                 // a browser leaves the default port out of an origin
                 int port = uri.getPort() < 0 ? 80 : uri.getPort();
-                return "http".equalsIgnoreCase(uri.getScheme()) && (host.equals("localhost") || host.equals("127.0.0.1")) && port == state.port;
+                return "http".equalsIgnoreCase(uri.getScheme()) && (host.equals(LOCALHOST) || host.equals(LOOPBACK)) && port == state.port;
             } catch (java.net.URISyntaxException e) {
                 return false;
             }
@@ -512,7 +517,7 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
 
         private static FullHttpResponse text(HttpResponseStatus status, String body) {
             FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, Unpooled.copiedBuffer(body, StandardCharsets.UTF_8));
-            response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=utf-8");
+            response.headers().set(HttpHeaderNames.CONTENT_TYPE, TEXT_PLAIN);
             return response;
         }
     }
