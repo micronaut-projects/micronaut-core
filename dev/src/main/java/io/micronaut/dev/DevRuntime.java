@@ -79,6 +79,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
@@ -140,7 +141,7 @@ public final class DevRuntime implements Closeable {
     private @Nullable DirectoryWatcher watcher;
     private @Nullable LiveReloadServer liveReload;
     private @Nullable Instrumentation instrumentation;
-    private volatile int redefinitions;
+    private final AtomicInteger redefinitions = new AtomicInteger();
     private @Nullable Thread worker;
     private OutputSnapshot snapshot = OutputSnapshot.empty();
     /**
@@ -312,7 +313,7 @@ public final class DevRuntime implements Closeable {
      * @return How many times a change was applied in place, by redefining method bodies, since the start
      */
     public int redefinitions() {
-        return redefinitions;
+        return redefinitions.get();
     }
 
     /**
@@ -906,7 +907,7 @@ public final class DevRuntime implements Closeable {
             LOG.info("Cannot redefine {} class(es) in place ({}): restarting instead", replacements.size(), e.getMessage());
             return false;
         }
-        redefinitions++;
+        redefinitions.incrementAndGet();
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         if (current != null && current.isRunning()) {
             ClassChangeEvent event = new ClassChangeEvent(this, Set.of(), generation, changeSet.classes(), ReloadStrategy.RELOAD);
@@ -925,7 +926,7 @@ public final class DevRuntime implements Closeable {
         return true;
     }
 
-    private static byte @Nullable [] classFile(List<Path> roots, String className) {
+    static byte @Nullable [] classFile(List<Path> roots, String className) {
         String relative = className.replace('.', '/') + ".class";
         for (Path root : roots) {
             Path file = root.resolve(relative);
