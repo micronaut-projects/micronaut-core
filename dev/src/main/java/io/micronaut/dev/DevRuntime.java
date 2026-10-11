@@ -153,7 +153,7 @@ public final class DevRuntime implements Closeable {
      * What the application's main of the last generation launched threw, once its context had started: a server that
      * cannot bind its port stops the context again, and main then throws why.
      */
-    private volatile AtomicReference<@Nullable Throwable> applicationFailure = new AtomicReference<>();
+    private volatile AtomicReference<@Nullable Throwable> applicationFailure = new AtomicReference<>(); // NOSONAR java:S3077 replaced whole per generation; the reference is thread-safe
     private volatile @Nullable CompileFailure lastFailure; // NOSONAR java:S3077 immutable failure, replaced whole
     private volatile Collection<BeanRegistration<?>> retainedForNext = List.of(); // NOSONAR java:S3077 replaced whole, never mutated once published
     private volatile String[] arguments = new String[0]; // NOSONAR java:S3077 copied in and out, never mutated in place
