@@ -238,7 +238,10 @@ public final class DevManifest {
         this.accessTokenEnabled = protection(ACCESS_TOKEN_ENABLED, properties.getProperty(ACCESS_TOKEN_ENABLED));
         this.bindLoopback = protection(BIND_LOOPBACK, properties.getProperty(BIND_LOOPBACK));
         String generationsDir = properties.getProperty(PREFIX + "generations");
-        this.generations = generationsDir == null ? projectDir.resolve("build").resolve("micronaut-dev").resolve("generations") : path(directory, generationsDir);
+        // test mode's apart from development mode's, as mnTest's manifest is from mnDev's: both may run at once
+        Path generationsParent = projectDir.resolve("build").resolve("micronaut-dev");
+        this.generations = generationsDir != null ? path(directory, generationsDir)
+            : (mode == DevMode.TEST ? generationsParent.resolve("test") : generationsParent).resolve("generations");
         this.liveReload = new LiveReload(
             Integer.parseInt(properties.getProperty(PREFIX + "livereload.port", "35729").trim()),
             Boolean.parseBoolean(properties.getProperty(PREFIX + "livereload.inject-script", "true")),
@@ -521,8 +524,9 @@ public final class DevManifest {
 
     /**
      * The directory the class loader snapshots each generation into, {@code micronaut.dev.generations}: by default
-     * {@code build/micronaut-dev/generations} under the project, which a Maven build points into {@code target}. The
-     * launcher owns it and empties it when it starts.
+     * {@code build/micronaut-dev/generations} under the project, {@code build/micronaut-dev/test/generations} in test
+     * mode, which a Maven build points into {@code target}. The launcher owns it and empties it when it starts; one
+     * another running process owns already is left to it, and the launcher takes {@code <directory>-2} or the next free.
      *
      * @return The directory
      */

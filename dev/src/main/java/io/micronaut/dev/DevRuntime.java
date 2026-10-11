@@ -40,9 +40,8 @@ import io.micronaut.dev.agent.DynamicAttach;
 import io.micronaut.dev.change.ChangeSet;
 import io.micronaut.dev.change.ClassStructure;
 import io.micronaut.dev.change.OutputSnapshot;
-import io.micronaut.dev.compile.CompilationRequest;
-import io.micronaut.dev.compile.CompilationResult;
 import io.micronaut.dev.compile.CompileMode;
+import io.micronaut.dev.compile.OutputLock;
 import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
@@ -75,7 +74,6 @@ import java.lang.instrument.Instrumentation;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -131,10 +129,11 @@ public final class DevRuntime implements Closeable {
     private static final Duration APP_STOP_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration FAILURE_WAIT = Duration.ofSeconds(2);
     private static final Duration START_TIMEOUT = Duration.ofMinutes(5);
-    private static final int MAX_PROPAGATION_PASSES = 5;
 
     private final DevManifest manifest;
     private final DevClassLoader classLoader;
+    // held while compiling and while reading the outputs whole: another process of the project may be compiling into them
+    private final OutputLock outputLock;
     private final ApplicationLauncher launcher;
     private final Map<SourceKind, SourceCompiler> compilers;
     private final Map<SourceKind, SourceKind> jointOwners;
@@ -218,6 +217,7 @@ public final class DevRuntime implements Closeable {
         this.compilers = new EnumMap<>(SourceKind.class);
         this.compilers.putAll(compilers);
         this.jointOwners = Compilations.jointOwners(manifest, this.compilers);
+        this.outputLock = Compilations.outputLock(manifest);
         for (ResourceRoot root : manifest.resourceRoots()) {
             resourceRootKinds.put(root.path().toAbsolutePath().normalize(), root.kind());
         }
@@ -289,7 +289,7 @@ public final class DevRuntime implements Closeable {
         RuntimeException notRunning;
         try {
             memory.initializeParentTierStatics();
-            snapshot = OutputSnapshot.of(manifest.reloadableRoots());
+            snapshot = outputSnapshot();
             if (manifest.strategy() != ReloadStrategy.RESTART && !NativeImageUtils.inImageRuntimeCode()) {
                 // the fast path needs an agent: the launcher's, or one attached now. A native image has none: its
                 // Instrumentation cannot redefine a class, and it cannot attach one
@@ -702,7 +702,7 @@ public final class DevRuntime implements Closeable {
         }
         try {
             memory.initializeParentTierStatics();
-            snapshot = OutputSnapshot.of(manifest.reloadableRoots());
+            snapshot = outputSnapshot();
             // what the class files depend on and which are tests, before any change comes: a first change that removes a
             // constant, or deletes a test, needs to know the state it changes
             session.prime();
@@ -803,12 +803,32 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
+     * @return The lock of the outputs, held to read them whole
+     */
+    OutputLock outputLock() {
+        return outputLock;
+    }
+
+    private OutputSnapshot outputSnapshot() {
+        try (OutputLock.Hold hold = outputLock.lock()) {
+            return OutputSnapshot.of(manifest.reloadableRoots());
+        }
+    }
+
+    /**
+     * @return What changed in the reloadable roots since {@link #takeOutputChanges()} was last asked, which stays to take
+     */
+    ChangeSet peekOutputChanges() {
+        return snapshot.diff(outputSnapshot());
+    }
+
+    /**
      * What changed in the reloadable roots since the last time this was asked, which a new generation will see.
      *
      * @return The changes
      */
     ChangeSet takeOutputChanges() {
-        OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
+        OutputSnapshot latest = outputSnapshot();
         ChangeSet changes = snapshot.diff(latest);
         snapshot = latest;
         return changes;
@@ -820,7 +840,9 @@ public final class DevRuntime implements Closeable {
      * @return The new generation's loader
      */
     ClassLoader newGeneration() {
-        classLoader.swap();
+        try (OutputLock.Hold hold = outputLock.lock()) {
+            classLoader.swap();
+        }
         logging.beforeGeneration(classLoader.current());
         return classLoader.current();
     }
@@ -1222,76 +1244,13 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
-     * Compiles a batch's changes for the languages of a manifest, the application's or its tests' view, and
-     * what depends on them: the changed sources of each language, then, until nothing new is produced, the
-     * sources of every language that reference a class another one changed.
-     *
-     * @param target The manifest whose roots, outputs and classpaths are compiled
-     * @param joint The languages compiled jointly, by owner
-     * @param changes The changed sources, by language
-     * @param full Whether everything is compiled
-     * @param seed The classes changed by an earlier compilation, whose dependents among these sources are compiled too
-     * @return What was compiled, or the failure
+     * Compiles a batch's changes for the languages of a manifest, holding the output lock: see
+     * {@link Compilations#round}.
      */
     CompileRound compileRound(DevManifest target, Map<SourceKind, SourceKind> joint, Map<SourceKind, SourceChanges> changes, boolean full, Set<String> seed) {
-        Map<SourceKind, SourceChanges> sources = new EnumMap<>(SourceKind.class);
-        changes.forEach((kind, change) -> sources.merge(joint.getOrDefault(kind, kind), change.settled(), SourceChanges::merge));
-        // what another compilation changed reaches every language, as the changes of this batch do
-        Set<SourceKind> kinds = full || !seed.isEmpty() ? compilers.keySet() : sources.keySet();
-        boolean compiled = false;
-        Set<SourceKind> compiledKinds = new LinkedHashSet<>();
-        Set<String> affectedClasses = new LinkedHashSet<>();
-        for (SourceKind kind : kinds) {
-            SourceCompiler compiler = compilers.get(kind);
-            if (compiler == null || joint.containsKey(kind) || !Compilations.embedded(target, kind)) {
-                continue;
-            }
-            SourceChanges change = sources.getOrDefault(kind, SourceChanges.NONE);
-            CompilationRequest request = new CompilationRequest(kind, Compilations.compilationRoots(target, kind, joint), change.changed(), change.deleted(),
-                full || !target.isIncremental(), target.compileClasspath(), target.processorPath(),
-                target.classOutput(kind), target.generatedSources(kind), Compilations.compileOptions(target, kind, joint));
-            if (!seed.isEmpty()) {
-                request = request.withAffectedClasses(seed);
-            }
-            CompilationResult result = compiler.compile(request);
-            if (!result.isSuccess()) {
-                return CompileRound.failed(new CompileFailure(kind, result.diagnostics(), Instant.now()));
-            }
-            compiled = true;
-            compiledKinds.add(kind);
-            affectedClasses.addAll(result.compiledClasses());
-            LOG.info("Compiled {} {} source(s) in {} ms", result.compiledSources().size(), kind, result.duration().toMillis());
+        try (OutputLock.Hold hold = outputLock.lock()) {
+            return Compilations.round(compilers, target, joint, changes, full, seed);
         }
-        // a change in one language reaches the others: their sources that reference a changed class are
-        // recompiled too, and fail rather than keep bytecode linked against what is gone
-        // until nothing new is produced: a Groovy class recompiled for a Java change may itself be what a
-        // Java source depends on, and Java was visited first
-        Set<String> propagated = new LinkedHashSet<>();
-        for (int pass = 0; pass < MAX_PROPAGATION_PASSES && compilers.size() - joint.size() > 1 && !affectedClasses.equals(propagated); pass++) {
-            Set<String> fresh = new LinkedHashSet<>(affectedClasses);
-            fresh.removeAll(propagated);
-            propagated.addAll(affectedClasses);
-            for (Map.Entry<SourceKind, SourceCompiler> entry : compilers.entrySet()) {
-                SourceKind kind = entry.getKey();
-                // a language compiled in this batch for its own changes is visited again: an unchanged source of
-                // it that references what another language changed was not selected the first time
-                if (joint.containsKey(kind) || !Compilations.embedded(target, kind)) {
-                    continue;
-                }
-                CompilationRequest request = new CompilationRequest(kind, Compilations.compilationRoots(target, kind, joint), Set.of(), Set.of(), false, target.compileClasspath(),
-                    target.processorPath(), target.classOutput(kind), target.generatedSources(kind), Compilations.compileOptions(target, kind, joint)).withAffectedClasses(fresh);
-                CompilationResult result = entry.getValue().compile(request);
-                if (!result.isSuccess()) {
-                    return CompileRound.failed(new CompileFailure(kind, result.diagnostics(), Instant.now()));
-                }
-                if (result.status() == CompilationResult.Status.SUCCESS) {
-                    compiledKinds.add(kind);
-                    affectedClasses.addAll(result.compiledClasses());
-                    LOG.info("Compiled {} {} source(s) that depend on the changed classes in {} ms", result.compiledSources().size(), kind, result.duration().toMillis());
-                }
-            }
-        }
-        return new CompileRound(null, compiled, compiledKinds, affectedClasses);
     }
 
     private void handle(Pending next) {
@@ -1327,7 +1286,7 @@ public final class DevRuntime implements Closeable {
                     RefreshResult refresh = refreshConfiguration(current);
                     configurationChange = refresh == null ? ConfigurationChange.ofAll() : refresh.change();
                 }
-                OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
+                OutputSnapshot latest = outputSnapshot();
                 ChangeSet changeSet = snapshot.diff(latest);
                 snapshot = latest;
                 restart(changeSet, configurationChange, start);
@@ -1346,7 +1305,7 @@ public final class DevRuntime implements Closeable {
         ApplicationContext current = context;
         boolean configurationChanged = ResourceNotifier.notify(current, settledResources(batch.resources), this::rootsOf, this::refreshBrowsers);
         OutputSnapshot previous = snapshot;
-        OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
+        OutputSnapshot latest = outputSnapshot();
         ChangeSet changeSet = previous.diff(latest);
         snapshot = latest;
         logging.outputChanged(changeSet);
@@ -1639,7 +1598,10 @@ public final class DevRuntime implements Closeable {
                 return;
             }
         }
-        GenerationClassLoader retired = classLoader.swap();
+        GenerationClassLoader retired;
+        try (OutputLock.Hold hold = outputLock.lock()) {
+            retired = classLoader.swap();
+        }
         Collection<BeanRegistration<?>> retained = List.of();
         if (old != null) {
             ClassChangeEvent event = new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART);

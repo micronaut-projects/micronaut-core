@@ -19,6 +19,7 @@ import io.micronaut.context.reload.InPlaceResourceReloader;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.dev.change.ChangeSet;
 import io.micronaut.dev.compile.ClassDependencyIndex;
+import io.micronaut.dev.compile.OutputLock;
 import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
@@ -186,7 +187,15 @@ final class TestSession {
         // javac inlined the constants of a changed class into the tests that read them, without a reference to follow,
         // whether the class declares them now or declared them before the change: every test compiles and runs again
         boolean constants = application.affectedClasses().stream().anyMatch(name -> previousConstants.contains(name) || applicationConstants.contains(name));
-        DevRuntime.CompileRound testRound = runtime.compileRound(tests, testJoint, allTestSources, full || constants, application.affectedClasses());
+        Set<String> seed = new LinkedHashSet<>(application.affectedClasses());
+        if (allSources.values().stream().anyMatch(change -> !change.deleted().isEmpty())) {
+            // development mode of the project, compiling into the same output, may have removed the deleted sources'
+            // classes first, and their mapping with them: what went is found in the output, for the tests that used it
+            for (String className : runtime.peekOutputChanges().classNames()) {
+                seed.add(ClassDependencyIndex.topLevelOf(className));
+            }
+        }
+        DevRuntime.CompileRound testRound = runtime.compileRound(tests, testJoint, allTestSources, full || constants, seed);
         if (testRound.failure() != null) {
             compilationFailed(testRound.failure(), allSources, allTestSources);
             return;
@@ -270,10 +279,13 @@ final class TestSession {
         return merged;
     }
 
-    private static List<ClassDependencyIndex> scan(List<Path> outputs) {
+    private List<ClassDependencyIndex> scan(List<Path> outputs) {
         List<ClassDependencyIndex> scanned = new ArrayList<>();
-        for (Path output : outputs) {
-            scanned.add(ClassDependencyIndex.scan(output));
+        // another process of the project, development mode, may be compiling into the application's outputs
+        try (OutputLock.Hold hold = runtime.outputLock().lock()) {
+            for (Path output : outputs) {
+                scanned.add(ClassDependencyIndex.scan(output));
+            }
         }
         return scanned;
     }
