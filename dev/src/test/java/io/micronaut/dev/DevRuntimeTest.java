@@ -107,7 +107,8 @@ class DevRuntimeTest {
             assertSame(pool, second.getBean(RetainedPool.class));
             assertEquals(1, RetainedPool.CREATED.get());
             assertEquals(0, RetainedPool.DESTROYED.get());
-            assertEquals(1, runtime.retainedCount());
+            // the pool, and the HTTP server's event loop groups
+            assertEquals(2, runtime.retainedCount());
             assertTrue(runtime.lastFailure().isEmpty());
 
             // a broken edit: the compilation fails, generation two keeps running, the failure is reported
