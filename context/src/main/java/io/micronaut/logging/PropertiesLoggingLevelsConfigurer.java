@@ -27,7 +27,9 @@ import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
+import io.micronaut.runtime.context.scope.refresh.RefreshScope;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -61,6 +63,7 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
     private final Environment environment;
     private final PropertiesLoggingLevelsConfiguration configuration;
     private final List<LoggingSystem> loggingSystems;
+    private final boolean watched;
 
     /**
      * Sets log level according to properties.
@@ -68,26 +71,41 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
      * @param environment The environment
      * @param configuration The logging levels configuration
      * @param loggingSystems The logging systems
+     * @param beanContext The context, to watch the logger configuration on
      */
     PropertiesLoggingLevelsConfigurer(Environment environment,
                                       PropertiesLoggingLevelsConfiguration configuration,
-                                      List<LoggingSystem> loggingSystems) {
+                                      List<LoggingSystem> loggingSystems,
+                                      WatchableBeanContext beanContext) {
         this.environment = environment;
         this.configuration = configuration;
         this.loggingSystems = loggingSystems;
         initLogging();
         configureLogLevels();
+        // where a refresh scope hands refresh events to the refresher, the levels follow the refresher: only a
+        // change under logger.* is applied, after the configuration beans were rebound, so that the levels read
+        // are the new ones. Without one, as in the function and Android environments, the levels follow the
+        // refresh event as they always did, and the event refreshes nothing else
+        this.watched = beanContext.containsBean(RefreshScope.class);
+        if (watched) {
+            beanContext.configuration(LOGGER_PROPERTY_PREFIX).watch(change -> {
+                initLogging();
+                configureLogLevels();
+            });
+        }
     }
 
     /**
-     * Sets log level according to properties on refresh.
+     * Sets the log levels on a refresh event where there is no refresh scope.
      *
      * @param event refresh event
      */
     @Override
     public void onApplicationEvent(RefreshEvent event) {
-        initLogging();
-        configureLogLevels();
+        if (!watched) {
+            initLogging();
+            configureLogLevels();
+        }
     }
 
     @Override

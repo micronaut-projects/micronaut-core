@@ -23,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 import jakarta.inject.Singleton;
 
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
 
 /**
  * <p>A {@link MethodInterceptor} that will lock the bean preventing it from being destroyed by a
@@ -48,9 +49,13 @@ public class RefreshInterceptor implements MethodInterceptor {
     @Override
     public Object intercept(MethodInvocationContext context) {
         Object target = context.getTarget();
-        Lock lock = refreshScope.getLock(target).readLock();
+        // a bean disposed of since the caller obtained it has no lock any more: the call goes on without one
+        Lock lock = refreshScope.findLock(target).map(ReadWriteLock::readLock).orElse(null);
+        if (lock == null) {
+            return context.proceed();
+        }
+        lock.lock();
         try {
-            lock.lock();
             return context.proceed();
         } finally {
             lock.unlock();
