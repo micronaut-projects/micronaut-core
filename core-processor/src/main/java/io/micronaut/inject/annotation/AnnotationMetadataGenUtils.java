@@ -434,8 +434,9 @@ public final class AnnotationMetadataGenUtils {
                                                       Function<String, ExpressionDef> loadClassValueExpressionFn) {
         final boolean typeOnly = CollectionUtils.isEmpty(annotationValues);
 
-        // skip already registered
-        if (typeOnly && AnnotationMetadataSupport.getRegisteredAnnotationType(annotationName).isPresent()
+        // skip the types the runtime registers itself; not those registered by code that ran in this JVM, which would
+        // make the generated class depend on what ran before the compilation, as in a compiler embedded in a running application
+        if (typeOnly && AnnotationMetadataSupport.isCoreAnnotationType(annotationName)
             || AnnotationMetadataSupport.getCoreAnnotationDefaults().containsKey(annotationName)) {
             return;
         }
