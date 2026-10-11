@@ -148,6 +148,7 @@ class WebsocketPlainRequestRoutingSpec extends Specification {
 
         @OnMessage
         void onMessage(String message, WebSocketSession session) {
+            // a WebSocket needs an @OnMessage method: this one only tests the condition of the upgrade
         }
     }
 
