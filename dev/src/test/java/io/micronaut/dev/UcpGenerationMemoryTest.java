@@ -33,7 +33,7 @@ class UcpGenerationMemoryTest {
 
     @Test
     void theUcpPoolIsRetainedAndTheFirstGenerationCollected() throws Exception {
-        ProbeJvm.run(Probe.class, project, PASSED);
+        ProbeJvm.assertPasses(Probe.class, project, PASSED);
     }
 
     /**

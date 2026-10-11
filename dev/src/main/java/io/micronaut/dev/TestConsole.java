@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Locale;
+import java.util.function.IntConsumer;
 
 /**
  * The keys of test mode on a terminal: space runs the last tests again, {@code a} every test, {@code f} the failures,
@@ -38,10 +39,24 @@ final class TestConsole {
 
     private final DevRuntime runtime;
     private final InputStream input;
+    private final boolean characterMode;
+    private final IntConsumer exit;
 
     TestConsole(DevRuntime runtime, InputStream input) {
+        this(runtime, input, false, System::exit);
+    }
+
+    /**
+     * @param runtime The runtime in test mode
+     * @param input The keys
+     * @param characterMode Whether the terminal was put in character mode, to put back on quitting
+     * @param exit Exits the process with a status
+     */
+    TestConsole(DevRuntime runtime, InputStream input, boolean characterMode, IntConsumer exit) {
         this.runtime = runtime;
         this.input = input;
+        this.characterMode = characterMode;
+        this.exit = exit;
     }
 
     /**
@@ -58,7 +73,7 @@ final class TestConsole {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> characterMode(false), "micronaut-dev-terminal"));
         }
         System.out.println(BANNER + (characterMode ? "" : " Press Enter after the key."));
-        Thread thread = new Thread(() -> new TestConsole(runtime, System.in).read(), "micronaut-dev-test-console");
+        Thread thread = new Thread(() -> new TestConsole(runtime, System.in, characterMode, System::exit).read(), "micronaut-dev-test-console");
         thread.setDaemon(true);
         thread.start();
     }
@@ -118,8 +133,10 @@ final class TestConsole {
     private void quit() {
         TestRunSummary last = runtime.lastTestRun().orElse(null);
         runtime.close();
-        characterMode(false);
-        System.exit(last != null && last.isSuccess() ? 0 : 1);
+        if (characterMode) {
+            characterMode(false);
+        }
+        exit.accept(last != null && last.isSuccess() ? 0 : 1);
     }
 
     /**
