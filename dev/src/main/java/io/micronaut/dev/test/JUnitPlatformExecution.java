@@ -95,7 +95,7 @@ final class JUnitPlatformExecution {
         boolean cancelled = cancellation.isCancelled();
         boolean aborted = false;
         try {
-            listener.runStarted(new TestRunStarted(request.runId(), JUnitPlatformTestRunner.ID, request.selection(), Instant.now()));
+            listener.runStarted(new TestRunStarted(request.runId(), JUnitPlatformTestRunner.RUNNER_ID, request.selection(), Instant.now()));
             try {
                 if (cancellation.isCancelled()) {
                     cancelled = true;
@@ -114,7 +114,7 @@ final class JUnitPlatformExecution {
             } catch (RuntimeException | LinkageError e) {
                 // discovery or an engine failed before any test could report it: the run is not complete
                 aborted = true;
-                report(new TestId(request.runId() + "/launcher", JUnitPlatformTestRunner.ID, CLASS_ERROR, "The JUnit Platform failed"),
+                report(new TestId(request.runId() + "/launcher", JUnitPlatformTestRunner.RUNNER_ID, CLASS_ERROR, "The JUnit Platform failed"),
                     new TestOutcome(TestStatus.ERRORED, Duration.ZERO, TestFailure.of(e), null));
             }
             TestRunSummary summary = new TestRunSummary(request.runId(), passed, failed, errored, skipped, Duration.ofNanos(System.nanoTime() - start),
@@ -305,7 +305,7 @@ final class JUnitPlatformExecution {
                 return parent.get().getLegacyReportingName();
             }
         }
-        return JUnitPlatformTestRunner.ID;
+        return JUnitPlatformTestRunner.RUNNER_ID;
     }
 
     /**
