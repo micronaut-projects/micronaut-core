@@ -165,9 +165,15 @@ final class BeanWatchRegistry {
      * Feeds an {@link ExecutableMethodProcessor} the methods added after startup, as a watcher that sees
      * only additions. That the processor needs this adapter is what tells a launcher it is not
      * reload-capable.
+     *
+     * <p>A processor that implements {@link ExecutableMethodWatcher} or {@link BeanDefinitionWatcher} is
+     * not adapted: implementing the interface is its statement that it registers its own watch, through
+     * {@link WatchableBeanContext}, and follows a reload by itself. One that implements it without
+     * registering sees nothing after startup, which is what the interface promises it handles.</p>
      */
     <A extends Annotation> void adapt(Class<A> annotationType, ExecutableMethodProcessor<A> processor) {
-        if (!markAdapted(processor)) {
+        if (processor instanceof ExecutableMethodWatcher<?> || !markAdapted(processor)) {
+            // a processor that is a watcher registers its own watch and follows a reload by itself
             return;
         }
         MethodRegistration<A> registration = new MethodRegistration<>(annotationType, null, null, change -> {
@@ -200,7 +206,7 @@ final class BeanWatchRegistry {
      * only additions.
      */
     void adapt(Class<? extends Annotation> annotationType, BeanDefinitionProcessor<?> processor) {
-        if (!markAdapted(processor)) {
+        if (processor instanceof BeanDefinitionWatcher<?> || !markAdapted(processor)) {
             return;
         }
         DefinitionRegistration<Object> registration = new DefinitionRegistration<>(null, Qualifiers.byStereotype(annotationType), change -> {
