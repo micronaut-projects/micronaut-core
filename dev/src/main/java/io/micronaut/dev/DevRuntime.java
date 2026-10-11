@@ -146,7 +146,6 @@ public final class DevRuntime implements Closeable {
     private volatile Collection<BeanRegistration<?>> retainedForNext = List.of();
     private volatile String[] arguments = new String[0];
     private volatile int retainedCount;
-    private volatile long generationStartedNanos;
     private volatile boolean closed;
     /**
      * Whether the runtime closed because its generation budget was spent, for its launcher to relaunch the process.
@@ -701,13 +700,14 @@ public final class DevRuntime implements Closeable {
      */
     ClassLoader newGeneration() {
         classLoader.swap();
-        generationStartedNanos = System.nanoTime();
         return classLoader.current();
     }
 
     void compilationFailed(CompileFailure failure) {
         lastFailure = failure;
-        LOG.error("{}", failure.describe().strip());
+        if (LOG.isErrorEnabled()) {
+            LOG.error("{}", failure.describe().strip());
+        }
     }
 
     void compilationRecovered() {
@@ -1123,6 +1123,7 @@ public final class DevRuntime implements Closeable {
             try {
                 first = pending.take();
             } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 return;
             }
             // the gate closes as soon as a batch is taken, so a caller waiting for the reload sees it in progress
@@ -1136,9 +1137,10 @@ public final class DevRuntime implements Closeable {
                 pending.drainTo(batches);
                 handle(Pending.merge(batches));
             } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 gate.complete(null);
                 return;
-            } catch (Throwable e) {
+            } catch (Throwable e) { // NOSONAR a reload that fails, with a LinkageError of the edited code too, leaves the reload thread running
                 LOG.error("Reload failed: {}", e.getMessage(), e);
             } finally {
                 long last = 0;
@@ -1789,13 +1791,12 @@ public final class DevRuntime implements Closeable {
             return true;
         }
         Object bean = registration.getBean();
-        return bean != null && bean.getClass().getClassLoader() instanceof GenerationClassLoader;
+        return bean.getClass().getClassLoader() instanceof GenerationClassLoader;
     }
 
     private ApplicationContext launch(String reason) {
         String[] args = arguments.clone();
         CompletableFuture<ApplicationContext> future = started;
-        generationStartedNanos = System.nanoTime();
         // the generation loader, not the facade: a class the JVM resolved through the facade once would be
         // handed out again, from the retired generation, for as long as the facade lives
         GenerationClassLoader generation = classLoader.current();
@@ -1807,7 +1808,7 @@ public final class DevRuntime implements Closeable {
                     // main returned without a context starting: a startup failure the application logged itself
                     future.completeExceptionally(new IllegalStateException("The application's main returned without starting a context"));
                 }
-            } catch (Throwable e) {
+            } catch (Throwable e) { // NOSONAR an Error from main fails the start at once, rather than when the start times out
                 future.completeExceptionally(e);
             }
         }, "micronaut-dev-app");
@@ -1906,22 +1907,42 @@ public final class DevRuntime implements Closeable {
             // a native image never unloads a class it defined at runtime: every retired generation stays, as the budget expects
             return;
         }
+        if (oldRetiredGenerations().isEmpty()) {
+            // nothing older than the tolerance is reachable even before a collection: there is nothing to collect for
+            return;
+        }
         Thread thread = new Thread(() -> {
             try {
                 Thread.sleep(2000);
             } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 return;
             }
-            System.gc();
-            int current = classLoader.generation();
-            List<GenerationClassLoader> live = classLoader.liveRetiredGenerations();
-            List<Integer> old = live.stream().map(GenerationClassLoader::generation).filter(generation -> generation < current - LEAK_TOLERANCE).toList();
+            // only a collection tells a retired generation the collector has yet to reach from one the application keeps;
+            // it runs on this thread, a moment after the reload, and only while an old generation is still reachable
+            System.gc(); // NOSONAR leak detection: a retired generation's loader is unreachable only once it is collected
+            List<Integer> old = oldRetiredGenerations();
             if (!old.isEmpty()) {
                 LOG.warn("{} retired generation(s) {} are still reachable after the reload: a static cache or a thread of the application keeps old classes alive", old.size(), old);
             }
         }, "micronaut-dev-leak-detector");
         thread.setDaemon(true);
         thread.start();
+    }
+
+    private List<Integer> oldRetiredGenerations() {
+        return olderThanTolerance(classLoader.liveRetiredGenerations().stream().map(GenerationClassLoader::generation).toList(), classLoader.generation());
+    }
+
+    /**
+     * The retired generations that a reload should have released: those older than the tolerance.
+     *
+     * @param retired The generations of the retired loaders still reachable
+     * @param current The current generation
+     * @return The retired generations older than the tolerance
+     */
+    static List<Integer> olderThanTolerance(List<Integer> retired, int current) {
+        return retired.stream().filter(generation -> generation < current - LEAK_TOLERANCE).toList();
     }
 
     /**
@@ -1937,7 +1958,7 @@ public final class DevRuntime implements Closeable {
          * @param args The arguments
          * @throws Exception if main throws
          */
-        void launch(ClassLoader classLoader, String mainClass, String[] args) throws Exception;
+        void launch(ClassLoader classLoader, String mainClass, String[] args) throws Exception; // NOSONAR the application's main may throw any exception
     }
 
     /**
