@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.DevAccess;
 import io.micronaut.dev.management.DevEndpoint;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteInfo;
@@ -71,7 +72,13 @@ public final class DevAccessLinks {
             }
             Environment environment = generation.getEnvironment();
             int port = server.getPort();
-            String bound = environment.getProperty(SERVER_HOST, String.class).map(String::trim).filter(host -> !host.isEmpty()).orElse(null);
+            // the host of the configuration the server was built with, which a bean may replace, rather than the property
+            String bound = generation.findBean(HttpServerConfiguration.class)
+                .flatMap(HttpServerConfiguration::getHost)
+                .or(() -> environment.getProperty(SERVER_HOST, String.class))
+                .map(String::trim)
+                .filter(host -> !host.isEmpty())
+                .orElse(null);
             String named = bound == null || bound.equals("0.0.0.0") || bound.equals("::") || bound.equals("[::]") ? null : bracketed(bound);
             boolean allInterfaces = named == null;
             String host = named == null ? "localhost" : named;

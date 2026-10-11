@@ -133,4 +133,38 @@ class DevManifestSpec extends Specification {
         then:
         !DevManifest.of(dir, properties).retainAnnotated()
     }
+
+    void "the protections are on unless set to false, and a value that is neither true nor false is refused"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes")
+
+        expect:
+        DevManifest.of(dir, properties).accessTokenEnabled()
+        DevManifest.of(dir, properties).bindLoopback()
+        DevManifest.of(dir, properties).allowedHosts().isEmpty()
+
+        when:
+        properties.setProperty(DevManifest.ACCESS_TOKEN_ENABLED, "FALSE")
+        properties.setProperty(DevManifest.BIND_LOOPBACK, " false ")
+        properties.setProperty(DevManifest.ALLOWED_HOSTS, "devbox.lan, app-container")
+        DevManifest manifest = DevManifest.of(dir, properties)
+
+        then:
+        !manifest.accessTokenEnabled()
+        !manifest.bindLoopback()
+        manifest.allowedHosts() == ["devbox.lan", "app-container"]
+
+        when:
+        properties.setProperty(key, "flase")
+        DevManifest.of(dir, properties)
+
+        then:
+        IllegalArgumentException e = thrown()
+        e.message.contains(key)
+
+        where:
+        key << [DevManifest.ACCESS_TOKEN_ENABLED, DevManifest.BIND_LOOPBACK]
+    }
 }

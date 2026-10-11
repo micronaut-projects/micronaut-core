@@ -235,8 +235,8 @@ public final class DevManifest {
         this.requestDrainTimeout = duration(REQUESTS_DRAIN_TIMEOUT, properties.getProperty(REQUESTS_DRAIN_TIMEOUT), DEFAULT_DRAIN_TIMEOUT);
         this.retainServerSockets = Boolean.parseBoolean(properties.getProperty(REQUESTS_RETAIN_SOCKETS, "true").trim());
         this.allowedHosts = Arrays.stream(properties.getProperty(ALLOWED_HOSTS, "").split(",")).map(String::trim).filter(host -> !host.isEmpty()).toList();
-        this.accessTokenEnabled = Boolean.parseBoolean(properties.getProperty(ACCESS_TOKEN_ENABLED, "true").trim());
-        this.bindLoopback = Boolean.parseBoolean(properties.getProperty(BIND_LOOPBACK, "true").trim());
+        this.accessTokenEnabled = protection(ACCESS_TOKEN_ENABLED, properties.getProperty(ACCESS_TOKEN_ENABLED));
+        this.bindLoopback = protection(BIND_LOOPBACK, properties.getProperty(BIND_LOOPBACK));
         String generationsDir = properties.getProperty(PREFIX + "generations");
         this.generations = generationsDir == null ? projectDir.resolve("build").resolve("micronaut-dev").resolve("generations") : path(directory, generationsDir);
         this.liveReload = new LiveReload(
@@ -300,6 +300,24 @@ public final class DevManifest {
                     + (testSettings.initialRun() ? " when it runs the tests when it starts" : ": its first run takes the second generation"));
             }
         }
+    }
+
+    /**
+     * A setting that protects the development runtime: on unless set to {@code false}, and a value that is neither
+     * {@code true} nor {@code false} is refused rather than read as off.
+     */
+    private static boolean protection(String key, @Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return true;
+        }
+        String trimmed = value.trim();
+        if (trimmed.equalsIgnoreCase("true")) {
+            return true;
+        }
+        if (trimmed.equalsIgnoreCase("false")) {
+            return false;
+        }
+        throw new IllegalArgumentException("Invalid " + key + ": " + trimmed + ", true or false");
     }
 
     /**
