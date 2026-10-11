@@ -19,6 +19,8 @@ dependencies {
     // classpath, whose endpoints would start with every application the tests launch
     testImplementation(projects.micronautRouter)
     testCompileOnly(projects.micronautManagement)
+    // the compile-error page
+    testImplementation(projects.micronautHttpServer)
     testAnnotationProcessor(projects.micronautInjectJava)
 }
 
