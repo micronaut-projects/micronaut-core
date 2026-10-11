@@ -500,6 +500,20 @@ public final class DevRuntime implements Closeable {
      * @param compilers The compilers by language
      * @throws IllegalStateException if a compilation fails
      */
+    /**
+     * The roots a compilation of a language reads: its own, and for Kotlin the Java roots too, since kotlinc
+     * resolves the Java sources of a mixed module and KSP processes them; the index of a request takes only
+     * the roots of its own language as its sources.
+     */
+    private static List<SourceRoot> compilationRoots(DevManifest manifest, SourceKind kind) {
+        if (kind != SourceKind.KOTLIN) {
+            return manifest.sourceRoots(kind);
+        }
+        List<SourceRoot> roots = new ArrayList<>(manifest.sourceRoots(SourceKind.KOTLIN));
+        roots.addAll(manifest.sourceRoots(SourceKind.JAVA));
+        return roots;
+    }
+
     public static void compileMissingOutputs(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
         // decided before anything is compiled: two languages sharing one output are both missing, or neither
         Set<SourceKind> missing = new LinkedHashSet<>();
@@ -513,7 +527,7 @@ public final class DevRuntime implements Closeable {
             if (!missing.contains(kind)) {
                 continue;
             }
-            CompilationRequest request = new CompilationRequest(kind, manifest.sourceRoots(kind), Set.of(), Set.of(), true, manifest.compileClasspath(),
+            CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind), Set.of(), Set.of(), true, manifest.compileClasspath(),
                 manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), manifest.compileOptions(kind)).asFull();
             CompilationResult result = entry.getValue().compile(request);
             if (!result.isSuccess()) {
@@ -740,7 +754,7 @@ public final class DevRuntime implements Closeable {
                 continue;
             }
             SourceChanges changes = batch.sources.getOrDefault(kind, SourceChanges.NONE);
-            CompilationRequest request = new CompilationRequest(kind, manifest.sourceRoots(kind), changes.changed(), changes.deleted(),
+            CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind), changes.changed(), changes.deleted(),
                 batch.full || !manifest.isIncremental(), manifest.compileClasspath(), manifest.processorPath(),
                 manifest.classOutput(kind), manifest.generatedSources(kind), manifest.compileOptions(kind));
             CompilationResult result = compiler.compile(request);
@@ -785,7 +799,7 @@ public final class DevRuntime implements Closeable {
                 if (manifest.compileMode(kind) == CompileMode.BUILD_TOOL || manifest.sourceRoots(kind).isEmpty()) {
                     continue;
                 }
-                CompilationRequest request = new CompilationRequest(kind, manifest.sourceRoots(kind), Set.of(), Set.of(), false, manifest.compileClasspath(),
+                CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind), Set.of(), Set.of(), false, manifest.compileClasspath(),
                     manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), manifest.compileOptions(kind)).withAffectedClasses(fresh);
                 CompilationResult result = entry.getValue().compile(request);
                 if (!result.isSuccess()) {
