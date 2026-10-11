@@ -24,6 +24,7 @@ import spock.lang.TempDir
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Duration
 
 class DevManifestSpec extends Specification {
 
@@ -97,6 +98,63 @@ class DevManifestSpec extends Specification {
         manifest.strategy() == ReloadStrategy.AUTO
         manifest.compileMode(SourceKind.JAVA) == CompileMode.EMBEDDED
         manifest.liveReload().port() == 35729
+    }
+
+    void "a test manifest reads the test settings, and compiles a test language without an output beside the application's"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.mode", "test")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes")
+        properties.setProperty("micronaut.dev.compile.java.output", "build/classes/java/main")
+        properties.setProperty("micronaut.dev.test.sources.java", "src/test/java")
+        properties.setProperty("micronaut.dev.test.sources.kotlin", "src/test/kotlin")
+        properties.setProperty("micronaut.dev.test.selection", "All")
+        properties.setProperty("micronaut.dev.test.parameters.junit.jupiter.execution.parallel.enabled", " true ")
+
+        when:
+        DevManifest manifest = DevManifest.of(dir, properties)
+
+        then: "the tests load ahead of the application, the Kotlin tests from beside the first reloadable root"
+        manifest.mainClass() == ""
+        manifest.reloadableRoots() == [dir.resolve("build/classes/java/main-test"), dir.resolve("build/classes-test"), dir.resolve("build/classes")]
+        manifest.testClassOutput(SourceKind.JAVA) == dir.resolve("build/classes/java/main-test")
+        !manifest.testSettings().affectedOnly()
+        manifest.testSettings().parameters() == ["junit.jupiter.execution.parallel.enabled": "true"]
+
+        when:
+        properties.setProperty("micronaut.dev.test.selection", "some")
+        DevManifest.of(dir, properties)
+
+        then:
+        IllegalArgumentException e = thrown()
+        e.message.contains("Unknown test selection some")
+    }
+
+    void "a duration reads in milliseconds, seconds or minutes, seconds without a unit, and defaults when blank"() {
+        expect:
+        DevManifest.duration(DevManifest.REQUESTS_DRAIN_TIMEOUT, value, Duration.ofSeconds(30)) == expected
+
+        where:
+        value     | expected
+        null      | Duration.ofSeconds(30)
+        " "       | Duration.ofSeconds(30)
+        "500ms"   | Duration.ofMillis(500)
+        " 2 S "   | Duration.ofSeconds(2)
+        "1m"      | Duration.ofMinutes(1)
+        "7"       | Duration.ofSeconds(7)
+        "0"       | Duration.ZERO
+    }
+
+    void "a duration that is negative or not a number is refused"() {
+        when:
+        DevManifest.duration(DevManifest.REQUESTS_DRAIN_TIMEOUT, value, Duration.ofSeconds(30))
+
+        then:
+        IllegalArgumentException e = thrown()
+        e.message == "Invalid micronaut.dev.requests.drain-timeout: " + value.trim() + ", a duration such as 30s or 500ms"
+
+        where:
+        value << ["-1s", "soon", "5h"]
     }
 
     void "a manifest without a main class or a reloadable root is refused"() {
