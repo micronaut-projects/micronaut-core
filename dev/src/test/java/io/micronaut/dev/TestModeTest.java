@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -376,17 +377,24 @@ class TestModeTest {
 
         assertTrue(console.act('a'));
         assertEquals(2, runtime.testRuns());
+        assertTrue(console.act(' '));
+        assertEquals(3, runtime.testRuns());
         assertTrue(console.act('w'));
         assertFalse(runtime.isWatchingTests());
         assertTrue(console.act('\n'));
         assertTrue(console.act('f'));
-        assertEquals(2, runtime.testRuns());
+        assertEquals(3, runtime.testRuns());
         assertFalse(console.act('q'));
         assertFalse(console.act('Q'));
 
         // the input ends: the console stops reading, without quitting
         new TestConsole(runtime, new ByteArrayInputStream("w\n".getBytes(StandardCharsets.UTF_8))).read();
         assertTrue(runtime.isWatchingTests());
+
+        // 'q' closes the runtime and exits with the status of the last run
+        AtomicInteger status = new AtomicInteger(-1);
+        new TestConsole(runtime, new ByteArrayInputStream("xq".getBytes(StandardCharsets.UTF_8)), false, status::set).read();
+        assertEquals(0, status.get());
     }
 
     private DevManifest manifest(String extra) throws Exception {

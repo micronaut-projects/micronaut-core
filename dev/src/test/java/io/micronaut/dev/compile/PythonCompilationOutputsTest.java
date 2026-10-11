@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -124,6 +125,54 @@ class PythonCompilationOutputsTest {
         assertFalse(Files.exists(foreign.resolve("META-INF")));
         Files.delete(classes.resolve("app/Foreign.class"));
         assertNull(PythonCompilation.foreignClasses(classes));
+    }
+
+    @Test
+    void theOutcomeOfACompilationIsWhatItChangedInTheClassOutput() throws IOException {
+        Path work = directory.resolve("classes-python");
+        Path classes = directory.resolve("classes");
+        write(work, "app/Greeter.class", "one");
+        write(work, "app/Greeter$Inner.class", "inner");
+        write(work, "META-INF/GRAALPY-VFS/src/app/greeter.py", "print(1)");
+        CompilationRequest request = request(List.of(), List.of());
+        Set<Path> compiled = Set.of(directory.resolve("src/app/greeter.py"));
+
+        CompilationResult first = PythonCompilation.outcome(work, request, compiled, new ArrayList<>(), System.nanoTime());
+        assertEquals(CompilationResult.Status.SUCCESS, first.status());
+        assertEquals(compiled, first.compiledSources());
+        assertEquals(Set.of("app.Greeter"), first.compiledClasses());
+
+        // the same outputs again: nothing to do
+        CompilationResult again = PythonCompilation.outcome(work, request, compiled, new ArrayList<>(), System.nanoTime());
+        assertEquals(CompilationResult.Status.NOTHING_TO_DO, again.status());
+
+        // a removed class is a changed class too
+        Files.delete(work.resolve("app/Greeter$Inner.class"));
+        CompilationResult removed = PythonCompilation.outcome(work, request, compiled, new ArrayList<>(), System.nanoTime());
+        assertEquals(CompilationResult.Status.SUCCESS, removed.status());
+        assertEquals(Set.of("app.Greeter"), removed.compiledClasses());
+        assertEquals(Set.of(classes.resolve("app/Greeter$Inner.class")), removed.removedOutputs());
+    }
+
+    @Test
+    void outputsThatCannotReplaceTheClassOutputFailTheCompilationAndLeaveItAsItWas() throws IOException {
+        Path work = directory.resolve("classes-python");
+        Path classes = directory.resolve("classes");
+        write(work, "app/Greeter.class", "one");
+        write(work, "META-INF/GRAALPY-VFS/src/app/greeter.py", "print(1)");
+        PythonCompilation.mirror(work, classes, directory.resolve("generated"));
+
+        // the module changes, and a new class needs a directory where another tool wrote a file
+        write(classes, "lib", "foreign");
+        write(work, "META-INF/GRAALPY-VFS/src/app/greeter.py", "print(2)");
+        write(work, "lib/Thing.class", "thing");
+        CompilationResult result = PythonCompilation.outcome(work, request(List.of(), List.of()), Set.of(), new ArrayList<>(), System.nanoTime());
+
+        assertEquals(CompilationResult.Status.FAILED, result.status());
+        assertTrue(result.diagnostics().getFirst().message().startsWith("Cannot replace the outputs of the Python compiler"), result.diagnostics().toString());
+        assertEquals("one", Files.readString(classes.resolve("app/Greeter.class")));
+        assertEquals("print(1)", Files.readString(classes.resolve("META-INF/GRAALPY-VFS/src/app/greeter.py")));
+        assertEquals("foreign", Files.readString(classes.resolve("lib")));
     }
 
     @Test
