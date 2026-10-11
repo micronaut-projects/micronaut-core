@@ -96,11 +96,14 @@ public final class HtmlTestReport implements TestReportListener {
     private static final String TEMPLATE = "META-INF/micronaut-dev/test-report/index.html";
     private static final String LOGO = "META-INF/micronaut-dev/test-report/micronaut-logo.svg";
     private static final String BRAND = "META-INF/micronaut-dev/test-report/brand.properties";
-    private static final int HISTORY = 30;
+    private static final int MAX_HISTORY = 30;
+    // the keys of the report's JSON
+    private static final String CLASS_NAME = "className";
+    private static final String TESTS = "tests";
     // the captured output kept per stream and test: the JUnit XML reports keep it all
     private static final int MAX_OUTPUT = 64 * 1024;
     // a Java stack frame: at example.Type.method(Type.java:12)
-    private static final Pattern FRAME = Pattern.compile("at (?:[\\w.$]+/)*([\\w.$]+)\\.[\\w$<>]+\\(([\\w$-]+\\.(?:java|kt|groovy|kts)):\\d+\\)");
+    private static final Pattern FRAME = Pattern.compile("at (?:[\\w.$/]+/)?([\\w.$]+)\\.[\\w$<>]+\\(([\\w$-]+\\.(?:java|kt|groovy|kts)):\\d+\\)");
 
     private final TestResults results = new TestResults(MAX_OUTPUT);
     private final Deque<String> history = new ArrayDeque<>();
@@ -196,7 +199,7 @@ public final class HtmlTestReport implements TestReportListener {
         results.testStarted(test);
         publish(new Json().beginObject().field("type", "test-started")
             .field("id", test.uniqueId())
-            .field("className", test.className())
+            .field(CLASS_NAME, test.className())
             .field("displayName", test.displayName())
             .endObject().toString());
     }
@@ -218,7 +221,7 @@ public final class HtmlTestReport implements TestReportListener {
         }
         LiveReloadServer current = server;
         if (current != null && current.subscribers(TOPIC) > 0) {
-            Json json = new Json().beginObject().field("type", "test-finished").field("className", test.className()).name("test");
+            Json json = new Json().beginObject().field("type", "test-finished").field(CLASS_NAME, test.className()).name("test");
             result(json, result);
             json.name("sources");
             sources(json, List.of(result));
@@ -243,7 +246,7 @@ public final class HtmlTestReport implements TestReportListener {
             .endObject();
         last = json.toString();
         history.addFirst(last);
-        while (history.size() > HISTORY) {
+        while (history.size() > MAX_HISTORY) {
             history.removeLast();
         }
         running = null;
@@ -298,7 +301,7 @@ public final class HtmlTestReport implements TestReportListener {
         if (running != null) {
             results.inProgress().forEach((className, tests) -> {
                 for (TestResults.Result result : tests) {
-                    json.beginObject().field("className", className).name("test");
+                    json.beginObject().field(CLASS_NAME, className).name("test");
                     result(json, result);
                     json.endObject();
                 }
@@ -334,7 +337,7 @@ public final class HtmlTestReport implements TestReportListener {
         json.name("classes").beginArray();
         List<TestResults.Result> every = new ArrayList<>();
         all.forEach((className, tests) -> {
-            json.beginObject().field("name", className).name("tests").beginArray();
+            json.beginObject().field("name", className).name(TESTS).beginArray();
             for (TestResults.Result result : tests) {
                 result(json, result);
             }

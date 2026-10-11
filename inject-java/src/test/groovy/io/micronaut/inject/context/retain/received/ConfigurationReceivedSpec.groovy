@@ -103,6 +103,31 @@ class ConfigurationReceivedSpec extends Specification {
         start(retained).close()
     }
 
+    void "configuration that received a prototype bound to nothing keeps the bean made from it, unless the restart replaces its class"() {
+        given:
+        ApplicationContext first = start(List.of())
+        FormattedClient formatted = first.getBean(FormattedClient)
+
+        when:
+        Collection<BeanRegistration<?>> retained = stopRetaining(first, { false })
+        ApplicationContext second = start(retained)
+
+        then:
+        second.getBean(FormattedClient).is(formatted)
+
+        when:
+        second.close()
+        ApplicationContext third = start(List.of())
+        FormattedClient again = third.getBean(FormattedClient)
+        retained = stopRetaining(third, { Class<?> type -> type == Formatter })
+
+        then: "the prototype the configuration received is of the old generation of the application"
+        !retained*.bean.any { it.is(again) }
+
+        cleanup:
+        start(retained).close()
+    }
+
     private static Collection<BeanRegistration<?>> stopRetaining(ApplicationContext context, Predicate<Class<?>> replaced) {
         return ((DefaultBeanContext) context).stopRetaining(new PolicyRetentionCriteria(List.of(AnnotatedBeanRetentionPolicy.INSTANCE),
             { String prefix -> false }, replaced))

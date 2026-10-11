@@ -124,11 +124,8 @@ class PythonBodyEditOutputTest {
                 def value(self) -> str:
                     return "other"
             """);
-        PythonSourceCompiler last = new PythonSourceCompiler();
-        try {
+        try (PythonSourceCompiler last = new PythonSourceCompiler()) {
             assertTrue(last.compile(fixture.request(Set.of(), Set.of()).asFull()).isSuccess());
-        } finally {
-            last.close();
         }
         // what the last session compiled differs from the class output another build wrote since, as pyronaut process
         // rewrites it with other versions of the processors when a session starts
@@ -138,8 +135,7 @@ class PythonBodyEditOutputTest {
         assertTrue(Files.isRegularFile(stale), stale.toString());
         Files.write(stale, new byte[] {(byte) 0xCA, (byte) 0xFE});
 
-        PythonSourceCompiler session = new PythonSourceCompiler();
-        try {
+        try (PythonSourceCompiler session = new PythonSourceCompiler()) {
             OutputSnapshot before = OutputSnapshot.of(List.of(fixture.classOutput()));
             Files.writeString(hello, Files.readString(hello).replace("return \"alpha\"", "return \"beta\""));
             CompilationResult result = session.compile(fixture.request(Set.of(hello), Set.of()));
@@ -147,8 +143,6 @@ class PythonBodyEditOutputTest {
             ChangeSet changes = before.diff(OutputSnapshot.of(List.of(fixture.classOutput())));
             assertTrue(changes.classes().isEmpty(), changes.toString());
             assertTrue(changes.changedResources().stream().allMatch(resource -> resource.startsWith(SRC + "app/") && resource.contains("hello.")), changes.toString());
-        } finally {
-            session.close();
         }
     }
 
