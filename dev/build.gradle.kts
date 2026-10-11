@@ -10,10 +10,16 @@ dependencies {
     // the gate filter and the compile-error page exist only when an HTTP server is present
     compileOnly(projects.micronautHttp)
     compileOnly(projects.micronautHttpServer)
+    // the /dev endpoint exists only when the management module is present
+    compileOnly(projects.micronautManagement)
 
     testImplementation(projects.micronautInjectJava)
-    // the gate filter's answers and the compile-error page
     testImplementation(projects.micronautHttp)
+    // the gate filter tests route requests to the /dev endpoint; the management module stays off the test runtime
+    // classpath, whose endpoints would start with every application the tests launch
+    testImplementation(projects.micronautRouter)
+    testCompileOnly(projects.micronautManagement)
+    // the compile-error page
     testImplementation(projects.micronautHttpServer)
     testAnnotationProcessor(projects.micronautInjectJava)
 }
