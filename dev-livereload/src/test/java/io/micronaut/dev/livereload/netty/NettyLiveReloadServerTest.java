@@ -121,4 +121,141 @@ class NettyLiveReloadServerTest {
             return "no answer";
         }
     }
+
+    @Test
+    @Timeout(60)
+    void aMountedDirectoryIsServedWithTheScriptInItsPagesAndNothingOutsideIt(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        java.nio.file.Path reports = java.nio.file.Files.createDirectories(directory.resolve("reports"));
+        java.nio.file.Files.writeString(reports.resolve("index.html"), "<html><body><h1>Tests</h1></body></html>");
+        java.nio.file.Files.writeString(reports.resolve("events.ndjson"), "{}\n");
+        java.nio.file.Files.writeString(directory.resolve("secret.txt"), "secret");
+        try (LiveReloadServer server = NettyLiveReloadServer.start(0)) {
+            HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+            String address = server.serve("/reports/tests", reports);
+            assertEquals("http://localhost:" + server.port() + "/reports/tests/", address);
+            String base = "http://127.0.0.1:" + server.port();
+
+            HttpResponse<String> index = client.send(HttpRequest.newBuilder(URI.create(base + "/reports/tests/")).build(), HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, index.statusCode());
+            assertTrue(index.headers().firstValue("content-type").orElse("").startsWith("text/html"));
+            assertEquals("<html><body><h1>Tests</h1>" + LiveReloadServer.scriptTag(server.port()) + "</body></html>", index.body());
+            HttpResponse<String> events = client.send(HttpRequest.newBuilder(URI.create(base + "/reports/tests/events.ndjson")).build(), HttpResponse.BodyHandlers.ofString());
+            assertEquals("{}\n", events.body());
+            assertEquals("application/x-ndjson", events.headers().firstValue("content-type").orElse(""));
+
+            // a larger file is streamed as it is, and a HEAD request gets its headers only
+            byte[] large = new byte[3 * 1024 * 1024];
+            new java.util.Random(7).nextBytes(large);
+            java.nio.file.Files.write(reports.resolve("data.bin"), large);
+            HttpResponse<byte[]> streamed = client.send(HttpRequest.newBuilder(URI.create(base + "/reports/tests/data.bin")).build(), HttpResponse.BodyHandlers.ofByteArray());
+            assertEquals(200, streamed.statusCode());
+            org.junit.jupiter.api.Assertions.assertArrayEquals(large, streamed.body());
+            HttpResponse<byte[]> head = client.send(HttpRequest.newBuilder(URI.create(base + "/reports/tests/data.bin")).method("HEAD", HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofByteArray());
+            assertEquals(200, head.statusCode());
+            assertEquals(String.valueOf(large.length), head.headers().firstValue("content-length").orElse(""));
+            assertEquals(0, head.body().length);
+
+            // without the slash, relative links would resolve against the parent: redirected
+            HttpResponse<String> bare = client.send(HttpRequest.newBuilder(URI.create(base + "/reports/tests")).build(), HttpResponse.BodyHandlers.ofString());
+            assertEquals(301, bare.statusCode());
+            assertEquals("/reports/tests/", bare.headers().firstValue("location").orElse(""));
+
+            // nothing outside the directory, encoded or not
+            assertEquals(404, client.send(HttpRequest.newBuilder(URI.create(base + "/reports/tests/../secret.txt")).build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+            assertEquals(404, client.send(HttpRequest.newBuilder(URI.create(base + "/reports/tests/%2E%2E/secret.txt")).build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+            assertEquals(404, client.send(HttpRequest.newBuilder(URI.create(base + "/reports/tests/missing.html")).build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+
+            // a mounted page is the server's own: no other origin may read it, and no other host name
+            assertTrue(index.headers().firstValue("access-control-allow-origin").isEmpty());
+            assertTrue(rawStatusLine(server.port(), "GET /reports/tests/ HTTP/1.1\r\nHost: rebound.example:" + server.port() + "\r\n\r\n").contains("403"));
+            assertTrue(rawStatusLine(server.port(), "GET /reports/tests/ HTTP/1.1\r\nHost: localhost:" + server.port() + "\r\n\r\n").contains("200"));
+
+            // a directory deeper in the mount: redirected to its slash, then its index
+            java.nio.file.Path suite = java.nio.file.Files.createDirectories(reports.resolve("suite"));
+            java.nio.file.Files.writeString(suite.resolve("index.html"), "<p>suite</p>");
+            HttpResponse<String> nested = client.send(HttpRequest.newBuilder(URI.create(base + "/reports/tests/suite")).build(), HttpResponse.BodyHandlers.ofString());
+            assertEquals(301, nested.statusCode());
+            assertEquals("/reports/tests/suite/", nested.headers().firstValue("location").orElse(""));
+            assertTrue(client.send(HttpRequest.newBuilder(URI.create(base + "/reports/tests/suite/")).build(), HttpResponse.BodyHandlers.ofString()).body().startsWith("<p>suite</p>"));
+
+            // a link out of the directory leads nowhere
+            java.nio.file.Files.createSymbolicLink(reports.resolve("escape.txt"), directory.resolve("secret.txt"));
+            assertEquals(404, client.send(HttpRequest.newBuilder(URI.create(base + "/reports/tests/escape.txt")).build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+
+            // the longest prefix wins, whatever the order of the mounts
+            java.nio.file.Path all = java.nio.file.Files.createDirectories(directory.resolve("all"));
+            java.nio.file.Files.writeString(all.resolve("index.html"), "<p>all</p>");
+            server.serve("/reports/", all);
+            assertTrue(client.send(HttpRequest.newBuilder(URI.create(base + "/reports/tests/")).build(), HttpResponse.BodyHandlers.ofString()).body().contains("<h1>Tests</h1>"));
+            assertTrue(client.send(HttpRequest.newBuilder(URI.create(base + "/reports/")).build(), HttpResponse.BodyHandlers.ofString()).body().contains("<p>all</p>"));
+            server.unserve("/reports/");
+
+            server.unserve("/reports/tests/");
+            assertEquals(404, client.send(HttpRequest.newBuilder(URI.create(base + "/reports/tests/")).build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> server.serve("/", reports));
+        }
+    }
+
+    @Test
+    @Timeout(60)
+    void aPageListeningToATopicReceivesWhatIsPublishedOnItAndNothingElse() throws Exception {
+        try (LiveReloadServer server = NettyLiveReloadServer.start(0)) {
+            HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+            LinkedBlockingQueue<String> tests = listen(client, server, "tests");
+            LinkedBlockingQueue<String> other = listen(client, server, "other");
+            long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+            while ((server.subscribers("tests") < 1 || server.subscribers("other") < 1) && System.nanoTime() < deadline) {
+                Thread.sleep(20);
+            }
+            assertEquals(1, server.subscribers("tests"));
+            assertEquals(0, server.connections(), "the event channel is not a LiveReload client");
+
+            server.publish("tests", "{\"type\":\"testFinished\",\"status\":\"PASSED\"}");
+            assertEquals("{\"type\":\"testFinished\",\"status\":\"PASSED\"}", tests.poll(10, TimeUnit.SECONDS));
+            assertEquals(null, other.poll(200, TimeUnit.MILLISECONDS));
+            server.publish("nobody", "{}");
+
+            // a page of another origin may not follow the events: a WebSocket is not bound by the same-origin policy
+            String foreign = rawStatusLine(server.port(), "GET " + LiveReloadServer.EVENTS_PATH + "?topic=tests HTTP/1.1\r\nHost: localhost:" + server.port()
+                + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nOrigin: https://evil.example\r\n\r\n");
+            assertTrue(foreign.contains("403"), foreign);
+            String own = rawStatusLine(server.port(), "GET " + LiveReloadServer.EVENTS_PATH + "?topic=tests HTTP/1.1\r\nHost: localhost:" + server.port()
+                + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nOrigin: http://localhost:" + server.port() + "\r\n\r\n");
+            assertTrue(own.contains("101"), own);
+            // a topic goes with its last listener; the raw connection above closed
+            long gone = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+            while (server.subscribers("tests") > 1 && System.nanoTime() < gone) {
+                Thread.sleep(20);
+            }
+            assertEquals(1, server.subscribers("tests"));
+        }
+    }
+
+    private static String rawStatusLine(int port, String request) throws Exception {
+        try (java.net.Socket socket = new java.net.Socket("127.0.0.1", port)) {
+            socket.setSoTimeout(10_000);
+            socket.getOutputStream().write(request.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+            socket.getOutputStream().flush();
+            return new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream(), java.nio.charset.StandardCharsets.US_ASCII)).readLine();
+        }
+    }
+
+    private static LinkedBlockingQueue<String> listen(HttpClient client, LiveReloadServer server, String topic) throws Exception {
+        LinkedBlockingQueue<String> received = new LinkedBlockingQueue<>();
+        client.newWebSocketBuilder().buildAsync(URI.create("ws://127.0.0.1:" + server.port() + LiveReloadServer.EVENTS_PATH + "?topic=" + topic), new WebSocket.Listener() {
+            private final StringBuilder partial = new StringBuilder();
+
+            @Override
+            public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
+                partial.append(data);
+                if (last) {
+                    received.add(partial.toString());
+                    partial.setLength(0);
+                }
+                webSocket.request(1);
+                return CompletableFuture.completedFuture(null);
+            }
+        }).get(10, TimeUnit.SECONDS);
+        return received;
+    }
 }
