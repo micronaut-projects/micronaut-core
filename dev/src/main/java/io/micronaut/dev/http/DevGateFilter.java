@@ -79,10 +79,18 @@ public final class DevGateFilter {
      */
     @RequestFilter
     public CompletableFuture<@Nullable HttpResponse<?>> gate(HttpRequest<?> request) {
-        return runtime.whenReady().thenApply(ignored -> runtime.lastFailure().map(failure -> respond(request, failure)).orElse(null));
+        return runtime.whenReady().thenApply(ignored -> runtime.lastFailure().map(failure -> respond(request, failure, errorPage)).orElse(null));
     }
 
-    private HttpResponse<?> respond(HttpRequest<?> request, CompileFailure failure) {
+    /**
+     * The answer to a request while the last compilation failed: a page for a browser, a structured 503 for anything else.
+     *
+     * @param request The request
+     * @param failure The failure
+     * @param errorPage The server's error page, if there is one
+     * @return The response
+     */
+    static HttpResponse<?> respond(HttpRequest<?> request, CompileFailure failure, @Nullable DevErrorPage errorPage) {
         boolean html = request.getHeaders().accept().stream().anyMatch(type -> type.getName().equals(MediaType.TEXT_HTML));
         if (html) {
             HttpResponse<?> unavailable = HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE);

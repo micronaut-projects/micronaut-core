@@ -12,6 +12,9 @@ dependencies {
     compileOnly(projects.micronautHttpServer)
 
     testImplementation(projects.micronautInjectJava)
+    // the gate filter's answers and the compile-error page
+    testImplementation(projects.micronautHttp)
+    testImplementation(projects.micronautHttpServer)
     testAnnotationProcessor(projects.micronautInjectJava)
 }
 
