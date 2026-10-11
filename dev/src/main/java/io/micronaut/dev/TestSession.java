@@ -74,6 +74,7 @@ import java.util.concurrent.TimeoutException;
 final class TestSession {
 
     private static final Logger LOG = LoggerFactory.getLogger(TestSession.class);
+    private static final String FAILED_LABEL = "failed";
 
     private final DevRuntime runtime;
     private final DevManifest manifest;
@@ -99,7 +100,7 @@ final class TestSession {
     private int runs;
     private boolean compileFailed;
     private volatile boolean watching = true;
-    private volatile @Nullable Cancellation current;
+    private volatile @Nullable Cancellation current; // NOSONAR java:S3077 only the handle of the running tests is published; cancelling it is thread-safe
 
     TestSession(DevRuntime runtime, DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
         this.runtime = runtime;
@@ -329,7 +330,7 @@ final class TestSession {
         }
         return switch (requested) {
             case ALL -> TestSelection.all();
-            case FAILED -> failed.isEmpty() ? TestSelection.ofClasses(Set.of(), "failed") : TestSelection.ofClasses(failed, "failed");
+            case FAILED -> failed.isEmpty() ? TestSelection.ofClasses(Set.of(), FAILED_LABEL) : TestSelection.ofClasses(failed, FAILED_LABEL);
             case RERUN -> {
                 if (previous.everything()) {
                     yield TestSelection.all();
@@ -547,7 +548,7 @@ final class TestSession {
             notifyAll();
         }
         LOG.info("{} {}: {} passed, {} failed, {} errored, {} skipped in {} ms{}", selection.everything() ? "All tests" : "Tests " + selection.description(),
-            summary.isSuccess() ? "passed" : "failed", summary.passed(), summary.failed(), summary.errored(), summary.skipped(), summary.duration().toMillis(),
+            summary.isSuccess() ? "passed" : FAILED_LABEL, summary.passed(), summary.failed(), summary.errored(), summary.skipped(), summary.duration().toMillis(),
             summary.cancelled() ? " (cancelled)" : "");
         runtime.detectLeaks();
     }

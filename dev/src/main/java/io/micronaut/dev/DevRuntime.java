@@ -87,6 +87,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
@@ -136,13 +137,13 @@ public final class DevRuntime implements Closeable {
     private final AtomicLong completed = new AtomicLong();
     private final Object lifecycle = new Object();
     private final CountDownLatch closedLatch = new CountDownLatch(1);
-    private volatile CompletableFuture<ApplicationContext> started = new CompletableFuture<>();
-    private volatile CompletableFuture<Void> ready = CompletableFuture.completedFuture(null);
-    private volatile @Nullable ApplicationContext context;
-    private volatile @Nullable Thread applicationThread;
-    private volatile @Nullable CompileFailure lastFailure;
-    private volatile Collection<BeanRegistration<?>> retainedForNext = List.of();
-    private volatile String[] arguments = new String[0];
+    private volatile CompletableFuture<ApplicationContext> started = new CompletableFuture<>(); // NOSONAR java:S3077 swapped whole per generation; the future is thread-safe
+    private volatile CompletableFuture<Void> ready = CompletableFuture.completedFuture(null); // NOSONAR java:S3077 swapped whole per generation; the future is thread-safe
+    private volatile @Nullable ApplicationContext context; // NOSONAR java:S3077 only the reference is published; the context is thread-safe
+    private volatile @Nullable Thread applicationThread; // NOSONAR java:S3077 only the reference is published
+    private volatile @Nullable CompileFailure lastFailure; // NOSONAR java:S3077 immutable failure, replaced whole
+    private volatile Collection<BeanRegistration<?>> retainedForNext = List.of(); // NOSONAR java:S3077 replaced whole, never mutated once published
+    private volatile String[] arguments = new String[0]; // NOSONAR java:S3077 copied in and out, never mutated in place
     private volatile int retainedCount;
     private volatile boolean closed;
     /**
@@ -152,8 +153,8 @@ public final class DevRuntime implements Closeable {
     private @Nullable DirectoryWatcher watcher;
     private @Nullable LiveReloadServer liveReload;
     private @Nullable Instrumentation instrumentation;
-    private volatile int redefinitions;
-    private volatile int inPlacePatches;
+    private final AtomicInteger redefinitions = new AtomicInteger();
+    private final AtomicInteger inPlacePatches = new AtomicInteger();
     private @Nullable Thread worker;
     private OutputSnapshot snapshot = OutputSnapshot.empty();
     /**
@@ -331,7 +332,7 @@ public final class DevRuntime implements Closeable {
      * @return How many times a change was applied in place, by redefining method bodies, since the start
      */
     public int redefinitions() {
-        return redefinitions;
+        return redefinitions.get();
     }
 
     /**
@@ -1321,7 +1322,7 @@ public final class DevRuntime implements Closeable {
      * Whether an injection point names a changed property: {@code @Property(name = "key")}, or a
      * {@code @Value} expression with a {@code ${key}} or {@code ${key:default}} placeholder.
      */
-    private static boolean mentionsChangedProperty(io.micronaut.core.annotation.AnnotationMetadata metadata, ConfigurationChange change) {
+    static boolean mentionsChangedProperty(io.micronaut.core.annotation.AnnotationMetadata metadata, ConfigurationChange change) {
         // the raw values: a string value read through the metadata has its placeholders resolved already
         Object property = metadata.getValues(io.micronaut.context.annotation.Property.class.getName()).get("name");
         if (property != null && change.touches(property.toString())) {
@@ -1359,7 +1360,7 @@ public final class DevRuntime implements Closeable {
      * @return The result, or null when the context is not running or has no refresher, which restarts instead
      */
     @Nullable
-    private static RefreshResult refreshConfiguration(@Nullable ApplicationContext current) {
+    static RefreshResult refreshConfiguration(@Nullable ApplicationContext current) {
         if (current == null || !current.isRunning()) {
             return null;
         }
@@ -1422,7 +1423,7 @@ public final class DevRuntime implements Closeable {
             LOG.info("Cannot redefine {} class(es) in place ({}): restarting instead", replacements.size(), e.getMessage());
             return false;
         }
-        redefinitions++;
+        redefinitions.incrementAndGet();
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         if (current != null && current.isRunning()) {
             ClassChangeEvent event = new ClassChangeEvent(this, Set.of(), generation, changeSet.classes(), ReloadStrategy.RELOAD);
@@ -1498,7 +1499,7 @@ public final class DevRuntime implements Closeable {
             LOG.debug("The in-place patch failed", e);
             return false;
         }
-        inPlacePatches++;
+        inPlacePatches.incrementAndGet();
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         ClassChangeEvent event = new ClassChangeEvent(this, Set.of(), generation, List.of(), ReloadStrategy.RELOAD);
         try {
@@ -1515,7 +1516,7 @@ public final class DevRuntime implements Closeable {
         return true;
     }
 
-    private static byte @Nullable [] classFile(List<Path> roots, String className) {
+    static byte @Nullable [] classFile(List<Path> roots, String className) {
         return resourceFile(roots, className.replace('.', '/') + ".class");
     }
 
