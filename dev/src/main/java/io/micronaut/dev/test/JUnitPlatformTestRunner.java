@@ -38,13 +38,13 @@ public final class JUnitPlatformTestRunner implements TestRunner {
     /**
      * The runner's identifier.
      */
-    public static final String ID = "junit-platform";
+    public static final String RUNNER_ID = "junit-platform";
 
     private static final String LAUNCHER = "org.junit.platform.launcher.core.LauncherFactory";
 
     @Override
     public String id() {
-        return ID;
+        return RUNNER_ID;
     }
 
     @Override

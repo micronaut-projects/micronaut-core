@@ -107,6 +107,13 @@ public final class DevManifest {
     public static final int NATIVE_MAX_GENERATIONS = 50;
 
     private static final String TEST = "test.";
+    private static final String MAIN_CLASS = "main-class";
+    private static final String COMPILE_CLASSPATH = "compile-classpath";
+    private static final String PROCESSOR_PATH = "processor-path";
+    private static final String SOURCES = "sources.";
+    private static final String RESOURCES = "resources.";
+    private static final String COMPILE = "compile.";
+    private static final String AFFECTED = "affected";
 
     private final Path directory;
     private final Properties properties;
@@ -146,14 +153,14 @@ public final class DevManifest {
         this.properties.putAll(properties);
         this.mode = DevMode.valueOf(properties.getProperty(PREFIX + "mode", "run").trim().toUpperCase(Locale.ROOT));
         // a test run has no application main
-        this.mainClass = mode == DevMode.TEST ? properties.getProperty(PREFIX + "main-class", "").trim() : require(properties, "main-class");
+        this.mainClass = mode == DevMode.TEST ? properties.getProperty(PREFIX + MAIN_CLASS, "").trim() : require(properties, MAIN_CLASS);
         this.projectDir = path(directory, properties.getProperty(PREFIX + "project-dir", "."));
         this.strategy = ReloadStrategy.valueOf(properties.getProperty(PREFIX + "strategy", "auto").trim().toUpperCase(Locale.ROOT));
         this.patchInPlace = Boolean.parseBoolean(properties.getProperty(PREFIX + "patch-in-place", "true").trim());
         this.runtimeClasspath = paths(directory, properties.getProperty(PREFIX + "runtime-classpath", ""));
         List<Path> reloadable = paths(directory, require(properties, "reloadable"));
-        this.compileClasspath = paths(directory, properties.getProperty(PREFIX + "compile-classpath", ""));
-        this.processorPath = paths(directory, properties.getProperty(PREFIX + "processor-path", ""));
+        this.compileClasspath = paths(directory, properties.getProperty(PREFIX + COMPILE_CLASSPATH, ""));
+        this.processorPath = paths(directory, properties.getProperty(PREFIX + PROCESSOR_PATH, ""));
         this.sourceRoots = sourceRoots(directory, properties);
         List<ResourceRoot> resources = resourceRoots(directory, properties);
         this.compileMode = CompileMode.of(properties.getProperty(PREFIX + "compile.mode", "embedded"))
@@ -175,8 +182,8 @@ public final class DevManifest {
             Integer.parseInt(properties.getProperty(PREFIX + "livereload.port", "35729").trim()),
             Boolean.parseBoolean(properties.getProperty(PREFIX + "livereload.inject-script", "true"))
         );
-        this.testSourceRoots = sourceRoots(directory, properties, TEST + "sources.");
-        this.testResourceRoots = resourceRoots(directory, properties, TEST + "resources.");
+        this.testSourceRoots = sourceRoots(directory, properties, TEST + SOURCES);
+        this.testResourceRoots = resourceRoots(directory, properties, TEST + RESOURCES);
         if (mode == DevMode.TEST) {
             // the tests load from the generation as the classes under test do, ahead of them as on a build's test
             // classpath, so a test class may shadow an application class; their resources come first too
@@ -206,13 +213,13 @@ public final class DevManifest {
                 parameters.put(name.substring((PREFIX + TEST + "parameters.").length()), properties.getProperty(name).trim());
             }
         }
-        String selection = properties.getProperty(PREFIX + TEST + "selection", "affected").trim().toLowerCase(Locale.ROOT);
-        if (!selection.equals("affected") && !selection.equals("all")) {
+        String selection = properties.getProperty(PREFIX + TEST + "selection", AFFECTED).trim().toLowerCase(Locale.ROOT);
+        if (!selection.equals(AFFECTED) && !selection.equals("all")) {
             throw new IllegalArgumentException("Unknown test selection " + selection + ": affected or all");
         }
         this.testSettings = new TestSettings(
             properties.getProperty(PREFIX + TEST + "runner", "junit-platform").trim(),
-            selection.equals("affected"),
+            selection.equals(AFFECTED),
             Boolean.parseBoolean(properties.getProperty(PREFIX + TEST + "initial-run", "true")),
             Boolean.parseBoolean(properties.getProperty(PREFIX + TEST + "once", "false")),
             path(directory, properties.getProperty(PREFIX + TEST + "reports", "build/micronaut-dev/test-results")),
@@ -527,7 +534,7 @@ public final class DevManifest {
     }
 
     private static Path testClassOutput(Path directory, Properties properties, Map<SourceKind, Path> classOutputs, List<Path> reloadable, SourceKind kind) {
-        String output = properties.getProperty(PREFIX + TEST + "compile." + kind.name().toLowerCase(Locale.ROOT) + ".output");
+        String output = properties.getProperty(PREFIX + TEST + COMPILE + kind.name().toLowerCase(Locale.ROOT) + ".output");
         if (output != null && !output.isBlank()) {
             return path(directory, output);
         }
@@ -555,19 +562,19 @@ public final class DevManifest {
         Properties view = new Properties();
         for (String name : properties.stringPropertyNames()) {
             String key = name.substring(name.startsWith(PREFIX) ? PREFIX.length() : 0);
-            boolean application = key.startsWith("sources.") || key.startsWith("resources.") || key.equals("compile-classpath")
-                || key.equals("processor-path") || (key.startsWith("compile.") && key.indexOf('.', "compile.".length()) > 0);
+            boolean application = key.startsWith(SOURCES) || key.startsWith(RESOURCES) || key.equals(COMPILE_CLASSPATH)
+                || key.equals(PROCESSOR_PATH) || (key.startsWith(COMPILE) && key.indexOf('.', COMPILE.length()) > 0);
             if (name.startsWith(PREFIX) && !application && !key.startsWith(TEST)) {
                 view.setProperty(name, properties.getProperty(name));
             }
         }
         for (String name : properties.stringPropertyNames()) {
-            if (name.startsWith(PREFIX + TEST + "sources.") || name.startsWith(PREFIX + TEST + "resources.") || name.startsWith(PREFIX + TEST + "compile.")) {
+            if (name.startsWith(PREFIX + TEST + SOURCES) || name.startsWith(PREFIX + TEST + RESOURCES) || name.startsWith(PREFIX + TEST + COMPILE)) {
                 view.setProperty(PREFIX + name.substring((PREFIX + TEST).length()), properties.getProperty(name));
             }
         }
         List<String> classpath = new ArrayList<>();
-        String testClasspath = properties.getProperty(PREFIX + TEST + "compile-classpath");
+        String testClasspath = properties.getProperty(PREFIX + TEST + COMPILE_CLASSPATH);
         for (Path entry : testClasspath != null ? paths(directory, testClasspath) : compileClasspath) {
             classpath.add(entry.toString());
         }
@@ -577,18 +584,18 @@ public final class DevManifest {
                 classpath.add(output);
             }
         }
-        view.setProperty(PREFIX + "compile-classpath", String.join(java.io.File.pathSeparator, classpath));
-        String testProcessors = properties.getProperty(PREFIX + TEST + "processor-path");
+        view.setProperty(PREFIX + COMPILE_CLASSPATH, String.join(java.io.File.pathSeparator, classpath));
+        String testProcessors = properties.getProperty(PREFIX + TEST + PROCESSOR_PATH);
         List<String> processors = new ArrayList<>();
         for (Path entry : testProcessors != null ? paths(directory, testProcessors) : processorPath) {
             processors.add(entry.toString());
         }
-        view.setProperty(PREFIX + "processor-path", String.join(java.io.File.pathSeparator, processors));
+        view.setProperty(PREFIX + PROCESSOR_PATH, String.join(java.io.File.pathSeparator, processors));
         for (SourceRoot root : testSourceRoots) {
-            view.setProperty(PREFIX + "compile." + root.kind().name().toLowerCase(Locale.ROOT) + ".output", testClassOutput(root.kind()).toString());
+            view.setProperty(PREFIX + COMPILE + root.kind().name().toLowerCase(Locale.ROOT) + ".output", testClassOutput(root.kind()).toString());
         }
         view.setProperty(PREFIX + "mode", DevMode.RUN.name().toLowerCase(Locale.ROOT));
-        view.setProperty(PREFIX + "main-class", mainClass.isEmpty() ? "tests" : mainClass);
+        view.setProperty(PREFIX + MAIN_CLASS, mainClass.isEmpty() ? "tests" : mainClass);
         return new DevManifest(directory, view);
     }
 
@@ -726,7 +733,7 @@ public final class DevManifest {
     }
 
     private static List<SourceRoot> sourceRoots(Path directory, Properties properties) {
-        return sourceRoots(directory, properties, "sources.");
+        return sourceRoots(directory, properties, SOURCES);
     }
 
     private static List<SourceRoot> sourceRoots(Path directory, Properties properties, String prefix) {
@@ -744,7 +751,7 @@ public final class DevManifest {
     }
 
     private static List<ResourceRoot> resourceRoots(Path directory, Properties properties) {
-        return resourceRoots(directory, properties, "resources.");
+        return resourceRoots(directory, properties, RESOURCES);
     }
 
     private static List<ResourceRoot> resourceRoots(Path directory, Properties properties, String prefix) {
@@ -769,7 +776,7 @@ public final class DevManifest {
     private static <V> Map<SourceKind, V> perKind(Properties properties, String suffix, java.util.function.Function<String, V> parser) {
         Map<SourceKind, V> values = new EnumMap<>(SourceKind.class);
         for (SourceKind kind : SourceKind.values()) {
-            String value = properties.getProperty(PREFIX + "compile." + kind.name().toLowerCase(Locale.ROOT) + "." + suffix);
+            String value = properties.getProperty(PREFIX + COMPILE + kind.name().toLowerCase(Locale.ROOT) + "." + suffix);
             if (value != null && !value.isBlank()) {
                 values.put(kind, parser.apply(value));
             }
