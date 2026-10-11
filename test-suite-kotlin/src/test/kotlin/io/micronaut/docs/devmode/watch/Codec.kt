@@ -13,17 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/**
- * The development mode launcher: {@link io.micronaut.dev.MicronautDevMain} starts an application
- * behind a reloadable class loader and the {@link io.micronaut.dev.DevRuntime} recompiles, restarts
- * and reports as sources and resources change.
- *
- * @author graemerocher
- * @since 5.3.0
- */
-@Experimental
-@NullMarked
-package io.micronaut.dev;
+package io.micronaut.docs.devmode.watch
 
-import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
+/**
+ * A codec, the bean type [CodecRegistry] watches.
+ */
+fun interface Codec {
+
+    fun mediaType(): String
+}

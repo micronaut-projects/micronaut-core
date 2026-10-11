@@ -1,0 +1,52 @@
+A change is handled as one batch: files saved together, across several directories, are compiled and applied together. What the batch does depends on what changed.
+
+== Sources
+
+The changed files are compiled, together with every source whose classes link against a changed or deleted class. An index of which classes reference which finds those sources. They compile with the compile classpath, the annotation processors and the options the build uses.
+
+The class files and generated sources go to a staging directory, and replace the output only when the compilation succeeded. A broken edit therefore leaves the running application as it is:
+
+* the errors are logged;
+* when an HTTP server runs, the errors are shown to a browser in place of the page, until the next successful compilation.
+
+== Classes
+
+When a class file changed, the application restarts on a new generation:
+
+. The context of the previous generation is stopped, retaining what a api:context.reload.BeanRetentionPolicy[] asks for.
+. A new generation of the class loader is created over a fresh snapshot of the output.
+. The application's `main` runs again.
+
+The retained singletons are adopted by the new context under their definitions, so a bean that depends on them is created on top of the same instance.
+
+Two events frame the restart: api:context.reload.ClassChangeEvent[] is published to the old context before it stops, and api:context.reload.ReloadCompletedEvent[] to the new one once it started.
+
+== Resources
+
+A changed template, static file or message bundle does not restart anything: it reaches the beans that watch resources of that kind (see the next section).
+
+A changed configuration file restarts the application, retaining nothing.
+
+== Retaining a bean
+
+Two mechanisms say which beans are kept across restarts:
+
+* The manifest's `micronaut.dev.retain` names the types to keep.
+* A module can contribute a api:context.reload.BeanRetentionPolicy[] bean instead, which is consulted for every singleton when the context stops.
+
+A bean is only retained when its class and everything it received, as the dependency graph records, come from the runtime classpath rather than the reloadable tier. A bean that holds an application class cannot survive a change to that class.
+
+A module declares which of its beans are retained with api:context.annotation.Retain[], on the bean's class or on the factory method that produces it. A module that defines a connection pool does so, so that a restart keeps the pool, and an in-memory database with it. The bean is dropped and created again when the configuration under one of the prefixes its `invalidatedBy` names changes.
+
+Set `micronaut.dev.retain-annotated=false` to retain only what `micronaut.dev.retain` names.
+
+Two cases concern pools in particular:
+
+* A pool that a `BeanCreatedEventListener` wraps, as Micronaut Data wraps a data source, is retained as the listener received it, and wrapped again by the new context's listeners.
+* A pool is not retained when the factory that made it holds the application context, since destroying the factory would close it. The log says why.
+
+== What the console shows
+
+The console shows what each reload did: the generation started, the time it took, the classes changed and the beans retained.
+
+Once the new generation serves, the runtime checks that generations older than two are no longer reachable, and warns when one is. A static cache in application code or a thread that was never stopped is the usual cause.

@@ -108,6 +108,7 @@ public final class DevManifest {
     @Nullable
     private final Path buildToolTrigger;
     private final List<String> retain;
+    private final boolean retainAnnotated;
     private final LiveReload liveReload;
 
     private DevManifest(Path directory, Properties properties) {
@@ -132,6 +133,7 @@ public final class DevManifest {
         String trigger = properties.getProperty(PREFIX + "build-tool.trigger");
         this.buildToolTrigger = trigger == null ? null : path(directory, trigger);
         this.retain = list(directory, properties.getProperty(PREFIX + "retain", ""));
+        this.retainAnnotated = Boolean.parseBoolean(properties.getProperty(PREFIX + "retain-annotated", "true").trim());
         this.liveReload = new LiveReload(
             properties.getProperty(PREFIX + "livereload.enabled", "auto").trim().toLowerCase(Locale.ROOT),
             Integer.parseInt(properties.getProperty(PREFIX + "livereload.port", "35729").trim()),
@@ -330,6 +332,16 @@ public final class DevManifest {
      */
     public List<String> retain() {
         return retain;
+    }
+
+    /**
+     * Whether the beans a module annotated with {@link io.micronaut.context.annotation.Retain} are retained too, as they
+     * are unless {@code micronaut.dev.retain-annotated=false}, which leaves only what {@code micronaut.dev.retain} names.
+     *
+     * @return True to retain them
+     */
+    public boolean retainAnnotated() {
+        return retainAnnotated;
     }
 
     /**

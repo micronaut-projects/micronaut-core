@@ -13,17 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/**
- * The development mode launcher: {@link io.micronaut.dev.MicronautDevMain} starts an application
- * behind a reloadable class loader and the {@link io.micronaut.dev.DevRuntime} recompiles, restarts
- * and reports as sources and resources change.
- *
- * @author graemerocher
- * @since 5.3.0
- */
-@Experimental
-@NullMarked
-package io.micronaut.dev;
+package io.micronaut.docs.devmode.watch
 
-import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NullMarked;
+import io.micronaut.context.annotation.Requires
+import jakarta.inject.Singleton
+
+/**
+ * A bean that received {@link SerializerLookup}: recreating the lookup recreates it too.
+ */
+@Requires(property = "spec.name", value = "BeanWatchSnippetsSpec")
+@Singleton
+class Writer {
+
+    final SerializerLookup lookup
+
+    Writer(SerializerLookup lookup) {
+        this.lookup = lookup
+    }
+
+    String write(Object value) {
+        lookup.serializerFor(value).serialize(value)
+    }
+}

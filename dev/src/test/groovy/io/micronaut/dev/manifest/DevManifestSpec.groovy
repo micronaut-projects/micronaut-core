@@ -118,4 +118,20 @@ class DevManifestSpec extends Specification {
         then:
         thrown(IllegalArgumentException)
     }
+
+    void "the beans a module annotated are retained unless the manifest turns annotation retention off"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "classes")
+
+        expect:
+        DevManifest.of(dir, properties).retainAnnotated()
+
+        when:
+        properties.setProperty("micronaut.dev.retain-annotated", "false")
+
+        then:
+        !DevManifest.of(dir, properties).retainAnnotated()
+    }
 }
