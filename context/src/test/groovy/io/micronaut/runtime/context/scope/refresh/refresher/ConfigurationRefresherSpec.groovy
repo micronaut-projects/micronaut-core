@@ -309,6 +309,33 @@ class ConfigurationRefresherSpec extends Specification {
         context.close()
     }
 
+    void "a refresh event for a list that lost entries reads no value for the indexes it reports as gone"() {
+        given:
+        Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec", "unused.items": ['a', 'b', 'c', 'd']]
+        def source = new MapPropertySource("test", values) {
+            @Override
+            Object get(String key) { values[key] }
+
+            @Override
+            Iterator<String> iterator() { values.keySet().iterator() }
+        }
+        def context = ApplicationContext.builder().propertySources(source).start()
+        def scope = context.getBean(RefreshScope)
+
+        when: "the publisher refreshes the environment and reports the indexes past the new end"
+        values["unused.items"] = ['a', 'b']
+        def diff = context.environment.refreshAndDiff()
+        scope.onRefreshEvent(new RefreshEvent(diff))
+
+        then:
+        diff.keySet().any { it.startsWith("unused.items[") }
+        noExceptionThrown()
+        context.getProperty("unused.items", List).get() == ['a', 'b']
+
+        cleanup:
+        context.close()
+    }
+
     void "a bound key whose placeholder no longer resolves fails the refresh, rather than resetting the bean to its default"() {
         given:
         Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec", "pool.url": "one", "pool.size": 5, "bound.label": "a"]
