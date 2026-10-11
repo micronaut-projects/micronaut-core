@@ -143,6 +143,9 @@ class TestModeTest {
                 void runs() {
                     try (ApplicationContext context = ApplicationContext.run()) {
                         assertEquals("io.micronaut.dev.loader.GenerationClassLoader", context.getEnvironment().getClassLoader().getClass().getName());
+                        // test mode, which modules may keep warm across runs, and not development mode
+                        assertEquals(true, io.micronaut.context.env.DevelopmentMode.isTestMode(context.getEnvironment()));
+                        assertEquals(false, context.getEnvironment().isDevelopmentMode());
                         assertEquals("hello", context.getProperty("greeting", String.class).orElseThrow());
                     }
                 }
