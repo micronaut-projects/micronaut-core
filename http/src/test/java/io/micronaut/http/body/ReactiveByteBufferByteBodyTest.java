@@ -52,10 +52,12 @@ class ReactiveByteBufferByteBodyTest {
         ByteBodyFactory.StreamingBody streaming = bbf.createStreamingBody(BodySizeLimits.UNLIMITED, new BufferConsumer.Upstream() {
             @Override
             public void onBytesConsumed(long bytesConsumed) {
+                // the test adds the bytes itself, whatever the demand
             }
 
             @Override
             public void allowDiscard() {
+                // nothing to discard: the test completes the body
             }
         });
         CloseableByteBody root = streaming.rootBody();
