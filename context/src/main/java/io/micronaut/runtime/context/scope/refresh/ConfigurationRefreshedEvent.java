@@ -32,7 +32,10 @@ import java.util.Objects;
 @Experimental
 public final class ConfigurationRefreshedEvent extends ApplicationEvent {
 
-    private final RefreshResult result;
+    /**
+     * Transient as the source of every event: the result holds bean definitions, which are not serializable.
+     */
+    private final transient RefreshResult result;
 
     /**
      * Creates the event.
