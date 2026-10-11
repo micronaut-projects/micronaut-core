@@ -130,7 +130,8 @@ class KotlinModuleMappingTest {
     private void assertRefused(byte[] contents) throws IOException {
         Path classes = directory.resolve("refused");
         write(classes, contents);
-        assertThrows(IOException.class, () -> KotlinModuleMapping.mergeInto(MODULE, classes, Files.createDirectories(directory.resolve("refused-staging")), name -> false));
+        Path staging = Files.createDirectories(directory.resolve("refused-staging"));
+        assertThrows(IOException.class, () -> KotlinModuleMapping.mergeInto(MODULE, classes, staging, name -> false));
     }
 
     /**
