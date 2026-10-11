@@ -80,16 +80,19 @@ public final class DevAccessLinks {
             boolean hasControlPanel = hasRoute(generation, controlPanel);
             String path = controlPanel;
             int linkPort = port;
+            String scheme = server.getScheme();
             if (!hasControlPanel) {
                 // the development endpoint wherever its route is: endpoints.all.path, endpoints.dev.path and a
                 // management port move it
                 UriRouteInfo<?, ?> endpoint = devEndpointRoute(generation);
                 path = endpoint == null ? contextPath + "/" + DevEndpoint.NAME : endpointPath(endpoint);
-                if (endpoint != null && endpoint.getPort() != null && endpoint.getPort() > 0) {
+                if (endpoint != null && endpoint.getPort() != null && endpoint.getPort() > 0 && endpoint.getPort() != port) {
+                    // a management port is a listener of its own, which the server opens without TLS
                     linkPort = endpoint.getPort();
+                    scheme = "http";
                 }
             }
-            String url = server.getScheme() + "://" + host + ":" + linkPort + path
+            String url = scheme + "://" + host + ":" + linkPort + path
                 + (access.tokenEnabled() ? "?" + DevAccess.TOKEN_PARAMETER + "=" + access.token() : "");
             String bindAddress = named == null ? "all interfaces (*:" + port + ")" : named + ":" + port;
             return new Link(url, bindAddress, allInterfaces, access.tokenEnabled());
