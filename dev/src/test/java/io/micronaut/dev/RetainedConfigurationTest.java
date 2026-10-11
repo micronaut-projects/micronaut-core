@@ -19,7 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 /**
  * A bean a module annotated with {@code @Retain(invalidatedBy = ...)} that received a configuration bean under that
  * prefix is retained across a restart, the configuration bean being bound again by each generation, and released by a
- * change under the prefix; one that received configuration under another prefix is not retained.
+ * change under the prefix; one that received configuration under another prefix is retained too, and released by a
+ * change under that prefix, which it does not have to name.
  */
 class RetainedConfigurationTest {
 
@@ -46,15 +47,29 @@ class RetainedConfigurationTest {
             ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));
             assertSame(covered, second.getBean(SettingsPools.Covered.class));
             assertNotSame(settings, second.getBean(PoolSettings.class));
-            assertNotSame(uncovered, second.getBean(SettingsPools.Uncovered.class));
+            assertSame(uncovered, second.getBean(SettingsPools.Uncovered.class));
             assertEquals(1, SettingsPools.Covered.CREATED.get());
-            assertEquals(2, SettingsPools.Uncovered.CREATED.get());
+            assertEquals(1, SettingsPools.Uncovered.CREATED.get());
 
             Files.writeString(project.resolve("src/main/resources/application.properties"), "my.settings.size=2\nother.settings.size=1\n");
             ApplicationContext third = runtime.awaitGeneration(3, Duration.ofMinutes(2));
             SettingsPools.Covered recreated = third.getBean(SettingsPools.Covered.class);
             assertNotSame(covered, recreated);
             assertEquals(2, recreated.size);
+            assertEquals(2, SettingsPools.Covered.CREATED.get());
+            // the uncovered pool names my.settings too, so it is released with the covered one
+            SettingsPools.Uncovered uncoveredThird = third.getBean(SettingsPools.Uncovered.class);
+            assertNotSame(uncovered, uncoveredThird);
+            assertEquals(2, SettingsPools.Uncovered.CREATED.get());
+
+            // a change under the prefix of the configuration it received, which it does not name, releases it alone
+            Files.writeString(project.resolve("src/main/resources/application.properties"), "my.settings.size=2\nother.settings.size=3\n");
+            ApplicationContext fourth = runtime.awaitGeneration(4, Duration.ofMinutes(2));
+            SettingsPools.Uncovered remade = fourth.getBean(SettingsPools.Uncovered.class);
+            assertNotSame(uncoveredThird, remade);
+            assertEquals(3, remade.size);
+            assertEquals(3, SettingsPools.Uncovered.CREATED.get());
+            assertSame(recreated, fourth.getBean(SettingsPools.Covered.class));
             assertEquals(2, SettingsPools.Covered.CREATED.get());
         } finally {
             runtime.close();

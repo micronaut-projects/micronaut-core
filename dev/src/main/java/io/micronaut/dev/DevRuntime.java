@@ -1701,8 +1701,8 @@ public final class DevRuntime implements Closeable {
     /**
      * What a restart retains: what a policy retains and none refuses, unless a change touched a prefix one of those that
      * retain it declares for it, or a bean it holds or received is of a class of a generation, which the restart
-     * replaces and the bean would keep running. The prefixes the policies declare for a bean are also those under which
-     * a configuration bean it received is not retained with it, but bound again by the next generation.
+     * replaces and the bean would keep running, or the change touched the prefix of a configuration bean in its closure.
+     * No configuration bean is retained with it: the next generation binds each again.
      */
     private DefaultBeanContext.RetentionCriteria retentionCriteria(ApplicationContext old, @Nullable ConfigurationChange configurationChange) {
         List<BeanRetentionPolicy> policies = new ArrayList<>(old.getBeansOfType(BeanRetentionPolicy.class));
@@ -1723,6 +1723,11 @@ public final class DevRuntime implements Closeable {
             @Override
             public Set<String> invalidatedBy(BeanRegistration<?> registration) {
                 return criteria.invalidatedBy(registration);
+            }
+
+            @Override
+            public boolean touches(String prefix) {
+                return criteria.touches(prefix);
             }
 
             @Override
