@@ -99,6 +99,9 @@ import java.util.stream.Stream;
  *     {@link WatchableBeanContext#recreate(Object)}: a filter route keeps the instance it resolved first, so the table
  *     is rebuilt for the next request, whose filter routes resolve the bean anew. A module that recreates a filter
  *     needs nothing else.</li>
+ *     <li>a {@link Controller} bean is destroyed, such as by {@link WatchableBeanContext#recreate(Object)}: the execution
+ *     handle of each of its routes keeps the instance it resolved first, so the table is rebuilt for the next request,
+ *     whose routes resolve the controller anew.</li>
  *     <li>a {@link LocatedRoutes} bean is destroyed: the locator routes that return it hold the instance that went,
  *     and the table of its routes, so the table is rebuilt for the next request, whose locator routes, declared
  *     again, return the current bean.</li>
@@ -125,7 +128,7 @@ public final class DevRouter implements Router {
     private volatile @Nullable Router router;
     private volatile @Nullable List<Integer> defaultPorts;
     private volatile int rebuilds;
-    // how many filter and located-routes beans were destroyed, other than by a rebuild, and how many the route table was
+    // how many filter, controller and located-routes beans were destroyed, other than by a rebuild, and how many the route table was
     // built after
     private final AtomicInteger routeBeansDestroyed = new AtomicInteger();
     private volatile int routeBeansSeen;
@@ -162,7 +165,7 @@ public final class DevRouter implements Router {
                 current = resolve();
                 router = current;
             } else if (routeBeansSeen != routeBeansDestroyed.get()) {
-                // a filter or located-routes bean was destroyed since the table was built, and its routes hold the instance
+                // a filter, controller or located-routes bean was destroyed since the table was built, and its routes hold the instance
                 // that went
                 rebuild();
                 current = Objects.requireNonNull(router);
@@ -226,9 +229,9 @@ public final class DevRouter implements Router {
     }
 
     /**
-     * Called when a server filter bean or a {@link LocatedRoutes} bean of the context is destroyed, such as by
-     * {@link WatchableBeanContext#recreate(Object)}: the next request is routed by a table rebuilt then, whose filter routes
-     * resolve the bean anew and whose locator routes return the current one. Takes no lock, as the thread destroying the
+     * Called when a server filter, a controller or a {@link LocatedRoutes} bean of the context is destroyed, such as by
+     * {@link WatchableBeanContext#recreate(Object)}: the next request is routed by a table rebuilt then, whose filter and
+     * controller routes resolve the bean anew and whose locator routes return the current one. Takes no lock, as the thread destroying the
      * bean may hold the context's.
      */
     void routeBeanDestroyed() {
@@ -598,7 +601,7 @@ public final class DevRouter implements Router {
     }
 
     /**
-     * Tells the development router that a server filter bean or a {@link LocatedRoutes} bean was destroyed. It exists only beside that router, in
+     * Tells the development router that a server filter, a controller or a {@link LocatedRoutes} bean was destroyed. It exists only beside that router, in
      * development mode, and looks the router up among the beans already created, never creating it.
      */
     @Internal
@@ -619,6 +622,8 @@ public final class DevRouter implements Router {
             BeanDefinition<Object> definition = event.getBeanDefinition();
             // the filters the route table holds: a client filter declared with @Filter is left out of it
             if (definition.hasStereotype(ServerFilter.class)
+                // the controllers whose routes' execution handles hold the instance they resolved first
+                || definition.hasStereotype(Controller.class)
                 || (definition.hasStereotype(Filter.class) && !HttpClientFilter.class.isAssignableFrom(definition.getBeanType()))
                 // the located routes the locator routes return, and the tables built from them
                 || LocatedRoutes.class.isAssignableFrom(definition.getBeanType())) {

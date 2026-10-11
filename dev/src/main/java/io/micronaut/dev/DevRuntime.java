@@ -1324,22 +1324,10 @@ public final class DevRuntime implements Closeable {
             // the broken language compiles again; a batch that did not touch it leaves the failure shown
             lastFailure = null;
         }
-        // resources that are not configuration reach the running context's watches; configuration is refreshed
-        boolean configurationChanged = false;
+        // every resource change reaches the running context's watches, those under the configuration root too;
+        // a configuration file changed also refreshes the configuration
         ApplicationContext current = context;
-        for (Map.Entry<ResourceKind, SourceChanges> entry : batch.resources.entrySet()) {
-            if (entry.getKey() == ResourceKind.CONFIG) {
-                configurationChanged = true;
-            } else {
-                if (current instanceof DefaultBeanContext defaultBeanContext && current.isRunning()) {
-                    defaultBeanContext.notifyResourceChange(new ResourceChange(entry.getKey(), rootsOf(entry.getKey()),
-                        new ArrayList<>(entry.getValue().changed()), new ArrayList<>(entry.getValue().deleted()), false));
-                }
-                if (entry.getKey() == ResourceKind.STATIC || entry.getKey() == ResourceKind.VIEWS) {
-                    refreshBrowsers(entry.getValue());
-                }
-            }
-        }
+        boolean configurationChanged = ResourceNotifier.notify(current, batch.resources, this::rootsOf, this::refreshBrowsers);
         OutputSnapshot previous = snapshot;
         OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
         ChangeSet changeSet = previous.diff(latest);

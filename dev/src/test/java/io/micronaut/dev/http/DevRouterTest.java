@@ -238,6 +238,31 @@ class DevRouterTest {
     }
 
     @Test
+    void aRecreatedControllerBeanServesTheNextRequestWithNoExplicitRebuild() throws IOException {
+        try (ApplicationContext context = ApplicationContext.run(Map.of(
+            "spec.name", "DevRouterTest",
+            "dev-router.instance-controller", true,
+            "micronaut.server.port", -1,
+            DevelopmentMode.PROPERTY, true))) {
+            EmbeddedServer server = context.getBean(EmbeddedServer.class).start();
+            DevRouter devRouter = context.getBean(DevRouter.class);
+            InstanceController first = context.getBean(InstanceController.class);
+            assertEquals("200 " + first.instance, get(server, "/dev-router/instance"));
+
+            // what a module does when the configuration its controller was created with changes
+            assertTrue(((WatchableBeanContext) context).recreate(first));
+            InstanceController second = context.getBean(InstanceController.class);
+            assertNotSame(first, second);
+
+            // the next request is served by the new instance: the routes no longer hold the one that went
+            assertEquals("200 " + second.instance, get(server, "/dev-router/instance"));
+            assertEquals("200 " + second.instance, get(server, "/dev-router/instance"));
+            assertEquals(1, devRouter.rebuilds());
+            assertEquals("200 static", get(server, "/dev-router/static"));
+        }
+    }
+
+    @Test
     void anApplicationThatDeclaresAPrimaryRouterKeepsIt() throws IOException {
         try (ApplicationContext context = ApplicationContext.run(Map.of(
             "spec.name", "DevRouterTest",
@@ -398,6 +423,20 @@ class DevRouterTest {
         @Override
         public void routes(io.micronaut.web.router.builder.HttpRouteBuilder routes) {
             routes.locate("/dev-router/shops/{shop}", (request, pathVariables) -> pathVariables.get("shop", String.class), shopRoutes);
+        }
+    }
+
+    @Requires(property = "spec.name", value = "DevRouterTest")
+    @Requires(property = "dev-router.instance-controller")
+    @Controller("/dev-router/instance")
+    static class InstanceController {
+        static final AtomicInteger CREATED = new AtomicInteger();
+
+        private final int instance = CREATED.incrementAndGet();
+
+        @Get
+        String instance() {
+            return String.valueOf(instance);
         }
     }
 
