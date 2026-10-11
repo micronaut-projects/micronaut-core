@@ -220,7 +220,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * The configuration watch: a change under the server's prefixes rebuilds the pipelines, and a change to
      * what the sockets are bound to, the port or the host, answers that only a restart applies it.
      */
-    private volatile @Nullable BeanWatch configurationWatch;
+    private volatile @Nullable BeanWatch configurationWatch; // NOSONAR java:S3077 only the handle is published; the watch is thread-safe
     private final List<NettyHttpServerConfiguration.NettyListenerConfiguration> listenerConfigurations;
     private final CompositeNettyServerCustomizer rootCustomizer = new CompositeNettyServerCustomizer();
 
