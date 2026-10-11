@@ -147,6 +147,25 @@ class DevAccessFilterTest {
         assertEquals("", DevAccessLinks.normalizedPath("/"));
     }
 
+    @Test
+    void theStartupLinkFollowsTheEndpointWhereverItsRouteIs() {
+        assertEquals("/management/dev", DevAccessLinks.endpointPath(route("/management/dev")));
+        assertEquals("/dev", DevAccessLinks.endpointPath(route("/dev/{action}")));
+    }
+
+    private static io.micronaut.web.router.UriRouteInfo<?, ?> route(String template) {
+        io.micronaut.http.uri.UriMatchTemplate uriTemplate = io.micronaut.http.uri.UriMatchTemplate.of(template);
+        return (io.micronaut.web.router.UriRouteInfo<?, ?>) java.lang.reflect.Proxy.newProxyInstance(DevAccessFilterTest.class.getClassLoader(),
+            new Class<?>[] {io.micronaut.web.router.UriRouteInfo.class},
+            (proxy, method, args) -> switch (method.getName()) {
+                case "getUriMatchTemplate" -> uriTemplate;
+                case "hashCode" -> System.identityHashCode(proxy);
+                case "equals" -> proxy == args[0];
+                case "toString" -> template;
+                default -> throw new UnsupportedOperationException(method.getName());
+            });
+    }
+
     private static MutableHttpRequest<?> local(String uri, String host) {
         return HttpRequest.GET(uri).header(HttpHeaders.HOST, host);
     }

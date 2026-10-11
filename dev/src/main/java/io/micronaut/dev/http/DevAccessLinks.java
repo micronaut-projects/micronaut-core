@@ -24,6 +24,7 @@ import io.micronaut.dev.management.DevEndpoint;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.Router;
+import io.micronaut.web.router.UriRouteInfo;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,8 +78,18 @@ public final class DevAccessLinks {
             String contextPath = normalizedPath(environment.getProperty(CONTEXT_PATH, String.class).orElse(""));
             String controlPanel = contextPath + controlPanelPath(environment);
             boolean hasControlPanel = hasRoute(generation, controlPanel);
-            String path = hasControlPanel ? controlPanel : contextPath + "/" + DevEndpoint.NAME;
-            String url = server.getScheme() + "://" + host + ":" + port + path
+            String path = controlPanel;
+            int linkPort = port;
+            if (!hasControlPanel) {
+                // the development endpoint wherever its route is: endpoints.all.path, endpoints.dev.path and a
+                // management port move it
+                UriRouteInfo<?, ?> endpoint = devEndpointRoute(generation);
+                path = endpoint == null ? contextPath + "/" + DevEndpoint.NAME : endpointPath(endpoint);
+                if (endpoint != null && endpoint.getPort() != null && endpoint.getPort() > 0) {
+                    linkPort = endpoint.getPort();
+                }
+            }
+            String url = server.getScheme() + "://" + host + ":" + linkPort + path
                 + (access.tokenEnabled() ? "?" + DevAccess.TOKEN_PARAMETER + "=" + access.token() : "");
             String bindAddress = named == null ? "all interfaces (*:" + port + ")" : named + ":" + port;
             return new Link(url, bindAddress, allInterfaces, access.tokenEnabled());
@@ -142,6 +153,31 @@ public final class DevAccessLinks {
             return "";
         }
         return path.replaceAll("/{2,}", "/");
+    }
+
+    /**
+     * The GET route of the development endpoint, its status; none without the management module.
+     */
+    private static @Nullable UriRouteInfo<?, ?> devEndpointRoute(ApplicationContext generation) {
+        try {
+            return generation.findBean(Router.class)
+                .flatMap(router -> router.uriRoutes()
+                    .filter(route -> route.getHttpMethod() == HttpMethod.GET && route.getDeclaringType() == DevEndpoint.class)
+                    .findFirst())
+                .orElse(null);
+        } catch (NoClassDefFoundError e) {
+            return null;
+        }
+    }
+
+    /**
+     * The path of a route's template up to its first variable.
+     */
+    static String endpointPath(UriRouteInfo<?, ?> route) {
+        String template = route.getUriMatchTemplate().toString();
+        int variable = template.indexOf('{');
+        String path = normalizedPath(variable < 0 ? template : template.substring(0, variable));
+        return path.isEmpty() ? "/" : path;
     }
 
     private static String bracketed(String host) {
