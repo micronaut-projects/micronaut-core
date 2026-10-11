@@ -929,7 +929,7 @@ public final class DevRuntime implements Closeable {
      * Whether an injection point names a changed property: {@code @Property(name = "key")}, or a
      * {@code @Value} expression with a {@code ${key}} or {@code ${key:default}} placeholder.
      */
-    private static boolean mentionsChangedProperty(io.micronaut.core.annotation.AnnotationMetadata metadata, ConfigurationChange change) {
+    static boolean mentionsChangedProperty(io.micronaut.core.annotation.AnnotationMetadata metadata, ConfigurationChange change) {
         // the raw values: a string value read through the metadata has its placeholders resolved already
         Object property = metadata.getValues(io.micronaut.context.annotation.Property.class.getName()).get("name");
         if (property != null && change.touches(property.toString())) {
@@ -967,7 +967,7 @@ public final class DevRuntime implements Closeable {
      * @return The result, or null when the context is not running or has no refresher, which restarts instead
      */
     @Nullable
-    private static RefreshResult refreshConfiguration(@Nullable ApplicationContext current) {
+    static RefreshResult refreshConfiguration(@Nullable ApplicationContext current) {
         if (current == null || !current.isRunning()) {
             return null;
         }
