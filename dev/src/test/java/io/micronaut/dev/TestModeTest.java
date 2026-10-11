@@ -1,5 +1,6 @@
 package io.micronaut.dev;
 
+import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.dev.test.TestRunSummary;
 import org.junit.jupiter.api.AfterEach;
@@ -11,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -607,6 +609,71 @@ class TestModeTest {
         assertNotSame(PatchingTestRunner.RUN_LOADERS.get(0), PatchingTestRunner.RUN_LOADERS.get(1));
         assertEquals("two", PatchingTestRunner.RUN_MESSAGES.get(1));
         assertEquals(generation + 1, runtime.generation());
+    }
+
+    @Test
+    void theWatchersLateReportOfAChangeARunCoversDoesNotCancelTheRun() throws Exception {
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Path test = Files.createDirectories(project.resolve("src/test/java/app"));
+        Path greeter = main.resolve("Greeter.java").toAbsolutePath();
+        Files.writeString(greeter, greeter("one"));
+        Path started = project.resolve("started").toAbsolutePath();
+        Path release = project.resolve("release").toAbsolutePath();
+        // the test says it started, then waits to be let go, so that a report can come while it runs
+        Files.writeString(test.resolve("GreeterTest.java"), """
+            package app;
+            import java.nio.file.Files;
+            import java.nio.file.Path;
+            import org.junit.jupiter.api.Test;
+            import static org.junit.jupiter.api.Assertions.assertEquals;
+            public class GreeterTest {
+                @Test
+                void greets() throws Exception {
+                    Files.writeString(Path.of("%s"), "");
+                    long deadline = System.nanoTime() + 30_000_000_000L;
+                    while (!Files.exists(Path.of("%s")) && System.nanoTime() < deadline) {
+                        Thread.sleep(10);
+                    }
+                    assertEquals("one", new Greeter().greet());
+                }
+            }
+            """.formatted(started.toString().replace("\\", "/"), release.toString().replace("\\", "/")));
+        Files.writeString(release, "");
+
+        runtime = new MicronautDevMain().launch(manifest(""), new String[0]);
+        assertTrue(runtime.lastTestRun().orElseThrow().isSuccess());
+        Files.delete(started);
+        Files.delete(release);
+
+        // the harness reports a change, and the run it starts waits
+        Files.writeString(greeter, greeter("two"));
+        Thread harness = new Thread(() -> runtime.changed(List.of(greeter), List.of()));
+        harness.start();
+        long deadline = System.nanoTime() + TIMEOUT.toNanos();
+        while (!Files.exists(started) && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        assertTrue(Files.exists(started), "the run started");
+
+        // the watcher reports the same write late, while the run that covers it is under way
+        long late = runtime.enqueue(new Pending(Map.of(SourceKind.JAVA, new SourceChanges(Set.of(greeter), Set.of())), Map.of(), false));
+        Files.writeString(release, "");
+        TestRunSummary second = runtime.awaitTestRun(2, TIMEOUT);
+        harness.join(TIMEOUT.toMillis());
+        runtime.awaitBatch(late);
+
+        // the run completes, and the late report changes nothing: no other run comes of it
+        assertFalse(second.cancelled());
+        assertEquals(1, second.failed());
+        assertEquals(2, runtime.testRuns());
+        assertEquals(Set.of("app.GreeterTest"), runtime.failedTestClasses());
+
+        // a write after the run is a change again
+        Files.delete(started);
+        Files.writeString(greeter, greeter("one"));
+        runtime.changed(List.of(greeter), List.of());
+        TestRunSummary third = runtime.awaitTestRun(3, TIMEOUT);
+        assertTrue(third.isSuccess());
     }
 
     private DevManifest manifest(String extra) throws Exception {

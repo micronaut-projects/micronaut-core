@@ -17,6 +17,7 @@ package io.micronaut.dev.livereload.netty;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.dev.livereload.LiveReloadServer;
+import io.micronaut.dev.livereload.LiveReloadServerFactory;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
@@ -49,7 +50,6 @@ import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.GlobalEventExecutor;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,15 +57,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -77,8 +74,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * script in their HTML, and an event channel at {@code /micronaut-dev/events} for pages that follow
  * a topic. It listens on the loopback address only, on an event loop of its own, so it belongs to the
  * launcher and outlives every application context.
- * The sockets accept native clients, the browser extensions and pages of a localhost origin, and refuse other
- * sites and other paths.
+ * The sockets accept native clients, the browser extensions, pages of a localhost origin and those of the origins
+ * configured, and refuse other sites and other paths: see {@link AllowedOrigins}.
  *
  * @author graemerocher
  * @since 5.3.0
@@ -92,8 +89,6 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
     private static final String SCRIPT_RESOURCE = "META-INF/micronaut-dev/livereload.js";
     private static final AttributeKey<Boolean> GREETED = AttributeKey.valueOf("micronaut-dev-livereload-greeted");
     private static final int MAX_CONTENT_LENGTH = 64 * 1024;
-    // the origins of the LiveReload browser extensions
-    private static final Set<String> EXTENSION_SCHEMES = Set.of("chrome-extension", "moz-extension", "safari-web-extension");
     private static final long MAX_INJECTED_PAGE = 16L * 1024 * 1024;
 
     private static final Map<String, String> CONTENT_TYPES = Map.ofEntries(
@@ -132,13 +127,27 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
      * @throws IOException if the port cannot be bound
      */
     public static NettyLiveReloadServer start(int port) throws IOException {
+        return start(port, List.of());
+    }
+
+    /**
+     * Starts a server on the loopback address whose socket also accepts the pages of the origins given, beside the
+     * clients it always accepts: see {@link LiveReloadServerFactory#start(int, List)}.
+     *
+     * @param port The port, {@link #DEFAULT_PORT} for the extensions; 0 for any free port
+     * @param allowedOrigins The origins, such as {@code http://devbox.lan:8080}, or host names, whose pages may connect
+     * @return The started server
+     * @throws IOException if the port cannot be bound
+     */
+    public static NettyLiveReloadServer start(int port, List<String> allowedOrigins) throws IOException {
+        AllowedOrigins origins = AllowedOrigins.of(allowedOrigins);
         EventLoopGroup group = new MultiThreadIoEventLoopGroup(1, runnable -> {
             Thread thread = new Thread(runnable, "micronaut-dev-livereload");
             thread.setDaemon(true);
             return thread;
         }, NioIoHandler.newFactory());
         ChannelGroup browsers = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
-        Server state = new Server(browsers);
+        Server state = new Server(browsers, origins);
         ServerBootstrap bootstrap = new ServerBootstrap()
             .group(group)
             .channel(NioServerSocketChannel.class)
@@ -245,36 +254,6 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
     }
 
     /**
-     * Whether a page of this origin may follow the LiveReload socket. A WebSocket is not bound by the same-origin policy,
-     * so without this any site the developer visits could connect to the loopback port, watch the reloads and hold
-     * connections open. Allowed are clients that are no page, which send no origin; the browser extensions the protocol
-     * was made for; and pages served by a localhost name or the loopback address, on any port, which are the
-     * application's pages wherever its generations bind, and this server's own. A page of another site is refused,
-     * and so is a rebinding page, whose origin keeps the name it was loaded from. The script a browser extension injects
-     * runs in the page and connects with the page's origin, so an application is opened through a localhost name.
-     *
-     * @param origin The {@code Origin} header, null when absent
-     * @return Whether the upgrade is allowed
-     */
-    static boolean isAllowedOrigin(@Nullable String origin) {
-        if (origin == null) {
-            return true;
-        }
-        try {
-            URI uri = new URI(origin.trim());
-            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
-            if (EXTENSION_SCHEMES.contains(scheme)) {
-                return true;
-            }
-            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-            return (scheme.equals("http") || scheme.equals("https"))
-                && (host.equals("localhost") || host.endsWith(".localhost") || host.equals("127.0.0.1") || host.equals("[::1]"));
-        } catch (URISyntaxException e) {
-            return false;
-        }
-    }
-
-    /**
      * An HTML page with the client script before its closing body tag, or at its end without one.
      */
     static String withScript(String html, int port) {
@@ -299,10 +278,12 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
         private final ChannelGroup browsers;
         private final Map<String, Path> mounts = new ConcurrentHashMap<>();
         private final Map<String, ChannelGroup> topics = new ConcurrentHashMap<>();
+        private final AllowedOrigins allowedOrigins;
         private volatile int port;
 
-        Server(ChannelGroup browsers) {
+        Server(ChannelGroup browsers, AllowedOrigins allowedOrigins) {
             this.browsers = browsers;
+            this.allowedOrigins = allowedOrigins;
         }
 
         ChannelGroup topic(String topic) {
@@ -344,7 +325,7 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
                     // the handshake would pass an upgrade for another path on, and the connection would stay open
                     refuse(context, HttpResponseStatus.NOT_FOUND, "LiveReload");
                     return;
-                } else if (!isAllowedOrigin(request.headers().get(HttpHeaderNames.ORIGIN))) {
+                } else if (!state.allowedOrigins.allows(request.headers().get(HttpHeaderNames.ORIGIN))) {
                     forbidden(context);
                     return;
                 } else {

@@ -24,7 +24,5 @@
 @NullMarked
 package io.micronaut.dev.livereload.netty;
 
-import org.jspecify.annotations.NullMarked;
-
 import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.NullMarked;
