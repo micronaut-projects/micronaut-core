@@ -332,6 +332,7 @@ devMode:
   devModeLaunch: Launching in Development Mode
   devModeReload: What a Change Does
   devModeWatch: Watching Beans, Configuration and Resources
+  devModeTest: Continuous Testing
 commandLineApps:
   title: Standalone Command Line Applications
   picocli:
