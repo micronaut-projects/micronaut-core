@@ -257,8 +257,8 @@ class Holder { static BeanDependencyGroup group; }
         when:
         ctx.close()
 
-        then: 'the released dependents go when released, the rest and the singleton created by the callback before the shutdown completes'
-        log.EVENTS == ['shutdown event', 'temporary', 'resource1', 'closed group', 'resource2', 'owner', 'resource4', 'resource3', 'shared']
+        then: 'the released dependents go when released; the singleton created by the callback, then the rest, before the shutdown completes'
+        log.EVENTS == ['shutdown event', 'temporary', 'resource1', 'closed group', 'resource2', 'owner', 'shared', 'resource4', 'resource3']
 
         when:
         owner.created.close()
