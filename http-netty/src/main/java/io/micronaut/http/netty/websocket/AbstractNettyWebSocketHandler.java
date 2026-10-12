@@ -415,10 +415,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(payload);
                         try {
                             data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
-                        } catch (Throwable t) {
-                            // readers release the buffer on success only
-                            payload.release();
-                            throw t;
+                        } catch (Throwable e) {
+                            // readers only release the buffer when they succeed
+                            if (payload.refCnt() > 0) {
+                                payload.release();
+                            }
+                            throw e;
                         }
                     }
                 }
