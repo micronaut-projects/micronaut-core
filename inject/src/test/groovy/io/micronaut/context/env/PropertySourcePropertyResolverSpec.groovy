@@ -1110,6 +1110,70 @@ class PropertySourcePropertyResolverSpec extends Specification {
         servicesRoot.toFile().deleteDir()
     }
 
+    void "the revision changes when the properties may have changed"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(PropertySource.of("test", [foo: 'bar']))
+        long initial = resolver.revision
+
+        expect: 'lookups and placeholder resolution do not change it'
+        resolver.getProperty("foo", String).get() == 'bar'
+        resolver.containsProperty("foo")
+        resolver.propertyPlaceholderResolver.resolvePlaceholders('${foo}').get() == 'bar'
+        resolver.revision == initial
+
+        when:
+        resolver.addPropertySource(PropertySource.of("other", [foo: 'baz'], 100))
+
+        then:
+        resolver.revision > initial
+        resolver.getProperty("foo", String).get() == 'baz'
+
+        when:
+        long added = resolver.revision
+        resolver.resetCaches()
+
+        then:
+        resolver.revision > added
+    }
+
+    void "the revision of the environment changes when a property source is added or removed and on a refresh"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(['revision.foo': 'bar'])
+        DefaultEnvironment environment = (DefaultEnvironment) ctx.environment
+        PropertySourcePropertyResolver resolver = (PropertySourcePropertyResolver) environment.delegate()
+        long initial = resolver.revision
+
+        expect:
+        ctx.getProperty('revision.foo', String).get() == 'bar'
+        resolver.revision == initial
+
+        when:
+        def source = PropertySource.of("revision-override", ['revision.foo': 'baz'], 1000)
+        environment.addPropertySource(source)
+        long added = resolver.revision
+
+        then:
+        added > initial
+        ctx.getProperty('revision.foo', String).get() == 'baz'
+
+        when:
+        environment.removePropertySource(source)
+        long removed = resolver.revision
+
+        then:
+        removed > added
+
+        when:
+        environment.refresh()
+
+        then:
+        resolver.revision > removed
+        ctx.getProperty('revision.foo', String).get() == 'bar'
+
+        cleanup:
+        ctx.close()
+    }
+
     interface PropertyExpressionResolverAutoCloseable extends PropertyExpressionResolver, AutoCloseable {
     }
 

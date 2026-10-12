@@ -99,6 +99,62 @@ class ClientMethodCacheSpec extends Specification {
         filter.templates.toList() == ['/method-cache/first', '/method-cache/first', '/method-cache/second', '/method-cache/second']
     }
 
+    void "placeholders are resolved again only after the properties may have changed"() {
+        given:
+        CountedClient client = ctx.getBean(CountedClient)
+        TemplateCapturingFilter filter = ctx.getBean(TemplateCapturingFilter)
+        CountingPropertyExpressionResolver.RESOLUTIONS.set(0)
+
+        when:
+        def results = (0..<5).collect { client.get() }
+
+        then: 'the placeholder is resolved for the first call only'
+        results == ['counted-first'] * 5
+        CountingPropertyExpressionResolver.RESOLUTIONS.get() == 1
+
+        when: 'a property source that does not change the value is added'
+        ctx.environment.addPropertySource(PropertySource.of("method-cache-unrelated", ['method-cache.unrelated': 'x'], 1000))
+        results = (0..<5).collect { client.get() }
+
+        then: 'the placeholder is resolved again once and the value is unchanged'
+        results == ['counted-first'] * 5
+        CountingPropertyExpressionResolver.RESOLUTIONS.get() == 2
+
+        when: 'a property source that changes the value is added'
+        ctx.environment.addPropertySource(PropertySource.of("method-cache-counted", ['method-cache.counted-path': '/counted-second'], 1001))
+        results = (0..<5).collect { client.get() }
+
+        then:
+        results == ['counted-second'] * 5
+        CountingPropertyExpressionResolver.RESOLUTIONS.get() == 3
+        filter.templates.toList() == ['/method-cache/counted-first'] * 10 + ['/method-cache/counted-second'] * 5
+    }
+
+    void "placeholders follow an environment refresh"() {
+        given: 'a property from a source that is read again on a refresh'
+        System.setProperty('method-cache.path', '/first')
+        ApplicationContext context = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'ClientMethodCacheSpec',
+                'method-cache.prefix': '/method-cache'
+        ]).applicationContext
+        PlaceholderClient client = context.getBean(PlaceholderClient)
+
+        expect:
+        client.get() == "first"
+
+        when:
+        System.setProperty('method-cache.path', '/second')
+        context.environment.refresh()
+
+        then:
+        client.get() == "second"
+        client.get() == "second"
+
+        cleanup:
+        System.clearProperty('method-cache.path')
+        context.close()
+    }
+
     static class Payload {
         String name
     }
@@ -143,6 +199,15 @@ class ClientMethodCacheSpec extends Specification {
     static interface PlaceholderClient {
 
         @Get('${method-cache.path}')
+        @Consumes(MediaType.TEXT_PLAIN)
+        String get()
+    }
+
+    @Requires(property = 'spec.name', value = 'ClientMethodCacheSpec')
+    @Client('/method-cache')
+    static interface CountedClient {
+
+        @Get('${counted.method-cache.counted-path:/counted-first}')
         @Consumes(MediaType.TEXT_PLAIN)
         String get()
     }
@@ -201,6 +266,16 @@ class ClientMethodCacheSpec extends Specification {
         @Get(value = '/second', produces = MediaType.TEXT_PLAIN)
         String second() {
             "second"
+        }
+
+        @Get(value = '/counted-first', produces = MediaType.TEXT_PLAIN)
+        String countedFirst() {
+            "counted-first"
+        }
+
+        @Get(value = '/counted-second', produces = MediaType.TEXT_PLAIN)
+        String countedSecond() {
+            "counted-second"
         }
     }
 }
