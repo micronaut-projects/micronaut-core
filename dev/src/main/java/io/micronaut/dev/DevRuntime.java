@@ -136,6 +136,7 @@ public final class DevRuntime implements Closeable {
     private final LinkedBlockingQueue<Pending> pending = new LinkedBlockingQueue<>();
     private final AtomicLong submitted = new AtomicLong();
     private final AtomicLong completed = new AtomicLong();
+    private final AtomicLong batchesHandled = new AtomicLong();
     private final Object lifecycle = new Object();
     private final CountDownLatch closedLatch = new CountDownLatch(1);
     private volatile CompletableFuture<ApplicationContext> started = new CompletableFuture<>(); // NOSONAR java:S3077 swapped whole per generation; the future is thread-safe
@@ -1208,6 +1209,13 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
+     * @return How many merged batches the worker has handled
+     */
+    long batchesHandled() {
+        return batchesHandled.get();
+    }
+
+    /**
      * Waits until the worker has handled the batch with the given sequence number, whichever merge it
      * ended up in.
      */
@@ -1264,6 +1272,7 @@ public final class DevRuntime implements Closeable {
                     last = Math.max(last, batch.sequence);
                 }
                 completed.accumulateAndGet(last, Math::max);
+                batchesHandled.incrementAndGet();
                 gate.complete(null);
             }
         }
