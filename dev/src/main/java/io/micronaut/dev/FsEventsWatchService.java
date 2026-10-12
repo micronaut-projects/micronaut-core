@@ -101,6 +101,15 @@ final class FsEventsWatchService implements WatchService {
         return polling.register(directory);
     }
 
+    /**
+     * @param latency How long FSEvents holds the events that follow a first one
+     * @return How long a write may take to be reported: the latency, or the interval once FSEvents could not watch a
+     * directory
+     */
+    Duration detectionDelay(Duration latency) {
+        return polling.isPollingEvery(fallbackInterval) ? fallbackInterval : latency;
+    }
+
     @Override
     public void close() {
         cleanable.clean();

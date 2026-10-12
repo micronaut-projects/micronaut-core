@@ -56,6 +56,11 @@ import java.util.stream.Stream;
 @Internal
 final class PollingWatchService implements WatchService {
 
+    /**
+     * Wakes the poller to wait for the interval as it is now, comparing nothing.
+     */
+    private static final Path WAKE = Path.of("micronaut-dev-wake");
+
     private final Map<Path, Key> keys = new ConcurrentHashMap<>();
     // the signalled keys, and once closed the marker that wakes every retrieval blocked on the queue
     private final LinkedBlockingQueue<Object> signalled = new LinkedBlockingQueue<>();
@@ -119,6 +124,7 @@ final class PollingWatchService implements WatchService {
      */
     void pollEvery(Duration interval) {
         intervalMillis = Math.max(1, interval.toMillis());
+        requested.add(WAKE);
     }
 
     /**
@@ -178,25 +184,32 @@ final class PollingWatchService implements WatchService {
     }
 
     private void pollLoop() {
-        long due = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(intervalMillis);
+        long compared = System.nanoTime();
         while (!closed) {
-            Path first;
-            try {
-                first = requested.poll(Math.max(0, due - System.nanoTime()), TimeUnit.NANOSECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
+            // the interval may have changed since the last comparison
+            long due = compared + TimeUnit.MILLISECONDS.toNanos(intervalMillis);
+            Path first = null;
+            long wait = due - System.nanoTime();
+            if (wait > 0) {
+                try {
+                    first = requested.poll(wait, TimeUnit.NANOSECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
             }
             if (first == null) {
+                // the interval elapsed, whatever the requests that kept coming before
                 for (Key key : keys.values()) {
                     key.compare();
                 }
-                due = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(intervalMillis);
+                compared = System.nanoTime();
                 continue;
             }
             List<Path> paths = new ArrayList<>();
             paths.add(first);
             requested.drainTo(paths);
+            paths.removeIf(path -> path == WAKE);
             for (Key key : keys.values()) {
                 for (Path path : paths) {
                     if (key.directory.startsWith(path)) {

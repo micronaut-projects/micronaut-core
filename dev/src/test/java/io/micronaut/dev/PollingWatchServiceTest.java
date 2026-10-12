@@ -69,6 +69,30 @@ class PollingWatchServiceTest {
     }
 
     @Test
+    void aRequestComparesTheDirectoriesUnderAPathAtOnceAndAShorterIntervalAppliesAtOnce() throws Exception {
+        Path parent = Files.createDirectories(directory.resolve("requested"));
+        Path child = Files.createDirectories(parent.resolve("child"));
+        PollingWatchService service = new PollingWatchService(Duration.ofHours(1));
+        try {
+            WatchKey childKey = service.register(child);
+            Files.writeString(child.resolve("a.txt"), "a");
+            // as a native service reports the directory, or one above it, where something changed
+            service.compareUnder(parent);
+            assertSame(childKey, service.poll(5, TimeUnit.SECONDS));
+            assertEquals(1, childKey.pollEvents().size());
+            childKey.reset();
+
+            Files.writeString(child.resolve("b.txt"), "b");
+            assertNull(service.poll(300, TimeUnit.MILLISECONDS));
+            // as when a native service could not watch a directory: the poller no longer waits for the hour
+            service.pollEvery(Duration.ofMillis(50));
+            assertSame(childKey, service.poll(5, TimeUnit.SECONDS));
+        } finally {
+            service.close();
+        }
+    }
+
+    @Test
     void theDirectoryWatcherWatchesWithItAndAClosedServiceRefusesToBePolled() throws Exception {
         PollingWatchService service = new PollingWatchService(Duration.ofMillis(20));
         LinkedBlockingQueue<FileChangeBatch> batches = new LinkedBlockingQueue<>();

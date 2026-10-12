@@ -112,8 +112,8 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
         if (service instanceof PollingWatchService) {
             return java.time.Duration.ofMillis(POLL_MILLIS);
         }
-        if (service instanceof FsEventsWatchService) {
-            return java.time.Duration.ofMillis(Math.round(MAC_LATENCY_SECONDS * 1000));
+        if (service instanceof FsEventsWatchService fsEvents) {
+            return fsEvents.detectionDelay(java.time.Duration.ofMillis(Math.round(MAC_LATENCY_SECONDS * 1000)));
         }
         return java.time.Duration.ZERO;
     }
