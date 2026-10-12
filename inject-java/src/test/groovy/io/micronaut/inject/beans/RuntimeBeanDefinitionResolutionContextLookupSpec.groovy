@@ -16,16 +16,14 @@ import java.util.function.Function
 
 /**
  * A bean the caller chose by definition is resolved within the caller's resolution context: what is created for it
- * sees the caller's path and attributes, and a dependent it creates belongs to the caller's registration.
+ * sees the caller as the injection point it is created for, and a dependent it creates belongs to the caller's
+ * registration.
  */
 class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
-
-    private static final String CALLER_ATTRIBUTE = "caller"
 
     private static RuntimeBeanDefinition<Chosen> chosenDefinition() {
         RuntimeBeanDefinition.builder(Chosen, { RuntimeBeanDefinition.CreationContext ctx ->
             new Chosen(
-                    ctx.getAttribute(CALLER_ATTRIBUTE),
                     ctx.injectionPoint.map { it.declaringBean.beanType }.orElse(null),
                     ctx.getBean(Argument.of(DisposableDependency))
             )
@@ -37,7 +35,6 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
 
     private static RuntimeBeanDefinition<Outer> outerDefinition(Function<RuntimeBeanDefinition.CreationContext, BeanRegistration<Chosen>> resolve) {
         RuntimeBeanDefinition.builder(Outer, { RuntimeBeanDefinition.CreationContext ctx ->
-            ctx.setAttribute(CALLER_ATTRIBUTE, "outer")
             new Outer(resolve.apply(ctx))
         } as Function<RuntimeBeanDefinition.CreationContext, Outer>)
                 .scope(Prototype)
@@ -51,7 +48,7 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
                 .start()
     }
 
-    void 'test a bean resolved by definition in the caller resolution context sees the caller path and attributes'() {
+    void 'test a bean resolved by definition in the caller resolution context is created for the caller'() {
         given:
         def context = start(chosenDefinition(), outerDefinition(ctx -> {
             BeanDefinition<Chosen> definition = ctx.beanContext.getBeanDefinition(Chosen)
@@ -63,7 +60,6 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
         Chosen chosen = outer.chosenRegistration.bean
 
         then: "the chosen bean was created in the resolution the outer bean started"
-        chosen.callerAttribute == "outer"
         chosen.declaringBeanType == Outer
         outer.chosenRegistration.beanDefinition.beanType == Chosen
 
@@ -71,7 +67,7 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
         context.close()
     }
 
-    void 'test a bean resolved by definition outside a resolution context sees neither'() {
+    void 'test a bean resolved by definition outside a resolution context is created for no injection point'() {
         given:
         def context = start(chosenDefinition())
 
@@ -79,7 +75,6 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
         Chosen chosen = context.getBeanRegistration(context.getBeanDefinition(Chosen), Argument.of(Chosen)).bean
 
         then:
-        chosen.callerAttribute == null
         chosen.declaringBeanType == null
 
         cleanup:
@@ -151,7 +146,6 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
         Chosen chosen = outerRegistration.bean.chosenRegistration.bean
 
         then:
-        chosen.callerAttribute == "outer"
         chosen.declaringBeanType == Outer
 
         when:
@@ -195,13 +189,11 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
     }
 
     static class Chosen {
-        final Object callerAttribute
         final Class<?> declaringBeanType
         final DisposableDependency dependency
         boolean disposed
 
-        Chosen(Object callerAttribute, Class<?> declaringBeanType, DisposableDependency dependency) {
-            this.callerAttribute = callerAttribute
+        Chosen(Class<?> declaringBeanType, DisposableDependency dependency) {
             this.declaringBeanType = declaringBeanType
             this.dependency = dependency
         }

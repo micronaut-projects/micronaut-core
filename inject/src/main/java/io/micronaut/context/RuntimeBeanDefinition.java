@@ -340,9 +340,9 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * given type, within the resolution this context belongs to.
          *
          * <p>This is {@link BeanResolutionContext#getBeanRegistration(BeanDefinition, Argument)} on the resolution
-         * context of this creation or disposal: no candidate lookup is run, what is created for the bean sees the
-         * path and attributes of this resolution, and a bean that has no scope of its own has the lifetime a lookup
-         * through {@link #getBean(Argument)} gives it.</p>
+         * context of this creation or disposal: no candidate lookup is run, what is created for the bean sees this
+         * bean's creation as the injection point it is created for, and a bean that has no scope of its own has the
+         * lifetime a lookup through {@link #getBean(Argument)} gives it.</p>
          *
          * @param definition The bean definition
          * @param type       The potentially parameterized type to resolve the definition as
@@ -354,30 +354,6 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          */
         <V> BeanRegistration<V> getBeanRegistration(BeanDefinition<? extends V> definition, Argument<V> type);
 
-        /**
-         * Reads an attribute of the resolution this context belongs to: what the caller that started the resolution,
-         * or a bean created earlier in it, attached with {@link #setAttribute(CharSequence, Object)} or
-         * {@link BeanResolutionContext#setAttribute(CharSequence, Object)}.
-         *
-         * @param key The attribute key
-         * @return The attribute value, or {@code null} if none is set
-         * @since 5.3.0
-         */
-        @Nullable
-        Object getAttribute(CharSequence key);
-
-        /**
-         * Attaches an attribute to the resolution this context belongs to, for what is created within it to read,
-         * as a factory that resolves a definition it chose with {@link #getBeanRegistration(BeanDefinition, Argument)}
-         * does for that bean's creation.
-         *
-         * @param key   The attribute key
-         * @param value The attribute value, or {@code null} to remove the attribute
-         * @return The previous value, or {@code null} if none was set
-         * @since 5.3.0
-         */
-        @Nullable
-        Object setAttribute(CharSequence key, @Nullable Object value);
 
         /**
          * Looks up a bean of the given type.

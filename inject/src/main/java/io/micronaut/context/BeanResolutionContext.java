@@ -160,8 +160,8 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * this context resolves for.
      *
      * <p>This is {@link #getBean(BeanDefinition, Argument)} with the registration kept: the bean is resolved within
-     * this context, so what is created for it sees this context's path and attributes, and a bean that has no scope
-     * of its own is a dependent of the bean this context resolves for and is destroyed with it. The registration is
+     * this context, so what is created for it sees this context's path, and a bean that has no scope of its own is a
+     * dependent of the bean this context resolves for and is destroyed with it. The registration is
      * the one {@link BeanDefinitionRegistry#getBeanRegistration(BeanDefinition, Argument)} returns when the
      * resolution starts no context of its own, with that ownership.</p>
      *

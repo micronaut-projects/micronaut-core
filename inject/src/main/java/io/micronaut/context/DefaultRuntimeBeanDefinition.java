@@ -405,16 +405,6 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
         }
 
         @Override
-        public @Nullable Object getAttribute(CharSequence key) {
-            return resolutionContext.getAttribute(key);
-        }
-
-        @Override
-        public @Nullable Object setAttribute(CharSequence key, @Nullable Object value) {
-            return resolutionContext.setAttribute(key, value);
-        }
-
-        @Override
         public <V> V getBean(Argument<V> type, @Nullable Qualifier<V> qualifier) {
             Objects.requireNonNull(type, MSG_BEAN_TYPE_CANNOT_BE_NULL);
             try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(DefaultRuntimeBeanDefinition.this, type)) {
