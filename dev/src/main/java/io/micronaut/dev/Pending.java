@@ -41,9 +41,10 @@ class Pending {
      */
     final long delivered = System.nanoTime();
     /**
-     * Whether the watcher delivered the batch, rather than a caller that reported a change.
+     * Whether a caller reported the batch for files it wrote, which the watcher reports in turn, rather than the
+     * watcher, or a caller asking for a restart or a test run.
      */
-    boolean watched;
+    boolean reported;
 
     Pending(Map<SourceKind, SourceChanges> sources, Map<ResourceKind, SourceChanges> resources, boolean full) {
         this(sources, Map.of(), resources, full, null);
