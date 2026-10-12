@@ -338,10 +338,10 @@ internal class KotlinAnnotationMetadataBuilder(
         val property = member as KSPropertyDeclaration
         return when (annotationValue) {
             is Collection<*> -> {
-                toArray(annotationValue, member, property.type)
+                arrayOrExpression(originatingElement, annotationName, memberName, toArray(annotationValue, member, property.type))
             }
             is Array<*> -> {
-                toArray(annotationValue.toList(), member, property.type)
+                arrayOrExpression(originatingElement, annotationName, memberName, toArray(annotationValue.toList(), member, property.type))
             }
             else -> {
                 if (isEvaluatedExpression(annotationValue)) {
@@ -356,6 +356,17 @@ internal class KotlinAnnotationMetadataBuilder(
                 }
             }
         }
+    }
+
+    private fun arrayOrExpression(
+        originatingElement: KSAnnotated,
+        annotationName: String,
+        memberName: String,
+        array: Array<out Any>
+    ): Any = if (isEvaluatedExpression(array)) {
+        buildEvaluatedExpressionReference(originatingElement, annotationName, memberName, array)
+    } else {
+        array
     }
 
     private fun toArray(
