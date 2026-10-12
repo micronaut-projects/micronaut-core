@@ -136,6 +136,27 @@ class FileDiscoveredTestsTest {
     }
 
     @Test
+    void aClassNameThatIsNoFileOfATestRootIsReportedAsItIs() throws Exception {
+        Path tests = Files.createDirectories(directory.resolve("project/tests"));
+        Files.writeString(tests.resolve("test_a.py"), "ok");
+        Path classes = Files.createDirectories(directory.resolve("project/test-classes"));
+        Path services = Files.createDirectories(directory.resolve("services/META-INF/services"));
+        Files.writeString(services.resolve("org.junit.platform.engine.TestEngine"), FileTestEngine.class.getName());
+        JUnitPlatformTestRunner runner = new JUnitPlatformTestRunner();
+        List<SourceRoot> sources = List.of(new SourceRoot(SourceKind.PYTHON, tests));
+
+        try (URLClassLoader loader = new URLClassLoader(new URL[] {directory.resolve("services").toUri().toURL()}, getClass().getClassLoader())) {
+            // an absolute path outside every test root, to a file that is not there, and a name no path can have
+            for (String name : List.of(directory.resolve("elsewhere/test_x.py").toString(), "bad\0name")) {
+                Map<String, String> named = Map.of("junit.jupiter.extensions.autodetection.enabled", "false", FileTestEngine.NAMED, name);
+                RecordingListener listener = new RecordingListener();
+                runner.run(new TestRunRequest("named", loader, List.of(classes), sources, TestSelection.all(), named), listener, new Cancellation());
+                assertEquals(Set.of(name + ".test_a.py"), listener.outcomes.keySet(), name);
+            }
+        }
+    }
+
+    @Test
     void aFileIsSelectedByItsPathRelativeToItsRootOrAbsoluteAndNothingElse() throws Exception {
         Path tests = Files.createDirectories(directory.resolve("project/tests"));
         Files.writeString(tests.resolve("test_a.py"), "ok");
