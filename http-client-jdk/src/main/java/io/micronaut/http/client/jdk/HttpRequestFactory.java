@@ -104,10 +104,12 @@ public final class HttpRequestFactory {
     /**
      * The headers of the request that are not sent. The JDK client frames the body itself, so a
      * {@code Transfer-Encoding} of the request would contradict the framing it sends. A raw
-     * request relays the headers of another request: its {@code Content-Length} and its
-     * hop-by-hop headers belong to that other connection. The headers that the
-     * {@code Connection} header of a relayed request lists are not removed here, because by now
-     * the request also holds the headers that the application and the client filters added: the
+     * request is sent with the framing of its byte body, so its {@code Content-Length} is not
+     * sent either, and the JDK client manages the connection itself, so its hop-by-hop headers
+     * are not sent. A raw request often carries the headers of a request that a relay received,
+     * which must not be forwarded. The JDK client refuses some of these headers for other
+     * requests. The headers that the {@code Connection} header lists are not removed here: by now
+     * the request also holds the headers that the application and the client filters added, so a
      * relay has to remove them from the request it received.
      *
      * @param request The request
