@@ -52,13 +52,21 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
     final String annotationSimpleName;
     @Nullable
     final AnnotationValue<Annotation> qualifierAnn;
+    /**
+     * Whether a candidate that does not carry the annotation qualifies by its name: a bean named
+     * {@code V8Engine} qualifies for {@code @V8 Engine}. That is the convention for a qualifier read off an
+     * injection point; a qualifier built from an annotation given to the API names the annotation it selects by.
+     */
+    private final boolean matchByName;
 
     private AnnotationMetadataQualifier(String annotationName,
                                         String annotationSimpleName,
-                                        @Nullable AnnotationValue<Annotation> value) {
+                                        @Nullable AnnotationValue<Annotation> value,
+                                        boolean matchByName) {
         this.annotationName = annotationName;
         this.annotationSimpleName = annotationSimpleName;
         this.qualifierAnn = value;
+        this.matchByName = matchByName;
     }
 
     static <T> AnnotationMetadataQualifier<T> fromType(AnnotationMetadata annotationMetadata,
@@ -66,7 +74,8 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         return new AnnotationMetadataQualifier<>(
             annotationType.getName(),
             annotationType.getSimpleName(),
-            resolveBindingAnnotationValue(annotationMetadata, annotationType.getName())
+            resolveBindingAnnotationValue(annotationMetadata, annotationType.getName()),
+            true
         );
     }
 
@@ -75,16 +84,29 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         return new AnnotationMetadataQualifier<>(
             annotationTypeName,
             NameUtils.getSimpleName(annotationTypeName),
-            resolveBindingAnnotationValue(annotationMetadata, annotationTypeName)
+            resolveBindingAnnotationValue(annotationMetadata, annotationTypeName),
+            true
         );
     }
 
+    /**
+     * The qualifier for an annotation value, comparing the members it was written with.
+     *
+     * <p>The value names the annotation the qualifier selects by, so a candidate that does not carry it does not
+     * qualify by its name the way it does for a qualifier read off an injection point.</p>
+     *
+     * @param annotationMetadata The metadata the value belongs to, which says which of its members do not bind
+     * @param annotationValue    The annotation value
+     * @param <T>                The type
+     * @return The qualifier
+     */
     static <T extends Annotation> AnnotationMetadataQualifier<T> fromValue(AnnotationMetadata annotationMetadata,
                                                                            AnnotationValue<T> annotationValue) {
         return new AnnotationMetadataQualifier<>(
             annotationValue.getAnnotationName(),
             NameUtils.getSimpleName(annotationValue.getAnnotationName()),
-            resolveBindingAnnotationValue(annotationMetadata, annotationValue.getAnnotationName(), annotationValue.getValues())
+            resolveBindingAnnotationValue(annotationMetadata, annotationValue.getAnnotationName(), annotationValue.getValues()),
+            false
         );
     }
 
@@ -110,7 +132,8 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         return new AnnotationMetadataQualifier<>(
             annotationType.getName(),
             annotationType.getSimpleName(),
-            new AnnotationValue<>(annotationType.getName(), bindingValues)
+            new AnnotationValue<>(annotationType.getName(), bindingValues),
+            false
         );
     }
 
@@ -155,7 +178,7 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         if (matchByAnnotationMetadata(candidate)) {
             return true;
         }
-        return QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
+        return matchByName && QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
     }
 
     @Override
@@ -166,7 +189,7 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         if (matchByAnnotationMetadata(candidate)) {
             return true;
         }
-        return QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
+        return matchByName && QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
     }
 
     private <BT extends BeanType<T>> boolean matchByAnnotationMetadata(BT candidate) {
