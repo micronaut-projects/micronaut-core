@@ -128,8 +128,8 @@ public final class FormRouteCompleter {
 
     /**
      * Discard the fields of every parameter that has not subscribed to its field. This is called
-     * when the route is never invoked. A parameter that was never subscribed to would otherwise
-     * keep its field buffered and stop the form from being read any further.
+     * when the route fails before it returns. A parameter that was never subscribed to would
+     * otherwise keep its field buffered and stop the form from being read any further.
      */
     public void discardUnsubscribed() {
         if (!started) {

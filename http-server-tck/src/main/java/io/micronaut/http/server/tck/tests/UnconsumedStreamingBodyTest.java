@@ -16,6 +16,7 @@
 package io.micronaut.http.server.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
@@ -23,12 +24,14 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Part;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.QueryValue;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
+import jakarta.validation.constraints.Min;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -52,9 +55,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * A streaming body argument claims the request body when it is bound. If the route is never
- * invoked, e.g. because another argument fails to bind, the server must not leave the connection
- * stalled on the unread body. These tests use a raw socket so that the rest of the body and a
+ * A streaming body argument claims the request body when it is bound. If the route fails before it
+ * returns, e.g. because another argument fails to bind, a {@code @Valid} constraint is violated or
+ * the route throws, the server must not leave the connection stalled on the unread body. These tests use a raw socket so that the rest of the body and a
  * second request can be sent on the same connection after the rejection.
  */
 @SuppressWarnings({
@@ -119,6 +122,44 @@ public class UnconsumedStreamingBodyTest {
     @Tag("multipart")
     void multipartBodyUnsatisfied() throws IOException {
         assertConnectionNotStalled("/unconsumed/multipart-body-unsatisfied", true);
+    }
+
+    @Test
+    void publisherValidationError() throws IOException {
+        assertConnectionNotStalled("/unconsumed/publisher-valid?value=1", false);
+    }
+
+    @Test
+    void inputStreamValidationError() throws IOException {
+        assertConnectionNotStalled("/unconsumed/input-stream-valid?value=1", false);
+    }
+
+    @Test
+    @Tag("multipart")
+    void streamingUploadValidationError() throws IOException {
+        assertConnectionNotStalled("/unconsumed/streaming-upload-valid?value=1", true);
+    }
+
+    @Test
+    @Tag("multipart")
+    void partPublisherValidationError() throws IOException {
+        assertConnectionNotStalled("/unconsumed/part-publisher-valid?value=1", true);
+    }
+
+    @Test
+    void publisherRouteThrows() throws IOException {
+        assertConnectionNotStalled("/unconsumed/publisher-throws", false);
+    }
+
+    @Test
+    void inputStreamRouteThrows() throws IOException {
+        assertConnectionNotStalled("/unconsumed/input-stream-throws", false);
+    }
+
+    @Test
+    @Tag("multipart")
+    void streamingUploadRouteThrows() throws IOException {
+        assertConnectionNotStalled("/unconsumed/streaming-upload-throws", true);
     }
 
     @Test
@@ -322,6 +363,41 @@ public class UnconsumedStreamingBodyTest {
         @Post(uri = "/multipart-body-unsatisfied", consumes = MediaType.MULTIPART_FORM_DATA)
         String multipartBodyUnsatisfied(@Body MultipartBody body, @QueryValue String missing) {
             return "unreachable";
+        }
+
+        @Post(uri = "/publisher-valid", consumes = MediaType.APPLICATION_OCTET_STREAM)
+        String publisherValid(@Body Publisher<byte[]> body, @QueryValue @Min(10) int value) {
+            return "unreachable";
+        }
+
+        @Post(uri = "/input-stream-valid", consumes = MediaType.APPLICATION_OCTET_STREAM)
+        String inputStreamValid(@Body InputStream body, @QueryValue @Min(10) int value) {
+            return "unreachable";
+        }
+
+        @Post(uri = "/streaming-upload-valid", consumes = MediaType.MULTIPART_FORM_DATA)
+        String streamingUploadValid(StreamingFileUpload file, @QueryValue @Min(10) int value) {
+            return "unreachable";
+        }
+
+        @Post(uri = "/part-publisher-valid", consumes = MediaType.MULTIPART_FORM_DATA)
+        String partPublisherValid(@Part("file") Publisher<PartData> file, @QueryValue @Min(10) int value) {
+            return "unreachable";
+        }
+
+        @Post(uri = "/publisher-throws", consumes = MediaType.APPLICATION_OCTET_STREAM)
+        String publisherThrows(@Body Publisher<byte[]> body) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "rejected");
+        }
+
+        @Post(uri = "/input-stream-throws", consumes = MediaType.APPLICATION_OCTET_STREAM)
+        String inputStreamThrows(@Body InputStream body) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "rejected");
+        }
+
+        @Post(uri = "/streaming-upload-throws", consumes = MediaType.MULTIPART_FORM_DATA)
+        String streamingUploadThrows(StreamingFileUpload file) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "rejected");
         }
 
         @Post(uri = "/publisher-later", consumes = MediaType.APPLICATION_OCTET_STREAM, produces = MediaType.TEXT_PLAIN)

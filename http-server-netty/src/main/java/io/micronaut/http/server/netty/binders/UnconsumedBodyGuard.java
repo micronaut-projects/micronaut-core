@@ -30,7 +30,7 @@ import java.io.InputStream;
 
 /**
  * Registers streaming body arguments that claim the request body when they are bound, so that
- * the body is discarded if the route is never invoked (see
+ * the body is discarded if the route fails before it returns (see
  * {@link BasicHttpAttributes#discardUnconsumedBodies}). Without this, the data received so far
  * stays buffered and the connection stops reading.
  *
@@ -44,24 +44,24 @@ public final class UnconsumedBodyGuard {
     }
 
     /**
-     * Discard the given publisher if the route is never invoked.
+     * Discard the given publisher if the route fails before it returns.
      *
      * @param request   The request
      * @param publisher The publisher that was bound from the request body
      */
-    public static void discardIfNotInvoked(HttpRequest<?> request, Publisher<?> publisher) {
+    public static void discardIfRouteFails(HttpRequest<?> request, Publisher<?> publisher) {
         // subscribe and cancel right away, this releases what was buffered so far and discards
         // the rest of the body
         BasicHttpAttributes.addUnconsumedBodyDiscard(request, () -> publisher.subscribe(new DiscardingSubscriber()));
     }
 
     /**
-     * Discard the given stream if the route is never invoked.
+     * Discard the given stream if the route fails before it returns.
      *
      * @param request The request
      * @param stream  The stream that was bound from the request body
      */
-    public static void discardIfNotInvoked(HttpRequest<?> request, InputStream stream) {
+    public static void discardIfRouteFails(HttpRequest<?> request, InputStream stream) {
         BasicHttpAttributes.addUnconsumedBodyDiscard(request, () -> {
             try {
                 stream.close();

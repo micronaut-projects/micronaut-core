@@ -85,7 +85,7 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
                 if (reader.isPresent() && reader.get() instanceof ChunkedMessageBodyReader<Object> piecewise) {
                     Publisher<?> pub = piecewise.readChunked(targetType, mediaType, nhr.getHeaders(), rootBody.toByteBufferPublisher());
                     // the body is claimed now, but only read once the route subscribes
-                    UnconsumedBodyGuard.discardIfNotInvoked(nhr, pub);
+                    UnconsumedBodyGuard.discardIfRouteFails(nhr, pub);
                     return () -> Optional.of(pub);
                 }
             }
