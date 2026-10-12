@@ -75,6 +75,8 @@ class FsEventsWatchServiceTest {
             directories.add(Files.createDirectories(base.resolve("dir" + i)));
             Files.createDirectories(base.resolve("dir" + i + "/sub"));
         }
+        // those of other tests' runtimes in this JVM
+        long runLoopsBefore = runLoops();
         AtomicBoolean writing = new AtomicBoolean(true);
         AtomicInteger written = new AtomicInteger();
         Thread writer = new Thread(() -> {
@@ -129,6 +131,17 @@ class FsEventsWatchServiceTest {
         }
         assertTrue(written.get() > 100);
         assertTrue(reported > 0, "no write was reported");
+        // the services dropped unclosed are closed once unreachable, their run loops ended
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        while (runLoops() > runLoopsBefore && System.nanoTime() < deadline) {
+            System.gc();
+            Thread.sleep(100);
+        }
+        assertEquals(runLoopsBefore, runLoops(), "run loops left");
+    }
+
+    private static long runLoops() {
+        return Thread.getAllStackTraces().keySet().stream().filter(thread -> thread.getName().equals("micronaut-dev-fsevents")).count();
     }
 
     private static Set<String> events(FsEventsWatchService service, WatchKey expected) throws InterruptedException {

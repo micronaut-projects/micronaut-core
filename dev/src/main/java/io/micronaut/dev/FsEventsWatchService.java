@@ -69,11 +69,14 @@ final class FsEventsWatchService implements WatchService {
      */
     FsEventsWatchService(double latency, Duration fallbackInterval) throws IOException {
         this.fallbackInterval = fallbackInterval;
-        this.polling = new PollingWatchService(SAFETY_INTERVAL);
+        // locals: the run loop thread holds what the streams hold, which must not reach this service, or the cleaner
+        // would never close one dropped unclosed
+        PollingWatchService comparisons = new PollingWatchService(SAFETY_INTERVAL);
+        this.polling = comparisons;
         try {
-            this.streams = new FsEventStreams(latency, polling::compareUnder, () -> fallBack(polling, fallbackInterval, "The FSEvents run loop ended"));
+            this.streams = new FsEventStreams(latency, comparisons::compareUnder, () -> fallBack(comparisons, fallbackInterval, "The FSEvents run loop ended"));
         } catch (IOException | RuntimeException | LinkageError e) {
-            polling.close();
+            comparisons.close();
             throw e;
         }
         cleanable = CLEANER.register(this, new Release(streams, polling));
