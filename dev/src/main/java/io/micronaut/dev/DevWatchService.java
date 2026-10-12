@@ -101,6 +101,23 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
     }
 
     /**
+     * How long the service may take at most to report a write, before the watcher's quiet period: the polling
+     * interval, or the native macOS service's latency for the events that follow a first one. The JDK's services
+     * elsewhere report at once.
+     *
+     * @return The delay
+     */
+    java.time.Duration detectionDelay() {
+        if (service instanceof PollingWatchService) {
+            return java.time.Duration.ofMillis(POLL_MILLIS);
+        }
+        if (service.getClass().getName().equals(MAC_SERVICE)) {
+            return java.time.Duration.ofMillis(Math.round(MAC_LATENCY_SECONDS * 1000));
+        }
+        return java.time.Duration.ZERO;
+    }
+
+    /**
      * @return A service comparing the watched directories every {@value #POLL_MILLIS} milliseconds
      */
     static DevWatchService polling() {

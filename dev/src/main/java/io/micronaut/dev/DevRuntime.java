@@ -126,10 +126,13 @@ public final class DevRuntime implements Closeable {
      */
     private static final Duration COALESCE_IDLE = Duration.ofMillis(25);
     /**
-     * How long the worker waits after taking a batch a caller reported, such as an IDE's or a test harness's report of
-     * a file it wrote: the watcher's own report of the same write follows within its quiet period.
+     * How long the watcher waits for further events before delivering a batch.
      */
-    private static final Duration COALESCE_REPORTED = Duration.ofMillis(150);
+    private static final Duration WATCH_QUIET_PERIOD = Duration.ofMillis(120);
+    /**
+     * What the worker waits for beyond the watcher's own delay after taking a batch a caller reported.
+     */
+    private static final Duration COALESCE_REPORTED_MARGIN = Duration.ofMillis(30);
     /**
      * How long the worker merges batches that keep arriving at most, from the first.
      */
@@ -177,6 +180,12 @@ public final class DevRuntime implements Closeable {
      */
     private volatile boolean startFailed;
     private @Nullable DirectoryWatcher watcher;
+    /**
+     * How long the worker waits after taking a batch a caller reported, such as an IDE's or a test harness's report of
+     * a file it wrote: the watcher's own report of the same write follows once its service noticed the write and its
+     * quiet period passed.
+     */
+    private volatile Duration coalesceReported = WATCH_QUIET_PERIOD.plus(COALESCE_REPORTED_MARGIN);
     private final Map<Path, FileWatcherRegistration> pinnedWatches = new ConcurrentHashMap<>();
     private @Nullable LiveReloadServer liveReload;
     private @Nullable Instrumentation instrumentation;
@@ -1033,7 +1042,9 @@ public final class DevRuntime implements Closeable {
             DevWatchService watchService = DevWatchService.create();
             DirectoryWatcher.Builder builder = DirectoryWatcher.builder(watchService.service())
                 .registrar(watchService.registrar())
+                .quietPeriod(WATCH_QUIET_PERIOD)
                 .threadName("micronaut-dev-watcher");
+            coalesceReported = watchService.detectionDelay().plus(WATCH_QUIET_PERIOD).plus(COALESCE_REPORTED_MARGIN);
             directoryWatcher = builder.closeWatchServiceOnClose(watchService.closeOnClose()).build().start();
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot start the file watcher", e);
@@ -1296,14 +1307,14 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
-     * Takes the batches that follow the first, until none came for {@link #COALESCE_IDLE}, and {@link #COALESCE_REPORTED}
+     * Takes the batches that follow the first, until none came for {@link #COALESCE_IDLE}, and the watcher's delay
      * passed since a batch a caller reported, or they kept coming for {@link #COALESCE_MAX}, so that a lone edit is
      * handled right after the watcher delivers it.
      */
     private void coalesce(List<Pending> batches) throws InterruptedException {
         long taken = System.nanoTime();
         long deadline = taken + COALESCE_MAX.toNanos();
-        long reported = batches.get(0).watched ? taken : taken + COALESCE_REPORTED.toNanos();
+        long reported = batches.get(0).watched ? taken : taken + coalesceReported.toNanos();
         while (true) {
             long now = System.nanoTime();
             long wait = Math.min(Math.max(COALESCE_IDLE.toNanos(), reported - now), deadline - now);
@@ -1313,7 +1324,7 @@ public final class DevRuntime implements Closeable {
                 return;
             }
             if (!next.watched) {
-                reported = Math.max(reported, System.nanoTime() + COALESCE_REPORTED.toNanos());
+                reported = Math.max(reported, System.nanoTime() + coalesceReported.toNanos());
             }
             batches.add(next);
         }
