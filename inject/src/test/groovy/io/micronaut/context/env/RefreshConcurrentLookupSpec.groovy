@@ -3,9 +3,14 @@ package io.micronaut.context.env
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.context.exceptions.ConfigurationException
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.convert.ArgumentConversionContext
+import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention
 import io.micronaut.core.order.Ordered
+import io.micronaut.core.type.Argument
 import io.micronaut.core.util.StringUtils
+import io.micronaut.core.value.PropertyCatalog
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -24,9 +29,10 @@ import java.util.function.Function
 
 /**
  * Lookups made while, or around, {@code Environment#refresh()} rebuilding the property catalogs.
- * The threads are sequenced with latches: one is parked inside a property source, a converter or a
- * hook of the resolver while the spec thread observes, and only then is the latch released. The
- * two tests about the lock additionally wait until the other thread is blocked on it.
+ * The threads are sequenced with latches: one is parked inside a property source, a property
+ * value, a converter or a hook of the resolver while the spec thread observes, and only then is
+ * the latch released. The tests about the lock additionally wait until the other thread is blocked
+ * on it.
  */
 class RefreshConcurrentLookupSpec extends Specification {
 
@@ -131,8 +137,8 @@ class RefreshConcurrentLookupSpec extends Specification {
         dir?.toFile()?.delete()
     }
 
-    void "a miss the refreshing thread caches while it rebuilds the catalogs is not published"() {
-        given: "a property source, read between two others, that asks for a key the later one provides"
+    void "what the refreshing thread caches while it rebuilds the catalogs is not published"() {
+        given: "a property source, read between two others, that asks for a key the later one provides and for one it overrides"
         DefaultEnvironment env = new DefaultEnvironment({ ['test'] })
         PropertySource probing = new PropertySource() {
             @Override
@@ -148,19 +154,21 @@ class RefreshConcurrentLookupSpec extends Specification {
             Iterator<String> iterator() {
                 env.containsProperty('late.key')
                 env.getProperty('late.key', String)
+                env.getProperty('shadowed.key', String)
                 return Collections.emptyIterator()
             }
         }
-        env.addPropertySource(PropertySource.of('early', ['lead.key': 'value'], 10))
+        env.addPropertySource(PropertySource.of('early', ['lead.key': 'value', 'shadowed.key': 'early'], 10))
         env.addPropertySource(probing)
-        env.addPropertySource(PropertySource.of('late', ['late.key': 'value'], 20))
+        env.addPropertySource(PropertySource.of('late', ['late.key': 'value', 'shadowed.key': 'late'], 20))
 
         when:
         env.start()
 
-        then:
+        then: "neither the miss nor the value that was overridden since"
         env.containsProperty('late.key')
         env.getProperty('late.key', String).get() == 'value'
+        env.getProperty('shadowed.key', String).get() == 'late'
 
         when:
         env.refresh()
@@ -168,6 +176,7 @@ class RefreshConcurrentLookupSpec extends Specification {
         then:
         env.containsProperty('late.key')
         env.getProperty('late.key', String).get() == 'value'
+        env.getProperty('shadowed.key', String).get() == 'late'
 
         cleanup:
         env.stop()
@@ -208,6 +217,93 @@ class RefreshConcurrentLookupSpec extends Specification {
         release.countDown()
         executor.shutdownNow()
         env.stop()
+    }
+
+    void "a placeholder is resolved from the properties its value was read from when a refresh overtakes the lookup: #lookup"() {
+        given: "a value whose text can be parked, that is between reading the value and resolving its placeholder"
+        ParkedText oldValue = new ParkedText('${target}')
+        Map<String, Object> data = ['app.foo': oldValue, 'target': 'old']
+        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
+        env.addPropertySource(new MapPropertySource('data', data))
+        env.start()
+        ExecutorService executor = Executors.newSingleThreadExecutor()
+
+        when: "a refresh replaces the value and removes the property its placeholder names, while a reader is parked"
+        oldValue.arm()
+        Future<Object> reader = executor.submit({ read.call(env) } as Callable<Object>)
+        assert oldValue.reading.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        data.put('app.foo', '${other}')
+        data.remove('target')
+        data.put('other', 'new')
+        env.refresh()
+        oldValue.release.countDown()
+
+        then: "the reader resolves the placeholder it has read, from the properties it has read it from"
+        reader.get(WAIT_SECONDS, TimeUnit.SECONDS) == 'old'
+
+        and: "the next lookup of the same thread, like any other, resolves the refreshed value"
+        executor.submit({ read.call(env) } as Callable<Object>).get(WAIT_SECONDS, TimeUnit.SECONDS) == 'new'
+        read.call(env) == 'new'
+
+        cleanup:
+        oldValue.release.countDown()
+        executor.shutdownNow()
+        env.stop()
+
+        where:
+        lookup                      | read
+        'getProperty'               | { DefaultEnvironment e -> e.getProperty('app.foo', String).get() }
+        'getProperty as Map'        | { DefaultEnvironment e -> e.getProperty('app', Map).get().foo }
+        'getProperty as Properties' | { DefaultEnvironment e -> e.getProperty('app', Properties).get().getProperty('foo') }
+        'getProperties'             | { DefaultEnvironment e -> e.getProperties('app').foo }
+        'getAllProperties'          | { DefaultEnvironment e -> e.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.FLAT)['app.foo'] }
+    }
+
+    void "the values under a prefix are resolved from the properties they were read from when a refresh overtakes the lookup: #lookup"() {
+        given: "a lookup that can be parked once it has read the entries under the prefix, before it resolves their values"
+        Park park = new Park()
+        Map<String, Object> data = ['app.foo': '${target}', 'target': 'old']
+        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources()) {
+            @Override
+            protected Map<String, DefaultPropertyEntry> resolveEntriesForKey(String name, boolean allowCreate, PropertyCatalog propertyCatalog) {
+                Map<String, DefaultPropertyEntry> entries = super.resolveEntriesForKey(name, allowCreate, propertyCatalog)
+                if (!allowCreate) {
+                    park.pass()
+                }
+                return entries
+            }
+        }
+        env.addPropertySource(new MapPropertySource('data', data))
+        env.start()
+        ExecutorService executor = Executors.newSingleThreadExecutor()
+
+        when: "a refresh replaces the value and removes the property its placeholder names, while a reader is parked"
+        park.arm()
+        Future<Object> reader = executor.submit({ read.call(env, park) } as Callable<Object>)
+        assert park.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        data.put('app.foo', '${other}')
+        data.remove('target')
+        data.put('other', 'new')
+        env.refresh()
+        park.release.countDown()
+
+        then: "the reader resolves the entries it has read, from the properties it has read them from"
+        reader.get(WAIT_SECONDS, TimeUnit.SECONDS) == 'old'
+
+        and: "the next lookup of the same thread, like any other, resolves the refreshed value"
+        executor.submit({ read.call(env, park) } as Callable<Object>).get(WAIT_SECONDS, TimeUnit.SECONDS) == 'new'
+        read.call(env, park) == 'new'
+
+        cleanup:
+        park.release.countDown()
+        executor.shutdownNow()
+        env.stop()
+
+        where: "getProperties is parked where it reads the entries, the others where they read how to build the result"
+        lookup                      | read
+        'getProperties'             | { DefaultEnvironment e, Park p -> e.getProperties('app').foo }
+        'getProperty as Map'        | { DefaultEnvironment e, Park p -> e.getProperty('app', parkedContext(Map, p)).get().foo }
+        'getProperty as Properties' | { DefaultEnvironment e, Park p -> e.getProperty('app', parkedContext(Properties, p)).get().getProperty('foo') }
     }
 
     void "a property removed from its source does not resolve after a refresh"() {
@@ -425,6 +521,104 @@ class RefreshConcurrentLookupSpec extends Specification {
         }
     }
 
+    void "the difference a refresh reports is that of the refresh alone"() {
+        given: "an environment whose refresh can be parked once it has published what it read"
+        CountDownLatch refreshed = new CountDownLatch(1)
+        CountDownLatch release = new CountDownLatch(1)
+        AtomicBoolean armed = new AtomicBoolean()
+        Map<String, Object> data = ['myApp.fooBar': 'old']
+        DefaultEnvironment env = new DefaultEnvironment({ ['test'] } as ApplicationContextConfiguration) {
+            @Override
+            Environment refresh() {
+                Environment refreshedEnvironment = super.refresh()
+                if (armed.compareAndSet(true, false)) {
+                    refreshed.countDown()
+                    release.await(WAIT_SECONDS, TimeUnit.SECONDS)
+                }
+                return refreshedEnvironment
+            }
+        }
+        env.addPropertySource(new MapPropertySource('data', data))
+        env.start()
+        Map<String, Object> diff = null
+        Thread refresher = new Thread({ diff = env.refreshAndDiff() }, 'refresher')
+        Thread adder = new Thread({ env.addPropertySource(PropertySource.of('late', ['late.key': 'late'])) }, 'adder')
+        refresher.daemon = true
+        adder.daemon = true
+
+        when: "another thread adds a property source after the refresh, before the difference is taken"
+        data.put('myApp.fooBar', 'new')
+        armed.set(true)
+        refresher.start()
+        assert refreshed.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        adder.start()
+        new PollingConditions(timeout: WAIT_SECONDS).eventually {
+            assert adder.state == Thread.State.BLOCKED || !adder.alive
+        }
+        release.countDown()
+        refresher.join(WAIT_SECONDS * 1000L)
+        adder.join(WAIT_SECONDS * 1000L)
+
+        then: "it is added once the difference has been taken, and is not counted as a change of the refresh"
+        !refresher.alive
+        !adder.alive
+        diff != null
+        diff.keySet() == ['my-app.foo-bar'] as Set
+        env.getProperty('my-app.foo-bar', String).get() == 'new'
+        env.getProperty('late.key', String).get() == 'late'
+
+        cleanup:
+        release.countDown()
+        if (!refresher.alive && !adder.alive) {
+            env.stop()
+        }
+    }
+
+    void "each of two overlapping refreshes reports the change it has made"() {
+        given: "a refresh that can be parked once it has read the properties, before it publishes them"
+        Map<String, Object> data = ['flag.value': 'a']
+        Gate gate = new Gate(Ordered.LOWEST_PRECEDENCE)
+        DefaultEnvironment env = new DefaultEnvironment({ ['test'] })
+        env.addPropertySource(new MapPropertySource('data', data))
+        env.addPropertySource(gate)
+        env.start()
+        Map<String, Object> first = null
+        Map<String, Object> second = null
+        Thread firstRefresh = new Thread({ first = env.refreshAndDiff() }, 'first-refresh')
+        Thread secondRefresh = new Thread({ second = env.refreshAndDiff() }, 'second-refresh')
+        firstRefresh.daemon = true
+        secondRefresh.daemon = true
+
+        when: "a second refresh starts while the first is parked, and the value is set back before the second reads it"
+        data.put('flag.value', 'b')
+        gate.arm()
+        firstRefresh.start()
+        assert gate.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        secondRefresh.start()
+        new PollingConditions(timeout: WAIT_SECONDS).eventually {
+            assert secondRefresh.state == Thread.State.BLOCKED
+        }
+        data.put('flag.value', 'a')
+        gate.release.countDown()
+        firstRefresh.join(WAIT_SECONDS * 1000L)
+        secondRefresh.join(WAIT_SECONDS * 1000L)
+
+        then: "the first reports the change to b, and the second the change back, which no one would report otherwise"
+        !firstRefresh.alive
+        !secondRefresh.alive
+        first != null
+        first.keySet() == ['flag.value'] as Set
+        second != null
+        second.keySet() == ['flag.value'] as Set
+        env.getProperty('flag.value', String).get() == 'a'
+
+        cleanup:
+        gate.release.countDown()
+        if (!firstRefresh.alive && !secondRefresh.alive) {
+            env.stop()
+        }
+    }
+
     void "a refresh started by a property source that is being added does not deadlock with another refresh"() {
         given:
         ApplicationContext ctx = ApplicationContext.builder().start()
@@ -513,6 +707,54 @@ class RefreshConcurrentLookupSpec extends Specification {
     }
 
     /**
+     * The configuration of an environment that holds the properties a test gives it and nothing of
+     * the machine it runs on, which a lookup of a whole prefix, or of every property, reads as well.
+     */
+    private static ApplicationContextConfiguration withoutDefaultPropertySources() {
+        ApplicationContext.builder().environments('test').enableDefaultPropertySources(false) as ApplicationContextConfiguration
+    }
+
+    /**
+     * A conversion context for a lookup of the given type that passes the park when the lookup
+     * reads from it how to build its result.
+     */
+    private static <T> ArgumentConversionContext<T> parkedContext(Class<T> type, Park park) {
+        Argument<T> argument = Argument.of(type)
+        return new ArgumentConversionContext<T>() {
+            @Override
+            Argument<T> getArgument() { argument }
+
+            @Override
+            AnnotationMetadata getAnnotationMetadata() {
+                park.pass()
+                return AnnotationMetadata.EMPTY_METADATA
+            }
+        }
+    }
+
+    /**
+     * Parks, once armed, the thread that passes it.
+     */
+    static class Park {
+        final CountDownLatch reached = new CountDownLatch(1)
+        final CountDownLatch release = new CountDownLatch(1)
+        private final AtomicBoolean armed = new AtomicBoolean()
+
+        void arm() {
+            armed.set(true)
+        }
+
+        void pass() {
+            if (armed.compareAndSet(true, false)) {
+                reached.countDown()
+                if (!release.await(WAIT_SECONDS, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException('the park was never released')
+                }
+            }
+        }
+    }
+
+    /**
      * A property source without properties that, once armed, parks the thread that iterates it.
      */
     static class Gate implements PropertySource {
@@ -552,6 +794,44 @@ class RefreshConcurrentLookupSpec extends Specification {
 
     static class SlowValue {
         int number
+    }
+
+    /**
+     * A property value that, once armed, parks the thread that reads its text.
+     */
+    static class ParkedText implements CharSequence {
+        final CountDownLatch reading = new CountDownLatch(1)
+        final CountDownLatch release = new CountDownLatch(1)
+        private final String text
+        private final AtomicBoolean armed = new AtomicBoolean()
+
+        ParkedText(String text) {
+            this.text = text
+        }
+
+        void arm() {
+            armed.set(true)
+        }
+
+        @Override
+        int length() { text.length() }
+
+        @Override
+        char charAt(int index) { text.charAt(index) }
+
+        @Override
+        CharSequence subSequence(int start, int end) { text.subSequence(start, end) }
+
+        @Override
+        String toString() {
+            if (armed.compareAndSet(true, false)) {
+                reading.countDown()
+                if (!release.await(WAIT_SECONDS, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException('the text was never released')
+                }
+            }
+            return text
+        }
     }
 
     /**

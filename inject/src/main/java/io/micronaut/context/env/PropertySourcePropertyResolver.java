@@ -51,6 +51,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
@@ -108,6 +109,18 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     @SuppressWarnings("java:S3077") // a thread reference, not a mutable object
     private volatile Thread refreshingThread;
+    /**
+     * The state that the lookups of the current thread are kept on while
+     * {@link #onState(ResolverState, Supplier)} runs them a second time. Holds nothing for any
+     * other thread. The holder is a JDK type, so that a thread that outlives this resolver keeps
+     * nothing of it.
+     */
+    private final ThreadLocal<Object[]> pinnedState = new ThreadLocal<>();
+    /**
+     * The number of threads whose lookups are kept on a state that way. It is zero unless a
+     * refresh has just overtaken a lookup, which lets every other lookup skip the per-thread check.
+     */
+    private final AtomicInteger pinnedThreads = new AtomicInteger();
     private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
 
     /**
@@ -207,14 +220,67 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * resolver already holds (micronaut-test-resources contributes only the keys the environment
      * cannot resolve) must be answered from the catalog being built, not from the one the rebuild
      * is replacing. Every other thread keeps reading the published state until the rebuild is
-     * published in one step.
+     * published in one step, except for a thread that {@link #onState(ResolverState, Supplier)}
+     * keeps on the state a lookup has started with.
      *
      * @return The state to read the catalogs and the caches from
      */
     private ResolverState readState() {
-        // Only the refreshing thread takes the `writeState` branch, and it holds `catalogLock` for
-        // the whole rebuild, so it reads a field that no other thread can be writing.
-        return refreshingThread == Thread.currentThread() ? writeState : state;
+        if (refreshingThread == Thread.currentThread()) {
+            // Only the refreshing thread takes this branch, and it holds `catalogLock` for the
+            // whole rebuild, so it reads a field that no other thread can be writing.
+            return writeState;
+        }
+        if (pinnedThreads.get() != 0) {
+            Object[] pinned = pinnedState.get();
+            if (pinned != null && pinned[0] != null) {
+                return (ResolverState) pinned[0];
+            }
+        }
+        return state;
+    }
+
+    /**
+     * Runs lookups that come back into this resolver and have to read the given state, the one
+     * their caller has read the values from. Resolving a placeholder, for one, looks the properties
+     * it names up in this resolver again. Nearly always no refresh is published while the lookups
+     * run, so that state is all they have read. If one was published, they may have read what it
+     * published as well, and their result, or the failure they ended in, may be that of neither
+     * state: they are then run again, with the lookups of the current thread kept on the given
+     * state.
+     *
+     * @param resolverState The state the lookups have to read
+     * @param lookups       The lookups, which can be run more than once
+     * @param <R>           The result type
+     * @return The result of the lookups
+     */
+    private <R> R onState(ResolverState resolverState, Supplier<R> lookups) {
+        try {
+            R result = lookups.get();
+            if (readState() == resolverState) {
+                return result;
+            }
+        } catch (RuntimeException e) {
+            if (readState() == resolverState) {
+                throw e;
+            }
+        }
+        Object[] pinned = pinnedState.get();
+        if (pinned == null) {
+            pinned = new Object[1];
+            pinnedState.set(pinned);
+        }
+        try {
+            pinnedThreads.incrementAndGet();
+            pinned[0] = resolverState;
+            return lookups.get();
+        } finally {
+            if (pinned[0] != null) {
+                // a plain store first: nothing that can fail may leave the thread on the state
+                pinned[0] = null;
+                pinnedThreads.decrementAndGet();
+            }
+        }
     }
 
     /**
@@ -393,6 +459,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (StringUtils.isEmpty(name)) {
             return Collections.emptyMap();
         }
+        // one state for the entries and for the placeholders that their values hold
+        return onState(readState(), () -> resolveProperties(name, keyFormat));
+    }
+
+    private Map<String, Object> resolveProperties(String name, StringConvention keyFormat) {
         Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(name, false, keyFormat == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED);
         if (entries != null) {
             if (keyFormat == null) {
@@ -496,7 +567,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 Optional<T> converted;
                 if (entries != null) {
                     // iff entries is null, the value is from placeholderResolutionCache and doesn't need this step
-                    value = resolvePlaceHoldersIfNecessary(value);
+                    value = resolvePlaceHoldersIfNecessary(currentState, value);
                     currentState.placeholderResolutionCache.put(name, value);
                 }
                 if (requiredType.isInstance(value) && !CollectionUtils.isIterableOrMap(requiredType)) {
@@ -521,17 +592,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 currentState.resolvedValueCache.put(cacheKey, NO_VALUE);
                 return Optional.empty();
             } else if (Properties.class.isAssignableFrom(requiredType)) {
-                Properties properties = resolveSubProperties(name, entries, conversionContext);
+                Properties properties = resolveSubProperties(currentState, name, entries, conversionContext);
                 return Optional.of((T) properties);
             } else if (Map.class.isAssignableFrom(requiredType)) {
-                Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
+                Map<String, Object> subMap = resolveSubMap(currentState, name, entries, conversionContext);
                 if (!subMap.isEmpty()) {
                     return conversionService.convert(subMap, Map.class, requiredType, conversionContext);
                 } else {
                     return (Optional<T>) Optional.of(subMap);
                 }
             } else if (PropertyResolver.class.isAssignableFrom(requiredType)) {
-                Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
+                Map<String, Object> subMap = resolveSubMap(currentState, name, entries, conversionContext);
                 return Optional.of((T) new MapPropertyResolver(subMap, conversionService));
             }
         }
@@ -556,14 +627,15 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     public Map<String, Object> getAllProperties(StringConvention keyConvention, MapFormat.MapTransformation transformation) {
         Map<String, Object> map = new HashMap<>();
         boolean isNested = transformation == MapFormat.MapTransformation.NESTED;
+        ResolverState currentState = readState();
         Arrays
-            .stream(getCatalog(readState(), keyConvention == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED))
+            .stream(getCatalog(currentState, keyConvention == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED))
             .filter(Objects::nonNull)
             .map(Map::entrySet)
             .flatMap(Collection::stream)
             .forEach((Map.Entry<String, DefaultPropertyEntry> entry) -> {
                 String k = keyConvention.format(entry.getKey());
-                Object value = resolvePlaceHoldersIfNecessary(entry.getValue().value());
+                Object value = resolvePlaceHoldersIfNecessary(currentState, entry.getValue().value());
                 Map finalMap = map;
                 int index = k.indexOf('.');
                 if (index != -1 && isNested) {
@@ -598,6 +670,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
         StringConvention keyConvention = annotationMetadata.enumValue(MapFormat.class, "keyFormat", StringConvention.class)
                                                            .orElse(null);
+        // the state the entries were read from, when called by a lookup of this class
+        ResolverState currentState = readState();
         if (keyConvention == StringConvention.RAW) {
             entries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
         }
@@ -610,11 +684,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 if (value != null) {
                     String key = entry.getKey().substring(prefix.length());
                     key = keyConvention != null ? keyConvention.format(key) : key;
-                    properties.put(key, resolvePlaceHoldersIfNecessary(value.toString()));
+                    properties.put(key, resolvePlaceHoldersIfNecessary(currentState, value.toString()));
                 }
             });
 
         return properties;
+    }
+
+    private Properties resolveSubProperties(ResolverState resolverState, String name, Map<String, DefaultPropertyEntry> entries, ArgumentConversionContext<?> conversionContext) {
+        // through the overridable method, which reads the state of the current thread
+        return onState(resolverState, () -> resolveSubProperties(name, entries, conversionContext));
     }
 
     /**
@@ -638,6 +717,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         return resolveSubMap(name, entries, conversionContext, keyConvention, transformation);
     }
 
+    private Map<String, Object> resolveSubMap(ResolverState resolverState, String name, Map<String, DefaultPropertyEntry> entries, ArgumentConversionContext<?> conversionContext) {
+        // through the overridable method, which reads the state of the current thread
+        return onState(resolverState, () -> resolveSubMap(name, entries, conversionContext));
+    }
+
     /**
      * Resolves a submap for the given name and parameters.
      *
@@ -658,6 +742,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         final Argument<?> valueType = conversionContext.getTypeVariable("V").orElse(Argument.OBJECT_ARGUMENT);
         boolean valueTypeIsList = List.class.isAssignableFrom(valueType.getType());
         Map<String, Object> subMap = CollectionUtils.newLinkedHashMap(entries.size());
+        // the state the entries were read from, when called by a lookup of this class
+        ResolverState currentState = readState();
 
         String prefix = name + '.';
         for (Map.Entry<String, DefaultPropertyEntry> entry : entries.entrySet()) {
@@ -670,7 +756,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             if (key.startsWith(prefix)) {
                 String subMapKey = key.substring(prefix.length());
 
-                Object value = resolvePlaceHoldersIfNecessary(entry.getValue().value());
+                Object value = resolvePlaceHoldersIfNecessary(currentState, entry.getValue().value());
 
                 if (transformation == MapFormat.MapTransformation.FLAT) {
                     subMapKey = keyConvention != null ? keyConvention.format(subMapKey) : subMapKey;
@@ -987,22 +1073,35 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         return name.replace('-', '.');
     }
 
-    private Object resolvePlaceHoldersIfNecessary(Object value) {
+    /**
+     * Resolves the placeholders of a value.
+     *
+     * @param resolverState The state the value was read from, which the properties the
+     *                      placeholders name are read from too
+     * @param value         The value
+     * @return The value with its placeholders resolved
+     */
+    private Object resolvePlaceHoldersIfNecessary(ResolverState resolverState, Object value) {
         if (value instanceof CharSequence) {
-            return propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(value.toString());
+            String str = value.toString();
+            if (str.contains(propertyPlaceholderResolver.getPrefix())) {
+                return onState(resolverState, () -> propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(str));
+            }
+            // without a placeholder nothing is looked up
+            return propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(str);
         } else if (value instanceof List<?> list) {
             List<?> newList = new ArrayList<>(list);
             final ListIterator i = newList.listIterator();
             while (i.hasNext()) {
                 final Object o = i.next();
                 if (o instanceof CharSequence) {
-                    i.set(resolvePlaceHoldersIfNecessary(o));
+                    i.set(resolvePlaceHoldersIfNecessary(resolverState, o));
                 } else if (o instanceof Map<?,?> submap) {
                     Map<Object, Object> newMap = CollectionUtils.newLinkedHashMap(submap.size());
                     for (Map.Entry<?, ?> entry : submap.entrySet()) {
                         final Object k = entry.getKey();
                         final Object v = entry.getValue();
-                        newMap.put(k, resolvePlaceHoldersIfNecessary(v));
+                        newMap.put(k, resolvePlaceHoldersIfNecessary(resolverState, v));
                     }
                     i.set(newMap);
                 }

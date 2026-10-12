@@ -311,9 +311,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Map<String, Object> refreshAndDiff() {
-        Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(publishedCatalog());
-        refresh();
-        return diffCatalog(copiedCatalog, publishedCatalog());
+        // Under the lock of the catalogs, which the refresh takes itself: the difference is between
+        // what was published before this refresh and what it has published. A property source that
+        // another thread adds to the catalogs, or another refresh, waits until it has been taken.
+        synchronized (catalog) {
+            Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(publishedCatalog());
+            refresh();
+            return diffCatalog(copiedCatalog, publishedCatalog());
+        }
     }
 
     @Override
