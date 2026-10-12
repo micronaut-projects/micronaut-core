@@ -30,6 +30,8 @@ public final class FileTestEngine implements TestEngine {
     static final String ABSOLUTE = "file-tests.absolute";
     // names each test's class by its file's real path, through the links the test source root goes through
     static final String REAL = "file-tests.real";
+    // names every test's class by this name, whatever its file
+    static final String NAMED = "file-tests.named";
 
     @Override
     public String getId() {
@@ -41,17 +43,18 @@ public final class FileTestEngine implements TestEngine {
         EngineDescriptor engine = new EngineDescriptor(uniqueId, "File tests");
         boolean absolute = request.getConfigurationParameters().getBoolean(ABSOLUTE).orElse(false);
         boolean real = request.getConfigurationParameters().getBoolean(REAL).orElse(false);
+        String named = request.getConfigurationParameters().get(NAMED).orElse(null);
         for (DirectorySelector directory : request.getSelectorsByType(DirectorySelector.class)) {
             try (Stream<Path> files = Files.list(directory.getPath())) {
                 files.filter(file -> file.toString().endsWith(".py")).sorted()
-                    .forEach(file -> engine.addChild(new FileTest(uniqueId, directory.getPath().getParent(), file, absolute, real)));
+                    .forEach(file -> engine.addChild(new FileTest(uniqueId, directory.getPath().getParent(), file, absolute, real, named)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
         }
         for (FileSelector file : request.getSelectorsByType(FileSelector.class)) {
             Path path = file.getPath();
-            engine.addChild(new FileTest(uniqueId, path.getParent().getParent(), path, absolute, real));
+            engine.addChild(new FileTest(uniqueId, path.getParent().getParent(), path, absolute, real, named));
         }
         return engine;
     }
@@ -78,9 +81,10 @@ public final class FileTestEngine implements TestEngine {
     private static final class FileTest extends AbstractTestDescriptor {
         private final Path file;
 
-        FileTest(UniqueId engine, Path base, Path file, boolean absolute, boolean real) {
-            // named by the file's path relative to the directory holding the tests, or by its absolute or real path
-            super(engine.append("file", file.toString()), file.getFileName().toString(), MethodSource.from(name(base, file, absolute, real), "test"));
+        FileTest(UniqueId engine, Path base, Path file, boolean absolute, boolean real, String named) {
+            // named by the file's path relative to the directory holding the tests, by its absolute or real path, or as configured
+            super(engine.append("file", file.toString()), file.getFileName().toString(),
+                MethodSource.from(named != null ? named : name(base, file, absolute, real), "test"));
             this.file = file;
         }
 
