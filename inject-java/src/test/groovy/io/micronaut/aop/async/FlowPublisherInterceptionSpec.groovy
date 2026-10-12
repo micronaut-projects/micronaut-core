@@ -47,4 +47,13 @@ class FlowPublisherInterceptionSpec extends Specification {
         interceptor.resultTypes.reactiveStreamsPublisher == InterceptedMethod.ResultType.PUBLISHER
         interceptor.resultTypes.string == InterceptedMethod.ResultType.SYNCHRONOUS
     }
+
+    void "the propagated context of the interceptor reaches a Flow.Publisher"() {
+        given:
+        PropagatingBean bean = context.getBean(PropagatingBean)
+
+        expect:
+        Flux.from(FlowAdapters.toPublisher(bean.flowPublisher())).blockFirst() == "marked"
+        bean.flux().blockFirst() == "marked"
+    }
 }
