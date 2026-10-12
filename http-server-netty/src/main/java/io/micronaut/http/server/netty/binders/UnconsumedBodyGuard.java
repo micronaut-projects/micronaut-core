@@ -18,15 +18,18 @@ package io.micronaut.http.server.netty.binders;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
-import io.netty.util.ReferenceCountUtil;
+import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.CloseableByteBody;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Operators;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 /**
  * Registers streaming body arguments that claim the request body when they are bound, so that
@@ -44,15 +47,22 @@ public final class UnconsumedBodyGuard {
     }
 
     /**
-     * Discard the given publisher if the route fails before it returns.
+     * Open a streaming body argument from the given body only once the route subscribes to it.
+     * If the route fails before it subscribes, the body is closed instead. Closing discards the
+     * body without asking the client for it, so a request with {@code Expect: 100-continue} is
+     * not sent a {@code 100 Continue}, and it also releases a body that was already fully
+     * received.
      *
-     * @param request   The request
-     * @param publisher The publisher that was bound from the request body
+     * @param request The request
+     * @param body    The body, taken from the request by the binder
+     * @param open    Opens the publisher for the body when the route subscribes
+     * @param <T>     The item type
+     * @return The publisher to pass to the route
      */
-    public static void discardIfRouteFails(HttpRequest<?> request, Publisher<?> publisher) {
-        // subscribe and cancel right away, this releases what was buffered so far and discards
-        // the rest of the body
-        BasicHttpAttributes.addUnconsumedBodyDiscard(request, () -> publisher.subscribe(new DiscardingSubscriber()));
+    public static <T> Publisher<T> openWhenSubscribed(HttpRequest<?> request, CloseableByteBody body, Function<? super CloseableByteBody, ? extends Publisher<T>> open) {
+        LazyBody<T> lazy = new LazyBody<>(body, open);
+        BasicHttpAttributes.addUnconsumedBodyDiscard(request, lazy::discard);
+        return lazy;
     }
 
     /**
@@ -71,31 +81,50 @@ public final class UnconsumedBodyGuard {
         });
     }
 
-    private static final class DiscardingSubscriber implements Subscriber<Object> {
-        @Override
-        public void onSubscribe(Subscription s) {
-            s.cancel();
+    /**
+     * Publisher that either the route claims by subscribing, or the discard by closing the body,
+     * whichever comes first.
+     *
+     * @param <T> The item type
+     */
+    private static final class LazyBody<T> extends AtomicInteger implements Publisher<T> {
+        private static final int UNCLAIMED = 0;
+        private static final int SUBSCRIBED = 1;
+        private static final int DISCARDED = 2;
+
+        private final CloseableByteBody body;
+        private final Function<? super CloseableByteBody, ? extends Publisher<T>> open;
+
+        LazyBody(CloseableByteBody body, Function<? super CloseableByteBody, ? extends Publisher<T>> open) {
+            this.body = body;
+            this.open = open;
         }
 
         @Override
-        public void onNext(Object o) {
-            if (o instanceof AutoCloseable closeable) {
-                try {
-                    closeable.close();
-                } catch (Exception e) {
-                    LOG.debug("Failed to release discarded request body item", e);
-                }
-            } else {
-                ReferenceCountUtil.release(o);
+        public void subscribe(Subscriber<? super T> s) {
+            int previous = compareAndExchange(UNCLAIMED, SUBSCRIBED);
+            if (previous == DISCARDED) {
+                Operators.error(s, ByteBody.BodyDiscardedException.create());
+                return;
+            } else if (previous != UNCLAIMED) {
+                Operators.error(s, new IllegalStateException("Only one subscriber allowed"));
+                return;
             }
+            Publisher<T> publisher;
+            try {
+                publisher = open.apply(body);
+            } catch (Throwable t) {
+                body.close();
+                Operators.error(s, t);
+                return;
+            }
+            publisher.subscribe(s);
         }
 
-        @Override
-        public void onError(Throwable t) {
-        }
-
-        @Override
-        public void onComplete() {
+        void discard() {
+            if (compareAndSet(UNCLAIMED, DISCARDED)) {
+                body.close();
+            }
         }
     }
 }

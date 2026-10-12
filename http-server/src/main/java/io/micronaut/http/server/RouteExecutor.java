@@ -447,7 +447,14 @@ public final class RouteExecutor {
 
     ExecutionFlow<HttpResponse<?>> callRoute(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> request) {
         RouteInfo<?> routeInfo = routeMatch.getRouteInfo();
-        ExecutorService executorService = routeInfo.getExecutor(serverConfiguration.getThreadSelection());
+        ExecutorService executorService;
+        try {
+            executorService = routeInfo.getExecutor(serverConfiguration.getThreadSelection());
+        } catch (RuntimeException e) {
+            // e.g. the executor the route names is not configured, so the route never runs
+            BasicHttpAttributes.discardUnconsumedBodies(request);
+            throw e;
+        }
         ExecutionFlow<HttpResponse<?>> executeMethodResponseFlow;
         if (executorService != null) {
             try {
@@ -506,15 +513,15 @@ public final class RouteExecutor {
         PropagatedContext routePropagatedContext = propagatedContext.plus(new ServerHttpRequestContext(httpRequest));
         return routePropagatedContext.propagate(() -> {
             try {
-                if (isKotlinCoroutine && contextView != null) {
-                    coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext, executorService));
-                }
                 Object body;
                 try {
+                    if (isKotlinCoroutine && contextView != null) {
+                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext, executorService));
+                    }
                     requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
                     body = routeMatch.execute();
                 } catch (Throwable e) {
-                    // either an argument failed to bind and the route was never invoked, or the
+                    // either the route was never invoked (e.g. an argument failed to bind), or the
                     // invocation threw (e.g. a @Valid violation). In both cases the request has
                     // failed, so a streaming body argument is not consumed any more
                     BasicHttpAttributes.discardUnconsumedBodies(httpRequest);
