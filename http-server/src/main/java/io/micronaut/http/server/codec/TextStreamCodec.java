@@ -180,19 +180,22 @@ public class TextStreamCodec implements MediaTypeCodec {
             writeAttribute(eventData, RETRY_PREFIX, String.valueOf(retry.toMillis()));
         }
 
-        // Write the data, one data line per line. CRLF, LF and CR all end a line. There is always at
-        // least one data line, so that empty data and a trailing line break reach the client
-        int start = 0;
-        while (true) {
-            int end = indexOfLineBreak(body, start);
-            if (end == -1) {
-                eventData.write(DATA_PREFIX).write(body, start, body.length - start).write(NEWLINE);
-                break;
-            }
-            eventData.write(DATA_PREFIX).write(body, start, end - start).write(NEWLINE);
-            start = end + 1;
-            if (body[end] == '\r' && start < body.length && body[start] == '\n') {
-                start++;
+        // Write the data, one data line per line. CRLF, LF and CR all end a line, and a trailing line
+        // break gets a final empty data line. Empty data gets no data line, so that clients don't
+        // dispatch an event, e.g. for a comment used as keep-alive
+        if (body.length > 0) {
+            int start = 0;
+            while (true) {
+                int end = indexOfLineBreak(body, start);
+                if (end == -1) {
+                    eventData.write(DATA_PREFIX).write(body, start, body.length - start).write(NEWLINE);
+                    break;
+                }
+                eventData.write(DATA_PREFIX).write(body, start, end - start).write(NEWLINE);
+                start = end + 1;
+                if (body[end] == '\r' && start < body.length && body[start] == '\n') {
+                    start++;
+                }
             }
         }
 
