@@ -33,12 +33,9 @@ import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.NativeImageUtils;
-import io.micronaut.context.reload.ClassChange;
 import io.micronaut.dev.agent.DynamicAttach;
 import io.micronaut.dev.change.ChangeSet;
-import io.micronaut.dev.change.ClassStructure;
 import io.micronaut.dev.change.OutputSnapshot;
 import io.micronaut.dev.compile.CompileMode;
 import io.micronaut.dev.compile.OutputLock;
@@ -69,7 +66,6 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.instrument.ClassDefinition;
 import java.lang.instrument.Instrumentation;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -91,7 +87,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -171,8 +166,7 @@ public final class DevRuntime implements Closeable {
     private final Map<Path, FileWatcherRegistration> pinnedWatches = new ConcurrentHashMap<>();
     private @Nullable LiveReloadServer liveReload;
     private @Nullable Instrumentation instrumentation;
-    private final AtomicInteger redefinitions = new AtomicInteger();
-    private final AtomicInteger inPlacePatches = new AtomicInteger();
+    private final InPlaceUpdates inPlaceUpdates = new InPlaceUpdates(this);
     private @Nullable Thread worker;
     private OutputSnapshot snapshot = OutputSnapshot.empty();
     /**
@@ -408,7 +402,7 @@ public final class DevRuntime implements Closeable {
      * @return How many times a change was applied in place, by redefining method bodies, since the start
      */
     public int redefinitions() {
-        return redefinitions.get();
+        return inPlaceUpdates.redefinitions();
     }
 
     /**
@@ -416,7 +410,7 @@ public final class DevRuntime implements Closeable {
      *         {@link InPlaceResourceReloader}, without a restart, since the start
      */
     public int inPlacePatches() {
-        return inPlacePatches.get();
+        return inPlaceUpdates.inPlacePatches();
     }
 
     /**
@@ -1374,10 +1368,10 @@ public final class DevRuntime implements Closeable {
             }
             return;
         }
-        if (configurationChange == null && !batch.forcesRestart() && !startFailed && patchInPlace(changeSet, previous, start)) {
+        if (configurationChange == null && !batch.forcesRestart() && !startFailed && inPlaceUpdates.patchInPlace(context, changeSet, previous, start)) {
             return;
         }
-        if (configurationChange == null && !batch.forcesRestart() && !startFailed && redefine(changeSet, start)) {
+        if (configurationChange == null && !batch.forcesRestart() && !startFailed && inPlaceUpdates.redefine(instrumentation, context, changeSet, start)) {
             return;
         }
         restart(changeSet, configurationChange, start);
@@ -1402,187 +1396,6 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
-     * The fast path: when every changed class kept its structure and no generated class changed, the
-     * JVM redefines the loaded ones in place and the generation's snapshot gets the new bytes for the
-     * rest, so that the running beans see the new bodies and nothing restarts.
-     *
-     * @return Whether the change was applied this way
-     */
-    private boolean redefine(ChangeSet changeSet, long startNanos) {
-        Instrumentation agent = instrumentation;
-        if (agent == null || strategy() == ReloadStrategy.RESTART || changeSet.classes().isEmpty()
-            || !changeSet.changedResources().isEmpty() || !changeSet.removedResources().isEmpty()) {
-            return false;
-        }
-        GenerationClassLoader generation = classLoader.current();
-        List<ClassDefinition> definitions = new ArrayList<>();
-        Map<String, byte[]> replacements = new LinkedHashMap<>();
-        for (ClassChange change : changeSet.classes()) {
-            String name = change.className();
-            String simpleName = name.substring(name.lastIndexOf('.') + 1);
-            if (change.kind() != ClassChange.Kind.MODIFIED || simpleName.startsWith("$")) {
-                // a class added or removed, or a generated one that changed: the definitions changed shape
-                return false;
-            }
-            byte[] before = classFile(generation.roots(), name);
-            byte[] after = classFile(manifest.reloadableRoots(), name);
-            if (before == null || after == null || !ClassStructure.bodyOnlyChange(before, after)) {
-                return false;
-            }
-            replacements.put(name, after);
-        }
-        ApplicationContext current = context;
-        try {
-            // the snapshot first: a class a thread loads from now on is the new version, and one loaded before is
-            // found below and redefined; nothing can load the old version in between
-            for (Map.Entry<String, byte[]> entry : replacements.entrySet()) {
-                generation.replaceClassFile(entry.getKey(), entry.getValue());
-            }
-            for (Map.Entry<String, byte[]> entry : replacements.entrySet()) {
-                Class<?> loaded = generation.loadedClass(entry.getKey());
-                if (loaded != null) {
-                    definitions.add(new ClassDefinition(loaded, entry.getValue()));
-                }
-            }
-            if (!definitions.isEmpty()) {
-                agent.redefineClasses(definitions.toArray(new ClassDefinition[0]));
-            }
-        } catch (Exception | LinkageError e) {
-            // the snapshot may already hold the new bytes: the restart that follows builds a new generation anyway
-            LOG.info("Cannot redefine {} class(es) in place ({}): restarting instead", replacements.size(), e.getMessage());
-            return false;
-        }
-        redefinitions.incrementAndGet();
-        Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
-        if (current != null && current.isRunning()) {
-            ClassChangeEvent event = new ClassChangeEvent(this, Set.of(), generation, changeSet.classes(), ReloadStrategy.RELOAD);
-            try {
-                current.publishEvent(event);
-                current.publishEvent(new ReloadCompletedEvent(this, event, List.of(), List.of(), elapsed));
-            } catch (RuntimeException e) {
-                LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
-            }
-        }
-        LOG.info("Redefined {} class(es) in place in {} ms: method bodies only, generation {} keeps running", replacements.size(), elapsed.toMillis(), generation.generation());
-        LiveReloadServer server = liveReload;
-        if (server != null) {
-            server.reload("/", false);
-        }
-        return true;
-    }
-
-    /**
-     * Tier one: a change of resources alone, none added or removed and no class changed, is offered to the running
-     * context's {@link InPlaceResourceReloader}s; the first that takes the whole change gets the new contents in the
-     * generation's snapshot, then applies them to the running application. A Python module whose generated classes
-     * stayed byte for byte the same is such a change. Anything a reloader refuses, by answering no or by throwing,
-     * restarts as before, and the restart's new generation discards a half-applied patch.
-     *
-     * @return Whether the change was applied this way
-     */
-    private boolean patchInPlace(ChangeSet changeSet, OutputSnapshot previous, long startNanos) {
-        if (!isPatchable(changeSet, previous.resourcePaths())) {
-            return false;
-        }
-        ApplicationContext current = context;
-        if (current == null || !current.isRunning()) {
-            return false;
-        }
-        GenerationClassLoader generation = classLoader.current();
-        List<InPlaceResourceReloader> reloaders;
-        try {
-            reloaders = new ArrayList<>(current.getBeansOfType(InPlaceResourceReloader.class));
-        } catch (RuntimeException e) {
-            LOG.debug("Cannot look up the in-place reloaders: restarting instead", e);
-            return false;
-        }
-        InPlaceResourceReloader.Result result = patchGeneration(changeSet, reloaders, "restarting instead");
-        if (result == null) {
-            return false;
-        }
-        Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
-        ClassChangeEvent event = new ClassChangeEvent(this, Set.of(), generation, List.of(), ReloadStrategy.RELOAD);
-        try {
-            current.publishEvent(event);
-            current.publishEvent(new ReloadCompletedEvent(this, event, List.of(), List.of(), elapsed));
-        } catch (RuntimeException e) {
-            LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
-        }
-        LOG.info("Patched {} {} in place in {} ms: generation {} keeps running", result.count(), result.unit(), elapsed.toMillis(), generation.generation());
-        LiveReloadServer server = liveReload;
-        if (server != null) {
-            server.reload("/", false);
-        }
-        return true;
-    }
-
-    /**
-     * Whether a change of the class output is one an {@link InPlaceResourceReloader} may take: resources changed,
-     * none added or removed, and no class changed. {@link DevManifest#patchInPlace()} turns this off.
-     *
-     * @param changeSet The change
-     * @param before The resources the output held before it
-     * @return True if the change may be patched in place
-     */
-    boolean isPatchable(ChangeSet changeSet, Set<String> before) {
-        Set<String> changed = changeSet.changedResources();
-        // nor a resource added: a reloader reads an index of the resources it knows, a Python file system its file list
-        return manifest.patchInPlace() && !changeSet.hasClassChanges() && !changed.isEmpty() && changeSet.removedResources().isEmpty()
-            && before.containsAll(changed);
-    }
-
-    /**
-     * Patches a {@link #isPatchable patchable} change into the current generation: the first of the reloaders, in
-     * order, that takes the whole change gets the new contents in the generation's snapshot, then applies them. A
-     * refusal, by answering no or by throwing, leaves it to the caller to start a new generation, which discards a
-     * half-applied patch.
-     *
-     * @param changeSet The change
-     * @param reloaders The reloaders that may take it
-     * @param otherwise What the caller does when the change is not patched, for the log
-     * @return What was patched, or null when nothing was
-     */
-    InPlaceResourceReloader.@Nullable Result patchGeneration(ChangeSet changeSet, List<InPlaceResourceReloader> reloaders, String otherwise) {
-        Set<String> changed = changeSet.changedResources();
-        GenerationClassLoader generation = classLoader.current();
-        InPlaceResourceReloader reloader = null;
-        try {
-            List<InPlaceResourceReloader> sorted = new ArrayList<>(reloaders);
-            OrderUtil.sort(sorted);
-            for (InPlaceResourceReloader candidate : sorted) {
-                if (candidate.canReload(changed, Set.of())) {
-                    reloader = candidate;
-                    break;
-                }
-            }
-        } catch (RuntimeException | LinkageError e) {
-            LOG.debug("An in-place reloader failed to answer: {}", otherwise, e);
-            return null;
-        }
-        if (reloader == null) {
-            return null;
-        }
-        InPlaceResourceReloader.Result result;
-        try {
-            // the snapshot first: the reloader reads the new contents through the generation's loader
-            for (String resource : changed) {
-                byte[] contents = resourceFile(manifest.reloadableRoots(), resource);
-                if (contents == null || !generation.replaceResource(resource, contents)) {
-                    LOG.info("Cannot patch {} in place, the generation does not hold it: {}", resource, otherwise);
-                    return null;
-                }
-            }
-            result = reloader.reload(changed);
-        } catch (Exception | LinkageError e) {
-            LOG.info("Cannot patch {} resource(s) in place ({}): {}", changed.size(), e.getMessage(), otherwise);
-            LOG.debug("The in-place patch failed", e);
-            return null;
-        }
-        inPlacePatches.incrementAndGet();
-        return result;
-    }
-
-    /**
      * @return The resources of the reloadable roots as they were last compared, which the next change is compared with
      */
     Set<String> outputResources() {
@@ -1596,22 +1409,8 @@ public final class DevRuntime implements Closeable {
         return classLoader.current();
     }
 
-    static byte @Nullable [] classFile(List<Path> roots, String className) {
-        return resourceFile(roots, className.replace('.', '/') + ".class");
-    }
-
-    private static byte @Nullable [] resourceFile(List<Path> roots, String relative) {
-        for (Path root : roots) {
-            Path file = root.resolve(relative);
-            if (Files.isRegularFile(file)) {
-                try {
-                    return Files.readAllBytes(file);
-                } catch (IOException e) {
-                    return null;
-                }
-            }
-        }
-        return null;
+    InPlaceUpdates inPlaceUpdates() {
+        return inPlaceUpdates;
     }
 
     private void restart(ChangeSet changeSet, @Nullable ConfigurationChange configurationChange, long startNanos) {
