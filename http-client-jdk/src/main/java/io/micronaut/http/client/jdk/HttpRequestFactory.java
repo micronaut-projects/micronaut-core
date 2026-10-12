@@ -56,16 +56,15 @@ import java.util.stream.Collectors;
 @Experimental
 public final class HttpRequestFactory {
 
-    private static final Set<String> SKIPPED_HEADERS = Set.of("transfer-encoding");
-    private static final Set<String> RAW_REQUEST_SKIPPED_HEADERS = Set.of(
+    /**
+     * The headers of the request that are not sent. Like the Netty client, the JDK client frames
+     * the body itself and manages the connection, so the framing headers and the
+     * {@code Connection} header of the request would contradict what it sends.
+     */
+    private static final Set<String> SKIPPED_HEADERS = Set.of(
         "transfer-encoding",
         "content-length",
-        "connection",
-        "keep-alive",
-        "proxy-connection",
-        "te",
-        "trailer",
-        "upgrade"
+        "connection"
     );
 
     private HttpRequestFactory() {
@@ -88,9 +87,8 @@ public final class HttpRequestFactory {
             // the name of a custom method, e.g. PROPFIND, not CUSTOM
             builder.method(mutableHttpRequest.getMethodName(), bodyPublisher);
         }
-        Set<String> skippedHeaders = skippedHeaders(mutableHttpRequest);
         mutableHttpRequest.getHeaders().forEach((name, values) -> {
-            if (!skippedHeaders.contains(name.toLowerCase(Locale.ROOT))) {
+            if (!SKIPPED_HEADERS.contains(name.toLowerCase(Locale.ROOT))) {
                 values.forEach(value -> builder.header(name, value));
             }
         });
@@ -99,24 +97,6 @@ public final class HttpRequestFactory {
         }
         configuration.getReadTimeout().ifPresent(builder::timeout);
         return builder;
-    }
-
-    /**
-     * The headers of the request that are not sent. The JDK client frames the body itself, so a
-     * {@code Transfer-Encoding} of the request would contradict the framing it sends. A raw
-     * request is sent with the framing of its byte body, so its {@code Content-Length} is not
-     * sent either, and the JDK client manages the connection itself, so its hop-by-hop headers
-     * are not sent. A raw request often carries the headers of a request that a relay received,
-     * which must not be forwarded. The JDK client refuses some of these headers for other
-     * requests. The headers that the {@code Connection} header lists are not removed here: by now
-     * the request also holds the headers that the application and the client filters added, so a
-     * relay has to remove them from the request it received.
-     *
-     * @param request The request
-     * @return The lower case names of the headers that are not sent
-     */
-    private static Set<String> skippedHeaders(MutableHttpRequest<?> request) {
-        return request instanceof RawHttpRequestWrapper<?> ? RAW_REQUEST_SKIPPED_HEADERS : SKIPPED_HEADERS;
     }
 
     private static <I> HttpRequest.BodyPublisher publisherForRequest(

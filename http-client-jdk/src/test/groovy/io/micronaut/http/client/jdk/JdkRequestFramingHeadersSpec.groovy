@@ -27,10 +27,10 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 /**
- * The JDK client frames the request body itself, so it must not send the framing headers of the
- * request, and a relayed request must not carry the hop-by-hop headers of the connection it came
- * from. Otherwise the upstream can see both {@code Content-Length} and
- * {@code Transfer-Encoding}, and read the body as chunk framing.
+ * The JDK client frames the request body itself and manages the connection, so like the Netty
+ * client it must not send the framing headers and the {@code Connection} header of the request.
+ * Otherwise the upstream can see both {@code Content-Length} and {@code Transfer-Encoding}, and
+ * read the body as chunk framing.
  */
 class JdkRequestFramingHeadersSpec extends Specification {
     static final String SPEC_NAME = 'JdkRequestFramingHeadersSpec'
@@ -73,7 +73,7 @@ class JdkRequestFramingHeadersSpec extends Specification {
         client?.close()
     }
 
-    void "a raw exchange sends its own framing and no hop-by-hop headers"() {
+    void "a raw exchange sends its own framing and Connection"() {
         given:
         RawHttpClient client = server.applicationContext.createBean(RawHttpClient)
         MutableHttpRequest<?> request = HttpRequest.POST("http://127.0.0.1:$upstream.port/raw", null)
@@ -81,11 +81,6 @@ class JdkRequestFramingHeadersSpec extends Specification {
                 .header(HttpHeaders.TRANSFER_ENCODING, "chunked")
                 .header(HttpHeaders.CONTENT_LENGTH, "999")
                 .header(HttpHeaders.CONNECTION, "keep-alive")
-                .header("Keep-Alive", "timeout=5")
-                .header("Proxy-Connection", "keep-alive")
-                .header(HttpHeaders.TE, "trailers")
-                .header(HttpHeaders.TRAILER, "X-Trailer")
-                .header(HttpHeaders.UPGRADE, "websocket")
                 .header("X-End-To-End", "kept")
         byte[] body = "0\r\n\r\nGET /internal HTTP/1.1\r\nHost: upstream\r\n\r\n".getBytes(StandardCharsets.UTF_8)
 
@@ -100,11 +95,6 @@ class JdkRequestFramingHeadersSpec extends Specification {
         received.headers["content-length"] == [String.valueOf(body.length)]
         !received.headers.containsKey("transfer-encoding")
         !received.headers.containsKey("connection")
-        !received.headers.containsKey("keep-alive")
-        !received.headers.containsKey("proxy-connection")
-        !received.headers.containsKey("te")
-        !received.headers.containsKey("trailer")
-        !received.headers.containsKey("upgrade")
         received.headers["x-end-to-end"] == ["kept"]
         received.body == body
 
@@ -132,14 +122,16 @@ class JdkRequestFramingHeadersSpec extends Specification {
         received.headers["x-forwarded-for"] == ["gateway"]
     }
 
-    void "the regular client does not send a Transfer-Encoding next to its own framing"() {
+    void "the regular client sends its own framing and Connection"() {
         given:
         HttpClient client = server.applicationContext.createBean(HttpClient, new URL("http://127.0.0.1:$upstream.port"))
 
         when:
         HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.POST("/regular", "hello")
                 .contentType(MediaType.TEXT_PLAIN_TYPE)
-                .header(HttpHeaders.TRANSFER_ENCODING, "chunked"))
+                .header(HttpHeaders.TRANSFER_ENCODING, "chunked")
+                .header(HttpHeaders.CONTENT_LENGTH, "999")
+                .header(HttpHeaders.CONNECTION, "keep-alive"))
         Received received = upstream.take()
 
         then:
@@ -147,6 +139,7 @@ class JdkRequestFramingHeadersSpec extends Specification {
         received.path == "/regular"
         received.headers["content-length"] == ["5"]
         !received.headers.containsKey("transfer-encoding")
+        !received.headers.containsKey("connection")
         new String(received.body, StandardCharsets.UTF_8) == "hello"
 
         cleanup:
