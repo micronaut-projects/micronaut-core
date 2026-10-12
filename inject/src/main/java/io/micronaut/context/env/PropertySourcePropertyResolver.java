@@ -77,8 +77,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     protected final ConversionService conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
     protected final Map<String, PropertySource> propertySources = new ConcurrentHashMap<>(10);
-    // properties are stored in an array of maps organized by character in the alphabet
-    // this allows optimization of searches by prefix
+    // The catalogs that lookups read are held by `state`. These three arrays are kept for binary
+    // compatibility with subclasses: they are no longer read by this class and mirror the published
+    // catalogs, slot by slot. The `catalog` array is also still the monitor that guards catalog
+    // writes, and with them the start, the stop and the refresh of an environment.
     @SuppressWarnings("MagicNumber")
     protected final Map<String, DefaultPropertyEntry>[] catalog = new Map[58];
     protected final Map<String, DefaultPropertyEntry>[] rawCatalog = new Map[58];
@@ -86,16 +88,26 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     protected Logger log;
 
-    private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
+    private final Object catalogLock = catalog;
     /**
-     * Cache for values <i>before</i> conversion. This avoids recomputing placeholders, which keeps
-     * random values (e.g. {@code ${random.port}} stable).
+     * The catalogs and the caches derived from them, as lookups see them. A refresh replaces it as
+     * a whole, so a lookup that reads this field never observes a catalog the refresh has only
+     * partially rebuilt.
      */
-    private final Map<String, Object> placeholderResolutionCache = new ConcurrentHashMap<>(20);
+    @SuppressWarnings("java:S3077") // ResolverState is only ever published fully initialized
+    private volatile ResolverState state = new ResolverState();
     /**
-     * Cache for values <i>after</i> conversion.
+     * The state that catalog writes go into. The same instance as {@link #state}, except while a
+     * refresh builds a replacement that is not published yet. Guarded by {@link #catalogLock}.
      */
-    private final Map<ConversionCacheKey, Object> resolvedValueCache = new ConcurrentHashMap<>(20);
+    private ResolverState writeState = state;
+    /**
+     * The thread {@link #refresh(Runnable)} is building a replacement state on, or
+     * {@code null} outside a refresh. Written under {@link #catalogLock}, read without it by every
+     * lookup.
+     */
+    @SuppressWarnings("java:S3077") // a thread reference, not a mutable object
+    private volatile Thread refreshingThread;
     private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
 
     /**
@@ -167,15 +179,101 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         return this;
     }
 
+    /**
+     * Drops the properties. Within {@link #refresh(Runnable)} the writes that follow go into
+     * an empty replacement state, which lookups on other threads do not see until the refresh
+     * publishes it. Outside a refresh the published state is replaced right away and, as stopping
+     * the environment always did, only the generated catalog and the caches are dropped: the raw
+     * and the normalized catalog stay, so a stopped environment answers what it used to.
+     */
+    void reset() {
+        synchronized (catalogLock) {
+            ResolverState replacement = new ResolverState();
+            if (refreshingThread == null) {
+                ResolverState current = state;
+                System.arraycopy(current.rawCatalog, 0, replacement.rawCatalog, 0, replacement.rawCatalog.length);
+                System.arraycopy(current.nonGenerated, 0, replacement.nonGenerated, 0, replacement.nonGenerated.length);
+                state = replacement;
+                mirrorPublishedState();
+            }
+            writeState = replacement;
+        }
+    }
+
+    /**
+     * The state a lookup reads from. Outside a refresh that is the published state. On the thread
+     * that is rebuilding the catalogs it is the replacement being built, so the rebuild sees the
+     * properties it has contributed so far: a {@link PropertySource} whose keys depend on what the
+     * resolver already holds (micronaut-test-resources contributes only the keys the environment
+     * cannot resolve) must be answered from the catalog being built, not from the one the rebuild
+     * is replacing. Every other thread keeps reading the published state until the rebuild is
+     * published in one step.
+     *
+     * @return The state to read the catalogs and the caches from
+     */
+    private ResolverState readState() {
+        // Only the refreshing thread takes the `writeState` branch, and it holds `catalogLock` for
+        // the whole rebuild, so it reads a field that no other thread can be writing.
+        return refreshingThread == Thread.currentThread() ? writeState : state;
+    }
+
+    /**
+     * Rebuilds the catalogs. The writes performed by {@code rebuild} go into a replacement state
+     * while lookups keep reading the current one, and the replacement is published in a single
+     * step once {@code rebuild} completes. A concurrent lookup therefore observes the properties
+     * either as they were before the rebuild or as they are after it, but never a half-built
+     * catalog. If {@code rebuild} throws, the replacement is discarded and the current state stays
+     * published.
+     *
+     * @param rebuild The rebuild to run
+     */
+    void refresh(Runnable rebuild) {
+        synchronized (catalogLock) {
+            if (refreshingThread != null) {
+                // Already inside a refresh, its outermost call publishes.
+                rebuild.run();
+                return;
+            }
+            refreshingThread = Thread.currentThread();
+            try {
+                rebuild.run();
+                state = writeState;
+                mirrorPublishedState();
+            } finally {
+                refreshingThread = null;
+                writeState = state;
+            }
+        }
+    }
+
+    /**
+     * @return The generated catalog as lookups on other threads currently see it
+     */
+    Map<String, DefaultPropertyEntry>[] publishedCatalog() {
+        return state.catalog;
+    }
+
+    /**
+     * Copies the published catalogs into the arrays kept for subclasses. Called with
+     * {@link #catalogLock} held.
+     */
+    private void mirrorPublishedState() {
+        ResolverState published = state;
+        System.arraycopy(published.catalog, 0, catalog, 0, catalog.length);
+        System.arraycopy(published.rawCatalog, 0, rawCatalog, 0, rawCatalog.length);
+        System.arraycopy(published.nonGenerated, 0, nonGenerated, 0, nonGenerated.length);
+    }
+
     @Override
     public boolean containsProperty(@Nullable String name) {
         if (StringUtils.isEmpty(name)) {
             return false;
         }
-        Boolean result = containsCache.get(name);
+        ResolverState currentState = readState();
+        Boolean result = currentState.containsCache.get(name);
         if (result == null) {
             for (PropertyCatalog convention : CONVENTIONS) {
-                Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(name, false, convention);
+                Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(currentState, name, convention);
                 if (entries != null) {
                     if (entries.containsKey(name)) {
                         result = true;
@@ -186,7 +284,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             if (result == null) {
                 result = false;
             }
-            containsCache.put(name, result);
+            currentState.containsCache.put(name, result);
         }
         return result;
     }
@@ -334,17 +432,20 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         Class<T> requiredType = conversionContext.getArgument().getType();
         boolean cacheableType = ClassUtils.isJavaLangType(requiredType);
         ConversionCacheKey cacheKey = new ConversionCacheKey(name, requiredType);
-        Object cached = cacheableType ? resolvedValueCache.get(cacheKey) : null;
+        // A single read of the state, so the catalogs and the caches this lookup consults cannot be
+        // replaced underneath it by a concurrent refresh.
+        ResolverState currentState = readState();
+        Object cached = cacheableType ? currentState.resolvedValueCache.get(cacheKey) : null;
         if (cached != null) {
             return cached == NO_VALUE ? Optional.empty() : Optional.of((T) cached);
         }
-        Object value = placeholderResolutionCache.get(name);
+        Object value = currentState.placeholderResolutionCache.get(name);
         // entries map to get the value from, only populated if there's a cache miss with placeholderResolutionCache
         Map<String, DefaultPropertyEntry> entries = null;
         if (value == null) {
-            entries = resolveEntriesForKey(name, false, PropertyCatalog.GENERATED);
+            entries = resolveEntriesForKey(currentState, name, PropertyCatalog.GENERATED);
             if (entries == null) {
-                entries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
+                entries = resolveEntriesForKey(currentState, name, PropertyCatalog.RAW);
             }
         }
         if (entries != null || value != null) {
@@ -355,7 +456,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 value = entries.getOrDefault(normalizeName(name), NULL_ENTRY).value();
                 if (value == null && name.indexOf('[') == -1) {
                     // last chance lookup the raw value
-                    Map<String, DefaultPropertyEntry> rawEntries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
+                    Map<String, DefaultPropertyEntry> rawEntries = resolveEntriesForKey(currentState, name, PropertyCatalog.RAW);
                     value = rawEntries != null ? rawEntries.getOrDefault(name, NULL_ENTRY).value() : null;
                     if (value != null) {
                         entries = rawEntries;
@@ -396,7 +497,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 if (entries != null) {
                     // iff entries is null, the value is from placeholderResolutionCache and doesn't need this step
                     value = resolvePlaceHoldersIfNecessary(value);
-                    placeholderResolutionCache.put(name, value);
+                    currentState.placeholderResolutionCache.put(name, value);
                 }
                 if (requiredType.isInstance(value) && !CollectionUtils.isIterableOrMap(requiredType)) {
                     converted = (Optional<T>) Optional.of(value);
@@ -413,11 +514,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 }
 
                 if (cacheableType) {
-                    resolvedValueCache.put(cacheKey, converted.orElse((T) NO_VALUE));
+                    currentState.resolvedValueCache.put(cacheKey, converted.orElse((T) NO_VALUE));
                 }
                 return converted;
             } else if (cacheableType) {
-                resolvedValueCache.put(cacheKey, NO_VALUE);
+                currentState.resolvedValueCache.put(cacheKey, NO_VALUE);
                 return Optional.empty();
             } else if (Properties.class.isAssignableFrom(requiredType)) {
                 Properties properties = resolveSubProperties(name, entries, conversionContext);
@@ -456,7 +557,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         Map<String, Object> map = new HashMap<>();
         boolean isNested = transformation == MapFormat.MapTransformation.NESTED;
         Arrays
-            .stream(getCatalog(keyConvention == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED))
+            .stream(getCatalog(readState(), keyConvention == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED))
             .filter(Objects::nonNull)
             .map(Map::entrySet)
             .flatMap(Collection::stream)
@@ -595,7 +696,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     @SuppressWarnings("MagicNumber")
     protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
         this.propertySources.put(properties.getName(), properties);
-        synchronized (catalog) {
+        synchronized (catalogLock) {
             for (String property : properties) {
 
                 log.trace("Processing property key {}", property);
@@ -678,6 +779,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                     ));
                 }
             }
+            // A lookup can cache a miss between reset() and catalog reinitialization, clear those
+            // entries now that the catalog holds this property source. Within a refresh these are
+            // the caches of the replacement, filled by the lookups the rebuild itself made, so no
+            // answer computed from a half-built catalog is published. The caches are cleared
+            // directly: resetCaches() is a hook for subclasses, and this runs from the constructor.
+            clearCaches(writeState);
         }
     }
 
@@ -774,17 +881,37 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
+     * Resolves the entries of the catalog that hold the given name. Note that
+     * {@link #getProperty(String, ArgumentConversionContext)} and {@link #containsProperty(String)}
+     * read the catalogs and the caches of one state and do not go through this method.
+     *
      * @param name        The name
      * @param allowCreate Whether allows creation
      * @param propertyCatalog The string convention
      * @return The map with the resolved entries for the name
      */
-    @SuppressWarnings("MagicNumber")
     protected Map<String, DefaultPropertyEntry> resolveEntriesForKey(String name, boolean allowCreate, @Nullable PropertyCatalog propertyCatalog) {
+        if (allowCreate) {
+            // Writes go to the state being built, which is the published one outside of a refresh.
+            // The lock guards the read of `writeState`; every write path already holds it, and the
+            // lock is reentrant, so this only ever matters to an external caller that does not.
+            synchronized (catalogLock) {
+                return resolveEntriesForKey(writeState, name, true, propertyCatalog);
+            }
+        }
+        return resolveEntriesForKey(readState(), name, propertyCatalog);
+    }
+
+    private Map<String, DefaultPropertyEntry> resolveEntriesForKey(ResolverState resolverState, String name, @Nullable PropertyCatalog propertyCatalog) {
+        return resolveEntriesForKey(resolverState, name, false, propertyCatalog);
+    }
+
+    @SuppressWarnings("MagicNumber")
+    private Map<String, DefaultPropertyEntry> resolveEntriesForKey(ResolverState resolverState, String name, boolean allowCreate, @Nullable PropertyCatalog propertyCatalog) {
         if (name.isEmpty()) {
             return null;
         }
-        final Map<String, DefaultPropertyEntry>[] catalog = getCatalog(propertyCatalog);
+        final Map<String, DefaultPropertyEntry>[] catalog = getCatalog(resolverState, propertyCatalog);
 
         Map<String, DefaultPropertyEntry> entries = null;
         char firstChar = name.charAt(0);
@@ -795,6 +922,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 if (allowCreate && entries == null) {
                     entries = new LinkedHashMap<>(5);
                     catalog[index] = entries;
+                    if (resolverState == state) {
+                        mirrorPublishedState();
+                    }
                 }
             }
         }
@@ -803,15 +933,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     /**
      * Obtain a property catalog.
+     * @param resolverState The state to read the catalog from
      * @param propertyCatalog The catalog
      * @return The catalog
      */
-    private Map<String, DefaultPropertyEntry>[] getCatalog(@Nullable PropertyCatalog propertyCatalog) {
+    private Map<String, DefaultPropertyEntry>[] getCatalog(ResolverState resolverState, @Nullable PropertyCatalog propertyCatalog) {
         propertyCatalog = propertyCatalog != null ? propertyCatalog : PropertyCatalog.GENERATED;
         return switch (propertyCatalog) {
-            case RAW -> this.rawCatalog;
-            case NORMALIZED -> this.nonGenerated;
-            default -> this.catalog;
+            case RAW -> resolverState.rawCatalog;
+            case NORMALIZED -> resolverState.nonGenerated;
+            default -> resolverState.catalog;
         };
     }
 
@@ -819,9 +950,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * Subclasses can override to reset caches.
      */
     protected void resetCaches() {
-        containsCache.clear();
-        resolvedValueCache.clear();
-        placeholderResolutionCache.clear();
+        clearCaches(readState());
+    }
+
+    private static void clearCaches(ResolverState resolverState) {
+        resolverState.containsCache.clear();
+        resolverState.resolvedValueCache.clear();
+        resolverState.placeholderResolutionCache.clear();
     }
 
     private void processSubmapKey(Map<String, Object> map, String key, Object value, @Nullable StringConvention keyConvention) {
@@ -899,6 +1034,36 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (propertyPlaceholderResolver instanceof AutoCloseable autoCloseable) {
             autoCloseable.close();
         }
+    }
+
+    /**
+     * The mutable state of the resolver: the property catalogs and the caches derived from them.
+     * Holding them together means a refresh can build a replacement without touching what lookups
+     * are reading, and publish it with a single write to {@link #state}. A lookup racing with that
+     * switch keeps reading the state it started from, so a value it computes from the previous
+     * catalogs is cached against those catalogs rather than leaking into the new ones.
+     */
+    private static final class ResolverState {
+
+        // properties are stored in an array of maps organized by character in the alphabet
+        // this allows optimization of searches by prefix
+        @SuppressWarnings("MagicNumber")
+        private static final int CATALOG_SIZE = 58;
+
+        private final Map<String, DefaultPropertyEntry>[] catalog = new Map[CATALOG_SIZE];
+        private final Map<String, DefaultPropertyEntry>[] rawCatalog = new Map[CATALOG_SIZE];
+        private final Map<String, DefaultPropertyEntry>[] nonGenerated = new Map[CATALOG_SIZE];
+
+        private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
+        /**
+         * Cache for values <i>before</i> conversion. This avoids recomputing placeholders, which keeps
+         * random values (e.g. {@code ${random.port}} stable).
+         */
+        private final Map<String, Object> placeholderResolutionCache = new ConcurrentHashMap<>(20);
+        /**
+         * Cache for values <i>after</i> conversion.
+         */
+        private final Map<ConversionCacheKey, Object> resolvedValueCache = new ConcurrentHashMap<>(20);
     }
 
     private record ConversionCacheKey(@NonNull String name, Class<?> requiredType) {

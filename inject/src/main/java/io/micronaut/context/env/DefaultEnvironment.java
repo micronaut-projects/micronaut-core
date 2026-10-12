@@ -76,7 +76,7 @@ import java.util.stream.Stream;
  * @author rvanderwerf
  * @since 1.0
  */
-public class DefaultEnvironment extends PropertySourcePropertyResolver implements Environment {
+public class DefaultEnvironment extends PropertySourcePropertyResolver implements Environment, AtomicRefresh<Environment> {
 
     private static final List<PropertySource> CONSTANT_PROPERTY_SOURCES = StaticOptimizations.get(ConstantPropertySources.class)
             .map(ConstantPropertySources::getSources)
@@ -273,12 +273,20 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment start() {
-        if (running.compareAndSet(false, true)) {
-            log.debug("Starting environment {} for active names {}", this, getActiveNames());
-            if (reading.compareAndSet(false, true)) {
-
-                readPropertySources(getPropertySourceRootName());
-                reading.set(false);
+        // A refresh holds the lock of the catalogs from before it stops this environment until it
+        // has published what it read. A start from another thread waits for that here, rather than
+        // taking the read over and leaving the refresh to publish a catalog it has not filled.
+        synchronized (catalog) {
+            if (running.compareAndSet(false, true)) {
+                log.debug("Starting environment {} for active names {}", this, getActiveNames());
+                if (reading.compareAndSet(false, true)) {
+                    try {
+                        readPropertySources(getPropertySourceRootName());
+                    } finally {
+                        // also when the read fails, or a property source added later is never processed
+                        reading.set(false);
+                    }
+                }
             }
         }
         return this;
@@ -291,11 +299,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment stop() {
-        running.set(false);
-        reading.set(false);
-        this.propertySources.values().removeAll(refreshablePropertySources);
         synchronized (catalog) {
-            Arrays.fill(catalog, null);
+            running.set(false);
+            reading.set(false);
+            this.propertySources.values().removeAll(refreshablePropertySources);
+            reset();
             resetCaches();
         }
         return this;
@@ -303,9 +311,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Map<String, Object> refreshAndDiff() {
-        Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog();
+        Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(publishedCatalog());
         refresh();
-        return diffCatalog(copiedCatalog, catalog);
+        return diffCatalog(copiedCatalog, publishedCatalog());
     }
 
     @Override
@@ -918,7 +926,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return !Objects.deepEquals(newValue, oldValue);
     }
 
-    private Map<String, DefaultPropertyEntry>[] copyCatalog() {
+    private Map<String, DefaultPropertyEntry>[] copyCatalog(Map<String, DefaultPropertyEntry>[] catalog) {
         Map<String, DefaultPropertyEntry>[] newCatalog = new Map[catalog.length];
         for (int i = 0; i < catalog.length; i++) {
             Map<String, DefaultPropertyEntry> entry = catalog[i];

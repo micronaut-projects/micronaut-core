@@ -29,6 +29,13 @@ import spock.lang.Specification
 import spock.util.environment.Jvm
 import spock.util.environment.RestoreSystemProperties
 
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+
 /**
  * Created by graemerocher on 12/06/2017.
  */
@@ -67,6 +74,50 @@ class DefaultEnvironmentSpec extends Specification {
         env.getProperty("test.foo", Map.class).get() == [bar: "10", baz: "20"]
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/12190")
+    void "test cache related issue when refresh method is executed"() {
+        given:
+        def propertyMap = ['testPropKey': 'testPropValueOld']
+        def propertySource = new MapPropertySource('CustomPS', propertyMap)
+        def env = new DefaultEnvironment({['test']})
+        env.addPropertySource(propertySource)
+        env.start()
+
+        expect:
+        env.getRequiredProperty("testPropKey", String.class) == 'testPropValueOld'
+
+        and:
+        def testFinished = new AtomicBoolean(false)
+        def started = new CountDownLatch(1)
+        def executor = Executors.newSingleThreadExecutor()
+        def task = executor.submit(new Runnable() {
+            @Override
+            void run() {
+                started.countDown()
+                while (!testFinished.get() && !Thread.currentThread().isInterrupted()) {
+                    env.getProperty("testPropKey", String.class)
+                }
+            }
+        })
+        assert started.await(5, TimeUnit.SECONDS)
+
+        when:
+        propertyMap.put('testPropKey', 'testPropValueNew')
+        def diff = env.refreshAndDiff()
+        testFinished.set(true)
+
+        then:
+        env.getRequiredProperty("testPropKey", String.class) == 'testPropValueNew'
+        diff.get('test-prop-key') == 'testPropValueOld'
+
+        cleanup:
+        testFinished.set(true)
+        executor.shutdownNow()
+        assert executor.awaitTermination(5, TimeUnit.SECONDS)
+        task.get(0, TimeUnit.MILLISECONDS)
+        env.stop()
+    }
+
     @RestoreSystemProperties
     void "test environment refresh and diff"() {
         given:
@@ -80,6 +131,40 @@ class DefaultEnvironmentSpec extends Specification {
 
         then:
         diff.isEmpty()
+    }
+
+    void "test environment refresh and diff when bootstrap property changed"() {
+        given:
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
+        System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "ms")
+        Path tempConfigDir = Files.createTempDirectory("micronaut-data-config-")
+        Path tempConfigFile = tempConfigDir.resolve("bootstrap-ms.yml")
+        tempConfigFile.toFile().text = "prop-key: prop-value-1"
+
+        when:
+        ApplicationContext applicationContext = ApplicationContext.builder()
+                .overrideConfigLocations("file:" + tempConfigDir)
+                .build()
+                .start()
+
+        then:
+        applicationContext.getRequiredProperty("prop-key", String.class) == "prop-value-1"
+
+        when:
+        Files.deleteIfExists(tempConfigFile)
+        def diff = applicationContext.getEnvironment().refreshAndDiff()
+
+        then:
+        diff.get("prop-key") == "prop-value-1"
+        applicationContext.getProperty("prop-key", String.class).isEmpty()
+
+        cleanup:
+        applicationContext?.close()
+        if (tempConfigDir) {
+            Files.deleteIfExists(tempConfigDir)
+        }
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
+        System.clearProperty(Environment.ENVIRONMENTS_PROPERTY)
     }
 
     void "test environment system property refresh"() {
@@ -886,6 +971,59 @@ class DefaultEnvironmentSpec extends Specification {
         then: 'the environment is deduced'
         env.activeNames == ["test", Environment.KUBERNETES, Environment.CLOUD] as Set
     }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/12941")
+    void "test property value is never null when refresh method is executed"() {
+        given:
+        def propertyMap = ['testPropKey': 'testPropValueOld']
+        def propertySource = new MapPropertySource('CustomPS', propertyMap)
+        def env = new DefaultEnvironment({['test']})
+        env.addPropertySource(propertySource)
+        env.start()
+
+        def testFinished = new AtomicBoolean(false)
+        def oldValueObserved = new CountDownLatch(1)
+        def newValueObserved = new CountDownLatch(1)
+        Set<String> observedValues = Collections.synchronizedSet(new HashSet<>())
+        def executor = Executors.newSingleThreadExecutor()
+        def task = executor.submit(new Runnable() {
+            @Override
+            void run() {
+                while (!testFinished.get() && !Thread.currentThread().isInterrupted()) {
+                    String value = env.getProperty("testPropKey", String.class).orElse(null)
+                    observedValues.add(value)
+                    if (value == 'testPropValueOld') {
+                        oldValueObserved.countDown()
+                    } else if (value == 'testPropValueNew') {
+                        newValueObserved.countDown()
+                    }
+                }
+            }
+        })
+        assert oldValueObserved.await(5, TimeUnit.SECONDS)
+
+        when:
+        propertyMap.put('testPropKey', 'testPropValueNew')
+        def diff = env.refreshAndDiff()
+        assert newValueObserved.await(5, TimeUnit.SECONDS)
+        testFinished.set(true)
+        executor.shutdown()
+
+        then:
+        assert executor.awaitTermination(5, TimeUnit.SECONDS)
+        env.getRequiredProperty("testPropKey", String.class) == 'testPropValueNew'
+        diff.get('test-prop-key') == 'testPropValueOld'
+        observedValues.containsAll(['testPropValueOld', 'testPropValueNew'])
+        !observedValues.contains(null)
+
+        cleanup:
+        testFinished.set(true)
+        executor.shutdownNow()
+        assert executor.awaitTermination(5, TimeUnit.SECONDS)
+        task.get(0, TimeUnit.MILLISECONDS)
+        env.stop()
+    }
+
     private static Environment startEnv(String files) {
         new DefaultEnvironment({["test"]}) {
             @Override
