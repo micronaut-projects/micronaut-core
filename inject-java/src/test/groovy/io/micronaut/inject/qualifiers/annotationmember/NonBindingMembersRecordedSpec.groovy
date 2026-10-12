@@ -165,6 +165,61 @@ class V6Engine implements Engine {
         context.close()
     }
 
+    void 'test the non-binding members of one qualifier on a bean do not reach another qualifier of it'() {
+        given: 'a bean carrying two qualifiers, where only one has a member that does not bind'
+        def context = buildContext('''
+package nonbindingtwo;
+
+import io.micronaut.context.annotation.NonBinding;
+import jakarta.inject.Qualifier;
+import jakarta.inject.Singleton;
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+interface Engine {
+}
+
+@Cylinders(8)
+@Series(10)
+@Singleton
+class V8Engine implements Engine {
+}
+
+@Singleton
+class Holder {
+    @Cylinders(6) public Engine six;
+    @Cylinders(8) public Engine eight;
+}
+
+@Qualifier
+@Retention(RUNTIME)
+@interface Cylinders {
+    int value();
+}
+
+@Qualifier
+@Retention(RUNTIME)
+@interface Series {
+    @NonBinding
+    int value();
+}
+''')
+        Class<?> engine = context.classLoader.loadClass('nonbindingtwo.Engine')
+        def holder = context.getBeanDefinition(context.classLoader.loadClass('nonbindingtwo.Holder'))
+        def six = holder.injectedFields.find { it.name == 'six' }.annotationMetadata
+        def eight = holder.injectedFields.find { it.name == 'eight' }.annotationMetadata
+
+        expect: 'the cylinders are compared although the series is not'
+        context.getBeanDefinitions(engine, Qualifiers.byAnnotation(eight, 'nonbindingtwo.Cylinders'))*.beanType*.simpleName == ['V8Engine']
+        context.getBeanDefinitions(engine, Qualifiers.byAnnotation(six, 'nonbindingtwo.Cylinders')).isEmpty()
+        context.getBeanDefinitions(engine, Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA, AnnotationValue.builder('nonbindingtwo.Cylinders').value(8).build()))*.beanType*.simpleName == ['V8Engine']
+        context.getBeanDefinitions(engine, Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA, AnnotationValue.builder('nonbindingtwo.Cylinders').value(6).build())).isEmpty()
+        context.getBeanDefinitions(engine, Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA, AnnotationValue.builder('nonbindingtwo.Series').value(3).build()))*.beanType*.simpleName == ['V8Engine']
+
+        cleanup:
+        context.close()
+    }
+
     private static Set<String> nonBinding(AnnotationValue<?> annotation) {
         annotation.stringValues(AnnotationUtil.NON_BINDING_ATTRIBUTE) as Set
     }

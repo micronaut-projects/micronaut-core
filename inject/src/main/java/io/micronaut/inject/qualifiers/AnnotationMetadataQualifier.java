@@ -182,8 +182,10 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         // annotation, and AnnotationValue#matches compares them as such, filling in the members neither of them
         // declared from the one set of defaults both sides are given here. A member either side records as
         // non-binding is left out of both: the qualifier's own list was applied when it was built, and the
-        // candidate's is applied here, so a qualifier built without the list still compares by the binding members
-        Set<String> nonBinding = resolveNonBindingMembers(candidateMetadata);
+        // candidate's is applied here, so a qualifier built without the list still compares by the binding members.
+        // The list is the one the candidate's occurrence of this annotation records, not the one on the shared
+        // qualifier stereotype, which merges the lists of every qualifier the candidate carries
+        Set<String> nonBinding = resolveNonBindingMembers(candidateMetadata, annotationName);
         Map<CharSequence, Object> defaults = AnnotationMetadataSupport.getDefaultValues(annotationName);
         return withDefaults(resolveBindingValues(nonBinding, qualifierAnn.getValues()), defaults)
             .matches(withDefaults(resolveBindingValues(nonBinding, candidateMetadata.getValues(annotationName)), defaults));
@@ -200,20 +202,23 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         return resolveBindingAnnotationValue(annotationMetadata, annotationName, annotationMetadata.getValues(annotationName));
     }
 
+    /**
+     * The binding members of an annotation value: the ones its own record of non-binding members, or failing
+     * that the record of the metadata's occurrence of the annotation, does not list.
+     */
     @Nullable
     private static <K extends Annotation> AnnotationValue<K> resolveBindingAnnotationValue(AnnotationMetadata annotationMetadata,
                                                                                            String annotationName,
                                                                                            Map<CharSequence, Object> values) {
-        Map<CharSequence, Object> bindingValues = resolveBindingValues(annotationMetadata, values);
+        Set<String> nonBinding = values.get(AnnotationUtil.NON_BINDING_ATTRIBUTE) instanceof String[] recorded ? toSet(recorded) : Collections.emptySet();
+        if (nonBinding.isEmpty()) {
+            nonBinding = resolveNonBindingMembers(annotationMetadata, annotationName);
+        }
+        Map<CharSequence, Object> bindingValues = resolveBindingValues(nonBinding, values);
         if (CollectionUtils.isNotEmpty(bindingValues)) {
             return new AnnotationValue<>(annotationName, bindingValues);
         }
         return null;
-    }
-
-    private static Map<CharSequence, Object> resolveBindingValues(AnnotationMetadata annotationMetadata,
-                                                                  Map<CharSequence, Object> values) {
-        return resolveBindingValues(resolveNonBindingMembers(annotationMetadata), values);
     }
 
     private static Map<CharSequence, Object> resolveBindingValues(Set<String> nonBinding,
@@ -230,9 +235,15 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         return map;
     }
 
-    private static Set<String> resolveNonBindingMembers(AnnotationMetadata annotationMetadata) {
-        String[] nonBindingArray = AnnotationUtil.resolveNonBindingMembers(annotationMetadata);
-        return ArrayUtils.isNotEmpty(nonBindingArray) ? new LinkedHashSet<>(Arrays.asList(nonBindingArray)) : Collections.emptySet();
+    /**
+     * The members the metadata's occurrence of the annotation records as non-binding.
+     */
+    private static Set<String> resolveNonBindingMembers(AnnotationMetadata annotationMetadata, String annotationName) {
+        return toSet(annotationMetadata.stringValues(annotationName, AnnotationUtil.NON_BINDING_ATTRIBUTE));
+    }
+
+    private static Set<String> toSet(String[] members) {
+        return ArrayUtils.isNotEmpty(members) ? new LinkedHashSet<>(Arrays.asList(members)) : Collections.emptySet();
     }
 
     @Override
