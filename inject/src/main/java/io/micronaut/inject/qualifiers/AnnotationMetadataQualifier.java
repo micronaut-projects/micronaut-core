@@ -57,7 +57,7 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
      * {@code V8Engine} qualifies for {@code @V8 Engine}. That is the convention for a qualifier read off an
      * injection point; a qualifier built from an annotation given to the API names the annotation it selects by.
      */
-    private final boolean matchByName;
+    final boolean matchByName;
 
     private AnnotationMetadataQualifier(String annotationName,
                                         String annotationSimpleName,
@@ -102,11 +102,31 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
      */
     static <T extends Annotation> AnnotationMetadataQualifier<T> fromValue(AnnotationMetadata annotationMetadata,
                                                                            AnnotationValue<T> annotationValue) {
+        return fromValue(annotationMetadata, annotationValue, false);
+    }
+
+    /**
+     * The qualifier a bean definition declares, for one of the qualifier annotations in its metadata: it selects
+     * the way a qualifier read off an injection point does, by the annotation and by the candidate's name.
+     *
+     * @param annotationMetadata The metadata of the bean
+     * @param annotationValue    The qualifier annotation
+     * @param <T>                The type
+     * @return The qualifier
+     */
+    static <T extends Annotation> AnnotationMetadataQualifier<T> fromDeclaredValue(AnnotationMetadata annotationMetadata,
+                                                                                   AnnotationValue<T> annotationValue) {
+        return fromValue(annotationMetadata, annotationValue, true);
+    }
+
+    private static <T extends Annotation> AnnotationMetadataQualifier<T> fromValue(AnnotationMetadata annotationMetadata,
+                                                                                   AnnotationValue<T> annotationValue,
+                                                                                   boolean matchByName) {
         return new AnnotationMetadataQualifier<>(
             annotationValue.getAnnotationName(),
             NameUtils.getSimpleName(annotationValue.getAnnotationName()),
             resolveBindingAnnotationValue(annotationMetadata, annotationValue.getAnnotationName(), annotationValue.getValues()),
-            false
+            matchByName
         );
     }
 

@@ -82,6 +82,43 @@ class HasDefault {
         context.close()
     }
 
+    void 'test a lookup by the annotation alone and one by name are cached apart, in either order'() {
+        given: 'the context caches a lookup by its qualifier, so the two must not be equal'
+        def context = buildContext(SOURCE)
+        Class<?> greeter = context.classLoader.loadClass('qualifierbyname.Greeter')
+        def byAnnotationAlone = Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA, AnnotationValue.builder('qualifierbyname.Default').build())
+        def byName = Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA, 'qualifierbyname.Default')
+
+        expect:
+        byAnnotationAlone != byName
+        byName != byAnnotationAlone
+
+        when: 'the lookup by the annotation alone comes first'
+        def strictFirst = context.getBeansOfType(greeter, byAnnotationAlone)*.class*.simpleName
+        def thenByName = context.getBeansOfType(greeter, byName)*.class*.simpleName
+
+        then:
+        strictFirst == ['SpecialGreeter']
+        thenByName as Set == ['SpecialGreeter', 'DefaultGreeter'] as Set
+
+        when: 'the lookup by name comes first, in a fresh context'
+        context.close()
+        context = buildContext(SOURCE)
+        greeter = context.classLoader.loadClass('qualifierbyname.Greeter')
+        def nameFirst = context.getBeansOfType(greeter, byName)*.class*.simpleName
+        def thenStrict = context.getBeansOfType(greeter, byAnnotationAlone)*.class*.simpleName
+
+        then:
+        nameFirst as Set == ['SpecialGreeter', 'DefaultGreeter'] as Set
+        thenStrict == ['SpecialGreeter']
+
+        and: 'a single bean lookup sees the difference too'
+        context.findBean(greeter, byAnnotationAlone).get().class.simpleName == 'SpecialGreeter'
+
+        cleanup:
+        context.close()
+    }
+
     void 'test a qualifier read off an injection point still selects a bean by its name'() {
         given:
         def context = buildContext(SOURCE)

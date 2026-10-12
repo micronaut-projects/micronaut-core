@@ -276,6 +276,26 @@ public class Qualifiers {
     }
 
     /**
+     * <p>Build the qualifier a bean definition declares, for one of the qualifier annotations in its metadata.
+     * It selects the way a qualifier read off an injection point does: by the annotation and its binding members,
+     * and failing the annotation by the candidate's name.</p>
+     *
+     * @param metadata        The metadata of the bean
+     * @param annotationValue The qualifier annotation
+     * @param <T>             The component type
+     * @return The qualifier
+     * @since 5.3.0
+     */
+    @Internal
+    public static <T extends Annotation> Qualifier<T> byDeclaredAnnotation(AnnotationMetadata metadata, AnnotationValue<T> annotationValue) {
+        Qualifier<T> qualifier = findCustomByName(metadata, annotationValue.getAnnotationName());
+        if (qualifier != null) {
+            return qualifier;
+        }
+        return AnnotationMetadataQualifier.fromDeclaredValue(metadata, annotationValue);
+    }
+
+    /**
      * <p>Builds a qualifier that uses the given repeatable annotation.</p>
      *
      * @param metadata The metadata
