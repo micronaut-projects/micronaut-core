@@ -63,7 +63,7 @@ final class PollingWatchService implements WatchService {
     // the paths a native service reported changes under, compared before the interval elapses
     private final LinkedBlockingQueue<Path> requested = new LinkedBlockingQueue<>();
     private final Thread poller;
-    private final long intervalMillis;
+    private volatile long intervalMillis;
     private volatile boolean closed;
 
     /**
@@ -110,6 +110,23 @@ final class PollingWatchService implements WatchService {
         if (!closed) {
             requested.add(path);
         }
+    }
+
+    /**
+     * Compares the directories at another interval from the next comparison on.
+     *
+     * @param interval How long to wait between two comparisons
+     */
+    void pollEvery(Duration interval) {
+        intervalMillis = Math.max(1, interval.toMillis());
+    }
+
+    /**
+     * @param interval An interval
+     * @return Whether the directories are compared at that interval
+     */
+    boolean isPollingEvery(Duration interval) {
+        return intervalMillis == Math.max(1, interval.toMillis());
     }
 
     @Override

@@ -51,7 +51,7 @@ class FsEventsWatchServiceTest {
         Path root = Files.createDirectories(base.resolve("root"));
         Path nested = Files.createDirectories(root.resolve("nested"));
         Path file = Files.writeString(nested.resolve("a.txt"), "0");
-        try (FsEventsWatchService service = new FsEventsWatchService(DevWatchService.MAC_LATENCY_SECONDS)) {
+        try (FsEventsWatchService service = new FsEventsWatchService(DevWatchService.MAC_LATENCY_SECONDS, java.time.Duration.ofMillis(DevWatchService.POLL_MILLIS))) {
             service.register(root);
             WatchKey nestedKey = service.register(nested);
 
@@ -97,7 +97,7 @@ class FsEventsWatchServiceTest {
         int reported = 0;
         try {
             for (int round = 0; round < 150; round++) {
-                FsEventsWatchService service = new FsEventsWatchService(DevWatchService.MAC_LATENCY_SECONDS);
+                FsEventsWatchService service = new FsEventsWatchService(DevWatchService.MAC_LATENCY_SECONDS, java.time.Duration.ofMillis(DevWatchService.POLL_MILLIS));
                 for (Path directory : directories) {
                     service.register(directory);
                     service.register(directory.resolve("sub"));

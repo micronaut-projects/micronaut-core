@@ -258,12 +258,12 @@ final class FsEventStreams implements Closeable {
         }
         Pointer mode = NativeLibrary.getInstance("CoreFoundation").getGlobalVariableAddress("kCFRunLoopDefaultMode").getPointer(0);
         CoreServices.INSTANCE.fsEventStreamScheduleWithRunLoop(stream, runLoop.join(), mode);
-        Stream started = new Stream(stream, callback);
         if (CoreServices.INSTANCE.fsEventStreamStart(stream) == 0) {
-            started.release();
+            // only a started stream may be stopped
+            new Stream(stream, callback, false).release();
             throw new IOException("FSEvents could not start watching " + directory);
         }
-        return started;
+        return new Stream(stream, callback, true);
     }
 
     /**
@@ -271,14 +271,17 @@ final class FsEventStreams implements Closeable {
      *
      * @param stream The stream
      * @param callback The callback, kept reachable until the stream is released
+     * @param started Whether the stream started
      */
-    private record Stream(Pointer stream, EventCallback callback) {
+    private record Stream(Pointer stream, EventCallback callback, boolean started) {
         /**
          * Stops, invalidates and releases the stream. Called on the run loop thread, outside the run loop.
          */
         void release() {
             try {
-                CoreServices.INSTANCE.fsEventStreamStop(stream);
+                if (started) {
+                    CoreServices.INSTANCE.fsEventStreamStop(stream);
+                }
                 CoreServices.INSTANCE.fsEventStreamInvalidate(stream);
                 CoreServices.INSTANCE.fsEventStreamRelease(stream);
             } finally {

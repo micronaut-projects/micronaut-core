@@ -17,9 +17,12 @@ package io.micronaut.dev;
 
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.ref.Cleaner;
+import java.nio.file.ClosedWatchServiceException;
 import java.nio.file.Path;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
@@ -33,7 +36,8 @@ import java.util.concurrent.TimeUnit;
  * free a stream's callback while FSEvents could still call it, and released a stream from another thread, or from its
  * own callback, while its run loop ran: either crashed the JVM.
  *
- * <p>The directories are also compared at a long interval, for a stream FSEvents could not start. A service dropped
+ * <p>The directories are also compared at a long interval, and at the polling service's own once FSEvents could not
+ * watch a directory. A service dropped
  * without being closed is closed once it is unreachable: its run loop would otherwise hold its streams, which FSEvents
  * allows a process a limited number of, until the process ends.</p>
  *
@@ -49,18 +53,22 @@ final class FsEventsWatchService implements WatchService {
     static final Duration SAFETY_INTERVAL = Duration.ofSeconds(5);
 
     private static final Cleaner CLEANER = Cleaner.create();
+    private static final Logger LOG = LoggerFactory.getLogger(FsEventsWatchService.class);
 
     private final PollingWatchService polling;
     private final FsEventStreams streams;
     private final Cleaner.Cleanable cleanable;
+    private final Duration fallbackInterval;
 
     /**
      * Starts the service.
      *
      * @param latency How long FSEvents holds the events that follow a first one, in seconds
+     * @param fallbackInterval How often the directories are compared once FSEvents could not watch one of them
      * @throws IOException if FSEvents cannot be used
      */
-    FsEventsWatchService(double latency) throws IOException {
+    FsEventsWatchService(double latency, Duration fallbackInterval) throws IOException {
+        this.fallbackInterval = fallbackInterval;
         this.polling = new PollingWatchService(SAFETY_INTERVAL);
         try {
             this.streams = new FsEventStreams(latency, polling::compareUnder);
@@ -80,7 +88,16 @@ final class FsEventsWatchService implements WatchService {
      */
     WatchKey register(Path directory) throws IOException {
         // the stream first: a change made before the directory is read is in its first state, one made after is reported
-        streams.watch(directory.toAbsolutePath().normalize());
+        try {
+            streams.watch(directory.toAbsolutePath().normalize());
+        } catch (ClosedWatchServiceException e) {
+            throw e;
+        } catch (IOException e) {
+            if (!polling.isPollingEvery(fallbackInterval)) {
+                LOG.warn("{}: comparing the watched directories every {} ms instead", e.getMessage(), fallbackInterval.toMillis());
+                polling.pollEvery(fallbackInterval);
+            }
+        }
         return polling.register(directory);
     }
 

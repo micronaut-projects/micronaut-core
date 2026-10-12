@@ -131,7 +131,7 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      */
     private static final class MacOs {
         static DevWatchService create() throws IOException {
-            FsEventsWatchService service = new FsEventsWatchService(MAC_LATENCY_SECONDS);
+            FsEventsWatchService service = new FsEventsWatchService(MAC_LATENCY_SECONDS, java.time.Duration.ofMillis(POLL_MILLIS));
             return new DevWatchService(service, (directory, watchService) -> service.register(directory), true);
         }
     }
