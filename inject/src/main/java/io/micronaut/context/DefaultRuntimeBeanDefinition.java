@@ -400,6 +400,11 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
         }
 
         @Override
+        public BeanResolutionContext getResolutionContext() {
+            return resolutionContext;
+        }
+
+        @Override
         public <V> V getBean(Argument<V> type, @Nullable Qualifier<V> qualifier) {
             Objects.requireNonNull(type, MSG_BEAN_TYPE_CANNOT_BE_NULL);
             try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(DefaultRuntimeBeanDefinition.this, type)) {

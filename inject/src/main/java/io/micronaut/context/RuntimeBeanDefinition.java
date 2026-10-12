@@ -336,6 +336,22 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
         BeanContext getBeanContext();
 
         /**
+         * The resolution context the lookups of this context resolve through: the one of the creation, or of the
+         * disposal, this context belongs to.
+         *
+         * <p>Its path says what the bean is being created for, and its attributes are what the caller that started
+         * the resolution attached to it, so a factory that is handed a definition the caller chose can resolve it
+         * with {@link BeanResolutionContext#getBeanRegistration(BeanDefinition, Argument)} and read there what the
+         * caller attached. What a lookup through it creates has the lifetime a lookup through {@link #getBean(Argument)}
+         * gives, but no segment is pushed for it: a lookup that is to be seen as an injection point of the bean
+         * goes through the methods of this context.</p>
+         *
+         * @return The resolution context
+         * @since 5.3.0
+         */
+        BeanResolutionContext getResolutionContext();
+
+        /**
          * Looks up a bean of the given type.
          *
          * @param type The type to look up

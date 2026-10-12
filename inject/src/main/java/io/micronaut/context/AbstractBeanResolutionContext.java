@@ -372,8 +372,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
+    public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType) {
+        return context.getBeanRegistration(this, definition, beanType);
+    }
+
+    @Override
     public <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType) {
-        T bean = context.getBeanRegistration(this, definition, beanType).getBean();
+        T bean = getBeanRegistration(definition, beanType).getBean();
         if (tracer != null) {
             tracer.traceBeanResolved(
                 this,
