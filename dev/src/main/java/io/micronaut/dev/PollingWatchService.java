@@ -60,6 +60,8 @@ final class PollingWatchService implements WatchService {
     // the signalled keys, and once closed the marker that wakes every retrieval blocked on the queue
     private final LinkedBlockingQueue<Object> signalled = new LinkedBlockingQueue<>();
     private final Object closedMarker = new Object();
+    // the paths a native service reported changes under, compared before the interval elapses
+    private final LinkedBlockingQueue<Path> requested = new LinkedBlockingQueue<>();
     private final Thread poller;
     private final long intervalMillis;
     private volatile boolean closed;
@@ -95,6 +97,18 @@ final class PollingWatchService implements WatchService {
             return keys.compute(absolute, (path, existing) -> existing != null && existing.isValid() ? existing : new Key(path, entries(path)));
         } catch (UncheckedIOException e) {
             throw e.getCause();
+        }
+    }
+
+    /**
+     * Compares the registered directories at or under a path soon, rather than once the interval elapsed: a native
+     * service that tells where something changed calls it.
+     *
+     * @param path The path, absolute and normalized as the directories are registered
+     */
+    void compareUnder(Path path) {
+        if (!closed) {
+            requested.add(path);
         }
     }
 
@@ -147,15 +161,32 @@ final class PollingWatchService implements WatchService {
     }
 
     private void pollLoop() {
+        long due = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(intervalMillis);
         while (!closed) {
+            Path first;
             try {
-                Thread.sleep(intervalMillis);
+                first = requested.poll(Math.max(0, due - System.nanoTime()), TimeUnit.NANOSECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
             }
+            if (first == null) {
+                for (Key key : keys.values()) {
+                    key.compare();
+                }
+                due = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(intervalMillis);
+                continue;
+            }
+            List<Path> paths = new ArrayList<>();
+            paths.add(first);
+            requested.drainTo(paths);
             for (Key key : keys.values()) {
-                key.compare();
+                for (Path path : paths) {
+                    if (key.directory.startsWith(path)) {
+                        key.compare();
+                        break;
+                    }
+                }
             }
         }
     }

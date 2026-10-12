@@ -30,7 +30,7 @@ dependencies {
     compileOnly(libs.junit.platform.launcher)
     // attaches the agent to a JVM launched without -javaagent, when the project puts it on the classpath
     compileOnly(libs.bytebuddy.agent)
-    // the native macOS watch service, when micronaut-runtime-osx is on the development runtime classpath
+    // JNA, through which the native macOS watch service calls FSEvents when micronaut-runtime-osx is on the development runtime classpath
     compileOnly(libs.managed.methvin.directoryWatcher)
     // the threads of Reactor's schedulers get the parent tier's loader when Reactor is on the classpath
     compileOnly(libs.managed.reactor)
