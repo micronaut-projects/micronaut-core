@@ -91,7 +91,9 @@ final class FsEventStreams implements Closeable {
      * The trees watched, in the order they were registered.
      */
     private final List<Path> roots = new ArrayList<>();
+    private final Runnable failed;
     private volatile boolean closed;
+    private volatile boolean ended;
 
     /**
      * Starts the run loop thread.
@@ -99,11 +101,13 @@ final class FsEventStreams implements Closeable {
      * @param latency How long FSEvents holds the events that follow a first one, in seconds
      * @param changed Told of each directory under a watched tree in which something changed, or of the tree itself
      *                when the events under it must be looked for
+     * @param failed Run if the run loop ends before the streams are closed, which no longer report anything
      * @throws IOException if the run loop does not start
      */
-    FsEventStreams(double latency, Consumer<Path> changed) throws IOException {
+    FsEventStreams(double latency, Consumer<Path> changed, Runnable failed) throws IOException {
         this.latency = latency;
         this.changed = changed;
+        this.failed = failed;
         this.thread = new Thread(this::run, "micronaut-dev-fsevents");
         thread.setDaemon(true);
         thread.start();
@@ -129,6 +133,9 @@ final class FsEventStreams implements Closeable {
         synchronized (roots) {
             if (closed) {
                 throw new ClosedWatchServiceException();
+            }
+            if (ended) {
+                throw new IOException("The FSEvents run loop ended");
             }
             for (Path root : roots) {
                 if (directory.startsWith(root)) {
@@ -217,11 +224,15 @@ final class FsEventStreams implements Closeable {
             runLoop.completeExceptionally(e);
             LOG.warn("The FSEvents run loop failed: {}", e.getMessage(), e);
         } finally {
+            ended = true;
             // outside the run loop: no callback runs while the streams stop and are released
             for (Stream stream : streams) {
                 stream.release();
             }
             streams.clear();
+            if (!closed) {
+                failed.run();
+            }
         }
     }
 
@@ -231,20 +242,46 @@ final class FsEventStreams implements Closeable {
     private Stream start(Path directory) throws IOException {
         Path real = directory.toRealPath();
         EventCallback callback = new EventCallback(directory, real, changed);
-        String name = real.toString();
+        LIVE.add(callback);
+        Pointer stream = null;
+        boolean started = false;
+        try {
+            stream = create(directory, real.toString(), callback);
+            Pointer mode = NativeLibrary.getInstance("CoreFoundation").getGlobalVariableAddress("kCFRunLoopDefaultMode").getPointer(0);
+            CoreServices.INSTANCE.fsEventStreamScheduleWithRunLoop(stream, runLoop.join(), mode);
+            if (CoreServices.INSTANCE.fsEventStreamStart(stream) == 0) {
+                throw new IOException("FSEvents could not start watching " + directory);
+            }
+            started = true;
+            return new Stream(stream, callback, true);
+        } finally {
+            if (!started) {
+                if (stream != null) {
+                    // only a started stream may be stopped
+                    new Stream(stream, callback, false).release();
+                } else {
+                    LIVE.remove(callback);
+                }
+            }
+        }
+    }
+
+    private Pointer create(Path directory, String name, EventCallback callback) throws IOException {
         Pointer path = CoreServices.INSTANCE.cfStringCreateWithCharacters(null, name.toCharArray(), name.length());
         if (path == null) {
             throw new IOException("Cannot create the path of " + directory);
         }
-        Pointer stream;
         try {
             Pointer paths = CoreServices.INSTANCE.cfArrayCreate(null, new Pointer[] {path}, 1, null);
             if (paths == null) {
                 throw new IOException("Cannot create the paths of " + directory);
             }
             try {
-                LIVE.add(callback);
-                stream = CoreServices.INSTANCE.fsEventStreamCreate(null, callback, null, paths, SINCE_NOW, latency, CREATE_NO_DEFER);
+                Pointer stream = CoreServices.INSTANCE.fsEventStreamCreate(null, callback, null, paths, SINCE_NOW, latency, CREATE_NO_DEFER);
+                if (stream == null) {
+                    throw new IOException("FSEvents refused to watch " + directory);
+                }
+                return stream;
             } finally {
                 // the stream copied the paths
                 CoreServices.INSTANCE.cfRelease(paths);
@@ -252,18 +289,6 @@ final class FsEventStreams implements Closeable {
         } finally {
             CoreServices.INSTANCE.cfRelease(path);
         }
-        if (stream == null) {
-            LIVE.remove(callback);
-            throw new IOException("FSEvents refused to watch " + directory);
-        }
-        Pointer mode = NativeLibrary.getInstance("CoreFoundation").getGlobalVariableAddress("kCFRunLoopDefaultMode").getPointer(0);
-        CoreServices.INSTANCE.fsEventStreamScheduleWithRunLoop(stream, runLoop.join(), mode);
-        if (CoreServices.INSTANCE.fsEventStreamStart(stream) == 0) {
-            // only a started stream may be stopped
-            new Stream(stream, callback, false).release();
-            throw new IOException("FSEvents could not start watching " + directory);
-        }
-        return new Stream(stream, callback, true);
     }
 
     /**

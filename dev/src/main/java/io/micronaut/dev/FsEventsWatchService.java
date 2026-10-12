@@ -71,7 +71,7 @@ final class FsEventsWatchService implements WatchService {
         this.fallbackInterval = fallbackInterval;
         this.polling = new PollingWatchService(SAFETY_INTERVAL);
         try {
-            this.streams = new FsEventStreams(latency, polling::compareUnder);
+            this.streams = new FsEventStreams(latency, polling::compareUnder, () -> fallBack(polling, fallbackInterval, "The FSEvents run loop ended"));
         } catch (IOException | RuntimeException | LinkageError e) {
             polling.close();
             throw e;
@@ -93,10 +93,7 @@ final class FsEventsWatchService implements WatchService {
         } catch (ClosedWatchServiceException e) {
             throw e;
         } catch (IOException e) {
-            if (!polling.isPollingEvery(fallbackInterval)) {
-                LOG.warn("{}: comparing the watched directories every {} ms instead", e.getMessage(), fallbackInterval.toMillis());
-                polling.pollEvery(fallbackInterval);
-            }
+            fallBack(polling, fallbackInterval, String.valueOf(e.getMessage()));
         }
         return polling.register(directory);
     }
@@ -108,6 +105,13 @@ final class FsEventsWatchService implements WatchService {
      */
     Duration detectionDelay(Duration latency) {
         return polling.isPollingEvery(fallbackInterval) ? fallbackInterval : latency;
+    }
+
+    private static void fallBack(PollingWatchService polling, Duration fallbackInterval, String why) {
+        if (!polling.isPollingEvery(fallbackInterval)) {
+            LOG.warn("{}: comparing the watched directories every {} ms instead", why, fallbackInterval.toMillis());
+            polling.pollEvery(fallbackInterval);
+        }
     }
 
     @Override
