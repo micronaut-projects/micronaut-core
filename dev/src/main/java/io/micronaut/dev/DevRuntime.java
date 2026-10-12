@@ -126,6 +126,11 @@ public final class DevRuntime implements Closeable {
      */
     private static final Duration COALESCE_IDLE = Duration.ofMillis(25);
     /**
+     * How long the worker waits after taking a batch a caller reported, such as an IDE's or a test harness's report of
+     * a file it wrote: the watcher's own report of the same write follows within its quiet period.
+     */
+    private static final Duration COALESCE_REPORTED = Duration.ofMillis(150);
+    /**
      * How long the worker merges batches that keep arriving at most, from the first.
      */
     private static final Duration COALESCE_MAX = Duration.ofMillis(500);
@@ -1042,20 +1047,20 @@ public final class DevRuntime implements Closeable {
             }
             // both spellings: the glob syntax alone leaves a file directly under the root out of "**/"
             String[] globs = root.kind().extensions().stream().flatMap(extension -> Stream.of("*." + extension, "**/*." + extension)).toArray(String[]::new);
-            directoryWatcher.directory(root.path()).include(globs).watch(batch -> enqueue(sourceBatch(root, batch)));
+            directoryWatcher.directory(root.path()).include(globs).watch(batch -> enqueueWatched(sourceBatch(root, batch)));
         }
         for (SourceRoot root : manifest.testSourceRoots()) {
             if (tests != null && Files.isDirectory(root.path())) {
                 String[] globs = root.kind().extensions().stream().flatMap(extension -> Stream.of("*." + extension, "**/*." + extension)).toArray(String[]::new);
                 directoryWatcher.directory(root.path()).include(globs).watch(batch -> {
                     Pending sources = sourceBatch(root, batch);
-                    enqueue(new Pending(Map.of(), sources.sources, Map.of(), false, null));
+                    enqueueWatched(new Pending(Map.of(), sources.sources, Map.of(), false, null));
                 });
             }
         }
         for (ResourceRoot root : manifest.resourceRoots()) {
             if (Files.isDirectory(root.path())) {
-                directoryWatcher.directory(root.path()).watch(batch -> enqueue(resourceBatch(root, batch)));
+                directoryWatcher.directory(root.path()).watch(batch -> enqueueWatched(resourceBatch(root, batch)));
             }
         }
         // the languages the build tool compiles, the tests' included in test mode: the dev JVM only sees their class output
@@ -1082,7 +1087,7 @@ public final class DevRuntime implements Closeable {
                         throw new UncheckedIOException("Cannot create the trigger directory " + directory, e);
                     }
                     String name = trigger.getFileName().toString();
-                    directoryWatcher.directory(directory).recursive(false).include(name).watch(batch -> enqueue(outputsChanged()));
+                    directoryWatcher.directory(directory).recursive(false).include(name).watch(batch -> enqueueWatched(outputsChanged()));
                 }
             } else {
                 // without a trigger the class output itself is watched, which may see a compilation half written
@@ -1091,7 +1096,7 @@ public final class DevRuntime implements Closeable {
                     for (SourceKind kind : SourceKind.values()) {
                         Path output = target.classOutput(kind);
                         if (!target.sourceRoots(kind).isEmpty() && Files.isDirectory(output) && !directoryWatcher.isWatching(output)) {
-                            directoryWatcher.directory(output).watch(batch -> enqueue(outputsChanged()));
+                            directoryWatcher.directory(output).watch(batch -> enqueueWatched(outputsChanged()));
                         }
                     }
                 }
@@ -1291,20 +1296,35 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
-     * Takes the batches that follow the first, until none came for {@link #COALESCE_IDLE} or they kept coming for
-     * {@link #COALESCE_MAX}, so that a lone edit is handled right after the watcher delivers it.
+     * Takes the batches that follow the first, until none came for {@link #COALESCE_IDLE}, and {@link #COALESCE_REPORTED}
+     * passed since a batch a caller reported, or they kept coming for {@link #COALESCE_MAX}, so that a lone edit is
+     * handled right after the watcher delivers it.
      */
     private void coalesce(List<Pending> batches) throws InterruptedException {
-        long deadline = System.nanoTime() + COALESCE_MAX.toNanos();
+        long taken = System.nanoTime();
+        long deadline = taken + COALESCE_MAX.toNanos();
+        long reported = batches.get(0).watched ? taken : taken + COALESCE_REPORTED.toNanos();
         while (true) {
-            long wait = Math.min(COALESCE_IDLE.toNanos(), deadline - System.nanoTime());
+            long now = System.nanoTime();
+            long wait = Math.min(Math.max(COALESCE_IDLE.toNanos(), reported - now), deadline - now);
             Pending next = wait > 0 ? pending.poll(wait, TimeUnit.NANOSECONDS) : null;
             if (next == null) {
                 pending.drainTo(batches);
                 return;
             }
+            if (!next.watched) {
+                reported = Math.max(reported, System.nanoTime() + COALESCE_REPORTED.toNanos());
+            }
             batches.add(next);
         }
+    }
+
+    /**
+     * Enqueues a batch the watcher delivered, which the worker handles once no other batch follows it shortly.
+     */
+    private long enqueueWatched(Pending batch) {
+        batch.watched = true;
+        return enqueue(batch);
     }
 
     /**
