@@ -400,8 +400,18 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
         }
 
         @Override
-        public BeanResolutionContext getResolutionContext() {
-            return resolutionContext;
+        public <V> BeanRegistration<V> getBeanRegistration(BeanDefinition<? extends V> definition, Argument<V> type) {
+            return resolutionContext.getBeanRegistration(definition, type);
+        }
+
+        @Override
+        public @Nullable Object getAttribute(CharSequence key) {
+            return resolutionContext.getAttribute(key);
+        }
+
+        @Override
+        public @Nullable Object setAttribute(CharSequence key, @Nullable Object value) {
+            return resolutionContext.setAttribute(key, value);
         }
 
         @Override

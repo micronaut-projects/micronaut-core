@@ -4,7 +4,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.context.BeanRegistration
-import io.micronaut.context.BeanResolutionContext
 import io.micronaut.context.RuntimeBeanDefinition
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.exceptions.NoSuchBeanException
@@ -25,11 +24,9 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
 
     private static RuntimeBeanDefinition<Chosen> chosenDefinition() {
         RuntimeBeanDefinition.builder(Chosen, { RuntimeBeanDefinition.CreationContext ctx ->
-            BeanResolutionContext resolutionContext = ctx.resolutionContext
             new Chosen(
-                    resolutionContext.getAttribute(CALLER_ATTRIBUTE),
-                    resolutionContext.rootDefinition?.beanType,
-                    resolutionContext.path.collect { it.declaringType.beanType },
+                    ctx.getAttribute(CALLER_ATTRIBUTE),
+                    ctx.injectionPoint.map { it.declaringBean.beanType }.orElse(null),
                     ctx.getBean(Argument.of(DisposableDependency))
             )
         } as Function<RuntimeBeanDefinition.CreationContext, Chosen>)
@@ -40,7 +37,7 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
 
     private static RuntimeBeanDefinition<Outer> outerDefinition(Function<RuntimeBeanDefinition.CreationContext, BeanRegistration<Chosen>> resolve) {
         RuntimeBeanDefinition.builder(Outer, { RuntimeBeanDefinition.CreationContext ctx ->
-            ctx.resolutionContext.setAttribute(CALLER_ATTRIBUTE, "outer")
+            ctx.setAttribute(CALLER_ATTRIBUTE, "outer")
             new Outer(resolve.apply(ctx))
         } as Function<RuntimeBeanDefinition.CreationContext, Outer>)
                 .scope(Prototype)
@@ -58,7 +55,7 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
         given:
         def context = start(chosenDefinition(), outerDefinition(ctx -> {
             BeanDefinition<Chosen> definition = ctx.beanContext.getBeanDefinition(Chosen)
-            ctx.resolutionContext.getBeanRegistration(definition, Argument.of(Chosen))
+            ctx.getBeanRegistration(definition, Argument.of(Chosen))
         }))
 
         when:
@@ -67,8 +64,7 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
 
         then: "the chosen bean was created in the resolution the outer bean started"
         chosen.callerAttribute == "outer"
-        chosen.rootBeanType == Outer
-        chosen.pathBeanTypes.contains(Outer)
+        chosen.declaringBeanType == Outer
         outer.chosenRegistration.beanDefinition.beanType == Chosen
 
         cleanup:
@@ -84,8 +80,7 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
 
         then:
         chosen.callerAttribute == null
-        chosen.rootBeanType == Chosen
-        !chosen.pathBeanTypes.contains(Outer)
+        chosen.declaringBeanType == null
 
         cleanup:
         context.close()
@@ -95,7 +90,7 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
         given:
         def context = start(chosenDefinition(), outerDefinition(ctx -> {
             BeanDefinition<Chosen> definition = ctx.beanContext.getBeanDefinition(Chosen)
-            ctx.resolutionContext.getBeanRegistration(definition, Argument.of(Chosen))
+            ctx.getBeanRegistration(definition, Argument.of(Chosen))
         }))
 
         when:
@@ -121,7 +116,7 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
         given:
         def context = start(chosenDefinition(), outerDefinition(ctx -> {
             BeanDefinition<Chosen> definition = ctx.beanContext.getBeanDefinition(Chosen)
-            ctx.resolutionContext.getBeanRegistration(definition, Argument.of(Chosen))
+            ctx.getBeanRegistration(definition, Argument.of(Chosen))
         }))
 
         when:
@@ -143,11 +138,11 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
         context.close()
     }
 
-    void 'test getBean by definition in the caller resolution context is the registration lookup without the registration'() {
+    void 'test the bean of a registration resolved by definition in the caller resolution context has the same lifetime'() {
         given:
         def context = start(chosenDefinition(), outerDefinition(ctx -> {
             BeanDefinition<Chosen> definition = ctx.beanContext.getBeanDefinition(Chosen)
-            Chosen resolved = ctx.resolutionContext.getBean(definition, Argument.of(Chosen))
+            Chosen resolved = ctx.getBeanRegistration(definition, Argument.of(Chosen)).bean
             BeanRegistration.of(ctx.beanContext, null, definition, resolved)
         }))
 
@@ -157,7 +152,7 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
 
         then:
         chosen.callerAttribute == "outer"
-        chosen.rootBeanType == Outer
+        chosen.declaringBeanType == Outer
 
         when:
         outerRegistration.close()
@@ -174,7 +169,7 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
         given:
         def context = start(chosenDefinition(), outerDefinition(ctx -> {
             BeanDefinition<Chosen> definition = ctx.beanContext.getBeanDefinition(Chosen)
-            ctx.resolutionContext.getBeanRegistration(definition, (Argument) Argument.of(String))
+            ctx.getBeanRegistration(definition, (Argument) Argument.of(String))
         }))
 
         when:
@@ -201,15 +196,13 @@ class RuntimeBeanDefinitionResolutionContextLookupSpec extends Specification {
 
     static class Chosen {
         final Object callerAttribute
-        final Class<?> rootBeanType
-        final List<Class<?>> pathBeanTypes
+        final Class<?> declaringBeanType
         final DisposableDependency dependency
         boolean disposed
 
-        Chosen(Object callerAttribute, Class<?> rootBeanType, List<Class<?>> pathBeanTypes, DisposableDependency dependency) {
+        Chosen(Object callerAttribute, Class<?> declaringBeanType, DisposableDependency dependency) {
             this.callerAttribute = callerAttribute
-            this.rootBeanType = rootBeanType
-            this.pathBeanTypes = pathBeanTypes
+            this.declaringBeanType = declaringBeanType
             this.dependency = dependency
         }
     }

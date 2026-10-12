@@ -336,20 +336,48 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
         BeanContext getBeanContext();
 
         /**
-         * The resolution context the lookups of this context resolve through: the one of the creation, or of the
-         * disposal, this context belongs to.
+         * Resolves the registration of a bean of the given definition, which the caller has already chosen, as the
+         * given type, within the resolution this context belongs to.
          *
-         * <p>Its path says what the bean is being created for, and its attributes are what the caller that started
-         * the resolution attached to it, so a factory that is handed a definition the caller chose can resolve it
-         * with {@link BeanResolutionContext#getBeanRegistration(BeanDefinition, Argument)} and read there what the
-         * caller attached. What a lookup through it creates has the lifetime a lookup through {@link #getBean(Argument)}
-         * gives, but no segment is pushed for it: a lookup that is to be seen as an injection point of the bean
-         * goes through the methods of this context.</p>
+         * <p>This is {@link BeanResolutionContext#getBeanRegistration(BeanDefinition, Argument)} on the resolution
+         * context of this creation or disposal: no candidate lookup is run, what is created for the bean sees the
+         * path and attributes of this resolution, and a bean that has no scope of its own has the lifetime a lookup
+         * through {@link #getBean(Argument)} gives it.</p>
          *
-         * @return The resolution context
+         * @param definition The bean definition
+         * @param type       The potentially parameterized type to resolve the definition as
+         * @return The bean registration
+         * @param <V> The bean type
+         * @throws io.micronaut.context.exceptions.NoSuchBeanException If the definition is not a candidate for the
+         *                                                             type
          * @since 5.3.0
          */
-        BeanResolutionContext getResolutionContext();
+        <V> BeanRegistration<V> getBeanRegistration(BeanDefinition<? extends V> definition, Argument<V> type);
+
+        /**
+         * Reads an attribute of the resolution this context belongs to: what the caller that started the resolution,
+         * or a bean created earlier in it, attached with {@link #setAttribute(CharSequence, Object)} or
+         * {@link BeanResolutionContext#setAttribute(CharSequence, Object)}.
+         *
+         * @param key The attribute key
+         * @return The attribute value, or {@code null} if none is set
+         * @since 5.3.0
+         */
+        @Nullable
+        Object getAttribute(CharSequence key);
+
+        /**
+         * Attaches an attribute to the resolution this context belongs to, for what is created within it to read,
+         * as a factory that resolves a definition it chose with {@link #getBeanRegistration(BeanDefinition, Argument)}
+         * does for that bean's creation.
+         *
+         * @param key   The attribute key
+         * @param value The attribute value, or {@code null} to remove the attribute
+         * @return The previous value, or {@code null} if none was set
+         * @since 5.3.0
+         */
+        @Nullable
+        Object setAttribute(CharSequence key, @Nullable Object value);
 
         /**
          * Looks up a bean of the given type.
