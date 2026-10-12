@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MediaType;
@@ -39,7 +38,6 @@ import java.net.URLEncoder;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -58,6 +56,7 @@ import java.util.stream.Collectors;
 @Experimental
 public final class HttpRequestFactory {
 
+    private static final Set<String> SKIPPED_HEADERS = Set.of("transfer-encoding");
     private static final Set<String> RAW_REQUEST_SKIPPED_HEADERS = Set.of(
         "transfer-encoding",
         "content-length",
@@ -106,23 +105,16 @@ public final class HttpRequestFactory {
      * The headers of the request that are not sent. The JDK client frames the body itself, so a
      * {@code Transfer-Encoding} of the request would contradict the framing it sends. A raw
      * request relays the headers of another request: its {@code Content-Length} and its
-     * hop-by-hop headers, including those listed in {@code Connection}, belong to that other
-     * connection.
+     * hop-by-hop headers belong to that other connection. The headers that the
+     * {@code Connection} header of a relayed request lists are not removed here, because by now
+     * the request also holds the headers that the application and the client filters added: the
+     * relay has to remove them from the request it received.
      *
      * @param request The request
      * @return The lower case names of the headers that are not sent
      */
     private static Set<String> skippedHeaders(MutableHttpRequest<?> request) {
-        if (!(request instanceof RawHttpRequestWrapper<?>)) {
-            return Set.of("transfer-encoding");
-        }
-        Set<String> skipped = new HashSet<>(RAW_REQUEST_SKIPPED_HEADERS);
-        for (String connection : request.getHeaders().getAll(HttpHeaders.CONNECTION)) {
-            for (String token : StringUtils.splitOmitEmptyStrings(connection, ',')) {
-                skipped.add(token.trim().toLowerCase(Locale.ROOT));
-            }
-        }
-        return skipped;
+        return request instanceof RawHttpRequestWrapper<?> ? RAW_REQUEST_SKIPPED_HEADERS : SKIPPED_HEADERS;
     }
 
     private static <I> HttpRequest.BodyPublisher publisherForRequest(

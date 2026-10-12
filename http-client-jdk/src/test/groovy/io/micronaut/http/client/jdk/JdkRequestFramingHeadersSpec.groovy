@@ -80,13 +80,12 @@ class JdkRequestFramingHeadersSpec extends Specification {
                 .contentType(MediaType.TEXT_PLAIN_TYPE)
                 .header(HttpHeaders.TRANSFER_ENCODING, "chunked")
                 .header(HttpHeaders.CONTENT_LENGTH, "999")
-                .header(HttpHeaders.CONNECTION, "keep-alive, X-Hop")
+                .header(HttpHeaders.CONNECTION, "keep-alive")
                 .header("Keep-Alive", "timeout=5")
                 .header("Proxy-Connection", "keep-alive")
                 .header(HttpHeaders.TE, "trailers")
                 .header(HttpHeaders.TRAILER, "X-Trailer")
                 .header(HttpHeaders.UPGRADE, "websocket")
-                .header("X-Hop", "secret")
                 .header("X-End-To-End", "kept")
         byte[] body = "0\r\n\r\nGET /internal HTTP/1.1\r\nHost: upstream\r\n\r\n".getBytes(StandardCharsets.UTF_8)
 
@@ -106,7 +105,6 @@ class JdkRequestFramingHeadersSpec extends Specification {
         !received.headers.containsKey("te")
         !received.headers.containsKey("trailer")
         !received.headers.containsKey("upgrade")
-        !received.headers.containsKey("x-hop")
         received.headers["x-end-to-end"] == ["kept"]
         received.body == body
 
@@ -129,8 +127,9 @@ class JdkRequestFramingHeadersSpec extends Specification {
         // the gateway may relay the body with a known length or chunked, but never both
         (received.headers.containsKey("content-length")) != (received.headers.containsKey("transfer-encoding"))
         new String(received.body, StandardCharsets.UTF_8) == payload
-        !received.headers.containsKey("x-hop")
         received.headers["x-end-to-end"] == ["kept"]
+        // the client lists X-Forwarded-For in Connection, but the gateway sets it after copying
+        received.headers["x-forwarded-for"] == ["gateway"]
     }
 
     void "the regular client does not send a Transfer-Encoding next to its own framing"() {
@@ -163,8 +162,9 @@ class JdkRequestFramingHeadersSpec extends Specification {
                     "Host: 127.0.0.1:$port\r\n" +
                     "Content-Type: text/plain\r\n" +
                     "Transfer-Encoding: chunked\r\n" +
-                    "Connection: close, X-Hop\r\n" +
-                    "X-Hop: secret\r\n" +
+                    "Connection: close\r\n" +
+                    "Connection: X-Forwarded-For\r\n" +
+                    "X-Forwarded-For: spoofed\r\n" +
                     "X-End-To-End: kept\r\n" +
                     "\r\n" +
                     Integer.toHexString(bytes.length) + "\r\n").getBytes(StandardCharsets.US_ASCII))
@@ -282,6 +282,7 @@ class JdkRequestFramingHeadersSpec extends Specification {
                     values.forEach(value -> relayed.header(name, value))
                 }
             })
+            relayed.headers.set("X-Forwarded-For", "gateway")
             return client.exchange(relayed, request.byteBody().move(), null)
         }
     }
