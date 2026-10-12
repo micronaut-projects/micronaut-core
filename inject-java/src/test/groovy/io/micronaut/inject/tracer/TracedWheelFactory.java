@@ -16,7 +16,6 @@
 package io.micronaut.inject.tracer;
 
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Named;

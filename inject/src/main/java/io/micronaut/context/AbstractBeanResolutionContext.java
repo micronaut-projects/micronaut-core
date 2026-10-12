@@ -909,6 +909,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * Class that represents a default path.
      */
+    @SuppressWarnings("java:S2160") // a path equals another path with the same segments, whatever is traced
     class DefaultPath extends LinkedList<Segment<?, ?>> implements Path {
 
         public static final String RIGHT_ARROW = "\\---> ";
@@ -917,7 +918,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         /** The segment pushed for the bean the path was started for, which is not traced as an injection point. */
         @Nullable
-        Segment<?, ?> rootBeanSegment;
+        transient Segment<?, ?> rootBeanSegment;
         /** Whether the segment of the bean the path is started for is being pushed. */
         private boolean creatingRootBean;
 
@@ -1859,7 +1860,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public String getMemberName() {
-            return name;
+            return getName();
         }
 
         @Override
@@ -1869,7 +1870,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public BeanDefinition<B> getDeclaringBean() {
-            return declaringComponent;
+            return getDeclaringType();
         }
 
         @Override

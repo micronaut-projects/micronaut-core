@@ -210,8 +210,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     /** The tracer of the trace mode, which only traces the beans matching the trace patterns, or null for none. */
     final @Nullable BeanResolutionTracer modeTracer;
     /** The registered and the active discovered tracers, which trace every bean, or null for none. */
+    @SuppressWarnings("java:S3077") // only the reference is published, replaced when the context is configured
     volatile @Nullable BeanResolutionTracer customTracer;
     /** The tracer of the trace mode combined with the custom tracer, or null when there is no tracer of the mode. */
+    @SuppressWarnings("java:S3077") // only the reference is published, replaced when the context is configured
     volatile @Nullable BeanResolutionTracer combinedTracer;
     final Map<BeanIdentifier, BeanRegistration<?>> singlesInCreation = new ConcurrentHashMap<>(5);
 
@@ -3741,6 +3743,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             definition, resolutionContext != null, true);
     }
 
+    @SuppressWarnings("java:S1181") // A failed creation is traced whatever failed it, then rethrown
     private <T> BeanRegistration<T> createRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                       Argument<T> beanType,
                                                       @Nullable Qualifier<T> qualifier,
