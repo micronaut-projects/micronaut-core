@@ -345,7 +345,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         System.setProperty(ClassUtils.PROPERTY_MICRONAUT_CLASSLOADER_LOGGING, "true");
         this.classLoader = contextConfiguration.getClassLoader();
         this.beanContextConfiguration = contextConfiguration;
-        this.beanResolutionCustomizer = Objects.requireNonNull(contextConfiguration.beanResolutionCustomizer(), "Bean resolution customizer cannot be null");
+        BeanResolutionCustomizer configuredCustomizer = Objects.requireNonNull(contextConfiguration.beanResolutionCustomizer(), "Bean resolution customizer cannot be null");
+        this.beanResolutionCustomizer = Objects.requireNonNull(configuredCustomizer.forContext(this), "Bean resolution customizer cannot be null");
         this.customScopeRegistry = Objects.requireNonNull(createCustomScopeRegistry(), "Scope registry cannot be null");
         Set<Class<? extends Annotation>> eagerInitAnnotated = contextConfiguration.getEagerInitAnnotated();
         List<String> configuredEagerSingletonAnnotations = new ArrayList<>(eagerInitAnnotated.size());
@@ -359,7 +360,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         this.eventsEnabled = contextConfiguration.eventsEnabled();
         this.eagerBeansEnabled = contextConfiguration.eagerBeansEnabled();
         this.conversionService = MutableConversionService.create();
-        beanDefinitionProvider = new DefaultBeanDefinitionService(beanContextConfiguration);
+        beanDefinitionProvider = new DefaultBeanDefinitionService(beanContextConfiguration, beanResolutionCustomizer);
     }
 
     /**
