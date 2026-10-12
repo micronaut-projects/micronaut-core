@@ -25,8 +25,10 @@ import java.io.UncheckedIOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -42,7 +44,9 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  * <p>Between processes it is a {@link FileChannel#lock() file lock} on a file beside the output; within one it is a
  * reentrant lock, since the JVM holds a file lock for the process and not for a thread. The file lock is taken by the
- * outermost hold and released with it.</p>
+ * outermost hold and released with it. A build's clean deletes the lock file and another process creates it again,
+ * so once the file lock is taken the path must still name the locked file, or the file the path names now is locked
+ * instead.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -133,26 +137,110 @@ public final class OutputLock {
 
         void lockFile(Path lockFile) throws IOException {
             Path parent = lockFile.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
+            boolean waiting = false;
+            while (true) {
+                if (parent != null) {
+                    Files.createDirectories(parent);
+                }
+                Opened opened;
+                try {
+                    opened = open(lockFile);
+                } catch (NoSuchFileException e) {
+                    // its directory was deleted while it was opened
+                    continue;
+                }
+                if (opened == null) {
+                    // deleted or replaced while it was opened
+                    continue;
+                }
+                FileChannel openedChannel = opened.channel;
+                try {
+                    FileLock taken = openedChannel.tryLock();
+                    if (taken == null) {
+                        if (!waiting) {
+                            waiting = true;
+                            // said once: with development and test mode both running, one waits for the other at each edit
+                            if (WAITED.compareAndSet(false, true)) {
+                                LOG.info("Another development process of the project is writing its class output: waiting for it ({})", lockFile);
+                            } else {
+                                LOG.debug("Waiting for another development process writing {}", lockFile);
+                            }
+                        }
+                        openedChannel.lock();
+                    }
+                    // a clean deletes the lock file beside the output and another process creates it again: the lock
+                    // of the unlinked file excludes nobody, so take the lock of the file the path now names
+                    if (!opened.isCurrent(lockFile)) {
+                        LOG.debug("The output lock file {} was replaced while it was locked: locking it again", lockFile);
+                        openedChannel.close();
+                        continue;
+                    }
+                } catch (IOException | RuntimeException e) {
+                    openedChannel.close();
+                    throw e;
+                }
+                channel = openedChannel;
+                return;
             }
+        }
+
+        /**
+         * Opens the lock file, creating it if needed, with the identity of the file opened.
+         *
+         * @param lockFile The lock file
+         * @return The opened file, null if the path was replaced while it was opened
+         * @throws IOException if it cannot be opened
+         */
+        private static @Nullable Opened open(Path lockFile) throws IOException {
+            BasicFileAttributes before = currentAttributes(lockFile);
             FileChannel opened = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
             try {
-                FileLock taken = opened.tryLock();
-                if (taken == null) {
-                    // said once: with development and test mode both running, one waits for the other at each edit
-                    if (WAITED.compareAndSet(false, true)) {
-                        LOG.info("Another development process of the project is writing its class output: waiting for it ({})", lockFile);
-                    } else {
-                        LOG.debug("Waiting for another development process writing {}", lockFile);
-                    }
-                    opened.lock();
+                BasicFileAttributes after = currentAttributes(lockFile);
+                if (after == null || (before != null && !sameFile(before, after))) {
+                    opened.close();
+                    return null;
                 }
+                return new Opened(opened, after);
             } catch (IOException | RuntimeException e) {
                 opened.close();
                 throw e;
             }
-            channel = opened;
+        }
+
+        private static @Nullable BasicFileAttributes currentAttributes(Path file) throws IOException {
+            try {
+                return Files.readAttributes(file, BasicFileAttributes.class);
+            } catch (NoSuchFileException e) {
+                return null;
+            }
+        }
+
+        private static boolean sameFile(BasicFileAttributes first, BasicFileAttributes second) {
+            Object key = first.fileKey();
+            if (key != null) {
+                return key.equals(second.fileKey());
+            }
+            // no file key, as on Windows: a file created again at the path has a later creation time
+            return first.creationTime().equals(second.creationTime());
+        }
+
+        /**
+         * An opened lock file.
+         *
+         * @param channel The channel of the file
+         * @param attributes The attributes of the file when opened
+         */
+        private record Opened(FileChannel channel, BasicFileAttributes attributes) {
+
+            /**
+             * @param lockFile The lock file
+             * @return Whether the path still names the opened file
+             * @throws IOException if its attributes cannot be read
+             */
+            boolean isCurrent(Path lockFile) throws IOException {
+                BasicFileAttributes current = currentAttributes(lockFile);
+                return current != null && sameFile(this.attributes, current);
+            }
         }
 
         void unlock() {
