@@ -407,6 +407,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         payload.release();
                         messageProcessingException(ctx, e);
                         return;
+                    } catch (Throwable e) {
+                        // codecs don't release the buffer, and not every decode error is a CodecException
+                        payload.release();
+                        throw e;
                     }
                     MessageBodyReader<?> reader = data == null ? messageBodyHandlerRegistry.findReader(bodyArgument, mediaType).orElse(null) : null;
                     if (reader == null) {

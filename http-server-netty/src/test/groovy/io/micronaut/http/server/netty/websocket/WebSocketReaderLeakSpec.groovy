@@ -35,10 +35,11 @@ class WebSocketReaderLeakSpec extends Specification {
         then:
         new PollingConditions(timeout: 10).eventually {
             listener.closeCode == 1011
+            // polled: a released pooled buffer can briefly be reused by a later allocation on the event loop
+            reader.buffers[0].refCnt() == 0
         }
         listener.messages.empty
         reader.buffers.size() == 1
-        reader.buffers[0].refCnt() == 0
 
         cleanup:
         ws?.abort()
