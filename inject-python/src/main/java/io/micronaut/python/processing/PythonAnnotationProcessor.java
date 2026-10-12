@@ -23,6 +23,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
+import io.micronaut.python.processing.model.ClassDef;
 import io.micronaut.python.processing.util.PythonAnnotationTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
 import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
@@ -87,6 +88,7 @@ import java.util.stream.Collectors;
 @SupportedAnnotationTypes(PythonAnnotationProcessor.PYTHON_APPLICATION_ANNOTATION)
 @SupportedOptions({
     PythonAnnotationProcessor.SOURCE_ROOT_OPTION,
+    PythonClassExclusions.OPTION,
     PythonReflectionGate.OPTION,
     PythonReflectionGate.WARNINGS_OPTION,
     PythonPooledStubGenerator.IGNORE_OPTION
@@ -705,10 +707,24 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 .stream()
                 .map(PythonAstParser.TransformResult::transformedSource)
                 .toList();
-            return parser.parse(
+            PythonEnvironment environment = parser.parse(
                 sourceList,
                 Arrays.asList(srcDirs),
                 javaVisitorContext
+            );
+            Map<String, ClassDef> retained = PythonClassExclusions.retain(
+                environment.classes(),
+                processingEnv.getOptions().get(PythonClassExclusions.OPTION)
+            );
+            if (retained.size() == environment.classes().size()) {
+                return environment;
+            }
+            return new PythonEnvironment(
+                retained,
+                environment.scripts(),
+                environment.decorators(),
+                environment.shadowedTypes(),
+                environment.context()
             );
         } catch (Exception e) {
             throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
