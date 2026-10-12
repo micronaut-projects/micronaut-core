@@ -180,10 +180,13 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         // the values recorded for an element are the members it declared, so a candidate leaving a member at its
         // default records something other than a qualifier writing that default down. The two are the same
         // annotation, and AnnotationValue#matches compares them as such, filling in the members neither of them
-        // declared from the one set of defaults both sides are given here
+        // declared from the one set of defaults both sides are given here. A member either side records as
+        // non-binding is left out of both: the qualifier's own list was applied when it was built, and the
+        // candidate's is applied here, so a qualifier built without the list still compares by the binding members
+        Set<String> nonBinding = resolveNonBindingMembers(candidateMetadata);
         Map<CharSequence, Object> defaults = AnnotationMetadataSupport.getDefaultValues(annotationName);
-        return withDefaults(qualifierAnn.getValues(), defaults)
-            .matches(withDefaults(resolveBindingValues(candidateMetadata, candidateMetadata.getValues(annotationName)), defaults));
+        return withDefaults(resolveBindingValues(nonBinding, qualifierAnn.getValues()), defaults)
+            .matches(withDefaults(resolveBindingValues(nonBinding, candidateMetadata.getValues(annotationName)), defaults));
     }
 
     private AnnotationValue<Annotation> withDefaults(Map<CharSequence, Object> bindingValues,
@@ -210,7 +213,11 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
 
     private static Map<CharSequence, Object> resolveBindingValues(AnnotationMetadata annotationMetadata,
                                                                   Map<CharSequence, Object> values) {
-        Set<String> nonBinding = resolveNonBindingMembers(annotationMetadata);
+        return resolveBindingValues(resolveNonBindingMembers(annotationMetadata), values);
+    }
+
+    private static Map<CharSequence, Object> resolveBindingValues(Set<String> nonBinding,
+                                                                  Map<CharSequence, Object> values) {
         if (values.isEmpty() || nonBinding.isEmpty()) {
             return values;
         }
