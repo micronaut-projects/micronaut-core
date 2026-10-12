@@ -3463,6 +3463,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         segment = i.hasNext() ? i.next() : null;
                     }
                 }
+                if (injectionPointSegment.getArgument().isNullable()
+                    && segment instanceof AbstractBeanResolutionContext.AbstractSegment<?, ?> abstractSegment && abstractSegment.isBeanCreate()) {
+                    // the root segment of a top level lookup is the creation of the bean itself, the bean was not injected.
+                    // A required injection point keeps receiving that segment, an each-bean reads its own qualifier from it
+                    segment = null;
+                }
                 if (segment != null) {
                     T ip = (T) segment.getInjectionPoint();
                     if (ip != null && beanType.isInstance(ip)) {

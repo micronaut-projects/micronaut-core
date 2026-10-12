@@ -995,32 +995,43 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public Path pushConstructorResolve(BeanDefinition declaringType, Argument argument) {
-            ConstructorInjectionPoint<?> constructor = declaringType.getConstructor();
-            if (constructor instanceof MethodInjectionPoint<?, ?> methodInjectionPoint) {
-                return pushConstructorResolve(declaringType, methodInjectionPoint.getName(), argument, constructor.getArguments());
-            }
-            return pushConstructorResolve(declaringType, CONSTRUCTOR_METHOD_NAME, argument, constructor.getArguments());
+            pushConstructorSegment(declaringType, argument);
+            return this;
         }
 
         @Override
         public Path pushConstructorResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments) {
+            pushConstructorSegment(declaringType, methodName, argument, arguments);
+            return this;
+        }
+
+        private AbstractSegment<Object, Object> pushConstructorSegment(BeanDefinition declaringType, Argument argument) {
+            ConstructorInjectionPoint<?> constructor = declaringType.getConstructor();
+            if (constructor instanceof MethodInjectionPoint<?, ?> methodInjectionPoint) {
+                return pushConstructorSegment(declaringType, methodInjectionPoint.getName(), argument, constructor.getArguments());
+            }
+            return pushConstructorSegment(declaringType, CONSTRUCTOR_METHOD_NAME, argument, constructor.getArguments());
+        }
+
+        private AbstractSegment<Object, Object> pushConstructorSegment(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments) {
             try {
                 if (CONSTRUCTOR_METHOD_NAME.equals(methodName)) {
                     ConstructorSegment constructorSegment = new ConstructorArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments);
                     detectCircularDependency(declaringType, argument, constructorSegment);
+                    return constructorSegment;
                 } else {
-                    MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, null);
+                    MethodSegment<Object, Object> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, null);
                     if (contains(methodSegment)) {
                         push(methodSegment);
                         throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                     } else {
                         push(methodSegment);
                     }
+                    return methodSegment;
                 }
             } finally {
                 traceResolution();
             }
-            return this;
         }
 
         @Override
@@ -1032,7 +1043,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                     beanType
                 );
             }
-            return pushConstructorResolve(declaringType, beanType);
+            pushConstructorSegment(declaringType, beanType).beanCreate = true;
+            return this;
         }
 
         private void traceResolution() {
@@ -1674,6 +1686,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         private final Qualifier<B> qualifier;
         private final String name;
         private final Argument<T> argument;
+        /**
+         * Whether the segment was pushed by {@link Path#pushBeanCreate(BeanDefinition, Argument)}: it
+         * stands for the creation of the bean the path was started for, not for an injection point.
+         */
+        private boolean beanCreate;
 
         /**
          * @param declaringClass The declaring class
@@ -1686,6 +1703,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             this.qualifier = qualifier;
             this.name = name;
             this.argument = argument;
+        }
+
+        /**
+         * @return Whether the segment was pushed for the creation of the bean the path was started for,
+         * rather than for an injection point
+         */
+        final boolean isBeanCreate() {
+            return beanCreate;
         }
 
         /**
