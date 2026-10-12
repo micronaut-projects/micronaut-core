@@ -224,6 +224,23 @@ public final class OutputLock {
             return first.creationTime().equals(second.creationTime());
         }
 
+        void unlock() {
+            try {
+                if (lock.getHoldCount() == 1) {
+                    FileChannel held = channel;
+                    channel = null;
+                    if (held != null) {
+                        // closing the channel releases its lock
+                        held.close();
+                    }
+                }
+            } catch (IOException e) {
+                LOG.debug("Cannot release the output lock", e);
+            } finally {
+                lock.unlock();
+            }
+        }
+
         /**
          * An opened lock file.
          *
@@ -243,21 +260,5 @@ public final class OutputLock {
             }
         }
 
-        void unlock() {
-            try {
-                if (lock.getHoldCount() == 1) {
-                    FileChannel held = channel;
-                    channel = null;
-                    if (held != null) {
-                        // closing the channel releases its lock
-                        held.close();
-                    }
-                }
-            } catch (IOException e) {
-                LOG.debug("Cannot release the output lock", e);
-            } finally {
-                lock.unlock();
-            }
-        }
     }
 }

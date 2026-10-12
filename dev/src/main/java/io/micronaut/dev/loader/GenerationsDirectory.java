@@ -80,20 +80,26 @@ final class GenerationsDirectory {
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            FileChannel channel = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
-            FileLock lock;
+            // the channel of a claimed directory stays open, with its lock, until the JVM exits
+            FileChannel channel = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE); // NOSONAR java:S2095
+            boolean claimed = false;
             try {
-                lock = channel.tryLock();
-            } catch (OverlappingFileLockException | IOException e) {
-                lock = null;
+                FileLock lock;
+                try {
+                    lock = channel.tryLock();
+                } catch (OverlappingFileLockException | IOException e) {
+                    lock = null;
+                }
+                if (lock != null) {
+                    CLAIMED.put(candidate, lock);
+                    claimed = true;
+                }
+                return claimed;
+            } finally {
+                if (!claimed) {
+                    channel.close();
+                }
             }
-            if (lock == null) {
-                channel.close();
-                return false;
-            }
-            // held, with its channel, until the JVM exits
-            CLAIMED.put(candidate, lock);
-            return true;
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot lock " + lockFile, e);
         }
