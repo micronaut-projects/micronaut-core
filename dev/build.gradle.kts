@@ -107,5 +107,6 @@ noReflection {
     allowIn("io.micronaut.dev.agent.DynamicAttach", "CLASS_LOADING")
     // the fast path redefines method bodies through the agent
     allowIn("io.micronaut.dev.DevRuntime", "INSTRUMENTATION")
+    allowIn("io.micronaut.dev.InPlaceUpdates", "INSTRUMENTATION")
     allowIn("io.micronaut.dev.DevWatchService", "CLASS_LOADING")
 }

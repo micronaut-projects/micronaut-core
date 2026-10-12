@@ -615,7 +615,7 @@ final class TestSession {
     private void patchOrRetire(ChangeSet changes, Set<String> before) {
         ClassLoader lastLoader = runLoader;
         InPlaceResourceReloader.Result result = null;
-        if (runLoaderCurrent && lastLoader != null && lastLoader == runtime.currentGeneration() && runtime.isPatchable(changes, before)) {
+        if (runLoaderCurrent && lastLoader != null && lastLoader == runtime.currentGeneration() && runtime.inPlaceUpdates().isPatchable(changes, before)) {
             long start = System.nanoTime();
             Optional<InPlaceResourceReloader> reloader;
             try {
@@ -625,7 +625,7 @@ final class TestSession {
                 reloader = Optional.empty();
             }
             if (reloader.isPresent()) {
-                result = runtime.patchGeneration(changes, List.of(reloader.get()), "the tests run on a new generation");
+                result = runtime.inPlaceUpdates().patchGeneration(changes, List.of(reloader.get()), "the tests run on a new generation");
             }
             if (result != null) {
                 LOG.info("Patched {} {} in place in {} ms: the tests run on generation {} again", result.count(), result.unit(),
