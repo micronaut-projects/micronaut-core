@@ -207,6 +207,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     final BeanResolutionTraceMode traceMode;
     final Set<String> tracePatterns;
+    /** The tracer of the trace mode, which only traces the beans matching the trace patterns, or null for none. */
+    final @Nullable BeanResolutionTracer modeTracer;
+    /** The registered and the active discovered tracers, which trace every bean, or null for none. */
+    volatile @Nullable BeanResolutionTracer customTracer;
+    /** The tracer of the trace mode combined with the custom tracer, or null when there is no tracer of the mode. */
+    volatile @Nullable BeanResolutionTracer combinedTracer;
     final Map<BeanIdentifier, BeanRegistration<?>> singlesInCreation = new ConcurrentHashMap<>(5);
 
     protected final SingletonScope singletonScope = new SingletonScope();
@@ -356,6 +362,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             .getTraceConfiguration();
         this.traceMode = traceConfiguration.mode();
         this.tracePatterns = traceConfiguration.classPatterns();
+        this.modeTracer = traceMode.getTracer().orElse(null);
+        this.combinedTracer = modeTracer;
         this.eventsEnabled = contextConfiguration.eventsEnabled();
         this.eagerBeansEnabled = contextConfiguration.eagerBeansEnabled();
         this.conversionService = MutableConversionService.create();
@@ -540,10 +548,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             terminating.set(false);
             running.set(false);
             configured.set(false);
-            if (traceMode != BeanResolutionTraceMode.NONE) {
-                traceMode.getTracer().ifPresent(tracer -> {
-                    tracer.traceContextShutdown(this);
-                });
+            BeanResolutionTracer tracer = combinedTracer != null ? combinedTracer : customTracer;
+            if (tracer != null) {
+                tracer.traceContextShutdown(this);
             }
             beanDefinitionProvider.reset();
         }
@@ -3734,7 +3741,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             definition, resolutionContext != null, true);
     }
 
-    @SuppressWarnings({"unchecked", "NullAway"}) // Nullable factory definitions may produce a registration without an instance.
     private <T> BeanRegistration<T> createRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                       Argument<T> beanType,
                                                       @Nullable Qualifier<T> qualifier,
@@ -3748,87 +3754,111 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             resolutionContext = resolutionContext.copy();
         }
         try (BeanResolutionContext context = newResolutionContext(definition, resolutionContext)) {
-            final BeanResolutionContext.Path path = context.getPath();
-            final boolean isNewPath = path.isEmpty();
-            if (isNewPath) {
-                Argument<T> resolvedBeanType;
-                if (qualifier instanceof TypeArgumentQualifier<T> taq) {
-                    Class<?>[] typeArguments = taq.getTypeArguments();
-                    resolvedBeanType = Argument.of(
-                        beanType.getType(),
-                        beanType.getAnnotationMetadata(),
-                        typeArguments
-                    );
-                } else {
-                    resolvedBeanType = beanType;
-                }
-                path.pushBeanCreate(definition, resolvedBeanType);
+            BeanResolutionTracer tracer = context instanceof AbstractBeanResolutionContext traced ? traced.getTracer() : null;
+            if (tracer == null) {
+                return createRegistrationInContext(context, beanType, qualifier, definition, dependent, customizeNull);
             }
+            tracer.traceBeanCreation(context, definition, resolveCreatedBeanType(beanType, qualifier));
+            BeanRegistration<T> registration;
             try {
-                AbstractBeanResolutionContext creatingContext = context instanceof AbstractBeanResolutionContext creating ? creating : null;
-                BeanCreationState previousCreation = creatingContext == null ? null : creatingContext.creationState;
-                BeanCreationState creation = creatingContext == null
-                    ? new BeanCreationState(definition, List.of()) : creatingContext.beginCreation(definition);
-                try {
-                    List<BeanRegistration<?>> parentDependentBeans = context.popDependentBeans();
-                    BeanRegistration<T> beanRegistration;
-                    try {
-                        T bean;
-                        if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-                            bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
-                        } else {
-                            throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
-                        }
-                        InterceptorCandidates interceptorCandidates = creation.lifecycleInterceptorCandidates();
-                        if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
-                            Object value = registrations.remove(definition);
-                            if (value instanceof List<?> list) {
-                                interceptorCandidates = new InterceptorCandidates.Resolved((List) list);
-                            }
-                        }
-                        bean = postBeanCreated(context, definition, beanType, qualifier, bean);
-                        if (customizeNull && bean == null) {
-                            bean = (T) beanResolutionCustomizer.resolveNullBean(beanType, beanType, definition).orElse(null);
-                        }
+                registration = createRegistrationInContext(context, beanType, qualifier, definition, dependent, customizeNull);
+            } catch (RuntimeException | Error e) {
+                tracer.traceBeanCreationFailed(context, definition, e);
+                throw e;
+            }
+            tracer.traceBeanCreated(context, definition);
+            return registration;
+        }
+    }
 
-                        BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
-                        if (dependentFactoryBean != null) {
-                            destroyBean(dependentFactoryBean);
-                        }
-                        Qualifier<T> registrationQualifier = qualifier;
-                        if (registrationQualifier == null) {
-                            registrationQualifier = definition.getDeclaredQualifier();
-                        }
-                        BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
-                        List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
-                        beanRegistration = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
-                            dependentBeans, interceptorCandidates, creation.dependencies);
-                    } catch (RuntimeException | Error e) {
-                        destroyDependentsOfFailedBean(context, e);
-                        destroyCreatedBeans(creation.dependencies.takeDependents(), e);
-                        context.pushDependentBeans(parentDependentBeans);
-                        throw e;
+    private static <T> Argument<T> resolveCreatedBeanType(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        if (qualifier instanceof TypeArgumentQualifier<T> taq) {
+            Class<?>[] typeArguments = taq.getTypeArguments();
+            return Argument.of(
+                beanType.getType(),
+                beanType.getAnnotationMetadata(),
+                typeArguments
+            );
+        }
+        return beanType;
+    }
+
+    @SuppressWarnings({"unchecked", "NullAway"}) // Nullable factory definitions may produce a registration without an instance.
+    private <T> BeanRegistration<T> createRegistrationInContext(BeanResolutionContext context,
+                                                               Argument<T> beanType,
+                                                               @Nullable Qualifier<T> qualifier,
+                                                               BeanDefinition<T> definition,
+                                                               boolean dependent,
+                                                               boolean customizeNull) {
+        final BeanResolutionContext.Path path = context.getPath();
+        final boolean isNewPath = path.isEmpty();
+        if (isNewPath) {
+            path.pushBeanCreate(definition, resolveCreatedBeanType(beanType, qualifier));
+        }
+        try {
+            AbstractBeanResolutionContext creatingContext = context instanceof AbstractBeanResolutionContext creating ? creating : null;
+            BeanCreationState previousCreation = creatingContext == null ? null : creatingContext.creationState;
+            BeanCreationState creation = creatingContext == null
+                ? new BeanCreationState(definition, List.of()) : creatingContext.beginCreation(definition);
+            try {
+                List<BeanRegistration<?>> parentDependentBeans = context.popDependentBeans();
+                BeanRegistration<T> beanRegistration;
+                try {
+                    T bean;
+                    if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
+                        bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
+                    } else {
+                        throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                     }
-                    if (definition instanceof ProxyBeanDefinition<?> proxyDefinition
-                        && context instanceof AbstractBeanResolutionContext creating
-                        && beanRegistration instanceof BeanDisposingRegistration<T> disposingRegistration) {
-                        // the context a lazy proxy retains holds what is created with the target it caches
-                        disposingRegistration.setProxyTargetContext(creating.takeLazyProxyTargetCopy(proxyDefinition.getTargetDefinitionType()));
+                    InterceptorCandidates interceptorCandidates = creation.lifecycleInterceptorCandidates();
+                    if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
+                        Object value = registrations.remove(definition);
+                        if (value instanceof List<?> list) {
+                            interceptorCandidates = new InterceptorCandidates.Resolved((List) list);
+                        }
                     }
+                    bean = postBeanCreated(context, definition, beanType, qualifier, bean);
+                    if (customizeNull && bean == null) {
+                        bean = (T) beanResolutionCustomizer.resolveNullBean(beanType, beanType, definition).orElse(null);
+                    }
+
+                    BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
+                    if (dependentFactoryBean != null) {
+                        destroyBean(dependentFactoryBean);
+                    }
+                    Qualifier<T> registrationQualifier = qualifier;
+                    if (registrationQualifier == null) {
+                        registrationQualifier = definition.getDeclaredQualifier();
+                    }
+                    BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
+                    List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
+                    beanRegistration = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
+                        dependentBeans, interceptorCandidates, creation.dependencies);
+                } catch (RuntimeException | Error e) {
+                    destroyDependentsOfFailedBean(context, e);
+                    destroyCreatedBeans(creation.dependencies.takeDependents(), e);
                     context.pushDependentBeans(parentDependentBeans);
-                    if (dependent) {
-                        context.addDependentBean(beanRegistration);
-                    }
-                    return beanRegistration;
-                } finally {
-                    if (creatingContext != null) {
-                        creatingContext.creationState = previousCreation;
-                    }
+                    throw e;
                 }
+                if (definition instanceof ProxyBeanDefinition<?> proxyDefinition
+                    && context instanceof AbstractBeanResolutionContext creating
+                    && beanRegistration instanceof BeanDisposingRegistration<T> disposingRegistration) {
+                    // the context a lazy proxy retains holds what is created with the target it caches
+                    disposingRegistration.setProxyTargetContext(creating.takeLazyProxyTargetCopy(proxyDefinition.getTargetDefinitionType()));
+                }
+                context.pushDependentBeans(parentDependentBeans);
+                if (dependent) {
+                    context.addDependentBean(beanRegistration);
+                }
+                return beanRegistration;
             } finally {
-                if (isNewPath) {
-                    path.close();
+                if (creatingContext != null) {
+                    creatingContext.creationState = previousCreation;
                 }
+            }
+        } finally {
+            if (isNewPath) {
+                path.close();
             }
         }
     }
@@ -4680,11 +4710,41 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     @Internal
     void configureContextInternal() {
         if (configured.compareAndSet(false, true)) {
+            initializeTracers();
             readAllBeanConfigurations();
             beanDefinitionProvider.initialize(this);
             // an index exhaustiveness computed before the bean definitions were read does not hold for them
             beanDefinitionsEpoch.incrementAndGet();
         }
+    }
+
+    /**
+     * Combines the registered tracers with the discovered tracers that activate for this context.
+     */
+    private void initializeTracers() {
+        List<BeanResolutionTracer> tracers = new ArrayList<>(beanContextConfiguration.getBeanResolutionTracers());
+        BeanResolutionTracer.Activation activation = new BeanResolutionTracer.Activation(
+            getTracerEnvironmentNames(),
+            beanContextConfiguration.isBeanResolutionTracerDiscoveryEnabled()
+        );
+        CompositeBeanResolutionTracer.discover(classLoader, activation, tracers);
+        BeanResolutionTracer custom = CompositeBeanResolutionTracer.of(tracers);
+        if (modeTracer != null && custom != null) {
+            tracers.add(0, modeTracer);
+            combinedTracer = CompositeBeanResolutionTracer.of(tracers);
+        } else {
+            combinedTracer = modeTracer;
+        }
+        customTracer = custom;
+    }
+
+    /**
+     * The environment names discovered tracers activate for.
+     *
+     * @return The active environment names
+     */
+    Set<String> getTracerEnvironmentNames() {
+        return Set.of();
     }
 
     /**

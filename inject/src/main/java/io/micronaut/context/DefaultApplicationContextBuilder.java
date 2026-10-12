@@ -89,6 +89,8 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private Boolean bootstrapEnvironment = null;
     private boolean enableDefaultPropertySources = true;
     private BeanResolutionTraceConfiguration traceConfiguration = new BeanResolutionTraceConfiguration();
+    private final List<BeanResolutionTracer> beanResolutionTracers = new ArrayList<>(2);
+    private boolean beanResolutionTracerDiscovery = BeanResolutionTraceMode.isTracerDiscoveryEnabledByDefault();
     private ResourceLoadStrategy configurationLoadStrategy = ResourceLoadStrategy.defaultStrategy();
     private BeanDefinitionsProvider beanDefinitionsProvider = new DefaultBeanDefinitionsProvider();
     private boolean eagerBeansEnabled = true;
@@ -129,6 +131,28 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public BeanResolutionTraceConfiguration getTraceConfiguration() {
         return this.traceConfiguration;
+    }
+
+    @Override
+    public ApplicationContextBuilder beanResolutionTracer(BeanResolutionTracer tracer) {
+        beanResolutionTracers.add(Objects.requireNonNull(tracer, "Tracer cannot be null"));
+        return this;
+    }
+
+    @Override
+    public List<BeanResolutionTracer> getBeanResolutionTracers() {
+        return Collections.unmodifiableList(beanResolutionTracers);
+    }
+
+    @Override
+    public ApplicationContextBuilder beanResolutionTracerDiscovery(boolean enabled) {
+        this.beanResolutionTracerDiscovery = enabled;
+        return this;
+    }
+
+    @Override
+    public boolean isBeanResolutionTracerDiscoveryEnabled() {
+        return beanResolutionTracerDiscovery;
     }
 
     @Override

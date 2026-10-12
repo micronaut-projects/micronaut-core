@@ -1,0 +1,57 @@
+The injection trace mode is built on the experimental api:context.BeanResolutionTracer[] API, which you can implement to observe bean resolution yourself. For example, a tracer can record the creation of each bean as a span of a trace, so you can see what makes startup slow.
+
+A tracer receives a callback when the creation of a bean starts (`traceBeanCreation`) and one when it ends (`traceBeanCreated`, or `traceBeanCreationFailed` if it failed). It also receives a callback before and after each injection point is resolved (`traceInjectBean` and `traceInjectComplete`). These callbacks come in pairs, are invoked on the thread that resolves the bean and nest like a call stack. A bean created for an injection point is reported between the two callbacks of that injection point. So a tracer can keep its open spans on a per-thread stack. Use api:context.BeanResolutionContext#getBeansInCreation()[] to find which bean a bean is being created for.
+
+.A tracer that measures bean creation
+[source,java]
+----
+public class TimingTracer implements BeanResolutionTracer {
+    private final ThreadLocal<Deque<Long>> starts = ThreadLocal.withInitial(ArrayDeque::new);
+
+    @Override
+    public void traceBeanCreation(BeanResolutionContext context, BeanDefinition<?> definition, Argument<?> beanType) {
+        starts.get().push(System.nanoTime());
+    }
+
+    @Override
+    public <T> void traceBeanCreated(BeanResolutionContext context, BeanDefinition<T> definition) {
+        long took = System.nanoTime() - starts.get().pop();
+        // record the time taken to create the bean
+    }
+
+    @Override
+    public <T> void traceBeanCreationFailed(BeanResolutionContext context, BeanDefinition<T> definition, Throwable failure) {
+        starts.get().pop();
+    }
+
+    @Override
+    public <B, T> void traceInjectBean(BeanResolutionContext context, BeanResolutionContext.Segment<B, T> segment) {
+    }
+}
+----
+
+Tracers are active from the start of the context, before any bean exists, so a tracer cannot be a bean. Register a tracer with the api:context.ApplicationContextBuilder[]:
+
+.Registering a tracer
+[source,java]
+----
+ApplicationContext.builder()
+    .beanResolutionTracer(new TimingTracer())
+    .start();
+----
+
+A library can also register its tracer with `ServiceLoader`, in a `META-INF/services/io.micronaut.context.BeanResolutionTracer` file. Discovered tracers are not active by default, so a library on the classpath does not trace production applications by accident. Enable them with the `micronaut.inject.trace.tracers` system property, the `MICRONAUT_INJECT_TRACE_TRACERS` environment variable or `ApplicationContextBuilder.beanResolutionTracerDiscovery(true)`. A discovered tracer can also decide for itself whether to activate, for example only in the `dev` environment, by overriding `isEnabled`:
+
+.A tracer active in development
+[source,java]
+----
+@Override
+public boolean isEnabled(Activation activation) {
+    return activation.discoveryEnabled()
+        || activation.environmentNames().contains(Environment.DEVELOPMENT);
+}
+----
+
+All active tracers receive every callback together with the tracer of the injection trace mode. The class patterns of `MICRONAUT_INJECT_TRACE` only restrict the trace mode's output, not your tracers. When no tracer is active, bean resolution does no tracing work.
+
+Callbacks run on the path that resolves every bean, so keep them fast. Do not throw from a callback or create beans in one: an exception thrown by a tracer fails the resolution being traced.

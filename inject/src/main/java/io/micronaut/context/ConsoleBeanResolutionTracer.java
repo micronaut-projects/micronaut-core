@@ -172,6 +172,10 @@ abstract sealed class ConsoleBeanResolutionTracer
     public void traceBeanCreation(
         BeanResolutionContext resolutionContext,
         BeanDefinition<?> beanDefinition, Argument<?> beanType) {
+        if (!resolutionContext.getPath().isEmpty()) {
+            // a bean created for an injection point is shown by the injection point
+            return;
+        }
         resolutionContext.setAttribute(START_TIME, System.currentTimeMillis());
         List<StackWalker.StackFrame> createdAt = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
             .walk(s ->
@@ -298,14 +302,26 @@ abstract sealed class ConsoleBeanResolutionTracer
 
     @Override
     public <T> void traceBeanCreated(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition) {
-        Object v = resolutionContext.getAttribute(START_TIME);
+        traceCreationEnd(resolutionContext, beanDefinition, "✅ Created ");
+    }
+
+    @Override
+    public <T> void traceBeanCreationFailed(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, Throwable failure) {
+        traceCreationEnd(resolutionContext, beanDefinition, "❌ Failed to create ");
+    }
+
+    private void traceCreationEnd(BeanResolutionContext resolutionContext, BeanDefinition<?> beanDefinition, String outcome) {
+        if (!resolutionContext.getPath().isEmpty()) {
+            return;
+        }
+        Object v = resolutionContext.removeAttribute(START_TIME);
         if (v instanceof Long start) {
             StringWriter sw = new StringWriter();
             try (BufferedWriter writer = new BufferedWriter(sw)) {
                 writer.newLine();
                 String beanName = beanDefinition.getBeanDescription(TypeInformation.TypeFormat.ANSI_SIMPLE, false);
                 long now = System.currentTimeMillis();
-                writer.write("✅ Created " + beanName + " in " + (now - start) + "ms");
+                writer.write(outcome + beanName + " in " + (now - start) + "ms");
                 writer.newLine();
                 writer.write("------------");
                 writer.newLine();

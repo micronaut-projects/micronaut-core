@@ -107,6 +107,26 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return state;
     }
 
+    /**
+     * @return The tracer of this context, or null when it is not traced
+     */
+    @Nullable BeanResolutionTracer getTracer() {
+        return tracer;
+    }
+
+    @Override
+    public List<BeanDefinition<?>> getBeansInCreation() {
+        if (creationState == null) {
+            return List.of();
+        }
+        ArrayList<BeanDefinition<?>> beans = new ArrayList<>();
+        for (BeanCreationState state = creationState; state != null; state = state.parent) {
+            beans.add(state.definition);
+        }
+        Collections.reverse(beans);
+        return Collections.unmodifiableList(beans);
+    }
+
     @Override
     public @Nullable BeanDependencyGroup getBeanDependencyGroup() {
         return creationState == null ? null : new DefaultBeanDependencyResolver(context, creationState.dependencies);
@@ -190,10 +210,12 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         this.context = context;
         this.rootDefinition = rootDefinition;
         this.path = new DefaultPath();
-        if (context.traceMode != BeanResolutionTraceMode.NONE && rootDefinition != null && isTraceEnabled(rootDefinition.getBeanType().getTypeName(), context.tracePatterns)) {
-            this.tracer = context.traceMode.getTracer().orElse(null);
+        BeanResolutionTracer combinedTracer = context.combinedTracer;
+        if (combinedTracer != null && rootDefinition != null && isTraceEnabled(rootDefinition.getBeanType().getTypeName(), context.tracePatterns)) {
+            this.tracer = combinedTracer;
         } else {
-            this.tracer = null;
+            // the trace patterns only restrict the tracer of the trace mode
+            this.tracer = context.customTracer;
         }
         this.propertyResolver = context instanceof DefaultApplicationContext applicationContext ?  unwrap(applicationContext) : null;
     }
@@ -1017,30 +1039,38 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                         push(methodSegment);
                     }
                 }
-            } finally {
-                traceResolution();
+            } catch (CircularDependencyException e) {
+                traceRejectedResolution();
+                throw e;
             }
+            traceResolution();
             return this;
         }
 
         @Override
         public Path pushBeanCreate(BeanDefinition<?> declaringType, Argument<?> beanType) {
-            if (tracer != null) {
-                tracer.traceBeanCreation(
-                    AbstractBeanResolutionContext.this,
-                    declaringType,
-                    beanType
-                );
-            }
             return pushConstructorResolve(declaringType, beanType);
         }
 
         private void traceResolution() {
             if (tracer != null) {
-                getPath().currentSegment().ifPresent(segment -> tracer.traceInjectBean(
-                    AbstractBeanResolutionContext.this,
-                    segment
-                ));
+                Segment<?, ?> segment = peek();
+                if (segment != null) {
+                    tracer.traceInjectBean(AbstractBeanResolutionContext.this, segment);
+                }
+            }
+        }
+
+        /**
+         * Traces an injection point that was pushed and rejected at once, for which the path is not closed.
+         */
+        private void traceRejectedResolution() {
+            if (tracer != null) {
+                Segment<?, ?> segment = peek();
+                if (segment != null) {
+                    tracer.traceInjectBean(AbstractBeanResolutionContext.this, segment);
+                    tracer.traceInjectComplete(AbstractBeanResolutionContext.this, segment);
+                }
             }
         }
 
@@ -1055,9 +1085,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 } else {
                     push(methodSegment);
                 }
-            } finally {
-                traceResolution();
+            } catch (CircularDependencyException e) {
+                traceRejectedResolution();
+                throw e;
             }
+            traceResolution();
 
             return this;
         }
@@ -1072,9 +1104,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 } else {
                     push(methodSegment);
                 }
-            } finally {
-                traceResolution();
+            } catch (CircularDependencyException e) {
+                traceRejectedResolution();
+                throw e;
             }
+            traceResolution();
 
             return this;
         }
@@ -1096,9 +1130,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 } else {
                     push(segment);
                 }
-            } finally {
-                traceResolution();
+            } catch (CircularDependencyException e) {
+                traceRejectedResolution();
+                throw e;
             }
+            traceResolution();
 
             return this;
         }
@@ -1113,9 +1149,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 } else {
                     push(fieldSegment);
                 }
-            } finally {
-                traceResolution();
+            } catch (CircularDependencyException e) {
+                traceRejectedResolution();
+                throw e;
             }
+            traceResolution();
             return this;
         }
 
@@ -1129,9 +1167,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 } else {
                     push(fieldSegment);
                 }
-            } finally {
-                traceResolution();
+            } catch (CircularDependencyException e) {
+                traceRejectedResolution();
+                throw e;
             }
+            traceResolution();
             return this;
         }
 
@@ -1145,9 +1185,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 } else {
                     push(annotationSegment);
                 }
-            } finally {
-                traceResolution();
+            } catch (CircularDependencyException e) {
+                traceRejectedResolution();
+                throw e;
             }
+            traceResolution();
             return this;
         }
 
@@ -1194,20 +1236,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public void close() {
-            if (tracer != null && rootDefinition != null) {
-                if (isEmpty()) {
-                    tracer.traceBeanCreated(
+            if (tracer != null) {
+                Segment<?, ?> segment = peek();
+                if (segment != null) {
+                    tracer.traceInjectComplete(
                         AbstractBeanResolutionContext.this,
-                        rootDefinition
+                        segment
                     );
-                } else {
-                    Segment<?, ?> segment = peek();
-                    if (segment != null) {
-                        tracer.traceInjectComplete(
-                            AbstractBeanResolutionContext.this,
-                            segment
-                        );
-                    }
                 }
             }
             Path.super.close();

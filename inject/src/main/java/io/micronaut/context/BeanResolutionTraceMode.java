@@ -50,6 +50,8 @@ public enum BeanResolutionTraceMode {
     private static final String MODE_ENV_VAR = "MICRONAUT_INJECT_TRACE_MODE";
     private static final String CLASSES_SYS_PROP = "micronaut.inject.trace";
     private static final String CLASSES_ENV_VAR = "MICRONAUT_INJECT_TRACE";
+    private static final String TRACERS_SYS_PROP = "micronaut.inject.trace.tracers";
+    private static final String TRACERS_ENV_VAR = "MICRONAUT_INJECT_TRACE_TRACERS";
 
     private final @Nullable BeanResolutionTracer resolutionTracer;
 
@@ -104,5 +106,19 @@ public enum BeanResolutionTraceMode {
             return Set.of(classes.split(","));
         }
         return Set.of();
+    }
+
+    /**
+     * Whether the tracers discovered with {@link java.util.ServiceLoader} are enabled by default, which the system
+     * property {@code micronaut.inject.trace.tracers} or the environment variable
+     * {@code MICRONAUT_INJECT_TRACE_TRACERS} set to {@code true} does.
+     *
+     * @return Whether discovery is enabled
+     */
+    static boolean isTracerDiscoveryEnabledByDefault() {
+        String enabled = Optional
+            .ofNullable(CachedEnvironment.getProperty(TRACERS_SYS_PROP))
+            .orElseGet(() -> CachedEnvironment.getenv(TRACERS_ENV_VAR));
+        return Boolean.parseBoolean(enabled);
     }
 }

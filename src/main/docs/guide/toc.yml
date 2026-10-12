@@ -18,7 +18,9 @@ ioc:
   title: Dependency Injection
   beans: Defining Beans
   how: How Does it Work?
-  iocDebugging: Debugging Dependency Injection
+  iocDebugging:
+    title: Debugging Dependency Injection
+    beanResolutionTracers: Custom Bean Resolution Tracers
   beanContext: The BeanContext
   injection:
     title: Dependency Injection Types

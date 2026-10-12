@@ -152,6 +152,16 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     }
 
     @Override
+    public List<BeanResolutionTracer> getBeanResolutionTracers() {
+        return delegate.getBeanResolutionTracers();
+    }
+
+    @Override
+    public boolean isBeanResolutionTracerDiscoveryEnabled() {
+        return delegate.isBeanResolutionTracerDiscoveryEnabled();
+    }
+
+    @Override
     public boolean isAllowEmptyProviders() {
         return delegate.isAllowEmptyProviders();
     }

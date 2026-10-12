@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
@@ -70,6 +71,37 @@ public interface ApplicationContextBuilder {
      */
     default ApplicationContextBuilder beanResolutionTrace(
         BeanResolutionTraceConfiguration configuration) {
+        return this;
+    }
+
+    /**
+     * Adds a tracer of bean resolution, which is active from the start of the context in addition to the tracer of
+     * the {@link BeanResolutionTraceMode} and to the other tracers.
+     *
+     * @param tracer The tracer
+     * @return This builder
+     * @since 5.3.0
+     * @see BeanResolutionTracer
+     */
+    @Experimental
+    default ApplicationContextBuilder beanResolutionTracer(BeanResolutionTracer tracer) {
+        return this;
+    }
+
+    /**
+     * Whether the tracers of bean resolution discovered with {@link java.util.ServiceLoader} from
+     * {@code META-INF/services/io.micronaut.context.BeanResolutionTracer} are enabled. A discovered tracer can still
+     * activate itself when they are not, see {@link BeanResolutionTracer#isEnabled(BeanResolutionTracer.Activation)}.
+     *
+     * <p>Defaults to the value of the system property {@code micronaut.inject.trace.tracers} or the environment
+     * variable {@code MICRONAUT_INJECT_TRACE_TRACERS}, and otherwise to {@code false}.</p>
+     *
+     * @param enabled Whether discovered tracers are enabled
+     * @return This builder
+     * @since 5.3.0
+     */
+    @Experimental
+    default ApplicationContextBuilder beanResolutionTracerDiscovery(boolean enabled) {
         return this;
     }
 
