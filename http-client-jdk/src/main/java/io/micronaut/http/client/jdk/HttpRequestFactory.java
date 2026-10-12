@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MediaType;
@@ -38,9 +39,12 @@ import java.net.URLEncoder;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
 
@@ -53,6 +57,17 @@ import java.util.stream.Collectors;
 @Internal
 @Experimental
 public final class HttpRequestFactory {
+
+    private static final Set<String> RAW_REQUEST_SKIPPED_HEADERS = Set.of(
+        "transfer-encoding",
+        "content-length",
+        "connection",
+        "keep-alive",
+        "proxy-connection",
+        "te",
+        "trailer",
+        "upgrade"
+    );
 
     private HttpRequestFactory() {
     }
@@ -74,12 +89,40 @@ public final class HttpRequestFactory {
             // the name of a custom method, e.g. PROPFIND, not CUSTOM
             builder.method(mutableHttpRequest.getMethodName(), bodyPublisher);
         }
-        mutableHttpRequest.getHeaders().forEach((name, values) -> values.forEach(value -> builder.header(name, value)));
+        Set<String> skippedHeaders = skippedHeaders(mutableHttpRequest);
+        mutableHttpRequest.getHeaders().forEach((name, values) -> {
+            if (!skippedHeaders.contains(name.toLowerCase(Locale.ROOT))) {
+                values.forEach(value -> builder.header(name, value));
+            }
+        });
         if (mutableHttpRequest.getContentType().isEmpty()) {
             builder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
         }
         configuration.getReadTimeout().ifPresent(builder::timeout);
         return builder;
+    }
+
+    /**
+     * The headers of the request that are not sent. The JDK client frames the body itself, so a
+     * {@code Transfer-Encoding} of the request would contradict the framing it sends. A raw
+     * request relays the headers of another request: its {@code Content-Length} and its
+     * hop-by-hop headers, including those listed in {@code Connection}, belong to that other
+     * connection.
+     *
+     * @param request The request
+     * @return The lower case names of the headers that are not sent
+     */
+    private static Set<String> skippedHeaders(MutableHttpRequest<?> request) {
+        if (!(request instanceof RawHttpRequestWrapper<?>)) {
+            return Set.of("transfer-encoding");
+        }
+        Set<String> skipped = new HashSet<>(RAW_REQUEST_SKIPPED_HEADERS);
+        for (String connection : request.getHeaders().getAll(HttpHeaders.CONNECTION)) {
+            for (String token : StringUtils.splitOmitEmptyStrings(connection, ',')) {
+                skipped.add(token.trim().toLowerCase(Locale.ROOT));
+            }
+        }
+        return skipped;
     }
 
     private static <I> HttpRequest.BodyPublisher publisherForRequest(
