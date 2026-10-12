@@ -120,7 +120,15 @@ public final class DevRuntime implements Closeable {
      * The system property that has {@code BeanIntrospector.SHARED} read the introspections of the thread's context class loader.
      */
     private static final String INTROSPECTIONS_USE_CONTEXT_CLASSLOADER = "micronaut.introspections.use.context.classloader";
-    private static final Duration COALESCE = Duration.ofMillis(150);
+    /**
+     * How long the worker waits for another batch after the last one it took: the watcher delivers the batches of
+     * one save-all's roots within a few milliseconds of each other, and its quiet period already groups each root's.
+     */
+    private static final Duration COALESCE_IDLE = Duration.ofMillis(25);
+    /**
+     * How long the worker merges batches that keep arriving at most, from the first.
+     */
+    private static final Duration COALESCE_MAX = Duration.ofMillis(500);
     private static final Duration APP_STOP_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration FAILURE_WAIT = Duration.ofSeconds(2);
     private static final Duration START_TIMEOUT = Duration.ofMinutes(5);
@@ -1254,9 +1262,13 @@ public final class DevRuntime implements Closeable {
             batches.add(first);
             try {
                 // one save-all touches several roots: their batches arrive within a few milliseconds of each other
-                Thread.sleep(COALESCE.toMillis());
-                pending.drainTo(batches);
+                coalesce(batches);
+                long handling = System.nanoTime();
                 handle(Pending.merge(batches));
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Handled {} batch(es) in {} ms, {} ms after the first was delivered", batches.size(),
+                        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - handling), TimeUnit.NANOSECONDS.toMillis(handling - first.delivered));
+                }
             } catch (InterruptedException e) {
                 admission.complete(null);
                 Thread.currentThread().interrupt();
@@ -1275,6 +1287,23 @@ public final class DevRuntime implements Closeable {
                 batchesHandled.incrementAndGet();
                 gate.complete(null);
             }
+        }
+    }
+
+    /**
+     * Takes the batches that follow the first, until none came for {@link #COALESCE_IDLE} or they kept coming for
+     * {@link #COALESCE_MAX}, so that a lone edit is handled right after the watcher delivers it.
+     */
+    private void coalesce(List<Pending> batches) throws InterruptedException {
+        long deadline = System.nanoTime() + COALESCE_MAX.toNanos();
+        while (true) {
+            long wait = Math.min(COALESCE_IDLE.toNanos(), deadline - System.nanoTime());
+            Pending next = wait > 0 ? pending.poll(wait, TimeUnit.NANOSECONDS) : null;
+            if (next == null) {
+                pending.drainTo(batches);
+                return;
+            }
+            batches.add(next);
         }
     }
 

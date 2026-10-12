@@ -36,6 +36,10 @@ class Pending {
     final boolean full;
     final @Nullable TestRequest requested;
     long sequence;
+    /**
+     * When the batch was created, as the watcher or a caller delivered it, by {@link System#nanoTime()}.
+     */
+    final long delivered = System.nanoTime();
 
     Pending(Map<SourceKind, SourceChanges> sources, Map<ResourceKind, SourceChanges> resources, boolean full) {
         this(sources, Map.of(), resources, full, null);

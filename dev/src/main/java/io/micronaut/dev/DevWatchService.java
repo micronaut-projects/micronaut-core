@@ -49,6 +49,13 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      */
     static final int POLL_MILLIS = 250;
 
+    /**
+     * How long the native macOS service holds the events that follow a first one before it reports them, in seconds.
+     * Its default, half a second, reported the rest of a save or a checkout after the watcher's quiet period had
+     * delivered the first event alone; under the quiet period, they reach the same batch.
+     */
+    static final double MAC_LATENCY_SECONDS = 0.05;
+
     private static final Logger LOG = LoggerFactory.getLogger(DevWatchService.class);
     private static final String MAC_SERVICE = "io.methvin.watchservice.MacOSXListeningWatchService";
 
@@ -106,7 +113,12 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      */
     private static final class MacOs {
         static DevWatchService create() throws IOException {
-            io.methvin.watchservice.MacOSXListeningWatchService service = new io.methvin.watchservice.MacOSXListeningWatchService();
+            io.methvin.watchservice.MacOSXListeningWatchService service = new io.methvin.watchservice.MacOSXListeningWatchService(new io.methvin.watchservice.MacOSXListeningWatchService.Config() {
+                @Override
+                public double latency() {
+                    return MAC_LATENCY_SECONDS;
+                }
+            });
             DirectoryWatcher.WatchKeyRegistrar registrar = (directory, watchService) -> new io.methvin.watchservice.WatchablePath(directory).register(
                 watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY);
             // closing the native service has crashed the JVM; micronaut-runtime-osx leaves it open as well
