@@ -38,7 +38,7 @@ class DevRuntimeClassFileTest {
         Files.createDirectories(first.resolve("Greeter.class"));
         Files.write(second.resolve("Greeter.class"), new byte[] {1, 2});
         List<Path> roots = List.of(directory.resolve("first"), directory.resolve("second"));
-        assertArrayEquals(new byte[] {1, 2}, DevRuntime.classFile(roots, "app.Greeter"));
-        assertNull(DevRuntime.classFile(roots, "app.Missing"));
+        assertArrayEquals(new byte[] {1, 2}, InPlaceUpdates.classFile(roots, "app.Greeter"));
+        assertNull(InPlaceUpdates.classFile(roots, "app.Missing"));
     }
 }
