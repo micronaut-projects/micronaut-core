@@ -194,23 +194,6 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
-     * The definitions of the beans this context is creating at the moment, from the outermost to the innermost, the
-     * innermost being the bean whose dependencies are being resolved. A bean created for an injection point of
-     * another bean is nested in it. Beans that are resolved with another resolution context, for example because a
-     * bean looks them up programmatically, are not included.
-     *
-     * <p>Meant for diagnostics such as a {@link BeanResolutionTracer}, which can use it to find the bean a bean
-     * is created for.</p>
-     *
-     * @return The beans in creation, empty when the context is not creating a bean or does not track creations
-     * @since 5.3.0
-     */
-    @Experimental
-    default List<BeanDefinition<?>> getBeansInCreation() {
-        return List.of();
-    }
-
-    /**
      * Returns a resolver owned by the bean the current segment of the path belongs to: the bean a field, constructor
      * argument or method argument is being injected into, or the bean itself when it is resolved by a lookup rather
      * than injected.

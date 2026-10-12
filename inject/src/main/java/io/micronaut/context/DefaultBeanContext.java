@@ -3754,19 +3754,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             resolutionContext = resolutionContext.copy();
         }
         try (BeanResolutionContext context = newResolutionContext(definition, resolutionContext)) {
-            BeanResolutionTracer tracer = context instanceof AbstractBeanResolutionContext traced ? traced.getTracer() : null;
-            if (tracer == null) {
+            AbstractBeanResolutionContext traced = context instanceof AbstractBeanResolutionContext abstractContext ? abstractContext : null;
+            BeanResolutionTracer tracer = traced == null ? null : traced.getTracer();
+            TracedResolution resolution = traced == null ? null : traced.getTracedResolution();
+            if (tracer == null || resolution == null) {
                 return createRegistrationInContext(context, beanType, qualifier, definition, dependent, customizeNull);
             }
-            tracer.traceBeanCreation(context, definition, resolveCreatedBeanType(beanType, qualifier));
+            tracer.traceBeanCreation(resolution, definition, resolveCreatedBeanType(beanType, qualifier));
             BeanRegistration<T> registration;
             try {
                 registration = createRegistrationInContext(context, beanType, qualifier, definition, dependent, customizeNull);
             } catch (RuntimeException | Error e) {
-                tracer.traceBeanCreationFailed(context, definition, e);
+                tracer.traceBeanCreationFailed(resolution, definition, e);
                 throw e;
             }
-            tracer.traceBeanCreated(context, definition);
+            tracer.traceBeanCreated(resolution, definition);
             return registration;
         }
     }

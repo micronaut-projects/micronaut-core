@@ -1,6 +1,6 @@
 The injection trace mode is built on the experimental api:context.BeanResolutionTracer[] API, which you can implement to observe bean resolution yourself. For example, a tracer can record the creation of each bean as a span of a trace, so you can see what makes startup slow.
 
-A tracer receives a callback when the creation of a bean starts (`traceBeanCreation`) and one when it ends (`traceBeanCreated`, or `traceBeanCreationFailed` if it failed). It also receives a callback before and after each injection point is resolved (`traceInjectBean` and `traceInjectComplete`). These callbacks come in pairs, are invoked on the thread that resolves the bean and nest like a call stack. A bean created for an injection point is reported between the two callbacks of that injection point. So a tracer can keep its open spans on a per-thread stack. Use api:context.BeanResolutionContext#getBeansInCreation()[] to find which bean a bean is being created for.
+A tracer receives a callback when the creation of a bean starts (`traceBeanCreation`) and one when it ends (`traceBeanCreated`, or `traceBeanCreationFailed` if it failed). It also receives a callback before and after each injection point is resolved (`traceInjectBean` and `traceInjectComplete`). These callbacks come in pairs, are invoked on the thread that resolves the bean and nest like a call stack. A bean created for an injection point is reported between the two callbacks of that injection point. So a tracer can keep its open spans on a per-thread stack. Each callback receives a `BeanResolutionTracer.Resolution`, a read-only view of the resolution in progress. Its `getBeansInCreation()` tells you which bean a bean is being created for, and `getInjectionPath()` lists the injection points being resolved. An injection point is a `BeanResolutionTracer.Injection`, which gives its kind (constructor, method, field, annotation or event listener), the bean that declares it, the member name and the argument.
 
 .A tracer that measures bean creation
 [source,java]
@@ -9,23 +9,23 @@ public class TimingTracer implements BeanResolutionTracer {
     private final ThreadLocal<Deque<Long>> starts = ThreadLocal.withInitial(ArrayDeque::new);
 
     @Override
-    public void traceBeanCreation(BeanResolutionContext context, BeanDefinition<?> definition, Argument<?> beanType) {
+    public void traceBeanCreation(Resolution resolution, BeanDefinition<?> definition, Argument<?> beanType) {
         starts.get().push(System.nanoTime());
     }
 
     @Override
-    public <T> void traceBeanCreated(BeanResolutionContext context, BeanDefinition<T> definition) {
+    public <T> void traceBeanCreated(Resolution resolution, BeanDefinition<T> definition) {
         long took = System.nanoTime() - starts.get().pop();
         // record the time taken to create the bean
     }
 
     @Override
-    public <T> void traceBeanCreationFailed(BeanResolutionContext context, BeanDefinition<T> definition, Throwable failure) {
+    public <T> void traceBeanCreationFailed(Resolution resolution, BeanDefinition<T> definition, Throwable failure) {
         starts.get().pop();
     }
 
     @Override
-    public <B, T> void traceInjectBean(BeanResolutionContext context, BeanResolutionContext.Segment<B, T> segment) {
+    public void traceInjectBean(Resolution resolution, Injection injection) {
     }
 }
 ----

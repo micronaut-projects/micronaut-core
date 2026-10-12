@@ -72,59 +72,59 @@ final class CompositeBeanResolutionTracer implements BeanResolutionTracer {
     }
 
     @Override
-    public void traceBeanCreation(BeanResolutionContext resolutionContext, BeanDefinition<?> beanDefinition, Argument<?> beanType) {
+    public void traceBeanCreation(Resolution resolution, BeanDefinition<?> beanDefinition, Argument<?> beanType) {
         for (BeanResolutionTracer tracer : tracers) {
-            tracer.traceBeanCreation(resolutionContext, beanDefinition, beanType);
+            tracer.traceBeanCreation(resolution, beanDefinition, beanType);
         }
     }
 
     @Override
-    public <T> void traceBeanResolved(BeanResolutionContext resolutionContext, Argument<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable T bean) {
+    public <T> void traceBeanResolved(Resolution resolution, Argument<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable T bean) {
         for (BeanResolutionTracer tracer : tracers) {
-            tracer.traceBeanResolved(resolutionContext, beanType, qualifier, bean);
+            tracer.traceBeanResolved(resolution, beanType, qualifier, bean);
         }
     }
 
     @Override
-    public <T> void traceBeanDisabled(BeanResolutionContext resolutionContext, Argument<T> beanType, @Nullable Qualifier<T> qualifier, String disabledBeanMessage) {
+    public <T> void traceBeanDisabled(Resolution resolution, Argument<T> beanType, @Nullable Qualifier<T> qualifier, String disabledBeanMessage) {
         for (BeanResolutionTracer tracer : tracers) {
-            tracer.traceBeanDisabled(resolutionContext, beanType, qualifier, disabledBeanMessage);
+            tracer.traceBeanDisabled(resolution, beanType, qualifier, disabledBeanMessage);
         }
     }
 
     @Override
-    public <T> void traceValueResolved(BeanResolutionContext resolutionContext, Argument<T> argument, String property, @Nullable T value) {
+    public <T> void traceValueResolved(Resolution resolution, Argument<T> argument, String property, @Nullable T value) {
         for (BeanResolutionTracer tracer : tracers) {
-            tracer.traceValueResolved(resolutionContext, argument, property, value);
+            tracer.traceValueResolved(resolution, argument, property, value);
         }
     }
 
     @Override
-    public <T> void traceBeanCreated(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition) {
+    public <T> void traceBeanCreated(Resolution resolution, BeanDefinition<T> beanDefinition) {
         // in reverse, so that the tracers nest like the creations they trace
         for (int i = tracers.length - 1; i >= 0; i--) {
-            tracers[i].traceBeanCreated(resolutionContext, beanDefinition);
+            tracers[i].traceBeanCreated(resolution, beanDefinition);
         }
     }
 
     @Override
-    public <T> void traceBeanCreationFailed(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, Throwable failure) {
+    public <T> void traceBeanCreationFailed(Resolution resolution, BeanDefinition<T> beanDefinition, Throwable failure) {
         for (int i = tracers.length - 1; i >= 0; i--) {
-            tracers[i].traceBeanCreationFailed(resolutionContext, beanDefinition, failure);
+            tracers[i].traceBeanCreationFailed(resolution, beanDefinition, failure);
         }
     }
 
     @Override
-    public <B, T> void traceInjectBean(BeanResolutionContext resolutionContext, BeanResolutionContext.Segment<B, T> segment) {
+    public void traceInjectBean(Resolution resolution, Injection injection) {
         for (BeanResolutionTracer tracer : tracers) {
-            tracer.traceInjectBean(resolutionContext, segment);
+            tracer.traceInjectBean(resolution, injection);
         }
     }
 
     @Override
-    public <B, T> void traceInjectComplete(BeanResolutionContext resolutionContext, BeanResolutionContext.Segment<B, T> segment) {
+    public void traceInjectComplete(Resolution resolution, Injection injection) {
         for (int i = tracers.length - 1; i >= 0; i--) {
-            tracers[i].traceInjectComplete(resolutionContext, segment);
+            tracers[i].traceInjectComplete(resolution, injection);
         }
     }
 

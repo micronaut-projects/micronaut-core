@@ -28,40 +28,46 @@ import java.util.List;
 
 /**
  * Records the creations and injections of the beans of this package, indented by their nesting, and the callbacks
- * that are not paired as documented.
+ * that are not paired or ordered as documented.
  */
 public class RecordingTracer implements BeanResolutionTracer {
 
     public final List<String> events = Collections.synchronizedList(new ArrayList<>());
-    public final List<String> unpaired = Collections.synchronizedList(new ArrayList<>());
+    public final List<String> violations = Collections.synchronizedList(new ArrayList<>());
     private final ThreadLocal<Deque<Frame>> open = ThreadLocal.withInitial(ArrayDeque::new);
 
     @Override
-    public void traceBeanCreation(BeanResolutionContext resolutionContext, BeanDefinition<?> beanDefinition, Argument<?> beanType) {
-        List<BeanDefinition<?>> beansInCreation = resolutionContext.getBeansInCreation();
+    public void traceBeanCreation(Resolution resolution, BeanDefinition<?> beanDefinition, Argument<?> beanType) {
+        if (resolution instanceof BeanResolutionContext || resolution.getBeanContext() == null) {
+            violations.add("the resolution exposes the resolution context");
+        }
+        List<BeanDefinition<?>> beansInCreation = resolution.getBeansInCreation();
         String parent = beansInCreation.isEmpty() ? "" : " <- " + beansInCreation.get(beansInCreation.size() - 1).getBeanType().getSimpleName();
-        start("create " + beanDefinition.getBeanType().getSimpleName() + parent, "bean " + beanDefinition, isTraced(beanDefinition));
+        start("create " + beanDefinition.getBeanType().getSimpleName() + parent, beanDefinition, isTraced(beanDefinition));
     }
 
     @Override
-    public <T> void traceBeanCreated(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition) {
-        end(null, "bean " + beanDefinition);
+    public <T> void traceBeanCreated(Resolution resolution, BeanDefinition<T> beanDefinition) {
+        end(null, beanDefinition);
     }
 
     @Override
-    public <T> void traceBeanCreationFailed(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, Throwable failure) {
-        end("failed " + beanDefinition.getBeanType().getSimpleName() + ": " + failure.getClass().getSimpleName(), "bean " + beanDefinition);
+    public <T> void traceBeanCreationFailed(Resolution resolution, BeanDefinition<T> beanDefinition, Throwable failure) {
+        end("failed " + beanDefinition.getBeanType().getSimpleName() + ": " + failure.getClass().getSimpleName(), beanDefinition);
     }
 
     @Override
-    public <B, T> void traceInjectBean(BeanResolutionContext resolutionContext, BeanResolutionContext.Segment<B, T> segment) {
-        String label = "inject " + segment.getDeclaringType().getBeanType().getSimpleName() + "." + segment.getName() + "(" + segment.getArgument().getName() + ")";
-        start(label, "segment " + System.identityHashCode(segment), isTraced(segment.getDeclaringType()));
+    public void traceInjectBean(Resolution resolution, Injection injection) {
+        String label = "inject " + injection.getKind() + " " + injection.getDeclaringBean().getBeanType().getSimpleName() + "." + injection.getMemberName() + "(" + injection.getArgument().getName() + ")";
+        if (resolution.getInjectionPath().get(resolution.getInjectionPath().size() - 1) != injection) {
+            violations.add(label + " is not the innermost injection");
+        }
+        start(label, injection, isTraced(injection.getDeclaringBean()));
     }
 
     @Override
-    public <B, T> void traceInjectComplete(BeanResolutionContext resolutionContext, BeanResolutionContext.Segment<B, T> segment) {
-        end(null, "segment " + System.identityHashCode(segment));
+    public void traceInjectComplete(Resolution resolution, Injection injection) {
+        end(null, injection);
     }
 
     /**
@@ -73,7 +79,7 @@ public class RecordingTracer implements BeanResolutionTracer {
         }
     }
 
-    private void start(String label, String key, boolean traced) {
+    private void start(String label, Object key, boolean traced) {
         Deque<Frame> frames = open.get();
         if (traced) {
             events.add(indent(frames) + label);
@@ -81,11 +87,11 @@ public class RecordingTracer implements BeanResolutionTracer {
         frames.push(new Frame(key, traced));
     }
 
-    private void end(String label, String key) {
+    private void end(String label, Object key) {
         Deque<Frame> frames = open.get();
         Frame frame = frames.poll();
-        if (frame == null || !frame.key.equals(key)) {
-            unpaired.add(key + " closed while " + (frame == null ? "nothing" : frame.key) + " was open");
+        if (frame == null || frame.key != key) {
+            violations.add(key + " closed while " + (frame == null ? "nothing" : frame.key) + " was open");
             return;
         }
         if (label != null && frame.traced) {
@@ -107,6 +113,6 @@ public class RecordingTracer implements BeanResolutionTracer {
         return definition.getBeanType().getPackageName().equals(RecordingTracer.class.getPackageName());
     }
 
-    private record Frame(String key, boolean traced) {
+    private record Frame(Object key, boolean traced) {
     }
 }

@@ -25,14 +25,12 @@ class BeanResolutionTracerSpec extends Specification {
         then:
         tracer.eventsAsText() == '''\
 create TracedEngine
-  inject TracedEngine.io.micronaut.inject.tracer.TracedEngine(tracedEngine)
-    inject TracedEngine.io.micronaut.inject.tracer.TracedEngine(spark)
-      create TracedSpark <- TracedEngine
-    inject TracedEngine.fuel(fuel)
-      create TracedFuel <- TracedEngine
-create TracedFuel
-  inject TracedFuel.io.micronaut.inject.tracer.TracedFuel(tracedFuel)'''
-        tracer.unpaired.isEmpty()
+  inject CONSTRUCTOR TracedEngine.<init>(spark)
+    create TracedSpark <- TracedEngine
+  inject FIELD TracedEngine.fuel(fuel)
+    create TracedFuel <- TracedEngine
+create TracedFuel'''
+        tracer.violations.isEmpty()
 
         cleanup:
         context.close()
@@ -49,13 +47,12 @@ create TracedFuel
         then:
         tracer.eventsAsText() == '''\
 create TracedTyre
-  inject TracedTyre.io.micronaut.inject.tracer.TracedTyre(tracedTyre)
-    inject TracedTyre.io.micronaut.inject.tracer.TracedTyre(wheel)
-      create TracedWheel <- TracedTyre
-        create TracedWheelFactory <- TracedWheel
-        inject TracedWheel.front(spark)
-          create TracedSpark <- TracedWheel'''
-        tracer.unpaired.isEmpty()
+  inject CONSTRUCTOR TracedTyre.<init>(wheel)
+    create TracedWheel <- TracedTyre
+      create TracedWheelFactory <- TracedWheel
+      inject CONSTRUCTOR TracedWheel.front(spark)
+        create TracedSpark <- TracedWheel'''
+        tracer.violations.isEmpty()
 
         cleanup:
         context.close()
@@ -73,14 +70,13 @@ create TracedTyre
         thrown(BeanInstantiationException)
         tracer.eventsAsText() == '''\
 create TracedBroken
-  inject TracedBroken.io.micronaut.inject.tracer.TracedBroken(tracedBroken)
-    inject TracedBroken.io.micronaut.inject.tracer.TracedBroken(exploding)
-      create TracedExploding <- TracedBroken
-        inject TracedExploding.io.micronaut.inject.tracer.TracedExploding(spark)
-          create TracedSpark <- TracedExploding
-      failed TracedExploding: BeanInstantiationException
+  inject CONSTRUCTOR TracedBroken.<init>(exploding)
+    create TracedExploding <- TracedBroken
+      inject CONSTRUCTOR TracedExploding.<init>(spark)
+        create TracedSpark <- TracedExploding
+    failed TracedExploding: BeanInstantiationException
 failed TracedBroken: BeanInstantiationException'''
-        tracer.unpaired.isEmpty()
+        tracer.violations.isEmpty()
 
         when: "the context goes on resolving beans"
         tracer.events.clear()
@@ -88,7 +84,7 @@ failed TracedBroken: BeanInstantiationException'''
 
         then: "the callbacks remain paired"
         tracer.events.first() == 'create TracedEngine'
-        tracer.unpaired.isEmpty()
+        tracer.violations.isEmpty()
 
         cleanup:
         context.close()
@@ -106,8 +102,8 @@ failed TracedBroken: BeanInstantiationException'''
         then:
         !first.events.isEmpty()
         first.events == second.events
-        first.unpaired.isEmpty()
-        second.unpaired.isEmpty()
+        first.violations.isEmpty()
+        second.violations.isEmpty()
 
         cleanup:
         context.close()
@@ -129,7 +125,7 @@ failed TracedBroken: BeanInstantiationException'''
         then:
         DiscoveredTracer.ACTIVATED.size() == 1
         DiscoveredTracer.ACTIVATED.first().events.first() == 'create TracedEngine'
-        DiscoveredTracer.ACTIVATED.first().unpaired.isEmpty()
+        DiscoveredTracer.ACTIVATED.first().violations.isEmpty()
 
         when: "the tracer activates itself for an environment"
         context.close()
@@ -168,7 +164,7 @@ failed TracedBroken: BeanInstantiationException'''
         and: "the registered tracer traces every bean"
         tracer.events.contains('create TracedEngine')
         tracer.events.contains('create TracedTyre')
-        tracer.unpaired.isEmpty()
+        tracer.violations.isEmpty()
 
         cleanup:
         System.setOut(originalOut)
@@ -190,7 +186,7 @@ failed TracedBroken: BeanInstantiationException'''
         context.combinedTracer.getClass().simpleName == 'CompositeBeanResolutionTracer'
         context.customTracer.is(tracer)
         tracer.events.first() == 'create TracedEngine'
-        tracer.unpaired.isEmpty()
+        tracer.violations.isEmpty()
 
         cleanup:
         context.close()
