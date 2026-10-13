@@ -38,6 +38,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -48,6 +49,7 @@ import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -122,12 +124,32 @@ public final class MicronautMetaServiceLoaderUtils {
      * @throws IOException The exception
      */
     public static Set<String> findMicronautMetaServiceEntries(ClassLoader classLoader, String serviceName) throws IOException {
+        return findMicronautMetaServiceEntries(classLoader, serviceName, ServiceScanner.findServiceIndex(classLoader));
+    }
+
+    /**
+     * Find Micronaut service entries for a lookup that has already asked for the service index.
+     *
+     * <p>A lookup asks for the index once, on the thread that starts it, and hands the answer to its fork-join tasks.
+     * A task does not ask again, so the whole lookup uses one answer: an index can be registered, or switched off,
+     * while the lookup runs.</p>
+     *
+     * @param classLoader The classloader
+     * @param serviceName The service name
+     * @param index       The service index that applies to the class loader, or null to scan the class path
+     * @return The entries
+     * @throws IOException The exception
+     */
+    static Set<String> findMicronautMetaServiceEntries(ClassLoader classLoader, String serviceName, @Nullable ServiceIndex index) throws IOException {
         ExclusiveStaticServiceDefinitions staticDefinitions = ServiceScanner.findStaticServiceDefinitions();
         if (staticDefinitions != null) {
             Set<String> serviceEntries = staticDefinitions.serviceTypeMap().get(serviceName);
             if (serviceEntries != null) {
                 return serviceEntries;
             }
+        }
+        if (index != null) {
+            return index.micronautServices().getOrDefault(serviceName, Set.of());
         }
         CacheEntry ce = cacheEntry;
         if (ce == null || ce.classLoader.get() != classLoader) {
@@ -145,6 +167,20 @@ public final class MicronautMetaServiceLoaderUtils {
      * @throws IOException
      */
     public static Map<String, Set<String>> findAllMicronautMetaServices(ClassLoader classLoader) throws IOException {
+        return findAllMicronautMetaServices(classLoader, false);
+    }
+
+    /**
+     * Find all Micronaut services.
+     *
+     * @param classLoader The classloader
+     * @param sorted      Whether to list the entries of the directories in the order of their names, instead of the
+     *                    order of the file system, so that the result does not depend on the file system. A directory
+     *                    that cannot be read then fails the lookup instead of being skipped
+     * @return the all entries
+     * @throws IOException If a directory cannot be read and the entries are sorted
+     */
+    static Map<String, Set<String>> findAllMicronautMetaServices(ClassLoader classLoader, boolean sorted) throws IOException {
         List<URI> resourceDefs = IOUtils.getResources(classLoader, MICRONAUT_SERVICES_PATH);
         if (resourceDefs.isEmpty()) {
             return Map.of();
@@ -177,7 +213,7 @@ public final class MicronautMetaServiceLoaderUtils {
                     return FileVisitResult.CONTINUE;
                 }
                 Path fileName = currentPath.getFileName();
-                if (fileName.startsWith(".")) {
+                if (isDotEntry(fileName)) {
                     return FileVisitResult.CONTINUE;
                 }
                 if (definitions != null) {
@@ -212,10 +248,17 @@ public final class MicronautMetaServiceLoaderUtils {
                 }
                 Path myPath = IOUtils.resolvePath(uri, MICRONAUT_SERVICES_PATH, toClose);
                 if (myPath != null) {
-                    Files.walkFileTree(myPath, Collections.emptySet(), 2, visitor);
+                    if (sorted) {
+                        collectSortedServices(myPath, services);
+                    } else {
+                        Files.walkFileTree(myPath, Collections.emptySet(), 2, visitor);
+                    }
                 }
             }
         } catch (IOException e) {
+            if (sorted) {
+                throw e;
+            }
             // ignore, can't do anything here and can't log because class used in compiler
         } finally {
             for (Closeable closeable : toClose) {
@@ -226,6 +269,49 @@ public final class MicronautMetaServiceLoaderUtils {
             }
         }
         return services;
+    }
+
+    /**
+     * Collects the services of a {@code META-INF/micronaut/} directory in the order of their names. As walking two levels
+     * of the directory does, every directory below it is a service, and every entry of a service that is neither hidden
+     * nor named with a leading dot is one of its entries.
+     *
+     * <p>A plain file directly in {@code META-INF/micronaut/} is ignored here. That differs from the two-level walk,
+     * which adds the name of such a file to the service whose directory it visited last, or drops it if it has not
+     * visited one yet. A file there belongs to no service, so this method does not reproduce that.</p>
+     *
+     * @param root     The {@code META-INF/micronaut/} directory
+     * @param services The services to add to
+     * @throws IOException If a directory cannot be read
+     */
+    private static void collectSortedServices(Path root, Map<String, Set<String>> services) throws IOException {
+        for (Path serviceDir : sortedChildren(root)) {
+            if (Files.isDirectory(serviceDir)) {
+                Set<String> definitions = services.computeIfAbsent(serviceDir.getFileName().toString(), name -> new LinkedHashSet<>());
+                for (Path entry : sortedChildren(serviceDir)) {
+                    if (!Files.isHidden(entry) && !isDotEntry(entry.getFileName())) {
+                        definitions.add(entry.getFileName().toString());
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Whether the name of an entry starts with a dot. Not every file system marks such an entry as hidden, and
+     * {@link Path#startsWith(String)} compares whole names, so the name is compared as a string.
+     *
+     * @param fileName The name of the entry
+     * @return True if the name starts with a dot
+     */
+    private static boolean isDotEntry(Path fileName) {
+        return fileName.toString().startsWith(".");
+    }
+
+    private static List<Path> sortedChildren(Path dir) throws IOException {
+        try (Stream<Path> children = Files.list(dir)) {
+            return children.sorted(Comparator.comparing(path -> path.getFileName().toString())).toList();
+        }
     }
 
     /**
@@ -618,13 +704,16 @@ public final class MicronautMetaServiceLoaderUtils {
      *
      * @param <S> The service type
      */
-    @SuppressWarnings("java:S1948")
-    private static final class MicronautServiceCollector<S> extends RecursiveActionValuesCollector<S> {
+    // package-private, unlike its superclass, for the test that checks when the service index is asked for
+    @SuppressWarnings({"java:S1948", "ExposedPrivateType"})
+    static final class MicronautServiceCollector<S> extends RecursiveActionValuesCollector<S> {
 
         private final ClassLoader classLoader;
         private final String serviceName;
         @Nullable
         private final Predicate<S> predicate;
+        @Nullable
+        private final ServiceIndex index;
         private final List<RecursiveActionValuesCollector<S>> tasks = new ArrayList<>();
         private int size;
 
@@ -632,12 +721,14 @@ public final class MicronautMetaServiceLoaderUtils {
             this.classLoader = classLoader;
             this.serviceName = serviceName;
             this.predicate = predicate;
+            // asked for here, on the thread that starts the lookup, and not in compute(), which a pool thread can run
+            this.index = ServiceScanner.findServiceIndex(classLoader);
         }
 
         @Override
         protected void compute() {
             try {
-                Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName);
+                Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName, index);
                 size = serviceEntries.size();
                 for (String serviceEntry : serviceEntries) {
                     final ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(classLoader, serviceEntry, predicate);
@@ -666,7 +757,7 @@ public final class MicronautMetaServiceLoaderUtils {
                 return collection;
             }
             try {
-                Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName);
+                Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName, index);
                 List<S> collection = new ArrayList<>(serviceEntries.size());
                 for (String serviceEntry : serviceEntries) {
                     S val = instantiate(serviceEntry, classLoader);
