@@ -1023,8 +1023,8 @@ public final class DevRuntime implements Closeable {
         ApplicationContext current = context;
         ClassFileReplacement snapshotChange = new ClassFileReplacement(generation);
         try {
-            // the snapshot first: a class a thread loads from now on is the new version, and one loaded before is
-            // found below and redefined; nothing can load the old version in between
+            // the snapshot first, with class loading through the generation held until the change is applied or rolled
+            // back: a class loaded before is found below and redefined, and one loaded after reads the files as left
             for (Map.Entry<String, byte[]> entry : replacements.entrySet()) {
                 snapshotChange.replace(entry.getKey(), Objects.requireNonNull(originals.get(entry.getKey())), entry.getValue());
             }
@@ -1042,6 +1042,8 @@ public final class DevRuntime implements Closeable {
             snapshotChange.rollBack();
             LOG.info("Cannot redefine {} class(es) in place: restarting instead", replacements.size(), e);
             return false;
+        } finally {
+            snapshotChange.close();
         }
         redefinitions.incrementAndGet();
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
