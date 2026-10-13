@@ -39,7 +39,8 @@ import java.util.function.Function;
  * {@link FileWatchConfiguration#PATHS} nor {@link FileWatchConfiguration#ENABLED}; only setting
  * {@link FileWatchConfiguration#ENABLED} to {@code false}, which removes the watch service, removes it. The
  * {@link FileWatchConfiguration#getCheckInterval() check interval} and the
- * {@link FileWatchConfiguration#getQuietPeriod() quiet period} of the configuration apply when it is present.
+ * {@link FileWatchConfiguration#getQuietPeriod() quiet period} of the configuration, which does not require the watch
+ * paths either, apply.
  *
  * @author graemerocher
  * @since 5.3.0
@@ -58,7 +59,7 @@ public class DefaultFileWatcher implements FileWatcher, Closeable {
 
     /**
      * @param watchServices The watch service, obtained by the first registration
-     * @param configuration The configuration, if the watch paths are set
+     * @param configuration The configuration of the check interval and the quiet period
      */
     public DefaultFileWatcher(BeanProvider<WatchService> watchServices, @Nullable FileWatchConfiguration configuration) {
         this.watchServices = watchServices;
