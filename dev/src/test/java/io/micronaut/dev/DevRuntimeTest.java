@@ -27,6 +27,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import io.micronaut.dev.loader.GenerationClassLoader;
+import java.lang.instrument.Instrumentation;
+import java.lang.instrument.UnmodifiableClassException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 class DevRuntimeTest {
 
@@ -206,7 +213,7 @@ class DevRuntimeTest {
             Class<?> type = first.getClassLoader().loadClass("app.Greeter");
             Object bean = first.getBean(type);
             assertEquals("one", type.getMethod("greet").invoke(bean));
-            assertEquals(io.micronaut.context.reload.ReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            assertEquals(io.micronaut.dev.manifest.DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
 
             // a body-only edit: the same generation, the same context, the same bean, a new body
             Files.writeString(greeter, greeter("two"));
@@ -469,4 +476,79 @@ class DevRuntimeTest {
         Object bean = context.getBean(type);
         return (String) type.getMethod("greet").invoke(bean);
     }
+
+    @Test
+    void aRedefinitionTheJvmRefusesRestartsWithEveryChangedClassAndLeavesTheRetiredGenerationAsItWas() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest")).mainClass(Application.class).start();
+                }
+            }
+            """);
+        Path greeter = src.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        Path other = src.resolve("Other.java");
+        Files.writeString(other, other("one"));
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=auto
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            assertEquals("one", greet(first));
+            assertEquals(io.micronaut.dev.manifest.DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            refuseRedefinitions(runtime);
+            GenerationClassLoader generation = runtime.classLoader().current();
+            byte[] greeterBefore = InPlaceUpdates.classFile(generation.roots(), "app.Greeter");
+            byte[] otherBefore = InPlaceUpdates.classFile(generation.roots(), "app.Other");
+
+            // two body-only edits the JVM refuses to redefine: the restart applies both
+            Files.writeString(greeter, greeter("two"));
+            Files.writeString(other, other("two"));
+            runtime.reload();
+            ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));
+            assertNotSame(first, second);
+            assertEquals(0, runtime.redefinitions());
+            assertEquals("two", greet(second));
+            Class<?> otherType = second.getClassLoader().loadClass("app.Other");
+            assertEquals("two", otherType.getMethod("value").invoke(null));
+            // the retired generation's snapshot holds the class files it ran with, not the refused ones
+            assertArrayEquals(greeterBefore, InPlaceUpdates.classFile(generation.roots(), "app.Greeter"));
+            assertArrayEquals(otherBefore, InPlaceUpdates.classFile(generation.roots(), "app.Other"));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    /**
+     * Gives the runtime an agent that refuses every redefinition, as the JVM does a change it cannot apply.
+     */
+    private static void refuseRedefinitions(DevRuntime runtime) throws ReflectiveOperationException {
+        Field field = DevRuntime.class.getDeclaredField("instrumentation");
+        field.setAccessible(true);
+        Instrumentation agent = (Instrumentation) field.get(runtime);
+        field.set(runtime, Proxy.newProxyInstance(DevRuntimeTest.class.getClassLoader(), new Class<?>[] {Instrumentation.class}, (proxy, method, args) -> {
+            if (method.getName().equals("redefineClasses")) {
+                throw new UnmodifiableClassException("refused by the test");
+            }
+            try {
+                return method.invoke(agent, args);
+            } catch (InvocationTargetException e) {
+                throw e.getCause();
+            }
+        }));
+    }
+
 }
