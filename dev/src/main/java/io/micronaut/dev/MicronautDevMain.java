@@ -213,6 +213,7 @@ public class MicronautDevMain {
      * @param args The arguments
      * @throws Exception if main throws
      */
+    @SuppressWarnings("NoReflection") // the one reflective call of the launcher: the application's main, by name, through the generation's loader
     protected void launchApplication(ClassLoader classLoader, String mainClass, String[] args) throws Exception { // NOSONAR the application's main may throw any exception
         Class<?> type = Class.forName(mainClass, true, classLoader);
         Method main = type.getMethod("main", String[].class);

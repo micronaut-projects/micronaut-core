@@ -52,7 +52,9 @@ import java.lang.annotation.Annotation;
  * {@code onReplaced}, which are called for each change of a batch once it is applied.</p>
  *
  * <p>Implemented by the default context, which is injectable as this type. A watch registered while a
- * bean is being created belongs to that bean and is closed when the bean is destroyed.</p>
+ * bean is being created belongs to that bean and is closed when the bean is destroyed. The context holds that bean
+ * weakly, so a bean it never destroys, such as a prototype, is not kept reachable by its watch unless the watcher
+ * references it; such a bean closes its watch itself, or is destroyed with {@link BeanContext#destroyBean(Object)}.</p>
  *
  * <p>This is public API for modules, and experimental: a module that derives state from the context,
  * such as a registry built from beans or a cache of what configuration says, watches it here rather
@@ -175,16 +177,31 @@ public sealed interface WatchableBeanContext extends BeanContext permits Default
     ClassChangeWatchRequest classChanges();
 
     /**
+     * Whether {@link #recreate(Object)} and its variants can recreate anything in this context: whether it
+     * {@link BeanContextConfiguration#beanDependencyTrackingEnabled() tracks bean dependencies}, which by default only a
+     * context in {@link io.micronaut.context.env.DevelopmentMode development mode} does. When it does not, every
+     * {@code recreate} call returns false and does nothing; a watcher that would otherwise recreate a bean asks this
+     * first and falls back to what it does without a reload, such as applying the change in place or nothing.
+     *
+     * @return Whether beans can be recreated
+     * @since 5.3.0
+     */
+    boolean isRecreateSupported();
+
+    /**
      * Recreates a singleton the context holds, and the beans that depend on it: the transitive dependents the
      * {@link BeanDependencyGraph} records are destroyed first, the bean is destroyed and created again from its
      * definition, and the dependents are created again when they are next requested, on top of the new instance. This
      * is what a watcher does when a change it is told about cannot be applied to a bean in place, such as a cache of
      * serializers or validators built from classes that a development reload replaced.
      *
-     * <p>Meant for development-time watches. The dependents are known only when the context
-     * {@link BeanContextConfiguration#beanDependencyTrackingEnabled() tracks bean dependencies}, which by default only a
-     * context in {@link io.micronaut.context.env.DevelopmentMode development mode} does; any other context recreates
-     * nothing and returns false, rather than leave dependents holding the instance it destroyed.</p>
+     * <p>Meant for development-time watches, and here, beside the watches, because it is what a watcher does with a
+     * change it cannot apply in place, as a configuration watch answering
+     * {@link io.micronaut.context.watch.ReloadingConfigurationWatcher.Outcome#RECREATE} has the context do for it. The
+     * dependents are known only when the context
+     * {@link BeanContextConfiguration#beanDependencyTrackingEnabled() tracks bean dependencies}, as
+     * {@link #isRecreateSupported()} tells; any other context recreates nothing and returns false, rather than leave
+     * dependents holding the instance it destroyed, and logs why at debug level.</p>
      *
      * <p>An {@link io.micronaut.context.processor.ExecutableMethodProcessor}, whether it is the bean recreated or one
      * of its dependents, is created again at once and given the methods the context gave it at startup, once, so
