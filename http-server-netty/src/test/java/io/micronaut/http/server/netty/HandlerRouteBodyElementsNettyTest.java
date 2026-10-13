@@ -34,7 +34,9 @@ import io.netty.util.internal.ThreadExecutorMap;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -50,6 +52,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -128,7 +131,24 @@ class HandlerRouteBodyElementsNettyTest {
         try (Socket socket = new Socket("localhost", server.getPort())) {
             socket.setSoTimeout(20_000);
             socket.getOutputStream().write(request.getBytes(StandardCharsets.US_ASCII));
-            return new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            // read until the response is complete: the end of a chunked body is its last chunk,
+            // otherwise the server closing the connection
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+            InputStream in = socket.getInputStream();
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            while (System.nanoTime() < deadline) {
+                int n = in.read(buffer);
+                if (n == -1) {
+                    break;
+                }
+                bytes.write(buffer, 0, n);
+                String response = bytes.toString(StandardCharsets.UTF_8);
+                if (head(response).contains("transfer-encoding: chunked") && parseChunks(response) != null) {
+                    return response;
+                }
+            }
+            return bytes.toString(StandardCharsets.UTF_8);
         }
     }
 
@@ -141,13 +161,33 @@ class HandlerRouteBodyElementsNettyTest {
      * @return The body
      */
     private static String chunks(String response) {
-        String rest = response.substring(response.indexOf("\r\n\r\n") + 4);
+        String body = parseChunks(response);
+        assertNotNull(body, () -> "Incomplete chunked response: " + response);
+        return body;
+    }
+
+    /**
+     * @param response A response with a chunked body
+     * @return The body, or null when the last chunk has not been received
+     */
+    private static String parseChunks(String response) {
+        int headEnd = response.indexOf("\r\n\r\n");
+        if (headEnd < 0) {
+            return null;
+        }
+        String rest = response.substring(headEnd + 4);
         StringBuilder body = new StringBuilder();
         while (true) {
             int end = rest.indexOf("\r\n");
+            if (end < 0) {
+                return null;
+            }
             int size = Integer.parseInt(rest.substring(0, end).trim(), 16);
             if (size == 0) {
-                return body.toString();
+                return rest.startsWith("\r\n", end + 2) ? body.toString() : null;
+            }
+            if (rest.length() < end + 2 + size + 2) {
+                return null;
             }
             body.append(rest, end + 2, end + 2 + size);
             rest = rest.substring(end + 2 + size + 2);
