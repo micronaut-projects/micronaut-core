@@ -178,21 +178,21 @@ micronaut:
 
 The context is captured when a task is submitted or scheduled, so it stays referenced until the task has run. This matters for the `ScheduledExecutorService` methods:
 
-* A periodic task (`scheduleAtFixedRate` or `scheduleWithFixedDelay`) runs every time with the context captured when it was scheduled, and keeps that context alive until it is cancelled.
-* A task that schedules itself again, for example a polling loop or a retry with backoff, passes its context to the next run, so a request's context can outlive the request.
+* A periodic task (`scheduleAtFixedRate` or `scheduleWithFixedDelay`) doesn't capture the context, because it would keep that context alive until it is cancelled. It runs without the context of the code that scheduled it. To run it with that context, wrap it yourself, for example `scheduler.scheduleAtFixedRate(PropagatedContext.wrapCurrent(this::poll), 0, 30, TimeUnit.SECONDS)`.
+* A one-shot task (`schedule`) captures the context. A task that schedules itself again with `schedule`, for example a polling loop or a retry with backoff, therefore passes its context to the next run, and a request's context can outlive the request.
 
-`@Scheduled` methods are scheduled at startup, without a context. When code that runs with a request's context schedules long-lived work, schedule it from an empty context so that the request's MDC or tracing state isn't kept:
+`@Scheduled` methods are scheduled at startup, without a context. When code that runs with a request's context schedules long-lived work that reschedules itself, schedule it from an empty context so that the request's MDC or tracing state isn't kept:
 
 [source,java]
 ----
 PropagatedContext.empty().propagate(() ->
-    scheduler.scheduleAtFixedRate(this::poll, 0, 30, TimeUnit.SECONDS)
+    scheduler.schedule(this::pollAndReschedule, 30, TimeUnit.SECONDS)
 );
 ----
 
 Alternatively, set `propagate-context: false` on an executor that runs such work.
 
-NOTE: Only tasks passed to the executor's own methods (`execute`, `submit`, `invokeAll`, `invokeAny` and the `schedule*` methods) are wrapped. Work that a task forks directly onto a `ForkJoinPool`, for example with `ForkJoinTask.fork()`, doesn't go through the wrapper.
+NOTE: Only tasks passed to the executor's own methods (`execute`, `submit`, `invokeAll`, `invokeAny` and `schedule`) are wrapped. Work that a task forks directly onto a `ForkJoinPool`, for example with `ForkJoinTask.fork()`, doesn't go through the wrapper.
 
 === Default thread-local propagation with optional Scoped Values
 

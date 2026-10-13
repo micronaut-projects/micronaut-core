@@ -17,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -76,6 +77,38 @@ class ExecutorContextPropagationTest {
             Future<String> detached = propagatedContext.propagate(() -> PropagatedContext.empty().propagate(() ->
                 executor.schedule(ExecutorContextPropagationTest::currentValue, 1, TimeUnit.MILLISECONDS)));
             assertEquals("none", detached.get(5, TimeUnit.SECONDS));
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"thread-local", "scoped-value"})
+    void periodicTasksDoNotCaptureTheCallersContext(String mode) throws Exception {
+        try (ApplicationContext context = run(mode, Map.of(
+            "micronaut.executors.timer.type", "scheduled",
+            "micronaut.executors.timer.core-pool-size", 1
+        ))) {
+            ScheduledExecutorService executor = (ScheduledExecutorService) context.getBean(ExecutorService.class, Qualifiers.byName("timer"));
+            PropagatedContext propagatedContext = PropagatedContext.getOrEmpty().plus(new TestElement("periodic"));
+
+            CompletableFuture<String> fixedRate = new CompletableFuture<>();
+            ScheduledFuture<?> fixedRateTask = propagatedContext.propagate(() ->
+                executor.scheduleAtFixedRate(() -> fixedRate.complete(currentValue()), 1, 10, TimeUnit.MILLISECONDS));
+            assertEquals("none", fixedRate.get(5, TimeUnit.SECONDS));
+            fixedRateTask.cancel(false);
+
+            CompletableFuture<String> fixedDelay = new CompletableFuture<>();
+            ScheduledFuture<?> fixedDelayTask = propagatedContext.propagate(() ->
+                executor.scheduleWithFixedDelay(() -> fixedDelay.complete(currentValue()), 1, 10, TimeUnit.MILLISECONDS));
+            assertEquals("none", fixedDelay.get(5, TimeUnit.SECONDS));
+            fixedDelayTask.cancel(false);
+
+            // a periodic task can still opt in by wrapping itself
+            CompletableFuture<String> wrapped = new CompletableFuture<>();
+            Runnable completeWrapped = () -> wrapped.complete(currentValue());
+            ScheduledFuture<?> wrappedTask = propagatedContext.propagate(() ->
+                executor.scheduleAtFixedRate(PropagatedContext.wrapCurrent(completeWrapped), 1, 10, TimeUnit.MILLISECONDS));
+            assertEquals("periodic", wrapped.get(5, TimeUnit.SECONDS));
+            wrappedTask.cancel(false);
         }
     }
 

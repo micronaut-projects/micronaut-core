@@ -74,6 +74,8 @@ The instrumentation that makes `ExecutorService` beans run submitted tasks with 
 
 A task captures the context when it is submitted, so a task that submits or schedules more work on an executor bean passes its context on. To keep the previous behaviour for one executor, set `propagate-context: false` on it, for example `micronaut.executors.scheduled.propagate-context: false`.
 
+Periodic tasks, scheduled with `scheduleAtFixedRate` or `scheduleWithFixedDelay`, no longer capture the context, because they would keep it alive until they are cancelled. This also applies to applications that use `micronaut-runtime` or `micronaut-http`, where these tasks previously ran with the context of the code that scheduled them. To keep that, wrap the task with `PropagatedContext.wrapCurrent(..)` when scheduling it.
+
 Executors created from `micronaut.executors.*` are now instrumented when they are created, before any `BeanCreatedEventListener` of `ExecutorService` runs. The context propagation is therefore the innermost wrapper, and other executor instrumentations run with the context on the worker thread. Previously, an instrumentation ordered before the context propagation instrumentation ran without it. The listener still instruments other `ExecutorService` beans.
 
 === A reflectively dispatched executable method propagates the method's exception
