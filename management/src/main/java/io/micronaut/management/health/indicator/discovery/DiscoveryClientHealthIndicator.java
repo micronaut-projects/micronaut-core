@@ -61,6 +61,8 @@ import java.util.stream.Stream;
 @Requires(property = HealthEndpoint.PREFIX + ".discovery-client-health.enabled", defaultValue = StringUtils.TRUE, notEquals = StringUtils.FALSE)
 public class DiscoveryClientHealthIndicator implements HealthIndicator {
 
+    private static final String SERVICES = "services";
+
     private final DiscoveryClient discoveryClient;
     private final DiscoveryClient uncachedDiscoveryClient;
     private final String description;
@@ -88,7 +90,7 @@ public class DiscoveryClientHealthIndicator implements HealthIndicator {
     public Publisher<HealthResult> getResult() {
         if (hasNoChildClients) {
             return Flux.just(HealthResult.builder(description, HealthStatus.UP)
-                .details(Collections.singletonMap("services", Collections.emptyMap()))
+                .details(Collections.singletonMap(SERVICES, Collections.emptyMap()))
                 .build());
         }
         return Flux.defer(() -> getResult(discoveryClient))
@@ -121,7 +123,7 @@ public class DiscoveryClientHealthIndicator implements HealthIndicator {
         }
         if (hasNoChildClients) {
             return CompletableFuture.completedFuture(List.of(HealthResult.builder(description, HealthStatus.UP)
-                .details(Collections.singletonMap("services", Collections.emptyMap()))
+                .details(Collections.singletonMap(SERVICES, Collections.emptyMap()))
                 .build()));
         }
         CompletableFuture<List<HealthResult>> result = CompletionStagePublishers.future();
@@ -178,7 +180,7 @@ public class DiscoveryClientHealthIndicator implements HealthIndicator {
                 value.put(service.getKey(), service.getValue().stream().map(ServiceInstance::getURI).toList());
             }
             return HealthResult.builder(discoveryClient.getDescription(), HealthStatus.UP)
-                .details(Collections.singletonMap("services", value))
+                .details(Collections.singletonMap(SERVICES, value))
                 .build();
         });
     }
@@ -212,7 +214,7 @@ public class DiscoveryClientHealthIndicator implements HealthIndicator {
                     );
 
                     builder.details(Collections.singletonMap(
-                        "services", value
+                        SERVICES, value
                     ));
                     return builder.build();
                 }).flux();

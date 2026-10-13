@@ -288,6 +288,7 @@ class AsyncSpiEndpointSpec extends Specification {
 
         @Override
         void setLogLevel(ManagedLoggingSystem loggingSystem, String name, LogLevel level) {
+            // no-op: the spec only reads loggers
         }
     }
 }
