@@ -1249,6 +1249,9 @@ record MethodFilter<T>(FilterOrder order,
          * @param context     The context the downstream runs with
          * @return The Reactor context of the downstream
          */
+        // the deprecated request key is still written by the route executor and read by
+        // ServerRequestContext.currentRequest(ContextView): a stale copy has to be replaced
+        @SuppressWarnings({"deprecation", "java:S1874"})
         private static Context downstreamReactorContext(ContextView contextView, FilterContext context) {
             Context reactorContext = Context.of(contextView);
             if (contextView.hasKey(ReactorPropagation.PROPAGATED_CONTEXT_REACTOR_CONTEXT_VIEW_KEY)) {
