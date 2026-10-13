@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Consumes;
@@ -25,6 +26,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.netty.contrib.multipart.FormDecoderException;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -46,7 +48,8 @@ class FullFormErrorTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
-    void malformedMultipartReachesTheDecoderErrorHandler(boolean chunked) throws Exception {
+    // the demuxer answers a malformed body with a bad request; the decoder failure is its cause
+    void malformedMultipartReachesTheErrorHandlerAsBadRequest(boolean chunked) throws Exception {
         try (ApplicationContext context = run(Map.of());
              HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()) {
             EmbeddedServer server = context.getBean(EmbeddedServer.class).start();
@@ -131,9 +134,12 @@ class FullFormErrorTest {
             return body.get("field");
         }
 
-        @Error(exception = FormDecoderException.class)
-        HttpResponse<String> malformed() {
-            return HttpResponse.badRequest("malformed multipart");
+        @Error(exception = HttpStatusException.class)
+        HttpResponse<String> malformed(HttpStatusException exception) {
+            if (exception.getStatus() == HttpStatus.BAD_REQUEST && exception.getCause() instanceof FormDecoderException) {
+                return HttpResponse.badRequest("malformed multipart");
+            }
+            return HttpResponse.serverError("unexpected " + exception);
         }
     }
 }
