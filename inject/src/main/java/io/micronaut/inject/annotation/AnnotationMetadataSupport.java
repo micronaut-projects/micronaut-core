@@ -427,7 +427,8 @@ public final class AnnotationMetadataSupport {
             if (aClass != null && Annotation.class.isAssignableFrom(aClass)) {
                 // a thread still running a retired generation is answered, but does not register its type again
                 if (!(loadersRetired && isRetired(aClass.getClassLoader()))) {
-                    ANNOTATION_TYPES.put(name, aClass);
+                    // the first registration wins here too, should another loader have registered meanwhile
+                    ANNOTATION_TYPES.putIfAbsent(name, aClass);
                     forgetIfRetired(name, aClass);
                 }
                 return Optional.of(aClass);
