@@ -34,6 +34,9 @@ import java.util.function.Supplier;
  * a discard hook, so that it releases the items it drops when it is cancelled. Any other source
  * is subscribed to directly, without a wrapper. Reactor operators are not used.
  *
+ * <p>Public only because the server module ({@code io.micronaut.http.server}) subscribes to body
+ * sources through it as well; it is internal API.</p>
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */
