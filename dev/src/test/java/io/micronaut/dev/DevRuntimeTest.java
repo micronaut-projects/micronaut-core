@@ -454,6 +454,8 @@ class DevRuntimeTest {
         assertTrue(ResourceNotifier.isPropertySource(project.resolve("custom.yml"), roots, origins));
         assertTrue(ResourceNotifier.isPropertySource(project.resolve("other/extra.yml"), roots, origins));
         assertFalse(ResourceNotifier.isPropertySource(project.resolve("schema.graphqls"), roots, origins));
+        // a file micronaut.config.import names with classpath*:
+        assertTrue(ResourceNotifier.isPropertySource(project.resolve("shared.yml"), roots, Set.of("classpath*:shared.yml")));
         // a file micronaut.config.files names relative to the working directory
         Path relative = Path.of("").toAbsolutePath().relativize(project.resolve("relative.yml").toAbsolutePath());
         assertTrue(ResourceNotifier.isPropertySource(project.resolve("relative.yml"), roots, Set.of("file:" + relative)));

@@ -61,6 +61,7 @@ final class ResourceNotifier {
      * is not running to ask.
      */
     private static final String CLASSPATH_PREFIX = "classpath:";
+    private static final String CLASSPATH_ALL_PREFIX = "classpath*:";
     private static final String FILE_PREFIX = "file:";
     private static final Set<String> DEFAULT_EXTENSIONS = Set.of("properties", "yml", "yaml", "json", "toml", "groovy");
 
@@ -178,8 +179,10 @@ final class ResourceNotifier {
                 }
                 relative.append(segment);
             }
-            if (origins.contains(CLASSPATH_PREFIX + relative) || origins.contains(CLASSPATH_PREFIX + "/" + relative)) {
-                return true;
+            for (String prefix : List.of(CLASSPATH_PREFIX, CLASSPATH_ALL_PREFIX)) {
+                if (origins.contains(prefix + relative) || origins.contains(prefix + "/" + relative)) {
+                    return true;
+                }
             }
         }
         return false;
