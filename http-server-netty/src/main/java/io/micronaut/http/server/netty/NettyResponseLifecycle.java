@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.subscriber.LazySendingSubscriber;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.ByteBodyHttpResponse;
@@ -26,6 +25,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ConcatenatingSubscriber;
+import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
@@ -38,7 +38,6 @@ import io.netty.handler.codec.http.HttpContent;
 import io.netty.util.LeakPresenceDetector;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.util.concurrent.Executor;
 
@@ -73,8 +72,8 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
         if (response instanceof NettyHttpResponseBuilder builder) {
             io.netty.handler.codec.http.HttpResponse nettyResponse = builder.toHttpResponse();
             if (nettyResponse instanceof StreamedHttpResponse streamed) {
-                return LazySendingSubscriber.create(streamed).map(contents -> {
-                    CloseableByteBody body = byteBodyFactory().adapt(Flux.from(contents).map(HttpContent::content), null, null);
+                return BodyPublishers.awaitFirst(streamed, HttpContent::release).map(contents -> {
+                    CloseableByteBody body = byteBodyFactory().adapt(BodyPublishers.map(contents, HttpContent::content), null, null);
                     return ByteBodyHttpResponseWrapper.wrap(response, body);
                 }).onErrorResume(e -> (ExecutionFlow) handleStreamingError(request, e));
             }

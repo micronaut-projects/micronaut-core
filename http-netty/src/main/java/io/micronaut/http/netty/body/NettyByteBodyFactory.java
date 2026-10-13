@@ -27,6 +27,7 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
+import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -40,7 +41,6 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.util.internal.ThreadExecutorMap;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
@@ -107,7 +107,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
 
     public CloseableByteBody adapt(Publisher<ByteBuf> publisher, @Nullable HttpHeaders headersForLength, @Nullable Runnable onDiscard) {
         return adapt(
-            Flux.from(publisher).map(readBufferFactory()::adapt),
+            BodyPublishers.map(publisher, readBufferFactory()::adapt),
             BodySizeLimits.UNLIMITED, headersForLength == null ? null : new NettyHttpHeaders(headersForLength, ConversionService.SHARED),
             onDiscard);
     }
@@ -122,9 +122,8 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
         }
     }
 
-    public static Flux<ByteBuf> toByteBufs(ByteBody body) {
-        return Flux.from(body.toReadBufferPublisher())
-            .map(NettyReadBufferFactory::toByteBuf);
+    public static Publisher<ByteBuf> toByteBufs(ByteBody body) {
+        return BodyPublishers.map(body.toReadBufferPublisher(), NettyReadBufferFactory::toByteBuf);
     }
 
     public StreamingNettyByteBody.SharedBuffer createStreamingBuffer(BodySizeLimits limits, BufferConsumer.Upstream rootUpstream) {

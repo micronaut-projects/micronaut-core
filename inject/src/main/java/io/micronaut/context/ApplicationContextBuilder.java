@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
@@ -27,6 +28,7 @@ import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -426,6 +428,35 @@ public interface ApplicationContextBuilder {
      * @since 5.0
      */
     ApplicationContextBuilder eventsEnabled(boolean enabled);
+
+    /**
+     * Record which bean received which other bean, as a {@link BeanDependencyGraph} the built context
+     * exposes through {@link ConfigurableBeanContext#findDependencyGraph()}. A development launcher switches this on;
+     * it defaults to on only in {@link io.micronaut.context.env.DevelopmentMode development mode}, whether switched
+     * on by system property or by the configuration of the context. Switching it off here wins over both.
+     *
+     * @param enabled True to record the graph
+     * @return This builder
+     * @since 5.3.0
+     */
+    default ApplicationContextBuilder beanDependencyTrackingEnabled(boolean enabled) {
+        return this;
+    }
+
+    /**
+     * Singleton registrations of a stopped context the built context adopts when it starts: the bean
+     * instances are registered under their definitions instead of being created again. A development
+     * launcher passes what {@link DefaultBeanContext#stopRetaining(java.util.function.Predicate)} returned.
+     *
+     * @param registrations The registrations to adopt
+     * @return This builder
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    default ApplicationContextBuilder retainedRegistrations(Collection<BeanRegistration<?>> registrations) {
+        return this;
+    }
 
     /**
      * Set a predicate to filter beans considered by the context.

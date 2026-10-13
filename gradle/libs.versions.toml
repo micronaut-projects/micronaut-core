@@ -35,6 +35,7 @@ jazzer = "0.24.0"
 jcache = "1.1.1"
 junit5 = "5.12.2"
 junit-platform="1.12.2"
+junit-testng-engine = "1.0.5"
 logback = "1.5.38"
 lombok = "1.18.46"
 logbook-netty = "3.12.3"
@@ -258,6 +259,8 @@ junit-platform-engine = { module = "org.junit.platform:junit-platform-suite-engi
 junit-platform-testkit = { module = "org.junit.platform:junit-platform-testkit", version.ref = "junit-platform" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
 junit-vintage = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit5" }
+junit-testng-engine = { module = "org.junit.support:testng-engine", version.ref = "junit-testng-engine" }
+reactive-streams-tck = { module = "org.reactivestreams:reactive-streams-tck", version.ref = "managed-reactive-streams" }
 
 junit4 = { module = "junit:junit", version.ref = "junit4" }
 

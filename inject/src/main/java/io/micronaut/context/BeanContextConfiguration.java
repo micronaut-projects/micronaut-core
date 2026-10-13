@@ -16,8 +16,10 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanConfiguration;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -25,6 +27,7 @@ import io.micronaut.inject.QualifiedBeanType;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -139,6 +142,39 @@ public interface BeanContextConfiguration {
      */
     default boolean eventsEnabled() {
         return true;
+    }
+
+    /**
+     * Whether the context records which bean received which other bean, as a
+     * {@link BeanDependencyGraph}. On by default only when {@link DevelopmentMode development mode}
+     * is switched on by system property, since a production run has no use for the graph. An application
+     * context whose configuration switches development mode on ({@value DevelopmentMode#PROPERTY}) tracks
+     * dependencies too, deciding so as it starts and before it creates any bean, unless its builder switched
+     * tracking off with {@link ApplicationContextBuilder#beanDependencyTrackingEnabled(boolean)}.
+     *
+     * @return True to record the graph
+     * @since 5.3.0
+     */
+    default boolean beanDependencyTrackingEnabled() {
+        return DevelopmentMode.isEnabledBySystemProperty();
+    }
+
+    /**
+     * Singleton registrations of a previous context that this context adopts when it starts, so
+     * that the bean instances survive a restart. A development launcher obtains them from
+     * {@link DefaultBeanContext#stopRetaining(Predicate)} on the context it stops.
+     *
+     * <p>The registrations are consumed: a context reads them once when it starts for the first time
+     * and an implementation may hand them over and forget them, so that the previous context is not
+     * kept reachable.</p>
+     *
+     * @return The registrations to adopt, empty by default
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    default Collection<BeanRegistration<?>> getRetainedRegistrations() {
+        return Collections.emptyList();
     }
 
     /**
