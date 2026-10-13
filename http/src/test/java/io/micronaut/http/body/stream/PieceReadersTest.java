@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -71,6 +72,76 @@ class PieceReadersTest {
         recorder.request(2);
         assertEquals(List.of("a", "b"), recorder.elements);
         assertTrue(recorder.complete);
+    }
+
+    @Test
+    void theBridgeDecodesNoUnrequestedElementOfTheLastPiece() {
+        AtomicInteger decoded = new AtomicInteger();
+        Recorder<String> recorder = new Recorder<>();
+        PieceReaders.publisher(pieces("a\nb\nc\n"), new LineReader(decoded)).subscribe(recorder);
+
+        recorder.request(1);
+        assertEquals(List.of("a"), recorder.elements);
+        assertEquals(1, decoded.get());
+        assertFalse(recorder.complete);
+        recorder.request(1);
+        assertEquals(List.of("a", "b"), recorder.elements);
+        assertEquals(2, decoded.get());
+        assertFalse(recorder.complete);
+        recorder.request(1);
+        assertEquals(3, decoded.get());
+        assertTrue(recorder.complete);
+    }
+
+    @Test
+    void anUnrequestedElementThatFailsToDecodeFailsOnlyWhenRequested() {
+        AtomicInteger decoded = new AtomicInteger();
+        Recorder<String> recorder = new Recorder<>();
+        PieceReaders.publisher(pieces("a\nboom\n"), new LineReader(decoded)).subscribe(recorder);
+
+        recorder.request(1);
+        assertEquals(List.of("a"), recorder.elements);
+        assertNull(recorder.failure);
+        assertFalse(recorder.complete);
+        recorder.request(1);
+        assertInstanceOf(CodecException.class, recorder.failure);
+        assertEquals(1, decoded.get());
+    }
+
+    @Test
+    void aReaderThatCannotTellItIsEmptyCompletesOnTheNextRequest() {
+        AtomicInteger decoded = new AtomicInteger();
+        Recorder<String> recorder = new Recorder<>();
+        LineReader lines = new LineReader(decoded);
+        PieceReader<String> unknown = new PieceReader<>() {
+            @Override
+            public void read(ReadBuffer piece) {
+                lines.read(piece);
+            }
+
+            @Override
+            public void complete() {
+                lines.complete();
+            }
+
+            @Override
+            public @Nullable String poll() {
+                return lines.poll();
+            }
+
+            @Override
+            public void close() {
+                lines.close();
+            }
+        };
+        PieceReaders.publisher(pieces("a\n"), unknown).subscribe(recorder);
+
+        recorder.request(1);
+        assertEquals(List.of("a"), recorder.elements);
+        assertFalse(recorder.complete);
+        recorder.request(1);
+        assertTrue(recorder.complete);
+        assertEquals(1, decoded.get());
     }
 
     @Test
@@ -322,6 +393,49 @@ class PieceReadersTest {
     }
 
     @Test
+    void aFailingCloseOnCancellationKeepsTheInvalidDemandSignal() {
+        RuntimeException closeFailure = new IllegalStateException("close failed");
+        Recorder<Integer> recorder = new Recorder<>();
+        new BodyElementsPublisher<Integer>(BodyElements.of(() -> new CompletableFuture<>(), () -> {
+            throw closeFailure;
+        })).subscribe(recorder);
+
+        recorder.request(0);
+        assertInstanceOf(IllegalArgumentException.class, recorder.failure);
+        assertEquals(List.of(closeFailure), List.of(recorder.failure.getSuppressed()));
+        recorder.subscription.cancel();
+    }
+
+    @Test
+    void aFailingCloseOnCancellationDoesNotThrowAndLateElementsAreDiscarded() {
+        CompletableFuture<Optional<Integer>> pending = new CompletableFuture<>();
+        AtomicInteger closes = new AtomicInteger();
+        List<Integer> discarded = new ArrayList<>();
+        Recorder<Integer> recorder = new Recorder<>();
+        BodyElements<Integer> elements = new BodyElements<>() {
+            @Override
+            public CompletionStage<Optional<Integer>> next() {
+                return pending;
+            }
+
+            @Override
+            public void close() {
+                closes.incrementAndGet();
+                throw new IllegalStateException("close failed");
+            }
+        };
+        new BodyElementsPublisher<>(elements, discarded::add).subscribe(recorder);
+
+        recorder.request(1);
+        recorder.subscription.cancel();
+        assertEquals(1, closes.get());
+        assertNull(recorder.failure);
+        pending.complete(Optional.of(7));
+        assertEquals(List.of(7), discarded);
+        assertTrue(recorder.elements.isEmpty());
+    }
+
+    @Test
     void anInputThatEmitsMoreThanRequestedIsCancelled() {
         AtomicBoolean cancelled = new AtomicBoolean();
         Publisher<ReadBuffer> eager = subscriber -> subscriber.onSubscribe(new Subscription() {
@@ -424,6 +538,11 @@ class PieceReadersTest {
             }
             decoded.incrementAndGet();
             return line;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return lines.isEmpty();
         }
 
         @Override
