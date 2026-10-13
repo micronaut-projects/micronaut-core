@@ -34,6 +34,7 @@ import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.PieceReader;
+import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
@@ -141,9 +142,8 @@ public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, C
 
     @Override
     public Flux<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input, long maxElementSize) {
-        JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
-        return processor.process(Flux.from(input).map(JsonChunkedProcessor::nettyBuffer))
-            .map(bb -> JsonChunkedProcessor.readReleasing(bb, value -> jsonMessageHandler.read(type, mediaType, httpHeaders, value)));
+        // the declared type of this method is a Flux
+        return Flux.from(PieceReaders.publisherOfBuffers(input, openPieceReader(type, mediaType, httpHeaders, maxElementSize), JsonPieceReader::adapt, JsonPieceReader::discardForeign));
     }
 
     @Override
