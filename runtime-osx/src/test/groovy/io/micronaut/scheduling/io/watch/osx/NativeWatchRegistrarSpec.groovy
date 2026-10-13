@@ -69,6 +69,35 @@ class NativeWatchRegistrarSpec extends Specification {
         then: "it is registered natively again"
         !renewed.is(rootKey)
         registered == [root, root]
+
+        when: "the watcher closes"
+        registrar.close()
+
+        then: "the keys kept are cancelled, so that the service, which stays open, queues nothing more for them"
+        !renewed.valid
+    }
+
+    void "closing the watcher cancels the keys the registrar keeps"() {
+        given:
+        FakeKey key = new FakeKey(root)
+        DirectoryWatcher watcher = DirectoryWatcher.builder(new FakeService())
+            .registrar(new NativeWatchRegistrar({ Path directory, WatchService service -> key } as DirectoryWatcher.WatchKeyRegistrar))
+            .closeWatchServiceOnClose(false)
+            .build()
+        def registration = watcher.directory(root).watch({})
+
+        when: "the registration closes while the watcher runs"
+        registration.close()
+
+        then: "the key is kept"
+        key.valid
+
+        when: "a new registration is made and the watcher closes"
+        watcher.directory(root).watch({})
+        watcher.close()
+
+        then:
+        !key.valid
     }
 
     @Requires({ System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac") })
@@ -122,6 +151,27 @@ class NativeWatchRegistrarSpec extends Specification {
         cleanup:
         againRegistration?.close()
         watcher?.close()
+    }
+
+    static class FakeService implements WatchService {
+        @Override
+        void close() {
+        }
+
+        @Override
+        WatchKey poll() {
+            return null
+        }
+
+        @Override
+        WatchKey poll(long timeout, java.util.concurrent.TimeUnit unit) {
+            return null
+        }
+
+        @Override
+        WatchKey take() {
+            throw new UnsupportedOperationException()
+        }
     }
 
     static class FakeKey implements WatchKey {

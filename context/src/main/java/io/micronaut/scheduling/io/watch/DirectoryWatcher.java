@@ -271,8 +271,9 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
             synchronized (this) {
                 closing = List.copyOf(registrations);
                 registrations.clear();
+                // cancelled outright, past the registrar: nothing registers with it again
                 for (WatchKey key : directoriesByKey.keySet()) {
-                    registrar.cancel(key);
+                    key.cancel();
                 }
                 directories.clear();
                 directoriesByKey.clear();
@@ -628,9 +629,9 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         WatchKey register(Path directory, WatchService watchService) throws IOException;
 
         /**
-         * Cancels a key once no watched directory is left that it reports for. A service whose keys must outlive
-         * that, such as the native macOS one, which answers a later registration under a registered directory with a
-         * key that never reports, keeps them.
+         * Cancels a key once no watched directory is left that it reports for, while the watcher runs. A service
+         * whose keys must outlive that, such as the native macOS one, which answers a later registration under a
+         * registered directory with a key that never reports, keeps them. Closing the watcher cancels its keys itself.
          *
          * @param key The key
          */

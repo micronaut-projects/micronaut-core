@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.io.watch.DefaultFileWatcher;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
@@ -44,6 +45,8 @@ import java.nio.file.WatchService;
 @Requires(beans = WatchService.class)
 public class MacOsFileWatcher extends DefaultFileWatcher {
 
+    private volatile @Nullable NativeWatchRegistrar registrar;
+
     /**
      * @param watchServices The watch service, obtained by the first registration
      * @param configuration The configuration of the check interval and the quiet period
@@ -58,8 +61,21 @@ public class MacOsFileWatcher extends DefaultFileWatcher {
             // the factory fell back to the JDK's service, which is registered and closed as usual
             return builder;
         }
+        NativeWatchRegistrar registrar = new NativeWatchRegistrar();
+        this.registrar = registrar;
         return builder
-            .registrar(new NativeWatchRegistrar())
+            .registrar(registrar)
             .closeWatchServiceOnClose(false);
+    }
+
+    @Override
+    @PreDestroy
+    public void close() {
+        super.close();
+        NativeWatchRegistrar current = registrar;
+        if (current != null) {
+            // the keys the registrar kept for later registrations, which the watcher no longer knew
+            current.close();
+        }
     }
 }

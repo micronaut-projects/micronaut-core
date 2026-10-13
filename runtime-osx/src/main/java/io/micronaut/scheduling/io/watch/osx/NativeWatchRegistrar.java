@@ -82,4 +82,15 @@ final class NativeWatchRegistrar implements DirectoryWatcher.WatchKeyRegistrar {
     public void cancel(WatchKey key) {
         // kept: cancelling would stop no stream, and would leave the directory and its tree unwatchable for this service
     }
+
+    /**
+     * Cancels the keys kept, once the watcher registering through this registrar closed, so that the service, which
+     * is left open, queues no more events for them.
+     */
+    synchronized void close() {
+        for (WatchKey key : roots.values()) {
+            key.cancel();
+        }
+        roots.clear();
+    }
 }
