@@ -438,7 +438,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         @Override
         protected @Nullable UriRouteMatch<Object, Object> matchRoute(HttpRequest<?> request) {
             // the conditions of the route, e.g. a @RouteCondition, which reads the request of the
-            // context, apply to the upgrade request
+            // context, apply to the upgrade request. Router.find(HttpMethod, path, request) only
+            // matches the method and the path, so the conditions are tested here, once
             return PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request))
                 .propagate(() -> router.<Object, Object>find(HttpMethod.GET, request.getPath(), request)
                     .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))

@@ -533,6 +533,7 @@ public class RequestLifecycle {
      * @return The match of the route, or {@code null} if no route matches
      * @since 5.3.0
      */
+    @Internal
     protected @Nullable UriRouteMatch<Object, Object> matchRoute(HttpRequest<?> request) {
         return routeExecutor.findRouteMatch(request);
     }
@@ -548,6 +549,7 @@ public class RequestLifecycle {
      * @return The response flow
      * @since 5.3.0
      */
+    @Internal
     protected ExecutionFlow<HttpResponse<?>> provideRouteResponse(HttpRequest<?> request,
                                                                   @Nullable UriRouteMatch<Object, Object> routeMatch,
                                                                   PropagatedContext propagatedContext) {
@@ -614,8 +616,10 @@ public class RequestLifecycle {
             LOG.debug("No matching route: {} {}", httpMethod, httpRequest.getUri());
         }
 
-        // if there is no route present try to locate a route that matches a different HTTP method
-        final List<UriRouteMatch<Object, Object>> anyMatchingRoutes = routeExecutor.router.findAny(httpRequest);
+        // if there is no route present try to locate a route that matches a different HTTP method.
+        // The route of a WebSocket only matches an upgrade request, see ServerWebSocketProcessor:
+        // the request is viewed as one, so that the same lookup finds the WebSocket at its path
+        final List<UriRouteMatch<Object, Object>> anyMatchingRoutes = routeExecutor.router.findAny(WebSocketUpgradeCondition.assumeUpgrade(httpRequest));
         final Collection<MediaType> acceptedTypes = httpRequest.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(acceptedTypes);
 
@@ -623,7 +627,14 @@ public class RequestLifecycle {
         Set<String> allowedMethods = new HashSet<>(5);
         Set<MediaType> produceableContentTypes = hasAcceptHeader ? new HashSet<>(5) : Set.of();
         Class<?> declaringType = null;
+        UriRouteMatch<?, ?> webSocketRoute = null;
         for (UriRouteMatch<?, ?> anyRoute : anyMatchingRoutes) {
+            if (anyRoute.getRouteInfo().isWebSocketRoute()) {
+                if (webSocketRoute == null) {
+                    webSocketRoute = anyRoute;
+                }
+                continue;
+            }
             final String routeMethod = anyRoute.getRouteInfo().getHttpMethodName();
             // the route of any custom method is a route of the method of a custom request
             boolean sameMethod = requestMethodName.equals(routeMethod)
@@ -666,7 +677,6 @@ public class RequestLifecycle {
         }
         // the route of a WebSocket only matches an upgrade request, see ServerWebSocketProcessor:
         // with no other route for the request, a plain request to its path is still answered for it
-        UriRouteMatch<Object, Object> webSocketRoute = findWebSocketRoute(httpRequest);
         if (webSocketRoute != null) {
             if (httpMethod == HttpMethod.GET || httpMethod == HttpMethod.HEAD) {
                 return onStatusError(
@@ -693,22 +703,6 @@ public class RequestLifecycle {
             new NotFoundException(),
             declaringType,
             propagatedContext);
-    }
-
-    /**
-     * The route of a WebSocket at the path of a request that is not an upgrade request, which
-     * the route does not match, and whose other conditions the request meets.
-     *
-     * @param httpRequest The request
-     * @return The match of the route, or {@code null}
-     */
-    private @Nullable UriRouteMatch<Object, Object> findWebSocketRoute(HttpRequest<?> httpRequest) {
-        for (UriRouteMatch<Object, Object> match : routeExecutor.router.<Object, Object>findAny(WebSocketUpgradeCondition.assumeUpgrade(httpRequest))) {
-            if (match.getRouteInfo().isWebSocketRoute()) {
-                return match;
-            }
-        }
-        return null;
     }
 
     /**

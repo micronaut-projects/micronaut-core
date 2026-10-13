@@ -16,6 +16,8 @@
 package io.micronaut.http.server.tck.tests.routing;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -104,6 +106,25 @@ public class WebSocketRoutingTest {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertThrows(server, HttpRequest.DELETE("/ws-routing/open-only"), HttpResponseAssertion.builder()
                 .status(HttpStatus.METHOD_NOT_ALLOWED)
+                .build());
+        }
+    }
+
+    @Test
+    void aHeadRequestToAWebSocketWithoutAnotherRouteIsABadRequest() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertThrows(server, HttpRequest.HEAD("/ws-routing/open-only"), HttpResponseAssertion.builder()
+                .status(HttpStatus.BAD_REQUEST)
+                .build());
+        }
+    }
+
+    @Test
+    void anotherMethodToAWebSocketWithoutAnotherRouteAllowsGet() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertThrows(server, HttpRequest.POST("/ws-routing/open-only", "body"), HttpResponseAssertion.builder()
+                .status(HttpStatus.METHOD_NOT_ALLOWED)
+                .header(HttpHeaders.ALLOW, HttpMethod.GET.name())
                 .build());
         }
     }
