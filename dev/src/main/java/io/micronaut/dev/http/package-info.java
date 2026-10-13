@@ -21,6 +21,8 @@
  * @since 5.3.0
  */
 @Experimental
+@NullMarked
 package io.micronaut.dev.http;
 
 import io.micronaut.core.annotation.Experimental;
+import org.jspecify.annotations.NullMarked;

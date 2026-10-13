@@ -72,6 +72,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
@@ -129,8 +130,11 @@ public final class DevRuntime implements Closeable {
      * Whether the last generation failed to start, so that the next batch must launch one whether or not a class changed.
      */
     private volatile boolean startFailed;
+    private boolean contextClaimed; // guarded by lifecycle: whether the generation adopted its context, the first it created
+    private volatile List<Path> watchedRoots = List.of(); // NOSONAR java:S3077 an immutable list, replaced whole
+    private final AtomicBoolean leakCheckPending = new AtomicBoolean();
     private @Nullable DirectoryWatcher watcher;
-    private @Nullable Thread worker;
+    private volatile @Nullable Thread worker; // NOSONAR java:S3077 only the reference is published
     private OutputSnapshot snapshot = OutputSnapshot.empty();
     /**
      * The changes of the batch whose compilation failed, merged into the next batch until they compile: the next edit
@@ -184,6 +188,7 @@ public final class DevRuntime implements Closeable {
      *
      * @return The compilers by language
      */
+    @Internal
     public static Map<SourceKind, SourceCompiler> availableCompilers() {
         Map<SourceKind, SourceCompiler> compilers = new EnumMap<>(SourceKind.class);
         for (SourceCompiler compiler : ServiceLoader.load(SourceCompiler.class, SourceCompiler.class.getClassLoader())) {
@@ -282,8 +287,7 @@ public final class DevRuntime implements Closeable {
      * @return The roots the runtime watches
      */
     public List<Path> watchedRoots() {
-        DirectoryWatcher directoryWatcher = watcher;
-        return directoryWatcher == null ? List.of() : directoryWatcher.watchedDirectories();
+        return watchedRoots;
     }
 
     /**
@@ -307,8 +311,12 @@ public final class DevRuntime implements Closeable {
     /**
      * Compiles every source and restarts if any class changed: the manual trigger, for an IDE that
      * saved without the watcher noticing, or after a failed compilation was fixed elsewhere.
+     *
+     * @throws IllegalStateException if called on the reload thread, from a reload listener, or on the main thread of a
+     * generation still starting: the reload waits for both
      */
     public void reload() {
+        RuntimeThreads.refuseOwnThreads(worker, applicationThread, context);
         awaitBatch(enqueue(new Pending(Map.of(), Map.of(), true)));
     }
 
@@ -320,13 +328,18 @@ public final class DevRuntime implements Closeable {
      * @param deleted The files deleted
      */
     void sourcesChanged(SourceKind kind, Set<Path> changed, Set<Path> deleted) {
+        RuntimeThreads.refuseOwnThreads(worker, applicationThread, context);
         awaitBatch(enqueue(new Pending(Map.of(kind, new SourceChanges(changed, deleted)), Map.of(), false)));
     }
 
     /**
      * Restarts the application on a new generation without compiling anything.
+     *
+     * @throws IllegalStateException if called on the reload thread, from a reload listener, or on the main thread of a
+     * generation still starting: the reload waits for both
      */
     public void restart() {
+        RuntimeThreads.refuseOwnThreads(worker, applicationThread, context);
         awaitBatch(enqueue(new Pending(Map.of(), Map.of(), false) {
             @Override
             boolean forcesRestart() {
@@ -373,7 +386,18 @@ public final class DevRuntime implements Closeable {
      */
     @Internal
     void contextCreated(ApplicationContext applicationContext) {
-        this.context = applicationContext;
+        synchronized (lifecycle) {
+            if (closed) {
+                // the main of a generation launched as the runtime closed: nothing would stop its context
+                throw new IllegalStateException("The development runtime is closed: no new generation starts");
+            }
+            if (contextClaimed) {
+                // a further context of the generation, such as a client's built in main: not the application's
+                return;
+            }
+            contextClaimed = true;
+            this.context = applicationContext;
+        }
     }
 
     /**
@@ -383,7 +407,17 @@ public final class DevRuntime implements Closeable {
      */
     @Internal
     void contextStarted(ApplicationContext applicationContext) {
-        this.context = applicationContext;
+        if (applicationContext != context) {
+            // a context the generation did not adopt starts with the runtime as a bean too
+            return;
+        }
+        synchronized (lifecycle) {
+            if (closed) {
+                // adopted as the runtime closed, which did not see it start
+                RuntimeThreads.stopOnceStarted(applicationContext);
+                return;
+            }
+        }
         reportResourceState(applicationContext);
         started.complete(applicationContext);
     }
@@ -411,14 +445,22 @@ public final class DevRuntime implements Closeable {
         }
         Thread thread = worker;
         if (thread != null) {
+            // a reload in progress ends before the generation it launched is stopped
             thread.interrupt();
+            RuntimeThreads.join(thread, APP_STOP_TIMEOUT);
         }
         DirectoryWatcher directoryWatcher = watcher;
         if (directoryWatcher != null) {
             directoryWatcher.close();
         }
+        synchronized (lifecycle) {
+            thread = contextClaimed ? null : applicationThread;
+        }
+        // a generation's main yet to create its context: what it creates is refused while this runtime runs the process
+        RuntimeThreads.join(thread, APP_STOP_TIMEOUT);
         ApplicationContext current = context;
-        if (current != null && current.isRunning()) {
+        if (current != null && (current.isRunning() || started.isDone())) {
+            // a context whose startup listeners still run is stopped once they ran: stop waits for start
             current.stop();
         }
         for (SourceCompiler compiler : new LinkedHashSet<>(compilers.values())) {
@@ -436,7 +478,7 @@ public final class DevRuntime implements Closeable {
      * @param compilers The compilers by language
      * @throws IllegalStateException if a compilation fails
      */
-    public static void compileMissingOutputs(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
+    static void compileMissingOutputs(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
         // decided before anything is compiled: two languages sharing one output are both missing, or neither
         Set<SourceKind> missing = new LinkedHashSet<>();
         for (SourceKind kind : compilers.keySet()) {
@@ -470,6 +512,7 @@ public final class DevRuntime implements Closeable {
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot start the file watcher", e);
         }
+        Set<Path> roots = new LinkedHashSet<>();
         for (SourceRoot root : manifest.sourceRoots()) {
             if (!Files.isDirectory(root.path())) {
                 continue;
@@ -480,10 +523,12 @@ public final class DevRuntime implements Closeable {
             // both spellings: the glob syntax alone leaves a file directly under the root out of "**/"
             String[] globs = root.kind().extensions().stream().flatMap(extension -> Stream.of("*." + extension, "**/*." + extension)).toArray(String[]::new);
             directoryWatcher.directory(root.path()).include(globs).watch(batch -> enqueue(sourceBatch(root, batch)));
+            roots.add(root.path().toAbsolutePath().normalize());
         }
         for (ResourceRoot root : manifest.resourceRoots()) {
             if (Files.isDirectory(root.path())) {
                 directoryWatcher.directory(root.path()).watch(batch -> enqueue(resourceBatch(root, batch)));
+                roots.add(root.path().toAbsolutePath().normalize());
             }
         }
         boolean external = false;
@@ -504,6 +549,7 @@ public final class DevRuntime implements Closeable {
                     }
                     String name = trigger.getFileName().toString();
                     directoryWatcher.directory(directory).recursive(false).include(name).watch(batch -> enqueue(new Pending(Map.of(), Map.of(), false)));
+                    roots.add(directory.normalize());
                 }
             } else {
                 // without a trigger the class output itself is watched, which may see a compilation half written
@@ -512,11 +558,13 @@ public final class DevRuntime implements Closeable {
                     Path output = manifest.classOutput(kind);
                     if (!manifest.sourceRoots(kind).isEmpty() && Files.isDirectory(output) && !directoryWatcher.isWatching(output)) {
                         directoryWatcher.directory(output).watch(batch -> enqueue(new Pending(Map.of(), Map.of(), false)));
+                        roots.add(output.toAbsolutePath().normalize());
                     }
                 }
             }
         }
         watcher = directoryWatcher;
+        watchedRoots = List.copyOf(roots);
     }
 
     private static Pending sourceBatch(SourceRoot root, FileChangeBatch batch) {
@@ -626,7 +674,12 @@ public final class DevRuntime implements Closeable {
                 gate.complete(null);
                 return;
             } catch (Throwable e) { // NOSONAR a reload that fails, with a LinkageError of the edited code too, leaves the reload thread running
-                LOG.error("Reload failed: {}", e.getMessage(), e);
+                if (closed) {
+                    // the runtime closing interrupted the reload
+                    LOG.debug("Reload ended by the runtime closing: {}", e.getMessage(), e);
+                } else {
+                    LOG.error("Reload failed: {}", e.getMessage(), e);
+                }
             } finally {
                 long last = 0;
                 for (Pending batch : batches) {
@@ -842,6 +895,9 @@ public final class DevRuntime implements Closeable {
         // the generation loader, not the facade: a class the JVM resolved through the facade once would be
         // handed out again, from the retired generation, for as long as the facade lives
         GenerationClassLoader generation = classLoader.current();
+        synchronized (lifecycle) {
+            contextClaimed = false;
+        }
         Thread thread = new Thread(() -> {
             Thread.currentThread().setContextClassLoader(generation);
             try {
@@ -859,9 +915,13 @@ public final class DevRuntime implements Closeable {
         applicationThread = thread;
         try {
             ApplicationContext applicationContext = future.get(START_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-            // the startup event is published a moment before the context reports itself running
-            long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
-            while (!applicationContext.isRunning() && System.nanoTime() < deadline) {
+            // the startup event is published before the other startup listeners ran and the context reports itself
+            // running; a main that returned has a command line application's context, which may have stopped already
+            long deadline = System.nanoTime() + START_TIMEOUT.toNanos();
+            while (!applicationContext.isRunning() && thread.isAlive()) {
+                if (System.nanoTime() > deadline) {
+                    throw new IllegalStateException("The application's context did not finish starting within " + START_TIMEOUT + " (" + reason + ")");
+                }
                 Thread.sleep(5);
             }
             return applicationContext;
@@ -945,8 +1005,8 @@ public final class DevRuntime implements Closeable {
     }
 
     private void detectLeaks() {
-        if (oldRetiredGenerations().isEmpty()) {
-            // nothing older than the tolerance is reachable even before a collection: there is nothing to collect for
+        if (oldRetiredGenerations().isEmpty() || !leakCheckPending.compareAndSet(false, true)) {
+            // nothing older than the tolerance is reachable even before a collection, or a check pending covers this reload
             return;
         }
         Thread thread = new Thread(() -> {
@@ -955,6 +1015,8 @@ public final class DevRuntime implements Closeable {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
+            } finally {
+                leakCheckPending.set(false);
             }
             // only a collection tells a retired generation the collector has yet to reach from one the application keeps;
             // it runs on this thread, a moment after the reload, and only while an old generation is still reachable
@@ -987,7 +1049,7 @@ public final class DevRuntime implements Closeable {
      * How the application's main is run, on the thread the runtime provides.
      */
     @FunctionalInterface
-    public interface ApplicationLauncher {
+    interface ApplicationLauncher {
         /**
          * Runs the application. Returns when main returns, which for a server is when the context stops.
          *
