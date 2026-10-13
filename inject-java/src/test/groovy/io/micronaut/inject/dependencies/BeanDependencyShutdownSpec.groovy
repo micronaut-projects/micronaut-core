@@ -191,6 +191,34 @@ class Holder { static BeanDependencyGroup group; }
         thrown(IllegalStateException)
     }
 
+    void "what a singleton first created during shutdown resolves through its resolver is destroyed after it"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+@Singleton class Late {
+    final BeanDependencyResolver resolver;
+    Late(BeanDependencyResolver resolver) { this.resolver = resolver; }
+    @PostConstruct void init() { resolver.getBean(Resource.class); }
+    @PreDestroy void close() { Log.EVENTS.add("late"); }
+}
+@Singleton class Owner {
+    final BeanContext context;
+    Owner(BeanContext context) { this.context = context; }
+    @PreDestroy void close() {
+        context.getBean(Late.class);
+        Log.EVENTS.add("owner");
+    }
+}
+''')
+        ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+        def log = ctx.classLoader.loadClass('test.Log')
+
+        when:
+        ctx.close()
+
+        then:
+        log.EVENTS == ['owner', 'late', 'resource1']
+    }
+
     void "a per-target interceptor first needed during shutdown is destroyed with its target"() {
         given:
         def ctx = buildContext(HEADER + '''

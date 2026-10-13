@@ -22,6 +22,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.async.propagation.ReactorPropagation;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
@@ -37,6 +39,7 @@ import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
 import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
+import io.micronaut.http.client.AsyncLoadBalancer;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
@@ -85,6 +88,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
@@ -476,6 +480,14 @@ abstract class AbstractJdkHttpClient {
         }
     }
 
+    private static CompletableFuture<@Nullable ServiceInstance> select(AsyncLoadBalancer asyncBalancer, LoadBalancer balancer, @Nullable Object discriminator) {
+        // a mock load balancer returns no stage
+        return CompletionStagePublishers.orElse(
+            asyncBalancer.selectAsync(discriminator),
+            () -> CompletionStagePublishers.first(balancer.select(discriminator), null)
+        ).toCompletableFuture();
+    }
+
     /**
      * @param request The request object
      * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to {@link io.micronaut.http.HttpRequest})
@@ -491,7 +503,27 @@ abstract class AbstractJdkHttpClient {
         }
 
         LoadBalancer balancer = loadBalancer;
-        return Mono.from(loadBalancer.select(getLoadBalancerDiscriminator(request))).map(server -> {
+        Mono<ServiceInstance> selected;
+        if (balancer instanceof AsyncLoadBalancer asyncBalancer) {
+            // a selection that is not complete yet is cancelled with the subscription, if the
+            // framework created it. The selection is made in the propagated context of the
+            // subscriber, so that a discovery client with publishers finds it in its Reactor
+            // context, as it did when its publisher was part of this chain
+            selected = Mono.deferContextual(contextView -> {
+                Object discriminator = getLoadBalancerDiscriminator(request);
+                PropagatedContext propagatedContext = ReactorPropagation.findPropagatedContext(contextView).orElse(null);
+                CompletableFuture<@Nullable ServiceInstance> selection;
+                if (propagatedContext == null || propagatedContext.isBound()) {
+                    selection = select(asyncBalancer, balancer, discriminator);
+                } else {
+                    selection = propagatedContext.propagate(() -> select(asyncBalancer, balancer, discriminator));
+                }
+                return Mono.fromFuture(selection, true).doOnCancel(() -> CompletionStagePublishers.cancel(selection));
+            });
+        } else {
+            selected = Mono.from(balancer.select(getLoadBalancerDiscriminator(request)));
+        }
+        return selected.map(server -> {
                 LoadBalancerSelection selection = new LoadBalancerSelection(balancer, server);
                 Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
                 if (request instanceof MutableHttpRequest<?> mutableRequest && authInfo.isPresent()) {

@@ -49,4 +49,11 @@ graalpy:
       - org.reactivestreams
 ----
 
+An entry matches by name:
+
+* a package, such as `com.example` (a trailing `.` is optional), matches its classes and its subpackages' classes, but not `com.examples`;
+* a class, such as `org.slf4j.Logger`, matches that class and its nested classes (`org.slf4j.Logger$Inner`);
+* primitive types are always visible, so primitive arrays such as `java.type("byte[]")` work without an entry, for example as a body type for `client.exchange(request, java.type("byte[]"))`;
+* an array matches when its element type does: `com.example.Foo[]` and `com.example.Foo[][]` are visible when `com.example.Foo` is. The JVM descriptor form, such as `[B` or `[Lcom.example.Foo;`, matches the same way. Listing an array name such as `byte[]` is not needed.
+
 A lookup outside the configured packages raises a Python `KeyError` for `java.type` or an `ImportError` for an import. Leave the setting unset to keep the default, unrestricted lookup.
