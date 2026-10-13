@@ -122,6 +122,11 @@ final class JsonPieceReader<T> implements PieceReader<T> {
     }
 
     @Override
+    public boolean isEmpty() {
+        return values.isEmpty();
+    }
+
+    @Override
     public void close() {
         if (closed) {
             return;
