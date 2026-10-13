@@ -28,6 +28,7 @@ import org.reactivestreams.Subscription;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 /**
@@ -51,9 +52,9 @@ final class PublisherPieceReader<T> implements PieceReader<T>, Subscriber<T> {
     private @Nullable Subscription output;
     private boolean requested;
     private boolean ended;
-    private volatile @Nullable Throwable failure;
+    private final AtomicReference<@Nullable Throwable> failure = new AtomicReference<>();
     // the thread in a call of the reader: a signal of the chunked reader on any other thread is asynchronous
-    private volatile @Nullable Thread caller;
+    private final AtomicReference<@Nullable Thread> caller = new AtomicReference<>();
     private boolean closed;
 
     /**
@@ -62,11 +63,11 @@ final class PublisherPieceReader<T> implements PieceReader<T>, Subscriber<T> {
      */
     PublisherPieceReader(String readerName, Function<Publisher<ByteBuffer<?>>, Publisher<? extends T>> chunked) {
         this.readerName = readerName;
-        caller = Thread.currentThread();
+        caller.set(Thread.currentThread());
         try {
             chunked.apply(input).subscribe(this);
         } finally {
-            caller = null;
+            caller.set(null);
         }
     }
 
@@ -80,11 +81,11 @@ final class PublisherPieceReader<T> implements PieceReader<T>, Subscriber<T> {
         try (piece) {
             buffer = piece.toByteBuffer();
         }
-        caller = Thread.currentThread();
+        caller.set(Thread.currentThread());
         try {
             input.offer(buffer);
         } finally {
-            caller = null;
+            caller.set(null);
         }
         rethrow();
     }
@@ -94,11 +95,11 @@ final class PublisherPieceReader<T> implements PieceReader<T>, Subscriber<T> {
         if (closed) {
             return;
         }
-        caller = Thread.currentThread();
+        caller.set(Thread.currentThread());
         try {
             input.complete();
         } finally {
-            caller = null;
+            caller.set(null);
         }
         rethrow();
     }
@@ -116,11 +117,11 @@ final class PublisherPieceReader<T> implements PieceReader<T>, Subscriber<T> {
         Subscription s = output;
         if (!requested && s != null) {
             requested = true;
-            caller = Thread.currentThread();
+            caller.set(Thread.currentThread());
             try {
                 s.request(1);
             } finally {
-                caller = null;
+                caller.set(null);
             }
             element = elements.poll();
             if (element != null) {
@@ -138,7 +139,7 @@ final class PublisherPieceReader<T> implements PieceReader<T>, Subscriber<T> {
     @Override
     public boolean isEmpty() {
         // the reactive reader ended without a failure: polling requests no other element
-        return elements.isEmpty() && failure == null && (ended || closed);
+        return elements.isEmpty() && failure.get() == null && (ended || closed);
     }
 
     @Override
@@ -181,7 +182,7 @@ final class PublisherPieceReader<T> implements PieceReader<T>, Subscriber<T> {
     @Override
     public void onError(Throwable t) {
         if (checkSynchronous()) {
-            failure = t;
+            failure.set(t);
         }
     }
 
@@ -200,18 +201,16 @@ final class PublisherPieceReader<T> implements PieceReader<T>, Subscriber<T> {
      * @return Whether the signal is synchronous
      */
     private boolean checkSynchronous() {
-        if (caller == Thread.currentThread()) {
+        if (caller.get() == Thread.currentThread()) {
             return true;
         }
-        if (failure == null) {
-            failure = new IllegalStateException("The chunked reader " + readerName
-                + " emitted outside of a read: a reader that emits asynchronously must implement openPieceReader");
-        }
+        failure.compareAndSet(null, new IllegalStateException("The chunked reader " + readerName
+            + " emitted outside of a read: a reader that emits asynchronously must implement openPieceReader"));
         return false;
     }
 
     private void rethrow() throws IOException {
-        Throwable f = failure;
+        Throwable f = failure.get();
         if (f == null) {
             return;
         }
