@@ -52,7 +52,8 @@ public class DefaultFileWatcher implements FileWatcher, Closeable {
 
     private final BeanProvider<WatchService> watchServices;
     private final @Nullable FileWatchConfiguration configuration;
-    private @Nullable DirectoryWatcher watcher;
+    // written under the lock, read without it by isWatching
+    private volatile @Nullable DirectoryWatcher watcher;
     private boolean closed;
 
     /**
@@ -72,16 +73,16 @@ public class DefaultFileWatcher implements FileWatcher, Closeable {
 
     @Override
     public boolean isWatching(Path path) {
-        DirectoryWatcher current;
-        synchronized (this) {
-            current = watcher;
-        }
+        DirectoryWatcher current = watcher;
         return current != null && current.isWatching(path);
     }
 
     /**
      * Configures the watcher before it is built. A subclass for a platform's watch service sets the registrar the
      * service needs, and whether it may be closed.
+     *
+     * <p>Internal extension point, like the class: it exists for {@code MacOsFileWatcher} in
+     * {@code micronaut-runtime-osx}, which replaces this bean, and is not supported for other subclasses.</p>
      *
      * @param builder The builder over the context's watch service
      * @param watchService The context's watch service

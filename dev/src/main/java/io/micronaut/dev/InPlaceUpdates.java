@@ -28,6 +28,7 @@ import io.micronaut.dev.change.ClassStructure;
 import io.micronaut.dev.change.OutputSnapshot;
 import io.micronaut.dev.loader.GenerationClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
+import io.micronaut.dev.manifest.DevReloadStrategy;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +43,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -97,13 +99,14 @@ final class InPlaceUpdates {
      * @return Whether the change was applied this way
      */
     boolean redefine(@Nullable Instrumentation agent, @Nullable ApplicationContext current, ChangeSet changeSet, long startNanos) {
-        if (agent == null || runtime.strategy() == ReloadStrategy.RESTART || changeSet.classes().isEmpty()
+        if (agent == null || runtime.strategy() == DevReloadStrategy.RESTART || changeSet.classes().isEmpty()
             || !changeSet.changedResources().isEmpty() || !changeSet.removedResources().isEmpty()) {
             return false;
         }
         DevManifest manifest = runtime.manifest();
         GenerationClassLoader generation = runtime.classLoader().current();
         List<ClassDefinition> definitions = new ArrayList<>();
+        Map<String, byte[]> originals = new LinkedHashMap<>();
         Map<String, byte[]> replacements = new LinkedHashMap<>();
         for (ClassChange change : changeSet.classes()) {
             String name = change.className();
@@ -117,13 +120,15 @@ final class InPlaceUpdates {
             if (before == null || after == null || !ClassStructure.bodyOnlyChange(before, after)) {
                 return false;
             }
+            originals.put(name, before);
             replacements.put(name, after);
         }
+        ClassFileReplacement snapshotChange = new ClassFileReplacement(generation);
         try {
             // the snapshot first: a class a thread loads from now on is the new version, and one loaded before is
             // found below and redefined; nothing can load the old version in between
             for (Map.Entry<String, byte[]> entry : replacements.entrySet()) {
-                generation.replaceClassFile(entry.getKey(), entry.getValue());
+                snapshotChange.replace(entry.getKey(), Objects.requireNonNull(originals.get(entry.getKey())), entry.getValue());
             }
             for (Map.Entry<String, byte[]> entry : replacements.entrySet()) {
                 Class<?> loaded = generation.loadedClass(entry.getKey());
@@ -135,8 +140,9 @@ final class InPlaceUpdates {
                 agent.redefineClasses(definitions.toArray(new ClassDefinition[0]));
             }
         } catch (Exception | LinkageError e) {
-            // the snapshot may already hold the new bytes: the restart that follows builds a new generation anyway
-            LOG.info("Cannot redefine {} class(es) in place ({}): restarting instead", replacements.size(), e.getMessage());
+            // the snapshot gets back the class files it held; the restart that follows applies the whole change
+            snapshotChange.rollBack();
+            LOG.info("Cannot redefine {} class(es) in place: restarting instead", replacements.size(), e);
             return false;
         }
         redefinitions.incrementAndGet();
