@@ -202,23 +202,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 return;
             }
 
-            // the WebSocket routes of the route builder that accept the port and the conditions of
-            // the request, e.g. their where predicates, the most specific first
-            List<UriRouteMatch<Object, Object>> functionalRoutes = router.<Object, Object>findAny(msg.getPath(), msg)
-                .filter(rm -> rm.getHttpMethod() == HttpMethod.GET && isFunctionalWebSocketRoute(rm))
-                .toList();
-            // the closest route, then the first of the lowest order, like the route of any other request
-            Optional<UriRouteMatch<Object, Object>> optionalRoute = functionalRoutes.isEmpty()
-                ? Optional.empty()
-                : DefaultRouter.resolveAmbiguity(msg, functionalRoutes).stream()
-                    .min(Comparator.comparingInt(rm -> rm.getRouteInfo().getOrder()));
-            if (optionalRoute.isEmpty()) {
-                // a @ServerWebSocket bean: the first route whose template matches, as before
-                optionalRoute = router.find(HttpMethod.GET, msg.getPath(), msg)
-                    .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
-                    .filter(rm -> !isFunctionalWebSocketRoute(rm))
-                    .findFirst();
-            }
+            Optional<UriRouteMatch<Object, Object>> optionalRoute = findWebSocketRoute(msg);
 
             WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, optionalRoute.orElse(null));
             ExecutionFlow<HttpResponse<?>> responseFlow = ExecutionFlow.async(
@@ -363,19 +347,10 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         int maxFramePayloadLength = webSocketBean.messageMethod()
                 .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
                 .orElse(65536)).orElse(65536);
-        String subprotocols;
-        if (webSocketBean instanceof WebSocketRouteEndpoint) {
-            List<String> supported = webSocketBean.getSubprotocols();
-            subprotocols = supported.isEmpty() ? null : String.join(",", supported);
-        } else {
-            subprotocols = webSocketBean.getBeanDefinition().stringValue(ServerWebSocket.class, "subprotocols")
-                .filter(s -> !StringUtils.isEmpty(s))
-                .orElse(null);
-        }
         WebSocketServerHandshakerFactory wsFactory =
                 new WebSocketServerHandshakerFactory(
                         getWebSocketURL(ctx, req),
-                        subprotocols,
+                        findSubprotocols(webSocketBean),
                         true,
                         maxFramePayloadLength
                 );
@@ -412,21 +387,59 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     }
 
     /**
-     * Obtains the web socket URL.
+     * Find the WebSocket route of an upgrade request. A WebSocket route of the route builder is
+     * preferred: of the ones that accept the port and the conditions of the request, e.g. their
+     * where predicates, the closest route, then the first of the lowest order, like the route of
+     * any other request. Otherwise, the first route of a {@code @ServerWebSocket} bean whose
+     * template matches.
      *
-     * @param ctx The context
-     * @param req The request
-     * @return The socket URL
+     * @param request The upgrade request
+     * @return The WebSocket route, if any
      */
+    private Optional<UriRouteMatch<Object, Object>> findWebSocketRoute(NettyHttpRequest<?> request) {
+        List<UriRouteMatch<Object, Object>> functionalRoutes = router.<Object, Object>findAny(request.getPath(), request)
+            .filter(rm -> rm.getHttpMethod() == HttpMethod.GET && isFunctionalWebSocketRoute(rm))
+            .toList();
+        if (!functionalRoutes.isEmpty()) {
+            return DefaultRouter.resolveAmbiguity(request, functionalRoutes).stream()
+                .min(Comparator.comparingInt(rm -> rm.getRouteInfo().getOrder()));
+        }
+        return router.<Object, Object>find(HttpMethod.GET, request.getPath(), request)
+            .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
+            .filter(rm -> !isFunctionalWebSocketRoute(rm))
+            .findFirst();
+    }
+
+    /**
+     * @param webSocketBean The WebSocket bean
+     * @return The subprotocols the WebSocket supports, comma separated, or {@code null} if none
+     */
+    private static @Nullable String findSubprotocols(WebSocketBean<?> webSocketBean) {
+        if (webSocketBean instanceof WebSocketRouteEndpoint) {
+            List<String> supported = webSocketBean.getSubprotocols();
+            return supported.isEmpty() ? null : String.join(",", supported);
+        }
+        return webSocketBean.getBeanDefinition().stringValue(ServerWebSocket.class, "subprotocols")
+            .filter(s -> !StringUtils.isEmpty(s))
+            .orElse(null);
+    }
+
     /**
      * @param routeMatch A route match
      * @return Whether it is a WebSocket route of the route builder, rather than of a
      * {@code @ServerWebSocket} bean
      */
     private static boolean isFunctionalWebSocketRoute(RouteMatch<?> routeMatch) {
-        return routeMatch.getRouteInfo().getAttribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, WebSocketRouteEndpoint.class).isPresent();
+        return routeMatch.getRouteInfo().getAttributes().get(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE) instanceof WebSocketRouteEndpoint;
     }
 
+    /**
+     * Obtains the web socket URL.
+     *
+     * @param ctx The context
+     * @param req The request
+     * @return The socket URL
+     */
     private String getWebSocketURL(ChannelHandlerContext ctx, HttpRequest req) {
         boolean isSecure = ctx.pipeline().get(SslHandler.class) != null;
         return (isSecure ? SCHEME_SECURE_WEBSOCKET : SCHEME_WEBSOCKET) + req.getHeaders().get(HttpHeaderNames.HOST) + req.getUri();
