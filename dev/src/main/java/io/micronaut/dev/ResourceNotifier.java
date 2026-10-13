@@ -27,6 +27,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -159,6 +160,12 @@ final class ResourceNotifier {
         if (origins.contains(absolute.toString()) || origins.contains(FILE_PREFIX + absolute)) {
             return true;
         }
+        for (String origin : origins) {
+            // micronaut.config.files may name a file relative to the working directory, as the environment reads it
+            if (origin.startsWith(FILE_PREFIX) && isFile(origin.substring(FILE_PREFIX.length()), absolute)) {
+                return true;
+            }
+        }
         for (Path root : roots) {
             Path normalizedRoot = root.toAbsolutePath().normalize();
             if (!absolute.startsWith(normalizedRoot) || absolute.equals(normalizedRoot)) {
@@ -176,6 +183,14 @@ final class ResourceNotifier {
             }
         }
         return false;
+    }
+
+    private static boolean isFile(String location, Path absolute) {
+        try {
+            return Path.of(location).toAbsolutePath().normalize().equals(absolute);
+        } catch (InvalidPathException e) {
+            return false;
+        }
     }
 
     private static Set<String> origins(@Nullable ApplicationContext current) {
