@@ -120,6 +120,11 @@ public final class BodyPieces implements PieceReader<ByteBuffer<?>> {
     }
 
     @Override
+    public boolean isEmpty() {
+        return pieces.isEmpty();
+    }
+
+    @Override
     public void close() {
         pieces.clear();
     }
