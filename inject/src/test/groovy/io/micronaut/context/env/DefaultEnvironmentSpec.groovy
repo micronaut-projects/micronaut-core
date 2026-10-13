@@ -160,11 +160,15 @@ class DefaultEnvironmentSpec extends Specification {
 
         cleanup:
         applicationContext?.close()
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
+        System.clearProperty(Environment.ENVIRONMENTS_PROPERTY)
+        // the file is still there when the test fails before it deletes it
+        if (tempConfigFile) {
+            Files.deleteIfExists(tempConfigFile)
+        }
         if (tempConfigDir) {
             Files.deleteIfExists(tempConfigDir)
         }
-        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
-        System.clearProperty(Environment.ENVIRONMENTS_PROPERTY)
     }
 
     void "test environment system property refresh"() {
