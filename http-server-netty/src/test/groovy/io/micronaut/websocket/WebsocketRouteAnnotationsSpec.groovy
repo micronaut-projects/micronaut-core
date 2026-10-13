@@ -10,6 +10,7 @@ import io.micronaut.http.annotation.ServerFilter
 import io.micronaut.http.server.annotation.PreMatching
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import io.micronaut.web.router.Router
 import io.micronaut.websocket.annotation.ClientWebSocket
 import io.micronaut.websocket.annotation.OnMessage
 import io.micronaut.websocket.annotation.OnOpen
@@ -36,6 +37,9 @@ class WebsocketRouteAnnotationsSpec extends Specification {
 
     @Inject
     GuardFilter guardFilter
+
+    @Inject
+    Router router
 
     void "the route condition of the @OnMessage method applies to the upgrade request"() {
         given:
@@ -93,6 +97,19 @@ class WebsocketRouteAnnotationsSpec extends Specification {
         socket?.close()
     }
 
+    void "where both methods declare an annotation the one of the @OnOpen method applies"() {
+        when: 'a non-repeatable annotation, like @Secured, differs between the methods'
+        def route = router.uriRoutes()
+            .filter(r -> r.uriMatchTemplate.toString() == "/route-annotations/access")
+            .findFirst()
+            .orElseThrow()
+
+        then:
+        route.annotationMetadata.stringValue(Access.name).get() == "open"
+        route.annotationMetadata.hasAnnotation(OnOpen)
+        route.annotationMetadata.hasAnnotation(OnMessage)
+    }
+
     void "a pre-matching filter rewrites the path the route of a WebSocket is matched with"() {
         given:
         WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURL())
@@ -123,6 +140,22 @@ class WebsocketRouteAnnotationsSpec extends Specification {
         @OnMessage
         @Guarded
         @RouteCondition("#{request.headers.getFirst('X-Message').orElse(null) == 'yes'}")
+        void onMessage(String message, WebSocketSession session) {
+            session.sendSync("echo " + message)
+        }
+    }
+
+    @Requires(property = "spec.name", value = "WebsocketRouteAnnotationsSpec")
+    @ServerWebSocket("/route-annotations/access")
+    static class AccessWebSocket {
+        @OnOpen
+        @Access("open")
+        void onOpen(WebSocketSession session) {
+            session.sendSync("open")
+        }
+
+        @OnMessage
+        @Access("message")
         void onMessage(String message, WebSocketSession session) {
             session.sendSync("echo " + message)
         }
@@ -180,4 +213,8 @@ class WebsocketRouteAnnotationsSpec extends Specification {
 
 @FilterMatcher
 @interface Guarded {
+}
+
+@interface Access {
+    String value()
 }

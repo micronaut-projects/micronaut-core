@@ -19,9 +19,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpRequestWrapper;
 
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /**
  * The condition of the route of a WebSocket: a WebSocket upgrade request, whose
@@ -38,22 +38,48 @@ public enum WebSocketUpgradeCondition implements Predicate<HttpRequest<?>> {
 
     private static final String UPGRADE = "upgrade";
     private static final String WEBSOCKET = "websocket";
+    private static final String ASSUME_UPGRADE = WebSocketUpgradeCondition.class.getName() + ".ASSUME_UPGRADE";
+
+    /**
+     * Whether a route of a WebSocket was registered. It is only ever set: with it set, a lookup
+     * for the WebSocket at the path of a plain request is merely not skipped.
+     */
+    private static volatile boolean registered;
 
     @Override
     public boolean test(HttpRequest<?> request) {
-        return request instanceof AssumedUpgradeRequest<?> || isWebSocketUpgrade(request);
+        return isWebSocketUpgrade(request) || request.getAttribute(ASSUME_UPGRADE).isPresent();
     }
 
     /**
-     * A view of a request that meets this condition and otherwise has the conditions of the
-     * routes apply to it as to the request, to find the WebSocket a plain request is for.
+     * Mark that a route of a WebSocket is registered with this condition.
+     */
+    static void registered() {
+        registered = true;
+    }
+
+    /**
+     * Run a lookup of the routes of a request, which meets this condition during the lookup and
+     * otherwise has the conditions of the routes apply to it as they are, to also find the
+     * WebSocket a plain request is for. The request is marked with an attribute for the lookup,
+     * so that conditions that read the request of the context see the same request.
      *
      * @param request The request
-     * @param <B>     The body type
-     * @return The view of the request
+     * @param lookup  The lookup
+     * @param <T>     The result type
+     * @return The result of the lookup
      */
-    public static <B> HttpRequest<B> assumeUpgrade(HttpRequest<B> request) {
-        return new AssumedUpgradeRequest<>(request);
+    public static <T> T assumingUpgrade(HttpRequest<?> request, Supplier<T> lookup) {
+        if (!registered) {
+            // no WebSocket can match: the lookup finds the same routes
+            return lookup.get();
+        }
+        request.setAttribute(ASSUME_UPGRADE, Boolean.TRUE);
+        try {
+            return lookup.get();
+        } finally {
+            request.removeAttribute(ASSUME_UPGRADE, Boolean.class);
+        }
     }
 
     /**
@@ -80,11 +106,5 @@ public enum WebSocketUpgradeCondition implements Predicate<HttpRequest<?>> {
     @Override
     public String toString() {
         return "WebSocket upgrade request";
-    }
-
-    private static final class AssumedUpgradeRequest<B> extends HttpRequestWrapper<B> {
-        AssumedUpgradeRequest(HttpRequest<B> delegate) {
-            super(delegate);
-        }
     }
 }

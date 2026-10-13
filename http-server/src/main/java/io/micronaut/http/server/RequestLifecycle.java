@@ -618,8 +618,9 @@ public class RequestLifecycle {
 
         // if there is no route present try to locate a route that matches a different HTTP method.
         // The route of a WebSocket only matches an upgrade request, see ServerWebSocketProcessor:
-        // the request is viewed as one, so that the same lookup finds the WebSocket at its path
-        final List<UriRouteMatch<Object, Object>> anyMatchingRoutes = routeExecutor.router.findAny(WebSocketUpgradeCondition.assumeUpgrade(httpRequest));
+        // the request is taken as one during the lookup, so that it also finds the WebSocket at its path
+        final List<UriRouteMatch<Object, Object>> anyMatchingRoutes = WebSocketUpgradeCondition.assumingUpgrade(httpRequest,
+            () -> routeExecutor.router.findAny(httpRequest));
         final Collection<MediaType> acceptedTypes = httpRequest.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(acceptedTypes);
 
