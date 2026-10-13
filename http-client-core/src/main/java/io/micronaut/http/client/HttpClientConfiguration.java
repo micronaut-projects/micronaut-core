@@ -313,7 +313,10 @@ public abstract class HttpClientConfiguration {
             this.connectTimeout = copy.connectTimeout;
             this.connectTtl = copy.connectTtl;
             this.bufferErrorBodyForStreaming = copy.bufferErrorBodyForStreaming;
-            this.jdk = new JdkConfiguration(copy.jdk);
+            if (copy.jdk != null) {
+                // a mock or partially built source has none: the defaults stay
+                this.jdk = new JdkConfiguration(copy.jdk);
+            }
             this.defaultCharset = copy.defaultCharset;
             this.exceptionOnErrorStatus = copy.exceptionOnErrorStatus;
             this.decompressionEnabled = copy.decompressionEnabled;

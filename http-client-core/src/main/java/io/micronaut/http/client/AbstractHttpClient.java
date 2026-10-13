@@ -1001,7 +1001,9 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     public HttpClientException handleResponseError(HttpRequest<?> finalRequest, @Nullable ServiceInstance instance, Throwable cause) {
         String message = cause.getMessage();
         if (message == null) {
-            message = cause.getClass().getName();
+            // the simple name of the class, as the Netty client named it
+            String className = cause.getClass().getName();
+            message = className.substring(Math.max(className.lastIndexOf('.'), className.lastIndexOf('$')) + 1);
         }
         if (log.isTraceEnabled()) {
             log.trace("HTTP Client exception ({}) occurred for request : {} {}",
