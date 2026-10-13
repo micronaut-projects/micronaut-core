@@ -29,8 +29,15 @@ public interface ReloadableBeanIntrospector extends BeanIntrospector {
 
     /**
      * Forgets the indexed introspections of the given class loader, and of every loader that delegates to it, so that
-     * the next lookup through them scans the classpath again. The cached service entries of every loader are
-     * forgotten too.
+     * the next lookup through them scans the classpath again.
+     *
+     * <p>The scan reads the {@code META-INF/micronaut} service entries, which
+     * {@link io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils} caches for the whole process: a caller whose
+     * loader changed what it lists clears that cache first, with
+     * {@link io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils#invalidate()}, which this method leaves alone.</p>
+     *
+     * <p>The index of a loader other than the introspector's own is held softly, and it strongly refers to that loader:
+     * a launcher has to invalidate every loader it retires, or the index keeps the loader until the memory runs short.</p>
      *
      * @param changed The class loader whose visible classes changed, such as a development launcher's delegating
      * loader after it swapped the generation it delegates to, or a retired generation
