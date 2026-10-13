@@ -280,12 +280,19 @@ class ReactiveStreamOperatorsTest {
     @Controller("/stream-operators")
     static class StreamController {
         private static <T> Publisher<T> body(String id, boolean fail, Function<Long, T> map) {
-            Flux<Long> ticks = Flux.interval(Duration.ofMillis(20));
+            // delayElements honours the demand: an interval fails with an overflow when the
+            // server writes slower than it ticks
+            Flux<Long> ticks = Flux.range(0, fail ? 2 : 20).map(Integer::longValue).delayElements(Duration.ofMillis(20));
             Flux<Long> source = fail
-                ? ticks.take(2).concatWith(Mono.error(new IllegalStateException("failed in the middle")))
-                : ticks.take(20);
+                ? ticks.concatWith(Mono.error(new IllegalStateException("failed in the middle")))
+                : ticks;
+            // the signals are recorded before they go downstream: doFinally runs after onError
+            // went down, and a server that cancels while it handles the error would win the race
+            CompletableFuture<String> signal = SERVER_SIGNALS.get(id);
             return source.map(map)
-                .doFinally(signal -> SERVER_SIGNALS.get(id).complete(signal.toString().replace("on", "").toLowerCase()));
+                .doOnComplete(() -> signal.complete("complete"))
+                .doOnError(e -> signal.complete("error"))
+                .doOnCancel(() -> signal.complete("cancel"));
         }
 
         @Get(uri = "/data", produces = MediaType.APPLICATION_OCTET_STREAM)
