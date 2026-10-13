@@ -479,6 +479,11 @@ public final class AnnotationMetadataSupport {
     static void registerDefaultValues(String annotation, Map<CharSequence, Object> defaultValues) {
         if (StringUtils.isNotEmpty(annotation) && CollectionUtils.isNotEmpty(defaultValues)) {
             ANNOTATION_DEFAULTS.put(annotation, defaultValues);
+            // checked after the insertion, as for a type: defaults a thread of a retired generation registers after
+            // retireClassLoader swept them are removed again, unless another generation replaced them meanwhile
+            if (loadersRetired && refersToRetired(defaultValues)) {
+                ANNOTATION_DEFAULTS.remove(annotation, defaultValues);
+            }
         }
     }
 
@@ -547,7 +552,7 @@ public final class AnnotationMetadataSupport {
      * retires loaders, and it has to retire every generation it replaces: the registry holds the types of a loader
      * that is not retired for as long as the JVM runs, as it does outside development mode. The repeatable containers
      * are held by name only and keep no loader. The sweep is done here: outside development mode registering and looking
-     * up only read one volatile flag, when a type or a proxy factory is cached.</p>
+     * up only read one volatile flag, when a type, default values or a proxy factory are cached.</p>
      *
      * @param retired The class loader whose classes are no longer used
      * @since 5.3.0

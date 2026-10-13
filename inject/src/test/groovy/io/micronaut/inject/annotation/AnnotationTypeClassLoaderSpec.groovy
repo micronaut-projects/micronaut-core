@@ -219,6 +219,30 @@ class AnnotationTypeClassLoaderSpec extends Specification {
         AnnotationMetadataSupport.ANNOTATION_DEFAULTS.remove("example.Plain")
     }
 
+    void "defaults a retired generation registers after it was retired are not kept, and a live generation's are"() {
+        given:
+        def retired = new OwnCopy(Removed.classLoader)
+        def retiredCopy = retired.define(Removed.name)
+        def live = new OwnCopy(Removed.classLoader)
+        def liveCopy = live.define(Removed.name)
+        AnnotationMetadataSupport.retireClassLoader(retired)
+
+        when: "a straggling thread of the retired generation registers defaults referring to its classes"
+        AnnotationMetadataSupport.registerDefaultValues("example.Straggler", [value: new AnnotationClassValue<>(retiredCopy)])
+
+        then:
+        !AnnotationMetadataSupport.hasDefaultValues("example.Straggler")
+
+        when: "a live generation registers its own"
+        AnnotationMetadataSupport.registerDefaultValues("example.Straggler", [value: new AnnotationClassValue<>(liveCopy)])
+
+        then:
+        AnnotationMetadataSupport.getDefaultValues("example.Straggler").value.type.get().is(liveCopy)
+
+        cleanup:
+        AnnotationMetadataSupport.retireClassLoader(live)
+    }
+
     void "a retired loader whose annotation is never registered again can be collected"() {
         when:
         WeakReference<ClassLoader> retired = registerAndRetire()
