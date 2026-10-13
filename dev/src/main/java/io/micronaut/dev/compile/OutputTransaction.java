@@ -27,9 +27,11 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -61,7 +63,30 @@ final class OutputTransaction {
      */
     OutputTransaction(Path backup) throws IOException {
         this.backup = backup;
+        keepUnrestored(backup);
         deleteRecursively(backup);
+    }
+
+    /**
+     * Moves aside a backup directory that still holds files: a rollback that could not restore them,
+     * or a process that ended during a transaction, left them there, and they may be the only copy of
+     * an output.
+     */
+    private static void keepUnrestored(Path backup) throws IOException {
+        if (!Files.isDirectory(backup)) {
+            return;
+        }
+        try (Stream<Path> files = Files.walk(backup)) {
+            if (files.noneMatch(Files::isRegularFile)) {
+                return;
+            }
+        }
+        Path kept = backup.resolveSibling(backup.getFileName() + ".unrestored-" + System.currentTimeMillis());
+        for (int i = 1; Files.exists(kept); i++) {
+            kept = backup.resolveSibling(backup.getFileName() + ".unrestored-" + System.currentTimeMillis() + "-" + i);
+        }
+        Files.move(backup, kept);
+        LOG.warn("Outputs a rolled back compilation could not restore are kept in {}", kept);
     }
 
     /**
@@ -149,9 +174,31 @@ final class OutputTransaction {
     }
 
     /**
-     * Undoes every move, latest first, as far as the file system allows.
+     * Undoes every move after a failure, latest first, as far as the file system allows.
+     *
+     * @param cause The failure the transaction is rolled back for, added to a failure to roll back
+     * @throws IOException if a file could not be restored; see {@link #rollback()}
      */
-    void rollback() {
+    void rollback(Exception cause) throws IOException {
+        try {
+            rollback();
+        } catch (IOException e) {
+            e.addSuppressed(cause);
+            throw e;
+        }
+    }
+
+    /**
+     * Undoes every move, latest first, as far as the file system allows. The backup directory is
+     * deleted only once every move was undone: a move that cannot be undone stays in the transaction,
+     * and a removed file it parked stays in the backup directory, which the next transaction over it
+     * keeps aside rather than empties.
+     *
+     * @throws IOException if a file could not be restored, with the failure of each move as suppressed
+     */
+    void rollback() throws IOException {
+        Deque<Move> unrestored = new ArrayDeque<>();
+        List<IOException> failures = new ArrayList<>();
         while (!moves.isEmpty()) {
             Move move = moves.pop();
             try {
@@ -162,7 +209,18 @@ final class OutputTransaction {
                 Files.move(move.to(), move.from(), StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException e) {
                 LOG.warn("Cannot restore {} from {} while rolling back a compilation: {}", move.from(), move.to(), e.getMessage());
+                unrestored.addLast(move);
+                failures.add(e);
             }
+        }
+        if (!unrestored.isEmpty()) {
+            // latest first again, so that a later rollback retries them in the same order
+            moves.addAll(unrestored);
+            Move first = unrestored.getFirst();
+            IOException failure = new IOException("Cannot roll back the outputs: " + unrestored.size() + " move(s) cannot be undone, "
+                + first.from() + " from " + first.to() + " among them; the replaced outputs not restored are kept in " + backup);
+            failures.forEach(failure::addSuppressed);
+            throw failure;
         }
         removed.clear();
         try {

@@ -193,7 +193,7 @@ public final class JavacSourceCompiler implements SourceCompiler {
                 }
                 transaction.commit();
             } catch (IOException | UncheckedIOException e) {
-                transaction.rollback();
+                transaction.rollback(e);
                 throw e;
             }
             Set<Path> removed = new LinkedHashSet<>(transaction.removed());
@@ -230,7 +230,7 @@ public final class JavacSourceCompiler implements SourceCompiler {
             transaction.put(stagedMapping, SourceIndex.mappingFile(classOutput));
             transaction.commit();
         } catch (IOException | UncheckedIOException e) {
-            transaction.rollback();
+            transaction.rollback(e);
             throw e;
         }
         Set<Path> removed = new LinkedHashSet<>(transaction.removed());
