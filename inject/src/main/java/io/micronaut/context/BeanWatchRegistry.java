@@ -34,6 +34,7 @@ import io.micronaut.context.watch.ReloadingConfigurationWatcher;
 import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.context.watch.ResourceSelector;
 import io.micronaut.context.watch.ResourceWatcher;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
@@ -47,12 +48,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
+import java.lang.ref.Reference;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Deque;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -73,8 +78,10 @@ import java.util.stream.Stream;
  * <p>A watch registered before the context has read its definitions receives its startup batch when
  * the context initializes; one registered later receives it at once, so a watcher never needs a
  * separate startup path. A watch registered while a bean is being created belongs to that bean and is
- * closed when the bean is destroyed. Watchers run in {@link OrderUtil} order and a failing one does
- * not stop the others.</p>
+ * closed when the bean is destroyed. The registry holds the bean weakly: one that is collected without having been
+ * destroyed, as a prototype may be, has its watches closed then. It holds the watcher strongly until the watch is
+ * closed, so a watcher that references its bean keeps the bean reachable until then. Watchers run in
+ * {@link OrderUtil} order and a failing one does not stop the others.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -101,8 +108,23 @@ final class BeanWatchRegistry {
 
     private final DefaultBeanContext context;
     private final List<Registration> registrations = new CopyOnWriteArrayList<>();
-    private final ThreadLocal<Deque<Owner>> creating = ThreadLocal.withInitial(ArrayDeque::new);
-    private final Map<Object, List<Registration>> ownedByBean = new IdentityHashMap<>();
+    /**
+     * The creations in progress on each thread, innermost last. Kept for the thread once made, so that a creation
+     * allocates nothing: an {@link Owner} is made only when a watch is registered during it.
+     */
+    private final ThreadLocal<CreationStack> creating = ThreadLocal.withInitial(CreationStack::new);
+    /**
+     * The open watches of each bean that registered watches while it was created, keyed weakly by the bean's identity:
+     * the registry never keeps a bean reachable. A bean that is collected without having been destroyed, as a prototype
+     * nobody destroys may be, has its watches closed the next time the registry polls {@link #collectedOwners}.
+     * Guarded by itself.
+     */
+    private final Map<OwnerKey, List<Registration>> ownedByBean = new HashMap<>();
+    private final ReferenceQueue<Object> collectedOwners = new ReferenceQueue<>();
+    /**
+     * Whether any bean owns a watch, so that destroying a bean looks nothing up while none does.
+     */
+    private volatile boolean anyOwned;
     private final Set<Object> adaptedProcessors = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
     private final Map<ResourceKind, ResourceChange> resourceState = new ConcurrentHashMap<>();
     /**
@@ -244,8 +266,8 @@ final class BeanWatchRegistry {
     }
 
     private BeanWatch register(Registration registration) {
-        Deque<Owner> owners = creating.get();
-        Owner owner = owners.peek();
+        expungeCollectedOwners();
+        Owner owner = creating.get().currentOwner();
         if (owner != null) {
             registration.owner = owner;
             owner.registrations.add(registration);
@@ -272,6 +294,15 @@ final class BeanWatchRegistry {
      * Delivers the startup batch to every watch registered so far; later registrations get theirs at once.
      */
     void start() {
+        if (registrations.isEmpty()) {
+            // nothing registered yet, as in most contexts: a watch registered from now on is given its first batch at once
+            synchronized (enqueue) {
+                if (registrations.isEmpty()) {
+                    started = true;
+                    return;
+                }
+            }
+        }
         List<Delivery> firstBatches = new ArrayList<>();
         synchronized (enqueue) {
             if (started) {
@@ -364,7 +395,8 @@ final class BeanWatchRegistry {
      * The caller applied the change before calling this.
      */
     void definitionsChanged(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
-        if (removed.isEmpty() && added.isEmpty()) {
+        if (registrations.isEmpty() || removed.isEmpty() && added.isEmpty()) {
+            // no watch to tell: one registered later reads the definitions as they are then
             return;
         }
         List<Delivery> deliveries = new ArrayList<>();
@@ -391,6 +423,7 @@ final class BeanWatchRegistry {
      * @return The outcomes, one per watch delivered to
      */
     List<ReloadingConfigurationWatcher.Outcome> configurationChanged(ConfigurationChange change) {
+        expungeCollectedOwners();
         List<Delivery> deliveries = new ArrayList<>();
         synchronized (enqueue) {
             long sequence = epoch.incrementAndGet();
@@ -435,7 +468,7 @@ final class BeanWatchRegistry {
             }
             if (outcome == ReloadingConfigurationWatcher.Outcome.RECREATE) {
                 Owner owner = delivery.owner;
-                if (owner == null || owner.bean == null) {
+                if (owner == null || owner.bean() == null) {
                     LOG.warn("A configuration watch on [{}] answered RECREATE but was not registered while its bean was created; nothing to recreate", ((ConfigurationRegistration) delivery.registration).describe());
                     outcome = ReloadingConfigurationWatcher.Outcome.IGNORED;
                 } else {
@@ -449,7 +482,7 @@ final class BeanWatchRegistry {
         }
         Set<Owner> notRecreated = new LinkedHashSet<>();
         for (Owner owner : toRecreate) {
-            Object bean = owner.bean;
+            Object bean = owner.bean();
             if (bean == null || !context.recreateBean(bean)) {
                 LOG.warn("A configuration watch answered RECREATE for a bean of [{}] the context does not hold, such as a prototype; nothing recreated", owner.definition.getBeanType().getName());
                 notRecreated.add(owner);
@@ -519,6 +552,13 @@ final class BeanWatchRegistry {
             }
         }
         deliveries.forEach(this::deliver);
+    }
+
+    /**
+     * @return Whether any watch is registered, so that a caller with a change to deliver can skip building it when none is
+     */
+    boolean hasRegistrations() {
+        return !registrations.isEmpty();
     }
 
     /**
@@ -635,43 +675,41 @@ final class BeanWatchRegistry {
 
     /**
      * Marks the start of a bean's creation: watches registered until {@link #endCreation} belong to the bean.
+     * Allocates nothing: what a creation needs is made only when a watch is registered during it.
      */
     void beginCreation(BeanDefinition<?> definition) {
-        creating.get().push(new Owner(definition));
+        creating.get().push(definition);
     }
 
     /**
      * Marks the end of a bean's creation, attaching the watches registered meanwhile to the instance, or
-     * closing them when the creation failed. Paired with {@link #beginCreation} by definition, so an
-     * unpaired end from another creation path in between is ignored.
+     * closing them when the creation failed. Paired with {@link #beginCreation} by definition, innermost first.
+     * Creations begun above the one ending and never ended, because something threw between the creation of their
+     * instance and the end of it, are abandoned: their watches are closed and they are popped too, so that no later
+     * watch on the thread is attributed to them. An end that pairs with no creation in progress is ignored.
      *
      * @param definition The definition the creation began with
      * @param bean The bean created, as the creation listeners left it, or null if the creation failed
      */
     void endCreation(BeanDefinition<?> definition, @Nullable Object bean) {
-        Deque<Owner> owners = creating.get();
-        Owner top = owners.peek();
-        if (top == null || top.definition != definition) {
-            // not the creation this call pairs with: a bean created by another path ended in between
-            if (owners.isEmpty()) {
-                creating.remove();
-            }
+        CreationStack stack = creating.get();
+        int index = stack.indexOf(definition);
+        if (index < 0) {
             return;
         }
-        Owner owner = owners.poll();
-        if (owners.isEmpty()) {
-            creating.remove();
+        while (stack.size > index + 1) {
+            closeAll(stack.pop());
         }
-        if (owner.registrations.isEmpty()) {
+        Owner owner = stack.pop();
+        if (owner == null) {
+            // nothing was registered during the creation, as for nearly every bean
             return;
         }
         if (bean == null) {
-            for (Registration registration : owner.registrations) {
-                registration.close();
-            }
+            closeAll(owner);
             return;
         }
-        owner.bean = bean;
+        expungeCollectedOwners();
         synchronized (ownedByBean) {
             List<Registration> active = new ArrayList<>(owner.registrations.size());
             for (Registration registration : owner.registrations) {
@@ -680,7 +718,18 @@ final class BeanWatchRegistry {
                 }
             }
             if (!active.isEmpty()) {
-                ownedByBean.computeIfAbsent(bean, b -> new ArrayList<>()).addAll(active);
+                OwnerKey key = new OwnerKey(bean, collectedOwners);
+                owner.bean = key;
+                ownedByBean.computeIfAbsent(key, k -> new ArrayList<>(active.size())).addAll(active);
+                anyOwned = true;
+            }
+        }
+    }
+
+    private static void closeAll(@Nullable Owner owner) {
+        if (owner != null) {
+            for (Registration registration : new ArrayList<>(owner.registrations)) {
+                registration.close();
             }
         }
     }
@@ -689,17 +738,39 @@ final class BeanWatchRegistry {
      * Closes the watches a destroyed bean registered while it was created.
      */
     void closeOwnedBy(@Nullable Object bean) {
-        if (bean == null) {
+        if (bean == null || !anyOwned) {
             return;
         }
         List<Registration> owned;
         synchronized (ownedByBean) {
-            owned = ownedByBean.remove(bean);
+            owned = ownedByBean.remove(new OwnerKey(bean, null));
+            anyOwned = !ownedByBean.isEmpty();
         }
         if (owned != null) {
             for (Registration registration : new ArrayList<>(owned)) {
                 registration.close();
             }
+        }
+    }
+
+    /**
+     * Closes the watches of the beans that were collected without having been destroyed, such as prototypes nobody
+     * destroyed whose watchers do not reference them.
+     */
+    void expungeCollectedOwners() {
+        Reference<?> collected = collectedOwners.poll();
+        while (collected != null) {
+            List<Registration> owned;
+            synchronized (ownedByBean) {
+                owned = ownedByBean.remove(collected);
+                anyOwned = !ownedByBean.isEmpty();
+            }
+            if (owned != null) {
+                for (Registration registration : new ArrayList<>(owned)) {
+                    registration.close();
+                }
+            }
+            collected = collectedOwners.poll();
         }
     }
 
@@ -713,6 +784,10 @@ final class BeanWatchRegistry {
         registrations.clear();
         synchronized (ownedByBean) {
             ownedByBean.clear();
+            anyOwned = false;
+        }
+        while (collectedOwners.poll() != null) {
+            // forgotten with the map
         }
         synchronized (adaptedProcessors) {
             adaptedProcessors.clear();
@@ -737,11 +812,101 @@ final class BeanWatchRegistry {
     private static final class Owner {
         final BeanDefinition<?> definition;
         final List<Registration> registrations = new ArrayList<>(2);
+        /**
+         * The bean, held weakly, once its creation ended with watches still open.
+         */
         @Nullable
-        Object bean;
+        volatile OwnerKey bean;
 
         Owner(BeanDefinition<?> definition) {
             this.definition = definition;
+        }
+
+        @Nullable
+        Object bean() {
+            OwnerKey key = bean;
+            return key != null ? key.get() : null;
+        }
+    }
+
+    /**
+     * A bean as a key of {@link #ownedByBean}: by identity, and weakly.
+     */
+    private static final class OwnerKey extends WeakReference<Object> {
+        private final int hash;
+
+        OwnerKey(Object bean, @Nullable ReferenceQueue<Object> queue) {
+            super(bean, queue);
+            this.hash = System.identityHashCode(bean);
+        }
+
+        @Override
+        public int hashCode() {
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (!(other instanceof OwnerKey key)) {
+                return false;
+            }
+            Object bean = get();
+            return bean != null && bean == key.get();
+        }
+    }
+
+    /**
+     * The creations in progress on a thread: the definition of each and, once a watch is registered during it, its
+     * {@link Owner}.
+     */
+    private static final class CreationStack {
+        private BeanDefinition<?>[] definitions = new BeanDefinition<?>[8];
+        private @Nullable Owner[] owners = new Owner[8];
+        private int size;
+
+        void push(BeanDefinition<?> definition) {
+            if (size == definitions.length) {
+                definitions = Arrays.copyOf(definitions, size * 2);
+                owners = Arrays.copyOf(owners, size * 2);
+            }
+            definitions[size++] = definition;
+        }
+
+        /**
+         * @return The owner of the innermost creation, made now if it has none yet, or null outside any creation
+         */
+        @Nullable
+        Owner currentOwner() {
+            if (size == 0) {
+                return null;
+            }
+            Owner owner = owners[size - 1];
+            if (owner == null) {
+                owner = new Owner(definitions[size - 1]);
+                owners[size - 1] = owner;
+            }
+            return owner;
+        }
+
+        int indexOf(BeanDefinition<?> definition) {
+            for (int i = size - 1; i >= 0; i--) {
+                if (definitions[i] == definition) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        @Nullable
+        Owner pop() {
+            size--;
+            Owner owner = owners[size];
+            definitions[size] = null;
+            owners[size] = null;
+            return owner;
         }
     }
 
@@ -833,19 +998,20 @@ final class BeanWatchRegistry {
             if (!closed.compareAndSet(false, true)) {
                 return;
             }
-            // a closed watch is forgotten entirely: the registry must not keep its watcher, or the bean that owned it
+            // a closed watch is forgotten entirely: the registry keeps neither its watcher nor its entry for the owning bean
             registrations.remove(this);
             Owner owningBean = owner;
             if (owningBean != null) {
-                owningBean.registrations.remove(this);
-                Object bean = owningBean.bean;
-                if (bean != null) {
-                    synchronized (ownedByBean) {
+                OwnerKey bean = owningBean.bean;
+                synchronized (ownedByBean) {
+                    owningBean.registrations.remove(this);
+                    if (bean != null) {
                         List<Registration> owned = ownedByBean.get(bean);
                         if (owned != null) {
                             owned.remove(this);
                             if (owned.isEmpty()) {
                                 ownedByBean.remove(bean);
+                                anyOwned = !ownedByBean.isEmpty();
                             }
                         }
                     }
@@ -907,6 +1073,10 @@ final class BeanWatchRegistry {
 
         @Override
         void deliverInitial() {
+            if (adapted) {
+                // the startup pass gave the processor what the first batch lists: the adapter is for what comes later
+                return;
+            }
             Collection<BeanDefinition<T>> current = current();
             resolved.clear();
             for (BeanDefinition<T> definition : current) {
@@ -1153,7 +1323,6 @@ final class BeanWatchRegistry {
         @Nullable
         private final ExecutableMethodWatcher<A> watcher;
         private final ChangeHandlers<BeanExecutableMethod<A>, ExecutableMethodChange.Replacement<A>> handlers;
-        private final boolean processedAtStartup;
         /**
          * The definitions delivered for an iterable definition, one per entry, by that definition: a removal of it
          * removes their methods. Read and updated only by the delivery of a batch, which is one at a time.
@@ -1169,7 +1338,6 @@ final class BeanWatchRegistry {
             this.qualifier = qualifier;
             this.watcher = watcher;
             this.handlers = handlers;
-            this.processedAtStartup = isProcessedOnStartup(annotationType);
         }
 
         @Override
@@ -1179,6 +1347,10 @@ final class BeanWatchRegistry {
 
         @Override
         void deliverInitial() {
+            if (adapted) {
+                // the startup pass gave the processor what the first batch lists: the adapter is for what comes later
+                return;
+            }
             List<BeanExecutableMethod<A>> current = current();
             deliver(new ExecutableMethodChange<>(current, List.of(), current, true));
         }
@@ -1270,8 +1442,9 @@ final class BeanWatchRegistry {
             // annotation can sit on a method without marking its bean, and only a scan of the definitions finds
             // those, which decides the conditions of the definitions it finds only
             Set<BeanDefinition<?>> candidates = new LinkedHashSet<>();
-            if (processedAtStartup) {
-                candidates.addAll(context.processedBeanDefinitions());
+            List<BeanDefinition<Object>> processed = context.processedBeanDefinitions();
+            if (isProcessedOnStartup(annotationType, processed)) {
+                candidates.addAll(processed);
                 candidates.addAll(context.getBeanDefinitions(Qualifiers.byStereotype(annotationType)));
                 candidates.addAll(context.definitionsWithMethodsAnnotated(annotationType, true));
             } else {
@@ -1473,41 +1646,46 @@ final class BeanWatchRegistry {
     }
 
     /**
-     * Whether the methods annotated with an annotation are processed at startup: whether the annotation is annotated
-     * {@code @Executable(processOnStartup = true)}, directly or through one of its stereotypes, as the compiler reads
-     * it. An annotation type has no bean whose metadata could be resolved and no compiled metadata of its own, so
-     * its declared annotations are read; where they cannot be, it is not, and a watch scans the definitions for it
-     * instead.
+     * Whether the methods annotated with an annotation are processed at startup, so that every compiled bean with such
+     * a method is in the index of the processed definitions, read from the compiled metadata of the methods in that
+     * index. An annotation type has no compiled metadata of its own, and the metadata of a method merges the
+     * {@code @Executable} members of all its annotations, so only a method whose one annotation carrying
+     * {@code @Executable} is the watched one, directly present, proves it. Without such a method, a watch scans the definitions instead, which
+     * finds the same methods.
      *
      * @param annotationType The annotation
-     * @return Whether its methods are processed at startup
+     * @param processed The definitions processed at startup
+     * @return Whether its methods are known to be processed at startup
      */
-    static boolean isProcessedOnStartup(Class<? extends Annotation> annotationType) {
-        try {
-            return isProcessedOnStartup(annotationType, Collections.newSetFromMap(new IdentityHashMap<>()));
-        } catch (RuntimeException | LinkageError e) {
-            // a meta-annotation, or a class one of them names, is missing from the class path
-            return false;
-        }
-    }
-
-    private static boolean isProcessedOnStartup(Class<? extends Annotation> annotationType, Set<Class<?>> visited) {
-        if (!visited.add(annotationType)) {
-            return false;
-        }
-        Executable executable = annotationType.getAnnotation(Executable.class);
-        if (executable != null && executable.processOnStartup()) {
-            return true;
-        }
-        for (Annotation stereotype : annotationType.getAnnotations()) {
-            Class<? extends Annotation> stereotypeType = stereotype.annotationType();
-            if (stereotypeType != Executable.class
-                && !stereotypeType.getName().startsWith("java.lang.annotation.")
-                && isProcessedOnStartup(stereotypeType, visited)) {
-                return true;
+    static boolean isProcessedOnStartup(Class<? extends Annotation> annotationType, Iterable<? extends BeanDefinition<?>> processed) {
+        for (BeanDefinition<?> definition : processed) {
+            for (ExecutableMethod<?, ?> method : definition.getExecutableMethodsForProcessing()) {
+                if (provesProcessedOnStartup(method.getAnnotationMetadata(), annotationType)) {
+                    return true;
+                }
             }
         }
         return false;
+    }
+
+    /**
+     * Whether the metadata of a method shows that an annotation is {@code @Executable(processOnStartup = true)}: the
+     * method is processed at startup, the annotation is present on it directly and is the one annotation of the method
+     * that carries {@code @Executable}, and {@code @Executable} itself is not present. An annotation that reaches
+     * {@code @Executable} through another stereotype proves nothing, since the metadata records only the annotation
+     * carrying {@code @Executable}.
+     *
+     * @param metadata The metadata of a method
+     * @param annotationType The annotation
+     * @return Whether the metadata proves the annotation is processed at startup
+     */
+    static boolean provesProcessedOnStartup(AnnotationMetadata metadata, Class<? extends Annotation> annotationType) {
+        if (!metadata.hasAnnotation(annotationType) || metadata.hasAnnotation(Executable.class)
+            || !metadata.isTrue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP)) {
+            return false;
+        }
+        List<Class<? extends Annotation>> executable = metadata.getAnnotationTypesByStereotype(Executable.class);
+        return executable.size() == 1 && executable.get(0) == annotationType;
     }
 
     /**

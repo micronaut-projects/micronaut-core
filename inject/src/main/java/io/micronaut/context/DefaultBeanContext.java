@@ -174,7 +174,7 @@ import java.util.stream.StreamSupport;
 @Internal
 @NextMajorVersion("Remove public in v6")
 @SuppressWarnings("MagicNumber")
-public sealed class DefaultBeanContext implements ConfigurableBeanContext, WatchableBeanContext permits DefaultApplicationContext {
+public sealed class DefaultBeanContext implements ConfigurableBeanContext, WatchableBeanContext, BeanWatchNotifier permits DefaultApplicationContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
@@ -295,6 +295,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * the first batch of a watch, is fed by that pass, not again by {@link #recreateBean(Object)}.
      */
     private volatile boolean startupMethodsProcessed;
+    /**
+     * Whether the definitions may change after startup in a way processors must follow: the context tracks bean
+     * dependencies or runs in development mode. Only then is a processor fed, through an adapter, the definitions added
+     * after startup; any other context leaves processors as they always were, at no cost. Decided as the context starts.
+     */
+    private volatile boolean adaptsProcessors;
     /**
      * The recorded dependency graph, null when the context does not track dependencies. Decided by the configuration
      * as the context is constructed, or by its environment as it starts (see {@link #isBeanDependencyTrackingEnabledOnStart()}),
@@ -482,6 +488,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
                     // environment is started and no bean has been created yet, so the graph sees every bean
                     dependencyGraph = new DefaultBeanDependencyGraph();
                 }
+                adaptsProcessors = dependencyGraph != null || isDevelopmentMode();
                 configureAndStartContext();
                 if (LOG.isDebugEnabled()) {
                     String activeConfigurations = beanConfigurations
@@ -701,8 +708,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * @param removed The definitions retired
      * @param added The definitions added
      */
-    @Internal
-    @Experimental
+    @Override
     public void notifyDefinitionChange(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
         watches.definitionsChanged(removed, added);
     }
@@ -715,8 +721,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * @param change The change
      * @return The outcomes of the watches delivered to
      */
-    @Internal
-    @Experimental
+    @Override
     public List<ReloadingConfigurationWatcher.Outcome> notifyConfigurationChange(ConfigurationChange change) {
         ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
         return watches.configurationChanged(change);
@@ -728,8 +733,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      *
      * @param change The change
      */
-    @Internal
-    @Experimental
+    @Override
     public void notifyResourceChange(ResourceChange change) {
         ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
         watches.resourcesChanged(change);
@@ -741,8 +745,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      *
      * @param change The change
      */
-    @Internal
-    @Experimental
+    @Override
     public void notifyClassChange(ClassChangeEvent change) {
         ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
         watches.classesChanged(change);
@@ -751,8 +754,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     /**
      * @return Whether a class change watch is registered and active, so that a publisher of class changes is not empty
      */
-    @Internal
-    @Experimental
+    @Override
     public boolean hasClassChangeWatches() {
         return watches.hasClassChangeWatches();
     }
@@ -762,23 +764,32 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      *
      * @return The adapted processors
      */
-    @Internal
-    @Experimental
+    @Override
     public Collection<Object> adaptedProcessors() {
         return watches.adaptedProcessors();
+    }
+
+    @Override
+    public boolean isRecreateSupported() {
+        return dependencyGraph != null;
     }
 
     @Override
     public boolean recreate(Object bean) {
         Objects.requireNonNull(bean, "bean");
         // without the graph the dependents are unknown, and would keep the destroyed instance
-        return dependencyGraph != null && isRecreatable(singletonScope.findBeanRegistration(bean)) && recreateBean(bean);
+        if (dependencyGraph == null) {
+            logRecreateUnsupported(bean.getClass().getName());
+            return false;
+        }
+        return isRecreatable(singletonScope.findBeanRegistration(bean)) && recreateBean(bean);
     }
 
     @Override
     public <T> boolean recreate(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         Objects.requireNonNull(beanType, "beanType");
         if (dependencyGraph == null) {
+            logRecreateUnsupported(beanType.getTypeName());
             return false;
         }
         BeanDefinition<T> definition = findBeanDefinition(beanType, qualifier).orElse(null);
@@ -790,6 +801,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             return false;
         }
         return recreateBean(held.bean);
+    }
+
+    private static void logRecreateUnsupported(String beanType) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Not recreating a bean of [{}]: the context does not track bean dependencies (see isRecreateSupported())", beanType);
+        }
     }
 
     /**
@@ -2507,7 +2524,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             // a bean of this scope resolved earlier left the scope's absence recorded in the registry
             customScopeRegistry.invalidate();
         }
-        watches.definitionsChanged(List.of(), List.of(definition));
+        if (watches.hasRegistrations()) {
+            watches.definitionsChanged(List.of(), List.of(definition));
+        }
         return this;
     }
 
@@ -2886,7 +2905,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     }
 
     /**
-     * Feeds a processor the methods of definitions added after startup.
+     * Feeds a processor the methods of definitions added after startup, in a context whose definitions may change after
+     * startup (see {@link #adaptsProcessors}); in any other context this does nothing.
      *
      * @param annotationType The annotation the processor handles
      * @param processor The processor
@@ -2895,18 +2915,23 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     @Internal
     @SuppressWarnings("unchecked")
     <A extends Annotation> void adaptProcessor(Class<A> annotationType, ExecutableMethodProcessor<?> processor) {
-        watches.adapt(annotationType, (ExecutableMethodProcessor<A>) processor);
+        if (adaptsProcessors) {
+            watches.adapt(annotationType, (ExecutableMethodProcessor<A>) processor);
+        }
     }
 
     /**
-     * Feeds a processor the definitions added after startup.
+     * Feeds a processor the definitions added after startup, in a context whose definitions may change after startup
+     * (see {@link #adaptsProcessors}); in any other context this does nothing.
      *
      * @param annotationType The annotation the processor handles
      * @param processor The processor
      */
     @Internal
     void adaptProcessor(Class<? extends Annotation> annotationType, BeanDefinitionProcessor<?> processor) {
-        watches.adapt(annotationType, processor);
+        if (adaptsProcessors) {
+            watches.adapt(annotationType, processor);
+        }
     }
 
     private void initializeEagerBeans() {
@@ -4319,12 +4344,19 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
                         } else {
                             throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                         }
-                        InterceptorCandidates interceptorCandidates = creation.lifecycleInterceptorCandidates();
-                        if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
-                            Object value = registrations.remove(definition);
-                            if (value instanceof List<?> list) {
-                                interceptorCandidates = new InterceptorCandidates.Resolved((List) list);
+                        InterceptorCandidates interceptorCandidates;
+                        try {
+                            interceptorCandidates = creation.lifecycleInterceptorCandidates();
+                            if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
+                                Object value = registrations.remove(definition);
+                                if (value instanceof List<?> list) {
+                                    interceptorCandidates = new InterceptorCandidates.Resolved((List) list);
+                                }
                             }
+                        } catch (RuntimeException | Error e) {
+                            // the creation the instance began ends here, failed, as postBeanCreated would have ended it
+                            watches.endCreation(definition, null);
+                            throw e;
                         }
                         T created = bean;
                         bean = postBeanCreated(context, definition, beanType, qualifier, bean);
