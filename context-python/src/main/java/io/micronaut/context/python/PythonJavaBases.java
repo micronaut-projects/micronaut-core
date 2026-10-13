@@ -41,9 +41,10 @@ import java.util.Set;
  * (created by {@link #baseClass}) that records the arguments of {@code super().__init__(...)} and
  * defines a Python method for every accessible instance method of the Java base. Those methods
  * reach the base implementation through the Java instance bound to the Python object
- * ({@link #bind}), which the generated constructors create from the recorded arguments. A Python
- * object created in Python code gets its Java instance the first time an inherited method is
- * called.
+ * ({@link #bind}), which the generated constructors create from the recorded arguments; when the
+ * Java super constructor takes no argument, they create it before {@code __init__} runs, so the
+ * inherited methods {@code __init__} calls reach it. A Python object created in Python code gets
+ * its Java instance the first time an inherited method is called.
  *
  * @author Micronaut Team
  * @since 5.2.0
@@ -291,8 +292,7 @@ public final class PythonJavaBases {
             return members;
         }
         throw new IllegalStateException("Python object of class [" + className(self)
-            + "] has no Java instance of its Java base class: the Java instance is created after __init__ returns, "
-            + "so inherited Java methods cannot be called from __init__");
+            + "] has no Java instance of its Java base class");
     }
 
     private static @Nullable Object boundInstance(Value pythonObject) {
