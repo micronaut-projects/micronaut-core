@@ -46,6 +46,12 @@ import java.util.function.Supplier;
 @Factory
 public class ExecutorFactory implements GracefulShutdownCapable {
 
+    /**
+     * The thread factory {@link #executorService(ExecutorConfiguration, ThreadFactory)} received, while it calls
+     * {@link #executorService(ExecutorConfiguration)}.
+     */
+    private static final ThreadLocal<ThreadFactory> PRODUCING_THREAD_FACTORY = new ThreadLocal<>();
+
     @Nullable
     private final BeanLocator beanLocator;
     private final ThreadFactory threadFactory;
@@ -102,7 +108,8 @@ public class ExecutorFactory implements GracefulShutdownCapable {
     }
 
     /**
-     * Create the ExecutorService with the given configuration.
+     * Create the ExecutorService with the given configuration, by calling {@link #executorService(ExecutorConfiguration)},
+     * which a subclass that replaces this factory may override, with the thread factory of the configuration's name.
      *
      * @param executorConfiguration The configuration to create a thread pool that creates new threads as needed
      * @param namedThreadFactory The thread factory bean of the same name as the configuration, which
@@ -116,19 +123,31 @@ public class ExecutorFactory implements GracefulShutdownCapable {
     public ExecutorService executorService(ExecutorConfiguration executorConfiguration, @Parameter ThreadFactory namedThreadFactory) {
         // the thread factories the bean locator resolved: the primary one for a configuration without a name
         ThreadFactory configured = executorConfiguration.getName() == null ? threadFactory : namedThreadFactory;
-        return createExecutorService(executorConfiguration, () -> configured);
+        ThreadFactory previous = PRODUCING_THREAD_FACTORY.get();
+        PRODUCING_THREAD_FACTORY.set(configured);
+        try {
+            return executorService(executorConfiguration);
+        } finally {
+            if (previous == null) {
+                PRODUCING_THREAD_FACTORY.remove();
+            } else {
+                PRODUCING_THREAD_FACTORY.set(previous);
+            }
+        }
     }
 
     /**
-     * Create the ExecutorService with the given configuration.
+     * Create the ExecutorService with the given configuration. Called by
+     * {@link #executorService(ExecutorConfiguration, ThreadFactory)}, which produces the executor service beans, so
+     * that a subclass replacing this factory can override it; called by it, this uses the thread factory it received,
+     * otherwise the one the bean locator of {@link #ExecutorFactory(BeanLocator, ThreadFactory)} resolves.
      *
      * @param executorConfiguration The configuration to create a thread pool that creates new threads as needed
      * @return A thread pool that creates new threads as needed
-     * @deprecated The executor service receives the thread factory of its configuration; use {@link #executorService(ExecutorConfiguration, ThreadFactory)}
      */
-    @Deprecated(since = "5.3.0")
     public ExecutorService executorService(ExecutorConfiguration executorConfiguration) {
-        return createExecutorService(executorConfiguration, () -> lookupThreadFactory(executorConfiguration));
+        ThreadFactory producing = PRODUCING_THREAD_FACTORY.get();
+        return createExecutorService(executorConfiguration, producing != null ? () -> producing : () -> lookupThreadFactory(executorConfiguration));
     }
 
     private ExecutorService createExecutorService(ExecutorConfiguration executorConfiguration, Supplier<ThreadFactory> threadFactory) {
