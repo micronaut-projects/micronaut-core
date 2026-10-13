@@ -5,14 +5,17 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.body.JsonMessageHandler;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -109,7 +112,7 @@ public final class PieceReaderBenchmarkSupport {
     public static <T> Publisher<T> legacyArrayElements(NettyJsonHandler<T> handler, Argument<T> type, Headers headers, Publisher<ByteBuffer<?>> input, long maxElementSize) {
         JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
         processor.counter.unwrapTopLevelArray();
-        return processor.process(Flux.from(input).map(JsonChunkedProcessor::nettyBuffer))
+        return legacyProcess(processor, Flux.from(input).map(JsonChunkedProcessor::nettyBuffer))
             .map(bb -> JsonChunkedProcessor.readReleasing(bb, value -> handler.read(type, MediaType.APPLICATION_JSON_TYPE, headers, value)));
     }
 
@@ -126,7 +129,7 @@ public final class PieceReaderBenchmarkSupport {
     public static <T> List<T> legacyStreamList(JsonMapper mapper, Argument<T> type, Headers headers, ByteBuffer<?> body) {
         JsonMessageHandler<T> handler = new JsonMessageHandler<>(mapper);
         JsonChunkedProcessor processor = new JsonChunkedProcessor();
-        return Objects.requireNonNull(processor.process(Flux.just(body).map(JsonChunkedProcessor::nettyBuffer))
+        return Objects.requireNonNull(legacyProcess(processor, Flux.just(body).map(JsonChunkedProcessor::nettyBuffer))
             .map(bb -> JsonChunkedProcessor.readReleasing(bb, value -> handler.read(type, MediaType.APPLICATION_JSON_STREAM_TYPE, headers, value)))
             .collectList()
             .block());
@@ -187,5 +190,34 @@ public final class PieceReaderBenchmarkSupport {
             }
             return count;
         }
+    }
+
+    /**
+     * The processing of the JSON values of a body as it was before the piece readers.
+     */
+    private static Flux<ByteBuffer<?>> legacyProcess(JsonChunkedProcessor processor, Flux<ByteBuf> input) {
+        return Flux.concat(input
+                .concatMap(b -> Flux.<ByteBuffer<?>>create(s -> {
+                    try {
+                        processor.feed(b, s::next);
+                        s.complete();
+                    } catch (IOException | ContentLengthExceededException e) {
+                        s.error(e);
+                    } finally {
+                        b.release();
+                    }
+                })), Flux.create(s -> {
+                try {
+                    processor.finish(s::next);
+                    s.complete();
+                } catch (Throwable e) {
+                    s.error(e);
+                }
+            }))
+            // also when the subscriber cancels, e.g. a reader that stops before the last element:
+            // the partial element and the elements and input not delivered yet are released
+            .doFinally(signal -> processor.discard())
+            .doOnDiscard(ByteBuffer.class, JsonChunkedProcessor::release)
+            .doOnDiscard(ByteBuf.class, ByteBuf::release);
     }
 }

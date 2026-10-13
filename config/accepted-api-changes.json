@@ -1373,6 +1373,26 @@
     "reason": "Experimental configuration record, added the workSpillMinQueueAge component"
   },
   {
+    "type": "io.micronaut.http.body.stream.BaseSharedBuffer$AsFlux",
+    "member": "Class io.micronaut.http.body.stream.BaseSharedBuffer$AsFlux",
+    "reason": "BaseSharedBuffer is internal: its Reactor publisher AsFlux is replaced by AsPublisher, a publisher without Reactor"
+  },
+  {
+    "type": "io.micronaut.http.body.stream.BaseSharedBuffer$AsFlux",
+    "member": "Constructor io.micronaut.http.body.stream.BaseSharedBuffer$AsFlux(io.micronaut.http.body.stream.BaseSharedBuffer)",
+    "reason": "BaseSharedBuffer is internal: its Reactor publisher AsFlux is replaced by AsPublisher, a publisher without Reactor"
+  },
+  {
+    "type": "io.micronaut.http.body.stream.BaseSharedBuffer$AsFlux",
+    "member": "Method io.micronaut.http.body.stream.BaseSharedBuffer$AsFlux.asFlux(io.micronaut.http.body.stream.BufferConsumer$Upstream)",
+    "reason": "BaseSharedBuffer is internal: its Reactor publisher AsFlux is replaced by AsPublisher, a publisher without Reactor"
+  },
+  {
+    "type": "io.micronaut.http.body.stream.BaseSharedBuffer$AsFlux",
+    "member": "Implemented interface io.micronaut.http.body.stream.BufferConsumer",
+    "reason": "BaseSharedBuffer is internal: its Reactor publisher AsFlux is replaced by AsPublisher, a publisher without Reactor"
+  },
+  {
     "type": "io.micronaut.annotation.processing.visitor.JavaNativeElement$Placeholder",
     "member": "Constructor io.micronaut.annotation.processing.visitor.JavaNativeElement$Placeholder(javax.lang.model.element.Element,javax.lang.model.type.TypeVariable,io.micronaut.annotation.processing.visitor.JavaNativeElement)",
     "reason": "JavaNativeElement is @Internal. Its placeholder metadata now distinguishes declarations and type uses; this compiler representation is not a user API."

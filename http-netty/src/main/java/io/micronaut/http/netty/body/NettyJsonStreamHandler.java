@@ -46,7 +46,6 @@ import io.netty.buffer.ByteBuf;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -136,14 +135,13 @@ public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, C
     }
 
     @Override
-    public Flux<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+    public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
         return readChunked(type, mediaType, httpHeaders, input, Long.MAX_VALUE);
     }
 
     @Override
-    public Flux<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input, long maxElementSize) {
-        // the declared type of this method is a Flux
-        return Flux.from(PieceReaders.publisherOfBuffers(input, openPieceReader(type, mediaType, httpHeaders, maxElementSize), JsonPieceReader::adapt, JsonPieceReader::discardForeign));
+    public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input, long maxElementSize) {
+        return PieceReaders.publisherOfBuffers(input, openPieceReader(type, mediaType, httpHeaders, maxElementSize), JsonPieceReader::adapt, JsonPieceReader::discardForeign);
     }
 
     @Override
