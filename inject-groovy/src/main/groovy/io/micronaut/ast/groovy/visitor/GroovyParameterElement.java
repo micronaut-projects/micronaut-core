@@ -85,7 +85,7 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     @Override
     public ClassElement getGenericType() {
         if (genericType == null) {
-            genericType = newClassElement(parameter.getType(), methodElement.getTypeArguments());
+            genericType = newClassElement(parameter.getType(), methodElement.getTypeArguments(), parameter);
         }
         return genericType;
     }
@@ -114,7 +114,7 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     @Override
     public ClassElement getType() {
         if (typeElement == null) {
-            typeElement = newClassElement(parameter.getType());
+            typeElement = newClassElement(parameter.getType(), null, parameter);
         }
         return typeElement;
     }

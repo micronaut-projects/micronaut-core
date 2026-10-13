@@ -69,7 +69,7 @@ public final class TextPlainObjectBodyReader<T> implements TypedMessageBodyReade
     @Override
     public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         try {
-            String string = new String(inputStream.readAllBytes(), getCharset(mediaType, httpHeaders));
+            String string = new String(inputStream.readAllBytes(), getCharset(mediaType));
             return conversionService.convertRequired(string, type);
         } catch (IOException e) {
             throw new CodecException("Failed to read InputStream", e);
@@ -78,7 +78,7 @@ public final class TextPlainObjectBodyReader<T> implements TypedMessageBodyReade
 
     @Override
     public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
-        return read0(type, byteBuffer, getCharset(mediaType, httpHeaders));
+        return read0(type, byteBuffer, getCharset(mediaType));
     }
 
     private T read0(Argument<T> type, ByteBuffer<?> byteBuffer, Charset charset) {
@@ -92,10 +92,14 @@ public final class TextPlainObjectBodyReader<T> implements TypedMessageBodyReade
 
     @Override
     public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        return Flux.from(input).map(byteBuffer -> read0(type, byteBuffer, getCharset(mediaType, httpHeaders)));
+        return Flux.from(input).map(byteBuffer -> read0(type, byteBuffer, getCharset(mediaType)));
     }
 
-    private Charset getCharset(@Nullable MediaType mediaType, Headers httpHeaders) {
-        return MessageBodyWriter.findCharset(mediaType, httpHeaders).orElse(defaultCharset);
+    /**
+     * Only the charset of the {@code Content-Type} describes how the body is encoded. The
+     * {@code Accept-Charset} header is a preference for the response and is not consulted.
+     */
+    private Charset getCharset(@Nullable MediaType mediaType) {
+        return mediaType == null ? defaultCharset : mediaType.getCharset().orElse(defaultCharset);
     }
 }

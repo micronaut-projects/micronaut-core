@@ -32,16 +32,14 @@ import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.RawFormField;
-import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.multipart.FormFactory;
+import io.micronaut.http.server.multipart.ReleasingFieldPublisher;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -158,13 +156,39 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
             result.completeExceptionally(new CancellationException("The request ended before its form was read completely"));
         });
         // the parts of a form arrive in order: each one is read or stored before the next
-        Disposable subscription = Flux.from(source)
-            .concatMap(field -> Flux.from(ReactiveExecutionFlow.toPublisher(complete(factory, uploadContext, request, field, collected))))
-            // the fields waiting behind the one being read when the reading stops: the request
-            // ended, the handler did not wait for the form, or the body failed
-            .doOnDiscard(RawFormField.class, RawFormField::close)
-            .then(Mono.fromSupplier(() -> form(collected.fields(), collected.files(), conversionService)))
-            .subscribe(result::complete, result::completeExceptionally);
+        FormFieldFlows.Concat<RawFormField, Boolean> subscription = new FormFieldFlows.Concat<>(
+            field -> complete(factory, uploadContext, request, field, collected),
+            // the fields that arrive after the reading stopped: the request ended, the handler
+            // did not wait for the form, or the body failed
+            RawFormField::close,
+            ignored -> {
+            },
+            error -> {
+                if (error != null) {
+                    result.completeExceptionally(error);
+                    return;
+                }
+                FormData form;
+                try {
+                    form = form(collected.fields(), collected.files(), conversionService);
+                } catch (Throwable t) {
+                    result.completeExceptionally(t);
+                    return;
+                }
+                result.complete(form);
+            });
+        if (source instanceof ReleasingFieldPublisher<RawFormField>) {
+            // e.g. the fields of the Netty server: it releases the fields it holds itself
+            source.subscribe(subscription);
+        } else {
+            // the fields of a request of another implementation may come from a Reactor publisher,
+            // also through a delegating one, that releases the fields it holds when the subscriber
+            // cancels with the discard hook of the subscriber: the fields waiting behind the one
+            // being read when the reading stops
+            Flux.from(source)
+                .doOnDiscard(RawFormField.class, RawFormField::close)
+                .subscribe(subscription);
+        }
         owned.reading(subscription);
         return new Collection(result, subscription);
     }
@@ -241,7 +265,7 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
      * @param result       Completes with the form
      * @param subscription The subscription to the fields of the form
      */
-    record Collection(CompletableFuture<FormData> result, Disposable subscription) {
+    record Collection(CompletableFuture<FormData> result, FormFieldFlows.Concat<?, ?> subscription) {
 
         /**
          * Stop reading the form, if it was not completely read: the rest of the body is
@@ -251,7 +275,7 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
             if (result.isDone()) {
                 return;
             }
-            subscription.dispose();
+            subscription.cancel();
             result.completeExceptionally(new CancellationException("The form was not read completely before the handler completed"));
         }
     }
@@ -263,7 +287,7 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
         // guarded by this
         private final List<FileUpload> uploads = new ArrayList<>();
         private boolean closed;
-        private @Nullable Disposable reading;
+        private FormFieldFlows.@Nullable Concat<?, ?> reading;
 
         synchronized boolean add(FileUpload upload) {
             if (closed) {
@@ -273,20 +297,20 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
             return true;
         }
 
-        void reading(Disposable subscription) {
+        void reading(FormFieldFlows.Concat<?, ?> subscription) {
             boolean dispose;
             synchronized (this) {
                 dispose = closed;
                 reading = subscription;
             }
             if (dispose) {
-                subscription.dispose();
+                subscription.cancel();
             }
         }
 
         void close() {
             List<FileUpload> owned;
-            Disposable subscription;
+            FormFieldFlows.Concat<?, ?> subscription;
             synchronized (this) {
                 if (closed) {
                     return;
@@ -297,7 +321,7 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
             }
             if (subscription != null) {
                 // a form the request no longer needs: nothing to do once it was read
-                subscription.dispose();
+                subscription.cancel();
             }
             if (!owned.isEmpty()) {
                 release(owned);

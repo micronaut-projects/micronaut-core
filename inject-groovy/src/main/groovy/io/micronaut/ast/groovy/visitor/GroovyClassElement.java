@@ -139,6 +139,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     private List<PropertyElement> nativeProperties;
     @Nullable
     private ElementAnnotationMetadata elementTypeAnnotationMetadata;
+    // Innermost dimension first. These describe type uses, not the legacy metadata of the element type.
+    private List<MutableAnnotationMetadataDelegate<AnnotationMetadata>> arrayTypeAnnotations = List.of();
     @Nullable
     private ClassElement theType;
     private final GroovyEnclosedElementsQuery groovyEnclosedElementsQuery = new GroovyEnclosedElementsQuery(false);
@@ -217,7 +219,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     protected @NonNull GroovyClassElement copyConstructor() {
-        return new GroovyClassElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, resolvedTypeArguments, arrayDimensions, isTypeVar);
+        return copyArrayTypeAnnotations(new GroovyClassElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, resolvedTypeArguments, arrayDimensions, isTypeVar));
     }
 
     @Override
@@ -227,7 +229,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         }
         if (annotationMetadata == null) {
             if (getNativeType() instanceof GroovyNativeElement.ClassWithOwner) {
-                annotationMetadata = new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getTypeAnnotationMetadata());
+                annotationMetadata = new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(),
+                    isArray() ? getElementTypeAnnotationMetadata() : getTypeAnnotationMetadata());
             } else {
                 annotationMetadata = super.getAnnotationMetadata();
             }
@@ -250,7 +253,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public @NonNull ClassElement withTypeArguments(Map<String, ClassElement> typeArguments) {
-        return new GroovyClassElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, typeArguments, arrayDimensions);
+        return copyArrayTypeAnnotations(new GroovyClassElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, typeArguments, arrayDimensions));
     }
 
     @Override
@@ -711,7 +714,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new GroovyClassElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, resolvedTypeArguments, arrayDimensions);
+        return copyArrayTypeAnnotations(new GroovyClassElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, resolvedTypeArguments, arrayDimensions));
     }
 
     @Override
@@ -875,10 +878,36 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public @NonNull MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
+        if (isArray() && !arrayTypeAnnotations.isEmpty()) {
+            return arrayDimensions <= arrayTypeAnnotations.size()
+                ? arrayTypeAnnotations.get(arrayDimensions - 1)
+                : ArrayableClassElement.super.getTypeAnnotationMetadata();
+        }
+        return getElementTypeAnnotationMetadata();
+    }
+
+    /**
+     * The type annotations of the element type, which an array use also answers in its annotation metadata, the
+     * legacy convention that {@link #getTypeAnnotationMetadata()} no longer follows for an array.
+     *
+     * @return The type annotations of the element type
+     */
+    protected final MutableAnnotationMetadataDelegate<AnnotationMetadata> getElementTypeAnnotationMetadata() {
         if (elementTypeAnnotationMetadata == null) {
             elementTypeAnnotationMetadata = elementAnnotationMetadataFactory.buildTypeAnnotations(this);
         }
         return elementTypeAnnotationMetadata;
+    }
+
+    final GroovyClassElement withArrayTypeAnnotations(List<MutableAnnotationMetadataDelegate<AnnotationMetadata>> annotations) {
+        GroovyClassElement copy = copyConstructor();
+        copy.arrayTypeAnnotations = List.copyOf(annotations);
+        return copy;
+    }
+
+    protected final <T extends GroovyClassElement> T copyArrayTypeAnnotations(T copy) {
+        ((GroovyClassElement) copy).arrayTypeAnnotations = arrayTypeAnnotations;
+        return copy;
     }
 
     /**

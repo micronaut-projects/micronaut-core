@@ -38,6 +38,8 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
     private OwnershipState state = OwnershipState.OPEN;
     /** The destruction invocation a temporary group belongs to, which may resolve during shutdown; null for any other owner. */
     final @Nullable DefaultBeanResolutionContext destructionContext;
+    /** The destruction invocation that stopped resolution, whose callbacks may still resolve through this owner. */
+    private @Nullable DefaultBeanResolutionContext stoppedBy;
 
     /** Creates the owner of a bean being created, or of an independent group. */
     DefaultBeanDependencies() {
@@ -140,11 +142,32 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
         return state != OwnershipState.OPEN;
     }
 
-    /** Rejects further resolution through this owner while keeping what it holds, as the destruction of its bean begins. */
-    synchronized void stopResolving() {
+    /**
+     * Rejects further resolution through this owner while keeping what it holds, as the destruction of its bean begins.
+     * The destruction callbacks of the invocation may still resolve, on its thread and until it returns; what they
+     * create is destroyed with the owner.
+     *
+     * @param invocation The destruction invocation, or null when its callbacks may not resolve through this owner
+     */
+    synchronized void stopResolving(@Nullable DefaultBeanResolutionContext invocation) {
         if (state == OwnershipState.OPEN) {
             state = OwnershipState.RESOLUTION_STOPPED;
         }
+        if (state != OwnershipState.OWNERSHIP_RELEASED && stoppedBy == null) {
+            stoppedBy = invocation;
+        }
+    }
+
+    /**
+     * @return Whether a resolution may be attached to this owner: it is open, or the current thread runs the
+     * destruction invocation that stopped it
+     */
+    private synchronized boolean isResolvable() {
+        return switch (state) {
+            case OPEN -> true;
+            case RESOLUTION_STOPPED, DESTRUCTION_CLAIMED -> stoppedBy != null && stoppedBy.isDestructionInvocationActive();
+            case OWNERSHIP_RELEASED -> false;
+        };
     }
 
     /**
@@ -170,6 +193,7 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
         List<BeanRegistration<?>> taken = owned;
         owned = List.of();
         required = List.of();
+        stoppedBy = null;
         interceptorCandidates = InterceptorCandidates.Unresolved.INSTANCE;
         return taken;
     }
@@ -216,13 +240,14 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
     }
 
     /**
-     * Throws when nothing can be resolved through this owner any more: it is closing, the context is shutting down,
-     * or the destruction invocation it belongs to has returned.
+     * Throws when nothing can be resolved through this owner any more: it is closing and the lookup is not made by
+     * its destruction callbacks, the context is shutting down and the lookup is not made by the thread running the
+     * shutdown, or the destruction invocation it belongs to has returned.
      *
      * @param context The context
      */
     synchronized void checkOpen(DefaultBeanContext context) {
-        if (isClosing() || destructionContext != null && !destructionContext.isDestructionInvocationActive()
+        if (!isResolvable() || destructionContext != null && !destructionContext.isDestructionInvocationActive()
             || destructionContext == null && context.isDependencyResolutionClosed()) {
             throw new IllegalStateException("Cannot resolve a dependency after owner destruction or context shutdown has begun");
         }
@@ -250,6 +275,10 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
                 synchronized (this) {
                     checkOpen(context);
                     attach(created, resolution.requiredBeans());
+                    if (destructionContext == null) {
+                        // A temporary destruction group releases its dependents itself.
+                        context.trackShutdownDependents(this, created);
+                    }
                 }
                 return result;
             } catch (RuntimeException | Error failure) {
@@ -263,7 +292,7 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
     @Override
     public <S> @Nullable S resolveDependencies(BeanLocator context, @Nullable BeanDefinition<?> definition,
                                                Function<BeanResolutionContext, S> operation) {
-        if (!(context instanceof DefaultBeanContext beanContext) || isClosing()) {
+        if (!(context instanceof DefaultBeanContext beanContext) || !isResolvable()) {
             return null;
         }
         return resolve(beanContext, definition, operation);
