@@ -21,6 +21,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.CurrentHealthStatus;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.health.indicator.HealthIndicator;
+import io.micronaut.management.health.indicator.HealthIndicatorStages;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -34,7 +35,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -125,21 +125,16 @@ public class HealthMonitorTask {
     }
 
     /**
-     * Collects the results of an indicator from {@link HealthIndicator#getResult()}, all of them
-     * as the monitor always did. The monitor keeps the publisher rather than
-     * {@link HealthIndicator#getResultAsync()}, so that a test double of an indicator that only
-     * stubs {@link HealthIndicator#getResult()} keeps working; the built-in indicators adapt
-     * their {@link HealthIndicator#getResultAsync()} to the publisher without a reactive library.
+     * Collects all the results of an indicator through {@link HealthIndicator#getResultAsync()},
+     * the same path as the endpoint aggregation. A test double that only stubs
+     * {@link HealthIndicator#getResult()} (its {@link HealthIndicator#getResultAsync()} returning
+     * {@code null}) falls back to the publisher.
      *
      * @param healthIndicator The indicator
      * @return The results of the indicator
      */
-    private static CompletableFuture<List<HealthResult>> resultOf(HealthIndicator healthIndicator) {
-        try {
-            return CompletionStagePublishers.collect(healthIndicator.getResult());
-        } catch (Exception e) {
-            return CompletableFuture.failedFuture(e);
-        }
+    private static CompletionStage<List<HealthResult>> resultOf(HealthIndicator healthIndicator) {
+        return HealthIndicatorStages.getResult(healthIndicator);
     }
 
     private void onError(Throwable e) {
