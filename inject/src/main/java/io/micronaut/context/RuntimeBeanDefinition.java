@@ -336,6 +336,26 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
         BeanContext getBeanContext();
 
         /**
+         * Resolves the registration of a bean of the given definition, which the caller has already chosen, as the
+         * given type, within the resolution this context belongs to.
+         *
+         * <p>This is {@link BeanResolutionContext#getBeanRegistration(BeanDefinition, Argument)} on the resolution
+         * context of this creation or disposal: no candidate lookup is run, what is created for the bean sees this
+         * bean's creation as the injection point it is created for, and a bean that has no scope of its own has the
+         * lifetime a lookup through {@link #getBean(Argument)} gives it.</p>
+         *
+         * @param definition The bean definition
+         * @param type       The potentially parameterized type to resolve the definition as
+         * @return The bean registration
+         * @param <V> The bean type
+         * @throws io.micronaut.context.exceptions.NoSuchBeanException If the definition is not a candidate for the
+         *                                                             type
+         * @since 5.3.0
+         */
+        <V> BeanRegistration<V> getBeanRegistration(BeanDefinition<? extends V> definition, Argument<V> type);
+
+
+        /**
          * Looks up a bean of the given type.
          *
          * @param type The type to look up

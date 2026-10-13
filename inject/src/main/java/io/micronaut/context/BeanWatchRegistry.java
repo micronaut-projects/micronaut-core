@@ -109,10 +109,10 @@ final class BeanWatchRegistry {
     private final DefaultBeanContext context;
     private final List<Registration> registrations = new CopyOnWriteArrayList<>();
     /**
-     * The creations in progress on each thread, innermost last. Kept for the thread once made, so that a creation
-     * allocates nothing: an {@link Owner} is made only when a watch is registered during it.
+     * The creations in progress on each thread, innermost last: set by the outermost creation and removed once it
+     * ends, so that no thread keeps an entry. An {@link Owner} is made only when a watch is registered during a creation.
      */
-    private final ThreadLocal<CreationStack> creating = ThreadLocal.withInitial(CreationStack::new);
+    private final ThreadLocal<CreationStack> creating = new ThreadLocal<>();
     /**
      * The open watches of each bean that registered watches while it was created, keyed weakly by the bean's identity:
      * the registry never keeps a bean reachable. A bean that is collected without having been destroyed, as a prototype
@@ -267,7 +267,8 @@ final class BeanWatchRegistry {
 
     private BeanWatch register(Registration registration) {
         expungeCollectedOwners();
-        Owner owner = creating.get().currentOwner();
+        CreationStack stack = creating.get();
+        Owner owner = stack != null ? stack.currentOwner() : null;
         if (owner != null) {
             registration.owner = owner;
             owner.registrations.add(registration);
@@ -678,10 +679,15 @@ final class BeanWatchRegistry {
 
     /**
      * Marks the start of a bean's creation: watches registered until {@link #endCreation} belong to the bean.
-     * Allocates nothing: what a creation needs is made only when a watch is registered during it.
+     * Only the outermost creation of a thread allocates, its stack; an owner is made only when a watch is registered.
      */
     void beginCreation(BeanDefinition<?> definition) {
-        creating.get().push(definition);
+        CreationStack stack = creating.get();
+        if (stack == null) {
+            stack = new CreationStack();
+            creating.set(stack);
+        }
+        stack.push(definition);
     }
 
     /**
@@ -696,6 +702,9 @@ final class BeanWatchRegistry {
      */
     void endCreation(BeanDefinition<?> definition, @Nullable Object bean) {
         CreationStack stack = creating.get();
+        if (stack == null) {
+            return;
+        }
         int index = stack.indexOf(definition);
         if (index < 0) {
             return;
@@ -704,6 +713,10 @@ final class BeanWatchRegistry {
             closeAll(stack.pop());
         }
         Owner owner = stack.pop();
+        if (stack.size == 0) {
+            // the outermost creation ended: the thread keeps nothing
+            creating.remove();
+        }
         if (owner == null) {
             // nothing was registered during the creation, as for nearly every bean
             return;
@@ -722,7 +735,7 @@ final class BeanWatchRegistry {
             }
             if (!active.isEmpty()) {
                 OwnerKey key = new OwnerKey(bean, collectedOwners);
-                owner.bean = key;
+                owner.key = key;
                 ownedByBean.computeIfAbsent(key, k -> new ArrayList<>(active.size())).addAll(active);
                 anyOwned = true;
             }
@@ -820,7 +833,7 @@ final class BeanWatchRegistry {
          * The bean, held weakly, once its creation ended with watches still open.
          */
         @Nullable
-        volatile OwnerKey bean;
+        volatile OwnerKey key; // NOSONAR java:S3077 only the reference is published, once, to the weak key of the bean
 
         Owner(BeanDefinition<?> definition) {
             this.definition = definition;
@@ -828,8 +841,8 @@ final class BeanWatchRegistry {
 
         @Nullable
         Object bean() {
-            OwnerKey key = bean;
-            return key != null ? key.get() : null;
+            OwnerKey current = key;
+            return current != null ? current.get() : null;
         }
     }
 
@@ -1006,7 +1019,7 @@ final class BeanWatchRegistry {
             registrations.remove(this);
             Owner owningBean = owner;
             if (owningBean != null) {
-                OwnerKey bean = owningBean.bean;
+                OwnerKey bean = owningBean.key;
                 synchronized (ownedByBean) {
                     owningBean.registrations.remove(this);
                     if (bean != null) {
