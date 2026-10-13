@@ -56,6 +56,8 @@ import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.context.reload.ResourceKind;
+import io.micronaut.context.reload.RetainingBeanContext;
+import io.micronaut.context.reload.RetentionCriteria;
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.watch.ClassChangeWatchRequest;
 import io.micronaut.context.watch.ConfigurationChange;
@@ -175,7 +177,7 @@ import java.util.stream.StreamSupport;
 @Internal
 @NextMajorVersion("Remove public in v6")
 @SuppressWarnings("MagicNumber")
-public sealed class DefaultBeanContext implements ConfigurableBeanContext, WatchableBeanContext permits DefaultApplicationContext {
+public sealed class DefaultBeanContext implements ConfigurableBeanContext, RetainingBeanContext, WatchableBeanContext, BeanWatchNotifier permits DefaultApplicationContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
@@ -297,9 +299,20 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      */
     private volatile boolean startupMethodsProcessed;
     /**
+     * Whether the definitions may change after startup in a way processors must follow: the context tracks bean
+     * dependencies or runs in development mode. Only then is a processor fed, through an adapter, the definitions added
+     * after startup; any other context leaves processors as they always were, at no cost. Decided as the context starts.
+     */
+    private volatile boolean adaptsProcessors;
+    /**
      * The recorded dependency graph, null when the context does not track dependencies. Decided by the configuration
      * as the context is constructed, or by its environment as it starts (see {@link #isBeanDependencyTrackingEnabledOnStart()}),
      * in both cases before the context creates a bean; it only ever goes from null to a graph.
+     *
+     * <p>Not volatile on purpose: it is read on every bean creation, and it is written only inside the synchronized
+     * {@link #start()}, before the context creates its first bean. Another thread that creates beans got the context
+     * through a happens-before edge after that (it started the context, or was handed it by the starter), so it sees
+     * the graph; a thread racing {@code start()} itself is not supported by the context anyway.</p>
      */
     @Nullable
     private DefaultBeanDependencyGraph dependencyGraph;
@@ -313,10 +326,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      */
     private final AtomicReference<@Nullable RetentionCriteria> retentionCriteria = new AtomicReference<>();
     /**
-     * The instances the {@link #stopRetaining(RetentionCriteria)} in progress keeps, once decided.
+     * The instances the {@link #stopRetaining(RetentionCriteria)} in progress keeps, once decided; read without the
+     * lock by {@link #isRetainedOnStop(Object)} once it is.
      */
     @Nullable
-    private Set<Object> retainedOnStopBeans;
+    private volatile Set<Object> retainedOnStopBeans;
     private final List<BeanRegistration<?>> retainedOnStop = new ArrayList<>();
     /**
      * Retained registrations this context has no definition for, destroyed once its listeners exist.
@@ -483,6 +497,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
                     // environment is started and no bean has been created yet, so the graph sees every bean
                     dependencyGraph = new DefaultBeanDependencyGraph();
                 }
+                adaptsProcessors = dependencyGraph != null || isDevelopmentMode();
                 configureAndStartContext();
                 if (LOG.isDebugEnabled()) {
                     String activeConfigurations = beanConfigurations
@@ -720,8 +735,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * @param removed The definitions retired
      * @param added The definitions added
      */
-    @Internal
-    @Experimental
+    @Override
     public void notifyDefinitionChange(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
         watches.definitionsChanged(removed, added);
     }
@@ -734,8 +748,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * @param change The change
      * @return The outcomes of the watches delivered to
      */
-    @Internal
-    @Experimental
+    @Override
     public List<ReloadingConfigurationWatcher.Outcome> notifyConfigurationChange(ConfigurationChange change) {
         ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
         return watches.configurationChanged(change);
@@ -747,8 +760,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      *
      * @param change The change
      */
-    @Internal
-    @Experimental
+    @Override
     public void notifyResourceChange(ResourceChange change) {
         ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
         watches.resourcesChanged(change);
@@ -760,8 +772,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      *
      * @param change The change
      */
-    @Internal
-    @Experimental
+    @Override
     public void notifyClassChange(ClassChangeEvent change) {
         ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
         watches.classesChanged(change);
@@ -770,8 +781,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     /**
      * @return Whether a class change watch is registered and active, so that a publisher of class changes is not empty
      */
-    @Internal
-    @Experimental
+    @Override
     public boolean hasClassChangeWatches() {
         return watches.hasClassChangeWatches();
     }
@@ -781,23 +791,32 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      *
      * @return The adapted processors
      */
-    @Internal
-    @Experimental
+    @Override
     public Collection<Object> adaptedProcessors() {
         return watches.adaptedProcessors();
+    }
+
+    @Override
+    public boolean isRecreateSupported() {
+        return dependencyGraph != null;
     }
 
     @Override
     public boolean recreate(Object bean) {
         Objects.requireNonNull(bean, "bean");
         // without the graph the dependents are unknown, and would keep the destroyed instance
-        return dependencyGraph != null && isRecreatable(singletonScope.findBeanRegistration(bean)) && recreateBean(bean);
+        if (dependencyGraph == null) {
+            logRecreateUnsupported(bean.getClass().getName());
+            return false;
+        }
+        return isRecreatable(singletonScope.findBeanRegistration(bean)) && recreateBean(bean);
     }
 
     @Override
     public <T> boolean recreate(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         Objects.requireNonNull(beanType, "beanType");
         if (dependencyGraph == null) {
+            logRecreateUnsupported(beanType.getTypeName());
             return false;
         }
         BeanDefinition<T> definition = findBeanDefinition(beanType, qualifier).orElse(null);
@@ -809,6 +828,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             return false;
         }
         return recreateBean(held.bean);
+    }
+
+    private static void logRecreateUnsupported(String beanType) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Not recreating a bean of [{}]: the context does not track bean dependencies (see isRecreateSupported())", beanType);
+        }
     }
 
     /**
@@ -2539,7 +2564,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             // a bean of this scope resolved earlier left the scope's absence recorded in the registry
             customScopeRegistry.invalidate();
         }
-        watches.definitionsChanged(List.of(), List.of(definition));
+        if (watches.hasRegistrations()) {
+            watches.definitionsChanged(List.of(), List.of(definition));
+        }
         return this;
     }
 
@@ -2918,7 +2945,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     }
 
     /**
-     * Feeds a processor the methods of definitions added after startup.
+     * Feeds a processor the methods of definitions added after startup, in a context whose definitions may change after
+     * startup (see {@link #adaptsProcessors}); in any other context this does nothing.
      *
      * @param annotationType The annotation the processor handles
      * @param processor The processor
@@ -2927,18 +2955,23 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     @Internal
     @SuppressWarnings("unchecked")
     <A extends Annotation> void adaptProcessor(Class<A> annotationType, ExecutableMethodProcessor<?> processor) {
-        watches.adapt(annotationType, (ExecutableMethodProcessor<A>) processor);
+        if (adaptsProcessors) {
+            watches.adapt(annotationType, (ExecutableMethodProcessor<A>) processor);
+        }
     }
 
     /**
-     * Feeds a processor the definitions added after startup.
+     * Feeds a processor the definitions added after startup, in a context whose definitions may change after startup
+     * (see {@link #adaptsProcessors}); in any other context this does nothing.
      *
      * @param annotationType The annotation the processor handles
      * @param processor The processor
      */
     @Internal
     void adaptProcessor(Class<? extends Annotation> annotationType, BeanDefinitionProcessor<?> processor) {
-        watches.adapt(annotationType, processor);
+        if (adaptsProcessors) {
+            watches.adapt(annotationType, processor);
+        }
     }
 
     private void initializeEagerBeans() {
@@ -4351,12 +4384,19 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
                         } else {
                             throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                         }
-                        InterceptorCandidates interceptorCandidates = creation.lifecycleInterceptorCandidates();
-                        if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
-                            Object value = registrations.remove(definition);
-                            if (value instanceof List<?> list) {
-                                interceptorCandidates = new InterceptorCandidates.Resolved((List) list);
+                        InterceptorCandidates interceptorCandidates;
+                        try {
+                            interceptorCandidates = creation.lifecycleInterceptorCandidates();
+                            if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
+                                Object value = registrations.remove(definition);
+                                if (value instanceof List<?> list) {
+                                    interceptorCandidates = new InterceptorCandidates.Resolved((List) list);
+                                }
                             }
+                        } catch (RuntimeException | Error e) {
+                            // the creation the instance began ends here, failed, as postBeanCreated would have ended it
+                            watches.endCreation(definition, null);
+                            throw e;
                         }
                         T created = bean;
                         bean = postBeanCreated(context, definition, beanType, qualifier, bean);
@@ -4672,17 +4712,25 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     @Experimental
     public Collection<BeanRegistration<?>> stopRetaining(Predicate<BeanRegistration<?>> retain) {
         ArgumentUtils.requireNonNull("retain", retain);
-        return stopRetaining(new RetentionCriteria() {
-            @Override
-            public boolean retain(BeanRegistration<?> registration) {
-                return retain.test(registration);
-            }
+        return stopRetaining(new PredicateRetentionCriteria(retain));
+    }
 
-            @Override
-            public Set<String> invalidatedBy(BeanRegistration<?> registration) {
-                return Set.of();
-            }
-        });
+    /**
+     * The criteria of {@link #stopRetaining(Predicate)}, which know of no configuration change: a configuration bean a
+     * retained bean holds is retained with it, as any other bean it holds.
+     *
+     * @param retain Which singleton registrations to keep alive
+     */
+    private record PredicateRetentionCriteria(Predicate<BeanRegistration<?>> retain) implements RetentionCriteria {
+        @Override
+        public boolean retain(BeanRegistration<?> registration) {
+            return retain.test(registration);
+        }
+
+        @Override
+        public Set<String> observedConfigurationPrefixes(BeanRegistration<?> registration) {
+            return Set.of();
+        }
     }
 
     /**
@@ -4690,7 +4738,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * {@link RetentionCriteria#retain(BeanRegistration) retain}. A configuration bean, one of
      * {@link io.micronaut.context.annotation.ConfigurationProperties}, {@link io.micronaut.context.annotation.EachProperty}
      * or another {@link ConfigurationReader}, that a retained bean holds does not keep it from being retained when its
-     * prefix is one of the prefixes {@link RetentionCriteria#invalidatedBy(BeanRegistration) whose change releases} the
+     * prefix is one of the prefixes {@link RetentionCriteria#observedConfigurationPrefixes(BeanRegistration) whose change releases} the
      * retained bean, or under one: the configuration bean is not retained, the next context creates its own, and the
      * retained bean keeps what it copied from it, which stays valid until a change under that prefix releases the
      * bean. A retained bean must therefore not keep its configuration bean, only its values. A configuration bean
@@ -5147,45 +5195,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             for (BeanRegistration<?> dependent : disposing.dependentBeans()) {
                 collectDependencies(dependent, into, visited);
             }
-        }
-    }
-
-    /**
-     * What {@link #stopRetaining(RetentionCriteria)} asks about the singletons of the context it stops.
-     *
-     * @since 5.3.0
-     */
-    @Internal
-    @Experimental
-    public interface RetentionCriteria {
-
-        /**
-         * Whether a singleton survives the restart, with what it holds.
-         *
-         * @param registration The singleton's registration
-         * @return True to retain it
-         */
-        boolean retain(BeanRegistration<?> registration);
-
-        /**
-         * The configuration prefixes a change under which releases a singleton this retains: a configuration bean
-         * under one of them that the singleton holds is not retained with it, nor does it keep it from being retained.
-         *
-         * @param registration The retained singleton's registration
-         * @return The prefixes, empty when no configuration change releases it
-         */
-        Set<String> invalidatedBy(BeanRegistration<?> registration);
-
-        /**
-         * Whether the restart replaces a class, so that a retained bean bound to it would keep the stopped generation
-         * of the application reachable and run its old code: a bean whose closure has a definition, an instance or a
-         * prototype it owns of such a class is not retained.
-         *
-         * @param type The class of a definition or an instance in the closure of a retained bean
-         * @return True when the class is replaced
-         */
-        default boolean isReplaced(Class<?> type) {
-            return false;
         }
     }
 
@@ -5671,6 +5680,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * @return True when a retention is in progress and retains it
      * @since 5.3.0
      */
+    @Override
     @Internal
     @Experimental
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -5679,9 +5689,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             // no retention in progress: the common stop, which asks nothing more
             return false;
         }
-        synchronized (this) {
-            return retainedBeans((List) BeanDestructionOrder.sort((Collection) singletonScope.getBeanRegistrations())).contains(bean);
+        Set<Object> retained = retainedOnStopBeans;
+        if (retained == null) {
+            // the first question decides, over the singletons in destruction order; the later ones read the decision
+            synchronized (this) {
+                retained = retainedOnStopBeans;
+                if (retained == null) {
+                    retained = retainedBeans((List) BeanDestructionOrder.sort((Collection) singletonScope.getBeanRegistrations()));
+                }
+            }
         }
+        return retained.contains(bean);
     }
 
     private Set<Object> decideRetainedBeans(List<BeanRegistration> registrations) {
@@ -5695,7 +5713,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             // this context (a provider, a proxy, the context itself) keeps the whole closure from being retained,
             // except configuration a change of which releases the bean: it is not retained, but made again by the next context
             List<BeanRegistration<?>> closure = new ArrayList<>();
-            Set<String> invalidatedBy = criteria.invalidatedBy(registration);
+            Set<String> invalidatedBy = criteria.observedConfigurationPrefixes(registration);
             BeanRegistration<?> bound = collectRetentionClosure(registration, invalidatedBy, closure, Collections.newSetFromMap(new IdentityHashMap<>()));
             if (bound != null) {
                 if (LOG_LIFECYCLE.isWarnEnabled()) {

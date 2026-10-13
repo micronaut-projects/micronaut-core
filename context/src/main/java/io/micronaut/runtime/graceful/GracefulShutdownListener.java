@@ -15,10 +15,10 @@
  */
 package io.micronaut.runtime.graceful;
 
-import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ShutdownEvent;
+import io.micronaut.context.reload.RetainingBeanContext;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.Ordered;
@@ -61,7 +61,7 @@ public final class GracefulShutdownListener implements ApplicationEventListener<
     @Override
     public void onApplicationEvent(ShutdownEvent event) {
         // a context stopping for a restart in development mode leaves running what it retains for the next one
-        shutdownGracefully(event.getSource() instanceof DefaultBeanContext context
+        shutdownGracefully(event.getSource() instanceof RetainingBeanContext context
             ? capable -> !context.isRetainedOnStop(capable)
             : null);
     }

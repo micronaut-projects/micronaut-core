@@ -101,6 +101,29 @@ class GroovySourceCompilerSpec extends Specification {
         Files.exists(out.resolve("example/Base.class"))
     }
 
+    void "a class another compiler changed in the output since the last compilation is seen as it is now"() {
+        given: "a Java class in the shared output and a statically compiled Groovy caller"
+        Path java = Files.createDirectories(project.resolve("src/main/java/example"))
+        Files.createDirectories(out)
+        Files.writeString(java.resolve("Words.java"), 'package example; public class Words { public static String text() { return "one"; } }')
+        javac(java.resolve("Words.java"))
+        write("example/Shout.groovy", "package example\n@groovy.transform.CompileStatic\nclass Shout { static String shout() { Words.text().toUpperCase() } }")
+        assert compiler.compile(request().asFull()).status == CompilationResult.Status.SUCCESS
+
+        when: "the Java class loses the method and Groovy is told"
+        Files.writeString(java.resolve("Words.java"), 'package example; public class Words { public static String words() { return "two"; } }')
+        javac(java.resolve("Words.java"))
+        def result = compiler.compile(request().withAffectedClasses(["example.Words"] as Set))
+
+        then: "the caller fails to compile against the class as it is now"
+        result.status == CompilationResult.Status.FAILED
+        result.compiledSources*.fileName*.toString().contains("Shout.groovy")
+    }
+
+    private void javac(Path source) {
+        assert javax.tools.ToolProvider.systemJavaCompiler.run(null, null, null, "-d", out.toString(), source.toString()) == 0
+    }
+
     private Path write(String relative, String source) {
         Path file = src.resolve(relative)
         Files.createDirectories(file.parent)

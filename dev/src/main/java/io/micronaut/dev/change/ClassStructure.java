@@ -15,7 +15,7 @@
  */
 package io.micronaut.dev.change;
 
-import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 
 import java.lang.classfile.ClassFile;
 import java.lang.classfile.ClassModel;
@@ -40,7 +40,7 @@ import java.util.Arrays;
  * @author graemerocher
  * @since 5.3.0
  */
-@Experimental
+@Internal
 public final class ClassStructure {
 
     private static final String STATIC_INITIALIZER = "<clinit>";
