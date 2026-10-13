@@ -15,7 +15,6 @@
  */
 package io.micronaut.dev.manifest
 
-import io.micronaut.context.reload.ReloadStrategy
 import io.micronaut.context.reload.ResourceKind
 import io.micronaut.dev.compile.CompileMode
 import io.micronaut.dev.compile.SourceKind
@@ -61,7 +60,7 @@ class DevManifestSpec extends Specification {
         then:
         manifest.mainClass() == "example.Application"
         manifest.projectDir() == dir.toAbsolutePath().normalize()
-        manifest.strategy() == ReloadStrategy.RESTART
+        manifest.strategy() == DevReloadStrategy.RESTART
         manifest.runtimeClasspath() == [dir.resolve("lib/a.jar"), dir.resolve("lib/b.jar")]
         manifest.reloadableRoots() == [dir.resolve("build/classes/java/main"), dir.resolve("build/resources/main")]
         manifest.compileClasspath() == [dir.resolve("lib/a.jar"), dir.resolve("lib/b.jar")]
@@ -94,7 +93,7 @@ class DevManifestSpec extends Specification {
         DevManifest manifest = DevManifest.of(dir, properties)
 
         then:
-        manifest.strategy() == ReloadStrategy.RESTART
+        manifest.strategy() == DevReloadStrategy.AUTO
         manifest.compileMode(SourceKind.JAVA) == CompileMode.EMBEDDED
         manifest.liveReload().port() == 35729
     }

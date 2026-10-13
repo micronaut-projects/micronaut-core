@@ -6,12 +6,18 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.dev.compile.SourceKind;
+import io.micronaut.dev.loader.GenerationClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.instrument.Instrumentation;
+import java.lang.instrument.UnmodifiableClassException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -20,6 +26,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -56,6 +63,7 @@ class DevRuntimeTest {
         Files.write(project.resolve("cp.argfile"), classpath);
         Files.writeString(manifestFile, """
             micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
             micronaut.dev.reloadable=build/classes
             micronaut.dev.resources.config=src/main/resources
             micronaut.dev.compile-classpath=@cp.argfile
@@ -154,6 +162,133 @@ class DevRuntimeTest {
     }
 
     @Test
+    void aBodyOnlyEditIsAppliedInPlaceWhenTheManifestAllowsItAndAnAgentIsThere() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest")).mainClass(Application.class).start();
+                }
+            }
+            """);
+        Path greeter = src.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=auto
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            Class<?> type = first.getClassLoader().loadClass("app.Greeter");
+            Object bean = first.getBean(type);
+            assertEquals("one", type.getMethod("greet").invoke(bean));
+            assertEquals(io.micronaut.dev.manifest.DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+
+            // a body-only edit: the same generation, the same context, the same bean, a new body
+            Files.writeString(greeter, greeter("two"));
+            runtime.reload();
+            assertEquals(1, runtime.redefinitions());
+            assertEquals(1, runtime.generation());
+            assertSame(first, runtime.context().orElseThrow());
+            assertEquals("two", type.getMethod("greet").invoke(bean));
+
+            // a structural edit still restarts
+            Files.writeString(greeter, "package app; @jakarta.inject.Singleton public class Greeter { public String greet() { return \"three\"; } public int extra() { return 3; } }");
+            runtime.reload();
+            ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));
+            assertNotSame(first, second);
+            assertEquals("three", greet(second));
+            assertEquals(1, runtime.redefinitions());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void aRedefinitionTheJvmRefusesRestartsWithEveryChangedClassAndLeavesTheRetiredGenerationAsItWas() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest")).mainClass(Application.class).start();
+                }
+            }
+            """);
+        Path greeter = src.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        Path other = src.resolve("Other.java");
+        Files.writeString(other, other("one"));
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=auto
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            assertEquals("one", greet(first));
+            assertEquals(io.micronaut.dev.manifest.DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            refuseRedefinitions(runtime);
+            GenerationClassLoader generation = runtime.classLoader().current();
+            byte[] greeterBefore = DevRuntime.classFile(generation.roots(), "app.Greeter");
+            byte[] otherBefore = DevRuntime.classFile(generation.roots(), "app.Other");
+
+            // two body-only edits the JVM refuses to redefine: the restart applies both
+            Files.writeString(greeter, greeter("two"));
+            Files.writeString(other, other("two"));
+            runtime.reload();
+            ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));
+            assertNotSame(first, second);
+            assertEquals(0, runtime.redefinitions());
+            assertEquals("two", greet(second));
+            Class<?> otherType = second.getClassLoader().loadClass("app.Other");
+            assertEquals("two", otherType.getMethod("value").invoke(null));
+            // the retired generation's snapshot holds the class files it ran with, not the refused ones
+            assertArrayEquals(greeterBefore, DevRuntime.classFile(generation.roots(), "app.Greeter"));
+            assertArrayEquals(otherBefore, DevRuntime.classFile(generation.roots(), "app.Other"));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    /**
+     * Gives the runtime an agent that refuses every redefinition, as the JVM does a change it cannot apply.
+     */
+    private static void refuseRedefinitions(DevRuntime runtime) throws ReflectiveOperationException {
+        Field field = DevRuntime.class.getDeclaredField("instrumentation");
+        field.setAccessible(true);
+        Instrumentation agent = (Instrumentation) field.get(runtime);
+        field.set(runtime, Proxy.newProxyInstance(DevRuntimeTest.class.getClassLoader(), new Class<?>[] {Instrumentation.class}, (proxy, method, args) -> {
+            if (method.getName().equals("redefineClasses")) {
+                throw new UnmodifiableClassException("refused by the test");
+            }
+            try {
+                return method.invoke(agent, args);
+            } catch (InvocationTargetException e) {
+                throw e.getCause();
+            }
+        }));
+    }
+
+    @Test
     void theSourcesOfAFailedCompilationCompileAgainWithTheNextEdit() throws Exception {
         Path src = Files.createDirectories(project.resolve("src/main/java/app"));
         Files.writeString(src.resolve("Application.java"), """
@@ -205,10 +340,10 @@ class DevRuntimeTest {
             assertTrue(runtime.lastFailure().get().describe().contains("incompatible types"));
             assertEquals(2, runtime.generation());
 
-            // the fix reloads both edits
+            // the fix applies both edits, by a restart or, body only, in place
             Files.writeString(greeter, greeter("three"));
             runtime.sourcesChanged(SourceKind.JAVA, Set.of(greeter), Set.of());
-            ApplicationContext fixed = runtime.awaitGeneration(3, Duration.ofMinutes(2));
+            ApplicationContext fixed = runtime.context().orElseThrow();
             assertTrue(runtime.lastFailure().isEmpty());
             assertEquals("three", greet(fixed));
             Class<?> otherType = fixed.getClassLoader().loadClass("app.Other");

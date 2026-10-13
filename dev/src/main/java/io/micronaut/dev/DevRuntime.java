@@ -29,7 +29,10 @@ import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.context.reload.ClassChange;
+import io.micronaut.dev.agent.DynamicAttach;
 import io.micronaut.dev.change.ChangeSet;
+import io.micronaut.dev.change.ClassStructure;
 import io.micronaut.dev.change.OutputSnapshot;
 import io.micronaut.dev.compile.CompilationRequest;
 import io.micronaut.dev.compile.CompilationResult;
@@ -42,6 +45,7 @@ import io.micronaut.dev.livereload.LiveReloadServerFactory;
 import io.micronaut.dev.loader.DevClassLoader;
 import io.micronaut.dev.loader.GenerationClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
+import io.micronaut.dev.manifest.DevReloadStrategy;
 import io.micronaut.dev.manifest.ResourceRoot;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
@@ -56,6 +60,8 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.instrument.ClassDefinition;
+import java.lang.instrument.Instrumentation;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -68,6 +74,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -77,6 +84,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -142,6 +150,8 @@ public final class DevRuntime implements Closeable {
     private @Nullable DirectoryWatcher watcher;
     // read by the request threads of the script filter and the /dev endpoint, set by the launcher
     private volatile @Nullable LiveReloadServer liveReload; // NOSONAR java:S3077 thread-safe server, replaced whole
+    private @Nullable Instrumentation instrumentation;
+    private final AtomicInteger redefinitions = new AtomicInteger();
     private final Map<Path, FileWatcherRegistration> pinnedWatches = new ConcurrentHashMap<>();
     private volatile @Nullable Thread worker; // NOSONAR java:S3077 only the reference is published
     private OutputSnapshot snapshot = OutputSnapshot.empty();
@@ -227,6 +237,13 @@ public final class DevRuntime implements Closeable {
         ApplicationContext first;
         try {
             snapshot = OutputSnapshot.of(manifest.reloadableRoots());
+            if (manifest.strategy() != DevReloadStrategy.RESTART) {
+                // the fast path needs an agent: the launcher's, or one attached now
+                instrumentation = DynamicAttach.instrumentation();
+                if (instrumentation != null && !instrumentation.isRedefineClassesSupported()) {
+                    instrumentation = null;
+                }
+            }
             startLiveReload();
             startWatching();
             Thread thread = new Thread(this::processBatches, "micronaut-dev-reload");
@@ -297,10 +314,18 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
-     * @return The strategy applied: RESTART, the only one implemented, whatever the manifest asks for
+     * @return The strategy in force: RESTART when the manifest asks for it or no agent is available, otherwise
+     *         the manifest's, under which a change to method bodies alone is applied in place and anything else restarts
      */
-    public ReloadStrategy strategy() {
-        return ReloadStrategy.RESTART;
+    public DevReloadStrategy strategy() {
+        return instrumentation == null ? DevReloadStrategy.RESTART : manifest.strategy();
+    }
+
+    /**
+     * @return How many times a change was applied in place, by redefining method bodies, since the start
+     */
+    public int redefinitions() {
+        return redefinitions.get();
     }
 
     /**
@@ -938,6 +963,9 @@ public final class DevRuntime implements Closeable {
             }
             return;
         }
+        if (!configurationChanged && !batch.forcesRestart() && !startFailed && redefine(changeSet, start)) {
+            return;
+        }
         restart(changeSet, !configurationChanged, start);
     }
 
@@ -958,6 +986,95 @@ public final class DevRuntime implements Closeable {
                 return batch.forcesRestart();
             }
         };
+    }
+
+    /**
+     * The fast path: when every changed class kept its structure and no generated class changed, the
+     * JVM redefines the loaded ones in place and the generation's snapshot gets the new bytes for the
+     * rest, so that the running beans see the new bodies and nothing restarts.
+     *
+     * @return Whether the change was applied this way
+     */
+    private boolean redefine(ChangeSet changeSet, long startNanos) {
+        Instrumentation agent = instrumentation;
+        if (agent == null || strategy() == DevReloadStrategy.RESTART || changeSet.classes().isEmpty()
+            || !changeSet.changedResources().isEmpty() || !changeSet.removedResources().isEmpty()) {
+            return false;
+        }
+        GenerationClassLoader generation = classLoader.current();
+        List<ClassDefinition> definitions = new ArrayList<>();
+        Map<String, byte[]> originals = new LinkedHashMap<>();
+        Map<String, byte[]> replacements = new LinkedHashMap<>();
+        for (ClassChange change : changeSet.classes()) {
+            String name = change.className();
+            String simpleName = name.substring(name.lastIndexOf('.') + 1);
+            if (change.kind() != ClassChange.Kind.MODIFIED || simpleName.startsWith("$")) {
+                // a class added or removed, or a generated one that changed: the definitions changed shape
+                return false;
+            }
+            byte[] before = classFile(generation.roots(), name);
+            byte[] after = classFile(manifest.reloadableRoots(), name);
+            if (before == null || after == null || !ClassStructure.bodyOnlyChange(before, after)) {
+                return false;
+            }
+            originals.put(name, before);
+            replacements.put(name, after);
+        }
+        ApplicationContext current = context;
+        ClassFileReplacement snapshotChange = new ClassFileReplacement(generation);
+        try {
+            // the snapshot first: a class a thread loads from now on is the new version, and one loaded before is
+            // found below and redefined; nothing can load the old version in between
+            for (Map.Entry<String, byte[]> entry : replacements.entrySet()) {
+                snapshotChange.replace(entry.getKey(), Objects.requireNonNull(originals.get(entry.getKey())), entry.getValue());
+            }
+            for (Map.Entry<String, byte[]> entry : replacements.entrySet()) {
+                Class<?> loaded = generation.loadedClass(entry.getKey());
+                if (loaded != null) {
+                    definitions.add(new ClassDefinition(loaded, entry.getValue()));
+                }
+            }
+            if (!definitions.isEmpty()) {
+                agent.redefineClasses(definitions.toArray(new ClassDefinition[0]));
+            }
+        } catch (Exception | LinkageError e) {
+            // the snapshot gets back the class files it held; the restart that follows applies the whole change
+            snapshotChange.rollBack();
+            LOG.info("Cannot redefine {} class(es) in place: restarting instead", replacements.size(), e);
+            return false;
+        }
+        redefinitions.incrementAndGet();
+        Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
+        if (current != null && current.isRunning()) {
+            ClassChangeEvent event = new ClassChangeEvent(this, Set.of(), generation, changeSet.classes(), ReloadStrategy.RELOAD);
+            try {
+                current.publishEvent(event);
+                current.publishEvent(new ReloadCompletedEvent(this, event, List.of(), List.of(), elapsed));
+            } catch (RuntimeException e) {
+                LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
+            }
+        }
+        LOG.info("Redefined {} class(es) in place in {} ms: method bodies only, generation {} keeps running", replacements.size(), elapsed.toMillis(), generation.generation());
+        LiveReloadServer server = liveReload;
+        if (server != null) {
+            server.reload("/", false);
+        }
+        return true;
+    }
+
+    static byte @Nullable [] classFile(List<Path> roots, String className) {
+        String relative = className.replace('.', '/') + ".class";
+        for (Path root : roots) {
+            Path file = root.resolve(relative);
+            if (Files.isRegularFile(file)) {
+                try {
+                    return Files.readAllBytes(file);
+                } catch (IOException e) {
+                    return null;
+                }
+            }
+        }
+        return null;
     }
 
     private void restart(ChangeSet changeSet, boolean retentionAllowed, long startNanos) {
