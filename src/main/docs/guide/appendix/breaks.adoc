@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== The built-in load balancers look up the discovery clients without a Reactor chain (5.3)
+
+The built-in load balancers and composite clients implement the new experimental `AsyncLoadBalancer`, `AsyncDiscoveryClient` and `AsyncConfigurationClient` interfaces, and `DefaultAsyncFunctionDiscoveryClient` serves the `@FunctionClient` methods that return a `CompletionStage` or a value. They call the `DiscoveryClient` beans that do not implement `AsyncDiscoveryClient` through their publishers, with a plain subscriber. When such a publisher is a Reactor publisher, its Reactor context holds the propagated context of the request, but no longer the other entries of the Reactor context of the caller. The `LoadBalancer`, `DiscoveryClient`, `ConfigurationClient` and `FunctionDiscoveryClient` interfaces are unchanged, and a load balancer that does not implement `AsyncLoadBalancer` is selected through its publisher as before.
+
 === Refreshing the Logback configuration follows Logback's own lookup (5.3)
 
 When any `logger.*` property is set, the Micronaut framework resets Logback and configures it again. Previously that refresh used the first `Configurator` service regardless of its rank and of the status it returned, and otherwise the file set with `logback.configurationFile` or `logger.config`, or `logback.xml`. Now, unless a Logback XML configuration file is set in Micronaut configuration, the refresh configures Logback the same way Logback configures itself at startup:
