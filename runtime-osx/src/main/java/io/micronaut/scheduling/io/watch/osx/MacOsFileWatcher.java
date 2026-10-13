@@ -17,7 +17,6 @@ package io.micronaut.scheduling.io.watch.osx;
 
 import com.sun.jna.Library;
 import io.methvin.watchservice.MacOSXListeningWatchService;
-import io.methvin.watchservice.WatchablePath;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
@@ -28,12 +27,12 @@ import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
-import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchService;
 
 /**
  * The file watcher of the context over the native macOS service, which it registers directories with as
- * {@link WatchablePath}s and leaves open when it closes, because closing it has crashed the JVM.
+ * {@code WatchablePath}s, giving a directory under a registered one the key of that one, whose stream reports its
+ * changes (see {@link NativeWatchRegistrar}), and leaves open when it closes, because closing it has crashed the JVM.
  *
  * @author graemerocher
  * @since 5.3.0
@@ -47,7 +46,7 @@ public class MacOsFileWatcher extends DefaultFileWatcher {
 
     /**
      * @param watchServices The watch service, obtained by the first registration
-     * @param configuration The configuration, if the watch paths are set
+     * @param configuration The configuration of the check interval and the quiet period
      */
     public MacOsFileWatcher(BeanProvider<WatchService> watchServices, @Nullable FileWatchConfiguration configuration) {
         super(watchServices, configuration);
@@ -60,12 +59,7 @@ public class MacOsFileWatcher extends DefaultFileWatcher {
             return builder;
         }
         return builder
-            .registrar((directory, service) -> new WatchablePath(directory).register(
-                service,
-                StandardWatchEventKinds.ENTRY_CREATE,
-                StandardWatchEventKinds.ENTRY_DELETE,
-                StandardWatchEventKinds.ENTRY_MODIFY
-            ))
+            .registrar(new NativeWatchRegistrar())
             .closeWatchServiceOnClose(false);
     }
 }

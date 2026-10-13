@@ -108,9 +108,11 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
      */
     private final Map<Path, WatchedDirectory> directories = new LinkedHashMap<>();
     /**
-     * Watched directories by key. Guarded by {@code this}.
+     * Watched directories by key. A key may report the changes of several directories: the native macOS service
+     * reports those of a whole tree through the key of the directory it registered natively, and a directory deleted
+     * and created again keeps its old key, besides its new one, until the old key is drained. Guarded by {@code this}.
      */
-    private final Map<WatchKey, WatchedDirectory> directoriesByKey = new LinkedHashMap<>();
+    private final Map<WatchKey, List<WatchedDirectory>> directoriesByKey = new LinkedHashMap<>();
     /**
      * The registrations with changes waiting for the quiet period to elapse. Each registration keeps its own, decided
      * when they are recorded, so that a registration receives only changes recorded after it was made, merged only
@@ -269,8 +271,8 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
             synchronized (this) {
                 closing = List.copyOf(registrations);
                 registrations.clear();
-                for (WatchedDirectory directory : directories.values()) {
-                    directory.key.cancel();
+                for (WatchKey key : directoriesByKey.keySet()) {
+                    registrar.cancel(key);
                 }
                 directories.clear();
                 directoriesByKey.clear();
@@ -337,7 +339,9 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
     private boolean drain(WatchKey key) {
         WatchedDirectory directory;
         synchronized (this) {
-            directory = directoriesByKey.get(key);
+            List<WatchedDirectory> reporting = directoriesByKey.get(key);
+            // the directory the key was registered for: a native key of a tree reports absolute paths, which resolve alike
+            directory = reporting == null ? null : reporting.get(0);
         }
         if (directory == null) {
             // a key of a directory a registration released, or one another component registered with the same service
@@ -369,7 +373,7 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
             }
         }
         if (!key.reset()) {
-            release(directory);
+            release(key);
         }
         return recorded;
     }
@@ -510,11 +514,16 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         }
         Path absolute = directory.toAbsolutePath().normalize();
         WatchedDirectory watched = directories.get(absolute);
+        if (watched != null && !watched.key.isValid()) {
+            // deleted and created again, and the parent's CREATE came before the old key was drained: the old key
+            // reports nothing more, so the directory is registered anew for the owners it has
+            watched = renew(watched);
+        }
         if (watched == null) {
             WatchKey key = registrar.register(absolute, watchService);
             watched = new WatchedDirectory(absolute, key);
             directories.put(absolute, watched);
-            directoriesByKey.put(key, watched);
+            directoriesByKey.computeIfAbsent(key, k -> new ArrayList<>(1)).add(watched);
         }
         // the initial scan and the watch thread may both register a directory created during the scan
         if (!watched.owners.contains(registration)) {
@@ -525,26 +534,67 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         }
     }
 
-    private synchronized void release(WatchedDirectory directory) {
-        directories.remove(directory.path);
-        directoriesByKey.remove(directory.key);
-        for (DirectoryRegistration owner : directory.owners) {
-            owner.directories.remove(directory);
+    /**
+     * Registers again a directory whose key became invalid, for the owners it has. The old entry keeps its key until
+     * that key is drained, so that the changes it still reports are recorded, and releasing it then leaves the new
+     * entry alone.
+     */
+    private WatchedDirectory renew(WatchedDirectory stale) throws IOException {
+        WatchKey key = registrar.register(stale.path, watchService);
+        WatchedDirectory renewed = new WatchedDirectory(stale.path, key);
+        renewed.owners.addAll(stale.owners);
+        for (DirectoryRegistration owner : stale.owners) {
+            owner.directories.replaceAll(directory -> directory == stale ? renewed : directory);
         }
-        directory.owners.clear();
-        directory.key.cancel();
+        stale.owners.clear();
+        directories.put(stale.path, renewed);
+        directoriesByKey.computeIfAbsent(key, k -> new ArrayList<>(1)).add(renewed);
+        return renewed;
+    }
+
+    /**
+     * Releases the directories of a key that became invalid. A directory registered anew since is not among them.
+     */
+    private synchronized void release(WatchKey key) {
+        List<WatchedDirectory> reporting = directoriesByKey.remove(key);
+        if (reporting == null) {
+            return;
+        }
+        for (WatchedDirectory directory : reporting) {
+            directories.remove(directory.path, directory);
+            for (DirectoryRegistration owner : directory.owners) {
+                owner.directories.remove(directory);
+            }
+            directory.owners.clear();
+        }
+        registrar.cancel(key);
     }
 
     private synchronized void unregister(DirectoryRegistration registration) {
         for (WatchedDirectory directory : List.copyOf(registration.directories)) {
             directory.owners.remove(registration);
             if (directory.owners.isEmpty()) {
-                directories.remove(directory.path);
-                directoriesByKey.remove(directory.key);
-                directory.key.cancel();
+                directories.remove(directory.path, directory);
+                forget(directory);
             }
         }
         registration.directories.clear();
+    }
+
+    /**
+     * Removes a directory no registration owns from those its key reports for, and cancels the key once none is left:
+     * a native key of a tree stays while a registration of a directory under its root is active.
+     */
+    private void forget(WatchedDirectory directory) {
+        List<WatchedDirectory> reporting = directoriesByKey.get(directory.key);
+        if (reporting == null) {
+            return;
+        }
+        reporting.remove(directory);
+        if (reporting.isEmpty()) {
+            directoriesByKey.remove(directory.key);
+            registrar.cancel(directory.key);
+        }
     }
 
     private static boolean isHidden(Path dir) {
@@ -576,6 +626,17 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
          * @throws IOException if registration fails
          */
         WatchKey register(Path directory, WatchService watchService) throws IOException;
+
+        /**
+         * Cancels a key once no watched directory is left that it reports for. A service whose keys must outlive
+         * that, such as the native macOS one, which answers a later registration under a registered directory with a
+         * key that never reports, keeps them.
+         *
+         * @param key The key
+         */
+        default void cancel(WatchKey key) {
+            key.cancel();
+        }
     }
 
     /**
@@ -870,6 +931,20 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
                 if (!registrationActive || held.isEmpty()) {
                     inFlight = false;
                     held.clear();
+                    return;
+                }
+                if (!pending.isEmpty()) {
+                    // later changes are still in their quiet period: the held ones join them, merged in order, so
+                    // that a file created while the stage was pending and deleted since is not reported, and are
+                    // delivered with them
+                    List<FileChange> later = List.copyOf(pending.values());
+                    pending.clear();
+                    pending.putAll(held);
+                    held.clear();
+                    for (FileChange change : later) {
+                        merge(pending, change.path(), change.type());
+                    }
+                    inFlight = false;
                     return;
                 }
                 changes = List.copyOf(held.values());
