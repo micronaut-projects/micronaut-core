@@ -60,6 +60,7 @@ import io.micronaut.runtime.EmbeddedApplication;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import io.micronaut.scheduling.io.watch.FileChange;
 import io.micronaut.scheduling.io.watch.FileChangeBatch;
+import io.micronaut.scheduling.io.watch.FileWatcherRegistration;
 import io.micronaut.scheduling.io.watch.event.WatchEventType;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -87,6 +88,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -170,6 +172,7 @@ public final class DevRuntime implements Closeable {
     private @Nullable Instrumentation instrumentation;
     private final AtomicInteger redefinitions = new AtomicInteger();
     private final AtomicInteger inPlacePatches = new AtomicInteger();
+    private final Map<Path, FileWatcherRegistration> pinnedWatches = new ConcurrentHashMap<>();
     private volatile @Nullable Thread worker; // NOSONAR java:S3077 only the reference is published
     private OutputSnapshot snapshot = OutputSnapshot.empty();
     /**
@@ -397,10 +400,33 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
-     * @return The roots the runtime watches
+     * The one watcher of the process, over the manifest's roots, which the {@link io.micronaut.scheduling.io.watch.FileWatcher}
+     * bean of every context registers through.
+     *
+     * @return The watcher, or null before the runtime started watching
+     */
+    @Nullable
+    DirectoryWatcher fileWatcher() {
+        return watcher;
+    }
+
+    /**
+     * @return The directories outside the roots that a context's file watcher bean registered, kept watched for the process
+     */
+    Map<Path, FileWatcherRegistration> pinnedWatches() {
+        return pinnedWatches;
+    }
+
+    /**
+     * @return The roots the runtime watches, and the directories outside them a context's file watcher bean registered
      */
     public List<Path> watchedRoots() {
-        return watchedRoots;
+        if (pinnedWatches.isEmpty()) {
+            return watchedRoots;
+        }
+        Set<Path> roots = new LinkedHashSet<>(watchedRoots);
+        roots.addAll(pinnedWatches.keySet());
+        return List.copyOf(roots);
     }
 
     /**
@@ -1054,12 +1080,35 @@ public final class DevRuntime implements Closeable {
                 continue;
             }
             if (change.type() == WatchEventType.DELETE) {
-                removed.add(change.path());
+                for (Path file : liveRemoved(change.path())) {
+                    if (own.equals(mostSpecificRoot(file))) {
+                        removed.add(file);
+                    }
+                }
             } else {
+                classLoader.liveResources().seen(change.path());
                 changed.add(change.path());
             }
         }
         return new Pending(Map.of(), Map.of(root.kind(), new SourceChanges(changed, removed)), false);
+    }
+
+    /**
+     * The resources a deletion removes: the file deleted, or every file known under a directory deleted as a whole,
+     * whose events may name only the directory. Each is recorded as belonging to its live root, so that the build
+     * output's copy of it is not served in its place.
+     */
+    private Set<Path> liveRemoved(Path path) {
+        Path absolute = path.toAbsolutePath().normalize();
+        Set<Path> removed = new LinkedHashSet<>();
+        removed.add(absolute);
+        List<Path> under = classLoader.liveResources().knownUnder(absolute);
+        if (under.isEmpty()) {
+            classLoader.liveResources().seen(absolute);
+        } else {
+            removed.addAll(under);
+        }
+        return removed;
     }
 
     /**
@@ -1298,22 +1347,10 @@ public final class DevRuntime implements Closeable {
             // the broken language compiles again; a batch that did not touch it leaves the failure shown
             lastFailure = null;
         }
-        // resources that are not configuration reach the running context's watches; configuration is refreshed
-        boolean configurationChanged = false;
+        // every resource change reaches the running context's watches, those under the configuration root too;
+        // a configuration file changed also refreshes the configuration
         ApplicationContext current = context;
-        for (Map.Entry<ResourceKind, SourceChanges> entry : batch.resources.entrySet()) {
-            if (entry.getKey() == ResourceKind.CONFIG) {
-                configurationChanged = true;
-            } else {
-                if (current instanceof DefaultBeanContext defaultBeanContext && current.isRunning()) {
-                    defaultBeanContext.notifyResourceChange(new ResourceChange(entry.getKey(), rootsOf(entry.getKey()),
-                        new ArrayList<>(entry.getValue().changed()), new ArrayList<>(entry.getValue().deleted()), false));
-                }
-                if (entry.getKey() == ResourceKind.STATIC || entry.getKey() == ResourceKind.VIEWS) {
-                    refreshBrowsers(entry.getValue());
-                }
-            }
-        }
+        boolean configurationChanged = ResourceNotifier.notify(current, batch.resources, this::rootsOf, this::refreshBrowsers);
         OutputSnapshot previous = snapshot;
         OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
         ChangeSet changeSet = previous.diff(latest);
