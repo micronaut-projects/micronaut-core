@@ -61,7 +61,7 @@ public final class ClassChangeEvent extends ApplicationEvent {
      * @param retiredLoaders The classloaders of the generations retired by this change; a class loaded by one of them is stale
      * @param newLoader The classloader of the new generation
      * @param changes The changed classes
-     * @param strategy The strategy the launcher applies, {@link ReloadStrategy#RESTART} or {@link ReloadStrategy#RELOAD}
+     * @param strategy The strategy the launcher applies
      */
     public ClassChangeEvent(Object source,
                             Set<ClassLoader> retiredLoaders,
@@ -76,9 +76,6 @@ public final class ClassChangeEvent extends ApplicationEvent {
         this.newLoader = Objects.requireNonNull(newLoader, "newLoader");
         this.changes = List.copyOf(Objects.requireNonNull(changes, "changes"));
         this.strategy = Objects.requireNonNull(strategy, "strategy");
-        if (strategy == ReloadStrategy.AUTO) {
-            throw new IllegalArgumentException("The strategy of a change is the one applied, RESTART or RELOAD, not AUTO");
-        }
     }
 
     /**
@@ -103,7 +100,7 @@ public final class ClassChangeEvent extends ApplicationEvent {
     }
 
     /**
-     * @return The strategy applied: {@link ReloadStrategy#RESTART} or {@link ReloadStrategy#RELOAD}
+     * @return The strategy applied
      */
     public ReloadStrategy strategy() {
         return strategy;

@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanDependencyResolver
 import io.micronaut.context.BeanRegistration
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.reload.RetentionCriteria
 import spock.lang.Specification
 
 /**
@@ -72,14 +73,14 @@ class RetainedResolverSpec extends Specification {
         ConnectionSettings settings = first.getBean(ConnectionSettings)
 
         when:
-        Collection<BeanRegistration<?>> retained = ((DefaultBeanContext) first).stopRetaining(new DefaultBeanContext.RetentionCriteria() {
+        Collection<BeanRegistration<?>> retained = ((DefaultBeanContext) first).stopRetaining(new RetentionCriteria() {
             @Override
             boolean retain(BeanRegistration<?> registration) {
                 return Connection.isAssignableFrom(registration.beanType)
             }
 
             @Override
-            Set<String> invalidatedBy(BeanRegistration<?> registration) {
+            Set<String> observedConfigurationPrefixes(BeanRegistration<?> registration) {
                 return Set.of('resolver.connection')
             }
         })
