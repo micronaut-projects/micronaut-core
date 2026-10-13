@@ -3,6 +3,7 @@ package io.micronaut.http.client.loadbalance
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.publisher.CompletionStagePublishers
+import io.micronaut.discovery.AsyncDiscoveryClient
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.exceptions.NoAvailableServiceException
@@ -27,7 +28,7 @@ import java.util.concurrent.CompletionStage
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * The Netty client selects the instance with {@link io.micronaut.http.client.LoadBalancer#selectAsync},
+ * The Netty client selects the instance with {@link io.micronaut.http.client.AsyncLoadBalancer#selectAsync},
  * which a discovery client completes asynchronously, and cancels the selection with the request.
  */
 class LoadBalancerSelectAsyncClientSpec extends Specification {
@@ -102,7 +103,7 @@ class LoadBalancerSelectAsyncClientSpec extends Specification {
      */
     @Singleton
     @Requires(property = 'spec.name', value = 'LoadBalancerSelectAsyncClientSpec')
-    static class PendingDiscoveryClient implements DiscoveryClient {
+    static class PendingDiscoveryClient implements DiscoveryClient, AsyncDiscoveryClient {
         final List<String> requested = new CopyOnWriteArrayList<>()
         final List<CompletableFuture<List<ServiceInstance>>> futures = new CopyOnWriteArrayList<>()
 
@@ -123,6 +124,11 @@ class LoadBalancerSelectAsyncClientSpec extends Specification {
             requested << serviceId
             futures << future
             return future
+        }
+
+        @Override
+        CompletionStage<List<String>> getServiceIdsAsync() {
+            CompletableFuture.completedFuture(['pending'])
         }
 
         @Override

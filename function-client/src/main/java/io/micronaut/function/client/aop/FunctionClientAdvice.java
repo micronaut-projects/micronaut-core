@@ -24,12 +24,16 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.function.client.AsyncFunctionDiscoveryClient;
+import io.micronaut.function.client.DefaultAsyncFunctionDiscoveryClient;
+import io.micronaut.function.client.DefaultFunctionDiscoveryClient;
 import io.micronaut.function.client.FunctionDefinition;
 import io.micronaut.function.client.FunctionDiscoveryClient;
 import io.micronaut.function.client.FunctionInvoker;
 import io.micronaut.function.client.FunctionInvokerChooser;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import reactor.core.Exceptions;
@@ -42,6 +46,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /**
  * Implements advice for the {@link io.micronaut.function.client.FunctionClient} annotation.
@@ -56,6 +61,12 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
     private final FunctionDiscoveryClient discoveryClient;
     private final FunctionInvokerChooser functionInvokerChooser;
     /**
+     * The client the functions are looked up with when the method returns a stage or a value, or
+     * {@code null} to look them up with {@link #discoveryClient}.
+     */
+    @Nullable
+    private final AsyncFunctionDiscoveryClient asyncDiscoveryClient;
+    /**
      * The function name of each method, which does not change.
      */
     private final Map<ExecutableMethod<?, ?>, String> functionNames = new ConcurrentHashMap<>();
@@ -68,9 +79,33 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
      * @param functionInvokerChooser functionInvokerChooser
      */
     public FunctionClientAdvice(ConversionService conversionService, FunctionDiscoveryClient discoveryClient, FunctionInvokerChooser functionInvokerChooser) {
+        this(conversionService, discoveryClient, null, functionInvokerChooser);
+    }
+
+    /**
+     * Constructor. The functions of the methods that return a {@link CompletionStage} or a value
+     * are looked up with the {@link AsyncFunctionDiscoveryClient}, unless it is the default one
+     * and the {@link FunctionDiscoveryClient} is not, so that a replaced
+     * {@link FunctionDiscoveryClient} keeps being used.
+     *
+     * @param conversionService      The conversion service
+     * @param discoveryClient        The function discovery client
+     * @param asyncDiscoveryClient   The asynchronous function discovery client, if any
+     * @param functionInvokerChooser The function invoker chooser
+     * @since 5.3.0
+     */
+    @Inject
+    public FunctionClientAdvice(ConversionService conversionService,
+                                FunctionDiscoveryClient discoveryClient,
+                                @Nullable AsyncFunctionDiscoveryClient asyncDiscoveryClient,
+                                FunctionInvokerChooser functionInvokerChooser) {
         this.conversionService = conversionService;
         this.discoveryClient = discoveryClient;
         this.functionInvokerChooser = functionInvokerChooser;
+        boolean replaced = asyncDiscoveryClient != null
+            && asyncDiscoveryClient.getClass() == DefaultAsyncFunctionDiscoveryClient.class
+            && discoveryClient.getClass() != DefaultFunctionDiscoveryClient.class;
+        this.asyncDiscoveryClient = replaced ? null : asyncDiscoveryClient;
     }
 
     @Nullable
@@ -157,19 +192,22 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
     }
 
     /**
-     * The function definition from {@link FunctionDiscoveryClient#getFunctionAsync(String)}, or
-     * from {@link FunctionDiscoveryClient#getFunction(String)} when the former returns no stage,
-     * or a stage completed with {@code null}, like a mock that only stubs the publisher method.
+     * The function definition from {@link AsyncFunctionDiscoveryClient#getFunction(String)}, or
+     * from {@link FunctionDiscoveryClient#getFunction(String)} when there is no asynchronous
+     * client, or when it returns no stage, or a stage completed with {@code null}, like a mock.
      */
     private CompletionStage<FunctionDefinition> functionDefinition(String functionName) {
-        return CompletionStagePublishers.orElseIfNull(discoveryClient.getFunctionAsync(functionName), () ->
+        Supplier<CompletionStage<FunctionDefinition>> fromPublisher = () ->
             CompletionStagePublishers.map(CompletionStagePublishers.first(discoveryClient.getFunction(functionName), null), def -> {
                 if (def == null) {
                     throw new FunctionNotFoundException(functionName);
                 }
                 return def;
-            })
-        );
+            });
+        if (asyncDiscoveryClient == null) {
+            return fromPublisher.get();
+        }
+        return CompletionStagePublishers.orElseIfNull(asyncDiscoveryClient.getFunction(functionName), fromPublisher);
     }
 
     /**
