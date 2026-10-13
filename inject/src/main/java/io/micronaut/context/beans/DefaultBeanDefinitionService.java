@@ -129,11 +129,12 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     private final List<BeanConfiguration> additionalBeanConfigurations = new ArrayList<>();
 
     /**
-     * Creates a new bean context with the given configuration.
+     * Creates a new bean definition service with the given configuration and the customizer serving the context.
      *
      * @param contextConfiguration The context configuration
+     * @param beanResolutionCustomizer The bean resolution customizer of the context
      */
-    public DefaultBeanDefinitionService(BeanContextConfiguration contextConfiguration) {
+    public DefaultBeanDefinitionService(BeanContextConfiguration contextConfiguration, BeanResolutionCustomizer beanResolutionCustomizer) {
         Set<Class<? extends Annotation>> eagerInitAnnotated = contextConfiguration.getEagerInitAnnotated();
         List<String> configuredEagerSingletonAnnotations = new ArrayList<>(eagerInitAnnotated.size());
         for (Class<? extends Annotation> ann : eagerInitAnnotated) {
@@ -145,10 +146,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         this.beansPredicate = contextConfiguration.beansPredicate();
         this.beanConfigurationsPredicate = contextConfiguration.beanConfiguraionsPredicate();
         this.beanDefinitionReferencesProvider = contextConfiguration.getBeanDefinitionsProvider();
-        this.beanResolutionCustomizer = Objects.requireNonNull(
-            contextConfiguration.beanResolutionCustomizer(),
-            "Bean resolution customizer cannot be null"
-        );
+        this.beanResolutionCustomizer = Objects.requireNonNull(beanResolutionCustomizer, "Bean resolution customizer cannot be null");
         this.classLoader = contextConfiguration.getClassLoader();
         if (beans == null) {
             beans = createBeans(resolveBeanDefinitionReferences(), List.of());
