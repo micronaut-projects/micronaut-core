@@ -2,6 +2,7 @@ package io.micronaut.management.health.indicator.discovery
 
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.async.publisher.CompletionStagePublishers
+import io.micronaut.discovery.AsyncDiscoveryClient
 import io.micronaut.discovery.CompositeDiscoveryClient
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
@@ -209,7 +210,7 @@ class DiscoveryClientHealthIndicatorAsyncSpec extends Specification {
         }
     }
 
-    static class AsyncOnlyClient implements DiscoveryClient {
+    static class AsyncOnlyClient implements DiscoveryClient, AsyncDiscoveryClient {
         final String description
         final CompletableFuture<List<String>> serviceIds
         final Map<String, CompletableFuture<List<ServiceInstance>>> instances
@@ -250,13 +251,18 @@ class DiscoveryClientHealthIndicatorAsyncSpec extends Specification {
         }
     }
 
-    static class FailingCompositeClient extends CompositeDiscoveryClient {
+    static class FailingCompositeClient extends CompositeDiscoveryClient implements AsyncDiscoveryClient {
         FailingCompositeClient(DiscoveryClient child) {
             super([child] as DiscoveryClient[])
         }
 
         @Override
         CompletionStage<List<String>> getServiceIdsAsync() {
+            return CompletableFuture.failedFuture(new ConfigurationException('No cache configured for name: discovery-client'))
+        }
+
+        @Override
+        CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
             return CompletableFuture.failedFuture(new ConfigurationException('No cache configured for name: discovery-client'))
         }
     }

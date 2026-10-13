@@ -232,6 +232,28 @@ public interface BodyElements<T> extends AutoCloseable {
      * @return The elements
      */
     static <T> BodyElements<T> of(Supplier<? extends CompletionStage<Optional<T>>> next, Runnable close) {
+        Objects.requireNonNull(close, "close");
+        return ofAsync(next, () -> {
+            close.run();
+            return CompletableFuture.completedStage(null);
+        });
+    }
+
+    /**
+     * The elements a function produces, with asynchronous resource cleanup, e.g. a database
+     * cursor whose close operation returns a stage. Cleanup starts once when the elements are
+     * closed. {@link #closeAsync()} waits for its completion and reports its failure;
+     * {@link #close()} starts it without waiting. Cancelling a future obtained from the cleanup
+     * stage does not cancel cleanup. Finishing a read does not itself close these elements.
+     *
+     * @param next Produces the next element, see {@link #next()}
+     * @param close Starts resource cleanup and returns its completion stage
+     * @param <T> The type of an element
+     * @return The elements
+     * @since 5.3.0
+     */
+    static <T> BodyElements<T> ofAsync(Supplier<? extends CompletionStage<Optional<T>>> next,
+                                     Supplier<? extends CompletionStage<Void>> close) {
         return new SuppliedBodyElements<>(Objects.requireNonNull(next, "next"), Objects.requireNonNull(close, "close"));
     }
 

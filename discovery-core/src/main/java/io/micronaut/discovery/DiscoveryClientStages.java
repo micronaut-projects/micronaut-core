@@ -24,10 +24,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 /**
- * Calls the {@link CompletionStage} methods of a {@link DiscoveryClient} for the framework. A
- * method that returns no stage, or a stage completed with {@code null}, as the methods of a mock
- * that only stubs the publisher methods do, is replaced by the publisher method. A method that
- * throws completes the stage with its error.
+ * Looks up the services of a {@link DiscoveryClient} with {@link CompletionStage}s for the
+ * framework: with the {@link AsyncDiscoveryClient} methods when the client implements it, and by
+ * adapting the publisher methods otherwise. An {@link AsyncDiscoveryClient} method that returns
+ * no stage, or a stage completed with {@code null}, as the methods of a mock may do, is replaced
+ * by the publisher method. A method that throws completes the stage with its error.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -41,14 +42,17 @@ public final class DiscoveryClientStages {
     /**
      * @param discoveryClient The discovery client
      * @param serviceId       The service id
-     * @return The stage of {@link DiscoveryClient#getInstancesAsync(String)}
+     * @return The stage of {@link AsyncDiscoveryClient#getInstancesAsync(String)}, or of {@link DiscoveryClient#getInstances(String)}
      */
     public static CompletionStage<List<ServiceInstance>> getInstances(DiscoveryClient discoveryClient, String serviceId) {
         try {
-            return CompletionStagePublishers.orElseIfNull(
-                discoveryClient.getInstancesAsync(serviceId),
-                () -> CompletionStagePublishers.first(discoveryClient.getInstances(serviceId), Collections.emptyList())
-            );
+            if (discoveryClient instanceof AsyncDiscoveryClient asyncDiscoveryClient) {
+                return CompletionStagePublishers.orElseIfNull(
+                    asyncDiscoveryClient.getInstancesAsync(serviceId),
+                    () -> CompletionStagePublishers.first(discoveryClient.getInstances(serviceId), Collections.emptyList())
+                );
+            }
+            return CompletionStagePublishers.first(discoveryClient.getInstances(serviceId), Collections.emptyList());
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }
@@ -56,14 +60,17 @@ public final class DiscoveryClientStages {
 
     /**
      * @param discoveryClient The discovery client
-     * @return The stage of {@link DiscoveryClient#getServiceIdsAsync()}
+     * @return The stage of {@link AsyncDiscoveryClient#getServiceIdsAsync()}, or of {@link DiscoveryClient#getServiceIds()}
      */
     public static CompletionStage<List<String>> getServiceIds(DiscoveryClient discoveryClient) {
         try {
-            return CompletionStagePublishers.orElseIfNull(
-                discoveryClient.getServiceIdsAsync(),
-                () -> CompletionStagePublishers.first(discoveryClient.getServiceIds(), Collections.emptyList())
-            );
+            if (discoveryClient instanceof AsyncDiscoveryClient asyncDiscoveryClient) {
+                return CompletionStagePublishers.orElseIfNull(
+                    asyncDiscoveryClient.getServiceIdsAsync(),
+                    () -> CompletionStagePublishers.first(discoveryClient.getServiceIds(), Collections.emptyList())
+                );
+            }
+            return CompletionStagePublishers.first(discoveryClient.getServiceIds(), Collections.emptyList());
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }

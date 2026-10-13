@@ -14,6 +14,7 @@ import spock.lang.Specification
 
 import javax.sql.DataSource
 import java.sql.SQLException
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -65,6 +66,20 @@ class JdbcIndicatorAsyncSpec extends Specification {
 
         cleanup:
         context.close()
+    }
+
+    void 'a data source that throws a runtime exception completes the result exceptionally'() {
+        given:
+        DataSource failing = [getConnection: { -> throw new IllegalStateException('pool closed') }] as DataSource
+        def indicator = new JdbcIndicator(executor, [failing] as DataSource[], null, Mock(HealthAggregator))
+
+        when:
+        indicator.resultAsync.toCompletableFuture().get(10, TimeUnit.SECONDS)
+
+        then:
+        ExecutionException e = thrown()
+        e.cause instanceof IllegalStateException
+        e.cause.message == 'pool closed'
     }
 
     void 'without data sources the indicator has no result'() {

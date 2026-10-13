@@ -17,7 +17,9 @@ package io.micronaut.http.client.loadbalance;
 
 import org.jspecify.annotations.Nullable;
 import io.micronaut.discovery.ServiceInstance;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.discovery.ServiceInstanceList;
+import io.micronaut.http.client.AsyncLoadBalancer;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import java.util.Optional;
@@ -28,7 +30,7 @@ import java.util.concurrent.CompletionStage;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobinLoadBalancer {
+public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobinLoadBalancer implements AsyncLoadBalancer {
     private final ServiceInstanceList serviceInstanceList;
 
     /**
@@ -64,7 +66,7 @@ public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobi
     @Override
     public CompletionStage<@Nullable ServiceInstance> selectAsync(@Nullable Object discriminator) {
         if (getClass() != ServiceInstanceListRoundRobinLoadBalancer.class) {
-            return super.selectAsync(discriminator);
+            return CompletionStagePublishers.first(select(discriminator), null);
         }
         try {
             return CompletableFuture.completedFuture(getNextAvailable(serviceInstanceList.getInstances(), discriminator));
