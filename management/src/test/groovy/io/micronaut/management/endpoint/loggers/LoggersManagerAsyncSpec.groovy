@@ -47,6 +47,7 @@ class LoggersManagerAsyncSpec extends Specification {
 
             @Override
             void setLogLevel(ManagedLoggingSystem system, String name, LogLevel level) {
+                // no-op: the spec only reads loggers
             }
         }
 
@@ -88,6 +89,7 @@ class LoggersManagerAsyncSpec extends Specification {
 
         @Override
         void setLogLevel(String name, LogLevel level) {
+            // no-op: the spec only reads loggers
         }
     }
 }
