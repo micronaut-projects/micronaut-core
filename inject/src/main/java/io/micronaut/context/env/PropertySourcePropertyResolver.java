@@ -50,9 +50,12 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -77,6 +80,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private static final String WILD_CARD_SUFFIX = ".*";
     private static final String RANDOM_EXPRESSION = "random.";
     private static final int MAX_RANDOM_VALUES = 8;
+    private static final int MAX_COLLECTION_DEPTH = 32;
     protected final ConversionService conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
     protected final Map<String, PropertySource> propertySources = new ConcurrentHashMap<>(10);
@@ -799,7 +803,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
                 log.trace("Processing property key {}", property);
 
-                Object value = properties.get(property);
+                // A list or a map is kept as a copy. An indexed property of a later property source
+                // is written into it, and a property source that is retained gives the same list to
+                // every rebuild: without the copy, the catalogs that are published while these are
+                // built would show what is being written.
+                Object value = copyOfCollections(properties.get(property), 0);
 
                 List<String> resolvedProperties = resolvePropertiesForConvention(property, convention);
                 boolean first = true;
@@ -886,6 +894,42 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             // constructor.
             clearLookupCaches(writeState);
         }
+    }
+
+    /**
+     * @param value A value as a property source gives it
+     * @param depth How deep in the value this part is
+     * @return The value, with every list and map in it as a copy that the catalogs can write the
+     * indexed properties of other property sources into. A sorted map stays one, with its order.
+     */
+    private static Object copyOfCollections(Object value, int depth) {
+        // the limit only matters to a collection that holds itself
+        if (depth < MAX_COLLECTION_DEPTH) {
+            if (value instanceof List<?> list) {
+                List<Object> copy = new ArrayList<>(list);
+                ListIterator<Object> i = copy.listIterator();
+                while (i.hasNext()) {
+                    Object element = i.next();
+                    Object elementCopy = copyOfCollections(element, depth + 1);
+                    if (elementCopy != element) {
+                        i.set(elementCopy);
+                    }
+                }
+                return copy;
+            }
+            if (value instanceof Map<?, ?> map) {
+                Map<Object, Object> copy = map instanceof SortedMap<?, ?> sorted ? new TreeMap<>((SortedMap<Object, Object>) sorted) : new LinkedHashMap<>(map);
+                for (Map.Entry<Object, Object> entry : copy.entrySet()) {
+                    Object entryValue = entry.getValue();
+                    Object entryCopy = copyOfCollections(entryValue, depth + 1);
+                    if (entryCopy != entryValue) {
+                        entry.setValue(entryCopy);
+                    }
+                }
+                return copy;
+            }
+        }
+        return value;
     }
 
     private void expandProperty(String property, Consumer<Object> containerSet, Supplier<Object> containerGet, Object actualValue) {
@@ -1074,11 +1118,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * has resolved to is remembered with the value, and returned again for as long as a lookup by
      * the name finds an equal value.</p>
      *
-     * <p>Only a value whose every placeholder is a random expression is remembered: resolving it
-     * reads no other property, so nothing a property source adds can make what it has resolved to
-     * out of date. A value that names another property next to a random expression is resolved
-     * again by every lookup that does not find it cached, and so is a value that another
-     * {@link PropertyExpressionResolver} resolves, as such a resolver may read properties too.</p>
+     * <p>Only a value whose every placeholder is a random expression, one that starts with
+     * {@code random.}, is remembered: resolving it reads no other property, so nothing a property
+     * source adds can make what it has resolved to out of date. A value that names another
+     * property next to a random expression is resolved again by every lookup that does not find it
+     * cached, and so is a value with an expression of another {@link PropertyExpressionResolver},
+     * as such a resolver may read properties too.</p>
      *
      * @param resolverState The state the value was read from
      * @param name          The name the value was looked up by
@@ -1092,7 +1137,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             return remembered;
         }
         Object resolved = resolvePlaceHoldersIfNecessary(resolverState, unresolved);
-        if (resolved != unresolved && isRandomValue(unresolved, resolved)) {
+        if (resolved != unresolved && isRandomValue(unresolved)) {
             // what a lookup of another thread has remembered for the value meanwhile is returned instead
             RandomValue random = resolverState.randomValues.compute(name, (key, earlier) -> rememberRandomValue(earlier, unresolved, resolved));
             remembered = rememberedRandomValue(random, unresolved);
@@ -1137,36 +1182,39 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     /**
      * @param unresolved A value as {@link #copyOfResolvable(Object)} gave it
-     * @param resolved   The value with its placeholders resolved, which is not the same object
-     * @return Whether every placeholder that was resolved is a random expression
+     * @return Whether the value holds placeholders and each of them is a random expression
      */
-    private boolean isRandomValue(Object unresolved, Object resolved) {
+    private boolean isRandomValue(Object unresolved) {
         if (unresolved instanceof String str) {
             return isRandomText(str);
         }
-        // a list that resolves to an equal one holds no placeholder at all
-        return unresolved instanceof List<?> list && !sameValue(list, resolved) && namesRandomValuesOnly(list);
+        String prefix = propertyPlaceholderResolver.getPrefix();
+        // a list with a placeholder in it, and with none that is not a random expression
+        return unresolved instanceof List<?> list
+            && !allTexts(list, str -> !str.contains(prefix))
+            && allTexts(list, str -> !str.contains(prefix) || isRandomText(str));
     }
 
     /**
      * @param value A value as {@link #copyOfResolvable(Object)} gave it, or a part of one
-     * @return Whether none of the texts in it that {@link #resolvePlaceHoldersIfNecessary} resolves
-     * holds a placeholder that is not a random expression: the value itself, the elements of a
-     * list, and the values of the maps among those elements
+     * @param test  What to ask of a text
+     * @return Whether it holds for every text in the value that
+     * {@link #resolvePlaceHoldersIfNecessary} resolves: the value itself, the elements of a list,
+     * and the values of the maps among those elements
      */
-    private boolean namesRandomValuesOnly(Object value) {
+    private static boolean allTexts(Object value, Predicate<String> test) {
         if (value instanceof String str) {
-            return !str.contains(propertyPlaceholderResolver.getPrefix()) || isRandomText(str);
+            return test.test(str);
         }
         if (value instanceof List<?> list) {
             for (Object element : list) {
-                if (element instanceof String) {
-                    if (!namesRandomValuesOnly(element)) {
+                if (element instanceof String str) {
+                    if (!test.test(str)) {
                         return false;
                     }
                 } else if (element instanceof Map<?, ?> map) {
                     for (Object mapValue : map.values()) {
-                        if (!namesRandomValuesOnly(mapValue)) {
+                        if (!allTexts(mapValue, test)) {
                             return false;
                         }
                     }
@@ -1229,8 +1277,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             }
             remembered++;
         }
-        // a name is given a few values at most; a value that does not even equal a copy of itself is not added without end
-        return remembered < MAX_RANDOM_VALUES ? new RandomValue(unresolved, resolved, earlier) : earlier;
+        // A name is given a few values at most. Beyond that the earlier ones are let go, so that a
+        // value that does not even equal a copy of itself is not added without end.
+        return new RandomValue(unresolved, resolved, remembered < MAX_RANDOM_VALUES ? earlier : null);
     }
 
     private static boolean sameValue(Object unresolved, Object other) {

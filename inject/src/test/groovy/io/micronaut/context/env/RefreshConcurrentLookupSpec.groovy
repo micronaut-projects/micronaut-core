@@ -109,6 +109,37 @@ class RefreshConcurrentLookupSpec extends Specification {
         env.stop()
     }
 
+    void "a lookup made while a refresh rebuilds the catalogs does not see what the refresh writes into a list"() {
+        given: "a list of a retained property source, two later sources that override its element in turn, and a gate between them"
+        List<String> list = ['low']
+        Map<String, String> map = [key: 'low']
+        Gate gate = new Gate(25)
+        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
+        env.addPropertySource(PropertySource.of('low', ['app.list': list, 'app.maps': [map]], 10))
+        env.addPropertySource(PropertySource.of('middle', ['app.list[0]': 'middle', 'app.maps[0].key': 'middle'], 20))
+        env.addPropertySource(gate)
+        env.addPropertySource(PropertySource.of('high', ['app.list[0]': 'high', 'app.maps[0].key': 'high'], 30))
+        env.start()
+
+        when: "the refresh is parked when it has applied the first override only, and the names are looked up for the first time"
+        Map<String, Object> mid = refreshThroughGate(env, gate) {
+            [list: env.getProperty('app.list', List).get(), maps: env.getProperty('app.maps', List).get()]
+        }
+
+        then: "they have the value they had before the refresh and have after it"
+        mid.list == ['high']
+        mid.maps == [[key: 'high']]
+        env.getProperty('app.list', List).get() == ['high']
+        env.getProperty('app.maps', List).get() == [[key: 'high']]
+
+        and: "what the property source holds is not written into"
+        list == ['low']
+        map == [key: 'low']
+
+        cleanup:
+        env.stop()
+    }
+
     @RestoreSystemProperties
     void "a bootstrap enabled context resolves the previous values while its refresh re-reads the bootstrap configuration"() {
         given:
