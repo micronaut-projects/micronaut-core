@@ -192,7 +192,7 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
             if (isFactoryMethod) {
                 beanDefinitionWriter.visitSuperBeanDefinitionFactory(targetBeanWriter.getBeanDefinitionName());
             } else {
-                beanDefinitionWriter.visitSuperBeanDefinition(targetBeanWriter.getBeanDefinitionName());
+                beanDefinitionWriter.visitSuperBeanDefinition(targetBeanWriter.getBeanDefinitionName(), targetBeanWriter.getBeanDefinitionTypeArgument());
             }
             visitor = runtimeProxyBeanDefinitionWriter;
         } else {
@@ -207,7 +207,7 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
             if (isFactoryMethod) {
                 beanDefinitionWriter.visitSuperBeanDefinitionFactory(targetBeanWriter.getBeanDefinitionName());
             } else {
-                beanDefinitionWriter.visitSuperBeanDefinition(targetBeanWriter.getBeanDefinitionName());
+                beanDefinitionWriter.visitSuperBeanDefinition(targetBeanWriter.getBeanDefinitionName(), targetBeanWriter.getBeanDefinitionTypeArgument());
             }
             visitor = aopProxyWriter;
         }

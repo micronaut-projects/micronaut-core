@@ -26,9 +26,13 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
+import io.micronaut.sourcegen.model.ObjectDef;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.annotation.RetentionPolicy;
 import java.net.URI;
 import java.net.URL;
@@ -53,6 +57,14 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     String MICRONAUT_PROCESSING_GROUP = "micronaut.processing.group";
     String MICRONAUT_PROCESSING_MODULE = "micronaut.processing.module";
     String MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER = "micronaut.processing.use.context.classloader";
+    /**
+     * Writes what the processors generate as Java source, which javac compiles in a later round, instead of as
+     * bytecode. A module sets it where its annotation processor path carries a Java source generator in place of the
+     * sourcegen bytecode writer.
+     *
+     * @since 5.3
+     */
+    String MICRONAUT_PROCESSING_JAVA_SOURCE = "micronaut.processing.java.source";
 
     /**
      * @return The visitor context's language.
@@ -387,6 +399,23 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @Experimental
     default void addGeneratedResource(String resource) {
         info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);
+    }
+
+    /**
+     * Writes the given object definition. The default implementation generates bytecode directly using
+     * {@code sourcegen-bytecode-writer}. Language specific implementations may override this to use a different
+     * {@code SourceGenerator}, for example one that writes actual source code.
+     *
+     * @param objectDef            The object definition to write
+     * @param originatingElements  The originating elements
+     * @throws IOException If an error occurs writing the class
+     * @since 5.2
+     */
+    @Internal
+    default void visitObjectDef(ObjectDef objectDef, Element... originatingElements) throws IOException {
+        try (OutputStream outputStream = visitClass(objectDef.getName(), originatingElements)) {
+            outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, this));
+        }
     }
 
     /**

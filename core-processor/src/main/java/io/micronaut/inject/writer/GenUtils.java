@@ -192,7 +192,10 @@ public final class GenUtils {
             }
             return SET_TYPE.invokeStatic("of", parameterTypes, SET_TYPE, values);
         } else {
-            return setOfArray(TypeDef.OBJECT.array().instantiate(values));
+            // The component type of a uniform array lets `Set.of(E...)` infer the element type in source
+            TypeDef componentType = values.getFirst().type();
+            boolean uniform = !componentType.isPrimitive() && values.stream().allMatch(v -> v.type().equals(componentType));
+            return setOfArray((uniform ? componentType : TypeDef.OBJECT).array().instantiate(values));
         }
     }
 

@@ -34,7 +34,6 @@ import org.jspecify.annotations.NullUnmarked;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -84,9 +83,7 @@ public class BeanConfigurationWriter implements ClassOutputWriter {
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName, originatingElement)) {
-            outputStream.write(generateClassBytes());
-        }
+        visitorContext.visitObjectDef(generateConfigurationClass(), originatingElement);
         classWriterOutputVisitor.visitServiceDescriptor(
             BeanConfiguration.class,
             configurationClassName,
@@ -94,7 +91,7 @@ public class BeanConfigurationWriter implements ClassOutputWriter {
         );
     }
 
-    private byte[] generateClassBytes() {
+    private ClassDef generateConfigurationClass() {
         ClassTypeDef targetType = ClassTypeDef.of(configurationClassName);
 
         ClassDef.ClassDefBuilder configurationClassBuilder = ClassDef.builder(configurationClassName).synthetic()
@@ -102,11 +99,10 @@ public class BeanConfigurationWriter implements ClassOutputWriter {
             .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
             .addAnnotation(AnnotationDef.builder(Generated.class).addMember("service", BeanConfiguration.class.getName()).build());
 
-        ClassDef configurationClass = configurationClassBuilder
+        configurationClassBuilder
             .addMethod(MethodDef.constructor().addModifiers(Modifier.PUBLIC).build((aThis, methodParameters)
                 -> aThis.superRef().invokeConstructor(ExpressionDef.constant(packageName))))
-            .addMethod(createGetAnnotationMetadataMethodDef(targetType, annotationMetadata))
-            .build();
+            .addMethod(createGetAnnotationMetadataMethodDef(targetType, annotationMetadata));
 
 
         Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
@@ -132,7 +128,7 @@ public class BeanConfigurationWriter implements ClassOutputWriter {
             }
         }
 
-        return ByteCodeWriterUtils.writeByteCode(configurationClass, visitorContext);
+        return configurationClassBuilder.build();
     }
 
 }

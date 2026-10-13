@@ -10,6 +10,10 @@ micronautBuild {
 
 dependencies {
     api(projects.micronautCoreProcessor)
+    // Used by a module whose processor path carries a source generator instead of the bytecode writer; it adds them
+    // there itself. On the regular classpath the sourcegen visitors would load in every consumer's Groovy compilation.
+    compileOnly(mnSourcegen.micronaut.sourcegen.generator)
+    compileOnly(mnSourcegen.micronaut.sourcegen.generator.java)
 
     testImplementation(projects.micronautContext)
     testImplementation(projects.micronautAop)
