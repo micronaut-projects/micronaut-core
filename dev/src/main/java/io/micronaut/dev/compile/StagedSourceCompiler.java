@@ -196,7 +196,7 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                 }
                 transaction.commit();
             } catch (IOException | UncheckedIOException e) {
-                transaction.rollback();
+                transaction.rollback(e);
                 throw e;
             }
             Set<Path> removed = new LinkedHashSet<>(transaction.removed());
@@ -234,7 +234,7 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             transaction.put(stagedMapping, SourceIndex.mappingFile(classOutput, request.kind()));
             transaction.commit();
         } catch (IOException | UncheckedIOException e) {
-            transaction.rollback();
+            transaction.rollback(e);
             throw e;
         }
         Set<Path> removed = new LinkedHashSet<>(transaction.removed());

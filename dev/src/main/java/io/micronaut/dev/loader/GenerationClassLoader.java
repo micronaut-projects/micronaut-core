@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.ref.Cleaner;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.FileVisitResult;
@@ -32,6 +33,8 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.List;
@@ -64,9 +67,20 @@ public final class GenerationClassLoader extends URLClassLoader {
     private final List<Path> sources;
     private final List<Path> roots;
     private final Cleaner.Cleanable snapshotCleanup;
+    // the URLs of the directories read live, whose resources hide the build output's copies of them
+    private final List<String> live;
+    // the resources known to belong to the live directories, whose build copies stay hidden while the live file is absent
+    private final LiveResources liveResources;
 
-    private GenerationClassLoader(int generation, List<Path> sources, List<Path> roots, @Nullable Path snapshot, @Nullable ClassLoader parent) {
+    private GenerationClassLoader(int generation, List<Path> sources, List<Path> roots, int liveCount, LiveResources liveResources, @Nullable Path snapshot, @Nullable ClassLoader parent) {
         super("micronaut-dev-generation-" + generation, toUrls(roots), parent);
+        URL[] urls = getURLs();
+        List<String> liveUrls = new ArrayList<>(liveCount);
+        for (int i = 0; i < liveCount; i++) {
+            liveUrls.add(urls[i].toExternalForm());
+        }
+        this.live = List.copyOf(liveUrls);
+        this.liveResources = liveResources;
         this.generation = generation;
         this.sources = List.copyOf(sources);
         this.roots = List.copyOf(roots);
@@ -82,7 +96,7 @@ public final class GenerationClassLoader extends URLClassLoader {
      * @param parent The parent loader, holding the libraries
      */
     GenerationClassLoader(int generation, List<Path> roots, @Nullable ClassLoader parent) {
-        this(generation, roots, roots, null, parent);
+        this(generation, roots, roots, 0, new LiveResources(List.of()), null, parent);
     }
 
     /**
@@ -113,7 +127,27 @@ public final class GenerationClassLoader extends URLClassLoader {
      * @throws UncheckedIOException if the directories cannot be copied
      */
     static GenerationClassLoader snapshot(int generation, List<Path> liveRoots, List<Path> sources, Path snapshotDir, @Nullable ClassLoader parent) {
-        List<Path> roots = new java.util.ArrayList<>(liveRoots.size() + sources.size());
+        return snapshot(generation, liveRoots, new LiveResources(liveRoots), sources, snapshotDir, parent);
+    }
+
+    /**
+     * Creates a generation over live directories followed by a snapshot of others, sharing what is known of the live
+     * directories' resources with the other generations of the same loader: a resource deleted from a live directory
+     * stays deleted in every generation, rather than coming back as the build output's stale copy.
+     *
+     * @param generation The number of the generation, counted from one
+     * @param liveRoots The directories read live, searched first
+     * @param liveResources The resources known to belong to the live directories
+     * @param sources The directories to snapshot, searched after the live ones
+     * @param snapshotDir Where the snapshot goes; emptied first
+     * @param parent The parent loader
+     * @return The generation
+     * @throws UncheckedIOException if the directories cannot be copied
+     * @since 5.3.0
+     */
+    static GenerationClassLoader snapshot(int generation, List<Path> liveRoots, LiveResources liveResources, List<Path> sources, Path snapshotDir,
+                                                 @Nullable ClassLoader parent) {
+        List<Path> roots = new ArrayList<>(liveRoots.size() + sources.size());
         roots.addAll(liveRoots);
         try {
             deleteRecursively(snapshotDir);
@@ -126,9 +160,9 @@ public final class GenerationClassLoader extends URLClassLoader {
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot snapshot the reloadable directories into " + snapshotDir, e);
         }
-        List<Path> all = new java.util.ArrayList<>(liveRoots);
+        List<Path> all = new ArrayList<>(liveRoots);
         all.addAll(sources);
-        return new GenerationClassLoader(generation, all, roots, snapshotDir, parent);
+        return new GenerationClassLoader(generation, all, roots, liveRoots.size(), liveResources, snapshotDir, parent);
     }
 
     /**
@@ -175,6 +209,85 @@ public final class GenerationClassLoader extends URLClassLoader {
     @Nullable
     URL findInGenerationResource(String name) {
         return findResource(name);
+    }
+
+    /**
+     * The resources of a name, without the build output's copies of those a live directory holds: a resource the
+     * build copied from a resource root would be found twice, which configuration loading rejects as a duplicate,
+     * and the copy may be stale. Resources under {@code META-INF/} are left alone: a processor generates those into
+     * the class output beside the ones a resource root holds, as service descriptors, and every one counts.
+     *
+     * @param name The resource name
+     * @return The resources
+     * @throws IOException if the directories cannot be read
+     */
+    @Override
+    public Enumeration<URL> findResources(String name) throws IOException {
+        List<URL> all = Collections.list(super.findResources(name));
+        if (live.isEmpty() || name.startsWith("META-INF/")) {
+            return Collections.enumeration(all);
+        }
+        boolean anyLive = false;
+        for (URL url : all) {
+            if (isLive(url)) {
+                anyLive = true;
+                seen(name, url);
+            }
+        }
+        if (!anyLive && !liveResources.belongs(name)) {
+            return Collections.enumeration(all);
+        }
+        // the live file wins over the build's copies of it, and a live file deleted takes its copies with it
+        List<URL> kept = new ArrayList<>(all.size());
+        for (URL url : all) {
+            if (isLive(url)) {
+                kept.add(url);
+            }
+        }
+        return Collections.enumeration(kept);
+    }
+
+    /**
+     * The resource of a name, from a live directory first. A resource that belongs to a live directory and is absent
+     * from it, deleted by the developer, is not found: the build output's copy of it is stale. Resources under
+     * {@code META-INF/} are left alone, as in {@link #findResources(String)}.
+     *
+     * @param name The resource name
+     * @return The resource, or null
+     */
+    @Override
+    @Nullable
+    public URL findResource(String name) {
+        URL url = super.findResource(name);
+        if (url == null || live.isEmpty() || name.startsWith("META-INF/")) {
+            return url;
+        }
+        if (isLive(url)) {
+            seen(name, url);
+            return url;
+        }
+        return liveResources.belongs(name) ? null : url;
+    }
+
+    private void seen(String name, URL url) {
+        if (liveResources.belongs(name)) {
+            return;
+        }
+        try {
+            liveResources.seen(Path.of(url.toURI()));
+        } catch (URISyntaxException | IllegalArgumentException | java.nio.file.FileSystemNotFoundException e) {
+            LOG.debug("Cannot record the live resource {}", url, e);
+        }
+    }
+
+    private boolean isLive(URL url) {
+        String external = url.toExternalForm();
+        for (String root : live) {
+            if (external.startsWith(root)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
