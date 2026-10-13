@@ -28,6 +28,8 @@ import io.micronaut.context.beans.DefaultBeanDefinitionService;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.condition.Failure;
 import io.micronaut.context.env.CachedEnvironment;
+import io.micronaut.context.env.ConfigurationPath;
+import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.event.BeanCreatedEvent;
@@ -51,18 +53,33 @@ import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.context.exceptions.NonUniqueBeanException;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.context.reload.ClassChangeEvent;
+import io.micronaut.context.reload.ResourceKind;
+import io.micronaut.context.reload.RetainingBeanContext;
+import io.micronaut.context.reload.RetentionCriteria;
 import io.micronaut.context.scope.BeanCreationContext;
+import io.micronaut.context.watch.ClassChangeWatchRequest;
+import io.micronaut.context.watch.ConfigurationChange;
+import io.micronaut.context.watch.ConfigurationWatchRequest;
+import io.micronaut.context.watch.DefinitionWatchRequest;
+import io.micronaut.context.watch.MethodWatchRequest;
+import io.micronaut.context.watch.ReloadingConfigurationWatcher;
+import io.micronaut.context.watch.ResourceChange;
+import io.micronaut.context.watch.ResourceWatchRequest;
 import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import io.micronaut.core.naming.NameResolver;
@@ -84,6 +101,7 @@ import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.DisposableBeanDefinition;
@@ -126,6 +144,7 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -157,12 +176,13 @@ import java.util.stream.StreamSupport;
 @Internal
 @NextMajorVersion("Remove public in v6")
 @SuppressWarnings("MagicNumber")
-public sealed class DefaultBeanContext implements ConfigurableBeanContext permits DefaultApplicationContext {
+public sealed class DefaultBeanContext implements ConfigurableBeanContext, RetainingBeanContext, WatchableBeanContext, BeanWatchNotifier permits DefaultApplicationContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
     private static final String ARGUMENT_DEFINITION = "definition";
+    private static final String ARGUMENT_CHANGE = "change";
     private static final String AROUND_TYPE = "io.micronaut.aop.Around";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     /**
@@ -208,6 +228,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     final BeanResolutionTraceMode traceMode;
     final Set<String> tracePatterns;
     final Map<BeanIdentifier, BeanRegistration<?>> singlesInCreation = new ConcurrentHashMap<>(5);
+    private final BeanWatchRegistry watches = new BeanWatchRegistry(this);
 
     protected final SingletonScope singletonScope = new SingletonScope();
 
@@ -244,6 +265,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private final Set<Class<?>> thisInterfaces = CollectionUtils.setOf(
         BeanDefinitionRegistry.class,
         BeanContext.class,
+        WatchableBeanContext.class,
         AnnotationMetadataResolver.class,
         BeanLocator.class,
         ExecutionHandleLocator.class,
@@ -276,6 +298,62 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private final boolean eventsEnabled;
     private final boolean eagerBeansEnabled;
+    /**
+     * Whether the startup pass has fed the executable method processors: a processor recreated before it, such as by
+     * the first batch of a watch, is fed by that pass, not again by {@link #recreateBean(Object)}.
+     */
+    private volatile boolean startupMethodsProcessed;
+    /**
+     * Whether the definitions may change after startup in a way processors must follow: the context tracks bean
+     * dependencies or runs in development mode. Only then is a processor fed, through an adapter, the definitions added
+     * after startup; any other context leaves processors as they always were, at no cost. Decided as the context starts.
+     */
+    private volatile boolean adaptsProcessors;
+    /**
+     * The recorded dependency graph, null when the context does not track dependencies. Decided by the configuration
+     * as the context is constructed, or by its environment as it starts (see {@link #isBeanDependencyTrackingEnabledOnStart()}),
+     * in both cases before the context creates a bean; it only ever goes from null to a graph.
+     *
+     * <p>Not volatile on purpose: it is read on every bean creation, and it is written only inside the synchronized
+     * {@link #start()}, before the context creates its first bean. Another thread that creates beans got the context
+     * through a happens-before edge after that (it started the context, or was handed it by the starter), so it sees
+     * the graph; a thread racing {@code start()} itself is not supported by the context anyway.</p>
+     */
+    @Nullable
+    private DefaultBeanDependencyGraph dependencyGraph;
+    /**
+     * Registrations of a previous context to adopt on the first start, released once adopted so that
+     * neither the previous context nor its classloader stays reachable through them.
+     */
+    private Collection<BeanRegistration<?>> registrationsToAdopt;
+    /**
+     * While a {@link #stopRetaining(RetentionCriteria)} is in progress, which registrations it keeps.
+     */
+    private final AtomicReference<@Nullable RetentionCriteria> retentionCriteria = new AtomicReference<>();
+    /**
+     * The instances the {@link #stopRetaining(RetentionCriteria)} in progress keeps, once decided; read without the
+     * lock by {@link #isRetainedOnStop(Object)} once it is.
+     */
+    @Nullable
+    private volatile Set<Object> retainedOnStopBeans; // NOSONAR java:S3077 published whole once decided, never modified after
+    private final List<BeanRegistration<?>> retainedOnStop = new ArrayList<>();
+    /**
+     * Retained registrations this context has no definition for, destroyed once its listeners exist.
+     */
+    private final List<BeanRegistration<?>> rejectedRetainedRegistrations = new ArrayList<>();
+    /**
+     * Instances adopted under at least one registration, so a rejection under another does not destroy them.
+     */
+    private Set<Object> adoptedRetainedBeans = Collections.newSetFromMap(new IdentityHashMap<>());
+    /**
+     * While retained registrations are adopted, the instances this context adopts, by identity.
+     */
+    private Set<Object> adoptingRetainedBeans = Set.of();
+    /**
+     * Adopted registrations of instances that bean created listeners replaced in the previous context, to wrap again
+     * with this context's listeners once they are known.
+     */
+    private List<BeanRegistration<?>> adoptedToWrap = new ArrayList<>();
 
     private @Nullable ForkJoinTask<?> checkEnabledBeans;
 
@@ -365,6 +443,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         this.tracePatterns = traceConfiguration.classPatterns();
         this.eventsEnabled = contextConfiguration.eventsEnabled();
         this.eagerBeansEnabled = contextConfiguration.eagerBeansEnabled();
+        this.dependencyGraph = contextConfiguration.beanDependencyTrackingEnabled() ? new DefaultBeanDependencyGraph() : null;
+        this.registrationsToAdopt = List.copyOf(contextConfiguration.getRetainedRegistrations());
         this.conversionService = MutableConversionService.create();
         beanDefinitionProvider = new DefaultBeanDefinitionService(beanContextConfiguration, beanResolutionCustomizer);
     }
@@ -418,6 +498,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Starting BeanContext");
                 }
+                if (dependencyGraph == null && isBeanDependencyTrackingEnabledOnStart()) {
+                    // development mode was switched on by configuration rather than by system property: the
+                    // environment is started and no bean has been created yet, so the graph sees every bean
+                    dependencyGraph = new DefaultBeanDependencyGraph();
+                }
+                adaptsProcessors = dependencyGraph != null || isDevelopmentMode();
                 configureAndStartContext();
                 if (LOG.isDebugEnabled()) {
                     String activeConfigurations = beanConfigurations
@@ -439,6 +525,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             initializing.set(false);
         }
         return this;
+    }
+
+    /**
+     * Whether the context, which was not configured to track bean dependencies, tracks them after all as it
+     * starts, before it reads its definitions and creates any bean. An application context does so when its
+     * environment switches development mode on by configuration.
+     *
+     * @return True to start recording the dependency graph
+     */
+    boolean isBeanDependencyTrackingEnabledOnStart() {
+        return false;
     }
 
     /**
@@ -539,6 +636,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             beanConfigurations.clear();
             disabledConfigurations.clear();
             singletonScope.clear();
+            watches.clear();
+            startupMethodsProcessed = false;
             attributes.clear();
             beanInitializedEventListeners = null;
             beanCreationEventListeners = null;
@@ -553,6 +652,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 });
             }
             beanDefinitionProvider.reset();
+            // a restarted context reads its configurations and validator again, as it does its definitions
+            beanConfigurationsList = null;
+            beanValidator = null;
+            if (dependencyGraph != null) {
+                dependencyGraph.clear();
+            }
         }
         return this;
     }
@@ -565,6 +670,268 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return findBeanDefinitionInternal(Argument.of(type), null)
             .map(AnnotationMetadataProvider::getAnnotationMetadata)
             .orElse(AnnotationMetadata.EMPTY_METADATA);
+    }
+
+    @Override
+    public <T> DefinitionWatchRequest<T> definitions(Argument<T> beanType) {
+        ArgumentUtils.requireNonNull("beanType", beanType);
+        return new BeanWatchRequests.DefinitionRequest<>(watches, beanType);
+    }
+
+    @Override
+    public <A extends Annotation> MethodWatchRequest<A> methods(Class<A> annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
+        return new BeanWatchRequests.MethodRequest<>(watches, annotationType, null, null);
+    }
+
+    @Override
+    public ConfigurationWatchRequest configuration() {
+        return new BeanWatchRequests.ConfigurationRequest(watches, null);
+    }
+
+    @Override
+    public ConfigurationWatchRequest configuration(String prefix) {
+        ArgumentUtils.requireNonNull("prefix", prefix);
+        return new BeanWatchRequests.ConfigurationRequest(watches, prefix);
+    }
+
+    @Override
+    public ResourceWatchRequest resources(ResourceKind kind) {
+        ArgumentUtils.requireNonNull("kind", kind);
+        return new BeanWatchRequests.ResourceRequest(watches, kind);
+    }
+
+    @Override
+    public ClassChangeWatchRequest classChanges() {
+        return new BeanWatchRequests.ClassChangeRequest(watches, this::isDevelopmentMode);
+    }
+
+    /**
+     * @return Whether the context runs in development mode, the only mode in which classes change
+     */
+    private boolean isDevelopmentMode() {
+        if (this instanceof PropertyResolver propertyResolver) {
+            return DevelopmentMode.isEnabled(propertyResolver);
+        }
+        return DevelopmentMode.isEnabledBySystemProperty();
+    }
+
+    /**
+     * Delivers a change of definitions to the watches: the removed definitions are no longer resolvable,
+     * the added ones are. A development launcher calls this once per reload, after swapping the definitions.
+     *
+     * @param removed The definitions retired
+     * @param added The definitions added
+     */
+    @Override
+    public void notifyDefinitionChange(Collection<? extends BeanDefinition<?>> removed, Collection<? extends BeanDefinition<?>> added) {
+        watches.definitionsChanged(removed, added);
+    }
+
+    /**
+     * Delivers a configuration change to the watches whose prefix it touches. The configuration refresh
+     * calls this after rebinding the configuration beans; a watch answering
+     * {@link ReloadingConfigurationWatcher.Outcome#RECREATE} has its bean recreated before this returns.
+     *
+     * @param change The change
+     * @return The outcomes of the watches delivered to
+     */
+    @Override
+    public List<ReloadingConfigurationWatcher.Outcome> notifyConfigurationChange(ConfigurationChange change) {
+        ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
+        return watches.configurationChanged(change);
+    }
+
+    /**
+     * Delivers a resource change to the watches its kind and files concern. An initial change is kept
+     * as the state of its kind, which a watch registered later receives as its first batch.
+     *
+     * @param change The change
+     */
+    @Override
+    public void notifyResourceChange(ResourceChange change) {
+        ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
+        watches.resourcesChanged(change);
+    }
+
+    /**
+     * Delivers a class change to the class change watches. The event publisher calls this for every
+     * {@link ClassChangeEvent} it publishes, ahead of the listeners of the event.
+     *
+     * @param change The change
+     */
+    @Override
+    public void notifyClassChange(ClassChangeEvent change) {
+        ArgumentUtils.requireNonNull(ARGUMENT_CHANGE, change);
+        watches.classesChanged(change);
+    }
+
+    /**
+     * @return Whether a class change watch is registered and active, so that a publisher of class changes is not empty
+     */
+    @Override
+    public boolean hasClassChangeWatches() {
+        return watches.hasClassChangeWatches();
+    }
+
+    /**
+     * The processors fed through an adapter, which see additions only and cannot follow a reload.
+     *
+     * @return The adapted processors
+     */
+    @Override
+    public Collection<Object> adaptedProcessors() {
+        return watches.adaptedProcessors();
+    }
+
+    @Override
+    public boolean isRecreateSupported() {
+        return dependencyGraph != null;
+    }
+
+    @Override
+    public boolean recreate(Object bean) {
+        Objects.requireNonNull(bean, "bean");
+        // without the graph the dependents are unknown, and would keep the destroyed instance
+        if (dependencyGraph == null) {
+            logRecreateUnsupported(bean.getClass().getName());
+            return false;
+        }
+        return isRecreatable(singletonScope.findBeanRegistration(bean)) && recreateBean(bean);
+    }
+
+    @Override
+    public <T> boolean recreate(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        Objects.requireNonNull(beanType, "beanType");
+        if (dependencyGraph == null) {
+            logRecreateUnsupported(beanType.getTypeName());
+            return false;
+        }
+        BeanDefinition<T> definition = findBeanDefinition(beanType, qualifier).orElse(null);
+        if (definition == null) {
+            return false;
+        }
+        BeanRegistration<T> held = singletonScope.findBeanRegistration(definition);
+        if (held == null || !isRecreatable(held)) {
+            return false;
+        }
+        return recreateBean(held.bean);
+    }
+
+    private static void logRecreateUnsupported(String beanType) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Not recreating a bean of [{}]: the context does not track bean dependencies (see isRecreateSupported())", beanType);
+        }
+    }
+
+    /**
+     * Whether a registration is a singleton of the singleton scope that its definition can create anew: a bean of a
+     * custom scope stays with its scope, and the definition of a singleton registered at runtime may only hand back the
+     * instance it was given, which would be destroyed and returned again.
+     */
+    private static boolean isRecreatable(@Nullable BeanRegistration<?> registration) {
+        return registration != null && registration.bean != null && !(registration.getBeanDefinition() instanceof RuntimeBeanDefinition<?>);
+    }
+
+    /**
+     * Replaces a singleton with a new instance of its definition, destroying first the beans that received
+     * it, as the dependency graph records, so that they are created again on top of the new instance.
+     *
+     * <p>An {@link ExecutableMethodProcessor} among them is created again at once, as the startup pass created it,
+     * since nothing else would ask for it, and is given the methods the startup pass gave it.</p>
+     *
+     * @param bean The bean to recreate
+     * @return Whether the context held the bean and replaced it; a prototype is nobody's to replace
+     */
+    boolean recreateBean(Object bean) {
+        BeanRegistration<Object> registration = findBeanRegistration(bean).orElse(null);
+        if (registration == null) {
+            return false;
+        }
+        BeanDefinition<Object> definition = registration.getBeanDefinition();
+        List<BeanDefinition<Object>> processors = new ArrayList<>(2);
+        if (dependencyGraph != null) {
+            List<BeanDefinition<?>> dependents = new ArrayList<>(dependencyGraph.transitiveDependentsOf(definition));
+            Collections.reverse(dependents);
+            for (BeanDefinition<?> dependent : dependents) {
+                BeanRegistration<Object> held = singletonScope.findBeanRegistration((BeanDefinition<Object>) dependent);
+                if (held != null) {
+                    if (held.bean instanceof ExecutableMethodProcessor<?> && !processors.contains(held.getBeanDefinition())) {
+                        processors.add(held.getBeanDefinition());
+                    }
+                    destroyBean(held);
+                }
+            }
+        }
+        destroyBean(registration);
+        Object recreated = getBean(definition);
+        if (recreated instanceof ExecutableMethodProcessor<?> processor) {
+            processRecreated(definition, processor);
+        }
+        // in the order they were created, the reverse of the order they were destroyed in
+        Collections.reverse(processors);
+        for (BeanDefinition<Object> processorDefinition : processors) {
+            if (processorDefinition != definition && getBean(processorDefinition) instanceof ExecutableMethodProcessor<?> processor) {
+                processRecreated(processorDefinition, processor);
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Gives a processor created again by {@link #recreateBean(Object)} the methods the startup pass gives a
+     * processor of its annotation: those of the processed definitions whose executable stereotypes include it. The
+     * adapter the processor was given as it was created sees later additions only, so nothing is given twice.
+     *
+     * <p>A deprecated processor, one whose annotation is not processed on startup, was also given, as it was created,
+     * every method of the definitions whose class carries its annotation, by the legacy
+     * {@link ExecutableMethodProcessorListener}. Those definitions, selected as the listener selects them, are skipped
+     * here, so that the processor is given only what the listener did not give it, such as methods carrying the
+     * annotation in a class that does not.</p>
+     *
+     * @param processorDefinition The definition of the processor
+     * @param processor The new processor
+     */
+    @SuppressWarnings({"java:S3776", "unchecked", "rawtypes"})
+    private void processRecreated(BeanDefinition<?> processorDefinition, ExecutableMethodProcessor<?> processor) {
+        if (!startupMethodsProcessed) {
+            // the startup pass has not run yet, and gives the processor its methods when it does, or never runs, without
+            // eager beans
+            return;
+        }
+        List<Argument<?>> typeArguments = processorDefinition.getTypeArguments(ExecutableMethodProcessor.class);
+        if (typeArguments.size() != 1) {
+            return;
+        }
+        Class<?> annotationType = typeArguments.get(0).getType();
+        Set<BeanDefinition<?>> givenAsCreated = processorDefinition.hasAnnotation(Deprecated.class)
+            ? new HashSet<>(getBeanDefinitions(Qualifiers.byStereotype((Class) annotationType)))
+            : Set.of();
+        boolean started = false;
+        try {
+            for (BeanDefinition<Object> processed : processedBeanDefinitions()) {
+                if (givenAsCreated.contains(processed)) {
+                    // the legacy listener gave the new processor every method of this definition as it created it
+                    continue;
+                }
+                for (ExecutableMethod<Object, ?> method : processed.getExecutableMethodsForProcessing()) {
+                    if (!method.getAnnotationMetadata().getAnnotationTypesByStereotype(Executable.class).contains(annotationType)) {
+                        continue;
+                    }
+                    if (!started) {
+                        started = true;
+                        if (processor instanceof LifeCycle<?> cycle) {
+                            cycle.start();
+                        }
+                    }
+                    processor.process(processed, method);
+                }
+            }
+        } finally {
+            if (started && processor instanceof LifeCycle<?> cycle) {
+                cycle.stop();
+            }
+        }
     }
 
     @Override
@@ -587,6 +954,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (bean != null) {
             BeanDefinition<T> definition = beanRegistration.definition();
             if (definition instanceof InjectableBeanDefinition<T> injectableBeanDefinition) {
+                if (dependencyGraph != null) {
+                    // the injections about to run replace the ones recorded, they do not join them
+                    dependencyGraph.removeReinjectable(definition);
+                }
                 injectableBeanDefinition.inject(this, bean);
             }
         }
@@ -1324,6 +1695,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     @Override
     public <T> void destroyBean(BeanRegistration<T> registration) {
+        if (registration instanceof RetainedRegistration<T> retained) {
+            // a registration stopRetaining returned that no context adopted: destroyed with what it owned, once
+            // for an instance returned under several registrations
+            if (retained.destroyed.compareAndSet(false, true)) {
+                destroyBean(retained.original, false);
+            }
+            return;
+        }
         destroyBean(registration, false);
     }
 
@@ -1352,7 +1731,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         if (registration.beanDefinition instanceof ProxyBeanDefinition) {
             if (registration.bean instanceof InterceptedBeanProxy) {
-                // Ignore the proxy and destroy the target
+                // Ignore the proxy and destroy the target; a watch registered while the proxy was created goes with it
+                watches.closeOwnedBy(registration.bean);
                 destroyProxyTargetBean(registration, dependent);
                 return;
             }
@@ -1367,6 +1747,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (definition.isSingleton()) {
                 singletonScope.purgeCacheForBeanInstance(definition, beanToDestroy);
             }
+            watches.closeOwnedBy(beanToDestroy);
+        }
+        if (dependencyGraph != null) {
+            // what a destroyed bean held is released with it; what held the bean stays recorded until that is destroyed.
+            // A singleton definition may have a fresh registration beside the scoped instance, and both record under it
+            dependencyGraph.destroyed(registration, definition.isSingleton() && singletonScope.findBeanRegistration(definition) != null);
         }
         try {
             beanToDestroy = triggerPreDestroyListeners(resolutionContext, definition, beanToDestroy);
@@ -2153,6 +2539,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             // a bean of this scope resolved earlier left the scope's absence recorded in the registry
             customScopeRegistry.invalidate();
         }
+        if (watches.hasRegistrations()) {
+            watches.definitionsChanged(List.of(), List.of(definition));
+        }
         return this;
     }
 
@@ -2344,6 +2733,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return Optional.empty();
     }
 
+    @Override
+    public Optional<BeanDependencyGraph> findDependencyGraph() {
+        return Optional.ofNullable(dependencyGraph);
+    }
+
     /**
      * Invalidates the bean caches. For testing only.
      */
@@ -2353,6 +2747,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         beanConcreteCandidateCache.clear();
         singletonBeanRegistrations.clear();
         indexExhaustiveCache.clear();
+        containsBeanCache.clear();
+        beanProxyTargetCache.clear();
     }
 
     /**
@@ -2419,6 +2815,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private void initializeContext() {
+        // the startup batch: every watch registered so far learns what the context holds, before any
+        // processor or eager bean runs, since those may register watches of their own and get theirs at once
+        watches.start();
         if (!eagerBeansEnabled) {
             return;
         }
@@ -2474,12 +2873,79 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
         }
 
-        for (Collection<ExecutableMethodProcessor> processors : processorsByAnnotation.values()) {
-            for (ExecutableMethodProcessor<?> processor : processors) {
+        for (Map.Entry<Class<? extends Annotation>, Collection<ExecutableMethodProcessor>> entry : processorsByAnnotation.entrySet()) {
+            for (ExecutableMethodProcessor<?> processor : entry.getValue()) {
                 if (processor instanceof LifeCycle<?> cycle) {
                     cycle.stop();
                 }
+                // what is registered after startup reaches the processor through an adapter that sees additions only
+                adaptProcessor(entry.getKey(), processor);
             }
+        }
+        startupMethodsProcessed = true;
+    }
+
+    /**
+     * The definitions with methods marked for processing at startup, replaced beans filtered out.
+     *
+     * @return The definitions
+     */
+    List<BeanDefinition<Object>> processedBeanDefinitions() {
+        List<BeanDefinition<Object>> processedBeans = new ArrayList<>();
+        beanDefinitionProvider.getProcessedBeans(this).forEach(processedBeans::add);
+        filterReplacedBeans(processedBeans);
+        return processedBeans;
+    }
+
+    /**
+     * The enabled definitions with an executable method annotated with the given annotation. Only their conditions are
+     * evaluated: the provider caches a definition whose conditions fail as disabled, so evaluating those of every
+     * definition, as {@link #getAllBeanDefinitions()} does, would disable for good a definition whose
+     * {@code @Requires(beans = ...)} fails only until its bean is registered.
+     *
+     * @param annotationType The annotation
+     * @param runtimeOnly Whether only the definitions registered at runtime are read, which the index of the
+     * definitions processed at startup leaves out
+     * @return The definitions
+     */
+    List<BeanDefinition<Object>> definitionsWithMethodsAnnotated(Class<? extends Annotation> annotationType, boolean runtimeOnly) {
+        return beanDefinitionProvider.getBeanDefinitions(this, runtimeOnly ? RuntimeBeanDefinition.class::isInstance : null, definition -> {
+            for (ExecutableMethod<Object, ?> method : definition.getExecutableMethods()) {
+                if (method.getAnnotationMetadata().hasStereotype(annotationType)) {
+                    return true;
+                }
+            }
+            return false;
+        });
+    }
+
+    /**
+     * Feeds a processor the methods of definitions added after startup, in a context whose definitions may change after
+     * startup (see {@link #adaptsProcessors}); in any other context this does nothing.
+     *
+     * @param annotationType The annotation the processor handles
+     * @param processor The processor
+     * @param <A> The annotation type
+     */
+    @Internal
+    @SuppressWarnings("unchecked")
+    <A extends Annotation> void adaptProcessor(Class<A> annotationType, ExecutableMethodProcessor<?> processor) {
+        if (adaptsProcessors) {
+            watches.adapt(annotationType, (ExecutableMethodProcessor<A>) processor);
+        }
+    }
+
+    /**
+     * Feeds a processor the definitions added after startup, in a context whose definitions may change after startup
+     * (see {@link #adaptsProcessors}); in any other context this does nothing.
+     *
+     * @param annotationType The annotation the processor handles
+     * @param processor The processor
+     */
+    @Internal
+    void adaptProcessor(Class<? extends Annotation> annotationType, BeanDefinitionProcessor<?> processor) {
+        if (adaptsProcessors) {
+            watches.adapt(annotationType, processor);
         }
     }
 
@@ -2688,6 +3154,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                        @Nullable Map<String, Object> argumentValues) {
         Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
         Qualifier<?> prevQualifier = resolutionContext.getCurrentQualifier();
+        // the creation, including the listeners and validation that follow in postBeanCreated, owns the
+        // watches registered meanwhile; a failure anywhere in it closes them
+        watches.beginCreation(beanDefinition);
+        boolean created = false;
+        DefaultBeanDependencyGraph graph = dependencyGraph;
+        // what the instance receives is counted once however many injection points receive it
+        DefaultBeanDependencyGraph.Creation creation = graph == null ? null : graph.beginCreation(beanDefinition);
         try {
             resolutionContext.setCurrentQualifier(declaredQualifier != null && !AnyQualifier.INSTANCE.equals(declaredQualifier) ? declaredQualifier : qualifier);
             createDependsOnBeans(resolutionContext, beanDefinition);
@@ -2707,6 +3180,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (bean instanceof Qualified qualified && declaredQualifier != null) {
                 qualified.$withBeanQualifier(declaredQualifier);
             }
+            created = true;
             return bean;
         } catch (ConstructorAdviceException e) {
             // Advice around the constructor rejected the construction. An exception thrown by advice reaches
@@ -2721,7 +3195,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
             throw new BeanInstantiationException(beanDefinition, e);
         } finally {
+            if (!created) {
+                watches.endCreation(beanDefinition, null);
+            }
             resolutionContext.setCurrentQualifier(prevQualifier);
+            if (creation != null) {
+                creation.end();
+            }
         }
     }
 
@@ -2749,16 +3229,22 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                   @Nullable Qualifier<T> qualifier,
                                   T bean) {
         Qualifier<T> finalQualifier = qualifier != null ? qualifier : beanDefinition.getDeclaredQualifier();
+        T settled = null;
+        try {
+            bean = triggerBeanCreatedEventListener(resolutionContext, beanDefinition, bean, beanType, finalQualifier);
 
-        bean = triggerBeanCreatedEventListener(resolutionContext, beanDefinition, bean, beanType, finalQualifier);
-
-        if (beanDefinition instanceof ValidatedBeanDefinition<T> validatedBeanDefinition) {
-            bean = validatedBeanDefinition.validate(resolutionContext, bean);
+            if (beanDefinition instanceof ValidatedBeanDefinition<T> validatedBeanDefinition) {
+                bean = validatedBeanDefinition.validate(resolutionContext, bean);
+            }
+            if (LOG_LIFECYCLE.isDebugEnabled()) {
+                LOG_LIFECYCLE.debug("Created bean [{}] from definition [{}] with qualifier [{}]", bean, beanDefinition, finalQualifier);
+            }
+            settled = bean;
+            return bean;
+        } finally {
+            // the instance the listeners settled on owns the watches registered since the creation began
+            watches.endCreation(beanDefinition, settled);
         }
-        if (LOG_LIFECYCLE.isDebugEnabled()) {
-            LOG_LIFECYCLE.debug("Created bean [{}] from definition [{}] with qualifier [{}]", bean, beanDefinition, finalQualifier);
-        }
-        return bean;
     }
 
     private <T> T triggerBeanCreatedEventListener(BeanResolutionContext resolutionContext,
@@ -3220,6 +3706,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             @SuppressWarnings("unchecked")
             BeanRegistration<T> resolver = (BeanRegistration<T>) createRegistration(resolutionContext,
                 Argument.of(BeanDependencyResolver.class), null, dependencyResolverDefinition, true);
+            if (dependencyGraph != null && resolver.bean() instanceof DefaultBeanDependencyResolver dependencyResolver) {
+                // what the bean later resolves or creates through the resolver is the bean's, as an injection would be
+                dependencyResolver.owner(dependencyGraph.ownerOf(resolutionContext), true);
+            }
             return resolver;
         }
         if (beanClass == InterceptionTarget.class) {
@@ -3563,10 +4053,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
         if (definition.isSingleton() && !isScopedProxyDefinition) {
             BeanRegistration<T> beanRegistration = singletonScope.findBeanRegistration(definition, beanType, qualifier);
-            if (beanRegistration != null) {
-                return beanRegistration;
+            if (beanRegistration == null) {
+                beanRegistration = singletonScope.getOrCreate(this, resolutionContext, definition, beanType, qualifier);
             }
-            return singletonScope.getOrCreate(this, resolutionContext, definition, beanType, qualifier);
+            recordDependency(resolutionContext, beanRegistration.beanDefinition, qualifier);
+            return beanRegistration;
         }
 
         final boolean isProxy = definition.isProxy();
@@ -3584,6 +4075,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     ((Qualified<T>) bean).$withBeanQualifier(q);
                 }
             }
+            // the receiving bean holds the scoped proxy, which is what a reload must know
+            recordDependency(resolutionContext, registration.beanDefinition, q);
             return registration;
         }
 
@@ -3592,10 +4085,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (isProxy) {
                 definition = getProxyTargetBeanDefinition(beanType, qualifier);
             }
-            return getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, beanType, definition, heldRegistration);
+            BeanRegistration<T> scoped = getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, beanType, definition, heldRegistration);
+            recordDependency(resolutionContext, scoped.beanDefinition, qualifier);
+            return scoped;
         }
         // Unknown scope, prototype scope etc
-        return createRegistration(resolutionContext, beanType, qualifier, definition, true);
+        BeanRegistration<T> prototype = createRegistration(resolutionContext, beanType, qualifier, definition, true);
+        // a prototype belongs to the bean that received it, and what the prototype received is recorded
+        // under the prototype's definition, so a path through it is not lost
+        recordDependency(resolutionContext, prototype.beanDefinition, qualifier);
+        return prototype;
     }
 
     private <T> BeanRegistration<T> intializeEagerBean(@Nullable BeanResolutionContext resolutionContext,
@@ -3743,8 +4242,82 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     final <T> BeanRegistration<T> createFreshRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                          BeanDefinition<T> definition) {
-        return createRegistration(resolutionContext, definition.asArgument(), definition.getDeclaredQualifier(),
+        BeanRegistration<T> registration = createRegistration(resolutionContext, definition.asArgument(), definition.getDeclaredQualifier(),
             definition, resolutionContext != null, true);
+        if (dependencyGraph != null) {
+            // what the fresh instance received is recorded under its definition as it is created; a singleton's
+            // fresh instance shares those edges with the scoped one, so destroying either must not forget them
+            dependencyGraph.freshCreated(registration);
+        }
+        return registration;
+    }
+
+    /**
+     * Records that the owner of a resolver received a bean through it, as the bean's injection would have been.
+     *
+     * @param owner The owner, or null when the graph is not recorded or the resolver has none
+     * @param registration The received registration
+     */
+    final void recordOwnedDependency(DefaultBeanDependencyGraph.@Nullable Owner owner, BeanRegistration<?> registration) {
+        if (dependencyGraph != null && owner != null) {
+            dependencyGraph.recordOwned(owner, registration.getBeanDefinition());
+        }
+    }
+
+    /**
+     * Whether the context records a {@link BeanDependencyGraph}.
+     *
+     * @return True when bean dependencies are tracked
+     */
+    final boolean isTrackingBeanDependencies() {
+        return dependencyGraph != null;
+    }
+
+    /**
+     * Records, when the graph is recorded, that the bean being created received the given bean at the current
+     * injection point. A provider is recorded as what it resolves: an edge, marked lazy, to each definition its type
+     * argument and qualifier select, since every provider of a kind shares one definition that names no target.
+     *
+     * @param resolutionContext The resolution context of the receiving bean
+     * @param received The definition of the received bean
+     * @param qualifier The qualifier the bean was resolved with
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void recordDependency(@Nullable BeanResolutionContext resolutionContext, BeanDefinition<?> received, @Nullable Qualifier<?> qualifier) {
+        DefaultBeanDependencyGraph graph = dependencyGraph;
+        if (graph == null || resolutionContext == null) {
+            return;
+        }
+        BeanDefinition<?> target = received instanceof BeanDefinitionDelegate<?> delegate ? delegate.getDelegate() : received;
+        if (target instanceof AbstractProviderDefinition<?>) {
+            Argument provided = DefaultBeanDependencyGraph.providedArgument(resolutionContext);
+            // a provider of Object names no target: every bean would be a candidate
+            Collection<? extends BeanDefinition<?>> candidates = provided != null && provided.getType() != Object.class
+                ? getBeanDefinitions(provided, (Qualifier) providerQualifier(resolutionContext, qualifier))
+                : List.of();
+            // a provider resolves through this context on every call, whatever it resolves today: with no candidate
+            // to name, the lazy edge goes to the provider itself, so that holding it is still recorded
+            graph.recordProvided(resolutionContext, candidates.isEmpty() ? List.of(received) : candidates);
+            return;
+        }
+        graph.record(resolutionContext, received);
+    }
+
+    /**
+     * The qualifier a provider resolves under, as {@link AbstractProviderDefinition} decides it: the qualifier it was
+     * looked up with, or for a provider injected into an iterable bean without one, the name the resolution carries.
+     *
+     * @param resolutionContext The resolution context injecting the provider
+     * @param qualifier The qualifier the provider was looked up with
+     * @return The qualifier the provider resolves under
+     */
+    private static @Nullable Qualifier<?> providerQualifier(BeanResolutionContext resolutionContext, @Nullable Qualifier<?> qualifier) {
+        if (qualifier != null) {
+            return qualifier;
+        }
+        BeanResolutionContext.Segment<?, ?> segment = resolutionContext.getPath().currentSegment().orElse(null);
+        Object name = resolutionContext.getAttribute(Named.class.getName());
+        return name != null && segment != null && segment.getDeclaringType().isIterable() ? Qualifiers.byName(name.toString()) : null;
     }
 
     @SuppressWarnings({"unchecked", "NullAway"}) // Nullable factory definitions may produce a registration without an instance.
@@ -3792,13 +4365,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         } else {
                             throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                         }
-                        InterceptorCandidates interceptorCandidates = creation.lifecycleInterceptorCandidates();
-                        if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
-                            Object value = registrations.remove(definition);
-                            if (value instanceof List<?> list) {
-                                interceptorCandidates = new InterceptorCandidates.Resolved((List) list);
+                        InterceptorCandidates interceptorCandidates;
+                        try {
+                            interceptorCandidates = creation.lifecycleInterceptorCandidates();
+                            if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
+                                Object value = registrations.remove(definition);
+                                if (value instanceof List<?> list) {
+                                    interceptorCandidates = new InterceptorCandidates.Resolved((List) list);
+                                }
                             }
+                        } catch (RuntimeException | Error e) {
+                            // the creation the instance began ends here, failed, as postBeanCreated would have ended it
+                            watches.endCreation(definition, null);
+                            throw e;
                         }
+                        T created = bean;
                         bean = postBeanCreated(context, definition, beanType, qualifier, bean);
                         if (customizeNull && bean == null) {
                             bean = (T) beanResolutionCustomizer.resolveNullBean(beanType, beanType, definition).orElse(null);
@@ -3814,8 +4395,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         }
                         BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
                         List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
-                        beanRegistration = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
+                        BeanDisposingRegistration<T> disposing = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
                             dependentBeans, interceptorCandidates, creation.dependencies);
+                        if (dependencyGraph != null && created != bean) {
+                            // a listener replaced the instance: a development context retains the one it received
+                            disposing.setBeforeListeners(created);
+                        }
+                        beanRegistration = disposing;
                     } catch (RuntimeException | Error e) {
                         destroyDependentsOfFailedBean(context, e);
                         destroyCreatedBeans(creation.dependencies.takeDependents(), e);
@@ -4072,8 +4658,553 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         registerConversionService();
         configureContextInternal();
         initializeEventListeners();
+        wrapAdoptedRegistrations();
+        destroyRejectedRetainedRegistrations();
         initializeTypeConverters();
         initializeContext();
+    }
+
+    /**
+     * Stops the context, destroying every singleton except those the given predicate accepts, which
+     * are returned instead so that a new context can {@link ApplicationContextBuilder#retainedRegistrations(Collection) adopt}
+     * them. No {@code @PreDestroy} method runs and no destruction event is published for a retained bean.
+     *
+     * <p>For a development launcher restarting the application: a connection pool or a client survives
+     * the restart, and the beans that depend on it are created again on top of it. The launcher is
+     * responsible for retaining only beans whose classes and dependencies are not being replaced, which
+     * the {@link BeanDependencyGraph} tells it. When the graph is recorded, the singletons a retained bean
+     * holds are retained with it, since it keeps them anyway, and a bean is not retained at all when it or
+     * one of them is a proxy or a {@link CustomScope}, or holds a {@link BeanProvider}, a {@code Provider}, a proxy,
+     * the context, its environment, its event publisher or its conversion service, because those would keep resolving
+     * through this stopped context, or keep the instances its scopes created; without the graph the predicate answers
+     * for all of that.
+     * When the graph is recorded, a bean that a {@link io.micronaut.context.event.BeanCreatedEventListener} replaced,
+     * by a wrapper that may hold this context, is retained as the listeners received it; the wrapper is dropped, neither
+     * destroyed nor announced. The adopting context runs its own listeners on every retained bean, as the bean's
+     * creation would have, so a listener that configures what it receives must be idempotent.
+     * Whoever holds the returned registrations destroys them eventually, through the context that adopted
+     * them or {@link #destroyBean(BeanRegistration)}.</p>
+     *
+     * @param retain Which singleton registrations to keep alive
+     * @return The retained registrations, in no particular order
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public Collection<BeanRegistration<?>> stopRetaining(Predicate<BeanRegistration<?>> retain) {
+        ArgumentUtils.requireNonNull("retain", retain);
+        return stopRetaining(new PredicateRetentionCriteria(retain));
+    }
+
+    /**
+     * The criteria of {@link #stopRetaining(Predicate)}, which know of no configuration change: a configuration bean a
+     * retained bean holds is retained with it, as any other bean it holds.
+     *
+     * @param retain Which singleton registrations to keep alive
+     */
+    private record PredicateRetentionCriteria(Predicate<BeanRegistration<?>> retain) implements RetentionCriteria {
+        @Override
+        public boolean retain(BeanRegistration<?> registration) {
+            return retain.test(registration);
+        }
+
+        @Override
+        public Set<String> observedConfigurationPrefixes(BeanRegistration<?> registration) {
+            return Set.of();
+        }
+    }
+
+    /**
+     * Stops the context as {@link #stopRetaining(Predicate)} does, retaining the singletons the criteria
+     * {@link RetentionCriteria#retain(BeanRegistration) retain}. A configuration bean, one of
+     * {@link io.micronaut.context.annotation.ConfigurationProperties}, {@link io.micronaut.context.annotation.EachProperty}
+     * or another {@link ConfigurationReader}, that a retained bean holds does not keep it from being retained when its
+     * prefix is one of the prefixes {@link RetentionCriteria#observedConfigurationPrefixes(BeanRegistration) whose change releases} the
+     * retained bean, or under one: the configuration bean is not retained, the next context creates its own, and the
+     * retained bean keeps what it copied from it, which stays valid until a change under that prefix releases the
+     * bean. A retained bean must therefore not keep its configuration bean, only its values. A configuration bean
+     * under another prefix is treated as any other bean the retained bean holds.
+     *
+     * @param criteria Which singleton registrations to keep alive
+     * @return The retained registrations, in no particular order
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public synchronized Collection<BeanRegistration<?>> stopRetaining(RetentionCriteria criteria) {
+        ArgumentUtils.requireNonNull("criteria", criteria);
+        retainedOnStop.clear();
+        retentionCriteria.set(criteria);
+        try {
+            stop();
+        } finally {
+            retentionCriteria.set(null);
+            retainedOnStopBeans = null;
+        }
+        List<BeanRegistration<?>> retained = List.copyOf(retainedOnStop);
+        retainedOnStop.clear();
+        return retained;
+    }
+
+    /**
+     * Registers the singletons of a previous context this one was configured with, under this context's
+     * definitions, before any bean is created, so that lookups and injections find the adopted instances.
+     */
+    private void adoptRetainedRegistrations() {
+        Collection<BeanRegistration<?>> registrations = registrationsToAdopt;
+        // adopted once: a later restart of this context must not register instances it has destroyed since
+        registrationsToAdopt = List.of();
+        // a registered instance first: an @EachBean member of it, which comes before it in the destruction order the
+        // registrations follow, is only found once this context has the instance's definition
+        for (BeanRegistration<?> registration : registrations) {
+            if (originalOf(registration).getBeanDefinition() instanceof RuntimeBeanDefinition<?> runtime) {
+                resolveAdoptedDefinition(runtime);
+            }
+        }
+        // decided for all before any is registered: a bean whose held dependency cannot be adopted is not
+        // adopted either, since it would keep holding a bean this context destroys
+        Map<BeanRegistration<?>, BeanDefinition<?>> adoptable = new LinkedHashMap<>();
+        List<BeanRegistration<?>> rejected = new ArrayList<>();
+        for (BeanRegistration<?> registration : registrations) {
+            BeanDefinition<?> definition = resolveAdoption(registration);
+            if (definition != null) {
+                adoptable.put(registration, definition);
+            } else {
+                rejected.add(registration);
+            }
+        }
+        boolean changed = true;
+        while (changed) {
+            changed = false;
+            for (BeanRegistration<?> registration : List.copyOf(adoptable.keySet())) {
+                BeanRegistration<?> rejectedDependency = rejectedDependencyOf(registration, rejected);
+                if (rejectedDependency != null) {
+                    if (LOG_LIFECYCLE.isWarnEnabled()) {
+                        LOG_LIFECYCLE.warn("Retained bean [{}] is destroyed instead of adopted because the bean [{}] it holds cannot be adopted", registration.bean, rejectedDependency.bean);
+                    }
+                    adoptable.remove(registration);
+                    // destroyed before the dependency it holds, as a shutdown would order them
+                    rejected.add(0, registration);
+                    changed = true;
+                }
+            }
+        }
+        Set<Object> adopting = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (BeanRegistration<?> registration : adoptable.keySet()) {
+            adopting.add(originalOf(registration).bean);
+            adopting.add(registration.bean);
+        }
+        adoptingRetainedBeans = adopting;
+        try {
+            for (Map.Entry<BeanRegistration<?>, BeanDefinition<?>> entry : adoptable.entrySet()) {
+                adopt(entry.getKey(), entry.getValue());
+            }
+        } finally {
+            adoptingRetainedBeans = Set.of();
+        }
+        for (BeanRegistration<?> registration : rejected) {
+            rejectedRetainedRegistrations.add(originalOf(registration));
+        }
+    }
+
+    private static <T> BeanRegistration<T> originalOf(BeanRegistration<T> registration) {
+        return registration instanceof RetainedRegistration<T> retained ? retained.original : registration;
+    }
+
+    /**
+     * The retained registration of a singleton the given bean holds that cannot be adopted, if any.
+     */
+    @Nullable
+    private BeanRegistration<?> rejectedDependencyOf(BeanRegistration<?> registration, List<BeanRegistration<?>> rejected) {
+        if (!(registration instanceof RetainedRegistration<?> retained)) {
+            return null;
+        }
+        for (BeanDependencyGraph.BeanDependency edge : retained.dependencies) {
+            if (edge.lazy()) {
+                continue;
+            }
+            for (BeanRegistration<?> candidate : rejected) {
+                // the carried edges name the definitions of the stopped context, as the registrations do
+                if (originalOf(candidate).beanDefinition == edge.dependency()) {
+                    return candidate;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The definition this context adopts the retained bean under, or null when it cannot: there is no
+     * definition for it here, or this context already holds another instance under it.
+     */
+    @Nullable
+    private <T> BeanDefinition<T> resolveAdoption(BeanRegistration<T> registration) {
+        BeanRegistration<T> original = originalOf(registration);
+        BeanDefinition<T> definition = resolveAdoptedDefinition(original.getBeanDefinition());
+        if (definition == null) {
+            if (LOG_LIFECYCLE.isWarnEnabled()) {
+                LOG_LIFECYCLE.warn("Retained bean [{}] has no definition in this context and is destroyed instead of adopted", original.bean);
+            }
+            return null;
+        }
+        BeanRegistration<T> existing = singletonScope.findBeanRegistration(definition);
+        if (existing == null) {
+            // an instance supplied to this context's builder is registered under a runtime definition of its own
+            existing = singletonScope.findBeanRegistration(definition, definition.asArgument(), definition.getDeclaredQualifier());
+        }
+        if (existing != null && existing.bean != original.bean) {
+            // this context already holds a bean under the definition, supplied to its builder: what was chosen
+            // for this context wins over what the previous one had, and the retained bean is destroyed
+            if (LOG_LIFECYCLE.isWarnEnabled()) {
+                LOG_LIFECYCLE.warn("Retained bean [{}] is displaced by the bean [{}] this context already holds and is destroyed", original.bean, existing.bean);
+            }
+            return null;
+        }
+        return definition;
+    }
+
+    /**
+     * Destroys the retained beans this context could not adopt, once the bean event listeners exist so
+     * that their destruction is announced like any other.
+     */
+    private void destroyRejectedRetainedRegistrations() {
+        List<BeanRegistration<?>> rejected = List.copyOf(rejectedRetainedRegistrations);
+        rejectedRetainedRegistrations.clear();
+        Set<Object> adopted = adoptedRetainedBeans;
+        adoptedRetainedBeans = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<Object> destroyed = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (BeanRegistration<?> registration : rejected) {
+            // an instance adopted under another of its registrations lives on; one rejected under several is destroyed once
+            if (adopted.contains(registration.bean) || !destroyed.add(registration.bean)) {
+                continue;
+            }
+            destroyBean(registration);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> void adopt(BeanRegistration<T> registration, BeanDefinition<?> resolved) {
+        BeanRegistration<T> original = originalOf(registration);
+        BeanDefinition<T> definition = (BeanDefinition<T>) resolved;
+        // the adopted registration keeps owning what the original owned: the prototypes it received and its
+        // interceptor registrations are destroyed with it, as they would have been. They are bound to this
+        // context, so the stopped one is not kept reachable through them
+        List<BeanRegistration<?>> dependents = null;
+        List<?> interceptorRegistrations = null;
+        if (original instanceof BeanDisposingRegistration<T> disposing) {
+            List<BeanRegistration<?>> owned = disposing.dependentBeans();
+            dependents = rebindAll(owned);
+            interceptorRegistrations = rebindInterceptors(disposing.getInterceptorCandidates().legacyRegistrations(), owned, dependents);
+        }
+        // a retained registration carries the instance as the listeners received it when they replaced it: that one is
+        // registered, and this context's listeners run on it once they are initialized, whether or not the previous
+        // context's listeners replaced it
+        BeanRegistration<T> adopted = BeanRegistration.of(this, original.getIdentifier(), definition, registration.getBean(), dependents, interceptorRegistrations);
+        singletonScope.registerSingletonBean(adopted, definition.getDeclaredQualifier());
+        adoptedToWrap.add(adopted);
+        // the prototypes the instance owns are one set however many registrations it is adopted under
+        boolean firstRegistration = adoptedRetainedBeans.add(original.bean);
+        if (dependencyGraph != null && registration instanceof RetainedRegistration<T> retained) {
+            for (BeanDependencyGraph.BeanDependency edge : retained.dependencies) {
+                if (!firstRegistration && edge.dependent() != original.getBeanDefinition()) {
+                    // the edges of the prototypes it owns, already counted once per prototype instance
+                    continue;
+                }
+                // an edge of the bean itself, or of a prototype it owns: both ends are re-keyed to this context
+                BeanDefinition<?> dependent = edge.dependent() == original.getBeanDefinition() ? definition : resolveAdoptedDefinition(edge.dependent());
+                BeanDefinition<?> dependency = resolveAdoptedDefinition(edge.dependency());
+                if (dependent != null && dependency != null) {
+                    dependencyGraph.record(new BeanDependencyGraph.BeanDependency(dependent, dependency, edge.kind(), edge.lazy(), edge.collection()));
+                }
+            }
+        }
+        if (LOG_LIFECYCLE.isDebugEnabled()) {
+            LOG_LIFECYCLE.debug("Adopted retained bean [{}] with identifier [{}]", original.bean, original.identifier);
+        }
+    }
+
+    /**
+     * Applies this context's bean created listeners to every adopted instance, as its creation would have: a listener
+     * the application changed since the previous context applies to a retained bean too, and a wrapper bound to the
+     * stopped context, such as one holding its bean locator, is made again bound to this one, around the same retained
+     * instance. The listeners run on the instance they received before, never on the previous context's replacement,
+     * whose state is not carried over: a listener that configures rather than replaces what it receives sees the
+     * retained instance again, so it must be idempotent. Between the adoption and this, while the context is configured,
+     * the instance is registered as the listeners received it, as a bean created then would be, since the listeners
+     * only apply once they are initialized.
+     */
+    private void wrapAdoptedRegistrations() {
+        if (adoptedToWrap.isEmpty()) {
+            return;
+        }
+        List<BeanRegistration<?>> adopted = adoptedToWrap;
+        adoptedToWrap = new ArrayList<>();
+        boolean replaced = false;
+        for (BeanRegistration<?> registration : adopted) {
+            replaced |= wrapAdopted(registration);
+        }
+        if (replaced) {
+            // a collection of beans resolved since the adoption holds the instances as they were adopted
+            singletonBeanRegistrations.clear();
+        }
+    }
+
+    /**
+     * @return Whether the adopted registration was replaced by one of what the listeners returned
+     */
+    private <T> boolean wrapAdopted(BeanRegistration<T> adopted) {
+        BeanDefinition<T> definition = adopted.beanDefinition;
+        if (singletonScope.findBeanRegistration(definition) != adopted) {
+            // destroyed or replaced since it was adopted, by what configured this context
+            return false;
+        }
+        T instance = adopted.bean;
+        T wrapped;
+        List<BeanRegistration<?>> created;
+        try (BeanResolutionContext context = newResolutionContext(definition, null)) {
+            try {
+                // as the creation of the bean applies them: the listeners, then the validation of what they returned
+                wrapped = triggerBeanCreatedEventListener(context, definition, instance, definition.asArgument(), definition.getDeclaredQualifier());
+                if (definition instanceof ValidatedBeanDefinition<T> validatedBeanDefinition) {
+                    wrapped = validatedBeanDefinition.validate(context, wrapped);
+                }
+            } catch (RuntimeException | Error e) {
+                // what the listeners created for it is owned by nothing
+                destroyDependentsOfFailedBean(context, e);
+                throw e;
+            }
+            created = context.getAndResetDependentBeans();
+        }
+        if (wrapped == instance && created.isEmpty()) {
+            return false;
+        }
+        List<BeanRegistration<?>> dependents = new ArrayList<>(adopted.dependentBeans());
+        dependents.addAll(created);
+        List<?> interceptorRegistrations = adopted instanceof BeanDisposingRegistration<T> disposing
+            ? disposing.getInterceptorCandidates().legacyRegistrations() : null;
+        BeanRegistration<T> registration = BeanRegistration.of(this, adopted.identifier, definition, wrapped, dependents, interceptorRegistrations);
+        if (wrapped != instance && registration instanceof BeanDisposingRegistration<T> disposing) {
+            // retained again as the listeners received it on the next restart
+            disposing.setBeforeListeners(instance);
+        }
+        singletonScope.registerSingletonBean(registration, definition.getDeclaredQualifier());
+        if (LOG_LIFECYCLE.isDebugEnabled()) {
+            LOG_LIFECYCLE.debug("Wrapped adopted bean [{}] again as [{}]", instance, wrapped);
+        }
+        return true;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> RetainedRegistration<T> retainedRegistration(BeanRegistration<T> registration,
+                                                                    List<BeanDependencyGraph.BeanDependency> dependencies,
+                                                                    AtomicBoolean destroyed) {
+        T beforeListeners = registration instanceof BeanDisposingRegistration<T> disposing ? (T) disposing.getBeforeListeners() : null;
+        return new RetainedRegistration<>(registration, dependencies, destroyed, beforeListeners);
+    }
+
+    /**
+     * This context's definition for a definition of the context the bean was retained from.
+     *
+     * @param retained The retained definition
+     * @param <T> The bean type
+     * @return The definition to register the bean under, or null when this context has none for it
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private <T> BeanDefinition<T> resolveAdoptedDefinition(BeanDefinition<T> retained) {
+        if (retained instanceof RuntimeBeanDefinition<T> runtime) {
+            // a registered instance: nothing generated to look up. The definition is registered here so that
+            // the instance is found through every type it exposes, not only its own class
+            for (BeanDefinition<T> candidate : getBeanDefinitions(runtime.asArgument(), runtime.getDeclaredQualifier())) {
+                if (candidate == runtime) {
+                    return retained;
+                }
+                if (candidate instanceof RuntimeBeanDefinition<T>
+                    && candidate.getBeanType() == runtime.getBeanType()
+                    && Objects.equals(candidate.getDeclaredQualifier(), runtime.getDeclaredQualifier())) {
+                    // this context registered an instance of its own for the type: the bean is adopted under that
+                    // definition, and the collision check decides between the two instances
+                    return candidate;
+                }
+            }
+            registerBeanDefinition(runtime);
+            return retained;
+        }
+        if (retained instanceof BeanDefinitionDelegate<T> delegate) {
+            // an @EachProperty entry or an @EachBean member: this context makes its own delegate from its
+            // configuration and beans, and the retained bean is registered under that one. No delegate here
+            // means the entry was removed or the origin is gone, and the bean is destroyed like any other
+            BeanDefinition<T> found = findBeanDefinition(delegate.asArgument(), delegate.getDeclaredQualifier())
+                .filter(definition -> definition.isEnabled(this))
+                .orElse(null);
+            return found != null ? found : resolveNestedEntryDefinition(delegate);
+        }
+        BeanDefinition<T> definition = findBeanDefinitionByDefinitionClass((Class<? extends BeanDefinition<T>>) retained.getClass()).orElse(null);
+        return definition != null && definition.isEnabled(this) ? definition : null;
+    }
+
+    /**
+     * This context's definition for an {@code @EachProperty} entry nested in the entry of another configuration, which
+     * a lookup finds only within the configuration path of its parent: no lookup has walked that path yet while the
+     * retained beans are adopted. The entry's delegate is made again from the path it was created under, over this
+     * context's definition, as the walk would make it, as long as this context's configuration still has the entry. It
+     * equals the delegate the walk makes later, so lookups find the adopted instance under it.
+     */
+    @Nullable
+    private <T> BeanDefinition<T> resolveNestedEntryDefinition(BeanDefinitionDelegate<T> delegate) {
+        ConfigurationPath path = delegate.getConfigurationPath().orElse(null);
+        Qualifier<T> qualifier = delegate.getDeclaredQualifier();
+        // only an entry of configuration nested in another's: an @EachBean member, or a top-level entry, is found by the
+        // lookup when its origin or its entry is still there, and is gone otherwise
+        if (path == null || qualifier == null || !path.hasDynamicSegments() || delegate.getTarget() instanceof BeanDefinitionDelegate<T>
+            || !delegate.getTarget().hasStereotype(ConfigurationReader.class)
+            || !(this instanceof PropertyResolver resolver) || !resolver.containsProperties(path.prefix())) {
+            return null;
+        }
+        BeanDefinition<T> target = resolveAdoptedDefinition(delegate.getTarget());
+        if (target == null) {
+            return null;
+        }
+        BeanDefinitionDelegate<T> again = BeanDefinitionDelegate.create(target, qualifier, path.copy());
+        return again.isEnabled(this) ? again : null;
+    }
+
+    @Nullable
+    private List<BeanRegistration<?>> rebindAll(@Nullable List<BeanRegistration<?>> registrations) {
+        if (registrations == null) {
+            return null;
+        }
+        List<BeanRegistration<?>> rebound = new ArrayList<>(registrations.size());
+        for (BeanRegistration<?> registration : registrations) {
+            rebound.add(rebind(registration));
+        }
+        return rebound;
+    }
+
+    /**
+     * Rebinds the interceptor candidates a retained bean kept. A candidate the bean also owns is the registration
+     * its owned dependents were rebound to, so the adopted owner sees one registration for it, as the original did.
+     */
+    @Nullable
+    private List<?> rebindInterceptors(@Nullable List<BeanRegistration<?>> registrations,
+                                       List<BeanRegistration<?>> owned,
+                                       @Nullable List<BeanRegistration<?>> reboundOwned) {
+        if (registrations == null) {
+            return null;
+        }
+        List<Object> rebound = new ArrayList<>(registrations.size());
+        for (BeanRegistration<?> registration : registrations) {
+            int index = indexOfIdentity(owned, registration);
+            rebound.add(index >= 0 && reboundOwned != null ? reboundOwned.get(index) : rebind(registration));
+        }
+        return rebound;
+    }
+
+    private static int indexOfIdentity(List<BeanRegistration<?>> registrations, BeanRegistration<?> registration) {
+        for (int i = 0; i < registrations.size(); i++) {
+            if (registrations.get(i) == registration) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * A registration a retained bean owns (a prototype it received, an interceptor of its own), bound to
+     * this context instead of the stopped one, under this context's definition where it has one.
+     */
+    @SuppressWarnings("unchecked")
+    private <T> BeanRegistration<T> rebind(BeanRegistration<T> registration) {
+        if (!(registration instanceof BeanDisposingRegistration<T> disposing)) {
+            return registration;
+        }
+        if (disposing.getBean() instanceof DefaultBeanDependencyResolver && disposing.getBeanDefinition() != dependencyResolverDefinition) {
+            // a resolver the bean received, or a group it opened: bound to the stopped context, and through its owner to
+            // that context's graph. What it resolved stays owned, under a resolver of this context; the bean only used
+            // the resolver while it was created, and a bean that kept it would hold the stopped context anyway
+            List<BeanRegistration<?>> owned = rebindAll(disposing.dependentBeans());
+            DefaultBeanDependencyResolver resolver = new DefaultBeanDependencyResolver(this);
+            BeanRegistration<T> rebound = (BeanRegistration<T>) BeanRegistration.of(this, disposing.getIdentifier(), dependencyResolverDefinition,
+                resolver, owned, null);
+            // the singletons it resolved that this context adopts too, which the bean's destruction is ordered before, as
+            // registrations of this context; one the stopped context destroyed is not held, it would keep that context's
+            // generation reachable
+            List<BeanRegistration<?>> required = new ArrayList<>();
+            for (BeanRegistration<?> shared : disposing.getDependencies().requiredBeans()) {
+                BeanRegistration<?> here = adoptingRetainedBeans.contains(shared.getBean()) ? sharedRegistration(shared) : null;
+                if (here != null) {
+                    required.add(here);
+                }
+            }
+            resolver.dependencies.requireAll(required);
+            return rebound;
+        }
+        BeanDefinition<T> definition = resolveAdoptedDefinition(disposing.getBeanDefinition());
+        List<BeanRegistration<?>> owned = disposing.dependentBeans();
+        List<BeanRegistration<?>> dependents = rebindAll(owned);
+        return BeanRegistration.of(
+            this,
+            disposing.getIdentifier(),
+            definition != null ? definition : disposing.getBeanDefinition(),
+            disposing.getBean(),
+            dependents,
+            rebindInterceptors(disposing.getInterceptorCandidates().legacyRegistrations(), owned, dependents)
+        );
+    }
+
+    /**
+     * A registration of this context for a shared instance a rebound resolver orders its destruction by: the instance
+     * under this context's definition, as it is adopted, without what the stopped context's registration owned. The
+     * stopped context's definition is not held: it was configured with that context's environment.
+     */
+    @Nullable
+    private <S> BeanRegistration<S> sharedRegistration(BeanRegistration<S> shared) {
+        BeanDefinition<S> definition = resolveAdoptedDefinition(shared.getBeanDefinition());
+        return definition == null ? null : BeanRegistration.of(this, shared.getIdentifier(), definition, shared.getBean());
+    }
+
+    /**
+     * Collects what a retained bean received, and what the prototypes it owns received, since those
+     * travel with it and may hold a singleton the bean therefore holds too.
+     */
+    private void collectDependencies(BeanRegistration<?> registration, List<BeanDependencyGraph.BeanDependency> into, Set<Object> visited) {
+        if (dependencyGraph == null || !visited.add(registration)) {
+            return;
+        }
+        into.addAll(dependencyGraph.dependenciesOf(registration.beanDefinition));
+        if (registration instanceof BeanDisposingRegistration<?> disposing && !disposing.dependentBeans().isEmpty()) {
+            for (BeanRegistration<?> dependent : disposing.dependentBeans()) {
+                collectDependencies(dependent, into, visited);
+            }
+        }
+    }
+
+    /**
+     * A registration {@link #stopRetaining(Predicate)} returns: the original registration, so the
+     * adopting context keeps what it owned, and what the bean received, so that context's graph knows.
+     *
+     * @param <T> The bean type
+     */
+    private static final class RetainedRegistration<T> extends BeanRegistration<T> implements DependentBeanProvider {
+        private final BeanRegistration<T> original;
+        private final List<BeanDependencyGraph.BeanDependency> dependencies;
+        /**
+         * Shared by the registrations of one instance, so a launcher destroying them all destroys it once.
+         */
+        private final AtomicBoolean destroyed;
+
+        RetainedRegistration(BeanRegistration<T> original, List<BeanDependencyGraph.BeanDependency> dependencies, AtomicBoolean destroyed,
+                             @Nullable T beforeListeners) {
+            super(original.identifier, original.beanDefinition, beforeListeners != null ? beforeListeners : original.bean);
+            this.original = original;
+            this.dependencies = dependencies;
+            this.destroyed = destroyed;
+        }
+
+        @Override
+        public List<BeanRegistration<?>> dependentBeans() {
+            return original instanceof DependentBeanProvider provider ? provider.dependentBeans() : List.of();
+        }
     }
 
     protected void initializeTypeConverters() {
@@ -4287,7 +5418,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         CollectionHolder<T> existing = singletonBeanRegistrations.get(key);
         if (existing != null && existing.registrations != null) {
             logResolvedExistingBeanRegistrations(beanType, qualifier, existing.registrations);
-            return existing.registrations;
+            return recordCachedDependencies(resolutionContext, existing.registrations);
         }
 
         Collection<BeanDefinition<T>> beanDefinitions = findBeanCandidatesInternal(resolutionContext, beanType);
@@ -4313,7 +5444,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 synchronized (holder) {
                     if (holder.registrations != null) {
                         logResolvedExistingBeanRegistrations(beanType, qualifier, holder.registrations);
-                        return holder.registrations;
+                        return recordCachedDependencies(resolutionContext, holder.registrations);
                     }
                     holder.registrations = resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier);
                     return holder.registrations;
@@ -4345,6 +5476,25 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         beansOfTypeList.sort(OrderUtil.ORDERED_COMPARATOR);
         return beansOfTypeList;
+    }
+
+    /**
+     * Records, when the graph is recorded, that the bean being created received each member of a cached collection,
+     * as resolving the members afresh would have: the receiver that first resolved the collection is not the only one.
+     *
+     * @param resolutionContext The resolution context of the receiving bean
+     * @param registrations The cached registrations
+     * @param <T> The bean type
+     * @return The registrations
+     */
+    private <T> Collection<BeanRegistration<T>> recordCachedDependencies(@Nullable BeanResolutionContext resolutionContext,
+                                                                         Collection<BeanRegistration<T>> registrations) {
+        if (dependencyGraph != null && resolutionContext != null) {
+            for (BeanRegistration<T> registration : registrations) {
+                recordDependency(resolutionContext, registration.beanDefinition, registration.beanDefinition.getDeclaredQualifier());
+            }
+        }
+        return registrations;
     }
 
     private <T> void logResolvedExistingBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier, Collection<BeanRegistration<T>> existing) {
@@ -4500,9 +5650,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         // need to sort registered singletons so that beans with that require other beans appear first
         List<BeanRegistration> objects = (List) BeanDestructionOrder.sort((Collection) registrations);
 
+        Set<Object> retainedBeans = retainedBeans(objects);
         for (BeanRegistration beanRegistration : objects) {
             Object bean = beanRegistration.bean;
             if (!processed.add(bean)) {
+                continue;
+            }
+            if (retainedBeans.contains(bean)) {
+                // kept alive for the context that comes next: no @PreDestroy, no destruction event
                 continue;
             }
 
@@ -4518,6 +5673,342 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 }
             }
         }
+    }
+
+    /**
+     * The instances a {@link #stopRetaining(RetentionCriteria)} in progress keeps, and their registrations. An
+     * instance registered under several definitions is kept when any of its registrations is accepted,
+     * and every registration of it is kept, so the instance stays reachable under each of them.
+     *
+     * @param registrations The singleton registrations about to be destroyed
+     * @return The retained instances, by identity; empty when no retention is in progress
+     */
+    private Set<Object> retainedBeans(List<BeanRegistration> registrations) {
+        if (retentionCriteria.get() == null) {
+            return Set.of();
+        }
+        // decided once, over the singletons as the stop found them: a singleton created while the context stops is not
+        // retained, and what a shutdown listener asked about is what is retained
+        Set<Object> retained = retainedOnStopBeans;
+        if (retained == null) {
+            retained = decideRetainedBeans(registrations);
+            retainedOnStopBeans = retained;
+        }
+        return retained;
+    }
+
+    /**
+     * Whether the {@link #stopRetaining(RetentionCriteria)} in progress keeps the given instance alive for the context
+     * that comes next, so that what the stop shuts down, such as the graceful shutdown of the
+     * {@link io.micronaut.context.event.ShutdownEvent}, leaves it running.
+     *
+     * @param bean The instance
+     * @return True when a retention is in progress and retains it
+     * @since 5.3.0
+     */
+    @Override
+    @Internal
+    @Experimental
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public boolean isRetainedOnStop(Object bean) {
+        if (retentionCriteria.get() == null) {
+            // no retention in progress: the common stop, which asks nothing more
+            return false;
+        }
+        Set<Object> retained = retainedOnStopBeans;
+        if (retained == null) {
+            // the first question decides, over the singletons in destruction order; the later ones read the decision
+            synchronized (this) {
+                retained = retainedOnStopBeans;
+                if (retained == null) {
+                    retained = retainedBeans((List) BeanDestructionOrder.sort((Collection) singletonScope.getBeanRegistrations()));
+                }
+            }
+        }
+        return retained.contains(bean);
+    }
+
+    private Set<Object> decideRetainedBeans(List<BeanRegistration> registrations) {
+        RetentionCriteria criteria = Objects.requireNonNull(retentionCriteria.get());
+        Map<Object, AtomicBoolean> beans = new IdentityHashMap<>();
+        for (BeanRegistration<?> registration : registrations) {
+            if (registration.bean == null || !criteria.retain(registration)) {
+                continue;
+            }
+            // a retained bean keeps the singletons it holds, so they are retained with it; one of them bound to
+            // this context (a provider, a proxy, the context itself) keeps the whole closure from being retained,
+            // except configuration a change of which releases the bean: it is not retained, but made again by the next context
+            List<BeanRegistration<?>> closure = new ArrayList<>();
+            Set<String> invalidatedBy = criteria.observedConfigurationPrefixes(registration);
+            BeanRegistration<?> bound = collectRetentionClosure(registration, invalidatedBy, closure, Collections.newSetFromMap(new IdentityHashMap<>()));
+            if (bound != null) {
+                if (LOG_LIFECYCLE.isWarnEnabled()) {
+                    LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: {} holds a provider, a proxy, a scope or the context, which are bound to this context",
+                        registration.bean, bound == registration ? "it" : "the bean [" + bound.bean + "] it holds");
+                }
+                continue;
+            }
+            // what it received is what it runs: a class the restart replaces, anywhere in the closure, would keep the old
+            // generation of the application running in it
+            Set<Object> examined = Collections.newSetFromMap(new IdentityHashMap<>());
+            BeanRegistration<?> replacing = null;
+            Class<?> replaced = null;
+            for (BeanRegistration<?> member : closure) {
+                replaced = replacedClassOf(member, criteria, invalidatedBy, examined);
+                if (replaced != null) {
+                    replacing = member;
+                    break;
+                }
+            }
+            if (replacing != null && replaced != null) {
+                if (LOG_LIFECYCLE.isWarnEnabled()) {
+                    LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: {} bound to the class [{}], which the restart replaces",
+                        registration.bean, replacing == registration ? "it is" : "the bean [" + replacing.bean + "] it holds is", replaced.getName());
+                }
+                continue;
+            }
+            for (BeanRegistration<?> member : closure) {
+                beans.putIfAbsent(member.bean, new AtomicBoolean());
+            }
+        }
+        for (BeanRegistration<?> registration : registrations) {
+            AtomicBoolean destroyed = registration.bean == null ? null : beans.get(registration.bean);
+            if (destroyed != null) {
+                // what the bean received travels with it, so the next context's graph knows what it holds
+                List<BeanDependencyGraph.BeanDependency> dependencies = new ArrayList<>();
+                if (dependencyGraph != null) {
+                    collectDependencies(registration, dependencies, Collections.newSetFromMap(new IdentityHashMap<>()));
+                }
+                retainedOnStop.add(retainedRegistration(registration, List.copyOf(dependencies), destroyed));
+                if (LOG_LIFECYCLE.isDebugEnabled()) {
+                    LOG_LIFECYCLE.debug("Retaining bean [{}] with identifier [{}] across the restart", registration.bean, registration.identifier);
+                }
+            }
+        }
+        return beans.keySet();
+    }
+
+    /**
+     * Whether a bean received something that resolves through this context on every use, a
+     * {@link BeanProvider} or a lazy proxy, or is such a proxy itself. Adopted by another context it
+     * would keep resolving through this stopped one, so it is not retained. Known only when the
+     * dependency graph is recorded; without it the caller answers for what it retains.
+     */
+    /**
+     * Collects a bean and the singletons it holds, directly or through the singletons they hold, into
+     * the closure that is retained with it. Known only when the dependency graph is recorded; without it
+     * the closure is the bean alone and the caller answers for what it holds.
+     *
+     * @param invalidatedBy The prefixes a change under which releases the retained bean: a configuration bean under one
+     * of them is left out of the closure rather than examined
+     * @return The first member bound to this context, which keeps the closure from being retained, or null
+     */
+    @Nullable
+    private BeanRegistration<?> collectRetentionClosure(BeanRegistration<?> registration, Set<String> invalidatedBy,
+                                                       List<BeanRegistration<?>> closure, Set<Object> visited) {
+        if (!visited.add(registration)) {
+            return null;
+        }
+        if (!closure.isEmpty() && isCoveredConfiguration(registration.beanDefinition, invalidatedBy)) {
+            // the next context binds it again; the retained bean holds only what it copied, valid until a change releases it
+            return null;
+        }
+        if (holdsContextBoundState(registration, invalidatedBy)) {
+            return registration;
+        }
+        closure.add(registration);
+        if (dependencyGraph == null) {
+            return null;
+        }
+        return collectRetentionClosure(registration.beanDefinition, invalidatedBy, closure, visited);
+    }
+
+    /**
+     * Follows what a definition's beans received: a singleton joins the closure, a prototype travels with
+     * its owner and contributes what it received in turn.
+     */
+    @Nullable
+    private BeanRegistration<?> collectRetentionClosure(BeanDefinition<?> definition, Set<String> invalidatedBy,
+                                                       List<BeanRegistration<?>> closure, Set<Object> visited) {
+        if (dependencyGraph == null) {
+            return null;
+        }
+        for (BeanDependencyGraph.BeanDependency edge : dependencyGraph.dependenciesOf(definition)) {
+            if (edge.lazy()) {
+                continue;
+            }
+            BeanRegistration<?> bound;
+            if (edge.dependency().isSingleton()) {
+                BeanRegistration<?> dependency = singletonScope.findBeanRegistration(edge.dependency());
+                bound = dependency == null ? null : collectRetentionClosure(dependency, invalidatedBy, closure, visited);
+            } else if (isCoveredConfiguration(edge.dependency(), invalidatedBy)) {
+                bound = null;
+            } else if (visited.add(edge.dependency())) {
+                bound = collectRetentionClosure(edge.dependency(), invalidatedBy, closure, visited);
+            } else {
+                bound = null;
+            }
+            if (bound != null) {
+                return bound;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The first class the restart replaces that a member of a retained bean's closure is bound to: its definition, its
+     * instance, the instance the bean created listeners received, and the prototypes it owns or received.
+     */
+    @Nullable
+    private Class<?> replacedClassOf(BeanRegistration<?> registration, RetentionCriteria criteria, Set<String> invalidatedBy, Set<Object> examined) {
+        if (!examined.add(registration)) {
+            return null;
+        }
+        Class<?> replaced = replacedClassOf(registration.beanDefinition, criteria, invalidatedBy, examined);
+        if (replaced != null) {
+            return replaced;
+        }
+        Object beforeListeners = registration instanceof BeanDisposingRegistration<?> disposing ? disposing.getBeforeListeners() : null;
+        for (Object instance : new Object[] {registration.bean, beforeListeners}) {
+            if (instance != null && criteria.isReplaced(instance.getClass())) {
+                return instance.getClass();
+            }
+        }
+        if (registration instanceof BeanDisposingRegistration<?> disposing) {
+            for (BeanRegistration<?> dependent : disposing.dependentBeans()) {
+                if (isCoveredConfiguration(dependent.beanDefinition, invalidatedBy)) {
+                    continue;
+                }
+                replaced = replacedClassOf(dependent, criteria, invalidatedBy, examined);
+                if (replaced != null) {
+                    return replaced;
+                }
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private Class<?> replacedClassOf(BeanDefinition<?> definition, RetentionCriteria criteria, Set<String> invalidatedBy, Set<Object> examined) {
+        if (!examined.add(definition)) {
+            return null;
+        }
+        BeanDefinition<?> generated = definition;
+        while (generated instanceof DelegatingBeanDefinition<?> delegating) {
+            generated = delegating.getTarget();
+        }
+        if (criteria.isReplaced(generated.getClass())) {
+            return generated.getClass();
+        }
+        if (criteria.isReplaced(definition.getBeanType())) {
+            return definition.getBeanType();
+        }
+        if (dependencyGraph != null) {
+            for (BeanDependencyGraph.BeanDependency edge : dependencyGraph.dependenciesOf(definition)) {
+                // a singleton it received is a member of the closure, examined as such
+                if (edge.lazy() || edge.dependency().isSingleton() || isCoveredConfiguration(edge.dependency(), invalidatedBy)) {
+                    continue;
+                }
+                Class<?> replaced = replacedClassOf(edge.dependency(), criteria, invalidatedBy, examined);
+                if (replaced != null) {
+                    return replaced;
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean holdsContextBoundState(BeanRegistration<?> registration, Set<String> invalidatedBy) {
+        return holdsContextBoundState(registration, invalidatedBy, Collections.newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    /**
+     * Whether a definition is of configuration, {@link io.micronaut.context.annotation.ConfigurationProperties},
+     * {@link io.micronaut.context.annotation.EachProperty} or another {@link ConfigurationReader}, whose prefix is one
+     * of the given prefixes or under one: a change of it is a change under that prefix. The prefix of an
+     * {@code @EachProperty} entry is the entry's own.
+     */
+    private static boolean isCoveredConfiguration(BeanDefinition<?> definition, Set<String> invalidatedBy) {
+        if (invalidatedBy.isEmpty() || !definition.hasStereotype(ConfigurationReader.class)) {
+            return false;
+        }
+        String prefix = definition instanceof BeanDefinitionDelegate<?> delegate
+            ? delegate.getConfigurationPath().map(ConfigurationPath::prefix).orElse(null) : null;
+        if (prefix == null) {
+            prefix = definition.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse(null);
+        }
+        if (prefix == null || prefix.isEmpty()) {
+            return false;
+        }
+        for (String covering : invalidatedBy) {
+            if (prefix.equals(covering) || prefix.length() > covering.length() && prefix.startsWith(covering)
+                && (prefix.charAt(covering.length()) == '.' || prefix.charAt(covering.length()) == '[')) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a type is one the context owns an instance of per context: the context itself and what it
+     * registers or hands out for itself, which is stopped or discarded with it, and a custom scope, which holds the
+     * instances created in this context and is what the scoped proxies of this context resolve through.
+     */
+    private static boolean isContextOwnedType(Class<?> type) {
+        return BeanLocator.class.isAssignableFrom(type)
+            || CustomScope.class.isAssignableFrom(type)
+            || PropertyResolver.class.isAssignableFrom(type)
+            || ApplicationEventPublisher.class.isAssignableFrom(type)
+            || ConversionService.class.isAssignableFrom(type)
+            || ResourceLoader.class.isAssignableFrom(type)
+            || BeanResolutionContext.class.isAssignableFrom(type);
+    }
+
+    private boolean isContextOwned(@Nullable Object bean) {
+        return bean == this
+            || bean instanceof CustomScope<?>
+            || bean instanceof PropertyResolver
+            || bean instanceof ApplicationEventPublisher
+            || bean instanceof ConversionService
+            || bean instanceof ResourceLoader
+            || bean instanceof BeanResolutionContext;
+    }
+
+    private boolean holdsContextBoundState(BeanRegistration<?> registration, Set<String> invalidatedBy, Set<Object> visited) {
+        if (!visited.add(registration)) {
+            return false;
+        }
+        if (registration.beanDefinition.isProxy() || isContextOwned(registration.bean)
+            || registration instanceof BeanDisposingRegistration<?> disposing && isContextOwned(disposing.getBeforeListeners())) {
+            return true;
+        }
+        // the context and what it owns (its environment, its event publishers, its conversion service, its
+        // resource loader) are handed out without a recorded dependency: a bean holding one of them holds
+        // the stopped context's
+        for (Class<?> required : registration.beanDefinition.getRequiredComponents()) {
+            if (required.isInstance(this) || isContextOwnedType(required)) {
+                return true;
+            }
+        }
+        if (dependencyGraph != null) {
+            for (BeanDependencyGraph.BeanDependency dependency : dependencyGraph.dependenciesOf(registration.beanDefinition)) {
+                if (isCoveredConfiguration(dependency.dependency(), invalidatedBy)) {
+                    continue;
+                }
+                if (dependency.lazy() || dependency.dependency().isProxy()) {
+                    return true;
+                }
+            }
+        }
+        // what an owned prototype holds, the bean holds through it
+        if (registration instanceof BeanDisposingRegistration<?> disposing && !disposing.dependentBeans().isEmpty()) {
+            for (BeanRegistration<?> dependent : disposing.dependentBeans()) {
+                if (!isCoveredConfiguration(dependent.beanDefinition, invalidatedBy) && holdsContextBoundState(dependent, invalidatedBy, visited)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Override
@@ -4625,6 +6116,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (!visited.add(registration)) {
             return;
         }
+        if (dependencyGraph != null && registration.getBean() instanceof DefaultBeanDependencyResolver resolver) {
+            // the owner of the resolver is being destroyed: what it received through the resolver goes, and a lookup
+            // racing the destruction records nothing
+            resolver.releaseOwner(dependencyGraph);
+        }
         DefaultBeanDependencies dependencies = registration.getDependencies();
         if (dependencies != null) {
             dependencies.stopResolving(invocation);
@@ -4723,6 +6219,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             beanDefinitionProvider.initialize(this);
             // an index exhaustiveness computed before the bean definitions were read does not hold for them
             beanDefinitionsEpoch.incrementAndGet();
+            // before anything resolves a bean, including the application context configurers that run next in
+            // an application context: a configurer touching a retained type must find the retained instance
+            adoptRetainedRegistrations();
         }
     }
 
