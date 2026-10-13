@@ -255,27 +255,35 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
     }
 
     private void link(BeanDependency edge) {
-        byDependent.computeIfAbsent(edge.dependentKey(), k -> ConcurrentHashMap.newKeySet()).add(edge);
-        byDependency.computeIfAbsent(edge.dependencyKey(), k -> ConcurrentHashMap.newKeySet()).add(edge);
+        addTo(byDependent, edge.dependentKey(), edge);
+        addTo(byDependency, edge.dependencyKey(), edge);
+    }
+
+    /**
+     * Adds an edge to an index set, inside the map's atomic compute, so that a concurrent
+     * {@link #removeFrom(Map, Key, BeanDependency)} cannot drop the set it is added to.
+     */
+    private static void addTo(Map<Key, Set<BeanDependency>> index, Key key, BeanDependency edge) {
+        index.compute(key, (k, edges) -> {
+            Set<BeanDependency> set = edges != null ? edges : ConcurrentHashMap.newKeySet();
+            set.add(edge);
+            return set;
+        });
+    }
+
+    /**
+     * Removes an edge from an index set and the set once it is empty, in one atomic step of the map.
+     */
+    private static void removeFrom(Map<Key, Set<BeanDependency>> index, Key key, BeanDependency edge) {
+        index.computeIfPresent(key, (k, edges) -> {
+            edges.remove(edge);
+            return edges.isEmpty() ? null : edges;
+        });
     }
 
     private void unlink(BeanDependency edge) {
-        Key dependentKey = edge.dependentKey();
-        Set<BeanDependency> edges = byDependent.get(dependentKey);
-        if (edges != null) {
-            edges.remove(edge);
-            if (edges.isEmpty()) {
-                byDependent.remove(dependentKey, edges);
-            }
-        }
-        Key dependencyKey = edge.dependencyKey();
-        Set<BeanDependency> dependents = byDependency.get(dependencyKey);
-        if (dependents != null) {
-            dependents.remove(edge);
-            if (dependents.isEmpty()) {
-                byDependency.remove(dependencyKey, dependents);
-            }
-        }
+        removeFrom(byDependent, edge.dependentKey(), edge);
+        removeFrom(byDependency, edge.dependencyKey(), edge);
     }
 
     /**
@@ -474,18 +482,8 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
             } else {
                 owned.remove(edge);
             }
-            edges.remove(edge);
-            Key dependencyKey = edge.dependencyKey();
-            Set<BeanDependency> dependents = byDependency.get(dependencyKey);
-            if (dependents != null) {
-                dependents.remove(edge);
-                if (dependents.isEmpty()) {
-                    byDependency.remove(dependencyKey, dependents);
-                }
-            }
-        }
-        if (edges.isEmpty()) {
-            byDependent.remove(key, edges);
+            removeFrom(byDependent, key, edge);
+            removeFrom(byDependency, edge.dependencyKey(), edge);
         }
     }
 
@@ -503,20 +501,10 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
         }
         for (BeanDependency edge : List.copyOf(edges)) {
             if (edge.reinjectable()) {
-                edges.remove(edge);
                 instances.remove(edge);
-                Key dependencyKey = edge.dependencyKey();
-                Set<BeanDependency> dependents = byDependency.get(dependencyKey);
-                if (dependents != null) {
-                    dependents.remove(edge);
-                    if (dependents.isEmpty()) {
-                        byDependency.remove(dependencyKey, dependents);
-                    }
-                }
+                removeFrom(byDependent, key, edge);
+                removeFrom(byDependency, edge.dependencyKey(), edge);
             }
-        }
-        if (edges.isEmpty()) {
-            byDependent.remove(key, edges);
         }
     }
 
