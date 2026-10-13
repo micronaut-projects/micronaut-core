@@ -26,6 +26,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -59,6 +60,7 @@ final class ResourceNotifier {
      * is not running to ask.
      */
     private static final String CLASSPATH_PREFIX = "classpath:";
+    private static final String CLASSPATH_ALL_PREFIX = "classpath*:";
     private static final String FILE_PREFIX = "file:";
     private static final Set<String> DEFAULT_EXTENSIONS = Set.of("properties", "yml", "yaml", "json", "toml", "groovy");
 
@@ -158,6 +160,12 @@ final class ResourceNotifier {
         if (origins.contains(absolute.toString()) || origins.contains(FILE_PREFIX + absolute)) {
             return true;
         }
+        for (String origin : origins) {
+            // micronaut.config.files may name a file relative to the working directory, as the environment reads it
+            if (origin.startsWith(FILE_PREFIX) && isFile(origin.substring(FILE_PREFIX.length()), absolute)) {
+                return true;
+            }
+        }
         for (Path root : roots) {
             Path normalizedRoot = root.toAbsolutePath().normalize();
             if (!absolute.startsWith(normalizedRoot) || absolute.equals(normalizedRoot)) {
@@ -170,11 +178,21 @@ final class ResourceNotifier {
                 }
                 relative.append(segment);
             }
-            if (origins.contains(CLASSPATH_PREFIX + relative) || origins.contains(CLASSPATH_PREFIX + "/" + relative)) {
-                return true;
+            for (String prefix : List.of(CLASSPATH_PREFIX, CLASSPATH_ALL_PREFIX)) {
+                if (origins.contains(prefix + relative) || origins.contains(prefix + "/" + relative)) {
+                    return true;
+                }
             }
         }
         return false;
+    }
+
+    private static boolean isFile(String location, Path absolute) {
+        try {
+            return Path.of(location).toAbsolutePath().normalize().equals(absolute);
+        } catch (InvalidPathException e) {
+            return false;
+        }
     }
 
     private static Set<String> origins(@Nullable ApplicationContext current) {
