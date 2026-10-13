@@ -32,6 +32,79 @@ class DevClassLoaderSpec extends Specification {
     @TempDir
     Path project
 
+    void "a resource deleted from a live root is gone rather than served from the build output's copy, in every generation"() {
+        given: "a live resource root and the build's copy of it, beside a resource only the build output holds"
+        Path live = Files.createDirectories(project.resolve("src/main/resources"))
+        Path views = Files.createDirectories(live.resolve("views"))
+        Path index = views.resolve("index.html")
+        Files.writeString(index, "live")
+        Path partials = Files.createDirectories(views.resolve("partials"))
+        Files.writeString(partials.resolve("a.html"), "a")
+        Path output = Files.createDirectories(project.resolve("build/resources/main/views/partials"))
+        Files.writeString(output.resolve("../index.html").normalize(), "stale")
+        Files.writeString(output.resolve("a.html"), "stale a")
+        Files.writeString(output.resolve("../generated.html").normalize(), "generated")
+        DevClassLoader loader = new DevClassLoader(DevClassLoaderSpec.classLoader, [live], [project.resolve("build/resources/main")], project.resolve("generations"))
+
+        expect: "the live file wins, and is the only copy listed"
+        read(loader.current(), "views/index.html") == "live"
+        Collections.list(loader.current().getResources("views/index.html")).size() == 1
+
+        when: "the live file is deleted"
+        Files.delete(index)
+
+        then: "the stale copy is hidden, while a resource only the build output holds is served"
+        loader.current().getResource("views/index.html") == null
+        !loader.current().getResources("views/index.html").hasMoreElements()
+        read(loader.current(), "views/generated.html") == "generated"
+
+        when: "a directory is deleted as a whole, and a file created after startup is read and then deleted"
+        Files.delete(partials.resolve("a.html"))
+        Files.delete(partials)
+        List<Path> under = loader.liveResources().knownUnder(partials)
+        Path late = views.resolve("late.html")
+        Files.writeString(late, "late")
+        Files.writeString(project.resolve("build/resources/main/views/late.html"), "stale late")
+        String lateContent = read(loader.current(), "views/late.html")
+        Files.delete(late)
+
+        then: "each file it held is known, and every one is gone"
+        under == [partials.resolve("a.html").toAbsolutePath().normalize()]
+        loader.current().getResource("views/partials/a.html") == null
+        lateContent == "late"
+        loader.current().getResource("views/late.html") == null
+
+        when: "a file the watcher reported but nothing read is deleted, and the loader swaps"
+        Path reported = views.resolve("reported.html")
+        Files.writeString(reported, "reported")
+        Files.writeString(project.resolve("build/resources/main/views/reported.html"), "stale reported")
+        loader.liveResources().seen(reported)
+        Files.delete(reported)
+        loader.swap()
+
+        then: "the new generation keeps them gone"
+        loader.current().generation() == 2
+        loader.current().getResource("views/index.html") == null
+        loader.current().getResource("views/late.html") == null
+        loader.current().getResource("views/reported.html") == null
+        read(loader.current(), "views/generated.html") == "generated"
+
+        when: "the live file is written again"
+        Files.writeString(index, "back")
+
+        then: "it is served live"
+        read(loader.current(), "views/index.html") == "back"
+
+        cleanup:
+        loader?.current()?.close()
+    }
+
+    private static String read(ClassLoader loader, String name) {
+        InputStream input = loader.getResourceAsStream(name)
+        assert input != null : name
+        input.withCloseable { new String(it.readAllBytes(), "UTF-8") }
+    }
+
     void "a swap retires the generation, marks its classes stale and serves the new classes and resources"() {
         given: "a compiled generation and a resource root"
         Path src = Files.createDirectories(project.resolve("src"))
