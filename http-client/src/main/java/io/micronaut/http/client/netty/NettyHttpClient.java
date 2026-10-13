@@ -20,6 +20,7 @@ import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.propagation.ReactivePropagation;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.convert.ConversionService;
@@ -70,6 +71,7 @@ import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.AsyncLoadBalancer;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
@@ -130,6 +132,7 @@ import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
 import io.micronaut.json.codec.JsonStreamMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.websocket.AsyncWebSocketClient;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
@@ -191,7 +194,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -1126,19 +1132,63 @@ final class NettyHttpClient implements
     @Override
     public <T extends AutoCloseable> Publisher<T> connect(Class<T> clientEndpointType, MutableHttpRequest<?> request) {
         setupConversionService(request);
-        return toMono(resolveRequestURI(request), PropagatedContext.getOrEmpty()).flux()
-            .switchMap(target -> connectWebSocket(target.uri(), request, clientEndpointType, null));
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        // the target is resolved when connect is called, the connection made for each subscription
+        return toMono(resolveRequestURI(request), propagatedContext).flux()
+            .switchMap(target -> connectWebSocketOnSubscribe(propagatedContext,
+                () -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, null, false)));
     }
 
     @Override
     public <T extends AutoCloseable> Publisher<T> connect(Class<T> clientEndpointType, Map<String, Object> parameters) {
         WebSocketBean<T> webSocketBean = webSocketRegistry.getWebSocket(clientEndpointType);
+        MutableHttpRequest<Object> request = webSocketRequest(webSocketBean, parameters);
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        return toMono(resolveRequestURI(request), propagatedContext).flux()
+            .switchMap(target -> connectWebSocketOnSubscribe(propagatedContext,
+                () -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, webSocketBean, false)));
+    }
+
+    @Override
+    public AsyncWebSocketClient toAsyncWebSocket() {
+        return new NettyAsyncWebSocketClient(this);
+    }
+
+    /**
+     * The websocket connect of {@link #connect(Class, MutableHttpRequest)}, without Reactor.
+     *
+     * @param clientEndpointType The endpoint type
+     * @param request            The request that establishes the connection
+     * @param <T>                The endpoint type
+     * @return The flow of the connection handler, once the handshake completes. Cancelling it
+     * before that closes the connection
+     */
+    <T extends AutoCloseable> ExecutionFlow<NettyWebSocketClientHandler<T>> connectFlow(Class<T> clientEndpointType, MutableHttpRequest<?> request) {
+        setupConversionService(request);
+        return resolveRequestURI(request)
+            .flatMap(target -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, null, true));
+    }
+
+    /**
+     * The websocket connect of {@link #connect(Class, Map)}, without Reactor.
+     *
+     * @param clientEndpointType The endpoint type
+     * @param parameters         The URI parameters of the endpoint
+     * @param <T>                The endpoint type
+     * @return The flow of the connection handler, once the handshake completes. Cancelling it
+     * before that closes the connection
+     */
+    <T extends AutoCloseable> ExecutionFlow<NettyWebSocketClientHandler<T>> connectFlow(Class<T> clientEndpointType, Map<String, Object> parameters) {
+        WebSocketBean<T> webSocketBean = webSocketRegistry.getWebSocket(clientEndpointType);
+        MutableHttpRequest<Object> request = webSocketRequest(webSocketBean, parameters);
+        return resolveRequestURI(request)
+            .flatMap(target -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, webSocketBean, true));
+    }
+
+    private static MutableHttpRequest<Object> webSocketRequest(WebSocketBean<?> webSocketBean, Map<String, Object> parameters) {
         String uri = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("/ws");
         uri = UriTemplate.of(uri).expand(parameters);
-        MutableHttpRequest<Object> request = io.micronaut.http.HttpRequest.GET(uri);
-        return toMono(resolveRequestURI(request), PropagatedContext.getOrEmpty()).flux()
-            .switchMap(target -> connectWebSocket(target.uri(), request, clientEndpointType, webSocketBean));
-
+        return io.micronaut.http.HttpRequest.GET(uri);
     }
 
     @Override
@@ -1146,12 +1196,92 @@ final class NettyHttpClient implements
         stop();
     }
 
-    private <T> Publisher<T> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, @Nullable WebSocketBean<T> webSocketBean) {
+    /**
+     * Run the websocket connect for every subscription, like the other request methods.
+     * Cancelling the subscription before the endpoint is delivered cancels the connect, which
+     * closes the connection. An endpoint that completes at the same time as the cancel is
+     * discarded by Reactor, and its connection is closed too. A cancel after the endpoint was
+     * delivered (for example {@code Mono.from(flux)}) leaves the connection open.
+     *
+     * @param propagatedContext The context of the caller of connect
+     * @param connect Starts the connect
+     * @param <T> The client endpoint type
+     * @return A Flux, as before: callers may use Flux operators on the returned publisher
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static <T> Flux<T> connectWebSocketOnSubscribe(PropagatedContext propagatedContext, Supplier<ExecutionFlow<NettyWebSocketClientHandler<T>>> connect) {
+        Mono<NettyWebSocketClientHandler<T>> handlers = Mono.<NettyWebSocketClientHandler<T>>create(sink -> {
+            ExecutionFlow<NettyWebSocketClientHandler<T>> flow;
+            try {
+                flow = connect.get();
+            } catch (Exception e) {
+                // an Error is left to Reactor, which fails the sink unless the error is fatal
+                sink.error(e);
+                return;
+            }
+            AtomicBoolean completed = new AtomicBoolean();
+            flow.onComplete((handler, error) -> {
+                completed.set(true);
+                if (error != null) {
+                    sink.error(error);
+                } else if (handler != null) {
+                    // after a cancel, Reactor discards the handler: see doOnDiscard below
+                    sink.success(handler);
+                } else {
+                    sink.success();
+                }
+            });
+            sink.onCancel(() -> {
+                if (!completed.get()) {
+                    flow.cancel();
+                }
+            });
+        }).doOnDiscard((Class) NettyWebSocketClientHandler.class, handler -> ((NettyWebSocketClientHandler<?>) handler).closeUnclaimed());
+        return Flux.from(ReactivePropagation.propagate(propagatedContext, handlers))
+            .map(NettyWebSocketClientHandler::getClientEndpoint);
+    }
+
+    /**
+     * Connect a websocket to the target the load balancer selected. The outcome of the handshake is
+     * reported to the load balancer like the outcome of an HTTP exchange, see
+     * {@link NettyWebSocketClientHandler#getHandshakeOutcome()}; a cancel, or a failure that says
+     * nothing about the instance, releases the selection. A handshake timeout carries the service
+     * id like any other read timeout.
+     */
+    private <T> ExecutionFlow<NettyWebSocketClientHandler<T>> connectWebSocket(URI uri,
+                                                                             @Nullable LoadBalancerSelection selection,
+                                                                             MutableHttpRequest<?> request,
+                                                                             Class<T> clientEndpointType,
+                                                                             @Nullable WebSocketBean<T> webSocketBean,
+                                                                             boolean awaitCompletionStages) {
+        ExecutionFlow<NettyWebSocketClientHandler<T>> flow;
+        try {
+            flow = openWebSocket(uri, selection, request, clientEndpointType, webSocketBean, awaitCompletionStages);
+        } catch (RuntimeException e) {
+            releaseSelection(selection);
+            throw e;
+        }
+        if (selection != null && flow instanceof DelayedExecutionFlow<?> delayed) {
+            delayed.onCancel(selection::release);
+        }
+        return flow.onErrorResume(error -> {
+            // unless the handshake reported an outcome already
+            releaseSelection(selection);
+            return ExecutionFlow.error(error instanceof ReadTimeoutException timeout ? decorate(timeout) : error);
+        });
+    }
+
+    private <T> ExecutionFlow<NettyWebSocketClientHandler<T>> openWebSocket(URI uri,
+                                                                           @Nullable LoadBalancerSelection selection,
+                                                                           MutableHttpRequest<?> request,
+                                                                           Class<T> clientEndpointType,
+                                                                           @Nullable WebSocketBean<T> webSocketBean,
+                                                                           boolean awaitCompletionStages) {
         RequestKey requestKey;
         try {
             requestKey = new RequestKey(this, uri);
         } catch (HttpClientException e) {
-            return Flux.error(e);
+            return ExecutionFlow.error(e);
         }
 
         if (webSocketBean == null) {
@@ -1187,14 +1317,39 @@ final class NettyHttpClient implements
             requestBinderRegistry,
             mediaTypeCodecRegistry,
             handlerRegistry,
-            conversionService);
+            conversionService,
+            // by default the handshake response is awaited without a limit, as before
+            configuration.getHandshakeTimeout().orElse(null));
 
+        if (awaitCompletionStages) {
+            // the async client awaits the stages of the handlers, the reactive one as before
+            handler.awaitCompletionStages();
+        }
         if (!isRunning()) {
-            return Mono.error(decorate(new HttpClientException("The client is closed, unable to connect for websocket.")));
+            return ExecutionFlow.error(decorate(new HttpClientException("The client is closed, unable to connect for websocket.")));
         }
 
-        return connectionManager.connectForWebsocket(requestKey, handler)
-            .then(handler.getHandshakeCompletedMono());
+        ExecutionFlow<NettyWebSocketClientHandler<T>> flow = connectionManager.connectForWebsocket(requestKey, handler)
+            .onErrorResume(error -> {
+                handler.connectFailed(error);
+                return ExecutionFlow.error(error);
+            })
+            .then(() -> handler.getHandshakeCompletedFlow().map(endpoint -> handler));
+        if (selection == null) {
+            return flow;
+        }
+        return flow
+            .map(connected -> {
+                selection.report(LoadBalancer.Outcome.SUCCESS);
+                return connected;
+            })
+            .onErrorResume(error -> {
+                LoadBalancer.Outcome outcome = handler.getHandshakeOutcome();
+                if (outcome != null) {
+                    selection.report(outcome);
+                }
+                return ExecutionFlow.error(error);
+            });
     }
 
     @Override
@@ -1460,11 +1615,23 @@ final class NettyHttpClient implements
             return ExecutionFlow.error(decorate(new NoHostException("Request URI specifies no host to connect to")));
         }
         ExecutionFlow<ServiceInstance> selected;
-        if (loadBalancer instanceof FixedLoadBalancer fixed) {
+        if (loadBalancer instanceof FixedLoadBalancer fixed && fixed.getClass() == FixedLoadBalancer.class) {
+            // only the built-in one: a subclass of FixedLoadBalancer may override select
             selected = ExecutionFlow.just(fixed.getServiceInstance());
-        } else {
+        } else if (loadBalancer instanceof AsyncLoadBalancer asyncBalancer) {
             // a synchronous balancer (round-robin) completes right away, so the request proceeds
-            // without a Reactor chain
+            // without an asynchronous chain
+            LoadBalancer lb = loadBalancer;
+            Object discriminator = getLoadBalancerDiscriminator(request);
+            // a mock load balancer returns no stage
+            CompletionStage<@Nullable ServiceInstance> selection = CompletionStagePublishers.orElse(
+                asyncBalancer.selectAsync(discriminator),
+                () -> CompletionStagePublishers.first(lb.select(discriminator), null)
+            );
+            selected = toFlow(selection.toCompletableFuture(), PropagatedContext.getOrEmpty());
+        } else {
+            // a synchronous balancer completes right away, so the request proceeds without a
+            // Reactor chain
             selected = ReactiveExecutionFlow.fromPublisherEager(loadBalancer.select(getLoadBalancerDiscriminator(request)), PropagatedContext.getOrEmpty());
         }
 
@@ -1484,6 +1651,44 @@ final class NettyHttpClient implements
                 }
             }
         );
+    }
+
+    /**
+     * The flow of a selection of the load balancer. A selection that is not complete yet is
+     * cancelled when the flow is, if the framework created it, and completes the flow in the
+     * propagated context of the request, so that the steps of the flow run in it, as they did
+     * with the publisher of the selection.
+     *
+     * @param future            The selection
+     * @param propagatedContext The propagated context of the request
+     * @return The flow
+     */
+    private static ExecutionFlow<ServiceInstance> toFlow(CompletableFuture<@Nullable ServiceInstance> future, PropagatedContext propagatedContext) {
+        if (future.isDone()) {
+            try {
+                return ExecutionFlow.just(future.join());
+            } catch (CompletionException | CancellationException e) {
+                return ExecutionFlow.error(CompletionStagePublishers.unwrap(e));
+            }
+        }
+        DelayedExecutionFlow<ServiceInstance> flow = DelayedExecutionFlow.create();
+        future.whenComplete((instance, throwable) -> {
+            if (propagatedContext.isEmpty() || propagatedContext.isBound()) {
+                complete(flow, instance, throwable);
+            } else {
+                propagatedContext.propagate(() -> complete(flow, instance, throwable));
+            }
+        });
+        flow.onCancel(() -> CompletionStagePublishers.cancel(future));
+        return flow;
+    }
+
+    private static void complete(DelayedExecutionFlow<ServiceInstance> flow, @Nullable ServiceInstance instance, @Nullable Throwable throwable) {
+        if (throwable != null) {
+            flow.completeExceptionally(CompletionStagePublishers.unwrap(throwable));
+        } else {
+            flow.complete(instance);
+        }
     }
 
     @Override
