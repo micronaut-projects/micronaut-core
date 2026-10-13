@@ -93,7 +93,6 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
     private boolean done;
     private boolean upstreamCancelRequested;
     private boolean upstreamCancelled;
-    private @Nullable T held;
 
     /**
      * @param input   The pieces of the body
@@ -280,18 +279,16 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
                     return;
                 }
                 if (emitted < demand) {
-                    T element = held;
-                    held = null;
-                    if (element == null) {
-                        element = reader.poll();
-                    }
+                    T element = reader.poll();
                     if (element != null) {
                         subscriber.onNext(element);
                         emitted++;
                         continue;
                     }
-                } else if (!(inputEnded || readerFailure != null) || held != null) {
-                    // no demand: nothing more is read from the input
+                } else if (!(inputEnded || readerFailure != null) || (readerCompleted && !reader.isEmpty())) {
+                    // no demand: nothing more is read from the input, and nothing is decoded,
+                    // also not to discover the end: an element is decoded only when requested,
+                    // the end without demand is signalled only when the reader knows it is empty
                     break;
                 }
                 // Observe completion before taking the last piece published before it.
@@ -313,12 +310,7 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
                         completeReader();
                         continue;
                     }
-                    // the end, also without demand: an element the end completed waits for one
-                    T last = emitted < demand ? null : reader.poll();
-                    if (last != null) {
-                        held = last;
-                        break;
-                    }
+                    // a requested poll found no other element, or the reader is empty: the end
                     terminate(false);
                     if (readerFailure != null) {
                         subscriber.onError(readerFailure);
@@ -374,13 +366,6 @@ final class PieceReaderPublisher<I, T> implements Publisher<T>, Subscription, Co
      */
     private void terminate(boolean cancelUpstream) {
         done = true;
-        T last = held;
-        held = null;
-        if (last != null) {
-            // an element the end of the input completed, not emitted: e.g. a reference counted
-            // buffer
-            discardObject(last);
-        }
         reader.close();
         if (cancelUpstream) {
             upstreamCancelRequested = true;
