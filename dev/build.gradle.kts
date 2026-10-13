@@ -75,12 +75,15 @@ noReflection {
     // the loaders of the reloadable tier are classloaders; the manifest and the kinds parse names into enums
     allowIn("io.micronaut.dev.loader.GenerationClassLoader", "CLASS_LOADING")
     allowIn("io.micronaut.dev.loader.DevClassLoader", "CLASS_LOADING")
+    // the processors of an embedded Java compilation load from the processor path first
+    allowIn("io.micronaut.dev.compile.JavacSourceCompiler", "CLASS_LOADING")
     allowIn("io.micronaut.dev.manifest.DevManifest", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.compile.SourceKind", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.compile.CompileMode", "ENUM_CONSTANTS")
     // MicronautDevMain.launchApplication, which looks up and invokes the application's main, suppresses the check itself
     allowIn("io.micronaut.dev.DevRuntime", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.Compilations", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.dev.Pending", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.DevRuntime", "SERVICE_LOADING")
     allowIn("io.micronaut.dev.DevRuntime", "CLASS_LOADING")
     allowIn("io.micronaut.dev.ManifestRetentionPolicy", "CLASS_LOADING")
