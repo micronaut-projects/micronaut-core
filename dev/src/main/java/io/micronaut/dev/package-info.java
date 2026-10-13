@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 /**
- * Development mode: a launcher that keeps the JVM alive while the application's classes are
- * recompiled and reloaded.
+ * The development mode launcher: {@link io.micronaut.dev.MicronautDevMain} starts an application
+ * behind a reloadable class loader and the {@link io.micronaut.dev.DevRuntime} recompiles, restarts
+ * and reports as sources and resources change.
  *
  * @author graemerocher
  * @since 5.3.0
