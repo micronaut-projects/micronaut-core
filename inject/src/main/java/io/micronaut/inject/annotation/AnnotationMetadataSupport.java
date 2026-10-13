@@ -428,6 +428,7 @@ public final class AnnotationMetadataSupport {
                 // a thread still running a retired generation is answered, but does not register its type again
                 if (!(loadersRetired && isRetired(aClass.getClassLoader()))) {
                     ANNOTATION_TYPES.put(name, aClass);
+                    forgetIfRetired(name, aClass);
                 }
                 return Optional.of(aClass);
             }
@@ -519,6 +520,20 @@ public final class AnnotationMetadataSupport {
         } else {
             ANNOTATION_TYPES.replace(name, registered, type);
         }
+        forgetIfRetired(name, type);
+    }
+
+    /**
+     * Removes a type just registered if its loader was retired meanwhile: {@link #retireClassLoader(ClassLoader)} marks
+     * the loader before it removes the loader's entries, so an entry put after that removal is seen retired here.
+     *
+     * @param name The name of the annotation type
+     * @param type The type registered
+     */
+    private static void forgetIfRetired(String name, Class<? extends Annotation> type) {
+        if (loadersRetired && isRetired(type.getClassLoader())) {
+            ANNOTATION_TYPES.remove(name, type);
+        }
     }
 
     /**
@@ -604,11 +619,13 @@ public final class AnnotationMetadataSupport {
         if (factory != null) {
             return factory;
         }
+        factory = ANNOTATION_PROXY_CACHE.computeIfAbsent(annotation, AnnotationMetadataSupport::newProxyFactory);
         if (loadersRetired && isRetired(annotation.getClassLoader())) {
-            // a thread still running a retired generation gets a factory, which is not cached to keep its loader
-            return newProxyFactory(annotation);
+            // a thread still running a retired generation gets a factory, which is not kept to keep its loader;
+            // checked after the insertion, so that one racing with retireClassLoader is removed as well
+            ANNOTATION_PROXY_CACHE.remove(annotation, factory);
         }
-        return ANNOTATION_PROXY_CACHE.computeIfAbsent(annotation, AnnotationMetadataSupport::newProxyFactory);
+        return factory;
     }
 
     private static Function<InvocationHandler, Object> newProxyFactory(Class<? extends Annotation> aClass) {
