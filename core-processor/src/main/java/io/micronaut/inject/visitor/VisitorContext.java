@@ -26,6 +26,7 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 
@@ -387,6 +388,42 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @Experimental
     default void addGeneratedResource(String resource) {
         info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);
+    }
+
+    /**
+     * Registers a bean of the given type, which may be a class of the compilation or one already compiled, for
+     * example a class of a library. A bean definition is written for it, as if the type were annotated as a bean,
+     * with the annotations put on the returned builder, and without generating any source.
+     *
+     * <p>Unlike {@link ClassElement#addAssociatedBean(ClassElement)}, which a visitor calls on the class it is visiting,
+     * this method can be called with any element of the compilation as origin, and with several origins, so a bean
+     * can be registered from {@link TypeElementVisitor#finishRound(VisitorContext)} for what a whole round contained.</p>
+     *
+     * <p>The definition is named after the first originating element, which must be a class or a method of the
+     * compilation. Every originating element is reported to the compiler: an incremental build that recompiles or
+     * deletes one of them replaces or deletes the definition. Under javac, Gradle's incremental compilation of an
+     * isolating processor expects exactly one originating element, and recompiles every source when there are more.</p>
+     *
+     * <p>The definition is written with the beans of the current round, see
+     * {@link TypeElementVisitor#finishRound(VisitorContext)}. Registering from
+     * {@link TypeElementVisitor#finish(VisitorContext)} is not portable: Groovy writes the bean, javac writes it in the
+     * final round and warns that the written class is not processed anymore, and KSP refuses it, because it has
+     * invalidated the elements of the compilation once its last round is over.</p>
+     *
+     * <p>Like {@link ClassElement#addAssociatedBean(ClassElement)}, it can only be called from an
+     * {@link TypeElementVisitor.VisitorKind#ISOLATING} visitor.</p>
+     *
+     * @param beanType            The bean type
+     * @param originatingElements The originating elements, at least one
+     * @return The builder of the bean
+     * @throws IllegalArgumentException if no originating element is given, or the first one is neither a class nor a
+     *                                  method of the compilation
+     * @throws UnsupportedOperationException if the compiler does not support registering beans
+     * @since 5.3.0
+     */
+    @Experimental
+    default BeanElementBuilder registerBean(ClassElement beanType, Element... originatingElements) {
+        throw new UnsupportedOperationException("Registering beans is not supported by the " + getLanguage() + " processor");
     }
 
     /**
