@@ -53,7 +53,7 @@ class ChangedPropertyMentionTest {
 
     @Test
     void noRunningContextHasNoRefresh() {
-        assertNull(DevRuntime.refreshConfiguration(null));
+        assertNull(ConfigurationStaleness.refreshConfiguration(null));
     }
 
     private static MutableAnnotationMetadata value(String expression) {
