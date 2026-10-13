@@ -39,6 +39,9 @@ import java.util.function.Supplier;
  * Without Reactor, sources are subscribed to directly. Declared Reactor argument types are
  * adapted here without requiring Reactor converter beans.
  *
+ * <p>Public only because the server module ({@code io.micronaut.http.server}) subscribes to body
+ * sources through it as well; it is internal API.</p>
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */
