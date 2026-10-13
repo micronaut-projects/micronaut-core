@@ -92,30 +92,85 @@ class AnnotationTypeClassLoaderSpec extends Specification {
         }
     }
 
-    void "a registration by another loader replaces the registered type, one by the same loader does not"() {
+    void "a registration by a live sibling loader does not replace the registered type"() {
+        given: "two live loaders, sibling deployments, each defining a copy of an annotation"
+        def first = new OwnCopy(Reloaded.classLoader)
+        def second = new OwnCopy(Reloaded.classLoader)
+        def firstCopy = first.define(Reloaded.name)
+        def secondCopy = second.define(Reloaded.name)
+
+        expect:
+        !AnnotationMetadataSupport.getRegisteredAnnotationType(Reloaded.name).isPresent()
+
+        when: "both register their copy, in turn and again"
+        AnnotationMetadataSupport.registerAnnotationType(new AnnotationClassValue<>(firstCopy))
+        AnnotationMetadataSupport.registerAnnotationType(new AnnotationClassValue<>(secondCopy))
+        AnnotationMetadataSupport.registerAnnotationType(new AnnotationClassValue<>(firstCopy))
+        AnnotationMetadataSupport.registerAnnotationType(new AnnotationClassValue<>(secondCopy))
+
+        then: "the first registration is kept rather than flipping between the two"
+        AnnotationMetadataSupport.getRegisteredAnnotationType(Reloaded.name).get().is(firstCopy)
+
+        cleanup:
+        AnnotationMetadataSupport.retireClassLoader(first)
+        AnnotationMetadataSupport.retireClassLoader(second)
+    }
+
+    void "a retired loader's types are forgotten, and the generation replacing it registers its own"() {
         given: "two generations of an application loader, each defining a copy of an annotation"
         def first = new OwnCopy(Reloaded.classLoader)
         def second = new OwnCopy(Reloaded.classLoader)
         def firstCopy = first.define(Reloaded.name)
         def secondCopy = second.define(Reloaded.name)
 
-        when: "the first generation registers its copy"
+        and: "the first generation registered its copy and made a proxy of it"
         AnnotationMetadataSupport.registerAnnotationType(new AnnotationClassValue<>(firstCopy))
+        AnnotationMetadataSupport.getProxyFactory(firstCopy)
 
-        then:
+        expect:
         AnnotationMetadataSupport.getRegisteredAnnotationType(Reloaded.name).get().is(firstCopy)
+        AnnotationMetadataSupport.ANNOTATION_PROXY_CACHE.containsKey(firstCopy)
 
-        when: "the same generation registers again"
+        when: "the launcher retires the first generation"
+        AnnotationMetadataSupport.retireClassLoader(first)
+
+        then: "nothing keeps its class"
+        !AnnotationMetadataSupport.getRegisteredAnnotationType(Reloaded.name).isPresent()
+        !AnnotationMetadataSupport.ANNOTATION_PROXY_CACHE.containsKey(firstCopy)
+
+        when: "a straggling thread of the retired generation registers its copy, then the next generation its own"
         AnnotationMetadataSupport.registerAnnotationType(new AnnotationClassValue<>(firstCopy))
-
-        then: "the first registration is kept"
-        AnnotationMetadataSupport.getRegisteredAnnotationType(Reloaded.name).get().is(firstCopy)
-
-        when: "the next generation registers its copy"
         AnnotationMetadataSupport.registerAnnotationType(new AnnotationClassValue<>(secondCopy))
 
-        then: "the registry no longer pins the retired generation's class"
+        then: "the registry holds the next generation's copy"
         AnnotationMetadataSupport.getRegisteredAnnotationType(Reloaded.name).get().is(secondCopy)
+
+        cleanup:
+        AnnotationMetadataSupport.retireClassLoader(second)
+    }
+
+    void "the type a retired loader registered before it was retired is replaced by the next generation's"() {
+        given: "a generation that registers its copy after the launcher retired it, as a straggling thread may"
+        def first = new OwnCopy(Reloaded.classLoader)
+        def second = new OwnCopy(Reloaded.classLoader)
+        def firstCopy = first.define(Reloaded.name)
+        def secondCopy = second.define(Reloaded.name)
+        AnnotationMetadataSupport.registerAnnotationType(new AnnotationClassValue<>(firstCopy))
+        AnnotationMetadataSupport.RETIRED_LOADERS.put(first, Boolean.TRUE)
+        AnnotationMetadataSupport.loadersRetired = true
+
+        expect: "its entry is still there"
+        AnnotationMetadataSupport.getRegisteredAnnotationType(Reloaded.name).get().is(firstCopy)
+
+        when:
+        AnnotationMetadataSupport.registerAnnotationType(new AnnotationClassValue<>(secondCopy))
+
+        then:
+        AnnotationMetadataSupport.getRegisteredAnnotationType(Reloaded.name).get().is(secondCopy)
+
+        cleanup:
+        AnnotationMetadataSupport.retireClassLoader(first)
+        AnnotationMetadataSupport.retireClassLoader(second)
     }
 
     void "an annotation type of the JDK is served whatever the loader asks"() {

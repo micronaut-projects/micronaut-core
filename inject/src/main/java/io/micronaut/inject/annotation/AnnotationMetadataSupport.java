@@ -90,6 +90,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
@@ -112,24 +113,19 @@ public final class AnnotationMetadataSupport {
     private static final Map<String, String> CORE_REPEATABLE_ANNOTATIONS_CONTAINERS;
 
     /**
-     * A {@link ClassValue} rather than a map: it holds no strong reference to the annotation class, so an
-     * application classloader that defined an annotation can be collected once it is replaced.
+     * Both keep the classes of the loader that defined them: {@link #retireClassLoader(ClassLoader)} removes those of
+     * a loader a development launcher retired.
      */
-    private static final ClassValue<Function<InvocationHandler, Object>> ANNOTATION_PROXY_CACHE = new ClassValue<>() {
-        @Override
-        protected Function<InvocationHandler, Object> computeValue(Class<?> aClass) {
-            // Annotations loaded by the bootstrap or platform classloader (e.g. java.lang.Deprecated)
-            // cannot see Micronaut's AnnotationValueProvider; in that case fall back to the loader of
-            // AnnotationValueProvider, which still resolves the JDK annotation via parent delegation.
-            ClassLoader annotationLoader = aClass.getClassLoader();
-            ClassLoader proxyLoader = (annotationLoader == null || annotationLoader == ClassLoader.getPlatformClassLoader())
-                ? AnnotationValueProvider.class.getClassLoader()
-                : annotationLoader;
-            Class<?>[] interfaces = {aClass, AnnotationValueProvider.class};
-            return handler -> Proxy.newProxyInstance(proxyLoader, interfaces, handler);
-        }
-    };
+    private static final Map<Class<? extends Annotation>, Function<InvocationHandler, Object>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
     private static final Map<String, Class<? extends Annotation>> ANNOTATION_TYPES = new ConcurrentHashMap<>(20);
+    /**
+     * The loaders {@link #retireClassLoader(ClassLoader)} retired, held weakly so that they are not kept by it.
+     */
+    private static final Map<ClassLoader, Boolean> RETIRED_LOADERS = Collections.synchronizedMap(new WeakHashMap<>());
+    /**
+     * Whether any loader was retired, so that a registration outside development mode never consults the set above.
+     */
+    private static volatile boolean loadersRetired;
 
     /**
      * The annotation default values provider.
@@ -503,15 +499,52 @@ public final class AnnotationMetadataSupport {
     static void registerAnnotationType(AnnotationClassValue<?> annotationClassValue) {
         final String name = annotationClassValue.getName();
         final Class<? extends Annotation> registered = ANNOTATION_TYPES.get(name);
-        Class<?> aClass = annotationClassValue.getType().orElse(null);
-        if (aClass == null || !Annotation.class.isAssignableFrom(aClass)) {
+        // the first registration wins, whichever loader the next one comes from: two live loaders defining the
+        // same annotation, sibling deployments, must not take the entry from each other. Only the type of a loader
+        // a development launcher retired is replaced, by the generation that took its place
+        if (registered != null && !(loadersRetired && isRetired(registered.getClassLoader()))) {
             return;
         }
-        // the first registration wins for the same loader; a registration by another loader replaces it,
-        // so a reloaded application (a new generation of its classloader) does not pin the retired class
-        if (registered == null || registered.getClassLoader() != aClass.getClassLoader()) {
+        Class<?> aClass = annotationClassValue.getType().orElse(null);
+        if (aClass != null && Annotation.class.isAssignableFrom(aClass) && !(loadersRetired && isRetired(aClass.getClassLoader()))) {
             ANNOTATION_TYPES.put(name, (Class<? extends Annotation>) aClass);
         }
+    }
+
+    /**
+     * Forgets the annotation types a retired class loader, or a loader below it, defined, and their proxy factories,
+     * so that they do not keep it; and lets the generation that replaced it register its own copies of those types in
+     * their place, where the first registration otherwise wins.
+     *
+     * <p>Only a development launcher, which replaces the application's classes with a new generation of its loader,
+     * retires loaders, and it has to retire every generation it replaces: the registry holds the types of a loader
+     * that is not retired for as long as the JVM runs, as it does outside development mode.</p>
+     *
+     * @param retired The class loader whose classes are no longer used
+     * @since 5.3.0
+     */
+    @Internal
+    public static void retireClassLoader(ClassLoader retired) {
+        Objects.requireNonNull(retired, "retired");
+        RETIRED_LOADERS.put(retired, Boolean.TRUE);
+        loadersRetired = true;
+        ANNOTATION_TYPES.values().removeIf(type -> isRetired(type.getClassLoader()));
+        ANNOTATION_PROXY_CACHE.keySet().removeIf(type -> isRetired(type.getClassLoader()));
+    }
+
+    /**
+     * Whether a loader was retired, or delegates to one that was.
+     *
+     * @param loader The loader, {@code null} for the bootstrap loader
+     * @return True if it is retired
+     */
+    private static boolean isRetired(@Nullable ClassLoader loader) {
+        for (ClassLoader current = loader; current != null; current = current.getParent()) {
+            if (RETIRED_LOADERS.containsKey(current)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -557,7 +590,17 @@ public final class AnnotationMetadataSupport {
      * @return The proxy factory
      */
     static Function<InvocationHandler, Object> getProxyFactory(Class<? extends Annotation> annotation) {
-        return ANNOTATION_PROXY_CACHE.get(annotation);
+        return ANNOTATION_PROXY_CACHE.computeIfAbsent(annotation, aClass -> {
+            // Annotations loaded by the bootstrap or platform classloader (e.g. java.lang.Deprecated)
+            // cannot see Micronaut's AnnotationValueProvider; in that case fall back to the loader of
+            // AnnotationValueProvider, which still resolves the JDK annotation via parent delegation.
+            ClassLoader annotationLoader = aClass.getClassLoader();
+            ClassLoader proxyLoader = (annotationLoader == null || annotationLoader == ClassLoader.getPlatformClassLoader())
+                ? AnnotationValueProvider.class.getClassLoader()
+                : annotationLoader;
+            Class<?>[] interfaces = {aClass, AnnotationValueProvider.class};
+            return handler -> Proxy.newProxyInstance(proxyLoader, interfaces, handler);
+        });
     }
 
     /**
