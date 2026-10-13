@@ -15,7 +15,7 @@
  */
 package io.micronaut.dev.agent;
 
-import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.instrument.Instrumentation;
@@ -27,10 +27,13 @@ import java.util.concurrent.atomic.AtomicReference;
  * {@link Instrumentation} the fast path redefines method bodies with; without it every change
  * restarts.
  *
+ * <p>Only the entry points the JVM calls are public: the instrumentation itself stays within this package, for
+ * {@link DynamicAttach} to hand to the development runtime.</p>
+ *
  * @author graemerocher
  * @since 5.3.0
  */
-@Experimental
+@Internal
 public final class DevAgent {
 
     private static final AtomicReference<Instrumentation> INSTRUMENTATION = new AtomicReference<>();
@@ -62,7 +65,7 @@ public final class DevAgent {
      * @return The instrumentation, or null when no agent was loaded
      */
     @Nullable
-    public static Instrumentation instrumentation() {
+    static Instrumentation instrumentation() {
         return INSTRUMENTATION.get();
     }
 
@@ -71,7 +74,7 @@ public final class DevAgent {
      *
      * @param instrumentation The instrumentation
      */
-    public static void install(Instrumentation instrumentation) {
+    static void install(Instrumentation instrumentation) {
         INSTRUMENTATION.compareAndSet(null, instrumentation);
     }
 }

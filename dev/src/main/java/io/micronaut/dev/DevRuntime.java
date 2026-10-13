@@ -16,6 +16,7 @@
 package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.reload.RetentionCriteria;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.ConfigurableBeanContext;
 import io.micronaut.context.DefaultBeanContext;
@@ -46,6 +47,7 @@ import io.micronaut.dev.livereload.LiveReloadServerFactory;
 import io.micronaut.dev.loader.DevClassLoader;
 import io.micronaut.dev.loader.GenerationClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
+import io.micronaut.dev.manifest.DevReloadStrategy;
 import io.micronaut.dev.manifest.ResourceRoot;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher;
@@ -74,6 +76,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -83,6 +86,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
@@ -140,11 +144,15 @@ public final class DevRuntime implements Closeable {
      * Whether the last generation failed to start, so that the next batch must launch one whether or not a class changed.
      */
     private volatile boolean startFailed;
+    private boolean contextClaimed; // guarded by lifecycle: whether the generation adopted its context, the first it created
+    private volatile List<Path> watchedRoots = List.of(); // NOSONAR java:S3077 an immutable list, replaced whole
+    private final AtomicBoolean leakCheckPending = new AtomicBoolean();
     private @Nullable DirectoryWatcher watcher;
-    private @Nullable LiveReloadServer liveReload;
+    // read by the request threads of the script filter and the /dev endpoint, set by the launcher
+    private volatile @Nullable LiveReloadServer liveReload; // NOSONAR java:S3077 thread-safe server, replaced whole
     private @Nullable Instrumentation instrumentation;
     private final AtomicInteger redefinitions = new AtomicInteger();
-    private @Nullable Thread worker;
+    private volatile @Nullable Thread worker; // NOSONAR java:S3077 only the reference is published
     private OutputSnapshot snapshot = OutputSnapshot.empty();
     /**
      * The changes of the batch whose compilation failed, merged into the next batch until they compile: the next edit
@@ -198,6 +206,7 @@ public final class DevRuntime implements Closeable {
      *
      * @return The compilers by language
      */
+    @Internal
     public static Map<SourceKind, SourceCompiler> availableCompilers() {
         Map<SourceKind, SourceCompiler> compilers = new EnumMap<>(SourceKind.class);
         for (SourceCompiler compiler : ServiceLoader.load(SourceCompiler.class, SourceCompiler.class.getClassLoader())) {
@@ -227,7 +236,7 @@ public final class DevRuntime implements Closeable {
         ApplicationContext first;
         try {
             snapshot = OutputSnapshot.of(manifest.reloadableRoots());
-            if (manifest.strategy() != ReloadStrategy.RESTART) {
+            if (manifest.strategy() != DevReloadStrategy.RESTART) {
                 // the fast path needs an agent: the launcher's, or one attached now
                 instrumentation = DynamicAttach.instrumentation();
                 if (instrumentation != null && !instrumentation.isRedefineClassesSupported()) {
@@ -307,8 +316,8 @@ public final class DevRuntime implements Closeable {
      * @return The strategy in force: RESTART when the manifest asks for it or no agent is available, otherwise
      *         the manifest's, under which a change to method bodies alone is applied in place and anything else restarts
      */
-    public ReloadStrategy strategy() {
-        return instrumentation == null ? ReloadStrategy.RESTART : manifest.strategy();
+    public DevReloadStrategy strategy() {
+        return instrumentation == null ? DevReloadStrategy.RESTART : manifest.strategy();
     }
 
     /**
@@ -343,8 +352,7 @@ public final class DevRuntime implements Closeable {
      * @return The roots the runtime watches
      */
     public List<Path> watchedRoots() {
-        DirectoryWatcher directoryWatcher = watcher;
-        return directoryWatcher == null ? List.of() : directoryWatcher.watchedDirectories();
+        return watchedRoots;
     }
 
     /**
@@ -368,8 +376,12 @@ public final class DevRuntime implements Closeable {
     /**
      * Compiles every source and restarts if any class changed: the manual trigger, for an IDE that
      * saved without the watcher noticing, or after a failed compilation was fixed elsewhere.
+     *
+     * @throws IllegalStateException if called on the reload thread, from a reload listener, or on the thread running the
+     * generation's main: the reload waits for both
      */
     public void reload() {
+        RuntimeThreads.refuseOwnThreads(worker, applicationThread);
         awaitBatch(enqueue(new Pending(Map.of(), Map.of(), true)));
     }
 
@@ -381,13 +393,18 @@ public final class DevRuntime implements Closeable {
      * @param deleted The files deleted
      */
     void sourcesChanged(SourceKind kind, Set<Path> changed, Set<Path> deleted) {
+        RuntimeThreads.refuseOwnThreads(worker, applicationThread);
         awaitBatch(enqueue(new Pending(Map.of(kind, new SourceChanges(changed, deleted)), Map.of(), false)));
     }
 
     /**
      * Restarts the application on a new generation without compiling anything.
+     *
+     * @throws IllegalStateException if called on the reload thread, from a reload listener, or on the thread running the
+     * generation's main: the reload waits for both
      */
     public void restart() {
+        RuntimeThreads.refuseOwnThreads(worker, applicationThread);
         awaitBatch(enqueue(new Pending(Map.of(), Map.of(), false) {
             @Override
             boolean forcesRestart() {
@@ -434,7 +451,18 @@ public final class DevRuntime implements Closeable {
      */
     @Internal
     void contextCreated(ApplicationContext applicationContext) {
-        this.context = applicationContext;
+        synchronized (lifecycle) {
+            if (closed) {
+                // the main of a generation launched as the runtime closed: nothing would stop its context
+                throw new IllegalStateException("The development runtime is closed: no new generation starts");
+            }
+            if (contextClaimed) {
+                // a further context of the generation, such as a client's built in main: not the application's
+                return;
+            }
+            contextClaimed = true;
+            this.context = applicationContext;
+        }
     }
 
     /**
@@ -444,9 +472,20 @@ public final class DevRuntime implements Closeable {
      */
     @Internal
     void contextStarted(ApplicationContext applicationContext) {
-        this.context = applicationContext;
+        if (applicationContext != context) {
+            // a context the generation did not adopt starts with the runtime as a bean too
+            return;
+        }
         reportResourceState(applicationContext);
-        started.complete(applicationContext);
+        synchronized (lifecycle) {
+            if (closed) {
+                // adopted as the runtime closed, which did not see it start
+                RuntimeThreads.stopOnceStarted(applicationContext);
+                return;
+            }
+            // under the lock: a close from now on sees the start and stops the context
+            started.complete(applicationContext);
+        }
     }
 
     /**
@@ -472,7 +511,9 @@ public final class DevRuntime implements Closeable {
         }
         Thread thread = worker;
         if (thread != null) {
+            // a reload in progress ends before the generation it launched is stopped
             thread.interrupt();
+            RuntimeThreads.join(thread, APP_STOP_TIMEOUT);
         }
         DirectoryWatcher directoryWatcher = watcher;
         if (directoryWatcher != null) {
@@ -482,8 +523,14 @@ public final class DevRuntime implements Closeable {
         if (server != null) {
             server.close();
         }
+        synchronized (lifecycle) {
+            thread = contextClaimed ? null : applicationThread;
+        }
+        // a generation's main yet to create its context: what it creates is refused while this runtime runs the process
+        RuntimeThreads.join(thread, APP_STOP_TIMEOUT);
         ApplicationContext current = context;
-        if (current != null && current.isRunning()) {
+        if (current != null && (current.isRunning() || started.isDone())) {
+            // a context whose startup listeners still run is stopped once they ran: stop waits for start
             current.stop();
         }
         for (SourceCompiler compiler : new LinkedHashSet<>(compilers.values())) {
@@ -501,7 +548,7 @@ public final class DevRuntime implements Closeable {
      * @param compilers The compilers by language
      * @throws IllegalStateException if a compilation fails
      */
-    public static void compileMissingOutputs(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
+    static void compileMissingOutputs(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
         // decided before anything is compiled: two languages sharing one output are both missing, or neither
         Set<SourceKind> missing = new LinkedHashSet<>();
         for (SourceKind kind : compilers.keySet()) {
@@ -552,6 +599,7 @@ public final class DevRuntime implements Closeable {
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot start the file watcher", e);
         }
+        Set<Path> roots = new LinkedHashSet<>();
         for (SourceRoot root : manifest.sourceRoots()) {
             if (!Files.isDirectory(root.path())) {
                 continue;
@@ -562,10 +610,12 @@ public final class DevRuntime implements Closeable {
             // both spellings: the glob syntax alone leaves a file directly under the root out of "**/"
             String[] globs = root.kind().extensions().stream().flatMap(extension -> Stream.of("*." + extension, "**/*." + extension)).toArray(String[]::new);
             directoryWatcher.directory(root.path()).include(globs).watch(batch -> enqueue(sourceBatch(root, batch)));
+            roots.add(root.path().toAbsolutePath().normalize());
         }
         for (ResourceRoot root : manifest.resourceRoots()) {
             if (Files.isDirectory(root.path())) {
                 directoryWatcher.directory(root.path()).watch(batch -> enqueue(resourceBatch(root, batch)));
+                roots.add(root.path().toAbsolutePath().normalize());
             }
         }
         boolean external = false;
@@ -586,6 +636,7 @@ public final class DevRuntime implements Closeable {
                     }
                     String name = trigger.getFileName().toString();
                     directoryWatcher.directory(directory).recursive(false).include(name).watch(batch -> enqueue(new Pending(Map.of(), Map.of(), false)));
+                    roots.add(directory.normalize());
                 }
             } else {
                 // without a trigger the class output itself is watched, which may see a compilation half written
@@ -594,11 +645,13 @@ public final class DevRuntime implements Closeable {
                     Path output = manifest.classOutput(kind);
                     if (!manifest.sourceRoots(kind).isEmpty() && Files.isDirectory(output) && !directoryWatcher.isWatching(output)) {
                         directoryWatcher.directory(output).watch(batch -> enqueue(new Pending(Map.of(), Map.of(), false)));
+                        roots.add(output.toAbsolutePath().normalize());
                     }
                 }
             }
         }
         watcher = directoryWatcher;
+        watchedRoots = List.copyOf(roots);
     }
 
     private static Pending sourceBatch(SourceRoot root, FileChangeBatch batch) {
@@ -708,7 +761,12 @@ public final class DevRuntime implements Closeable {
                 gate.complete(null);
                 return;
             } catch (Throwable e) { // NOSONAR a reload that fails, with a LinkageError of the edited code too, leaves the reload thread running
-                LOG.error("Reload failed: {}", e.getMessage(), e);
+                if (closed) {
+                    // the runtime closing interrupted the reload
+                    LOG.debug("Reload ended by the runtime closing: {}", e.getMessage(), e);
+                } else {
+                    LOG.error("Reload failed: {}", e.getMessage(), e);
+                }
             } finally {
                 long last = 0;
                 for (Pending batch : batches) {
@@ -718,6 +776,19 @@ public final class DevRuntime implements Closeable {
                 gate.complete(null);
             }
         }
+    }
+
+    /**
+     * @return How many languages the launcher compiles itself: those with a compiler, sources and the embedded mode
+     */
+    private int compiledLanguages() {
+        int languages = 0;
+        for (SourceKind kind : compilers.keySet()) {
+            if (manifest.compileMode(kind) != CompileMode.BUILD_TOOL && !manifest.sourceRoots(kind).isEmpty()) {
+                languages++;
+            }
+        }
+        return languages;
     }
 
     private void handle(Pending next) {
@@ -735,6 +806,9 @@ public final class DevRuntime implements Closeable {
         boolean compiled = false;
         Set<SourceKind> compiledKinds = new LinkedHashSet<>();
         Set<String> affectedClasses = new LinkedHashSet<>();
+        // what each language already took into account: its own outputs, whose dependents among its sources it
+        // selected itself, and what it was told about
+        Map<SourceKind, Set<String>> known = new EnumMap<>(SourceKind.class);
         for (SourceKind kind : kinds) {
             SourceCompiler compiler = compilers.get(kind);
             if (compiler == null || manifest.compileMode(kind) == CompileMode.BUILD_TOOL || manifest.sourceRoots(kind).isEmpty()) {
@@ -768,24 +842,31 @@ public final class DevRuntime implements Closeable {
             compiled = true;
             compiledKinds.add(kind);
             affectedClasses.addAll(result.compiledClasses());
+            known.computeIfAbsent(kind, k -> new LinkedHashSet<>()).addAll(result.compiledClasses());
             LOG.info("Compiled {} {} source(s) in {} ms", result.compiledSources().size(), kind, result.duration().toMillis());
         }
         // a change in one language reaches the others: their sources that reference a changed class are
         // recompiled too, and fail rather than keep bytecode linked against what is gone
         // until nothing new is produced: a Groovy class recompiled for a Java change may itself be what a
         // Java source depends on, and Java was visited first
-        Set<String> propagated = new LinkedHashSet<>();
-        for (int pass = 0; pass < MAX_PROPAGATION_PASSES && compilers.size() > 1 && !affectedClasses.equals(propagated); pass++) {
-            Set<String> fresh = new LinkedHashSet<>(affectedClasses);
-            fresh.removeAll(propagated);
-            propagated.addAll(affectedClasses);
+        boolean produced = compiledLanguages() > 1;
+        for (int pass = 0; pass < MAX_PROPAGATION_PASSES && produced; pass++) {
+            produced = false;
             for (Map.Entry<SourceKind, SourceCompiler> entry : compilers.entrySet()) {
                 SourceKind kind = entry.getKey();
                 // a language compiled in this batch for its own changes is visited again: an unchanged source of
-                // it that references what another language changed was not selected the first time
+                // it that references what another language changed was not selected the first time. It is told
+                // only what it does not know yet, so it does not recompile the dependents of its own classes
                 if (manifest.compileMode(kind) == CompileMode.BUILD_TOOL || manifest.sourceRoots(kind).isEmpty()) {
                     continue;
                 }
+                Set<String> knownToKind = known.computeIfAbsent(kind, k -> new LinkedHashSet<>());
+                Set<String> fresh = new LinkedHashSet<>(affectedClasses);
+                fresh.removeAll(knownToKind);
+                if (fresh.isEmpty()) {
+                    continue;
+                }
+                knownToKind.addAll(fresh);
                 CompilationRequest request = new CompilationRequest(kind, manifest.sourceRoots(kind), Set.of(), Set.of(), false, manifest.compileClasspath(),
                     manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), manifest.compileOptions(kind)).withAffectedClasses(fresh);
                 CompilationResult result = entry.getValue().compile(request);
@@ -798,6 +879,8 @@ public final class DevRuntime implements Closeable {
                 if (result.status() == CompilationResult.Status.SUCCESS) {
                     compiledKinds.add(kind);
                     affectedClasses.addAll(result.compiledClasses());
+                    knownToKind.addAll(result.compiledClasses());
+                    produced |= !result.compiledClasses().isEmpty();
                     LOG.info("Compiled {} {} source(s) that depend on the changed classes in {} ms", result.compiledSources().size(), kind, result.duration().toMillis());
                 }
             }
@@ -1007,12 +1090,13 @@ public final class DevRuntime implements Closeable {
      */
     private boolean redefine(ChangeSet changeSet, long startNanos) {
         Instrumentation agent = instrumentation;
-        if (agent == null || strategy() == ReloadStrategy.RESTART || changeSet.classes().isEmpty()
+        if (agent == null || strategy() == DevReloadStrategy.RESTART || changeSet.classes().isEmpty()
             || !changeSet.changedResources().isEmpty() || !changeSet.removedResources().isEmpty()) {
             return false;
         }
         GenerationClassLoader generation = classLoader.current();
         List<ClassDefinition> definitions = new ArrayList<>();
+        Map<String, byte[]> originals = new LinkedHashMap<>();
         Map<String, byte[]> replacements = new LinkedHashMap<>();
         for (ClassChange change : changeSet.classes()) {
             String name = change.className();
@@ -1026,14 +1110,16 @@ public final class DevRuntime implements Closeable {
             if (before == null || after == null || !ClassStructure.bodyOnlyChange(before, after)) {
                 return false;
             }
+            originals.put(name, before);
             replacements.put(name, after);
         }
         ApplicationContext current = context;
+        ClassFileReplacement snapshotChange = new ClassFileReplacement(generation);
         try {
             // the snapshot first: a class a thread loads from now on is the new version, and one loaded before is
             // found below and redefined; nothing can load the old version in between
             for (Map.Entry<String, byte[]> entry : replacements.entrySet()) {
-                generation.replaceClassFile(entry.getKey(), entry.getValue());
+                snapshotChange.replace(entry.getKey(), Objects.requireNonNull(originals.get(entry.getKey())), entry.getValue());
             }
             for (Map.Entry<String, byte[]> entry : replacements.entrySet()) {
                 Class<?> loaded = generation.loadedClass(entry.getKey());
@@ -1045,8 +1131,9 @@ public final class DevRuntime implements Closeable {
                 agent.redefineClasses(definitions.toArray(new ClassDefinition[0]));
             }
         } catch (Exception | LinkageError e) {
-            // the snapshot may already hold the new bytes: the restart that follows builds a new generation anyway
-            LOG.info("Cannot redefine {} class(es) in place ({}): restarting instead", replacements.size(), e.getMessage());
+            // the snapshot gets back the class files it held; the restart that follows applies the whole change
+            snapshotChange.rollBack();
+            LOG.info("Cannot redefine {} class(es) in place: restarting instead", replacements.size(), e);
             return false;
         }
         redefinitions.incrementAndGet();
@@ -1159,14 +1246,14 @@ public final class DevRuntime implements Closeable {
      * running. The prefixes the policies declare for a bean are also those under which a configuration bean it received
      * is not retained with it, but bound again by the next generation.
      */
-    private DefaultBeanContext.RetentionCriteria retentionCriteria(ApplicationContext old, @Nullable ConfigurationChange configurationChange) {
+    private RetentionCriteria retentionCriteria(ApplicationContext old, @Nullable ConfigurationChange configurationChange) {
         List<BeanRetentionPolicy> policies = new ArrayList<>(old.getBeansOfType(BeanRetentionPolicy.class));
         if (manifest.retainAnnotated()) {
             // what the modules declare with @Retain, read from the definitions
             policies.add(AnnotatedBeanRetentionPolicy.INSTANCE);
         }
         OrderUtil.sort(policies);
-        return new DefaultBeanContext.RetentionCriteria() {
+        return new RetentionCriteria() {
             @Override
             public boolean retain(BeanRegistration<?> registration) {
                 if (isStale(registration)) {
@@ -1192,7 +1279,7 @@ public final class DevRuntime implements Closeable {
             }
 
             @Override
-            public Set<String> invalidatedBy(BeanRegistration<?> registration) {
+            public Set<String> observedConfigurationPrefixes(BeanRegistration<?> registration) {
                 Set<String> prefixes = new LinkedHashSet<>();
                 for (BeanRetentionPolicy policy : policies) {
                     if (policy.retain(registration)) {
@@ -1223,6 +1310,9 @@ public final class DevRuntime implements Closeable {
         // the generation loader, not the facade: a class the JVM resolved through the facade once would be
         // handed out again, from the retired generation, for as long as the facade lives
         GenerationClassLoader generation = classLoader.current();
+        synchronized (lifecycle) {
+            contextClaimed = false;
+        }
         Thread thread = new Thread(() -> {
             Thread.currentThread().setContextClassLoader(generation);
             try {
@@ -1236,13 +1326,18 @@ public final class DevRuntime implements Closeable {
             }
         }, "micronaut-dev-app");
         thread.setDaemon(false);
-        thread.start();
+        // published before it starts: a main that asks for a reload at once is refused
         applicationThread = thread;
+        thread.start();
         try {
             ApplicationContext applicationContext = future.get(START_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-            // the startup event is published a moment before the context reports itself running
-            long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
-            while (!applicationContext.isRunning() && System.nanoTime() < deadline) {
+            // the startup event is published before the other startup listeners ran and the context reports itself
+            // running; a main that returned has a command line application's context, which may have stopped already
+            long deadline = System.nanoTime() + START_TIMEOUT.toNanos();
+            while (!applicationContext.isRunning() && thread.isAlive()) {
+                if (System.nanoTime() > deadline) {
+                    throw new IllegalStateException("The application's context did not finish starting within " + START_TIMEOUT + " (" + reason + ")");
+                }
                 Thread.sleep(5);
             }
             return applicationContext;
@@ -1326,23 +1421,24 @@ public final class DevRuntime implements Closeable {
     }
 
     private void detectLeaks() {
-        if (oldRetiredGenerations().isEmpty()) {
-            // nothing older than the tolerance is reachable even before a collection: there is nothing to collect for
+        if (oldRetiredGenerations().isEmpty() || !leakCheckPending.compareAndSet(false, true)) {
+            // nothing older than the tolerance is reachable even before a collection, or a check pending covers this reload
             return;
         }
         Thread thread = new Thread(() -> {
             try {
                 Thread.sleep(2000);
+                // only a collection tells a retired generation the collector has yet to reach from one the application keeps;
+                // it runs on this thread, a moment after the reload, and only while an old generation is still reachable
+                System.gc(); // NOSONAR leak detection: a retired generation's loader is unreachable only once it is collected
+                List<Integer> old = oldRetiredGenerations();
+                if (!old.isEmpty()) {
+                    LOG.warn("{} retired generation(s) {} are still reachable after the reload: a static cache or a thread of the application keeps old classes alive", old.size(), old);
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return;
-            }
-            // only a collection tells a retired generation the collector has yet to reach from one the application keeps;
-            // it runs on this thread, a moment after the reload, and only while an old generation is still reachable
-            System.gc(); // NOSONAR leak detection: a retired generation's loader is unreachable only once it is collected
-            List<Integer> old = oldRetiredGenerations();
-            if (!old.isEmpty()) {
-                LOG.warn("{} retired generation(s) {} are still reachable after the reload: a static cache or a thread of the application keeps old classes alive", old.size(), old);
+            } finally {
+                leakCheckPending.set(false);
             }
         }, "micronaut-dev-leak-detector");
         thread.setDaemon(true);
@@ -1368,7 +1464,7 @@ public final class DevRuntime implements Closeable {
      * How the application's main is run, on the thread the runtime provides.
      */
     @FunctionalInterface
-    public interface ApplicationLauncher {
+    interface ApplicationLauncher {
         /**
          * Runs the application. Returns when main returns, which for a server is when the context stops.
          *
