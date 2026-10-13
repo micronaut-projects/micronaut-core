@@ -15,7 +15,7 @@
  */
 package io.micronaut.dev.compile;
 
-import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +51,7 @@ import java.util.stream.Stream;
  * @author graemerocher
  * @since 5.3.0
  */
-@Experimental
+@Internal
 public abstract class StagedSourceCompiler implements SourceCompiler {
 
     private static final Logger LOG = LoggerFactory.getLogger(StagedSourceCompiler.class);
