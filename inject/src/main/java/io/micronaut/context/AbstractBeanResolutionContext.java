@@ -75,6 +75,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /** The owner of the proxy whose lazy target this context creates, so that the target is released with the proxy. */
     @Nullable
     DefaultBeanDependencies lazyProxyDependencies;
+    /** The interceptor being created for an intercepted bean at the moment, or null; see {@link InterceptionTarget}. */
+    @Nullable
+    InterceptorCreation interceptorCreation;
     /** The attribute a {@link ProxyInterceptors} waits under between {@link #prepareProxyTarget} and the creation of the target. */
     private static final String PROXY_INTERCEPTORS = "io.micronaut.proxyInterceptors";
 
@@ -86,6 +89,56 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      * @param registrations The interceptor registrations of the proxy
      */
     record ProxyInterceptors(BeanDefinition<?> definition, List<BeanRegistration<?>> registrations) {
+    }
+
+    /**
+     * An interceptor the container is creating for an intercepted bean.
+     *
+     * @param interceptor The definition of the interceptor; only its own injection points receive the bean
+     * @param target The definition of the bean it is created for
+     */
+    record InterceptorCreation(BeanDefinition<?> interceptor, BeanDefinition<?> target) {
+
+        /**
+         * Whether an injection point is one of the interceptor's own. A qualified interceptor, one of an
+         * {@code @EachBean} for example, is a delegate, and its injection points are declared by the definition it
+         * delegates to.
+         *
+         * @param declaringType The definition that declares the injection point
+         * @return True if it is the definition of the interceptor
+         */
+        boolean isInterceptorDefinition(BeanDefinition<?> declaringType) {
+            return declaringType.equals(interceptor)
+                || interceptor instanceof BeanDefinitionDelegate<?> delegate && declaringType.equals(delegate.getDelegate());
+        }
+    }
+
+    /**
+     * @return The bean the interceptors resolved through this context are created for: the bean being created, or
+     * the bean a resolution on behalf of an existing bean is rooted at; null when there is none
+     */
+    @Nullable
+    BeanDefinition<?> interceptedDefinition() {
+        if (creationState != null) {
+            return creationState.definition;
+        }
+        return path.isEmpty() ? rootDefinition : null;
+    }
+
+    /**
+     * Finds the intercepted bean for an injection point of the bean being created now.
+     *
+     * @return The definition of the bean, or null when the bean being created is not an interceptor created for an
+     * intercepted bean
+     */
+    @Nullable
+    BeanDefinition<?> findInterceptionTarget() {
+        InterceptorCreation creation = interceptorCreation;
+        if (creation == null) {
+            return null;
+        }
+        Segment<?, ?> segment = path.peek();
+        return segment != null && creation.isInterceptorDefinition(segment.getDeclaringType()) ? creation.target() : null;
     }
 
     /**
