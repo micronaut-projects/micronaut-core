@@ -56,7 +56,7 @@ final class DefaultAsyncOverReactiveStreamingHttpClient extends DefaultAsyncOver
     /**
      * @param streamingHttpClient The delegate client
      */
-    DefaultAsyncOverReactiveStreamingHttpClient(StreamingHttpClient streamingHttpClient) {
+    public DefaultAsyncOverReactiveStreamingHttpClient(StreamingHttpClient streamingHttpClient) {
         super(streamingHttpClient);
         this.streamingHttpClient = streamingHttpClient;
     }
