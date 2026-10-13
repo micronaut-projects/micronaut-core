@@ -33,6 +33,7 @@ import io.netty.handler.codec.http.HttpVersion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -40,11 +41,15 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -134,6 +139,47 @@ class FormFactoryTest {
             assertThrows(ExecutionException.class, () -> flow.toCompletableFuture().get());
             assertEquals(0, fizz.refCnt(), "the content received before the request ended is released");
             assertEquals(0, buzz.refCnt(), "the content received after the request ended is released");
+        }
+    }
+
+    @Test
+    public void completedUploadOfACancelledFlowIsReleasedWhenItCompletes(@TempDir Path location) throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of(
+            "micronaut.server.multipart.disk", true,
+            "micronaut.server.multipart.location", location.toString()))) {
+            var factory = ctx.getBean(FormFactory.class);
+            FormFieldMetadata metadata = new FormFieldMetadata("foo", "bar.txt", MediaType.TEXT_PLAIN_TYPE);
+            ByteBodyFactory.StreamingBody streamingBody = mockRequest.byteBodyFactory().createStreamingBody(BodySizeLimits.UNLIMITED, new MockUpstream());
+            ExecutionFlow<CompletedFileUpload> flow = factory.completeFileUpload(mockRequest, new RawFormField(
+                metadata,
+                streamingBody.rootBody()
+            ));
+            streamingBody.sharedBuffer().add(mockRequest.byteBodyFactory().readBufferFactory().copyOf("fizz", UTF_8));
+            // the upload is stored in a file, which stays until the upload completed
+            awaitFiles(location, 1);
+            // nobody waits for the upload anymore, e.g. the reading of the form stopped
+            flow.cancel();
+            streamingBody.sharedBuffer().add(mockRequest.byteBodyFactory().readBufferFactory().copyOf("buzz", UTF_8));
+            streamingBody.sharedBuffer().complete();
+            // released when it completed, not when the request ends
+            awaitFiles(location, 0);
+        }
+    }
+
+    private static void awaitFiles(Path location, int count) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (true) {
+            long files;
+            try (Stream<Path> list = Files.list(location)) {
+                files = list.count();
+            }
+            if (files == count) {
+                return;
+            }
+            if (System.nanoTime() > deadline) {
+                assertEquals(count, files, "files in " + location);
+            }
+            Thread.sleep(10);
         }
     }
 

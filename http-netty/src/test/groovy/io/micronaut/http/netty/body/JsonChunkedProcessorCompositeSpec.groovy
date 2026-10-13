@@ -24,7 +24,7 @@ class JsonChunkedProcessorCompositeSpec extends Specification {
         def processor = new JsonChunkedProcessor()
         processor.counter.unwrapTopLevelArray()
         List<String> values = []
-        processor.process(Flux.fromIterable(chunks)).doOnNext {
+        JsonChunkedFlux.process(processor, Flux.fromIterable(chunks)).doOnNext {
             values << ((ByteBuffer<?>) it).toString(StandardCharsets.UTF_8)
             ((ReferenceCounted) it).release()
         }.blockLast()

@@ -20,6 +20,8 @@ import spock.lang.Unroll
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.CompletionException
+import java.util.concurrent.TimeoutException
 
 class HttpClientToAsyncSpec extends Specification {
 
@@ -28,6 +30,64 @@ class HttpClientToAsyncSpec extends Specification {
     EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'HttpClientToAsyncSpec'
     ])
+
+    void "original async #operation #termination aborts the pending connection"(boolean retrieve, boolean timeout) {
+        given:
+        RawSocketUpstream upstream = new RawSocketUpstream()
+        HttpClient client = HttpClient.create(upstream.uri("/").toURL())
+        def async = client.toAsync()
+        def original = (retrieve ? async.retrieve(HttpRequest.GET("/wait"), String) : async.exchange(HttpRequest.GET("/wait"), String)).toCompletableFuture()
+        def connection = upstream.nextConnection(10)
+        assert connection.awaitRequest(10)
+
+        when:
+        if (timeout) {
+            try {
+                original.orTimeout(1, TimeUnit.MILLISECONDS).join()
+            } catch (CompletionException e) {
+                assert e.cause instanceof TimeoutException
+            }
+        } else {
+            original.cancel(false)
+        }
+
+        then:
+        connection.awaitClosed(10)
+
+        cleanup:
+        client?.close()
+        upstream?.close()
+
+        where:
+        retrieve | timeout
+        false    | false
+        false    | true
+        true     | false
+        true     | true
+        operation = retrieve ? 'retrieve' : 'exchange'
+        termination = timeout ? 'timeout' : 'cancellation'
+    }
+
+    void "a dependent async client timeout leaves the original request running"() {
+        given:
+        RawSocketUpstream upstream = new RawSocketUpstream()
+        HttpClient client = HttpClient.create(upstream.uri("/").toURL())
+        def original = client.toAsync().retrieve(HttpRequest.GET("/wait"), String).toCompletableFuture()
+        def connection = upstream.nextConnection(10)
+        assert connection.awaitRequest(10)
+        def dependent = original.thenApply { it.length() }
+
+        when:
+        dependent.completeExceptionally(new TimeoutException())
+        connection.writeQuietly("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")
+
+        then:
+        original.get(10, TimeUnit.SECONDS) == "hello"
+
+        cleanup:
+        client?.close()
+        upstream?.close()
+    }
 
     void "http client toAsync adapts to CompletionStage API"() {
         given:

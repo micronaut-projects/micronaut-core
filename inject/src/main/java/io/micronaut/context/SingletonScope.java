@@ -22,6 +22,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
+import io.micronaut.inject.ProxyBeanDefinition;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -109,7 +110,12 @@ final class SingletonScope {
             // Special cases when custom bean definitions need to be indexed:
             // BeanDefinitionDelegate - doesn't really exist with a custom qualifier
             DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanDefinition, beanDefinition.getDeclaredQualifier());
-            singletonByArgumentAndQualifier.put(beanKey, registration);
+            indexByArgumentAndQualifier(beanKey, registration);
+            if (beanDefinition instanceof BeanDefinitionDelegate<T> delegate
+                && delegate.getDelegate() instanceof ProxyBeanDefinition<T> proxyDefinition) {
+                // A lookup by the type and the qualifier is a lookup of the proxy, not of its target
+                indexByArgumentAndQualifier(new DefaultBeanContext.BeanKey<>(Argument.of(proxyDefinition.getTargetType()), beanDefinition.getDeclaredQualifier()), registration);
+            }
         }
         return registration;
     }
@@ -244,9 +250,24 @@ final class SingletonScope {
                                                  @Nullable Qualifier<T> qualifier) {
         BeanRegistration<T> beanRegistration = singletonByBeanDefinition.get(BeanDefinitionIdentity.of(beanDefinition));
         if (beanRegistration == null) {
-            return findCachedSingletonBeanRegistration(beanType, qualifier);
+            beanRegistration = findCachedSingletonBeanRegistration(beanType, qualifier);
+            if (beanRegistration != null && isProxyOf(beanRegistration.beanDefinition, beanDefinition)) {
+                // the proxy of the same type and qualifier, not the target that is being looked up
+                return null;
+            }
         }
         return beanRegistration;
+    }
+
+    private <T> void indexByArgumentAndQualifier(DefaultBeanContext.BeanKey<T> beanKey, BeanRegistration<T> registration) {
+        // A proxy and its target share the type and the qualifier. Whichever is created first, the key
+        // stands for the proxy, which a target created after it (a proxy resolving it lazily) must not replace
+        singletonByArgumentAndQualifier.merge(beanKey, registration, (existing, added) ->
+            isProxyOf(existing.beanDefinition, added.beanDefinition) ? existing : added);
+    }
+
+    private static boolean isProxyOf(BeanDefinition<?> proxy, BeanDefinition<?> target) {
+        return proxy.isProxy() && !target.isProxy();
     }
 
     /**
@@ -297,9 +318,10 @@ final class SingletonScope {
      */
     @SuppressWarnings("ReferenceEquality") // A detached instance must not evict a scoped instance of the same definition.
     synchronized <T> void purgeCacheForBeanInstance(BeanDefinition<T> beanDefinition, T bean) {
-        BeanDefinitionIdentity key = BeanDefinitionIdentity.of(beanDefinition);
-        singletonByBeanDefinition.computeIfPresent(key, (ignored, registration) -> registration.bean() == bean ? null : registration);
-        singletonByArgumentAndQualifier.entrySet().removeIf(entry -> entry.getValue().bean() == bean);
+        // only the registration of this instance: another instance registered under the same definition
+        // (one adopted from a previous context displacing a retained one, or the reverse) stays
+        singletonByBeanDefinition.computeIfPresent(BeanDefinitionIdentity.of(beanDefinition), (identity, registration) -> registration.bean == bean ? null : registration);
+        singletonByArgumentAndQualifier.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(bean) && entry.getValue().bean == bean);
     }
 
     /**

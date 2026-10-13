@@ -23,7 +23,7 @@ class JsonChunkedProcessorTest {
         ByteBuf input = Unpooled.copiedBuffer("{\"a\":1} {\"b\":2} {\"c\"", StandardCharsets.UTF_8);
         int[] refCntAfterCancel = new int[1];
         List<String> received = new ArrayList<>();
-        new JsonChunkedProcessor().process(Flux.just(input)).subscribe(new Subscriber<ByteBuffer<?>>() {
+        JsonChunkedFlux.process(new JsonChunkedProcessor(), Flux.just(input)).subscribe(new Subscriber<ByteBuffer<?>>() {
             private Subscription subscription;
 
             @Override
@@ -63,7 +63,7 @@ class JsonChunkedProcessorTest {
         ByteBuf first = Unpooled.copiedBuffer("{\"a\":1} {\"b\"", StandardCharsets.UTF_8);
         ByteBuf second = Unpooled.copiedBuffer(":2} {\"c\":3}", StandardCharsets.UTF_8);
         List<String> received = new ArrayList<>();
-        new JsonChunkedProcessor().process(Flux.just(first, second)).doOnNext(buffer -> {
+        JsonChunkedFlux.process(new JsonChunkedProcessor(), Flux.just(first, second)).doOnNext(buffer -> {
             ByteBuf buf = (ByteBuf) buffer.asNativeBuffer();
             received.add(buf.toString(StandardCharsets.UTF_8));
             buf.release();

@@ -198,4 +198,9 @@ final class DefaultGenericPlaceholder<T>
     protected DefaultArgument<T> copyWithComponentType(@Nullable Argument<?> componentType) {
         return new DefaultGenericPlaceholder<>(this, componentType);
     }
+
+    @Override
+    public Argument<T> withTypeParameters(Argument<?>... typeParameters) {
+        return new DefaultGenericPlaceholder<>(getType(), name, variableName, getAnnotationMetadata(), typeParameters, bounds, resolved);
+    }
 }

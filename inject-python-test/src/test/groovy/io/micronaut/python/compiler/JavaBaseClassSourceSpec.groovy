@@ -189,4 +189,62 @@ class Keywords(GreetingBase):
         def e = thrown(RuntimeException)
         e.message.contains('must pass positional arguments only')
     }
+
+    def "the overrides of a raw generic base declare the erasure of its type variable, those of a parameterized base the type argument"() {
+        given:
+        def tempDir = File.createTempDir("python-java-base", "")
+        PyronautCompiler.builder()
+            .pythonCode('''
+from micronaut.python.annotation.processing.test.javabases import ContentComposite
+from micronaut.python.annotation.processing.test.javabases.ContentComposite import Panel
+
+
+class RawView(ContentComposite):
+    def initContent(self) -> Panel:
+        return Panel("raw")
+
+    def label(self, part: ContentComposite.Part) -> str:
+        return "raw"
+
+
+class UnhintedView(ContentComposite):
+    def initContent(self):
+        return Panel("unhinted")
+
+    def label(self, part) -> str:
+        return "unhinted"
+
+
+class ParameterizedView(ContentComposite[Panel]):
+    def initContent(self) -> Panel:
+        return Panel("parameterized")
+
+    def label(self, part: Panel) -> str:
+        return "parameterized"
+''')
+            .targetDir(tempDir)
+            .build()
+            .compile()
+
+        when:
+        def raw = new File(tempDir, "python/RawView.java").text
+        def unhinted = new File(tempDir, "python/UnhintedView.java").text
+        def parameterized = new File(tempDir, "python/ParameterizedView.java").text
+
+        then: 'a raw base: the return is the hint within the bound or the bound, a parameter the bound'
+        raw.contains('public ContentComposite.Panel initContent() {')
+        raw.contains('public String label(ContentComposite.Part part) {')
+        unhinted.contains('public ContentComposite.Part initContent() {')
+        unhinted.contains('public String label(ContentComposite.Part part) {')
+
+        and: 'the dispatcher passes a type variable argument to the base as its erasure'
+        raw.contains('return super.label((ContentComposite.Part) PythonConversion.convertValue(arguments.get(0), io.micronaut.python.annotation.processing.test.javabases.ContentComposite.Part.class));')
+
+        and: 'a parameterized base: the type argument'
+        parameterized.contains('public ContentComposite.Panel initContent() {')
+        parameterized.contains('public String label(ContentComposite.Panel part) {')
+
+        cleanup:
+        tempDir?.deleteDir()
+    }
 }
