@@ -15,7 +15,6 @@
  */
 package io.micronaut.dev.manifest;
 
-import io.micronaut.context.reload.ReloadStrategy;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.dev.compile.CompileMode;
@@ -89,7 +88,7 @@ public final class DevManifest {
     private final Path directory;
     private final String mainClass;
     private final Path projectDir;
-    private final ReloadStrategy strategy;
+    private final DevReloadStrategy strategy;
     private final List<Path> runtimeClasspath;
     private final List<Path> reloadableRoots;
     private final List<Path> compileClasspath;
@@ -114,7 +113,7 @@ public final class DevManifest {
         this.directory = directory;
         this.mainClass = require(properties, "main-class");
         this.projectDir = path(directory, properties.getProperty(PREFIX + "project-dir", "."));
-        this.strategy = ReloadStrategy.valueOf(properties.getProperty(PREFIX + "strategy", "auto").trim().toUpperCase(Locale.ROOT));
+        this.strategy = DevReloadStrategy.valueOf(properties.getProperty(PREFIX + "strategy", "auto").trim().toUpperCase(Locale.ROOT));
         this.runtimeClasspath = paths(directory, properties.getProperty(PREFIX + "runtime-classpath", ""));
         this.reloadableRoots = paths(directory, require(properties, "reloadable"));
         this.compileClasspath = paths(directory, properties.getProperty(PREFIX + "compile-classpath", ""));
@@ -196,9 +195,9 @@ public final class DevManifest {
     }
 
     /**
-     * @return The reload strategy
+     * @return The reload strategy asked for, {@link DevReloadStrategy#AUTO} when the manifest does not say
      */
-    public ReloadStrategy strategy() {
+    public DevReloadStrategy strategy() {
         return strategy;
     }
 
