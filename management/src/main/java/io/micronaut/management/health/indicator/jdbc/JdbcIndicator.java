@@ -134,8 +134,14 @@ public class JdbcIndicator implements HealthIndicator {
         try {
             DataSource resolved = dataSourceResolver.resolve(dataSource);
             executorService.execute(() -> {
-                if (!result.isDone()) {
+                if (result.isDone()) {
+                    return;
+                }
+                try {
                     result.complete(List.of(checkDataSource(resolved)));
+                } catch (Throwable e) {
+                    // the publisher path fails with the same error
+                    result.completeExceptionally(e);
                 }
             });
         } catch (Exception e) {
