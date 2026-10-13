@@ -31,6 +31,18 @@ import io.micronaut.core.annotation.Experimental;
  *     .watch(change -&gt; pool.resize(configuration.getMaximumPoolSize()));
  * </pre>
  *
+ * <h2>Which watcher</h2>
+ * <ul>
+ * <li>{@link #watch(ConfigurationWatcher)} takes a {@link ConfigurationWatcher}, which returns nothing: the watcher
+ * applies every change to the live bean, and the refresh reports it as
+ * {@link ReloadingConfigurationWatcher.Outcome#APPLIED}. This is the common case, such as a pool that resizes.</li>
+ * <li>{@link #watchReloading(ReloadingConfigurationWatcher)} takes a {@link ReloadingConfigurationWatcher}, which
+ * answers an {@link ReloadingConfigurationWatcher.Outcome} per change: for a watcher that cannot always apply a change
+ * in place, and asks for its bean to be recreated, or for a restart.</li>
+ * </ul>
+ * <p>The two are one kind of watch: a plain watcher is called as a reloading one that always answers
+ * {@code APPLIED}, and both are ordered, delivered and closed alike.</p>
+ *
  * <p>A watch registered while a bean is being created belongs to that bean, which is what lets a reloading watcher
  * answer {@link ReloadingConfigurationWatcher.Outcome#RECREATE}. Each terminal operation takes a snapshot of the
  * request, so a request may be reused for further watches.</p>
