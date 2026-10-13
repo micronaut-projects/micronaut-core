@@ -75,6 +75,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private static final Object NO_VALUE = new Object();
     private static final PropertyCatalog[] CONVENTIONS = {PropertyCatalog.GENERATED, PropertyCatalog.RAW};
     private static final String WILD_CARD_SUFFIX = ".*";
+    private static final String RANDOM_EXPRESSION = "random.";
     protected final ConversionService conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
     protected final Map<String, PropertySource> propertySources = new ConcurrentHashMap<>(10);
@@ -575,7 +576,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 Optional<T> converted;
                 if (entries != null) {
                     // iff entries is null, the value is from placeholderResolutionCache and doesn't need this step
-                    value = resolvePlaceHoldersIfNecessary(currentState, value);
+                    value = resolvePlaceHolders(currentState, name, value);
                     currentState.placeholderResolutionCache.put(name, value);
                 }
                 if (requiredType.isInstance(value) && !CollectionUtils.isIterableOrMap(requiredType)) {
@@ -878,9 +879,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             // A lookup can cache a miss between reset() and catalog reinitialization, clear those
             // entries now that the catalog holds this property source. Within a refresh these are
             // the caches of the replacement, filled by the lookups the rebuild itself made, so no
-            // answer computed from a half-built catalog is published. The caches are cleared
-            // directly: resetCaches() is a hook for subclasses, and this runs from the constructor.
-            clearCaches(writeState);
+            // answer computed from a half-built catalog is published. What the random texts have
+            // resolved to is not a cache of that kind and stays, see resolvePlaceHolders. The caches
+            // are cleared directly: resetCaches() is a hook for subclasses, and this runs from the
+            // constructor.
+            clearLookupCaches(writeState);
         }
     }
 
@@ -1050,9 +1053,78 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     private static void clearCaches(ResolverState resolverState) {
+        clearLookupCaches(resolverState);
+        resolverState.randomTexts.clear();
+    }
+
+    private static void clearLookupCaches(ResolverState resolverState) {
         resolverState.containsCache.clear();
         resolverState.resolvedValueCache.clear();
         resolverState.placeholderResolutionCache.clear();
+    }
+
+    /**
+     * Resolves the placeholders of the value that a lookup has found for a name.
+     *
+     * <p>A text made of random expressions alone, such as <code>${random.port}</code>, resolves to
+     * something else every time, and the cache that keeps what it has resolved to is cleared
+     * after each property source. A property source that reads such a value while the property
+     * sources are being processed would be left with one that no later lookup returns. So what
+     * the text has resolved to is remembered with the text, and returned again for as long as a
+     * lookup by the name finds the same text.</p>
+     *
+     * <p>Only a text whose every placeholder is a random expression is remembered: resolving it
+     * reads no property, so nothing a property source adds can make what it has resolved to out
+     * of date. A text that names a property next to a random expression is resolved again by
+     * every lookup that does not find it cached, and so are the random expressions in a list or
+     * a map.</p>
+     *
+     * @param resolverState The state the value was read from
+     * @param name          The name the value was looked up by
+     * @param value         The value
+     * @return The value with its placeholders resolved
+     */
+    private Object resolvePlaceHolders(ResolverState resolverState, String name, Object value) {
+        if (!(value instanceof CharSequence)) {
+            return resolvePlaceHoldersIfNecessary(resolverState, value);
+        }
+        String text = value.toString();
+        if (!isRandomText(text)) {
+            return resolvePlaceHoldersIfNecessary(resolverState, text);
+        }
+        RandomText remembered = resolverState.randomTexts.get(name);
+        if (remembered == null || !remembered.text().equals(text)) {
+            Object resolved = resolvePlaceHoldersIfNecessary(resolverState, text);
+            // what a lookup of another thread has remembered for the text meanwhile is returned instead
+            remembered = resolverState.randomTexts.compute(name, (key, earlier) ->
+                earlier != null && earlier.text().equals(text) ? earlier : new RandomText(text, resolved));
+        }
+        return remembered.resolved();
+    }
+
+    /**
+     * @param text The text of a value
+     * @return Whether it holds placeholders and each of them is a random expression
+     */
+    private boolean isRandomText(String text) {
+        String prefix = propertyPlaceholderResolver.getPrefix();
+        int placeholder = text.indexOf(prefix);
+        if (placeholder == -1) {
+            return false;
+        }
+        int length = text.length();
+        while (placeholder != -1) {
+            int expression = placeholder + prefix.length();
+            // an expression is trimmed before it is resolved
+            while (expression < length && text.charAt(expression) <= ' ') {
+                expression++;
+            }
+            if (!text.regionMatches(true, expression, RANDOM_EXPRESSION, 0, RANDOM_EXPRESSION.length())) {
+                return false;
+            }
+            placeholder = text.indexOf(prefix, expression);
+        }
+        return true;
     }
 
     private void processSubmapKey(Map<String, Object> map, String key, Object value, @Nullable StringConvention keyConvention) {
@@ -1170,9 +1242,23 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
          */
         private final Map<String, Object> placeholderResolutionCache = new ConcurrentHashMap<>(20);
         /**
+         * What the texts made of random expressions alone have resolved to, by the name they were
+         * looked up by. Unlike the caches it is kept when a property source is processed.
+         */
+        private final Map<String, RandomText> randomTexts = new ConcurrentHashMap<>(4);
+        /**
          * Cache for values <i>after</i> conversion.
          */
         private final Map<ConversionCacheKey, Object> resolvedValueCache = new ConcurrentHashMap<>(20);
+    }
+
+    /**
+     * What a text made of random expressions alone has resolved to.
+     *
+     * @param text     The text
+     * @param resolved What it has resolved to
+     */
+    private record RandomText(String text, Object resolved) {
     }
 
     private record ConversionCacheKey(@NonNull String name, Class<?> requiredType) {

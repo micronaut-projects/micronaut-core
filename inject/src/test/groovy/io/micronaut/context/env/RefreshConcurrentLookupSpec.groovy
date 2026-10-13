@@ -190,6 +190,114 @@ class RefreshConcurrentLookupSpec extends Specification {
         env.stop()
     }
 
+    void "a random text that a property source reads while the property sources are processed is the one that is published"() {
+        given: "a property source, read between two others, that takes its values from random properties of the earlier one"
+        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
+        Map<String, String> derived = [
+                'copy.token'     : 'app.token',
+                'copy.url'       : 'app.url',
+                'copy.blank'     : 'app.blank',
+                'copy.same'      : 'app.same',
+                'copy.overridden': 'app.overridden',
+                'copy.mixed'     : 'app.mixed'
+        ]
+        List<String> kept = ['copy.token', 'copy.url', 'copy.blank', 'copy.same']
+        PropertySource deriving = new PropertySource() {
+            @Override
+            String getName() { 'deriving' }
+
+            @Override
+            int getOrder() { 15 }
+
+            @Override
+            Object get(String key) {
+                derived.containsKey(key) ? env.getProperty(derived[key], Object).orElse(null) : null
+            }
+
+            @Override
+            Iterator<String> iterator() {
+                derived.keySet().iterator()
+            }
+        }
+        env.addPropertySource(PropertySource.of('early', [
+                'app.token'     : '${random.uuid2}',
+                'app.url'       : 'http://localhost:${random.port}/path',
+                'app.blank'     : '${ random.uuid2 }',
+                'app.same'      : '${random.uuid2}',
+                'app.overridden': '${random.uuid2}',
+                'app.mixed'     : '${app.prefix}-${random.uuid2}',
+                'app.prefix'    : 'early'
+        ], 10))
+        env.addPropertySource(deriving)
+        env.addPropertySource(PropertySource.of('late', [
+                'app.same'      : new String('${random.uuid2}'),
+                'app.overridden': 'late',
+                'app.prefix'    : 'late'
+        ], 20))
+
+        when:
+        env.start()
+
+        then: "the value the property source has read is the one every lookup gets from then on, a later source giving the same text included"
+        kept.findAll { env.getProperty(it, Object).get() != env.getProperty(derived[it], Object).get() } == []
+
+        and: "unless a later property source overrides the property, or one that the text also names"
+        env.getProperty('app.overridden', String).get() == 'late'
+        env.getProperty('copy.mixed', String).get().startsWith('early-')
+        env.getProperty('app.mixed', String).get().startsWith('late-')
+
+        when:
+        String token = env.getProperty('app.token', String).get()
+        env.refresh()
+
+        then: "a refresh draws the values again, and again publishes the ones that were read while it rebuilt the catalogs"
+        env.getProperty('app.token', String).get() != token
+        kept.findAll { env.getProperty(it, Object).get() != env.getProperty(derived[it], Object).get() } == []
+        env.getProperty('app.overridden', String).get() == 'late'
+        env.getProperty('app.mixed', String).get().startsWith('late-')
+
+        cleanup:
+        env.stop()
+    }
+
+    void "a random text keeps what it has resolved to when a property source is added to a resolver that is used on its own"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(PropertySource.of('declares', ['app.token': '${random.uuid2}']))
+        String token = resolver.getProperty('app.token', String).get()
+
+        when:
+        resolver.addPropertySource(PropertySource.of('other', ['other.key': 'value']))
+
+        then:
+        resolver.getProperty('app.token', String).get() == token
+
+        when: "a property source gives the property another value"
+        resolver.addPropertySource(PropertySource.of('overrides', ['app.token': 'fixed']))
+
+        then:
+        resolver.getProperty('app.token', String).get() == 'fixed'
+    }
+
+    void "a random text read while the environment is stopped is the one it has once started again"() {
+        given:
+        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
+        env.addPropertySource(PropertySource.of('declares', ['app.token': '${random.uuid2}', 'app.my.token': '${random.uuid2}'], 10))
+        env.start()
+        List<String> names = ['app.token', 'app.my-token']
+
+        when: "the names are looked up while the environment is stopped, and again when it has been started"
+        env.stop()
+        Map<String, Object> stopped = names.collectEntries { [it, env.getProperty(it, Object).orElse(null)] }
+        env.start()
+
+        then:
+        !stopped.containsValue(null)
+        names.findAll { env.getProperty(it, Object).orElse(null) != stopped[it] } == []
+
+        cleanup:
+        env.stop()
+    }
+
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/12190")
     void "a lookup that started before a refresh does not cache the old value over the refreshed one"() {
         given: "a value whose conversion can be parked, that is between reading the catalog and caching the result"
