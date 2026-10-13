@@ -50,6 +50,7 @@ import io.micronaut.dev.loader.GenerationClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.dev.manifest.DevMode;
 import io.micronaut.dev.manifest.ResourceRoot;
+import io.micronaut.dev.test.TestProgressConsole;
 import io.micronaut.dev.test.TestRunSummary;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher;
@@ -806,6 +807,13 @@ public final class DevRuntime implements Closeable {
         return requireTests().awaitRun(run, timeout);
     }
 
+    /**
+     * @return The console test runs show on, in test mode
+     */
+    TestProgressConsole testConsole() {
+        return requireTests().console();
+    }
+
     private TestSession requireTests() {
         TestSession session = tests;
         if (session == null) {
@@ -896,8 +904,12 @@ public final class DevRuntime implements Closeable {
     }
 
     void compilationFailed(CompileFailure failure) {
+        compilationFailed(failure, true);
+    }
+
+    void compilationFailed(CompileFailure failure, boolean log) {
         lastFailure = failure;
-        if (LOG.isErrorEnabled()) {
+        if (log && LOG.isErrorEnabled()) {
             LOG.error("{}", failure.describe().strip());
         }
     }
@@ -962,6 +974,7 @@ public final class DevRuntime implements Closeable {
             TestSession session = tests;
             if (session != null) {
                 session.cancelRun();
+                session.console().close();
             }
             Thread thread = worker;
             if (thread != null) {

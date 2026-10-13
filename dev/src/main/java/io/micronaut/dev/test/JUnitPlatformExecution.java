@@ -61,11 +61,13 @@ import java.util.regex.Pattern;
  */
 final class JUnitPlatformExecution {
 
+    // the name of the result of a class that failed, as JUnit names it, which the console shows as an error
+    static final String CLASS_ERROR = "initializationError";
+
     private static final String CAPTURE_STDOUT = "junit.platform.output.capture.stdout";
     private static final String CAPTURE_STDERR = "junit.platform.output.capture.stderr";
     private static final String STDOUT_KEY = "stdout";
     private static final String STDERR_KEY = "stderr";
-    private static final String CLASS_ERROR = "initializationError";
     // the languages whose tests are classes of the test class output, which the class path roots select
     private static final Set<SourceKind> JVM_KINDS = Set.of(SourceKind.JAVA, SourceKind.KOTLIN, SourceKind.GROOVY);
 
@@ -401,6 +403,7 @@ final class JUnitPlatformExecution {
         @Override
         public void testPlanExecutionStarted(TestPlan testPlan) {
             plan = testPlan;
+            listener.testsPlanned(testPlan.countTestIdentifiers(TestIdentifier::isTest));
         }
 
         @Override

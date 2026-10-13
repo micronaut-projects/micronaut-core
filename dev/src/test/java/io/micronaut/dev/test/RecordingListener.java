@@ -16,11 +16,18 @@ final class RecordingListener implements TestEventListener {
     final Map<String, StringBuilder> output = new LinkedHashMap<>();
     TestRunStarted started;
     TestRunSummary summary;
+    long planned = -1;
 
     @Override
     public void runStarted(TestRunStarted event) {
         started = event;
         events.add("runStarted");
+    }
+
+    @Override
+    public void testsPlanned(long count) {
+        planned = count;
+        events.add("testsPlanned " + count);
     }
 
     @Override

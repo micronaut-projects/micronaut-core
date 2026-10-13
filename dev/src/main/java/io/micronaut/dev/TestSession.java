@@ -33,6 +33,7 @@ import io.micronaut.dev.test.TestEventListeners;
 import io.micronaut.dev.test.TestFileNames;
 import io.micronaut.dev.test.TestId;
 import io.micronaut.dev.test.TestOutcome;
+import io.micronaut.dev.test.TestProgressConsole;
 import io.micronaut.dev.test.TestReportListener;
 import io.micronaut.dev.test.TestRunRequest;
 import io.micronaut.dev.test.TestRunStarted;
@@ -96,6 +97,7 @@ final class TestSession {
     private final TestRunner runner;
     private final JUnitXmlReportWriter xml;
     private final List<TestReportListener> reports;
+    private final TestProgressConsole console;
     // guarded by this
     private final Set<String> failedClasses = new LinkedHashSet<>();
     // what changed and no complete run has covered yet: a run cancelled, or not run while watching was off, leaves it owed
@@ -130,6 +132,31 @@ final class TestSession {
         this.runner = runner(settings.runner());
         this.xml = new JUnitXmlReportWriter(settings.reports());
         this.reports = TestEventListeners.reportListeners(TestSession.class.getClassLoader());
+        this.console = TestProgressConsole.create(this::reportLocation);
+    }
+
+    /**
+     * @return The console the runs show on
+     */
+    TestProgressConsole console() {
+        return console;
+    }
+
+    /**
+     * @return Where the first report that has one opens, for the console to show
+     */
+    private @Nullable String reportLocation() {
+        for (TestReportListener report : reports) {
+            try {
+                String location = report.location();
+                if (location != null) {
+                    return location;
+                }
+            } catch (RuntimeException e) {
+                LOG.error("The test report {} failed: {}", report.getClass().getName(), e.getMessage(), e);
+            }
+        }
+        return null;
     }
 
     /**
@@ -266,12 +293,12 @@ final class TestSession {
                 return;
             }
             if (!watching) {
-                LOG.info("Compiled; watching is off, so no test runs until one is asked for");
+                console.note("Compiled; watching is off, so no test runs until one is asked for");
                 return;
             }
             TestSelection selection = owed("affected");
             if (selection == null) {
-                LOG.info("Nothing to test: no test depends on what changed");
+                console.note("Nothing to test: no test depends on what changed");
                 return;
             }
             run(selection, true);
@@ -575,7 +602,7 @@ final class TestSession {
     private void run(TestSelection requested, boolean coversOwed) {
         TestSelection selection = requested.withPatterns(settings.patterns());
         if (selection.isEmpty()) {
-            LOG.info("No test to run for {}", selection.description());
+            console.note("No test to run for " + selection.description());
             return;
         }
         String runId;
@@ -600,6 +627,8 @@ final class TestSession {
         listeners.add(xml);
         listeners.addAll(reports);
         listeners.add(new FailureTracker());
+        // last: the summary it prints follows the reports' files
+        listeners.add(console);
         TestRunRequest request = new TestRunRequest(runId, generation, outputs(tests, tests.sourceRoots()), tests.sourceRoots(), selection, settings.parameters());
         TestRunSummary summary;
         try {
@@ -618,7 +647,8 @@ final class TestSession {
             }
             notifyAll();
         }
-        LOG.info("{} {}: {} passed, {} failed, {} errored, {} skipped in {} ms on generation {}{}", selection.everything() ? "All tests" : "Tests " + selection.description(),
+        // the console showed the run
+        LOG.debug("{} {}: {} passed, {} failed, {} errored, {} skipped in {} ms on generation {}{}", selection.everything() ? "All tests" : "Tests " + selection.description(),
             summary.isSuccess() ? "passed" : FAILED_LABEL, summary.passed(), summary.failed(), summary.errored(), summary.skipped(), summary.duration().toMillis(),
             generation instanceof GenerationClassLoader g ? g.generation() : runtime.generation(), summary.cancelled() ? " (cancelled)" : "");
         if (!settings.once() && runtime.isGenerationBudgetSpent()) {
@@ -677,7 +707,9 @@ final class TestSession {
     }
 
     private void compilationFailed(CompileFailure failure, Map<SourceKind, SourceChanges> sources, Map<SourceKind, SourceChanges> testSources) {
-        runtime.compilationFailed(failure);
+        // the console shows the errors
+        runtime.compilationFailed(failure, false);
+        console.compilationFailed(failure);
         synchronized (this) {
             compileFailed = true;
             retrySources.clear();

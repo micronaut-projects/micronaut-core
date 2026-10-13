@@ -277,6 +277,19 @@ public final class HtmlTestReport implements TestReportListener {
     }
 
     /**
+     * @return Where the page opens: the LiveReload server's URL of it, or the file, or null when no runtime runs the process
+     */
+    @Override
+    public synchronized @Nullable String location() {
+        configure();
+        if (url != null) {
+            return url;
+        }
+        Path target = directory;
+        return target == null ? null : target.resolve("index.html").toUri().toString();
+    }
+
+    /**
      * The state the page renders, as JSON.
      *
      * @return The state
