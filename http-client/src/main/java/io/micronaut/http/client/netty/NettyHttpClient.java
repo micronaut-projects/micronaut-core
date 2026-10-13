@@ -63,6 +63,11 @@ import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.PieceReader;
+import io.micronaut.http.body.stream.BodyElementsPublisher;
+import io.micronaut.http.body.stream.BodyPublishers;
+import io.micronaut.http.body.stream.ByteBodyElements;
+import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.body.WritableBodyWriter;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.BlockingHttpClient;
@@ -100,9 +105,8 @@ import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.ElementsStages;
-import io.micronaut.http.client.ByteBodyElements;
+import io.micronaut.http.client.BodyPieces;
 import io.micronaut.http.client.ElementsResponse;
-import io.micronaut.http.client.SubscriberBodyElements;
 import io.micronaut.http.client.sse.EventStreams;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.CodecException;
@@ -186,12 +190,10 @@ import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -758,6 +760,21 @@ final class NettyHttpClient implements
         return value;
     }
 
+    /**
+     * Starts the exchange of a reactive stream once the subscriber has its subscription, as the
+     * reactive client always did: a subscription cancelled in {@code onSubscribe} sends nothing.
+     * Unlike {@link Flux#defer}, which starts it before the subscriber is called.
+     *
+     * @param exchange Starts the exchange
+     * @param <T>      The element type
+     * @return The elements of the exchange
+     */
+    private static <T> Flux<T> afterSubscribe(Supplier<? extends Publisher<T>> exchange) {
+        // not a scalar source, which flatMapMany would map before the subscriber is called
+        return Mono.<Boolean>create(sink -> sink.onRequest(n -> sink.success(Boolean.TRUE)))
+            .flatMapMany(ignored -> exchange.get());
+    }
+
     private static <T> Mono<T> toMono(ExecutionFlow<T> flow, PropagatedContext context) {
         return Mono.from(ReactivePropagation.propagate(context, ReactiveExecutionFlow.toPublisher(flow)));
     }
@@ -783,85 +800,17 @@ final class NettyHttpClient implements
 
     @Override
     public <I, B> Publisher<HttpResponse<Event<B>>> exchangeEventStream(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
-        setupConversionService(request);
+        // the exchange of the async client: the events are decoded by its piece reader as they are
+        // requested, and each one is wrapped in the response
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return new MicronautFlux<>(Flux.defer(() -> {
-            MutableHttpRequest<?> mutableRequest = toMutableRequest(request);
-            if (!acceptsEvents(mutableRequest)) {
-                // keep what the caller accepts, such as application/json, and accept an event stream too
-                mutableRequest.getHeaders().add(io.micronaut.http.HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
-            }
-            return toMono(resolveRequestURI(mutableRequest), propagatedContext)
-                .flatMapMany(target -> exchangeEventStreamImpl(propagatedContext, mutableRequest, eventType, errorType, target));
-        }));
-    }
-
-    private <I, B> Flux<HttpResponse<Event<B>>> exchangeEventStreamImpl(PropagatedContext propagatedContext, MutableHttpRequest<I> request, Argument<B> eventType, Argument<?> errorType, ResolvedTarget target) {
-        return toMono(buildStreamExchange(propagatedContext, request, target, errorType, true, true), propagatedContext).flatMapMany(response -> {
-            if (!(response instanceof NettyStreamedHttpResponse)) {
-                throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
-            }
-            StreamedHttpResponse streamedResponse = NettyHttpResponseBuilder.toStreamResponse(response);
-            Flux<ByteBuf> content = Flux.from(streamedResponse).map(HttpContent::content);
-            Flux<Event<B>> events;
-            if (isEventStream(response)) {
-                // each event is decoded as soon as its lines arrive
-                MessageBodyReader<B> reader = handlerRegistry.getReader(eventType, List.of(MediaType.APPLICATION_JSON_TYPE));
-                SseEventDecoder decoder = new SseEventDecoder(sizeLimits().maxBufferSize());
-                events = content.concatMapIterable(line -> {
-                        try {
-                            return decoder.line(line);
-                        } finally {
-                            line.release();
-                        }
-                    })
-                    .map(event -> Event.of(event, readEventData(reader, eventType, MediaType.APPLICATION_JSON_TYPE, response, event.getData())));
-            } else {
-                // a single body, such as JSON, is one event
-                MediaType mediaType = response.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
-                MessageBodyReader<B> reader = handlerRegistry.getReader(eventType, List.of(mediaType));
-                long maxBufferSize = sizeLimits().maxBufferSize();
-                events = content
-                    .collect(ByteArrayOutputStream::new, (body, chunk) -> {
-                        try {
-                            long length = (long) body.size() + chunk.readableBytes();
-                            if (length > maxBufferSize) {
-                                throw new ContentLengthExceededException(maxBufferSize, length);
-                            }
-                            chunk.readBytes(body, chunk.readableBytes());
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        } finally {
-                            chunk.release();
-                        }
-                    })
-                    .filter(body -> body.size() > 0)
-                    .map(body -> Event.of(readEventData(reader, eventType, mediaType, response, body.toByteArray())))
-                    .flux();
-            }
-            return events
-                .doOnDiscard(ByteBuf.class, ReferenceCountUtil::safeRelease)
-                .map(event -> eventResponse(streamedResponse, event))
-                // without an event, the status and the headers of the response are still of interest
-                .switchIfEmpty(Mono.fromSupplier(() -> eventResponse(streamedResponse, null)))
-                .onErrorMap(e -> e instanceof HttpClientException ? e : decorate(new HttpClientException("Error consuming Server Sent Events: " + e.getMessage(), e)));
-        });
-    }
-
-    private <B> B readEventData(MessageBodyReader<B> reader, Argument<B> eventType, MediaType mediaType, HttpResponse<?> response, byte[] data) {
-        B decoded = reader.read(eventType, mediaType, response.getHeaders(), byteBufferFactory.wrap(Unpooled.wrappedBuffer(data)));
-        if (decoded == null) {
-            throw new HttpClientException("Event data decoded to null for type " + eventType);
-        }
-        return decoded;
-    }
-
-    private <B> HttpResponse<Event<B>> eventResponse(StreamedHttpResponse streamedResponse, @Nullable Event<B> event) {
-        NettyStreamedHttpResponse<Event<B>> response = new NettyStreamedHttpResponse<>(streamedResponse, conversionService);
-        if (event != null) {
-            response.setBody(event);
-        }
-        return new HttpResponseWrapper<>(response);
+        return new MicronautFlux<>(afterSubscribe(() -> toMono(exchangeEventStreamFlow(request, eventType, errorType), propagatedContext)
+            .flatMapMany(response -> {
+                BodyElements<Event<B>> events = Objects.requireNonNull(response.body(), "The response has no events");
+                return Flux.from(new BodyElementsPublisher<>(events))
+                    .map(event -> (HttpResponse<Event<B>>) new EventResponse<>(response, event))
+                    // without an event, the status and the headers of the response are still of interest
+                    .switchIfEmpty(Mono.fromSupplier(() -> new EventResponse<>(response, null)));
+            })));
     }
 
     @Override
@@ -902,12 +851,13 @@ final class NettyHttpClient implements
      */
     <I> ExecutionFlow<HttpResponse<BodyElements<ByteBuffer<?>>>> exchangeStreamFlow(io.micronaut.http.HttpRequest<I> request, Argument<?> errorType) {
         return exchangeElementsFlow(request, errorType, false,
-            response -> ElementsResponse.of(response, ByteBodyElements.pieces(response.byteBody().move())));
+            response -> ElementsResponse.of(response, BodyPieces.elements(response.byteBody().move())));
     }
 
     /**
-     * The {@link #jsonStream} of {@link DefaultAsyncHttpClient}: the exchange runs without Reactor,
-     * and the elements are decoded by the chunked JSON reader as they are pulled.
+     * The {@link #jsonStream} of {@link DefaultAsyncHttpClient}, without Reactor: the elements are
+     * split from the pieces of the body and decoded by the piece reader of the JSON reader as they
+     * are pulled.
      *
      * @param request   The request
      * @param type      The type of an element
@@ -925,18 +875,11 @@ final class NettyHttpClient implements
             }
             CloseableByteBody body = response.byteBody().move();
             io.micronaut.http.HttpHeaders headers = response.getHeaders();
+            // an element is decoded in memory: it is limited like buffered content
             long maxElementSize = sizeLimits().maxBufferSize();
-            return ElementsResponse.of(response, SubscriberBodyElements.of(() -> {
-                // an element is decoded in memory: it is limited like buffered content
-                Publisher<ByteBuffer<?>> bytes = Flux.from(InternalByteBody.toUnbufferedReadBufferPublisher(body))
-                    .doOnDiscard(ReadBuffer.class, ReadBuffer::close)
-                    .map(rb -> {
-                        try (rb) {
-                            return rb.toByteBuffer();
-                        }
-                    });
-                return reader.readChunked(type, mediaType, headers, bytes, maxElementSize);
-            }, body::close));
+            // without Reactor: the pieces are split into elements as they are pulled
+            PieceReader<O> pieceReader = PieceReaders.open(reader, type, mediaType, headers, maxElementSize);
+            return ElementsResponse.of(response, new ByteBodyElements<>(body, pieceReader, Function.identity()));
         });
     }
 
@@ -1575,10 +1518,10 @@ final class NettyHttpClient implements
                             parts.get(parts.size() - 1).release();
                             body = Flux.fromIterable(parts.subList(0, parts.size() - 1)).map(DefaultHttpContent::new);
                         } else {
-                            body = SseSplitter.split(NettyByteBodyFactory.toByteBufs(bb), sizeLimits()).map(DefaultHttpContent::new);
+                            body = SseSplitter.split(Flux.from(NettyByteBodyFactory.toByteBufs(bb)), sizeLimits()).map(DefaultHttpContent::new);
                         }
                     } else {
-                        body = NettyByteBodyFactory.toByteBufs(bb).map(DefaultHttpContent::new);
+                        body = BodyPublishers.map(NettyByteBodyFactory.toByteBufs(bb), DefaultHttpContent::new);
                     }
                 }
 
@@ -1792,7 +1735,7 @@ final class NettyHttpClient implements
                             new IllegalArgumentException("Unconvertible reactive type: " + bodyValue)
                         );
 
-                        Flux<HttpContent> requestBodyPublisher = Flux.from(publisher).map(value -> {
+                        Publisher<HttpContent> requestBodyPublisher = BodyPublishers.map(publisher, value -> {
                             Argument<Object> type = Argument.ofInstance(value);
                             ByteBuffer<?> buffer = handlerRegistry.getWriter(type, List.of(requestContentType))
                                 .writeTo(type, requestContentType, value, request.getHeaders(), byteBufferFactory);
@@ -1803,7 +1746,7 @@ final class NettyHttpClient implements
                             requestBodyPublisher = JsonSubscriber.lift(requestBodyPublisher);
                         }
 
-                        return byteBodyFactory.adapt(requestBodyPublisher.map(ByteBufHolder::content), outgoingHeaders, null);
+                        return byteBodyFactory.adapt(BodyPublishers.map(requestBodyPublisher, ByteBufHolder::content), outgoingHeaders, null);
                     } else if (bodyValue instanceof CharSequence sequence) {
                         bodyContent = charSequenceToByteBuf(sequence, requestContentType);
                     } else {
