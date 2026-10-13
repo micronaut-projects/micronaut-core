@@ -110,6 +110,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     protected final ElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
     private final Element originatingElement;
     private final ClassElement originatingType;
+    private final List<Element> additionalOriginatingElements = new ArrayList<>(0);
     private ClassElement beanType;
     /**
      * Tells apart the associated beans that would otherwise get the same name, see {@link #build(List, ElementBeanDefinitionBuilderFactory)}.
@@ -276,6 +277,40 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     @Override
     public Element getOriginatingElement() {
         return originatingElement;
+    }
+
+    /**
+     * Checks the originating elements of a bean registered with {@link VisitorContext#registerBean(ClassElement, Element...)}.
+     *
+     * @param beanType            The bean type
+     * @param originatingElements The originating elements
+     * @since 5.3.0
+     */
+    @Internal
+    public static void requireOriginatingElements(ClassElement beanType, Element... originatingElements) {
+        if (originatingElements == null || originatingElements.length == 0) {
+            throw new IllegalArgumentException("Bean [" + beanType.getName() + "] cannot be registered without an originating element");
+        }
+        if (!(originatingElements[0] instanceof ClassElement) && !(originatingElements[0] instanceof MethodElement)) {
+            throw new IllegalArgumentException("Bean [" + beanType.getName() + "] cannot be registered with the originating element ["
+                + originatingElements[0] + "]: the first originating element must be a class or a method");
+        }
+    }
+
+    /**
+     * Adds originating elements to the definition, after the originating element it is named after. A build that
+     * recompiles or deletes one of them has to replace or delete the definition.
+     *
+     * @param elements The additional originating elements
+     * @since 5.3.0
+     */
+    @Internal
+    public final void addOriginatingElements(Element... elements) {
+        for (Element element : elements) {
+            if (element != originatingElement && !additionalOriginatingElements.contains(element)) {
+                additionalOriginatingElements.add(element);
+            }
+        }
     }
 
     @Override
@@ -463,6 +498,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
     private BeanElementBuilder addChildBean(MethodElement producerMethod, Consumer<BeanElementBuilder> childBeanBuilder) {
         final AbstractBeanDefinitionBuilder childBuilder = createChildBean(producerMethod);
+        childBuilder.additionalOriginatingElements.addAll(additionalOriginatingElements);
         this.childBeans.add(childBuilder);
         if (childBeanBuilder != null) {
             childBeanBuilder.accept(childBuilder);
@@ -472,6 +508,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
     private BeanElementBuilder addChildBean(FieldElement producerMethod, Consumer<BeanElementBuilder> childBeanBuilder) {
         final AbstractBeanDefinitionBuilder childBuilder = createChildBean(producerMethod);
+        childBuilder.additionalOriginatingElements.addAll(additionalOriginatingElements);
         this.childBeans.add(childBuilder);
         if (childBeanBuilder != null) {
             childBeanBuilder.accept(childBuilder);
@@ -696,6 +733,9 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             // The definition is named after the element that added the bean, and that element alone decides whether
             // the definition exists: a build that recompiles the element has to replace or delete it
             beanDefinitionWriter.setOriginatingElement(originatingElement);
+            for (Element element : additionalOriginatingElements) {
+                beanDefinitionWriter.addOriginatingElement(element);
+            }
         }
         return beanDefinitionBuilder;
     }

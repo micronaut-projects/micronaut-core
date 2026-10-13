@@ -40,7 +40,7 @@ import java.util.function.Supplier;
 final class SuppliedBodyElements<T> implements BodyElements<T> {
 
     private final Supplier<? extends CompletionStage<Optional<T>>> next;
-    private final @Nullable Runnable close;
+    private final @Nullable Supplier<? extends CompletionStage<Void>> close;
     /**
      * The operation in progress, or {@code null}. Guarded by this.
      */
@@ -49,12 +49,13 @@ final class SuppliedBodyElements<T> implements BodyElements<T> {
      * Completes when the elements were closed, or {@code null} while they are open. Guarded by
      * this.
      */
-    private @Nullable CompletableFuture<@Nullable Void> closed;
+    private @Nullable CompletionStage<Void> closed;
 
     private boolean completed;
     private @Nullable Throwable failure;
 
-    SuppliedBodyElements(Supplier<? extends CompletionStage<Optional<T>>> next, @Nullable Runnable close) {
+    SuppliedBodyElements(Supplier<? extends CompletionStage<Optional<T>>> next,
+                         @Nullable Supplier<? extends CompletionStage<Void>> close) {
         this.next = next;
         this.close = close;
     }
@@ -159,12 +160,14 @@ final class SuppliedBodyElements<T> implements BodyElements<T> {
     public CompletionStage<Void> closeAsync() {
         CompletableFuture<?> pending;
         CompletableFuture<@Nullable Void> stage;
+        CompletionStage<Void> result;
         synchronized (this) {
             if (closed != null) {
                 return closed;
             }
             stage = new CompletableFuture<>();
-            closed = stage;
+            result = stage.minimalCompletionStage();
+            closed = result;
             pending = operation;
             operation = null;
         }
@@ -174,15 +177,20 @@ final class SuppliedBodyElements<T> implements BodyElements<T> {
             pending.completeExceptionally(cancellation);
         }
         try {
-            Runnable callback = close;
-            if (callback != null) {
-                callback.run();
-            }
-            stage.complete(null);
+            Supplier<? extends CompletionStage<Void>> callback = close;
+            CompletionStage<Void> cleanup = callback == null ? CompletableFuture.completedStage(null)
+                : Objects.requireNonNull(callback.get(), "The cleanup returned no stage");
+            cleanup.whenComplete((ignored, error) -> {
+                if (error == null) {
+                    stage.complete(null);
+                } else {
+                    stage.completeExceptionally(error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
+                }
+            });
         } catch (Exception | Error e) {
             stage.completeExceptionally(e);
         }
-        return stage;
+        return result;
     }
 
     @Override
