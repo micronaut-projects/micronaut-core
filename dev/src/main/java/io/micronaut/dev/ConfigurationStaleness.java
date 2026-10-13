@@ -438,7 +438,6 @@ final class ConfigurationStaleness {
         return false;
     }
 
-
     /**
      * Refreshes the configuration of the running context.
      *
@@ -456,7 +455,6 @@ final class ConfigurationStaleness {
             return null;
         }
     }
-
 
     /**
      * The definitions a context has of the given classes.
