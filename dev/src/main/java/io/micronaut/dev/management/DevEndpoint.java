@@ -58,7 +58,7 @@ import java.util.Map;
 @Requires(classes = {Endpoint.class, HttpRequest.class})
 @DevelopmentActive
 @Requires(beans = DevRuntime.class)
-public class DevEndpoint {
+public final class DevEndpoint {
 
     /**
      * The endpoint's name.
@@ -83,7 +83,7 @@ public class DevEndpoint {
     /**
      * @param runtime The runtime
      */
-    public DevEndpoint(DevRuntime runtime) {
+    DevEndpoint(DevRuntime runtime) {
         this.runtime = runtime;
     }
 

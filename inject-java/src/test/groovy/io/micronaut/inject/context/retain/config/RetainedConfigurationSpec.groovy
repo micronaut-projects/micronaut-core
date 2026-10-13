@@ -19,6 +19,9 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanRegistration
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Retain
+import io.micronaut.context.reload.RetentionCriteria
+import io.micronaut.context.reload.PolicyRetentionCriteria
+import io.micronaut.context.reload.AnnotatedBeanRetentionPolicy
 import spock.lang.Specification
 
 /**
@@ -88,14 +91,14 @@ class RetainedConfigurationSpec extends Specification {
     }
 
     private static Collection<BeanRegistration<?>> stopRetaining(ApplicationContext context, Set<String> touched) {
-        return ((DefaultBeanContext) context).stopRetaining(new DefaultBeanContext.RetentionCriteria() {
+        return ((DefaultBeanContext) context).stopRetaining(new RetentionCriteria() {
             @Override
             boolean retain(BeanRegistration<?> registration) {
                 return registration.beanDefinition.annotationMetadata.declaredMetadata.hasStereotype(Retain)
             }
 
             @Override
-            Set<String> invalidatedBy(BeanRegistration<?> registration) {
+            Set<String> observedConfigurationPrefixes(BeanRegistration<?> registration) {
                 return registration.beanDefinition.annotationMetadata.declaredMetadata.stringValues(Retain, 'invalidatedBy') as Set<String>
             }
 
@@ -106,9 +109,39 @@ class RetainedConfigurationSpec extends Specification {
         })
     }
 
-    private static ApplicationContext start(Collection<BeanRegistration<?>> retained) {
+    void "a change under the prefix the annotation names releases the pool, through the policy"() {
+        given:
+        ApplicationContext first = start(List.of())
+        SizedPool covered = first.getBean(SizedPool.Covered)
+
+        when: "the change behind the restart touched the prefix @Retain names"
+        Collection<BeanRegistration<?>> retained = stopRetainingByPolicy(first, 'my.pool')
+
+        then: "the policy releases the pool"
+        !retained*.bean.any { it.is(covered) }
+
+        when:
+        ApplicationContext second = start(retained, '5')
+
+        then: "the next context creates it again from the changed configuration"
+        !second.getBean(SizedPool.Covered).is(covered)
+        second.getBean(SizedPool.Covered).size == 5
+
+        cleanup:
+        second?.close()
+    }
+
+    /**
+     * Stops retaining what the annotated policy retains, reading the prefixes it observes from {@link Retain#invalidatedBy()}.
+     */
+    private static Collection<BeanRegistration<?>> stopRetainingByPolicy(ApplicationContext context, String touchedPrefix) {
+        return ((DefaultBeanContext) context).stopRetaining(new PolicyRetentionCriteria(
+            List.of(AnnotatedBeanRetentionPolicy.INSTANCE), { String prefix -> prefix == touchedPrefix }, { Class<?> type -> false }))
+    }
+
+    private static ApplicationContext start(Collection<BeanRegistration<?>> retained, String size = '3') {
         return ApplicationContext.builder()
-            .properties(['spec.name': 'RetainedConfigurationSpec', 'my.pool.size': '3', 'my.pool.limits.max': '7', 'other.pool.size': '2'])
+            .properties(['spec.name': 'RetainedConfigurationSpec', 'my.pool.size': size, 'my.pool.limits.max': '7', 'other.pool.size': '2'])
             .beanDependencyTrackingEnabled(true)
             .retainedRegistrations(retained)
             .start()
