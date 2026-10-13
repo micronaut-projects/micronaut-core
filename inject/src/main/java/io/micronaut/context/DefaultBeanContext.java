@@ -329,7 +329,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * lock by {@link #isRetainedOnStop(Object)} once it is.
      */
     @Nullable
-    private volatile Set<Object> retainedOnStopBeans;
+    private volatile Set<Object> retainedOnStopBeans; // NOSONAR java:S3077 published whole once decided, never modified after
     private final List<BeanRegistration<?>> retainedOnStop = new ArrayList<>();
     /**
      * Retained registrations this context has no definition for, destroyed once its listeners exist.
@@ -5379,7 +5379,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         CollectionHolder<T> existing = singletonBeanRegistrations.get(key);
         if (existing != null && existing.registrations != null) {
             logResolvedExistingBeanRegistrations(beanType, qualifier, existing.registrations);
-            return existing.registrations;
+            return recordCachedDependencies(resolutionContext, existing.registrations);
         }
 
         Collection<BeanDefinition<T>> beanDefinitions = findBeanCandidatesInternal(resolutionContext, beanType);
@@ -5405,7 +5405,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 synchronized (holder) {
                     if (holder.registrations != null) {
                         logResolvedExistingBeanRegistrations(beanType, qualifier, holder.registrations);
-                        return holder.registrations;
+                        return recordCachedDependencies(resolutionContext, holder.registrations);
                     }
                     holder.registrations = resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier);
                     return holder.registrations;
@@ -5437,6 +5437,25 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
         beansOfTypeList.sort(OrderUtil.ORDERED_COMPARATOR);
         return beansOfTypeList;
+    }
+
+    /**
+     * Records, when the graph is recorded, that the bean being created received each member of a cached collection,
+     * as resolving the members afresh would have: the receiver that first resolved the collection is not the only one.
+     *
+     * @param resolutionContext The resolution context of the receiving bean
+     * @param registrations The cached registrations
+     * @param <T> The bean type
+     * @return The registrations
+     */
+    private <T> Collection<BeanRegistration<T>> recordCachedDependencies(@Nullable BeanResolutionContext resolutionContext,
+                                                                         Collection<BeanRegistration<T>> registrations) {
+        if (dependencyGraph != null && resolutionContext != null) {
+            for (BeanRegistration<T> registration : registrations) {
+                recordDependency(resolutionContext, registration.beanDefinition, registration.beanDefinition.getDeclaredQualifier());
+            }
+        }
+        return registrations;
     }
 
     private <T> void logResolvedExistingBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier, Collection<BeanRegistration<T>> existing) {
