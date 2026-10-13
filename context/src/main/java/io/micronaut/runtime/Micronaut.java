@@ -28,6 +28,9 @@ import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.EnvironmentPropertySource;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
+import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.context.event.ShutdownEvent;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySource;
 import org.jspecify.annotations.NullMarked;
@@ -46,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
@@ -144,6 +148,9 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                 TrainingTestResources.warnNotATrainingRun(environment);
             }
 
+            // listening from before the context starts: whoever stops it, a development launcher among them, may do
+            // so while this thread is still starting the embedded application and has yet to register the hook
+            ShutdownHookRemoval hookRemoval = ShutdownHookRemoval.register(applicationContext);
             applicationContext.start();
 
             EmbeddedApplication<?> embeddedApplication = applicationContext.findBean(EmbeddedApplication.class).orElse(null);
@@ -196,7 +203,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                     Thread shutdownHook = null;
                     if (embeddedApplication.isShutdownHookNeeded()) {
                         try {
-                            shutdownHook = new Thread(() -> {
+                            Thread hook = new Thread(() -> {
                                 if (LOG.isInfoEnabled()) {
                                     LOG.info("Embedded Application shutting down");
                                 }
@@ -210,7 +217,9 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                                     }
                                 }
                             });
-                            Runtime.getRuntime().addShutdownHook(shutdownHook);
+                            Runtime.getRuntime().addShutdownHook(hook);
+                            shutdownHook = hook;
+                            hookRemoval.added(hook);
                         } catch (IllegalStateException e) {
                             try (applicationContext) {
                                 embeddedApplication.stop();
@@ -714,4 +723,45 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             .orElseGet(() -> new MicronautBanner(out));
     }
 
+    /**
+     * Removes the shutdown hook when the context stops, however it is stopped. An application that is not kept
+     * alive, such as the Netty server, returns from {@link #start()} with the hook registered, and a context
+     * stopped by its embedder (a test, or a development launcher that starts the next generation in the same
+     * JVM) would otherwise stay reachable from the hook, with the hook's context class loader, until the JVM
+     * exits. The listener is registered before the context starts: a context stopped before the hook is added, while
+     * the embedded application is still starting, has the hook removed as it is added. When the hook itself stops the
+     * context, the JVM is already shutting down and the hook stays.
+     */
+    private static final class ShutdownHookRemoval implements ApplicationEventListener<ShutdownEvent> {
+        private static final Object STOPPED = new Object();
+        private final AtomicReference<@Nullable Object> hook = new AtomicReference<>();
+
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        static ShutdownHookRemoval register(ApplicationContext applicationContext) {
+            ShutdownHookRemoval removal = new ShutdownHookRemoval();
+            applicationContext.registerBeanDefinition(
+                RuntimeBeanDefinition.builder((Class) ApplicationEventListener.class, () -> removal)
+                    .singleton(true)
+                    .typeArguments(Argument.of(ShutdownEvent.class))
+                    .build()
+            );
+            return removal;
+        }
+
+        /**
+         * @param shutdownHook The hook just registered for the context, removed at once if the context stopped meanwhile
+         */
+        void added(Thread shutdownHook) {
+            if (!hook.compareAndSet(null, shutdownHook)) {
+                removeShutdownHook(shutdownHook);
+            }
+        }
+
+        @Override
+        public void onApplicationEvent(ShutdownEvent event) {
+            if (hook.getAndSet(STOPPED) instanceof Thread shutdownHook) {
+                removeShutdownHook(shutdownHook);
+            }
+        }
+    }
 }
