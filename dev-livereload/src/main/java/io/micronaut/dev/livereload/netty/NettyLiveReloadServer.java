@@ -15,7 +15,7 @@
  */
 package io.micronaut.dev.livereload.netty;
 
-import io.micronaut.core.annotation.Experimental;
+import io.micronaut.dev.livereload.LiveReloadScript;
 import io.micronaut.dev.livereload.LiveReloadServer;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.Unpooled;
@@ -79,13 +79,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * a topic. It listens on the loopback address only, on an event loop of its own, so it belongs to the
  * launcher and outlives every application context.
  * The sockets accept native clients, the browser extensions and pages of a localhost origin, and refuse other
- * sites and other paths.
+ * sites and other paths. Commands go to the browsers that greeted the server with {@code hello}, as the protocol
+ * has it.
+ *
+ * <p>Started by {@link NettyLiveReloadServerFactory}, which the launcher service-loads.</p>
  *
  * @author graemerocher
  * @since 5.3.0
  */
-@Experimental
-public final class NettyLiveReloadServer implements LiveReloadServer {
+final class NettyLiveReloadServer implements LiveReloadServer {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyLiveReloadServer.class);
     private static final String PROTOCOL = "http://livereload.com/protocols/official-7";
@@ -133,18 +135,19 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
     /**
      * Starts a server on the loopback address.
      *
-     * @param port The port, {@link #DEFAULT_PORT} for the extensions; 0 for any free port
+     * @param port The port, {@link LiveReloadScript#DEFAULT_PORT} for the extensions; 0 for any free port
      * @return The started server
-     * @throws IOException if the port cannot be bound
+     * @throws IOException if the port cannot be bound, or the client script is missing
      */
-    public static NettyLiveReloadServer start(int port) throws IOException {
+    static NettyLiveReloadServer start(int port) throws IOException {
+        byte[] script = script();
         EventLoopGroup group = new MultiThreadIoEventLoopGroup(1, runnable -> {
             Thread thread = new Thread(runnable, "micronaut-dev-livereload");
             thread.setDaemon(true);
             return thread;
         }, NioIoHandler.newFactory());
         ChannelGroup browsers = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
-        Server state = new Server(browsers);
+        Server state = new Server(browsers, script);
         ServerBootstrap bootstrap = new ServerBootstrap()
             .group(group)
             .channel(NioServerSocketChannel.class)
@@ -190,7 +193,8 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
     @Override
     public void reload(String path, boolean liveCss) {
         String command = "{\"command\":\"reload\",\"path\":\"" + escape(path) + "\",\"liveCSS\":" + liveCss + "}";
-        browsers.writeAndFlush(new TextWebSocketFrame(command));
+        // only to the browsers that said hello: a client that did not is not speaking the protocol yet
+        browsers.writeAndFlush(new TextWebSocketFrame(command), NettyLiveReloadServer::isGreeted);
     }
 
     @Override
@@ -235,7 +239,7 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
         if (!normalized.endsWith("/")) {
             normalized += "/";
         }
-        if (normalized.equals("/") || normalized.startsWith(WEBSOCKET_PATH + "/") || normalized.startsWith(EVENTS_PATH) || normalized.startsWith(SCRIPT_PATH)) {
+        if (normalized.equals("/") || normalized.startsWith(WEBSOCKET_PATH + "/") || normalized.startsWith(EVENTS_PATH) || normalized.startsWith(LiveReloadScript.PATH)) {
             throw new IllegalArgumentException("Cannot serve files at " + prefix + ": the path is the server's own");
         }
         return normalized;
@@ -250,8 +254,38 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
         }
     }
 
-    private static String escape(String text) {
-        return text.replace("\\", "\\\\").replace("\"", "\\\"");
+    private static boolean isGreeted(Channel channel) {
+        return Boolean.TRUE.equals(channel.attr(GREETED).get());
+    }
+
+    /**
+     * The text as the contents of a JSON string: the quote, the backslash and every control character escaped.
+     *
+     * @param text The text
+     * @return The escaped text, without the surrounding quotes
+     */
+    static String escape(String text) {
+        StringBuilder escaped = new StringBuilder(text.length() + 8);
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            switch (c) {
+                case '"' -> escaped.append("\\\"");
+                case '\\' -> escaped.append("\\\\");
+                case '\b' -> escaped.append("\\b");
+                case '\f' -> escaped.append("\\f");
+                case '\n' -> escaped.append("\\n");
+                case '\r' -> escaped.append("\\r");
+                case '\t' -> escaped.append("\\t");
+                default -> {
+                    if (c < 0x20) {
+                        escaped.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        escaped.append(c);
+                    }
+                }
+            }
+        }
+        return escaped.toString();
     }
 
     /**
@@ -288,7 +322,7 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
      * An HTML page with the client script before its closing body tag, or at its end without one.
      */
     static String withScript(String html, int port) {
-        String tag = LiveReloadServer.scriptTag(port);
+        String tag = LiveReloadScript.tag(port);
         int body = html.toLowerCase(Locale.ROOT).lastIndexOf("</body>");
         return body < 0 ? html + tag : html.substring(0, body) + tag + html.substring(body);
     }
@@ -307,12 +341,15 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
      */
     private static final class Server {
         private final ChannelGroup browsers;
+        // read once: the script does not change while the launcher runs
+        private final byte[] script;
         private final Map<String, Path> mounts = new ConcurrentHashMap<>();
         private final Map<String, ChannelGroup> topics = new ConcurrentHashMap<>();
         private volatile int port;
 
-        Server(ChannelGroup browsers) {
+        Server(ChannelGroup browsers, byte[] script) {
             this.browsers = browsers;
+            this.script = script;
         }
 
         ChannelGroup topic(String topic) {
@@ -368,8 +405,9 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
             FullHttpResponse response;
             if (request.method() != HttpMethod.GET && request.method() != HttpMethod.HEAD) {
                 response = text(HttpResponseStatus.METHOD_NOT_ALLOWED, LIVERELOAD);
-            } else if (path.startsWith(SCRIPT_PATH)) {
-                response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.wrappedBuffer(script()));
+            } else if (path.equals(LiveReloadScript.PATH)) {
+                // exactly the script's path: /livereload.jsx is no script
+                response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.wrappedBuffer(state.script));
                 response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/javascript; charset=utf-8");
                 // the script is public and loaded by the application's pages, whatever their origin
                 response.headers().set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_ORIGIN, "*");

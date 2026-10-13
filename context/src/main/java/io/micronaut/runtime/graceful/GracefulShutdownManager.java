@@ -17,7 +17,6 @@ package io.micronaut.runtime.graceful;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Internal;
 import jakarta.inject.Singleton;
 
 import java.util.List;
@@ -59,8 +58,7 @@ public final class GracefulShutdownManager {
      * @return A future that completes when those beans have shut down
      * @since 5.3.0
      */
-    @Internal
-    public CompletionStage<?> shutdownGracefully(Predicate<? super GracefulShutdownCapable> filter) {
+    CompletionStage<?> shutdownGracefully(Predicate<? super GracefulShutdownCapable> filter) {
         return GracefulShutdownCapable.shutdownAll(delegates.stream().filter(filter));
     }
 
