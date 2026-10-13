@@ -295,10 +295,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     private final AtomicReference<@Nullable RetentionCriteria> retentionCriteria = new AtomicReference<>();
     /**
-     * The instances the {@link #stopRetaining(RetentionCriteria)} in progress keeps, once decided.
+     * The instances the {@link #stopRetaining(RetentionCriteria)} in progress keeps, once decided; read without the
+     * lock by {@link #isRetainedOnStop(Object)} once it is.
      */
     @Nullable
-    private Set<Object> retainedOnStopBeans;
+    private volatile Set<Object> retainedOnStopBeans;
     private final List<BeanRegistration<?>> retainedOnStop = new ArrayList<>();
     /**
      * Retained registrations this context has no definition for, destroyed once its listeners exist.
@@ -5265,9 +5266,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             // no retention in progress: the common stop, which asks nothing more
             return false;
         }
-        synchronized (this) {
-            return retainedBeans((List) BeanDestructionOrder.sort((Collection) singletonScope.getBeanRegistrations())).contains(bean);
+        Set<Object> retained = retainedOnStopBeans;
+        if (retained == null) {
+            // the first question decides, over the singletons in destruction order; the later ones read the decision
+            synchronized (this) {
+                retained = retainedOnStopBeans;
+                if (retained == null) {
+                    retained = retainedBeans((List) BeanDestructionOrder.sort((Collection) singletonScope.getBeanRegistrations()));
+                }
+            }
         }
+        return retained.contains(bean);
     }
 
     private Set<Object> decideRetainedBeans(List<BeanRegistration> registrations) {
