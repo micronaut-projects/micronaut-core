@@ -24,6 +24,7 @@ import io.micronaut.core.bind.DefaultExecutableBinder;
 import io.micronaut.core.bind.ExecutableBinder;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -72,6 +73,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -297,11 +299,36 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         } catch (Exception e) {
             return ExecutionFlow.error(e);
         }
+        if (result instanceof CompletionStage<?> stage && awaitsCompletionStages()) {
+            if (webSocketBean.closeMethod().orElse(null) == messageHandler || webSocketBean.errorMethod().orElse(null) == messageHandler) {
+                // the close does not wait for the stage of a close or error handler
+                stage.whenComplete((ignored, error) -> {
+                    if (error != null && LOG.isErrorEnabled()) {
+                        LOG.error("Error of the stage of the handler {} of WebSocket bean [{}]: {}", messageHandler.getExecutableMethod(), webSocketBean.getTarget(), error.getMessage(), error);
+                    }
+                });
+                return ExecutionFlow.just(stage);
+            }
+            // the handler is done once its stage completes, as for a publisher
+            return CompletableFutureExecutionFlow.just(stage);
+        }
         if (Publishers.isConvertibleToPublisher(result)) {
             return ReactiveExecutionFlow.fromPublisherEager(Publishers.convertToPublisher(conversionService, result), PropagatedContext.getOrEmpty());
         } else {
             return ExecutionFlow.just(result);
         }
+    }
+
+    /**
+     * Whether the {@link CompletionStage} a handler returns is awaited like a publisher: the open
+     * or message handler is done, and fails, with its stage. Otherwise the stage is a value of the
+     * handler, as before 5.3.
+     *
+     * @return Whether the stages of the handlers are awaited. {@code false} by default
+     * @since 5.3.0
+     */
+    protected boolean awaitsCompletionStages() {
+        return false;
     }
 
     @Override
@@ -336,6 +363,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             } else {
                 Argument<?> bodyArgument = this.getBodyArgument();
                 Object data;
+                ByteBuf content = null;
 
                 if (WebSocketFrame.class.isAssignableFrom(bodyArgument.getType())) {
                     data = msg.retain();
@@ -358,7 +386,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         return;
                     }
 
-                    ByteBuf content;
                     CompositeByteBuf buffer = frameBuffer.getAndSet(null);
                     if (buffer == null) {
                         content = msgContent;
@@ -368,32 +395,38 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     }
 
                     data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
-                    content.release();
+                    if (data != null) {
+                        content.release();
+                        content = null;
+                    }
                 }
 
-                if (data == null) {
+                if (data == null && content != null) {
+                    // the complete payload: a single frame or the assembled fragments
+                    ByteBuf payload = content;
                     MediaType mediaType;
                     try {
                         mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
                     } catch (IllegalArgumentException e) {
+                        payload.release();
                         exceptionCaught(ctx, e);
                         return;
                     }
                     try {
                         data = mediaTypeCodecRegistry.findCodec(mediaType)
-                            .map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content())))
+                            .map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(payload)))
                             .orElse(null);
                     } catch (CodecException e) {
+                        payload.release();
                         messageProcessingException(ctx, e);
                         return;
                     }
-                    if (data == null) {
-                        MessageBodyReader<?> reader = messageBodyHandlerRegistry.findReader(bodyArgument, mediaType)
-                            .orElse(null);
-                        if (reader != null) {
-                            ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content().retain());
-                            data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
-                        }
+                    MessageBodyReader<?> reader = data == null ? messageBodyHandlerRegistry.findReader(bodyArgument, mediaType).orElse(null) : null;
+                    if (reader == null) {
+                        payload.release();
+                    } else {
+                        ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(payload);
+                        data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
                     }
                 }
 
