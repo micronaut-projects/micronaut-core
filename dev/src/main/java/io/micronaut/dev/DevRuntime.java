@@ -112,6 +112,7 @@ public final class DevRuntime implements Closeable {
     private static final Duration APP_STOP_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration START_TIMEOUT = Duration.ofMinutes(5);
     private static final int LEAK_TOLERANCE = 2;
+    private static final int MAX_PROPAGATION_PASSES = 5;
 
     private final DevManifest manifest;
     private final DevClassLoader classLoader;
@@ -798,6 +799,19 @@ public final class DevRuntime implements Closeable {
         }
     }
 
+    /**
+     * @return How many languages the launcher compiles itself: those with a compiler, sources and the embedded mode
+     */
+    private int compiledLanguages() {
+        int languages = 0;
+        for (SourceKind kind : compilers.keySet()) {
+            if (manifest.compileMode(kind) != CompileMode.BUILD_TOOL && !manifest.sourceRoots(kind).isEmpty()) {
+                languages++;
+            }
+        }
+        return languages;
+    }
+
     private void handle(Pending next) {
         long start = System.nanoTime();
         Pending failed = failedBatch;
@@ -812,6 +826,10 @@ public final class DevRuntime implements Closeable {
         Set<SourceKind> kinds = batch.full ? compilers.keySet() : batch.sources.keySet();
         boolean compiled = false;
         Set<SourceKind> compiledKinds = new LinkedHashSet<>();
+        Set<String> affectedClasses = new LinkedHashSet<>();
+        // what each language already took into account: its own outputs, whose dependents among its sources it
+        // selected itself, and what it was told about
+        Map<SourceKind, Set<String>> known = new EnumMap<>(SourceKind.class);
         for (SourceKind kind : kinds) {
             SourceCompiler compiler = compilers.get(kind);
             if (compiler == null || manifest.compileMode(kind) == CompileMode.BUILD_TOOL || manifest.sourceRoots(kind).isEmpty()) {
@@ -844,7 +862,49 @@ public final class DevRuntime implements Closeable {
             }
             compiled = true;
             compiledKinds.add(kind);
+            affectedClasses.addAll(result.compiledClasses());
+            known.computeIfAbsent(kind, k -> new LinkedHashSet<>()).addAll(result.compiledClasses());
             LOG.info("Compiled {} {} source(s) in {} ms", result.compiledSources().size(), kind, result.duration().toMillis());
+        }
+        // a change in one language reaches the others: their sources that reference a changed class are
+        // recompiled too, and fail rather than keep bytecode linked against what is gone
+        // until nothing new is produced: a Groovy class recompiled for a Java change may itself be what a
+        // Java source depends on, and Java was visited first
+        boolean produced = compiledLanguages() > 1;
+        for (int pass = 0; pass < MAX_PROPAGATION_PASSES && produced; pass++) {
+            produced = false;
+            for (Map.Entry<SourceKind, SourceCompiler> entry : compilers.entrySet()) {
+                SourceKind kind = entry.getKey();
+                // a language compiled in this batch for its own changes is visited again: an unchanged source of
+                // it that references what another language changed was not selected the first time. It is told
+                // only what it does not know yet, so it does not recompile the dependents of its own classes
+                if (manifest.compileMode(kind) == CompileMode.BUILD_TOOL || manifest.sourceRoots(kind).isEmpty()) {
+                    continue;
+                }
+                Set<String> knownToKind = known.computeIfAbsent(kind, k -> new LinkedHashSet<>());
+                Set<String> fresh = new LinkedHashSet<>(affectedClasses);
+                fresh.removeAll(knownToKind);
+                if (fresh.isEmpty()) {
+                    continue;
+                }
+                knownToKind.addAll(fresh);
+                CompilationRequest request = new CompilationRequest(kind, manifest.sourceRoots(kind), Set.of(), Set.of(), false, manifest.compileClasspath(),
+                    manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), manifest.compileOptions(kind)).withAffectedClasses(fresh);
+                CompilationResult result = entry.getValue().compile(request);
+                if (!result.isSuccess()) {
+                    CompileFailure failure = new CompileFailure(kind, result.diagnostics(), Instant.now());
+                    lastFailure = failure;
+                    LOG.error("{}", failure.describe().strip());
+                    return;
+                }
+                if (result.status() == CompilationResult.Status.SUCCESS) {
+                    compiledKinds.add(kind);
+                    affectedClasses.addAll(result.compiledClasses());
+                    knownToKind.addAll(result.compiledClasses());
+                    produced |= !result.compiledClasses().isEmpty();
+                    LOG.info("Compiled {} {} source(s) that depend on the changed classes in {} ms", result.compiledSources().size(), kind, result.duration().toMillis());
+                }
+            }
         }
         CompileFailure failure = lastFailure;
         if (failure != null && compiledKinds.contains(failure.kind())) {

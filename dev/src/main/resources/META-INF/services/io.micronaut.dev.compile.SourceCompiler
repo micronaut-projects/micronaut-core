@@ -1,1 +1,2 @@
 io.micronaut.dev.compile.JavacSourceCompiler
+io.micronaut.dev.compile.GroovySourceCompiler
