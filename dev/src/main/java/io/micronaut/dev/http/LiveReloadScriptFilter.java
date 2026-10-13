@@ -50,8 +50,8 @@ import java.util.regex.Pattern;
 public final class LiveReloadScriptFilter {
 
     private static final String BODY_END = "</body>";
-    // a policy a page declares itself applies as the header does
-    private static final Pattern CSP_META = Pattern.compile("<meta\\s[^>]*http-equiv\\s*=\\s*[\"']?\\s*content-security-policy\\s*[\"'\\s/>]", Pattern.CASE_INSENSITIVE);
+    // a policy a page declares itself applies as the header does; http-equiv as a whole attribute name, not data-http-equiv
+    private static final Pattern CSP_META = Pattern.compile("<meta\\s(?:[^>]*\\s)?http-equiv\\s*=\\s*[\"']?\\s*content-security-policy\\s*[\"'\\s/>]", Pattern.CASE_INSENSITIVE);
 
     private final DevRuntime runtime;
     @Nullable

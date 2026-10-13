@@ -37,6 +37,7 @@ class LiveReloadScriptFilterTest {
         // a report-only policy blocks nothing, and other meta elements are no policy
         assertTrue(LiveReloadScriptFilter.inject("<html><head><meta http-equiv=\"Content-Security-Policy-Report-Only\" content=\"default-src 'self'\"></head><body></body></html>", 35729).contains("livereload.js"));
         assertTrue(LiveReloadScriptFilter.inject("<html><head><meta charset=\"utf-8\"><meta name=\"description\" content=\"Content-Security-Policy\"></head><body></body></html>", 35729).contains("livereload.js"));
+        assertTrue(LiveReloadScriptFilter.inject("<html><head><meta data-http-equiv=\"content-security-policy\"></head><body></body></html>", 35729).contains("livereload.js"));
     }
 
     @Test
