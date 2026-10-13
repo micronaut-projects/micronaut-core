@@ -462,7 +462,12 @@ public final class JavacSourceCompiler implements SourceCompiler {
             int lastDot = name.lastIndexOf('.');
             ClassLoader jdk = lastDot > 0 ? JDK_PACKAGES.get(name.substring(0, lastDot)) : null;
             if (jdk != null) {
-                return jdk.loadClass(name);
+                try {
+                    return jdk.loadClass(name);
+                } catch (ClassNotFoundException e) {
+                    // a class the JDK's module does not have, in one of its packages, comes from the processor path,
+                    // as javac's own loader would fall back to it
+                }
             }
             return super.findClass(name);
         }

@@ -27,11 +27,11 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -197,8 +197,7 @@ final class OutputTransaction {
      * @throws IOException if a file could not be restored, with the failure of each move as suppressed
      */
     void rollback() throws IOException {
-        Deque<Move> unrestored = new ArrayDeque<>();
-        List<IOException> failures = new ArrayList<>();
+        Map<Move, IOException> unrestored = new LinkedHashMap<>();
         while (!moves.isEmpty()) {
             Move move = moves.pop();
             try {
@@ -207,19 +206,21 @@ final class OutputTransaction {
                     Files.createDirectories(parent);
                 }
                 Files.move(move.to(), move.from(), StandardCopyOption.REPLACE_EXISTING);
+                // an earlier move restored over the path a later one could not move away from: the file that later
+                // move would take back is gone, and retrying it would take the restored file instead
+                unrestored.keySet().removeIf(later -> later.to().equals(move.from()));
             } catch (IOException e) {
                 LOG.warn("Cannot restore {} from {} while rolling back a compilation: {}", move.from(), move.to(), e.getMessage());
-                unrestored.addLast(move);
-                failures.add(e);
+                unrestored.put(move, e);
             }
         }
         if (!unrestored.isEmpty()) {
             // latest first again, so that a later rollback retries them in the same order
-            moves.addAll(unrestored);
-            Move first = unrestored.getFirst();
+            moves.addAll(unrestored.keySet());
+            Move first = unrestored.keySet().iterator().next();
             IOException failure = new IOException("Cannot roll back the outputs: " + unrestored.size() + " move(s) cannot be undone, "
                 + first.from() + " from " + first.to() + " among them; the replaced outputs not restored are kept in " + backup);
-            failures.forEach(failure::addSuppressed);
+            unrestored.values().forEach(failure::addSuppressed);
             throw failure;
         }
         removed.clear();

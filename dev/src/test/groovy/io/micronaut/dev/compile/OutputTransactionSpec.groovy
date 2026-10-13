@@ -82,6 +82,35 @@ class OutputTransactionSpec extends Specification {
         Files.list(kept[0]).withCloseable { files -> files.map { Files.readString(it) }.toList() } == ["original"]
     }
 
+    void "a replacement that cannot go back to staging is not retried once the original is restored over it"() {
+        given: "an output replaced by a staged file"
+        Path output = Files.createDirectories(directory.resolve("classes/example"))
+        Path foo = output.resolve("Foo.class")
+        Files.writeString(foo, "original")
+        Path staging = Files.createDirectories(directory.resolve("staging"))
+        Path staged = staging.resolve("Foo.class")
+        Files.writeString(staged, "new")
+        Path backup = directory.resolve("classes.backup")
+        OutputTransaction transaction = new OutputTransaction(backup)
+        transaction.put(staged, foo)
+
+        when: "the staging directory is obstructed, so the replacement cannot go back, and the transaction rolls back"
+        Files.delete(staging)
+        Files.writeString(staging, "obstruction")
+        transaction.rollback()
+
+        then: "the original is restored over the replacement, and nothing is left to retry"
+        Files.readString(foo) == "original"
+        !Files.exists(backup)
+
+        when: "a later rollback runs once the obstruction is gone"
+        Files.delete(staging)
+        transaction.rollback()
+
+        then: "the restored original stays"
+        Files.readString(foo) == "original"
+    }
+
     void "a rollback that restores every output deletes the backup"() {
         given:
         Path output = Files.createDirectories(directory.resolve("classes/example"))
