@@ -29,6 +29,18 @@ class LiveReloadScriptFilterTest {
     }
 
     @Test
+    void aPageDeclaringAContentSecurityPolicyInAMetaElementIsLeftAlone() {
+        // the policy would block the script, as one sent in the header would
+        assertNull(LiveReloadScriptFilter.inject("<html><head><meta http-equiv=\"Content-Security-Policy\" content=\"script-src 'self'\"></head><body></body></html>", 35729));
+        assertNull(LiveReloadScriptFilter.inject("<html><head><META content=\"default-src 'self'\" HTTP-EQUIV='content-security-policy'/></head><body></body></html>", 35729));
+        assertNull(LiveReloadScriptFilter.inject("<html><head><meta\nhttp-equiv = content-security-policy content=\"default-src 'self'\"></head><body></body></html>", 35729));
+        // a report-only policy blocks nothing, and other meta elements are no policy
+        assertTrue(LiveReloadScriptFilter.inject("<html><head><meta http-equiv=\"Content-Security-Policy-Report-Only\" content=\"default-src 'self'\"></head><body></body></html>", 35729).contains("livereload.js"));
+        assertTrue(LiveReloadScriptFilter.inject("<html><head><meta charset=\"utf-8\"><meta name=\"description\" content=\"Content-Security-Policy\"></head><body></body></html>", 35729).contains("livereload.js"));
+        assertTrue(LiveReloadScriptFilter.inject("<html><head><meta data-http-equiv=\"content-security-policy\"></head><body></body></html>", 35729).contains("livereload.js"));
+    }
+
+    @Test
     void theLengthAndTransferCodingOfTheReplacedBodyDescribeThePageWithTheScript() {
         String page = "<html><body>caf\u00e9</body></html>";
         String injected = LiveReloadScriptFilter.inject(page, 35729);

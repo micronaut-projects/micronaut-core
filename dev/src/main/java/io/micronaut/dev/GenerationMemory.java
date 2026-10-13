@@ -21,12 +21,14 @@ import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.dev.loader.DevClassLoader;
 import io.micronaut.dev.loader.GenerationClassLoader;
+import io.micronaut.inject.annotation.AnnotationMetadataSupport;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Keeps what lives as long as the JVM from keeping a retired generation of a {@link DevRuntime}: what a library of the
@@ -69,6 +71,8 @@ final class GenerationMemory {
     private static final String REACTOR_SCHEDULERS = "reactor.core.scheduler.Schedulers";
 
     private final DevClassLoader classLoader;
+    // at most one check pending: reloads in quick succession start one thread and one collection
+    private final AtomicBoolean leakCheckPending = new AtomicBoolean();
     private volatile boolean reactorThreads;
 
     /**
@@ -156,6 +160,8 @@ final class GenerationMemory {
     static void forgetRetired(GenerationClassLoader retired) {
         MicronautMetaServiceLoaderUtils.invalidate();
         ReloadableBeanIntrospector.invalidateShared(retired);
+        // what a stopping context cached again after the swap goes too
+        AnnotationMetadataSupport.retireClassLoader(retired);
     }
 
     /**
@@ -166,23 +172,24 @@ final class GenerationMemory {
             // a native image never unloads a class it defined at runtime: every retired generation stays, as the budget expects
             return;
         }
-        if (oldRetiredGenerations().isEmpty()) {
-            // nothing older than the tolerance is reachable even before a collection: there is nothing to collect for
+        if (oldRetiredGenerations().isEmpty() || !leakCheckPending.compareAndSet(false, true)) {
+            // nothing older than the tolerance is reachable even before a collection, or a check pending covers this reload
             return;
         }
         Thread thread = new Thread(() -> {
             try {
                 Thread.sleep(2000);
+                // only a collection tells a retired generation the collector has yet to reach from one the application keeps;
+                // it runs on this thread, a moment after the reload, and only while an old generation is still reachable
+                System.gc(); // NOSONAR leak detection: a retired generation's loader is unreachable only once it is collected
+                List<Integer> old = oldRetiredGenerations();
+                if (!old.isEmpty()) {
+                    LOG.warn("{} retired generation(s) {} are still reachable after the reload: a static cache or a thread of the application keeps old classes alive", old.size(), old);
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return;
-            }
-            // only a collection tells a retired generation the collector has yet to reach from one the application keeps;
-            // it runs on this thread, a moment after the reload, and only while an old generation is still reachable
-            System.gc(); // NOSONAR leak detection: a retired generation's loader is unreachable only once it is collected
-            List<Integer> old = oldRetiredGenerations();
-            if (!old.isEmpty()) {
-                LOG.warn("{} retired generation(s) {} are still reachable after the reload: a static cache or a thread of the application keeps old classes alive", old.size(), old);
+            } finally {
+                leakCheckPending.set(false);
             }
         }, "micronaut-dev-leak-detector");
         thread.setDaemon(true);

@@ -16,7 +16,6 @@
 package io.micronaut.context.reload;
 
 import io.micronaut.context.BeanRegistration;
-import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.OrderUtil;
@@ -41,7 +40,7 @@ import java.util.function.Predicate;
  */
 @Internal
 @Experimental
-public final class PolicyRetentionCriteria implements DefaultBeanContext.RetentionCriteria {
+public final class PolicyRetentionCriteria implements RetentionCriteria {
 
     private final List<BeanRetentionPolicy> policies;
     private final Predicate<String> touchedPrefix;
@@ -87,7 +86,7 @@ public final class PolicyRetentionCriteria implements DefaultBeanContext.Retenti
     }
 
     @Override
-    public Set<String> invalidatedBy(BeanRegistration<?> registration) {
+    public Set<String> observedConfigurationPrefixes(BeanRegistration<?> registration) {
         Set<String> prefixes = new LinkedHashSet<>();
         for (BeanRetentionPolicy policy : policies) {
             if (policy.decide(registration) == BeanRetentionPolicy.Decision.RETAIN) {
