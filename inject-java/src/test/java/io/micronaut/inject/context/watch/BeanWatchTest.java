@@ -286,6 +286,7 @@ class BeanWatchTest {
             DefaultBeanContext beanContext = (DefaultBeanContext) context;
             WatchingPrototype prototype = context.getBean(WatchingPrototype.class);
             BeanWatch watch = prototype.watch;
+            BeanWatch resourceWatch = prototype.resourceWatch;
             WeakReference<WatchingPrototype> reference = new WeakReference<>(prototype);
             int before = WatchingPrototype.CHANGES.get();
             beanContext.notifyConfigurationChange(ConfigurationChange.ofKeys(Set.of("protos.watching.size")));
@@ -300,9 +301,14 @@ class BeanWatchTest {
             }
             assertNull(reference.get(), "the registry keeps the prototype that registered a watch reachable");
 
-            // and its watch is closed the next time the registry looks
-            beanContext.notifyConfigurationChange(ConfigurationChange.ofKeys(Set.of("protos.watching.size")));
+            // and its watches are closed before the next change of any kind is delivered
+            int resourcesBefore = WatchingPrototype.RESOURCE_CHANGES.get();
+            Path root = Path.of("build", "watching-prototype").toAbsolutePath();
+            beanContext.notifyResourceChange(new ResourceChange(ResourceKind.STATIC, List.of(root), List.of(root.resolve("app.css")), List.of(), false));
+            assertFalse(resourceWatch.isActive());
             assertFalse(watch.isActive());
+            assertEquals(resourcesBefore, WatchingPrototype.RESOURCE_CHANGES.get());
+            beanContext.notifyConfigurationChange(ConfigurationChange.ofKeys(Set.of("protos.watching.size")));
             assertEquals(before + 1, WatchingPrototype.CHANGES.get());
         }
     }

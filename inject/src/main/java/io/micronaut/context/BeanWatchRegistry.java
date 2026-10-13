@@ -399,6 +399,7 @@ final class BeanWatchRegistry {
             // no watch to tell: one registered later reads the definitions as they are then
             return;
         }
+        expungeCollectedOwners();
         List<Delivery> deliveries = new ArrayList<>();
         synchronized (enqueue) {
             if (!started) {
@@ -505,6 +506,7 @@ final class BeanWatchRegistry {
      * receives that state as its first batch.
      */
     void resourcesChanged(ResourceChange change) {
+        expungeCollectedOwners();
         List<Delivery> deliveries = new ArrayList<>();
         synchronized (enqueue) {
             // the state and the number of the change move together, so that a first batch read from the state
@@ -577,6 +579,7 @@ final class BeanWatchRegistry {
      * Delivers a class change to the class change watches, in order, failures isolated.
      */
     void classesChanged(ClassChangeEvent change) {
+        expungeCollectedOwners();
         List<Delivery> deliveries = new ArrayList<>();
         synchronized (enqueue) {
             long sequence = epoch.incrementAndGet();
@@ -755,7 +758,8 @@ final class BeanWatchRegistry {
 
     /**
      * Closes the watches of the beans that were collected without having been destroyed, such as prototypes nobody
-     * destroyed whose watchers do not reference them.
+     * destroyed whose watchers do not reference them. Polled before every change is delivered, and as watches are
+     * registered or attached to their bean, so that no change reaches a watch whose bean is gone.
      */
     void expungeCollectedOwners() {
         Reference<?> collected = collectedOwners.poll();
