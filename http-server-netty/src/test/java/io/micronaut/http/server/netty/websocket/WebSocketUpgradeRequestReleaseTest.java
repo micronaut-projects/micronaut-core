@@ -35,6 +35,7 @@ import io.micronaut.websocket.annotation.OnClose;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
+import io.micronaut.websocket.event.WebSocketSessionClosedEvent;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
@@ -53,8 +54,10 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -170,6 +173,59 @@ class WebSocketUpgradeRequestReleaseTest {
     }
 
     @Test
+    void upgradeRequestIsReleasedOnceAnEarlierAsynchronousOnCloseCompleted() throws Exception {
+        Recorder recorder = ctx.getBean(Recorder.class);
+        WebSocket webSocket = client.newWebSocketBuilder().buildAsync(uri("/ws-release-blocked/close"), new WebSocket.Listener() {
+        }).get(10, TimeUnit.SECONDS);
+        await(() -> !recorder.opened.isEmpty());
+
+        // the close frame invokes @OnClose, then the connection goes away while it still runs
+        webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "bye").get(10, TimeUnit.SECONDS);
+        assertTrue(recorder.handlerEntered.await(10, TimeUnit.SECONDS));
+        webSocket.abort();
+        await(() -> !recorder.sessionsClosed.isEmpty());
+        Thread.sleep(200);
+
+        // the @OnClose handler still uses the request
+        assertTrue(recorder.disposed.isEmpty());
+        assertTrue(recorder.terminated.isEmpty());
+
+        recorder.releaseHandler.countDown();
+        await(() -> !recorder.disposed.isEmpty() && !recorder.terminated.isEmpty());
+        assertEquals(List.of(Boolean.FALSE), recorder.disposedAtClose);
+        assertEquals(List.of("/ws-release-blocked/close"), recorder.disposed);
+        assertEquals(List.of("/ws-release-blocked/close"), recorder.terminated);
+    }
+
+    @Test
+    void upgradeRequestIsReleasedOnceAnAsynchronousOnMessageCompleted() throws Exception {
+        Recorder recorder = ctx.getBean(Recorder.class);
+        WebSocket webSocket = client.newWebSocketBuilder().buildAsync(uri("/ws-release-blocked/message"), new WebSocket.Listener() {
+        }).get(10, TimeUnit.SECONDS);
+        await(() -> !recorder.opened.isEmpty());
+
+        // the connection goes away while @OnMessage still runs
+        webSocket.sendText("hello", true).get(10, TimeUnit.SECONDS);
+        assertTrue(recorder.handlerEntered.await(10, TimeUnit.SECONDS));
+        webSocket.abort();
+        await(() -> !recorder.sessionsClosed.isEmpty());
+        Thread.sleep(200);
+
+        // the @OnMessage handler still uses the request and its request scoped bean
+        assertTrue(recorder.disposed.isEmpty());
+        assertTrue(recorder.destroyedBeans.isEmpty());
+
+        recorder.releaseHandler.countDown();
+        await(() -> !recorder.disposed.isEmpty() && !recorder.terminated.isEmpty() && !recorder.destroyedBeans.isEmpty());
+        // the resumed handler used the bean of the request, destroyed once it completed
+        assertEquals(recorder.beanAtOpen, recorder.beanAtMessage);
+        assertEquals(List.of(Boolean.FALSE), recorder.disposedAtMessage);
+        assertEquals(List.of("/ws-release-blocked/message"), recorder.disposed);
+        assertEquals(List.of("/ws-release-blocked/message"), recorder.destroyedBeans);
+        assertEquals(1, recorder.createdBeans.get());
+    }
+
+    @Test
     void rejectedUpgradeRequestIsReleased() throws Exception {
         Recorder recorder = ctx.getBean(Recorder.class);
         ExecutionException e = assertThrows(ExecutionException.class, () -> client.newWebSocketBuilder()
@@ -206,6 +262,13 @@ class WebSocketUpgradeRequestReleaseTest {
         final List<String> terminated = new CopyOnWriteArrayList<>();
         final List<String> destroyedBeans = new CopyOnWriteArrayList<>();
         final List<Boolean> disposedAtClose = new CopyOnWriteArrayList<>();
+        final List<Boolean> disposedAtMessage = new CopyOnWriteArrayList<>();
+        final List<String> sessionsClosed = new CopyOnWriteArrayList<>();
+        final List<Integer> beanAtOpen = new CopyOnWriteArrayList<>();
+        final List<Integer> beanAtMessage = new CopyOnWriteArrayList<>();
+        final AtomicInteger createdBeans = new AtomicInteger();
+        volatile CountDownLatch handlerEntered = new CountDownLatch(1);
+        volatile CountDownLatch releaseHandler = new CountDownLatch(1);
 
         void clear() {
             opened.clear();
@@ -213,11 +276,18 @@ class WebSocketUpgradeRequestReleaseTest {
             terminated.clear();
             destroyedBeans.clear();
             disposedAtClose.clear();
+            disposedAtMessage.clear();
+            sessionsClosed.clear();
+            beanAtOpen.clear();
+            beanAtMessage.clear();
+            createdBeans.set(0);
+            handlerEntered = new CountDownLatch(1);
+            releaseHandler = new CountDownLatch(1);
         }
     }
 
     @Requires(property = "spec.name", value = SPEC)
-    @ServerFilter({"/ws-release/**", "/ws-release-slow/**"})
+    @ServerFilter({"/ws-release/**", "/ws-release-slow/**", "/ws-release-blocked/**"})
     static class DisposalFilter {
         private final Recorder recorder;
 
@@ -257,17 +327,38 @@ class WebSocketUpgradeRequestReleaseTest {
     }
 
     @Requires(property = "spec.name", value = SPEC)
+    @Singleton
+    static class SessionClosedListener implements ApplicationEventListener<WebSocketSessionClosedEvent> {
+        private final Recorder recorder;
+
+        SessionClosedListener(Recorder recorder) {
+            this.recorder = recorder;
+        }
+
+        @Override
+        public void onApplicationEvent(WebSocketSessionClosedEvent event) {
+            recorder.sessionsClosed.add(event.getSource().getId());
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC)
     @RequestScope
     static class RequestBean {
         private final Recorder recorder;
+        private final int id;
         private String path;
 
         RequestBean(Recorder recorder) {
             this.recorder = recorder;
+            this.id = recorder.createdBeans.incrementAndGet();
         }
 
         void use(String path) {
             this.path = path;
+        }
+
+        int id() {
+            return id;
         }
 
         @PreDestroy
@@ -327,6 +418,44 @@ class WebSocketUpgradeRequestReleaseTest {
         void onClose(String name) throws InterruptedException {
             Thread.sleep(200);
             recorder.disposedAtClose.add(!recorder.disposed.isEmpty());
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC)
+    @ServerWebSocket("/ws-release-blocked/{name}")
+    static class BlockedSocket {
+        private final Recorder recorder;
+        private final RequestBean requestBean;
+
+        BlockedSocket(Recorder recorder, RequestBean requestBean) {
+            this.recorder = recorder;
+            this.requestBean = requestBean;
+        }
+
+        @OnOpen
+        void onOpen(String name, HttpRequest<?> request) {
+            requestBean.use(request.getPath());
+            recorder.beanAtOpen.add(requestBean.id());
+            recorder.opened.add(request.getPath());
+        }
+
+        @OnMessage
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        void onMessage(String message) throws InterruptedException {
+            recorder.handlerEntered.countDown();
+            recorder.releaseHandler.await(10, TimeUnit.SECONDS);
+            recorder.disposedAtMessage.add(!recorder.disposed.isEmpty());
+            recorder.beanAtMessage.add(requestBean.id());
+        }
+
+        @OnClose
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        void onClose(String name) throws InterruptedException {
+            if (name.equals("close")) {
+                recorder.handlerEntered.countDown();
+                recorder.releaseHandler.await(10, TimeUnit.SECONDS);
+                recorder.disposedAtClose.add(!recorder.disposed.isEmpty());
+            }
         }
     }
 }

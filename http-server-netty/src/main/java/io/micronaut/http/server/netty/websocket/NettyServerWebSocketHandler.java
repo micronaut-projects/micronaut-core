@@ -56,6 +56,7 @@ import io.micronaut.websocket.event.WebSocketSessionClosedEvent;
 import io.micronaut.websocket.event.WebSocketSessionOpenEvent;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
@@ -76,6 +77,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 /**
@@ -99,14 +102,18 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     private final Runnable releaseRequest;
     /**
-     * Whether the handler is being removed, i.e. the session ends. Only accessed on the event loop.
+     * The event loop of the channel, on which the completion of a callback is counted.
      */
-    private boolean removing;
+    private final EventLoop eventLoop;
     /**
-     * Whether the release of the request waits for the {@code @OnClose} handler that the removal
-     * invoked. Only accessed on the event loop.
+     * The number of {@code @OnOpen}, {@code @OnMessage}, {@code @OnClose} and {@code @OnError}
+     * handlers still running, which may use the request.
      */
-    private boolean releaseAfterClose;
+    private final AtomicInteger runningHandlers = new AtomicInteger();
+    /**
+     * Whether the handler was removed, i.e. the session ended.
+     */
+    private volatile boolean removed;
     @Nullable
     private final CoroutineHelper coroutineHelper;
 
@@ -159,6 +166,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         this.threadSelection = threadSelection;
         this.executorSelector = executorSelector;
         this.releaseRequest = releaseRequest;
+        this.eventLoop = ctx.channel().eventLoop();
 
         this.serverSession = createWebSocketSession(ctx);
 
@@ -320,22 +328,49 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     protected ExecutionFlow<?> invokeExecutable(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
-        ExecutionFlow<?> flow = invokeExecutableWithCoroutines(boundExecutable, messageHandler);
-        if (removing && !releaseAfterClose && flow.tryComplete() == null) {
-            // the @OnClose handler of a session that ends, still running: the request it may use
-            // is released once it completed
-            releaseAfterClose = true;
-            DelayedExecutionFlow<Object> completion = DelayedExecutionFlow.create();
-            flow.onComplete((value, throwable) -> {
-                try {
-                    completion.complete(value, throwable);
-                } finally {
-                    releaseRequest.run();
-                }
-            });
-            return completion;
+        runningHandlers.incrementAndGet();
+        ExecutionFlow<?> flow;
+        try {
+            flow = invokeExecutableWithCoroutines(boundExecutable, messageHandler);
+        } catch (Throwable e) {
+            handlerCompleted();
+            throw e;
         }
-        return flow;
+        if (flow.tryComplete() != null) {
+            handlerCompleted();
+            return flow;
+        }
+        // the handler still runs: the request it may use is released once it completed, even if
+        // the session ended meanwhile
+        DelayedExecutionFlow<Object> completion = DelayedExecutionFlow.create();
+        flow.onComplete((value, throwable) -> {
+            try {
+                completion.complete(value, throwable);
+            } finally {
+                // counted on the event loop, after any @OnError handler the completion triggered
+                // was invoked
+                if (eventLoop.inEventLoop()) {
+                    handlerCompleted();
+                } else {
+                    try {
+                        eventLoop.execute(this::handlerCompleted);
+                    } catch (RejectedExecutionException e) {
+                        handlerCompleted();
+                    }
+                }
+            }
+        });
+        return completion;
+    }
+
+    /**
+     * Releases the upgrade request once the session ended and no handler that may use it still
+     * runs.
+     */
+    private void handlerCompleted() {
+        if (runningHandlers.decrementAndGet() == 0 && removed) {
+            releaseRequest.run();
+        }
     }
 
     private ExecutionFlow<?> invokeExecutableWithCoroutines(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
@@ -426,14 +461,15 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 LOG.error("Error publishing WebSocket closed event: " + e.getMessage(), e);
             }
         }
-        removing = true;
         try {
             // invokes the @OnClose handler, unless the session was closed already
             super.handlerRemoved(ctx);
         } finally {
-            if (!releaseAfterClose) {
-                // the session ended: release the upgrade request, which runs its disposal
-                // resources and publishes the request terminated event
+            removed = true;
+            if (runningHandlers.get() == 0) {
+                // the session ended and no handler runs: release the upgrade request, which runs
+                // its disposal resources and publishes the request terminated event. Otherwise the
+                // last handler to complete releases it
                 releaseRequest.run();
             }
         }
