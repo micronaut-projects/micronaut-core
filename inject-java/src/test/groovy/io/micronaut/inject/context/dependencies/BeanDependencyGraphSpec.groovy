@@ -241,6 +241,31 @@ class BeanDependencyGraphSpec extends Specification {
         context.close()
     }
 
+    void "every receiver of a cached collection records its members"() {
+        given:
+        ApplicationContext context = ApplicationContext.builder()
+            .properties('spec.name': 'BeanDependencyGraphSpec')
+            .beanDependencyTrackingEnabled(true)
+            .start()
+        BeanDependencyGraph graph = context.findDependencyGraph().get()
+
+        when: "two singletons receive the same list, the second from the cached collection"
+        context.getBean(ListService)
+        context.getBean(SecondListService)
+
+        then: "both record an edge to each member"
+        [ListService, SecondListService].every { receiver ->
+            def edges = graph.dependenciesOf(context.getBeanDefinition(receiver))
+            edges.size() == 2 &&
+                edges.every { it.collection() && it.kind() == InjectionKind.CONSTRUCTOR } &&
+                edges*.dependency()*.beanType.toSet() == [AHandler, BHandler] as Set
+        }
+        edge(graph.dependentsOf(context.getBeanDefinition(AHandler)), SecondListService).collection()
+
+        cleanup:
+        context.close()
+    }
+
     private static BeanDependencyGraph.BeanDependency edge(Collection<BeanDependencyGraph.BeanDependency> edges, Class<?> dependent) {
         def edge = edges.find { it.dependent().beanType == dependent }
         assert edge != null : "no dependency recorded for $dependent in $edges"
