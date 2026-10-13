@@ -37,6 +37,8 @@ import io.micronaut.dev.compile.CompileMode;
 import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
+import io.micronaut.dev.livereload.LiveReloadServer;
+import io.micronaut.dev.livereload.LiveReloadServerFactory;
 import io.micronaut.dev.loader.DevClassLoader;
 import io.micronaut.dev.loader.GenerationClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
@@ -137,6 +139,8 @@ public final class DevRuntime implements Closeable {
     private volatile List<Path> watchedRoots = List.of(); // NOSONAR java:S3077 an immutable list, replaced whole
     private final AtomicBoolean leakCheckPending = new AtomicBoolean();
     private @Nullable DirectoryWatcher watcher;
+    // read by the request threads of the script filter and the /dev endpoint, set by the launcher
+    private volatile @Nullable LiveReloadServer liveReload; // NOSONAR java:S3077 thread-safe server, replaced whole
     private final Map<Path, FileWatcherRegistration> pinnedWatches = new ConcurrentHashMap<>();
     private volatile @Nullable Thread worker; // NOSONAR java:S3077 only the reference is published
     private OutputSnapshot snapshot = OutputSnapshot.empty();
@@ -222,6 +226,7 @@ public final class DevRuntime implements Closeable {
         ApplicationContext first;
         try {
             snapshot = OutputSnapshot.of(manifest.reloadableRoots());
+            startLiveReload();
             startWatching();
             Thread thread = new Thread(this::processBatches, "micronaut-dev-reload");
             thread.setDaemon(true);
@@ -236,6 +241,37 @@ public final class DevRuntime implements Closeable {
         LOG.info("Development mode: generation {} started with strategy {}, {} compiler(s), watching {} root(s)",
             classLoader.generation(), strategy(), compilers.keySet(), watchedRoots().size());
         return first;
+    }
+
+    /**
+     * The LiveReload server, when {@code micronaut-dev-livereload} is on the classpath.
+     *
+     * @return The server
+     */
+    public Optional<LiveReloadServer> liveReload() {
+        return Optional.ofNullable(liveReload);
+    }
+
+    /**
+     * The path a browser would request a file of a resource root under: the file relative to its root,
+     * with a leading slash, or the file name alone for a file under no root.
+     *
+     * @param file The file
+     * @return The path
+     */
+    public String publicPathOf(Path file) {
+        Path absolute = file.toAbsolutePath().normalize();
+        Path root = mostSpecificRoot(absolute);
+        String relative = root != null ? root.relativize(absolute).toString() : absolute.getFileName().toString();
+        return "/" + relative.replace(java.io.File.separatorChar, '/');
+    }
+
+    /**
+     * Requests a reload without waiting for it: for a caller the reload would stop, such as an endpoint
+     * of the application.
+     */
+    public void requestReload() {
+        enqueue(new Pending(Map.of(), Map.of(), true));
     }
 
     /**
@@ -481,6 +517,10 @@ public final class DevRuntime implements Closeable {
         if (directoryWatcher != null) {
             directoryWatcher.close();
         }
+        LiveReloadServer server = liveReload;
+        if (server != null) {
+            server.close();
+        }
         synchronized (lifecycle) {
             thread = contextClaimed ? null : applicationThread;
         }
@@ -527,6 +567,22 @@ public final class DevRuntime implements Closeable {
                 throw new IllegalStateException(failure.describe());
             }
             LOG.info("Compiled {} {} source(s) in {} ms", result.compiledSources().size(), kind, result.duration().toMillis());
+        }
+    }
+
+    /**
+     * LiveReload is on when a server implementation is on the classpath, {@code micronaut-dev-livereload}:
+     * adding the module to the development runtime classpath is the switch, there is no other.
+     */
+    private void startLiveReload() {
+        LiveReloadServerFactory factory = ServiceLoader.load(LiveReloadServerFactory.class, LiveReloadServerFactory.class.getClassLoader()).findFirst().orElse(null);
+        if (factory == null) {
+            return;
+        }
+        try {
+            liveReload = factory.start(manifest.liveReload().port());
+        } catch (IOException e) {
+            LOG.warn("LiveReload server could not bind port {}: {}", manifest.liveReload().port(), e.getMessage());
         }
     }
 
@@ -801,9 +857,14 @@ public final class DevRuntime implements Closeable {
         for (Map.Entry<ResourceKind, SourceChanges> entry : batch.resources.entrySet()) {
             if (entry.getKey() == ResourceKind.CONFIG) {
                 configurationChanged = true;
-            } else if (current instanceof DefaultBeanContext defaultBeanContext && current.isRunning()) {
-                defaultBeanContext.notifyResourceChange(new ResourceChange(entry.getKey(), rootsOf(entry.getKey()),
-                    new ArrayList<>(entry.getValue().changed()), new ArrayList<>(entry.getValue().deleted()), false));
+            } else {
+                if (current instanceof DefaultBeanContext defaultBeanContext && current.isRunning()) {
+                    defaultBeanContext.notifyResourceChange(new ResourceChange(entry.getKey(), rootsOf(entry.getKey()),
+                        new ArrayList<>(entry.getValue().changed()), new ArrayList<>(entry.getValue().deleted()), false));
+                }
+                if (entry.getKey() == ResourceKind.STATIC || entry.getKey() == ResourceKind.VIEWS) {
+                    refreshBrowsers(entry.getValue());
+                }
             }
         }
         OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
@@ -881,7 +942,32 @@ public final class DevRuntime implements Closeable {
         List<BeanDefinition<?>> added = definitionsNamed(fresh, changeSet.classNames());
         fresh.publishEvent(new ReloadCompletedEvent(this, new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));
         LOG.info("Reloaded: generation {} started in {} ms ({} class(es) changed, {} bean(s) retained)", classLoader.generation(), elapsed.toMillis(), changeSet.classes().size(), retainedCount);
+        LiveReloadServer server = liveReload;
+        if (server != null) {
+            // the new generation serves: the browsers see the new code
+            server.reload("/", false);
+        }
         detectLeaks();
+    }
+
+    /**
+     * A change of static files or templates only needs the browser to refresh: a stylesheet is swapped in
+     * place when nothing but stylesheets changed, anything else reloads the page.
+     */
+    private void refreshBrowsers(SourceChanges changes) {
+        LiveReloadServer server = liveReload;
+        if (server == null) {
+            return;
+        }
+        boolean onlyCss = !changes.changed().isEmpty() && changes.deleted().isEmpty()
+            && changes.changed().stream().allMatch(path -> path.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".css"));
+        if (onlyCss) {
+            for (Path stylesheet : changes.changed()) {
+                server.reload(publicPathOf(stylesheet), true);
+            }
+        } else {
+            server.reload("/", false);
+        }
     }
 
     private Predicate<BeanRegistration<?>> retentionPredicate(ApplicationContext old, boolean retentionAllowed) {
