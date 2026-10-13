@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.DevRuntime;
+import io.micronaut.dev.livereload.LiveReloadScript;
 import io.micronaut.dev.livereload.LiveReloadServer;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
@@ -31,11 +32,12 @@ import org.jspecify.annotations.Nullable;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * Adds the LiveReload client script to HTML pages, and a no-store cache header so that a refresh
- * always reaches the server. Pages with a Content-Security-Policy are left alone, as the script
- * would be blocked; extension users turn the injection off in the manifest.
+ * always reaches the server. Pages with a Content-Security-Policy, in a header or in a {@code <meta http-equiv>}
+ * element, are left alone, as the script would be blocked; extension users turn the injection off in the manifest.
  *
  * @author graemerocher
  * @since 5.3.0
@@ -48,6 +50,8 @@ import java.util.Locale;
 public final class LiveReloadScriptFilter {
 
     private static final String BODY_END = "</body>";
+    // a policy a page declares itself applies as the header does
+    private static final Pattern CSP_META = Pattern.compile("<meta\\s[^>]*http-equiv\\s*=\\s*[\"']?\\s*content-security-policy\\s*[\"'\\s/>]", Pattern.CASE_INSENSITIVE);
 
     private final DevRuntime runtime;
     @Nullable
@@ -147,14 +151,18 @@ public final class LiveReloadScriptFilter {
      *
      * @param html The page
      * @param port The server's port
-     * @return The page with the tag, or null if the page has no body end to put it before
+     * @return The page with the tag, or null if the page has no body end to put it before, or declares a
+     *         Content-Security-Policy in a {@code <meta>} element that would block the script
      */
     @Nullable
     static String inject(String html, int port) {
+        if (CSP_META.matcher(html).find()) {
+            return null;
+        }
         int end = html.toLowerCase(Locale.ROOT).lastIndexOf(BODY_END);
         if (end < 0) {
             return null;
         }
-        return html.substring(0, end) + LiveReloadServer.scriptTag(port) + html.substring(end);
+        return html.substring(0, end) + LiveReloadScript.tag(port) + html.substring(end);
     }
 }

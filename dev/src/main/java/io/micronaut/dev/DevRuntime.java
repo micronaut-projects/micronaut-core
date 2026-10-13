@@ -132,7 +132,8 @@ public final class DevRuntime implements Closeable {
      */
     private volatile boolean startFailed;
     private @Nullable DirectoryWatcher watcher;
-    private @Nullable LiveReloadServer liveReload;
+    // read by the request threads of the script filter and the /dev endpoint, set by the launcher
+    private volatile @Nullable LiveReloadServer liveReload; // NOSONAR java:S3077 thread-safe server, replaced whole
     private @Nullable Thread worker;
     private OutputSnapshot snapshot = OutputSnapshot.empty();
     /**
