@@ -206,6 +206,49 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         ctx.close()
     }
 
+    void 'test service connection pool configuration inherits global values and allows overrides'() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'micronaut.http.client.pool.max-concurrent-http1-connections': 5,
+                'micronaut.http.client.pool.max-pending-acquires': 1000,
+                'micronaut.http.client.pool.acquire-timeout': '500ms',
+                'micronaut.http.services.foo.url': 'http://localhost',
+                'micronaut.http.services.bar.url': 'http://localhost',
+                'micronaut.http.services.bar.pool.max-concurrent-http1-connections': 20,
+        )
+
+        ServiceHttpClientConfiguration foo = ctx.getBean(ServiceHttpClientConfiguration, Qualifiers.byName("foo"))
+        ServiceHttpClientConfiguration bar = ctx.getBean(ServiceHttpClientConfiguration, Qualifiers.byName("bar"))
+
+        expect:
+        foo.connectionPoolConfiguration.maxConcurrentHttp1Connections == 5
+        foo.connectionPoolConfiguration.maxPendingAcquires == 1000
+        foo.connectionPoolConfiguration.acquireTimeout.get() == Duration.ofMillis(500)
+        bar.connectionPoolConfiguration.maxConcurrentHttp1Connections == 20
+        bar.connectionPoolConfiguration.maxPendingAcquires == 1000
+        bar.connectionPoolConfiguration.acquireTimeout.get() == Duration.ofMillis(500)
+
+        cleanup:
+        ctx.close()
+    }
+
+    void 'test service connection pool inherits a globally disabled pool'() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'micronaut.http.client.pool.enabled': false,
+                'micronaut.http.services.foo.url': 'http://localhost',
+                'micronaut.http.services.bar.url': 'http://localhost',
+                'micronaut.http.services.bar.pool.enabled': true,
+        )
+
+        expect:
+        !ctx.getBean(ServiceHttpClientConfiguration, Qualifiers.byName("foo")).connectionPoolConfiguration.enabled
+        ctx.getBean(ServiceHttpClientConfiguration, Qualifiers.byName("bar")).connectionPoolConfiguration.enabled
+
+        cleanup:
+        ctx.close()
+    }
+
     void "test that manually defining an HTTP client without URL doesn't create bean"() {
         given:
         ApplicationContext clientApp = ApplicationContext.run(
