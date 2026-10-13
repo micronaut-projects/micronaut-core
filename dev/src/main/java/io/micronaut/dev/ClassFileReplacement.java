@@ -26,8 +26,12 @@ import java.util.Map;
 
 /**
  * The class files the fast path writes into a running generation's snapshot ahead of a redefinition, kept with the
- * versions they replace, so that a redefinition the JVM refuses leaves the generation as it was before the restart
+ * versions they replace, so that a redefinition the JVM refuses leaves the snapshot as it was before the restart
  * that follows.
+ *
+ * <p>The rollback restores files, not classes: a changed class that another thread loaded for the first time between
+ * the replacement and the refusal is already the new version. That generation only runs until the restart, which
+ * retires it and starts a new one on the whole change, so nothing holds class loading for the attempt.</p>
  */
 final class ClassFileReplacement {
 

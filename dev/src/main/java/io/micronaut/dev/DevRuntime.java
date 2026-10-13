@@ -908,7 +908,7 @@ public final class DevRuntime implements Closeable {
                 agent.redefineClasses(definitions.toArray(new ClassDefinition[0]));
             }
         } catch (Exception | LinkageError e) {
-            // the generation keeps the class files it was running with; the restart that follows applies the whole change
+            // the snapshot gets back the class files it held; the restart that follows applies the whole change
             snapshotChange.rollBack();
             LOG.info("Cannot redefine {} class(es) in place: restarting instead", replacements.size(), e);
             return false;
