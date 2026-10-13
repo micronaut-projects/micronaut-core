@@ -138,7 +138,7 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
                 }
                 try {
                     return filter.test(s);
-                } catch (Throwable e) {
+                } catch (Throwable e) { // NOSONAR an Error escaping the matcher would leave the frame unreleased and the broadcast never completed
                     if (filterFailure[0] == null) {
                         filterFailure[0] = e;
                     }

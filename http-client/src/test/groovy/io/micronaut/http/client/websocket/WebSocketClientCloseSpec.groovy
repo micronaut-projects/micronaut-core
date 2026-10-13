@@ -50,6 +50,7 @@ class WebSocketClientCloseSpec extends Specification {
 
         @OnMessage
         void onMessage(String text) {
+            // the test only checks the close: messages are ignored
         }
 
         @OnClose
@@ -61,6 +62,7 @@ class WebSocketClientCloseSpec extends Specification {
 
         @Override
         void close() {
+            // nothing to release: the client is closed by the test
         }
     }
 
@@ -77,14 +79,10 @@ class WebSocketClientCloseSpec extends Specification {
                 try {
                     Socket socket = serverSocket.accept()
                     InputStream input = socket.inputStream
-                    StringBuilder request = new StringBuilder()
-                    while (!request.toString().endsWith('\r\n\r\n')) {
-                        int b = input.read()
-                        if (b < 0) {
-                            upgraded.completeExceptionally(new EOFException())
-                            return
-                        }
-                        request.append((char) b)
+                    String request = readUpgradeRequest(input)
+                    if (request == null) {
+                        upgraded.completeExceptionally(new EOFException())
+                        return
                     }
                     String key = request.readLines().find { it.toLowerCase().startsWith('sec-websocket-key:') }.substring('sec-websocket-key:'.length()).trim()
                     String accept = Base64.encoder.encodeToString(MessageDigest.getInstance('SHA-1').digest((key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').getBytes(StandardCharsets.US_ASCII)))
@@ -101,6 +99,21 @@ class WebSocketClientCloseSpec extends Specification {
                     closeAnswered.complete(true)
                 }
             }
+        }
+
+        /**
+         * @return the upgrade request, or {@code null} if the connection ended before it was complete
+         */
+        private static String readUpgradeRequest(InputStream input) {
+            StringBuilder request = new StringBuilder()
+            while (!request.toString().endsWith('\r\n\r\n')) {
+                int b = input.read()
+                if (b < 0) {
+                    return null
+                }
+                request.append((char) b)
+            }
+            return request.toString()
         }
 
         URI getUri() {
