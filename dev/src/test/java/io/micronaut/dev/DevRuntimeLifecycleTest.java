@@ -15,13 +15,20 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -128,6 +135,137 @@ class DevRuntimeLifecycleTest {
             runtime.close();
         }
         assertNull(DevRuntime.current());
+    }
+
+    @Test
+    void closingWhileAReloadLaunchesWaitsForTheGenerationAndRefusesTheContextItsMainCreates() throws Exception {
+        Files.createDirectories(project.resolve("build/classes"));
+        DevManifest manifest = manifest("");
+        CountDownLatch secondMain = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicReference<Throwable> refused = new AtomicReference<>();
+        AtomicInteger launches = new AtomicInteger();
+        DevRuntime runtime = runtime(manifest, (loader, mainClass, args) -> {
+            if (launches.incrementAndGet() == 2) {
+                // the second generation's main is still configuring as the runtime closes
+                secondMain.countDown();
+                release.await();
+                try {
+                    startContext(loader, "DevRuntimeLifecycleTest");
+                } catch (RuntimeException e) {
+                    refused.set(e);
+                    throw e;
+                }
+                return;
+            }
+            startContext(loader, "DevRuntimeLifecycleTest");
+        });
+        ApplicationContext first = runtime.start(new String[0]);
+        Thread restarting = new Thread(runtime::restart);
+        restarting.start();
+        assertTrue(secondMain.await(1, TimeUnit.MINUTES));
+        Thread closing = new Thread(runtime::close);
+        closing.start();
+        // the reload is interrupted, and close waits for the main of the generation it launched
+        closing.join(500);
+        assertTrue(closing.isAlive());
+        assertSame(runtime, DevRuntime.current());
+        release.countDown();
+        closing.join(TimeUnit.MINUTES.toMillis(1));
+        restarting.join(TimeUnit.MINUTES.toMillis(1));
+        assertFalse(closing.isAlive());
+        assertFalse(restarting.isAlive());
+        assertNull(DevRuntime.current());
+        assertFalse(first.isRunning());
+        Throwable failure = refused.get();
+        assertNotNull(failure);
+        assertTrue(causes(failure).stream().anyMatch(cause -> String.valueOf(cause.getMessage()).contains("development runtime is closed")), String.valueOf(failure));
+    }
+
+    @Test
+    void aGenerationAdoptsTheFirstContextItsMainCreatesAndARestartStopsThatOne() throws Exception {
+        Files.createDirectories(project.resolve("build/classes"));
+        List<ApplicationContext> clients = new CopyOnWriteArrayList<>();
+        DevRuntime runtime = runtime(manifest(""), (loader, mainClass, args) -> {
+            startContext(loader, "DevRuntimeLifecycleTest");
+            // a client's context, built in main after the application's, carries the runtime as a bean too
+            clients.add(startContext(loader, "DevRuntimeLifecycleTest"));
+        });
+        try {
+            ApplicationContext application = runtime.start(new String[0]);
+            // main builds the client once the application's context started
+            awaitSize(clients, 1);
+            assertSame(application, runtime.context().orElseThrow());
+            ApplicationContext client = clients.get(0);
+            assertNotSame(client, application);
+
+            runtime.restart();
+            ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(1));
+            awaitSize(clients, 2);
+            assertSame(second, runtime.context().orElseThrow());
+            assertNotSame(clients.get(1), second);
+            assertFalse(application.isRunning());
+            assertTrue(client.isRunning(), "the restart stopped the client's context rather than the application's");
+        } finally {
+            runtime.close();
+            clients.forEach(ApplicationContext::close);
+        }
+    }
+
+    @Test
+    void aReloadRequestedOnTheThreadsTheReloadWaitsForFailsFast() throws Exception {
+        Files.createDirectories(project.resolve("build/classes"));
+        AtomicReference<DevRuntime> self = new AtomicReference<>();
+        AtomicReference<Throwable> onMain = new AtomicReference<>();
+        ReentrantReloadListener.OUTCOME.set(null);
+        DevRuntime runtime = runtime(manifest(""), (loader, mainClass, args) -> {
+            try {
+                // the generation's main, whose context the reload waits for
+                self.get().reload();
+            } catch (IllegalStateException e) {
+                onMain.compareAndSet(null, e);
+            }
+            startContext(loader, "DevRuntimeLifecycleTest.reentrant");
+        });
+        self.set(runtime);
+        try {
+            runtime.start(new String[0]);
+            assertTrue(String.valueOf(onMain.get()).contains("which the reload waits for"), String.valueOf(onMain.get()));
+
+            long start = System.nanoTime();
+            // a reload listener runs on the reload thread: its own restart is refused rather than waited for
+            runtime.restart();
+            runtime.awaitGeneration(2, Duration.ofMinutes(1));
+            assertTrue(Duration.ofNanos(System.nanoTime() - start).compareTo(Duration.ofMinutes(1)) < 0);
+            Throwable outcome = ReentrantReloadListener.OUTCOME.get();
+            assertTrue(outcome instanceof IllegalStateException && outcome.getMessage().contains("micronaut-dev-reload"), String.valueOf(outcome));
+            assertEquals(2, runtime.generation());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    private static ApplicationContext startContext(ClassLoader loader, String specName) {
+        return ApplicationContext.builder()
+            .classLoader(loader)
+            .properties(Map.of("spec.name", specName))
+            .start();
+    }
+
+    private static void awaitSize(List<?> list, int size) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(1);
+        while (list.size() < size && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        assertEquals(size, list.size());
+    }
+
+    private static List<Throwable> causes(Throwable failure) {
+        List<Throwable> causes = new ArrayList<>();
+        for (Throwable cause = failure; cause != null && !causes.contains(cause); cause = cause.getCause()) {
+            causes.add(cause);
+        }
+        return causes;
     }
 
     private DevRuntime runtime(DevManifest manifest, DevRuntime.ApplicationLauncher launcher) {

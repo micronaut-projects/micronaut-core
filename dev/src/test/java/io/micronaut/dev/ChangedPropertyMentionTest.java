@@ -34,21 +34,21 @@ class ChangedPropertyMentionTest {
 
     @Test
     void aPropertyInjectionPointNamesItsKey() {
-        assertTrue(DevRuntime.mentionsChangedProperty(metadata(Property.class, "name", "app.greeting"), CHANGE));
-        assertFalse(DevRuntime.mentionsChangedProperty(metadata(Property.class, "name", "app.other"), CHANGE));
-        assertFalse(DevRuntime.mentionsChangedProperty(new MutableAnnotationMetadata(), CHANGE));
+        assertTrue(ConfigurationStaleness.mentionsChangedProperty(metadata(Property.class, "name", "app.greeting"), CHANGE));
+        assertFalse(ConfigurationStaleness.mentionsChangedProperty(metadata(Property.class, "name", "app.other"), CHANGE));
+        assertFalse(ConfigurationStaleness.mentionsChangedProperty(new MutableAnnotationMetadata(), CHANGE));
     }
 
     @Test
     void aValueNamesTheKeysOfItsPlaceholders() {
-        assertTrue(DevRuntime.mentionsChangedProperty(value("${app.greeting}"), CHANGE));
-        assertTrue(DevRuntime.mentionsChangedProperty(value("Hello ${app.name:you}, ${ app.greeting : hi }"), CHANGE));
-        assertFalse(DevRuntime.mentionsChangedProperty(value("${app.name:you} and ${app.other}"), CHANGE));
-        assertFalse(DevRuntime.mentionsChangedProperty(value("${} ${app.greeting"), CHANGE));
-        assertFalse(DevRuntime.mentionsChangedProperty(value("plain"), CHANGE));
+        assertTrue(ConfigurationStaleness.mentionsChangedProperty(value("${app.greeting}"), CHANGE));
+        assertTrue(ConfigurationStaleness.mentionsChangedProperty(value("Hello ${app.name:you}, ${ app.greeting : hi }"), CHANGE));
+        assertFalse(ConfigurationStaleness.mentionsChangedProperty(value("${app.name:you} and ${app.other}"), CHANGE));
+        assertFalse(ConfigurationStaleness.mentionsChangedProperty(value("${} ${app.greeting"), CHANGE));
+        assertFalse(ConfigurationStaleness.mentionsChangedProperty(value("plain"), CHANGE));
         // an expression reading the environment may read any key
-        assertTrue(DevRuntime.mentionsChangedProperty(value("#{ env['other'] }"), CHANGE));
-        assertFalse(DevRuntime.mentionsChangedProperty(value("#{ 1 + 1 }"), CHANGE));
+        assertTrue(ConfigurationStaleness.mentionsChangedProperty(value("#{ env['other'] }"), CHANGE));
+        assertFalse(ConfigurationStaleness.mentionsChangedProperty(value("#{ 1 + 1 }"), CHANGE));
     }
 
     @Test

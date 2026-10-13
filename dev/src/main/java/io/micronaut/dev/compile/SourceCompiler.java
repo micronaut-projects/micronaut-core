@@ -67,6 +67,9 @@ public interface SourceCompiler extends Closeable {
      * <p>A failed compilation leaves the output directory as it was, so the running application
      * keeps serving the previous generation. The result's diagnostics say what went wrong.</p>
      *
+     * <p>Callers serialize compilations: a compiler may stage its output and back up what it replaces in fixed
+     * directories, so two calls of one compiler must not overlap. The launcher compiles on a single thread.</p>
+     *
      * @param request What to compile
      * @return The result
      */
