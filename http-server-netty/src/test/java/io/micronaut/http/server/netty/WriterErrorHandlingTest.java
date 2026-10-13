@@ -189,6 +189,37 @@ public class WriterErrorHandlingTest {
         assertThrows(IOException.class, () -> get("/writer-errors/stream"));
     }
 
+    @Test
+    void codecErrorResponseWriterFailsToo() throws Exception {
+        // the error route answers a body whose writer fails with a CodecException too: the
+        // default error response is answered then
+        var response = get("/writer-errors-codec-twice/codec");
+        assertEquals(500, response.statusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.headers().firstValue("Content-Type").orElse(null));
+    }
+
+    @Test
+    void codecExceptionOnTheFirstElementOfAStreamingBody() throws Exception {
+        // nothing was sent yet: the streaming error handling answers the default error response
+        var response = get("/writer-errors/codec-stream");
+        assertEquals(500, response.statusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.headers().firstValue("Content-Type").orElse(null));
+    }
+
+    @Test
+    void codecExceptionAfterTheFirstElementOfAStreamingBodyAborts() {
+        assertThrows(IOException.class, () -> get("/writer-errors/codec-stream-after-first"));
+    }
+
+    @Test
+    void streamingErrorResponseWriterFailsWithACodecException() throws Exception {
+        // the body of the status exception that fails the stream cannot be serialized: the
+        // default error response is answered instead of the one of the status exception
+        var response = get("/writer-errors/stream-error-body-fails");
+        assertEquals(500, response.statusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.headers().firstValue("Content-Type").orElse(null));
+    }
+
     record NotFoundBody() {
     }
 
@@ -276,6 +307,36 @@ public class WriterErrorHandlingTest {
         @Get(value = "/stream", produces = MediaType.TEXT_PLAIN)
         Flux<CustomBody> stream() {
             return Flux.just(new CustomBody("first"), new CustomBody("fail"));
+        }
+
+        @Get(value = "/codec-stream", produces = MediaType.TEXT_PLAIN)
+        Flux<CodecBody> codecStream() {
+            return Flux.just(new CodecBody("streamed codec failure"));
+        }
+
+        @Get(value = "/codec-stream-after-first", produces = MediaType.TEXT_PLAIN)
+        Flux<Object> codecStreamAfterFirst() {
+            return Flux.just(new CustomBody("first"), new CodecBody("streamed codec failure"));
+        }
+
+        @Get(value = "/stream-error-body-fails", produces = MediaType.TEXT_PLAIN)
+        Flux<String> streamErrorBodyFails() {
+            return Flux.error(new HttpStatusException(HttpStatus.BAD_REQUEST, new JsonFailingBody()));
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC)
+    @Controller("/writer-errors-codec-twice")
+    static class CodecTwiceController {
+        @Get(value = "/codec", produces = MediaType.TEXT_PLAIN)
+        CodecBody codec() {
+            return new CodecBody("codec writer failure");
+        }
+
+        @Error(CodecException.class)
+        @Produces(MediaType.TEXT_PLAIN)
+        CodecBody onCodec(CodecException e) {
+            return new CodecBody("error route codec failure");
         }
     }
 

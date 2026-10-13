@@ -677,10 +677,23 @@ public abstract class ResponseLifecycle {
         } else {
             errorResponse = routeExecutor.createDefaultErrorResponse(request, t);
         }
-        return encodeHttpResponse(
-            request,
-            errorResponse
-        );
+        // the writer of the error response may fail too, e.g. with a CodecException: answer the
+        // default error response for that failure then, like encodeHttpResponseSafe
+        Throwable cause = t;
+        ExecutionFlow<? extends ByteBodyHttpResponse<?>> flow;
+        try {
+            flow = encodeHttpResponse(request, errorResponse);
+        } catch (Throwable e) {
+            return encodeDefaultErrorResponse(request, suppress(e, cause));
+        }
+        return flow.onErrorResume(e -> (ExecutionFlow) encodeDefaultErrorResponse(request, suppress(e, cause)));
+    }
+
+    private static Throwable suppress(Throwable e, Throwable cause) {
+        if (e != cause) {
+            e.addSuppressed(cause);
+        }
+        return e;
     }
 
     private MutableHttpResponse<?> createJsonSyntaxErrorResponse(HttpRequest<?> request, Throwable t) {
