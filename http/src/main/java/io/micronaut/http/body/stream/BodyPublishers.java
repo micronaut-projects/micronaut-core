@@ -36,6 +36,14 @@ import java.util.function.Function;
  * hook of its own, so that the source releases the items it drops when it is cancelled, see
  * {@link ReactorInterop}.
  *
+ * <p>These are not the general purpose publishers of
+ * {@link io.micronaut.core.async.publisher.Publishers}, which publish plain values: the items
+ * here are buffers that must be released exactly once, so each publisher here releases what it
+ * drops when it is cancelled or fails, passes its discard hook and the Reactor context of its
+ * subscriber on to a Reactor source, and checks the demand as the reactive streams specification
+ * requires. {@code Publishers.just} and {@code Publishers.map} do none of that. Only what the
+ * body publishers need is here.</p>
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */
