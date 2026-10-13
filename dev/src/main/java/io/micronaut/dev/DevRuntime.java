@@ -912,8 +912,9 @@ public final class DevRuntime implements Closeable {
             }
         }, "micronaut-dev-app");
         thread.setDaemon(false);
-        thread.start();
+        // published before it starts: a main that asks for a reload at once is refused
         applicationThread = thread;
+        thread.start();
         try {
             ApplicationContext applicationContext = future.get(START_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
             // the startup event is published before the other startup listeners ran and the context reports itself
@@ -1013,18 +1014,17 @@ public final class DevRuntime implements Closeable {
         Thread thread = new Thread(() -> {
             try {
                 Thread.sleep(2000);
+                // only a collection tells a retired generation the collector has yet to reach from one the application keeps;
+                // it runs on this thread, a moment after the reload, and only while an old generation is still reachable
+                System.gc(); // NOSONAR leak detection: a retired generation's loader is unreachable only once it is collected
+                List<Integer> old = oldRetiredGenerations();
+                if (!old.isEmpty()) {
+                    LOG.warn("{} retired generation(s) {} are still reachable after the reload: a static cache or a thread of the application keeps old classes alive", old.size(), old);
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return;
             } finally {
                 leakCheckPending.set(false);
-            }
-            // only a collection tells a retired generation the collector has yet to reach from one the application keeps;
-            // it runs on this thread, a moment after the reload, and only while an old generation is still reachable
-            System.gc(); // NOSONAR leak detection: a retired generation's loader is unreachable only once it is collected
-            List<Integer> old = oldRetiredGenerations();
-            if (!old.isEmpty()) {
-                LOG.warn("{} retired generation(s) {} are still reachable after the reload: a static cache or a thread of the application keeps old classes alive", old.size(), old);
             }
         }, "micronaut-dev-leak-detector");
         thread.setDaemon(true);
