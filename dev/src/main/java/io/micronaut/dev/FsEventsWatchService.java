@@ -68,13 +68,25 @@ final class FsEventsWatchService implements WatchService {
      * @throws IOException if FSEvents cannot be used
      */
     FsEventsWatchService(double latency, Duration fallbackInterval) throws IOException {
+        this(new JnaFsEvents(), latency, fallbackInterval);
+    }
+
+    /**
+     * Starts the service.
+     *
+     * @param api The calls to FSEvents
+     * @param latency How long FSEvents holds the events that follow a first one, in seconds
+     * @param fallbackInterval How often the directories are compared once FSEvents could not watch one of them
+     * @throws IOException if FSEvents cannot be used
+     */
+    FsEventsWatchService(FsEventsApi api, double latency, Duration fallbackInterval) throws IOException {
         this.fallbackInterval = fallbackInterval;
         // locals: the run loop thread holds what the streams hold, which must not reach this service, or the cleaner
         // would never close one dropped unclosed
         PollingWatchService comparisons = new PollingWatchService(SAFETY_INTERVAL);
         this.polling = comparisons;
         try {
-            this.streams = new FsEventStreams(latency, comparisons::compareUnder, () -> fallBack(comparisons, fallbackInterval, "The FSEvents run loop ended"));
+            this.streams = new FsEventStreams(api, latency, comparisons::compareUnder, () -> fallBack(comparisons, fallbackInterval, "The FSEvents run loop ended"));
         } catch (IOException | RuntimeException | LinkageError e) {
             comparisons.close();
             throw e;

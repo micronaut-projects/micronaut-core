@@ -60,6 +60,8 @@ dependencies {
     testImplementation(libs.bytebuddy.agent)
     testImplementation(libs.junit.platform.launcher)
     testImplementation(projects.micronautRuntimeOsx)
+    // JNA, to call the FSEvents callback with native memory on any platform
+    testCompileOnly(libs.managed.methvin.directoryWatcher)
     testImplementation(libs.managed.kotlin.build.tools.impl)
     testImplementation(libs.managed.kotlin.stdlib)
     testImplementation(libs.ksp.aaEmbeddable)

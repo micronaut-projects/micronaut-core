@@ -97,7 +97,7 @@ class FsEventsWatchServiceTest {
         writer.setDaemon(true);
         writer.start();
         int reported = 0;
-        try {
+        try { // NOSONAR the services are closed, or deliberately dropped unclosed, round by round
             for (int round = 0; round < 150; round++) {
                 FsEventsWatchService service = new FsEventsWatchService(DevWatchService.MAC_LATENCY_SECONDS, java.time.Duration.ofMillis(DevWatchService.POLL_MILLIS));
                 for (Path directory : directories) {

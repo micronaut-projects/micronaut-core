@@ -15,14 +15,7 @@
  */
 package io.micronaut.dev;
 
-import com.sun.jna.Callback;
-import com.sun.jna.FunctionMapper;
-import com.sun.jna.Library;
-import com.sun.jna.Native;
-import com.sun.jna.NativeLibrary;
-import com.sun.jna.Pointer;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,8 +25,6 @@ import java.nio.file.ClosedWatchServiceException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,12 +39,14 @@ import java.util.function.Consumer;
  * of their own, telling a consumer which directory changed. The callback only maps the reported paths to the watched
  * ones and hands them over; it never stops or releases a stream.
  *
- * <p>The native side holds the callback of a stream from its creation until its release: each callback stays
- * strongly reachable until then, from the stream and from {@link #LIVE}, so that the garbage collector cannot free the
+ * <p>The native side holds the callback of a stream from its creation until its release: each stream, which holds its
+ * callback, stays strongly reachable until then, from {@link #LIVE}, so that the garbage collector cannot free the
  * code the native side calls. A stream is created, scheduled, started, stopped, invalidated and released on the run
  * loop thread only, outside the run loop: no callback can run while it is stopped or released, nor after. Closing stops
  * the run loop, lets the thread release the streams, and waits for it; a thread that does not finish in time keeps
  * its callbacks for the rest of the process.</p>
+ *
+ * <p>The calls to FSEvents go through {@link FsEventsApi}; everything else here runs on any platform.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -61,13 +54,13 @@ import java.util.function.Consumer;
 @Internal
 final class FsEventStreams implements Closeable {
 
+    static final String THREAD_NAME = "micronaut-dev-fsevents";
+
     private static final Logger LOG = LoggerFactory.getLogger(FsEventStreams.class);
     /**
-     * The callbacks the native side may still call: removed only once their stream is released.
+     * The streams, and through them the callbacks, the native side may still call: removed only once released.
      */
     private static final Set<Object> LIVE = ConcurrentHashMap.newKeySet();
-    private static final long SINCE_NOW = -1;
-    private static final int CREATE_NO_DEFER = 0x00000002;
     private static final int EVENT_MUST_SCAN_SUB_DIRS = 0x00000001;
     private static final int EVENT_USER_DROPPED = 0x00000002;
     private static final int EVENT_KERNEL_DROPPED = 0x00000004;
@@ -78,15 +71,16 @@ final class FsEventStreams implements Closeable {
     private static final long REGISTER_TIMEOUT_SECONDS = 10;
     private static final long CLOSE_TIMEOUT_MILLIS = 5000;
 
+    private final FsEventsApi api;
     private final double latency;
     private final Consumer<Path> changed;
     private final Thread thread;
     private final LinkedBlockingQueue<Runnable> tasks = new LinkedBlockingQueue<>();
-    private final CompletableFuture<Pointer> runLoop = new CompletableFuture<>();
+    private final CompletableFuture<FsEventsApi.RunLoop> runLoop = new CompletableFuture<>();
     /**
      * The streams, touched on the run loop thread only.
      */
-    private final List<Stream> streams = new ArrayList<>();
+    private final List<FsEventsApi.NativeStream> streams = new ArrayList<>();
     /**
      * The trees watched, in the order they were registered.
      */
@@ -98,17 +92,19 @@ final class FsEventStreams implements Closeable {
     /**
      * Starts the run loop thread.
      *
+     * @param api The calls to FSEvents
      * @param latency How long FSEvents holds the events that follow a first one, in seconds
      * @param changed Told of each directory under a watched tree in which something changed, or of the tree itself
      *                when the events under it must be looked for
      * @param failed Run if the run loop ends before the streams are closed, which no longer report anything
      * @throws IOException if the run loop does not start
      */
-    FsEventStreams(double latency, Consumer<Path> changed, Runnable failed) throws IOException {
+    FsEventStreams(FsEventsApi api, double latency, Consumer<Path> changed, Runnable failed) throws IOException {
+        this.api = api;
         this.latency = latency;
         this.changed = changed;
         this.failed = failed;
-        this.thread = new Thread(this::run, "micronaut-dev-fsevents");
+        this.thread = new Thread(this::run, THREAD_NAME);
         thread.setDaemon(true);
         thread.start();
         try {
@@ -121,6 +117,14 @@ final class FsEventStreams implements Closeable {
             close();
             throw new IOException("Cannot start the FSEvents run loop: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * @param stream A stream
+     * @return Whether the native side may still call the stream's callback, which is kept reachable until then
+     */
+    static boolean isLive(FsEventsApi.NativeStream stream) {
+        return LIVE.contains(stream);
     }
 
     /**
@@ -197,17 +201,18 @@ final class FsEventStreams implements Closeable {
     private void wake() {
         // the thread runs the loop only while it has streams; otherwise it waits on the tasks
         tasks.add(() -> { });
-        Pointer loop = runLoop.getNow(null);
+        // none when the run loop could not start
+        FsEventsApi.RunLoop loop = runLoop.isDone() && !runLoop.isCompletedExceptionally() ? runLoop.join() : null;
         if (loop != null) {
             // stops the current or the next run of the loop: the thread then runs the tasks
-            CoreServices.INSTANCE.cfRunLoopStop(loop);
+            loop.stop();
         }
     }
 
     private void run() {
         try {
-            Pointer mode = NativeLibrary.getInstance("CoreFoundation").getGlobalVariableAddress("kCFRunLoopDefaultMode").getPointer(0);
-            runLoop.complete(CoreServices.INSTANCE.cfRunLoopGetCurrent());
+            FsEventsApi.RunLoop loop = api.currentRunLoop();
+            runLoop.complete(loop);
             while (!closed) {
                 Runnable task = streams.isEmpty() ? tasks.poll(RUN_SECONDS_MILLIS, TimeUnit.MILLISECONDS) : tasks.poll();
                 while (task != null) {
@@ -215,7 +220,7 @@ final class FsEventStreams implements Closeable {
                     task = tasks.poll();
                 }
                 if (!closed && !streams.isEmpty()) {
-                    CoreServices.INSTANCE.cfRunLoopRunInMode(mode, RUN_SECONDS, (byte) 0);
+                    loop.run(RUN_SECONDS);
                 }
             }
         } catch (InterruptedException e) {
@@ -226,8 +231,8 @@ final class FsEventStreams implements Closeable {
         } finally {
             ended = true;
             // outside the run loop: no callback runs while the streams stop and are released
-            for (Stream stream : streams) {
-                stream.release();
+            for (FsEventsApi.NativeStream stream : streams) {
+                release(stream, true);
             }
             streams.clear();
             if (!closed) {
@@ -239,119 +244,77 @@ final class FsEventStreams implements Closeable {
     /**
      * Creates, schedules and starts the stream of a tree. Called on the run loop thread.
      */
-    private Stream start(Path directory) throws IOException {
+    private FsEventsApi.NativeStream start(Path directory) throws IOException {
         Path real = directory.toRealPath();
-        EventCallback callback = new EventCallback(directory, real, changed);
-        LIVE.add(callback);
-        Pointer stream = null;
+        FsEventsApi.NativeStream stream = api.create(real.toString(), latency, new Events(directory, real, changed));
+        LIVE.add(stream);
         boolean started = false;
         try {
-            stream = create(directory, real.toString(), callback);
-            Pointer mode = NativeLibrary.getInstance("CoreFoundation").getGlobalVariableAddress("kCFRunLoopDefaultMode").getPointer(0);
-            CoreServices.INSTANCE.fsEventStreamScheduleWithRunLoop(stream, runLoop.join(), mode);
-            if (CoreServices.INSTANCE.fsEventStreamStart(stream) == 0) {
+            stream.schedule(runLoop.join());
+            if (!stream.start()) {
                 throw new IOException("FSEvents could not start watching " + directory);
             }
             started = true;
-            return new Stream(stream, callback, true);
+            return stream;
         } finally {
             if (!started) {
-                if (stream != null) {
-                    // only a started stream may be stopped
-                    new Stream(stream, callback, false).release();
-                } else {
-                    LIVE.remove(callback);
-                }
+                // only a started stream may be stopped
+                release(stream, false);
             }
         }
     }
 
-    private Pointer create(Path directory, String name, EventCallback callback) throws IOException {
-        Pointer path = CoreServices.INSTANCE.cfStringCreateWithCharacters(null, name.toCharArray(), name.length());
-        if (path == null) {
-            throw new IOException("Cannot create the path of " + directory);
-        }
+    /**
+     * Stops, invalidates and releases a stream. Called on the run loop thread, outside the run loop.
+     */
+    private static void release(FsEventsApi.NativeStream stream, boolean started) {
         try {
-            Pointer paths = CoreServices.INSTANCE.cfArrayCreate(null, new Pointer[] {path}, 1, null);
-            if (paths == null) {
-                throw new IOException("Cannot create the paths of " + directory);
+            if (started) {
+                stream.stop();
             }
-            try {
-                Pointer stream = CoreServices.INSTANCE.fsEventStreamCreate(null, callback, null, paths, SINCE_NOW, latency, CREATE_NO_DEFER);
-                if (stream == null) {
-                    throw new IOException("FSEvents refused to watch " + directory);
-                }
-                return stream;
-            } finally {
-                // the stream copied the paths
-                CoreServices.INSTANCE.cfRelease(paths);
-            }
+            stream.invalidate();
+            stream.release();
         } finally {
-            CoreServices.INSTANCE.cfRelease(path);
+            LIVE.remove(stream);
         }
     }
 
     /**
-     * A stream and the callback the native side calls for it.
-     *
-     * @param stream The stream
-     * @param callback The callback, kept reachable until the stream is released
-     * @param started Whether the stream started
+     * Maps the real paths FSEvents reports under a tree to the watched ones and hands them over.
      */
-    private record Stream(Pointer stream, EventCallback callback, boolean started) {
-        /**
-         * Stops, invalidates and releases the stream. Called on the run loop thread, outside the run loop.
-         */
-        void release() {
-            try {
-                if (started) {
-                    CoreServices.INSTANCE.fsEventStreamStop(stream);
-                }
-                CoreServices.INSTANCE.fsEventStreamInvalidate(stream);
-                CoreServices.INSTANCE.fsEventStreamRelease(stream);
-            } finally {
-                LIVE.remove(callback);
-            }
-        }
-    }
-
-    /**
-     * Maps the real paths FSEvents reports to the watched ones and hands them over. Never throws: an exception thrown
-     * into the native side would end the process.
-     */
-    static final class EventCallback implements Callback {
+    static final class Events {
         private final Path root;
         private final Path realRoot;
         private final Consumer<Path> changed;
 
-        EventCallback(Path root, Path realRoot, Consumer<Path> changed) {
+        /**
+         * @param root The tree watched
+         * @param realRoot Its real path, under which FSEvents reports
+         * @param changed Told of each directory in which something changed
+         */
+        Events(Path root, Path realRoot, Consumer<Path> changed) {
             this.root = root;
             this.realRoot = realRoot;
             this.changed = changed;
         }
 
         /**
-         * Called by FSEvents on the run loop thread.
+         * Hands over the directories of events, or the whole tree for an event after which it must be looked for.
          *
-         * @param stream The stream
-         * @param info The stream's context, none
-         * @param count How many events there are
-         * @param paths The paths of the events, C strings
+         * @param realPaths The real paths of the events
          * @param flags The flags of the events
-         * @param ids The identifiers of the events
          */
-        public void invoke(Pointer stream, Pointer info, long count, Pointer paths, Pointer flags, Pointer ids) {
-            try {
-                int events = (int) count;
-                String[] names = paths.getStringArray(0, events, "UTF-8");
-                int[] eventFlags = flags.getIntArray(0, events);
-                for (int i = 0; i < events; i++) {
-                    changed.accept((eventFlags[i] & RESCAN) != 0 ? root : watched(names[i]));
-                }
-            } catch (RuntimeException | LinkageError e) {
-                // the tree is compared as a whole instead
-                changed.accept(root);
+        void report(String[] realPaths, int[] flags) {
+            for (int i = 0; i < realPaths.length; i++) {
+                changed.accept((flags[i] & RESCAN) != 0 ? root : watched(realPaths[i]));
             }
+        }
+
+        /**
+         * Hands over the whole tree, when the events cannot be read.
+         */
+        void rescan() {
+            changed.accept(root);
         }
 
         private Path watched(String reported) {
@@ -361,38 +324,5 @@ final class FsEventStreams implements Closeable {
             }
             return root;
         }
-    }
-
-    /**
-     * The functions of CoreServices and CoreFoundation the streams use.
-     */
-    interface CoreServices extends Library {
-        // the Java names start in lower case: cfRelease is CFRelease, fsEventStreamStart FSEventStreamStart
-        CoreServices INSTANCE = Native.load("CoreServices", CoreServices.class, Map.of(
-            Library.OPTION_FUNCTION_MAPPER, (FunctionMapper) (library, method) -> method.getName().toUpperCase(Locale.ROOT).substring(0, 2) + method.getName().substring(2)));
-
-        Pointer cfStringCreateWithCharacters(@Nullable Pointer allocator, char[] chars, long length);
-
-        Pointer cfArrayCreate(@Nullable Pointer allocator, Pointer[] values, long count, @Nullable Pointer callbacks);
-
-        void cfRelease(Pointer object);
-
-        Pointer fsEventStreamCreate(@Nullable Pointer allocator, Callback callback, @Nullable Pointer context, Pointer paths, long sinceWhen, double latency, int flags);
-
-        void fsEventStreamScheduleWithRunLoop(Pointer stream, Pointer runLoop, Pointer mode);
-
-        byte fsEventStreamStart(Pointer stream);
-
-        void fsEventStreamStop(Pointer stream);
-
-        void fsEventStreamInvalidate(Pointer stream);
-
-        void fsEventStreamRelease(Pointer stream);
-
-        Pointer cfRunLoopGetCurrent();
-
-        int cfRunLoopRunInMode(Pointer mode, double seconds, byte returnAfterSourceHandled);
-
-        void cfRunLoopStop(Pointer runLoop);
     }
 }

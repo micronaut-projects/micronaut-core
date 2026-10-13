@@ -72,8 +72,7 @@ class PollingWatchServiceTest {
     void aRequestComparesTheDirectoriesUnderAPathAtOnceAndAShorterIntervalAppliesAtOnce() throws Exception {
         Path parent = Files.createDirectories(directory.resolve("requested"));
         Path child = Files.createDirectories(parent.resolve("child"));
-        PollingWatchService service = new PollingWatchService(Duration.ofHours(1));
-        try {
+        try (PollingWatchService service = new PollingWatchService(Duration.ofHours(1))) {
             WatchKey childKey = service.register(child);
             Files.writeString(child.resolve("a.txt"), "a");
             // as a native service reports the directory, or one above it, where something changed
@@ -87,8 +86,6 @@ class PollingWatchServiceTest {
             // as when a native service could not watch a directory: the poller no longer waits for the hour
             service.pollEvery(Duration.ofMillis(50));
             assertSame(childKey, service.poll(5, TimeUnit.SECONDS));
-        } finally {
-            service.close();
         }
     }
 
