@@ -187,7 +187,7 @@ public final class DevRuntime implements Closeable {
         this.launcher = launcher;
         this.compilers = new EnumMap<>(SourceKind.class);
         this.compilers.putAll(compilers);
-        this.jointOwners = jointOwners(manifest, this.compilers);
+        this.jointOwners = Compilations.jointOwners(manifest, this.compilers);
         for (ResourceRoot root : manifest.resourceRoots()) {
             resourceRootKinds.put(root.path().toAbsolutePath().normalize(), root.kind());
         }
@@ -811,68 +811,6 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
-     * The roots a compilation of a language reads: its own, and for Kotlin the Java roots too, since kotlinc
-     * resolves the Java sources of a mixed module and KSP processes them, and those of the languages it compiles
-     * jointly; the index of a request takes only the roots of its own language as its sources.
-     */
-    private static List<SourceRoot> compilationRoots(DevManifest manifest, SourceKind kind, Map<SourceKind, SourceKind> jointOwners) {
-        List<SourceRoot> roots = new ArrayList<>(manifest.sourceRoots(kind));
-        if (kind == SourceKind.KOTLIN) {
-            roots.addAll(manifest.sourceRoots(SourceKind.JAVA));
-        }
-        jointOwners.forEach((joint, owner) -> {
-            if (owner == kind) {
-                roots.addAll(manifest.sourceRoots(joint));
-            }
-        });
-        return roots;
-    }
-
-    /**
-     * The options of a compilation of a language: its own, then those of each language it compiles jointly,
-     * since one compiler run compiles them all. A language's options are kept whole, a flag with its value,
-     * and are not repeated when they are the same as the owner's.
-     */
-    private static List<String> compileOptions(DevManifest manifest, SourceKind kind, Map<SourceKind, SourceKind> jointOwners) {
-        List<String> own = manifest.compileOptions(kind);
-        List<String> options = new ArrayList<>(own);
-        jointOwners.forEach((joint, owner) -> {
-            List<String> jointOptions = manifest.compileOptions(joint);
-            if (owner == kind && !jointOptions.equals(own)) {
-                options.addAll(jointOptions);
-            }
-        });
-        return options;
-    }
-
-    /**
-     * The languages a compiler of another language compiles jointly (see {@link SourceCompiler#jointKinds()}):
-     * those it names that have sources, are compiled in this JVM and share its class output.
-     *
-     * @param manifest The manifest
-     * @param compilers The compilers by language
-     * @return The owning language, by jointly compiled language
-     */
-    static Map<SourceKind, SourceKind> jointOwners(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
-        Map<SourceKind, SourceKind> owners = new EnumMap<>(SourceKind.class);
-        compilers.forEach((kind, compiler) -> {
-            if (!embedded(manifest, kind)) {
-                return;
-            }
-            for (SourceKind joint : compiler.jointKinds()) {
-                if (joint != kind && embedded(manifest, joint) && manifest.classOutput(joint).equals(manifest.classOutput(kind))) {
-                    owners.putIfAbsent(joint, kind);
-                }
-            }
-        });
-        return owners;
-    }
-
-    private static boolean embedded(DevManifest manifest, SourceKind kind) {
-        return !manifest.sourceRoots(kind).isEmpty() && manifest.compileMode(kind) != CompileMode.BUILD_TOOL;
-    }
-
-    /**
      * Compiles in full every language whose class output does not exist yet, so that the launcher
      * works from a clean checkout as well as after a build. Runs before the loader takes its first
      * snapshot.
@@ -882,11 +820,11 @@ public final class DevRuntime implements Closeable {
      * @throws IllegalStateException if a compilation fails
      */
     static void compileMissingOutputs(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
-        Map<SourceKind, SourceKind> jointOwners = jointOwners(manifest, compilers);
+        Map<SourceKind, SourceKind> jointOwners = Compilations.jointOwners(manifest, compilers);
         // decided before anything is compiled: two languages sharing one output are both missing, or neither
         Set<SourceKind> missing = new LinkedHashSet<>();
         for (SourceKind kind : compilers.keySet()) {
-            if (!jointOwners.containsKey(kind) && embedded(manifest, kind) && !Files.isDirectory(manifest.classOutput(kind))) {
+            if (!jointOwners.containsKey(kind) && Compilations.embedded(manifest, kind) && !Files.isDirectory(manifest.classOutput(kind))) {
                 missing.add(kind);
             }
         }
@@ -895,8 +833,8 @@ public final class DevRuntime implements Closeable {
             if (!missing.contains(kind)) {
                 continue;
             }
-            CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind, jointOwners), Set.of(), Set.of(), true, manifest.compileClasspath(),
-                manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), compileOptions(manifest, kind, jointOwners)).asFull();
+            CompilationRequest request = new CompilationRequest(kind, Compilations.compilationRoots(manifest, kind, jointOwners), Set.of(), Set.of(), true, manifest.compileClasspath(),
+                manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), Compilations.compileOptions(manifest, kind, jointOwners)).asFull();
             CompilationResult result = entry.getValue().compile(request);
             if (!result.isSuccess()) {
                 CompileFailure failure = new CompileFailure(kind, result.diagnostics(), Instant.now());
@@ -1157,7 +1095,7 @@ public final class DevRuntime implements Closeable {
     private int compiledLanguages(DevManifest target, Map<SourceKind, SourceKind> jointOwners) {
         int languages = 0;
         for (SourceKind kind : compilers.keySet()) {
-            if (!jointOwners.containsKey(kind) && embedded(target, kind)) {
+            if (!jointOwners.containsKey(kind) && Compilations.embedded(target, kind)) {
                 languages++;
             }
         }
@@ -1189,13 +1127,13 @@ public final class DevRuntime implements Closeable {
         Map<SourceKind, Set<String>> known = new EnumMap<>(SourceKind.class);
         for (SourceKind kind : kinds) {
             SourceCompiler compiler = compilers.get(kind);
-            if (compiler == null || joint.containsKey(kind) || !embedded(target, kind)) {
+            if (compiler == null || joint.containsKey(kind) || !Compilations.embedded(target, kind)) {
                 continue;
             }
             SourceChanges change = sources.getOrDefault(kind, SourceChanges.NONE);
-            CompilationRequest request = new CompilationRequest(kind, compilationRoots(target, kind, joint), change.changed(), change.deleted(),
+            CompilationRequest request = new CompilationRequest(kind, Compilations.compilationRoots(target, kind, joint), change.changed(), change.deleted(),
                 full || !target.isIncremental(), target.compileClasspath(), target.processorPath(),
-                target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint));
+                target.classOutput(kind), target.generatedSources(kind), Compilations.compileOptions(target, kind, joint));
             if (!seed.isEmpty()) {
                 request = request.withAffectedClasses(seed);
             }
@@ -1221,7 +1159,7 @@ public final class DevRuntime implements Closeable {
                 // a language compiled in this batch for its own changes is visited again: an unchanged source of
                 // it that references what another language changed was not selected the first time. It is told
                 // only what it does not know yet, so it does not recompile the dependents of its own classes
-                if (joint.containsKey(kind) || !embedded(target, kind)) {
+                if (joint.containsKey(kind) || !Compilations.embedded(target, kind)) {
                     continue;
                 }
                 Set<String> knownToKind = known.computeIfAbsent(kind, k -> new LinkedHashSet<>());
@@ -1231,8 +1169,8 @@ public final class DevRuntime implements Closeable {
                     continue;
                 }
                 knownToKind.addAll(fresh);
-                CompilationRequest request = new CompilationRequest(kind, compilationRoots(target, kind, joint), Set.of(), Set.of(), false, target.compileClasspath(),
-                    target.processorPath(), target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint)).withAffectedClasses(fresh);
+                CompilationRequest request = new CompilationRequest(kind, Compilations.compilationRoots(target, kind, joint), Set.of(), Set.of(), false, target.compileClasspath(),
+                    target.processorPath(), target.classOutput(kind), target.generatedSources(kind), Compilations.compileOptions(target, kind, joint)).withAffectedClasses(fresh);
                 CompilationResult result = entry.getValue().compile(request);
                 if (!result.isSuccess()) {
                     return CompileRound.failed(new CompileFailure(kind, result.diagnostics(), Instant.now()));
@@ -1320,7 +1258,7 @@ public final class DevRuntime implements Closeable {
                 configurationChange = ConfigurationChange.ofAll();
             } else {
                 configurationChange = refresh.change();
-                String stale = staleAfterRefresh(current, refresh.change());
+                String stale = ConfigurationStaleness.afterRefresh(current, refresh.change());
                 if (stale != null) {
                     LOG.info("Restarting for the configuration change: {}", stale);
                 } else if (!refresh.requiresRestart() && changeSet.isEmpty() && !batch.forcesRestart() && !startFailed) {
@@ -1348,103 +1286,6 @@ public final class DevRuntime implements Closeable {
             return;
         }
         restart(changeSet, configurationChange, start);
-    }
-
-    /**
-     * What a refresh cannot update: a singleton that received a changed property through {@code @Value}
-     * or {@code @Property} rather than a configuration bean, and a definition whose {@code @Requires} names a
-     * changed property, whose presence the change may have flipped. Either one makes the batch restart.
-     *
-     * @return Why a restart is needed, or null when the refresh covered the change
-     */
-    @Nullable
-    private static String staleAfterRefresh(@Nullable ApplicationContext current, ConfigurationChange change) {
-        if (current == null || change.all()) {
-            return current == null ? null : "every property may have changed";
-        }
-        // the singletons, and through the graph what they hold: a prototype a singleton received and keeps
-        // is as stale as the singleton would be
-        Set<BeanDefinition<?>> definitions = new LinkedHashSet<>();
-        Optional<io.micronaut.context.BeanDependencyGraph> graph = current instanceof ConfigurableBeanContext configurable ? configurable.findDependencyGraph() : Optional.empty();
-        for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(io.micronaut.inject.qualifiers.Qualifiers.any())) {
-            BeanDefinition<?> definition = registration.getBeanDefinition();
-            definitions.add(definition);
-            graph.ifPresent(g -> definitions.addAll(g.transitiveDependenciesOf(definition)));
-        }
-        for (BeanDefinition<?> definition : definitions) {
-            if (definition.isConfigurationProperties()) {
-                continue;
-            }
-            if (injectsChangedProperty(definition, change)) {
-                return definition.getBeanType().getName() + " injects a changed property directly";
-            }
-        }
-        for (io.micronaut.inject.BeanDefinitionReference<?> reference : current.getBeanDefinitionReferences()) {
-            for (io.micronaut.core.annotation.AnnotationValue<io.micronaut.context.annotation.Requires> requires : reference.getAnnotationMetadata().getAnnotationValuesByType(io.micronaut.context.annotation.Requires.class)) {
-                String property = requires.stringValue("property").orElse(null);
-                if (property != null && change.touches(property)) {
-                    return reference.getBeanDefinitionName() + " requires a changed property";
-                }
-            }
-        }
-        return null;
-    }
-
-    private static boolean injectsChangedProperty(BeanDefinition<?> definition, ConfigurationChange change) {
-        for (io.micronaut.core.type.Argument<?> argument : definition.getConstructor().getArguments()) {
-            if (mentionsChangedProperty(argument.getAnnotationMetadata(), change)) {
-                return true;
-            }
-        }
-        for (io.micronaut.inject.FieldInjectionPoint<?, ?> field : definition.getInjectedFields()) {
-            if (mentionsChangedProperty(field.getAnnotationMetadata(), change)) {
-                return true;
-            }
-        }
-        for (io.micronaut.inject.MethodInjectionPoint<?, ?> method : definition.getInjectedMethods()) {
-            for (io.micronaut.core.type.Argument<?> argument : method.getArguments()) {
-                if (mentionsChangedProperty(argument.getAnnotationMetadata(), change)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Whether an injection point names a changed property: {@code @Property(name = "key")}, or a
-     * {@code @Value} expression with a {@code ${key}} or {@code ${key:default}} placeholder.
-     */
-    static boolean mentionsChangedProperty(io.micronaut.core.annotation.AnnotationMetadata metadata, ConfigurationChange change) {
-        // the raw values: a string value read through the metadata has its placeholders resolved already
-        Object property = metadata.getValues(io.micronaut.context.annotation.Property.class.getName()).get("name");
-        if (property != null && change.touches(property.toString())) {
-            return true;
-        }
-        Object raw = metadata.getValues(io.micronaut.context.annotation.Value.class.getName()).get("value");
-        if (raw == null) {
-            return false;
-        }
-        String expression = raw.toString();
-        if (expression.contains("#{") && expression.contains("env")) {
-            // an evaluated expression reading the environment: which keys it reads is not known, so any change counts
-            return true;
-        }
-        int start = expression.indexOf("${");
-        while (start >= 0) {
-            int end = expression.indexOf('}', start);
-            if (end < 0) {
-                break;
-            }
-            String placeholder = expression.substring(start + 2, end);
-            int colon = placeholder.indexOf(':');
-            String key = (colon >= 0 ? placeholder.substring(0, colon) : placeholder).trim();
-            if (!key.isEmpty() && change.touches(key)) {
-                return true;
-            }
-            start = expression.indexOf("${", end);
-        }
-        return false;
     }
 
     /**
