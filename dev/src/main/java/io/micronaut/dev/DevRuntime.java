@@ -44,6 +44,7 @@ import io.micronaut.dev.livereload.LiveReloadServerFactory;
 import io.micronaut.dev.loader.DevClassLoader;
 import io.micronaut.dev.loader.GenerationClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
+import io.micronaut.dev.manifest.DevReloadStrategy;
 import io.micronaut.dev.manifest.ResourceRoot;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
@@ -71,6 +72,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -225,7 +227,7 @@ public final class DevRuntime implements Closeable {
         ApplicationContext first;
         try {
             snapshot = OutputSnapshot.of(manifest.reloadableRoots());
-            if (manifest.strategy() != ReloadStrategy.RESTART) {
+            if (manifest.strategy() != DevReloadStrategy.RESTART) {
                 // the fast path needs an agent: the launcher's, or one attached now
                 instrumentation = DynamicAttach.instrumentation();
                 if (instrumentation != null && !instrumentation.isRedefineClassesSupported()) {
@@ -305,8 +307,8 @@ public final class DevRuntime implements Closeable {
      * @return The strategy in force: RESTART when the manifest asks for it or no agent is available, otherwise
      *         the manifest's, under which a change to method bodies alone is applied in place and anything else restarts
      */
-    public ReloadStrategy strategy() {
-        return instrumentation == null ? ReloadStrategy.RESTART : manifest.strategy();
+    public DevReloadStrategy strategy() {
+        return instrumentation == null ? DevReloadStrategy.RESTART : manifest.strategy();
     }
 
     /**
@@ -865,12 +867,13 @@ public final class DevRuntime implements Closeable {
      */
     private boolean redefine(ChangeSet changeSet, long startNanos) {
         Instrumentation agent = instrumentation;
-        if (agent == null || strategy() == ReloadStrategy.RESTART || changeSet.classes().isEmpty()
+        if (agent == null || strategy() == DevReloadStrategy.RESTART || changeSet.classes().isEmpty()
             || !changeSet.changedResources().isEmpty() || !changeSet.removedResources().isEmpty()) {
             return false;
         }
         GenerationClassLoader generation = classLoader.current();
         List<ClassDefinition> definitions = new ArrayList<>();
+        Map<String, byte[]> originals = new LinkedHashMap<>();
         Map<String, byte[]> replacements = new LinkedHashMap<>();
         for (ClassChange change : changeSet.classes()) {
             String name = change.className();
@@ -884,14 +887,16 @@ public final class DevRuntime implements Closeable {
             if (before == null || after == null || !ClassStructure.bodyOnlyChange(before, after)) {
                 return false;
             }
+            originals.put(name, before);
             replacements.put(name, after);
         }
         ApplicationContext current = context;
+        ClassFileReplacement snapshotChange = new ClassFileReplacement(generation);
         try {
             // the snapshot first: a class a thread loads from now on is the new version, and one loaded before is
             // found below and redefined; nothing can load the old version in between
             for (Map.Entry<String, byte[]> entry : replacements.entrySet()) {
-                generation.replaceClassFile(entry.getKey(), entry.getValue());
+                snapshotChange.replace(entry.getKey(), Objects.requireNonNull(originals.get(entry.getKey())), entry.getValue());
             }
             for (Map.Entry<String, byte[]> entry : replacements.entrySet()) {
                 Class<?> loaded = generation.loadedClass(entry.getKey());
@@ -903,8 +908,9 @@ public final class DevRuntime implements Closeable {
                 agent.redefineClasses(definitions.toArray(new ClassDefinition[0]));
             }
         } catch (Exception | LinkageError e) {
-            // the snapshot may already hold the new bytes: the restart that follows builds a new generation anyway
-            LOG.info("Cannot redefine {} class(es) in place ({}): restarting instead", replacements.size(), e.getMessage());
+            // the generation keeps the class files it was running with; the restart that follows applies the whole change
+            snapshotChange.rollBack();
+            LOG.info("Cannot redefine {} class(es) in place: restarting instead", replacements.size(), e);
             return false;
         }
         redefinitions.incrementAndGet();
