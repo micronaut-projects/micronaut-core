@@ -1,5 +1,6 @@
 package io.micronaut.dev;
 
+import io.micronaut.dev.manifest.DevReloadStrategy;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.reload.ReloadStrategy;
 import io.micronaut.dev.http.DevRouter;
@@ -45,7 +46,7 @@ class DevRouterInPlaceTest {
 
         DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifest()), new String[] {String.valueOf(port)});
         try {
-            assertEquals(ReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            assertEquals(DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
             ApplicationContext context = runtime.awaitGeneration(1, Duration.ofMinutes(1));
             EmbeddedServer server = context.getBean(EmbeddedServer.class);
             DevRouter router = context.getBean(DevRouter.class);
@@ -98,7 +99,7 @@ class DevRouterInPlaceTest {
             """);
         DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifest()), new String[] {String.valueOf(port)});
         try {
-            assertEquals(ReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            assertEquals(DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
             ApplicationContext context = runtime.awaitGeneration(1, Duration.ofMinutes(1));
             DevRouter router = context.getBean(DevRouter.class);
             awaitServer(port);
@@ -141,7 +142,7 @@ class DevRouterInPlaceTest {
             """);
         DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifest()), new String[] {String.valueOf(port)});
         try {
-            assertEquals(ReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            assertEquals(DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
             ApplicationContext context = runtime.awaitGeneration(1, Duration.ofMinutes(1));
             DevRouter router = context.getBean(DevRouter.class);
             awaitServer(port);
@@ -190,7 +191,7 @@ class DevRouterInPlaceTest {
             """);
         DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifest()), new String[] {String.valueOf(port)});
         try {
-            assertEquals(ReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            assertEquals(DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
             ApplicationContext context = runtime.awaitGeneration(1, Duration.ofMinutes(1));
             DevRouter router = context.getBean(DevRouter.class);
             awaitServer(port);

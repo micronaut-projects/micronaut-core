@@ -18,6 +18,8 @@ package io.micronaut.context;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanConfiguration;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -139,6 +141,8 @@ public interface BeanContextConfiguration {
      * @return The registrations to adopt, empty by default
      * @since 5.3.0
      */
+    @Internal
+    @Experimental
     default Collection<BeanRegistration<?>> getRetainedRegistrations() {
         return Collections.emptyList();
     }
