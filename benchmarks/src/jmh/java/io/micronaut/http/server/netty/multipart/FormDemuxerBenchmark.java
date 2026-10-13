@@ -60,7 +60,7 @@ public class FormDemuxerBenchmark {
 
     @Benchmark
     public int read() {
-        FormDemuxer demuxer = new FormDemuxer(PostBodyDecoder.builder().maxFields(fields).forUrlEncodedData(), channel,
+        FormDemuxer demuxer = new FormDemuxer(PostBodyDecoder.builder().maxFields(fields).forUrlEncodedData(), null, StandardCharsets.UTF_8, channel,
             BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, factory.adapt(form));
         OneAtATime reader = new OneAtATime();
         demuxer.fields().subscribe(reader);
