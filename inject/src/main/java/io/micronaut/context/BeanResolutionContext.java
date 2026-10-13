@@ -151,9 +151,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      *                                                             type
      * @since 5.3.0
      */
-    default <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType) {
-        return getBeanRegistration(definition, beanType).getBean();
-    }
+    <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType);
 
     /**
      * Resolves the registration of the bean of the given definition as the given bean type, on behalf of the bean
