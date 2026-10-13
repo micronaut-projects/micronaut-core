@@ -30,10 +30,10 @@ class PropertiesLoggingLevelsConfigurerSpec extends Specification {
         def env = context.getEnvironment()
         def loggingSystem = new LogbackLoggingSystem(null, null)
         def configuration = context.getBean(PropertiesLoggingLevelsConfigurer.PropertiesLoggingLevelsConfiguration)
-        def configurer = new PropertiesLoggingLevelsConfigurer(env, configuration, List.of(loggingSystem), context as io.micronaut.context.WatchableBeanContext)
+        def configurer = new PropertiesLoggingLevelsConfigurer(env, configuration, List.of(loggingSystem))
 
-        when: "a change under the logger prefix is refreshed: the configurer's watch applies the levels"
-        context.getBean(io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher).refresh(io.micronaut.context.watch.ConfigurationChange.ofKeys(["logger.levels.com.foo.bar"] as Set))
+        when:
+        configurer.refresh()
 
         then:
         def loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory()
@@ -58,6 +58,8 @@ class PropertiesLoggingLevelsConfigurerSpec extends Specification {
 
         expect:
         context.containsBean(io.micronaut.runtime.context.scope.refresh.RefreshScope) == scoped
+        context.containsBean(PropertiesLoggingLevelsWatcher) == scoped
+        context.containsBean(PropertiesLoggingLevelsRefreshListener) == !scoped
         recording.set.count("fn.logger=INFO") == 1
 
         when: "something refreshes the environment and publishes the event, as the refresh endpoint does"
