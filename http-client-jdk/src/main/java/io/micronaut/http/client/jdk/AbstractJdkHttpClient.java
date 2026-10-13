@@ -64,11 +64,11 @@ import java.net.http.HttpTimeoutException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import java.util.concurrent.Flow;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.CompletableFuture;
 import java.util.Objects;
 import java.nio.ByteBuffer;
 

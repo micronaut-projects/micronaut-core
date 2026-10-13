@@ -194,6 +194,29 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
+     * Returns a resolver owned by the bean the current segment of the path belongs to: the bean a field, constructor
+     * argument or method argument is being injected into, or the bean itself when it is resolved by a lookup rather
+     * than injected.
+     *
+     * <p>A bean built for the injection point it is injected into, such as one of an
+     * {@link io.micronaut.inject.provider.AbstractInjectionPointBeanDefinition}, uses it to resolve dependencies on
+     * behalf of the bean it is injected into: a dependent the resolver creates is destroyed with that bean, under the
+     * rules of an injected {@link BeanDependencyResolver}, and can be destroyed earlier with
+     * {@link BeanDependencyResolver#destroy(BeanRegistration)}. The resolver can be retained after the injection.</p>
+     *
+     * <p>The resolver does not share the path of this context: it must not be used to resolve the bean it is owned by
+     * while that bean is being created.</p>
+     *
+     * @return The resolver, or {@code null} if there is no current segment, the bean of the segment is not being
+     * created through this context, or the context does not track bean ownership
+     * @since 5.3.0
+     */
+    @Experimental
+    default @Nullable BeanDependencyResolver getDependencyResolver() {
+        return null;
+    }
+
+    /**
      * Associates a proxy's selected advice with the next creation of its unscoped target. Target construction
      * keeps its own interceptor semantics; the proxy's advice takes precedence for target destruction.
      * @param definition The target definition

@@ -5,3 +5,9 @@ The majority of the methods in the api:http.client.HttpClient[] interface return
 Micronaut's Reactor HTTP Client dependency ships with a sub-interface named link:{micronautreactorapi}/io/micronaut/reactor/http/client/ReactorHttpClient.html[ReactorHttpClient]. It provides a variation of the api:http.client.HttpClient[] interface that returns https://projectreactor.io[Project Reactor] reactor:Flux[] types.
 
 TIP: See the guide for https://guides.micronaut.io/latest/micronaut-http-client.html[Micronaut HTTP Client] to learn more.
+
+The api:http.client.AsyncHttpClient[] exposes `CompletionStage` results for full responses and their converted bodies. Micronaut's clients treat the future returned by `exchange` or `retrieve` as owning the request. Before that future completes, cancelling it or completing it exceptionally, including with `orTimeout`, aborts outstanding work. Cancellation is a best-effort hint: it cannot undo an action the remote server already performed.
+
+A dependent stage created with `thenApply`, `thenCompose`, or another standard stage method does not own the request. Cancelling or timing out only that stage leaves the original request running. Keep the original future and apply a deadline to it when the deadline should abort the request. Do not block on these futures on a client event loop.
+
+This ownership rule applies to client operations, not shared discovery or load-balancer SPI stages. A caller must not cancel or externally complete a shared SPI stage, since other callers may depend on it. Apply a caller-specific timeout to a dependent stage instead.

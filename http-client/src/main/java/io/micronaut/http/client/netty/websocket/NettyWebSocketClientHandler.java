@@ -21,10 +21,14 @@ import io.micronaut.core.bind.DefaultExecutableBinder;
 import io.micronaut.core.bind.ExecutableBinder;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.execution.DelayedExecutionFlow;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.client.LoadBalancer;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
@@ -48,13 +52,16 @@ import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.concurrent.ScheduledFuture;
 import org.jspecify.annotations.Nullable;
-import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Handler for WebSocket clients.
@@ -70,7 +77,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
      * Generic version of {@link #webSocketBean}.
      */
     private final WebSocketBean<T> genericWebSocketBean;
-    private final Sinks.One<T> completion = Sinks.one();
+    private final DelayedExecutionFlow<T> completion = DelayedExecutionFlow.create();
     @Nullable
     private final UriMatchInfo matchInfo;
     @Nullable
@@ -81,6 +88,30 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     private Argument<?> clientBodyArgument;
     @Nullable
     private Argument<?> clientPongArgument;
+    /**
+     * Set once the endpoint was handed to {@link #completion}, or the connect was cancelled
+     * before that: exactly one of the two wins.
+     */
+    private final AtomicBoolean connectSettled = new AtomicBoolean();
+    private volatile boolean connectCancelled;
+    private final AtomicReference<@Nullable Channel> channel = new AtomicReference<>();
+    @Nullable
+    private final Duration handshakeTimeout;
+    @Nullable
+    private ScheduledFuture<?> handshakeTimeoutTask;
+    /**
+     * Whether the stages the handlers return are awaited, see {@link #awaitCompletionStages()}.
+     */
+    private volatile boolean awaitCompletionStages;
+    /**
+     * What the handshake says about the instance, see {@link #getHandshakeOutcome()}: empty when
+     * it says nothing, {@code null} until it is known. The first outcome wins.
+     */
+    private final AtomicReference<@Nullable HandshakeResult> handshakeOutcome = new AtomicReference<>();
+    /**
+     * Whether the channel was connected: a close before that is a failure to connect. Event loop only.
+     */
+    private boolean channelConnected;
 
     /**
      * Default constructor.
@@ -101,12 +132,54 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             MessageBodyHandlerRegistry messageBodyHandlerRegistry,
             ConversionService conversionService) {
+        this(request, webSocketBean, handshaker, requestBinderRegistry, mediaTypeCodecRegistry, messageBodyHandlerRegistry, conversionService, null);
+    }
+
+    /**
+     * Constructor with a handshake timeout.
+     *
+     * @param request                    The originating request that created the WebSocket.
+     * @param webSocketBean              The WebSocket client bean.
+     * @param handshaker                 The handshaker
+     * @param requestBinderRegistry      The request binder registry
+     * @param mediaTypeCodecRegistry     The media type codec registry
+     * @param messageBodyHandlerRegistry The handler registry
+     * @param conversionService          The conversionService
+     * @param handshakeTimeout           How long to wait for the handshake response once connected,
+     *                                   or {@code null} to wait without a limit
+     * @since 5.3.0
+     */
+    public NettyWebSocketClientHandler(
+            MutableHttpRequest<?> request,
+            WebSocketBean<T> webSocketBean,
+            final WebSocketClientHandshaker handshaker,
+            RequestBinderRegistry requestBinderRegistry,
+            MediaTypeCodecRegistry mediaTypeCodecRegistry,
+            MessageBodyHandlerRegistry messageBodyHandlerRegistry,
+            ConversionService conversionService,
+            @Nullable Duration handshakeTimeout) {
         super(requestBinderRegistry, mediaTypeCodecRegistry, messageBodyHandlerRegistry, webSocketBean, request, Collections.emptyMap(), handshaker.version(), handshaker.actualSubprotocol(), null, conversionService);
         this.handshaker = handshaker;
         this.genericWebSocketBean = webSocketBean;
         String clientPath = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("");
         UriMatchTemplate matchTemplate = UriMatchTemplate.of(clientPath);
         this.matchInfo = matchTemplate.tryMatch(request.getPath());
+        this.handshakeTimeout = handshakeTimeout;
+        completion.onCancel(this::cancelConnect);
+    }
+
+    /**
+     * The connect was cancelled: close the connection unless the endpoint was already handed over.
+     * Runs on the cancelling thread.
+     */
+    private void cancelConnect() {
+        connectCancelled = true;
+        if (connectSettled.compareAndSet(false, true)) {
+            Channel ch = channel.get();
+            if (ch != null) {
+                ch.close();
+            }
+        }
     }
 
     @Override
@@ -138,6 +211,12 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) {
+        channel.set(ctx.channel());
+        if (connectCancelled) {
+            // cancelled before the handler was added
+            ctx.close();
+            return;
+        }
         if (ctx.channel().isActive()) {
             channelActive(ctx);
         }
@@ -145,12 +224,28 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     @Override
     public void channelActive(final ChannelHandlerContext ctx) {
+        if (connectCancelled) {
+            ctx.close();
+            return;
+        }
+        channelConnected = true;
+        if (handshakeTimeout != null && !handshakeTimeout.isNegative() && !handshakeTimeout.isZero() && handshakeTimeoutTask == null) {
+            handshakeTimeoutTask = ctx.executor().schedule(() -> {
+                if (!handshaker.isHandshakeComplete()) {
+                    // before the completion, which reports the outcome
+                    settleHandshakeOutcome(LoadBalancer.Outcome.TIMEOUT);
+                    if (completion.tryCompleteExceptionally(new ReadTimeoutException())) {
+                        ctx.close();
+                    }
+                }
+            }, handshakeTimeout.toNanos(), TimeUnit.NANOSECONDS);
+        }
         handshaker.handshake(ctx.channel()).addListener(future -> {
             if (future.isSuccess()) {
                 ctx.channel().config().setAutoRead(true);
                 ctx.read();
             } else {
-                completion.tryEmitError(future.cause());
+                completion.tryCompleteExceptionally(future.cause());
             }
         });
     }
@@ -159,14 +254,21 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
         final Channel ch = ctx.channel();
         if (!handshaker.isHandshakeComplete()) {
+            cancelHandshakeTimeout();
+            if (connectCancelled) {
+                // the connect was cancelled and the channel is closing: the endpoint is not opened
+                return;
+            }
             // web socket client connected
             FullHttpResponse res = (FullHttpResponse) msg;
             this.handshakeResponse = res;
+            // the instance responded, like the response of an HTTP exchange
+            settleHandshakeOutcome(res.status().code() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
             try {
                 handshaker.finishHandshake(ch, res);
             } catch (Exception e) {
                 try {
-                    completion.tryEmitError(new WebSocketClientException("Error finishing WebSocket handshake: " + e.getMessage(), e));
+                    completion.tryCompleteExceptionally(new WebSocketClientException("Error finishing WebSocket handshake: " + e.getMessage(), e));
                 } finally {
                     // clientSession isn't set yet, so we do the close manually instead of through session.close
                     ch.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
@@ -193,7 +295,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 this.clientBodyArgument = null;
 
                 try {
-                    completion.tryEmitError(new WebSocketClientException("WebSocket @OnMessage method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 message parameter, but found 2 possible candidates: " + unboundArguments));
+                    completion.tryCompleteExceptionally(new WebSocketClientException("WebSocket @OnMessage method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 message parameter, but found 2 possible candidates: " + unboundArguments));
                 } finally {
                     if (getSession().isOpen()) {
                         getSession().close(CloseReason.INTERNAL_ERROR);
@@ -212,7 +314,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                     this.clientPongArgument = null;
 
                     try {
-                        completion.tryEmitError(new WebSocketClientException("WebSocket @OnMessage pong handler method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 pong message parameter, but found: " + unboundArguments));
+                        completion.tryCompleteExceptionally(new WebSocketClientException("WebSocket @OnMessage pong handler method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 pong message parameter, but found: " + unboundArguments));
                     } finally {
                         if (getSession().isOpen()) {
                             getSession().close(CloseReason.INTERNAL_ERROR);
@@ -224,10 +326,11 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
             callOpenMethod(ctx).onComplete((v, t) -> {
                 if (t != null) {
-                    completion.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + t.getMessage(), t));
-                } else {
-                    completion.tryEmitValue(targetBean);
+                    completion.tryCompleteExceptionally(new WebSocketSessionException("Error opening WebSocket client session: " + t.getMessage(), t));
+                } else if (connectSettled.compareAndSet(false, true)) {
+                    completion.tryComplete(targetBean);
                 }
+                // else: the connect was cancelled while the open method ran, the channel is closing
             });
             return;
         }
@@ -260,22 +363,140 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         };
     }
 
+    private void cancelHandshakeTimeout() {
+        ScheduledFuture<?> task = handshakeTimeoutTask;
+        if (task != null) {
+            handshakeTimeoutTask = null;
+            task.cancel(false);
+        }
+    }
+
+    @Override
+    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+        cancelHandshakeTimeout();
+        super.handlerRemoved(ctx);
+    }
+
     @Override
     public void exceptionCaught(final ChannelHandlerContext ctx, final Throwable cause) {
-        completion.tryEmitError(cause);
+        if (!handshaker.isHandshakeComplete()) {
+            // e.g. a TLS failure: it says nothing about the instance
+            settleHandshakeOutcome(null);
+        }
+        completion.tryCompleteExceptionally(cause);
         super.exceptionCaught(ctx, cause);
     }
 
-    public final Mono<T> getHandshakeCompletedMono() {
-        return completion.asMono();
+    /**
+     * A flow that completes with the client endpoint bean once the handshake has completed and the
+     * open method has been called, or with the error that prevented that.
+     *
+     * @return The handshake completion flow
+     * @since 5.3.0
+     */
+    public final ExecutionFlow<T> getHandshakeCompletedFlow() {
+        return completion;
+    }
+
+    /**
+     * The client endpoint bean of this connection.
+     *
+     * @return The client endpoint
+     * @since 5.3.0
+     */
+    public final T getClientEndpoint() {
+        return genericWebSocketBean.getTarget();
+    }
+
+    /**
+     * Await the {@link java.util.concurrent.CompletionStage} the open and message handlers of the
+     * endpoint return, like a publisher: the connect completes once the stage of the open handler
+     * completed, and a failed stage reaches the error handler. Used by the connections of an
+     * {@link io.micronaut.websocket.AsyncWebSocketClient}; call it before the handler is added.
+     *
+     * @since 5.3.0
+     */
+    public final void awaitCompletionStages() {
+        awaitCompletionStages = true;
+    }
+
+    @Override
+    protected boolean awaitsCompletionStages() {
+        return awaitCompletionStages;
+    }
+
+    /**
+     * Close the connection of an endpoint that the connect completed with, but that nobody
+     * received because the connect was cancelled at the same time. Unlike the endpoint's own
+     * {@link AutoCloseable#close()}, this closes the session even for an endpoint class that does
+     * not close it.
+     *
+     * @since 5.3.0
+     */
+    public final void closeUnclaimed() {
+        NettyWebSocketSession session = clientSession;
+        if (session != null && session.isOpen()) {
+            session.close(CloseReason.GOING_AWAY);
+        } else {
+            Channel ch = channel.get();
+            if (ch != null) {
+                ch.close();
+            }
+        }
     }
 
     @Override
     protected void handleCloseReason(ChannelHandlerContext ctx, CloseReason cr, boolean writeCloseReason) {
         if (!handshaker.isHandshakeComplete()) {
-            completion.tryEmitError(new WebSocketClientException("Error opening WebSocket client session: " + cr.getReason()));
+            // closed by the instance before it responded, or not connected at all
+            settleHandshakeOutcome(channelConnected ? LoadBalancer.Outcome.RESET : LoadBalancer.Outcome.CONNECT_FAILURE);
+            completion.tryCompleteExceptionally(new WebSocketClientException("Error opening WebSocket client session: " + cr.getReason()));
             return;
         }
         super.handleCloseReason(ctx, cr, writeCloseReason);
+    }
+
+    /**
+     * The connect of the channel of this handler failed: the instance could not be reached, unless
+     * the failure is local, e.g. of the setup of the pipeline.
+     *
+     * @param failure The failure of the connect
+     * @since 5.3.0
+     */
+    public final void connectFailed(Throwable failure) {
+        settleHandshakeOutcome(failure instanceof WebSocketSessionException ? null : LoadBalancer.Outcome.CONNECT_FAILURE);
+    }
+
+    /**
+     * What the handshake says about the instance, to report to the load balancer that selected it,
+     * like the outcome of an HTTP exchange: {@link LoadBalancer.Outcome#SUCCESS} or
+     * {@link LoadBalancer.Outcome#SERVER_ERROR} once the instance responded to the upgrade,
+     * {@link LoadBalancer.Outcome#CONNECT_FAILURE} when it could not be reached,
+     * {@link LoadBalancer.Outcome#TIMEOUT} when it did not respond within the handshake timeout,
+     * {@link LoadBalancer.Outcome#RESET} when it closed the connection before it responded.
+     *
+     * @return The outcome, or {@code null} if the handshake says nothing about the instance (yet),
+     * or the connect was cancelled
+     * @since 5.3.0
+     */
+    public final LoadBalancer.@Nullable Outcome getHandshakeOutcome() {
+        if (connectCancelled) {
+            return null;
+        }
+        HandshakeResult result = handshakeOutcome.get();
+        return result == null ? null : result.outcome();
+    }
+
+    private void settleHandshakeOutcome(LoadBalancer.@Nullable Outcome outcome) {
+        handshakeOutcome.compareAndSet(null, new HandshakeResult(outcome));
+    }
+
+    /**
+     * A settled handshake, including one that provides no load-balancer outcome.
+     *
+     * @param outcome The outcome to report, or {@code null} if the handshake says nothing about the instance
+     */
+    @Internal
+    private record HandshakeResult(LoadBalancer.@Nullable Outcome outcome) {
     }
 }
