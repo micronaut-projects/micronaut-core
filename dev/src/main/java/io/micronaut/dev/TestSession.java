@@ -121,7 +121,7 @@ final class TestSession {
         this.runtime = runtime;
         this.manifest = manifest;
         this.tests = manifest.testView();
-        this.testJoint = DevRuntime.jointOwners(tests, compilers);
+        this.testJoint = Compilations.jointOwners(tests, compilers);
         this.settings = manifest.testSettings();
         this.runner = runner(settings.runner());
         this.xml = new JUnitXmlReportWriter(settings.reports());
