@@ -16,9 +16,13 @@
 package io.micronaut.dev.compile
 
 import io.micronaut.dev.compile.processor.MarkedProcessor
+import io.micronaut.core.value.OptionalValues
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import spock.lang.Specification
 import spock.lang.TempDir
 
+import javax.tools.ToolProvider
+import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -413,6 +417,19 @@ class JavacSourceCompilerSpec extends Specification {
         return file
     }
 
+    void "the processors load with the processor path alone, so a package they share with the launch class path is not split"() {
+        given: "a processor in micronaut-inject's package that uses one of its package-private classes, on a processor path"
+        Path processor = compileSplitPackageProcessor()
+        write("example/Alone.java", "package example; public class Alone { }")
+
+        when: "micronaut-inject is on the processor path as a separate copy, and on the launch class path as well, as a build plugin launches a project"
+        def result = compiler.compile(request([] as Set, [] as Set, [processor, copyOf(INJECT), copyOf(CORE)]).asFull())
+
+        then: "the processor and its package's classes come from the processor path, so the package-private class is accessible"
+        result.status == CompilationResult.Status.SUCCESS
+        Files.readString(out.resolve("META-INF/split-package")) == "io.micronaut.inject.annotation.EnvironmentOptionalValuesMap"
+    }
+
     private CompilationRequest request(Set<Path> changed = [] as Set, Set<Path> deleted = [] as Set, List<Path> processorPath = []) {
         new CompilationRequest(SourceKind.JAVA, [new SourceRoot(SourceKind.JAVA, src)], changed, deleted, false, processorPath, processorPath, out, generated, ["-parameters"])
     }
@@ -434,5 +451,84 @@ class JavacSourceCompilerSpec extends Specification {
         } finally {
             loader.close()
         }
+    }
+
+    private static final Path INJECT = Path.of(AnnotationMetadataHierarchy.protectionDomain.codeSource.location.toURI())
+    private static final Path CORE = Path.of(OptionalValues.protectionDomain.codeSource.location.toURI())
+
+    /**
+     * A copy of a launch class path entry, so that the processor path differs from the launch class path.
+     */
+    private Path copyOf(Path entry) {
+        Path copy = project.resolve("processor-path").resolve(entry.fileName.toString() + "-" + entry.hashCode())
+        if (Files.isDirectory(entry)) {
+            Files.walk(entry).withCloseable { paths ->
+                paths.forEach { Path path ->
+                    Path target = copy.resolve(entry.relativize(path).toString())
+                    if (Files.isDirectory(path)) {
+                        Files.createDirectories(target)
+                    } else {
+                        Files.copy(path, target)
+                    }
+                }
+            }
+        } else {
+            Files.createDirectories(copy.parent)
+            Files.copy(entry, copy)
+        }
+        copy
+    }
+
+    /**
+     * Compiles a processor declared in micronaut-inject's package, which reads a package-private class of it, with
+     * its service file, into a directory of its own: it is not on the launch class path.
+     */
+    private Path compileSplitPackageProcessor() {
+        Path sources = Files.createDirectories(project.resolve("split/src/io/micronaut/inject/annotation"))
+        Path classes = Files.createDirectories(project.resolve("split/classes"))
+        Path source = sources.resolve("SplitPackageProcessor.java")
+        Files.writeString(source, """
+            package io.micronaut.inject.annotation;
+
+            import java.io.IOException;
+            import java.io.UncheckedIOException;
+            import java.io.Writer;
+            import java.util.Set;
+            import javax.annotation.processing.AbstractProcessor;
+            import javax.annotation.processing.RoundEnvironment;
+            import javax.annotation.processing.SupportedAnnotationTypes;
+            import javax.lang.model.SourceVersion;
+            import javax.lang.model.element.TypeElement;
+            import javax.tools.StandardLocation;
+
+            @SupportedAnnotationTypes("*")
+            public class SplitPackageProcessor extends AbstractProcessor {
+                private boolean written;
+
+                @Override
+                public SourceVersion getSupportedSourceVersion() {
+                    return SourceVersion.latestSupported();
+                }
+
+                @Override
+                public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment round) {
+                    if (!written) {
+                        written = true;
+                        try (Writer writer = processingEnv.getFiler().createResource(StandardLocation.CLASS_OUTPUT, "", "META-INF/split-package").openWriter()) {
+                            writer.write(EnvironmentOptionalValuesMap.class.getName());
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    }
+                    return false;
+                }
+            }
+            """.stripIndent())
+        int status = ToolProvider.systemJavaCompiler.run(null, null, null, "-proc:none",
+            "-cp", [INJECT, CORE].join(File.pathSeparator), "-d", classes.toString(), source.toString())
+        assert status == 0
+        Path services = Files.createDirectories(classes.resolve("META-INF/services"))
+        Files.writeString(services.resolve("javax.annotation.processing.Processor"), "io.micronaut.inject.annotation.SplitPackageProcessor")
+        classes
     }
 }
