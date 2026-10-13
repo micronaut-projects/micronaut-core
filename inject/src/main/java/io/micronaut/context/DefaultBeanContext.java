@@ -55,6 +55,8 @@ import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.context.reload.ResourceKind;
+import io.micronaut.context.reload.RetainingBeanContext;
+import io.micronaut.context.reload.RetentionCriteria;
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.watch.ClassChangeWatchRequest;
 import io.micronaut.context.watch.ConfigurationChange;
@@ -174,7 +176,7 @@ import java.util.stream.StreamSupport;
 @Internal
 @NextMajorVersion("Remove public in v6")
 @SuppressWarnings("MagicNumber")
-public sealed class DefaultBeanContext implements ConfigurableBeanContext, WatchableBeanContext, BeanWatchNotifier permits DefaultApplicationContext {
+public sealed class DefaultBeanContext implements ConfigurableBeanContext, RetainingBeanContext, WatchableBeanContext, BeanWatchNotifier permits DefaultApplicationContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
@@ -305,6 +307,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * The recorded dependency graph, null when the context does not track dependencies. Decided by the configuration
      * as the context is constructed, or by its environment as it starts (see {@link #isBeanDependencyTrackingEnabledOnStart()}),
      * in both cases before the context creates a bean; it only ever goes from null to a graph.
+     *
+     * <p>Not volatile on purpose: it is read on every bean creation, and it is written only inside the synchronized
+     * {@link #start()}, before the context creates its first bean. Another thread that creates beans got the context
+     * through a happens-before edge after that (it started the context, or was handed it by the starter), so it sees
+     * the graph; a thread racing {@code start()} itself is not supported by the context anyway.</p>
      */
     @Nullable
     private DefaultBeanDependencyGraph dependencyGraph;
@@ -318,10 +325,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      */
     private final AtomicReference<@Nullable RetentionCriteria> retentionCriteria = new AtomicReference<>();
     /**
-     * The instances the {@link #stopRetaining(RetentionCriteria)} in progress keeps, once decided.
+     * The instances the {@link #stopRetaining(RetentionCriteria)} in progress keeps, once decided; read without the
+     * lock by {@link #isRetainedOnStop(Object)} once it is.
      */
     @Nullable
-    private Set<Object> retainedOnStopBeans;
+    private volatile Set<Object> retainedOnStopBeans;
     private final List<BeanRegistration<?>> retainedOnStop = new ArrayList<>();
     /**
      * Retained registrations this context has no definition for, destroyed once its listeners exist.
@@ -4672,17 +4680,25 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
     @Experimental
     public Collection<BeanRegistration<?>> stopRetaining(Predicate<BeanRegistration<?>> retain) {
         ArgumentUtils.requireNonNull("retain", retain);
-        return stopRetaining(new RetentionCriteria() {
-            @Override
-            public boolean retain(BeanRegistration<?> registration) {
-                return retain.test(registration);
-            }
+        return stopRetaining(new PredicateRetentionCriteria(retain));
+    }
 
-            @Override
-            public Set<String> invalidatedBy(BeanRegistration<?> registration) {
-                return Set.of();
-            }
-        });
+    /**
+     * The criteria of {@link #stopRetaining(Predicate)}, which know of no configuration change: a configuration bean a
+     * retained bean holds is retained with it, as any other bean it holds.
+     *
+     * @param retain Which singleton registrations to keep alive
+     */
+    private record PredicateRetentionCriteria(Predicate<BeanRegistration<?>> retain) implements RetentionCriteria {
+        @Override
+        public boolean retain(BeanRegistration<?> registration) {
+            return retain.test(registration);
+        }
+
+        @Override
+        public Set<String> observedConfigurationPrefixes(BeanRegistration<?> registration) {
+            return Set.of();
+        }
     }
 
     /**
@@ -4690,7 +4706,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * {@link RetentionCriteria#retain(BeanRegistration) retain}. A configuration bean, one of
      * {@link io.micronaut.context.annotation.ConfigurationProperties}, {@link io.micronaut.context.annotation.EachProperty}
      * or another {@link ConfigurationReader}, that a retained bean holds does not keep it from being retained when its
-     * prefix is one of the prefixes {@link RetentionCriteria#invalidatedBy(BeanRegistration) whose change releases} the
+     * prefix is one of the prefixes {@link RetentionCriteria#observedConfigurationPrefixes(BeanRegistration) whose change releases} the
      * retained bean, or under one: the configuration bean is not retained, the next context creates its own, and the
      * retained bean keeps what it copied from it, which stays valid until a change under that prefix releases the
      * bean. A retained bean must therefore not keep its configuration bean, only its values. A configuration bean
@@ -5147,45 +5163,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             for (BeanRegistration<?> dependent : disposing.dependentBeans()) {
                 collectDependencies(dependent, into, visited);
             }
-        }
-    }
-
-    /**
-     * What {@link #stopRetaining(RetentionCriteria)} asks about the singletons of the context it stops.
-     *
-     * @since 5.3.0
-     */
-    @Internal
-    @Experimental
-    public interface RetentionCriteria {
-
-        /**
-         * Whether a singleton survives the restart, with what it holds.
-         *
-         * @param registration The singleton's registration
-         * @return True to retain it
-         */
-        boolean retain(BeanRegistration<?> registration);
-
-        /**
-         * The configuration prefixes a change under which releases a singleton this retains: a configuration bean
-         * under one of them that the singleton holds is not retained with it, nor does it keep it from being retained.
-         *
-         * @param registration The retained singleton's registration
-         * @return The prefixes, empty when no configuration change releases it
-         */
-        Set<String> invalidatedBy(BeanRegistration<?> registration);
-
-        /**
-         * Whether the restart replaces a class, so that a retained bean bound to it would keep the stopped generation
-         * of the application reachable and run its old code: a bean whose closure has a definition, an instance or a
-         * prototype it owns of such a class is not retained.
-         *
-         * @param type The class of a definition or an instance in the closure of a retained bean
-         * @return True when the class is replaced
-         */
-        default boolean isReplaced(Class<?> type) {
-            return false;
         }
     }
 
@@ -5671,6 +5648,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
      * @return True when a retention is in progress and retains it
      * @since 5.3.0
      */
+    @Override
     @Internal
     @Experimental
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -5679,9 +5657,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             // no retention in progress: the common stop, which asks nothing more
             return false;
         }
-        synchronized (this) {
-            return retainedBeans((List) BeanDestructionOrder.sort((Collection) singletonScope.getBeanRegistrations())).contains(bean);
+        Set<Object> retained = retainedOnStopBeans;
+        if (retained == null) {
+            // the first question decides, over the singletons in destruction order; the later ones read the decision
+            synchronized (this) {
+                retained = retainedOnStopBeans;
+                if (retained == null) {
+                    retained = retainedBeans((List) BeanDestructionOrder.sort((Collection) singletonScope.getBeanRegistrations()));
+                }
+            }
         }
+        return retained.contains(bean);
     }
 
     private Set<Object> decideRetainedBeans(List<BeanRegistration> registrations) {
@@ -5695,7 +5681,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Watch
             // this context (a provider, a proxy, the context itself) keeps the whole closure from being retained,
             // except configuration a change of which releases the bean: it is not retained, but made again by the next context
             List<BeanRegistration<?>> closure = new ArrayList<>();
-            Set<String> invalidatedBy = criteria.invalidatedBy(registration);
+            Set<String> invalidatedBy = criteria.observedConfigurationPrefixes(registration);
             BeanRegistration<?> bound = collectRetentionClosure(registration, invalidatedBy, closure, Collections.newSetFromMap(new IdentityHashMap<>()));
             if (bound != null) {
                 if (LOG_LIFECYCLE.isWarnEnabled()) {

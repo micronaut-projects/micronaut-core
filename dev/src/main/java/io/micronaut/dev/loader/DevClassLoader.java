@@ -18,6 +18,7 @@ package io.micronaut.dev.loader;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.beans.ReloadableBeanIntrospector;
 import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataSupport;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -141,6 +142,8 @@ public final class DevClassLoader extends ClassLoader {
         // this loader now delegates to another generation, and the retired one is gone for good
         ReloadableBeanIntrospector.invalidateShared(this);
         ReloadableBeanIntrospector.invalidateShared(previous);
+        // the annotation types it defined give way to the next generation's, and their proxies let it go
+        AnnotationMetadataSupport.retireClassLoader(previous);
         return previous;
     }
 
