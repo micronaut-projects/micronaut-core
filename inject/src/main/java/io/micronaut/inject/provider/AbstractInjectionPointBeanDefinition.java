@@ -18,11 +18,15 @@ package io.micronaut.inject.provider;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.exceptions.BeanDestructionException;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.qualifiers.AnyQualifier;
@@ -47,9 +51,13 @@ import java.util.List;
  *     <li>The definition's declared qualifier is {@link AnyQualifier}: it is a candidate for an injection point of
  *     any qualifier, and the qualifier is for the bean to read.</li>
  *     <li>The bean type has one type variable, {@code T}, which the type argument of the injection point
- *     binds.</li>
+ *     binds. Each of the {@link #getExposedTypes() exposed types} is bound the same way.</li>
  *     <li>The definition is its own reference, named after its class, and definitions of one class are equal.</li>
+ *     <li>The annotation metadata is the one given to the constructor, empty by default.</li>
  * </ul>
+ *
+ * <p>The bean is not disposed of: a definition whose bean has to be let go of when the bean it is injected into
+ * is destroyed extends {@link Disposable} instead.</p>
  *
  * @param <T> The bean type
  * @author Denis Stepanov
@@ -59,6 +67,25 @@ import java.util.List;
 public abstract class AbstractInjectionPointBeanDefinition<T> implements InstantiatableBeanDefinition<T>, BeanDefinitionReference<T> {
 
     private static final Argument<Object> TYPE_VARIABLE = Argument.ofTypeVariable(Object.class, "T");
+
+    private final AnnotationMetadata annotationMetadata;
+
+    /**
+     * A definition with no annotation metadata.
+     */
+    protected AbstractInjectionPointBeanDefinition() {
+        this(AnnotationMetadata.EMPTY_METADATA);
+    }
+
+    /**
+     * A definition with the given annotation metadata, such as one declaring {@link AnnotationUtil#NULLABLE} for
+     * a bean that may be built as {@code null}.
+     *
+     * @param annotationMetadata The annotation metadata of the definition
+     */
+    protected AbstractInjectionPointBeanDefinition(AnnotationMetadata annotationMetadata) {
+        this.annotationMetadata = annotationMetadata;
+    }
 
     /**
      * Builds the bean for the injection point it is injected into.
@@ -124,9 +151,42 @@ public abstract class AbstractInjectionPointBeanDefinition<T> implements Instant
     }
 
     @Override
-    public final List<Argument<?>> getTypeArguments(Class<?> type) {
-        if (type == getBeanType()) {
+    public AnnotationMetadata getAnnotationMetadata() {
+        return annotationMetadata;
+    }
+
+    /**
+     * The type arguments of the bean type, or of one of the types it is exposed as.
+     *
+     * <p>Every one of the {@link #getExposedTypes() exposed types} is given the type arguments of the bean type,
+     * the way a {@code Provider<T>} implemented by a {@code BeanProvider<T>} is. The type parameters of an exposed
+     * type are not read reflectively, so a definition exposed as a type that is parameterized otherwise, or not at
+     * all, overrides this for that type.</p>
+     *
+     * @param type The bean type or an exposed type
+     * @return The type arguments, or an empty list for any other type
+     */
+    @Override
+    public List<Argument<?>> getTypeArguments(Class<?> type) {
+        if (type == getBeanType() || getExposedTypes().contains(type)) {
             return getTypeArguments();
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<Argument<?>> getTypeArguments(@Nullable String type) {
+        if (type == null) {
+            return Collections.emptyList();
+        }
+        Class<T> beanType = getBeanType();
+        if (beanType.getName().equals(type)) {
+            return getTypeArguments(beanType);
+        }
+        for (Class<?> exposedType : getExposedTypes()) {
+            if (exposedType.getName().equals(type)) {
+                return getTypeArguments(exposedType);
+            }
         }
         return Collections.emptyList();
     }
@@ -153,5 +213,64 @@ public abstract class AbstractInjectionPointBeanDefinition<T> implements Instant
     @Override
     public int hashCode() {
         return getClass().hashCode();
+    }
+
+    /**
+     * A definition whose bean is disposed of with the bean it is injected into.
+     *
+     * <p>Only this subclass is a {@link DisposableBeanDefinition}: the context disposes of a bean only when its
+     * definition is one, so a definition whose bean needs no disposing, such as a provider, keeps the behaviour it
+     * had.</p>
+     *
+     * @param <T> The bean type
+     * @since 5.3.0
+     */
+    @Experimental
+    public abstract static class Disposable<T> extends AbstractInjectionPointBeanDefinition<T> implements DisposableBeanDefinition<T> {
+
+        /**
+         * A definition with no annotation metadata.
+         */
+        protected Disposable() {
+        }
+
+        /**
+         * A definition with the given annotation metadata.
+         *
+         * @param annotationMetadata The annotation metadata of the definition
+         */
+        protected Disposable(AnnotationMetadata annotationMetadata) {
+            super(annotationMetadata);
+        }
+
+        /**
+         * Disposes of a bean this definition built, when the bean it was injected into is destroyed.
+         *
+         * <p>By default an {@link AutoCloseable} bean is closed.</p>
+         *
+         * @param context The bean context
+         * @param bean    The bean
+         */
+        protected void destroy(BeanContext context, T bean) {
+            if (bean instanceof AutoCloseable closeable) {
+                try {
+                    closeable.close();
+                } catch (Exception e) {
+                    throw new BeanDestructionException(this, e);
+                }
+            }
+        }
+
+        @Override
+        public final T dispose(BeanContext context, T bean) {
+            destroy(context, bean);
+            return bean;
+        }
+
+        @Override
+        public final T dispose(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+            destroy(context, bean);
+            return bean;
+        }
     }
 }

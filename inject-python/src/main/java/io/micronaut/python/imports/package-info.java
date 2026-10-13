@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2022 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,21 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.netty;
-
-import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
-import reactor.core.publisher.Sinks;
-
 /**
- * Sink with an additional optional {@link BlockHint} as metadata.
+ * Curated Python modules: the {@link io.micronaut.python.imports.PythonImportMapper} SPI that gathers the names
+ * of several Java packages behind one Python import, and their resolution against a class path.
  *
- * @param <T> The type that can be submitted to this sink.
- * @author Jonas Konrad
- * @since 4.0.0
+ * @author Graeme Rocher
+ * @since 5.3.0
  */
-@Internal
-interface PoolSink<T> extends Sinks.One<T> {
-    @Nullable
-    BlockHint getBlockHint();
-}
+@NullMarked
+package io.micronaut.python.imports;
+
+import org.jspecify.annotations.NullMarked;

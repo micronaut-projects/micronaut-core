@@ -89,6 +89,8 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     private final ClassElement owningType;
     private final ClassElement returnType;
     private final PythonParameterElement[] parameters;
+    /** The parameters injected with a bean ({@code ctx: ApplicationContext = Inject()}), hidden from the method. */
+    private final List<InjectedArgument> injectedArguments = new ArrayList<>();
     private final MethodElementAnnotationsHelper helper;
 
     private ClassElement resolvedGenericReturnType;
@@ -100,6 +102,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     private ElementAnnotationMetadata resolvedMergedMethodAnnotationMetadata;
     private AnnotationMetadata resolvedInheritedMethodAnnotationMetadata;
     private Collection<MethodElement> resolvedOverriddenMethods;
+    private Collection<MethodElement> resolvedDeclaringTypeOverriddenMethods;
     private Boolean resolvedParameterTypeRequired;
     private ParameterElement[] resolvedParameters;
 
@@ -314,7 +317,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     private AnnotationMetadata getOverriddenMethodAnnotationMetadata() {
         AnnotationMetadata inheritedMetadata = AnnotationMetadata.EMPTY_METADATA;
-        for (MethodElement overriddenMethod : getOverriddenMethods()) {
+        for (MethodElement overriddenMethod : getDeclaringTypeOverriddenMethods()) {
             AnnotationMetadata methodMetadata = overriddenMethod.getMethodAnnotationMetadata();
             if (methodMetadata.isEmpty()) {
                 continue;
@@ -509,12 +512,41 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         return resolvedParameterTypeRequired;
     }
 
+    /**
+     * The methods this method overrides as a member of its owning type, as javac reports them for the Java stub:
+     * the methods it overrides in the hierarchy of its declaring type and, for an inherited method, the methods
+     * it implements of the interfaces the owning type introduces.
+     *
+     * @return The overridden methods
+     */
     @Override
     public Collection<MethodElement> getOverriddenMethods() {
         if (resolvedOverriddenMethods == null) {
-            resolvedOverriddenMethods = resolveOverriddenMethods();
+            Collection<MethodElement> overriddenMethods = getDeclaringTypeOverriddenMethods();
+            List<MethodElement> implementedMethods = resolveImplementedMethods();
+            if (implementedMethods.isEmpty()) {
+                resolvedOverriddenMethods = overriddenMethods;
+            } else {
+                List<MethodElement> allOverriddenMethods = new ArrayList<>(overriddenMethods);
+                allOverriddenMethods.addAll(implementedMethods);
+                resolvedOverriddenMethods = List.copyOf(allOverriddenMethods);
+            }
         }
         return resolvedOverriddenMethods;
+    }
+
+    /**
+     * The methods this method overrides in the hierarchy of its declaring type. The method and its parameters
+     * inherit the annotations of these, as a Java method inherits those of the methods it overrides in the type
+     * declaring it.
+     *
+     * @return The overridden methods
+     */
+    Collection<MethodElement> getDeclaringTypeOverriddenMethods() {
+        if (resolvedDeclaringTypeOverriddenMethods == null) {
+            resolvedDeclaringTypeOverriddenMethods = resolveOverriddenMethods();
+        }
+        return resolvedDeclaringTypeOverriddenMethods;
     }
 
     @Override
@@ -527,7 +559,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     private ParameterElement[] resolveParameters() {
         PythonParameterElement[] resolved = parameters;
-        for (MethodElement overriddenMethod : getOverriddenMethods()) {
+        for (MethodElement overriddenMethod : getDeclaringTypeOverriddenMethods()) {
             ParameterElement[] overriddenParameters = overriddenMethod.getParameters();
             if (overriddenParameters.length != resolved.length) {
                 continue;
@@ -570,6 +602,33 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
             }
         }
         return overriddenMethods.isEmpty() ? List.of() : List.copyOf(overriddenMethods);
+    }
+
+    /**
+     * The methods an inherited method implements of the interfaces the owning type, or a class between it and the
+     * declaring type, introduces: the Java stub of the owning type implements them with the inherited method. The
+     * interfaces the declaring type implements itself are covered by its overridden methods.
+     */
+    private List<MethodElement> resolveImplementedMethods() {
+        if (isAbstract() || isStatic() || declaringType.getName().equals(owningType.getName())) {
+            return List.of();
+        }
+        List<MethodElement> implementedMethods = new ArrayList<>();
+        ClassElement type = owningType;
+        while (type != null && !type.getName().equals(declaringType.getName())) {
+            for (ClassElement anInterface : type.getInterfaces()) {
+                if (declaringType.isAssignable(anInterface)) {
+                    continue;
+                }
+                for (MethodElement candidate : anInterface.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance())) {
+                    if (!candidate.isPrivate() && isSubSignature(candidate, parameters) && !implementedMethods.contains(candidate)) {
+                        implementedMethods.add(candidate);
+                    }
+                }
+            }
+            type = type.getSuperType().orElse(null);
+        }
+        return implementedMethods;
     }
 
     private boolean isSubSignature(MethodElement overridden, ParameterElement[] currentParameters) {
@@ -757,10 +816,51 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
         for (int i = offset; i < size; i++) {
             ArgumentDef argDef = arguments.get(i);
+            if (isInjectedArgument(argDef)) {
+                // a bean, not an argument of the method: the bridge passes the bean the module or object holds
+                injectedArguments.add(new InjectedArgument(i - offset, argDef.name(), injectedAttributeName(functionDef.name(), argDef.name())));
+                continue;
+            }
             created.add(new PythonParameterElement(argDef, environment, this, getElementAnnotationMetadataFactory()));
         }
 
         return created.toArray(new PythonParameterElement[0]);
+    }
+
+    /**
+     * The parameters injected with a bean, by their position among the Python parameters (the receiver excluded):
+     * left out of the method Micronaut sees, they are passed by the generated bridge from the attribute the bean is
+     * injected into.
+     *
+     * @return The injected parameters, in declaration order
+     */
+    public List<InjectedArgument> injectedArguments() {
+        return List.copyOf(injectedArguments);
+    }
+
+    /**
+     * The name of the attribute holding the bean of an injected parameter; the processor declares it.
+     *
+     * @param functionName  The function name
+     * @param parameterName The parameter name
+     * @return The attribute name
+     */
+    public static String injectedAttributeName(String functionName, String parameterName) {
+        return "micronaut_inject_" + functionName + "_" + parameterName;
+    }
+
+    private static boolean isInjectedArgument(ArgumentDef argument) {
+        return argument.injected();
+    }
+
+    /**
+     * A parameter injected with a bean.
+     *
+     * @param position  The position among the Python parameters, the receiver excluded
+     * @param name      The parameter name
+     * @param attribute The attribute holding the bean
+     */
+    public record InjectedArgument(int position, String name, String attribute) {
     }
 
     @Override

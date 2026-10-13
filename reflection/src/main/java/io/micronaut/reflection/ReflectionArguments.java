@@ -539,7 +539,7 @@ public final class ReflectionArguments {
             Argument<?> argument = toArgument(null, mat.actual, substitutions, resolving);
             return rebuild(argument, name, combine(argument.getAnnotationMetadata(), ReflectionAnnotations.metadataOf(mat)), argument.getTypeParameters());
         } else {
-            Argument<?> simple = toArgument(null, annotatedType.getType(), substitutions, resolving);
+            Argument<?> simple = toArgument(null, annotatedType.getType(), substitutions, resolving, false);
             AnnotationMetadata annotations = ReflectionAnnotations.metadataOf(annotatedType);
             return rebuild(simple, name, combine(annotations, simple.getAnnotationMetadata()), simple.getTypeParameters());
         }
@@ -554,7 +554,7 @@ public final class ReflectionArguments {
      * @return The converted argument
      */
     private static Argument<?> toArgument(@Nullable String name, Type type, Map<TypeVariable<?>, AnnotatedType> substitutions) {
-        return toArgument(name, type, substitutions, Set.of());
+        return toArgument(name, type, substitutions, Set.of(), true);
     }
 
     /**
@@ -564,28 +564,30 @@ public final class ReflectionArguments {
      * @param type          The type to convert
      * @param substitutions Type variables to replace
      * @param resolving     The type variables whose bounds are being converted
+     * @param declaration   Whether a type variable is the declaration of the variable rather than a use of it
      * @return The converted argument
      */
     private static Argument<?> toArgument(@Nullable String name,
                                           Type type,
                                           Map<TypeVariable<?>, AnnotatedType> substitutions,
-                                          Set<TypeVariable<?>> resolving) {
+                                          Set<TypeVariable<?>> resolving,
+                                          boolean declaration) {
         if (type instanceof ParameterizedType pt) {
             Class<?> rawType = getRawType(pt.getRawType());
             TypeVariable<?>[] variables = rawType.getTypeParameters();
             Type[] actualTypeArguments = pt.getActualTypeArguments();
             Argument<?>[] typeArgs = new Argument[actualTypeArguments.length];
             for (int i = 0; i < typeArgs.length; i++) {
-                typeArgs[i] = toArgument(variables.length > i ? variables[i].getName() : null, actualTypeArguments[i], substitutions, resolving);
+                typeArgs[i] = toArgument(variables.length > i ? variables[i].getName() : null, actualTypeArguments[i], substitutions, resolving, false);
             }
             return Argument.of(rawType, name, typeArgs);
         } else if (type instanceof GenericArrayType gat) {
-            Argument<?> component = toArgument(null, gat.getGenericComponentType(), substitutions, resolving);
+            Argument<?> component = toArgument(null, gat.getGenericComponentType(), substitutions, resolving, false);
             return Argument.of(Array.newInstance(component.getType(), 0).getClass(), name, component.getAnnotationMetadata());
         } else if (type instanceof WildcardType wt) {
             Type[] lowerBounds = wt.getLowerBounds();
             Type[] bounds = lowerBounds.length == 0 ? wt.getUpperBounds() : lowerBounds;
-            return toArgument(name, bounds.length == 0 ? Object.class : bounds[0], substitutions, resolving);
+            return toArgument(name, bounds.length == 0 ? Object.class : bounds[0], substitutions, resolving, false);
         } else if (type instanceof Class<?> cl) {
             TypeVariable<?>[] variables = cl.getTypeParameters();
             if (variables.length == 0) {
@@ -595,7 +597,7 @@ public final class ReflectionArguments {
             // arguments the type declares, the way the processors write it
             Argument<?>[] typeArgs = new Argument[variables.length];
             for (int i = 0; i < typeArgs.length; i++) {
-                typeArgs[i] = toArgument(variables[i].getName(), variables[i], Map.of(), resolving);
+                typeArgs[i] = toArgument(variables[i].getName(), variables[i], Map.of(), resolving, true);
             }
             return Argument.ofRawType(cl, name, null, typeArgs);
         } else if (type instanceof TypeVariable<?> tv) {
@@ -604,9 +606,9 @@ public final class ReflectionArguments {
                 return toArgument(name, sub, Map.of(), resolving);
             }
             // a variable is an annotated element of its own: `class Bean<@Mark T>` annotates the declaration
-            // of the variable rather than any use of it, and a generated argument standing for the variable
-            // carries it, so it is read before the annotations of the bound
-            AnnotationMetadata declared = ReflectionAnnotations.metadataOf(tv);
+            // of the variable rather than any use of it, so only an argument standing for the declaration
+            // carries it, read before the annotations of the bound
+            AnnotationMetadata declared = declaration ? ReflectionAnnotations.metadataOf(tv) : AnnotationMetadata.EMPTY_METADATA;
             if (resolving.contains(tv)) {
                 // a bound naming the variable it bounds - `T extends Comparable<T>` - would be converted for
                 // ever: inside its own bound the variable stands for the erasure of that bound

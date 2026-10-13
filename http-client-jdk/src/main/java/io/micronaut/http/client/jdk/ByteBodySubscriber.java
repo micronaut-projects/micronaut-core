@@ -31,7 +31,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -105,12 +104,31 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
         } else if (item.size() == 1) {
             defer.onNext(BODY_FACTORY.readBufferFactory().adapt(item.get(0)));
         } else {
-            List<ReadBuffer> buffers = new ArrayList<>(item.size());
-            for (ByteBuffer byteBuffer : item) {
-                buffers.add(BODY_FACTORY.readBufferFactory().adapt(byteBuffer));
-            }
-            defer.onNext(BODY_FACTORY.readBufferFactory().compose(buffers));
+            defer.onNext(BODY_FACTORY.readBufferFactory().adapt(concat(item)));
         }
+    }
+
+    /**
+     * Copy the pieces into one array. The pieces of the JDK client are read-only heap buffers that
+     * expose no array, so composing them as {@link ReadBuffer}s would copy each piece twice: once
+     * out of the read-only buffer, and once more into the composite.
+     *
+     * @param item The pieces
+     * @return The bytes of all pieces
+     */
+    private static byte[] concat(List<ByteBuffer> item) {
+        int length = 0;
+        for (ByteBuffer byteBuffer : item) {
+            length = Math.addExact(length, byteBuffer.remaining());
+        }
+        byte[] bytes = new byte[length];
+        int offset = 0;
+        for (ByteBuffer byteBuffer : item) {
+            int remaining = byteBuffer.remaining();
+            byteBuffer.get(bytes, offset, remaining);
+            offset += remaining;
+        }
+        return bytes;
     }
 
     @Override

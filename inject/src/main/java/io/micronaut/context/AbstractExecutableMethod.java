@@ -246,10 +246,15 @@ public abstract class AbstractExecutableMethod<T, R> extends AbstractExecutable<
             Map<String, Argument<?>> typeVariables = getTypeVariables();
             Collection<Argument<?>> values = typeVariables.values();
             final AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+            Argument<R> argument;
             if (genericReturnType.isRawType()) {
-                return Argument.ofRawType(getType(), null, annotationMetadata, values.toArray(Argument.ZERO_ARGUMENTS));
+                argument = Argument.ofRawType(getType(), null, annotationMetadata, values.toArray(Argument.ZERO_ARGUMENTS));
+            } else {
+                argument = Argument.of(getType(), annotationMetadata, values.toArray(Argument.ZERO_ARGUMENTS));
             }
-            return Argument.of(getType(), annotationMetadata, values.toArray(Argument.ZERO_ARGUMENTS));
+            // An array keeps the component it was written with, and the annotations of it
+            Argument<?> componentType = genericReturnType.componentType();
+            return componentType != null ? argument.withComponentType(componentType) : argument;
         }
     }
 

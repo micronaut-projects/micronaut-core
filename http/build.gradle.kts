@@ -29,6 +29,8 @@ dependencies {
     testImplementation(libs.jazzer.junit)
     testImplementation(libs.jazzer.api)
     testImplementation(libs.junit.jupiter.params)
+    // the coroutine extensions of the streams
+    testImplementation(libs.managed.kotlinx.coroutines.core)
     testImplementation(libs.micronaut.test.junit5) {
         exclude(group= "io.micronaut")
     }

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.websocket;
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
@@ -71,6 +72,19 @@ public interface WebSocketClient extends AutoCloseable {
 
     @Override
     void close();
+
+    /**
+     * The client with connections that complete a {@link java.util.concurrent.CompletionStage}
+     * instead of emitting from a publisher. The default implementation adapts the reactive
+     * {@link #connect} methods. Closing the returned client closes this client.
+     *
+     * @return An {@link AsyncWebSocketClient} backed by this client
+     * @since 5.3.0
+     */
+    @Experimental
+    default AsyncWebSocketClient toAsyncWebSocket() {
+        return new AsyncOverReactiveWebSocketClient(this);
+    }
 
     /**
      * Connect the given client endpoint type to the URI over WebSocket.

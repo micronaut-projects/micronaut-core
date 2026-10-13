@@ -529,6 +529,8 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                     returnTypeAnnotationMetadata = annotationMetadata;
                 }
                 if (returnTypeArgument.getAnnotationMetadata() != returnTypeAnnotationMetadata) {
+                    // An array keeps the component it was written with, and the annotations of it
+                    Argument<?> componentType = returnTypeArgument.componentType();
                     returnTypeArgument = returnTypeArgument.isRawType() ? Argument.ofRawType(
                             returnTypeArgument.getType(),
                             null,
@@ -539,6 +541,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                             returnTypeAnnotationMetadata,
                             returnTypeArgument.getTypeParameters()
                     );
+                    if (componentType != null) {
+                        returnTypeArgument = returnTypeArgument.withComponentType(componentType);
+                    }
                 }
                 returnType = new DefaultReturnType<>(
                         returnTypeArgument,
