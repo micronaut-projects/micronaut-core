@@ -1,7 +1,12 @@
 package io.micronaut.inject.annotation
 
+import groovy.transform.CompileStatic
 import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.annotation.AnnotationValue
 import spock.lang.Specification
+
+import java.lang.annotation.Annotation
+import java.lang.ref.WeakReference
 
 class AnnotationTypeClassLoaderSpec extends Specification {
 
@@ -182,6 +187,85 @@ class AnnotationTypeClassLoaderSpec extends Specification {
         cleanup:
         AnnotationMetadataSupport.retireClassLoader(first)
         AnnotationMetadataSupport.retireClassLoader(second)
+    }
+
+    void "retiring a loader forgets its types and the defaults referring to its classes, though nothing registers the name again"() {
+        given: "a generation registering an annotation removed from the project since, with defaults referring to its classes"
+        def generation = new OwnCopy(Removed.classLoader)
+        def copy = generation.define(Removed.name)
+        AnnotationMetadataSupport.registerDefaultValues(new AnnotationClassValue<>(copy), [value: new AnnotationClassValue<>(copy)])
+        AnnotationMetadataSupport.registerDefaultValues("example.Nesting", [nested: new AnnotationValue("example.Nested", [type: new AnnotationClassValue<>(copy)])])
+        AnnotationMetadataSupport.registerDefaultValues("example.Plain", [value: "kept", type: new AnnotationClassValue<>(String)])
+        AnnotationMetadataSupport.getProxyFactory(copy)
+
+        expect:
+        AnnotationMetadataSupport.getRegisteredAnnotationType(Removed.name).get().is(copy)
+        AnnotationMetadataSupport.hasDefaultValues(Removed.name)
+        AnnotationMetadataSupport.hasDefaultValues("example.Nesting")
+
+        when: "the launcher retires the generation, and the next one never registers the name"
+        AnnotationMetadataSupport.retireClassLoader(generation)
+
+        then: "nothing refers to its classes any more"
+        !AnnotationMetadataSupport.getRegisteredAnnotationType(Removed.name).isPresent()
+        !AnnotationMetadataSupport.ANNOTATION_PROXY_CACHE.containsKey(copy)
+        !AnnotationMetadataSupport.hasDefaultValues(Removed.name)
+        !AnnotationMetadataSupport.hasDefaultValues("example.Nesting")
+
+        and: "defaults that refer to no retired class are kept"
+        AnnotationMetadataSupport.getDefaultValues("example.Plain").value == "kept"
+
+        cleanup:
+        AnnotationMetadataSupport.ANNOTATION_DEFAULTS.remove("example.Plain")
+    }
+
+    void "defaults a retired generation registers after it was retired are not kept, and a live generation's are"() {
+        given:
+        def retired = new OwnCopy(Removed.classLoader)
+        def retiredCopy = retired.define(Removed.name)
+        def live = new OwnCopy(Removed.classLoader)
+        def liveCopy = live.define(Removed.name)
+        AnnotationMetadataSupport.retireClassLoader(retired)
+
+        when: "a straggling thread of the retired generation registers defaults referring to its classes"
+        AnnotationMetadataSupport.registerDefaultValues("example.Straggler", [value: new AnnotationClassValue<>(retiredCopy)])
+
+        then:
+        !AnnotationMetadataSupport.hasDefaultValues("example.Straggler")
+
+        when: "a live generation registers its own"
+        AnnotationMetadataSupport.registerDefaultValues("example.Straggler", [value: new AnnotationClassValue<>(liveCopy)])
+
+        then:
+        AnnotationMetadataSupport.getDefaultValues("example.Straggler").value.type.get().is(liveCopy)
+
+        cleanup:
+        AnnotationMetadataSupport.retireClassLoader(live)
+    }
+
+    void "a retired loader whose annotation is never registered again can be collected"() {
+        when:
+        WeakReference<ClassLoader> retired = registerAndRetire()
+        for (int i = 0; i < 50 && retired.get() != null; i++) {
+            System.gc()
+            Thread.sleep(20)
+        }
+
+        then:
+        retired.get() == null
+    }
+
+    @CompileStatic
+    private static WeakReference<ClassLoader> registerAndRetire() {
+        // a loader written in Java: no Groovy call site or meta class refers to it or to the copy it defines
+        OwnCopyLoader generation = new OwnCopyLoader(Removed.classLoader)
+        Class<? extends Annotation> copy = (Class<? extends Annotation>) generation.define(Removed.name)
+        Map<CharSequence, Object> defaults = new HashMap<>()
+        defaults.put("value", new AnnotationClassValue<>(copy))
+        AnnotationMetadataSupport.registerDefaultValues(new AnnotationClassValue<>(copy), defaults)
+        AnnotationMetadataSupport.getProxyFactory(copy)
+        AnnotationMetadataSupport.retireClassLoader(generation)
+        return new WeakReference<ClassLoader>(generation)
     }
 
     void "an annotation type of the JDK is served whatever the loader asks"() {

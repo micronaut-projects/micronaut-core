@@ -586,6 +586,128 @@ class DirectoryWatcherSpec extends Specification {
         StandardWatchEventKinds.ENTRY_MODIFY | WatchEventType.CREATE
     }
 
+    void "a directory created again before its old key is drained is registered anew, and draining the old key keeps it"() {
+        given: "a controlled service and a recursive registration with a subdirectory"
+        Path sub = Files.createDirectories(root.resolve("sub")).toAbsolutePath().normalize()
+        ControlledWatchService service = new ControlledWatchService()
+        DirectoryWatcher controlled = controlledWatcher(service)
+        List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
+        controlled.directory(root).watch(batches::add)
+        ControlledKey stale = service.keys.get(sub)
+
+        when: "the subdirectory is deleted and created again: the service cancelled its key, which the watcher has not drained yet when the parent reports the new directory"
+        stale.valid = false
+        service.signalAndWait(root, true, event(StandardWatchEventKinds.ENTRY_CREATE, Path.of("sub")))
+
+        then: "the directory is registered anew"
+        service.registrations(sub) == 2
+        !service.keys.get(sub).is(stale)
+
+        when: "the old key is drained at last, with a deletion it still reports"
+        service.signalAndWait(stale, false, event(StandardWatchEventKinds.ENTRY_DELETE, Path.of("old.txt")))
+
+        then: "releasing it leaves the new registration alone"
+        controlled.watchedDirectories().contains(sub)
+
+        when: "a file changes in the directory created again"
+        service.signal(sub, true, event(StandardWatchEventKinds.ENTRY_MODIFY, Path.of("a.txt")))
+
+        then: "the change is delivered, and so is the deletion the old key reported"
+        conditions.eventually {
+            def changes = batches.collectMany { it.changes() }
+            assert changes.contains(new FileChange(sub.resolve("a.txt"), WatchEventType.MODIFY))
+            assert changes.contains(new FileChange(sub.resolve("old.txt"), WatchEventType.DELETE))
+        }
+
+        cleanup:
+        controlled.close()
+    }
+
+    void "changes still in their quiet period when a pending stage completes are merged with the held ones"() {
+        given: "a controlled service and a registration whose listener's work completes when the spec says"
+        ControlledWatchService service = new ControlledWatchService()
+        DirectoryWatcher controlled = controlledWatcher(service)
+        List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
+        List<CompletableFuture<Void>> stages = new CopyOnWriteArrayList<>()
+        controlled.directory(root).exclude("*.log").watchAsync({ FileChangeBatch batch ->
+            batches.add(batch)
+            CompletableFuture<Void> stage = new CompletableFuture<>()
+            stages.add(stage)
+            stage
+        })
+        Path kept = root.resolve("kept.txt").toAbsolutePath().normalize()
+
+        when: "a first change starts the listener's work"
+        service.signalAndWait(root, true, event(StandardWatchEventKinds.ENTRY_CREATE, Path.of("first.txt")))
+
+        then:
+        conditions.eventually {
+            assert batches.size() == 1
+        }
+
+        when: "two files are created while the work is under way, and held back once their quiet period passed"
+        service.signalAndWait(root, true,
+            event(StandardWatchEventKinds.ENTRY_CREATE, Path.of("transient.txt")),
+            event(StandardWatchEventKinds.ENTRY_CREATE, Path.of("kept.txt")))
+        Thread.sleep(1000)
+
+        and: "one of them is deleted again, which is still in its quiet period when the work completes"
+        service.signalAndWait(root, true, event(StandardWatchEventKinds.ENTRY_DELETE, Path.of("transient.txt")))
+        stages[0].complete(null)
+
+        and: "an excluded change wakes the watcher before that quiet period ends"
+        service.signalAndWait(root, true, event(StandardWatchEventKinds.ENTRY_MODIFY, Path.of("build.log")))
+
+        then: "one batch follows, without the file created and deleted again"
+        conditions.eventually {
+            assert batches.size() == 2
+        }
+        Thread.sleep(800)
+        batches.size() == 2
+        batches[1].changes() == [new FileChange(kept, WatchEventType.CREATE)]
+
+        cleanup:
+        stages.each { it.complete(null) }
+        controlled.close()
+    }
+
+    void "a key that reports for several directories is cancelled only once none of them is watched"() {
+        given: "a service that reports the changes of a tree through the key of its root, as the native macOS one does"
+        Path sub = Files.createDirectories(root.resolve("sub")).toAbsolutePath().normalize()
+        ControlledWatchService service = new ControlledWatchService()
+        ControlledKey rootKey = (ControlledKey) service.register(root)
+        DirectoryWatcher controlled = DirectoryWatcher.builder(service)
+            .registrar({ Path dir, WatchService s -> rootKey } as DirectoryWatcher.WatchKeyRegistrar)
+            .checkInterval(Duration.ofMillis(20))
+            .quietPeriod(Duration.ofMillis(100))
+            .build()
+            .start()
+        List<FileChangeBatch> parent = new CopyOnWriteArrayList<>()
+        List<FileChangeBatch> child = new CopyOnWriteArrayList<>()
+        def parentRegistration = controlled.directory(root).watch(parent::add)
+        def childRegistration = controlled.directory(sub).watch(child::add)
+
+        when: "the registration of the root closes, and the key reports a change under the other one"
+        parentRegistration.close()
+        service.signal(rootKey, true, event(StandardWatchEventKinds.ENTRY_CREATE, sub.resolve("later.txt")))
+
+        then: "the key stays, and the registration under its root receives the change"
+        rootKey.valid
+        conditions.eventually {
+            assert child.any { it.paths().contains(sub.resolve("later.txt")) }
+        }
+        parent.isEmpty()
+
+        when: "the last registration it reports for closes"
+        childRegistration.close()
+
+        then: "the key is cancelled"
+        !rootKey.valid
+
+        cleanup:
+        controlled.close()
+    }
+
     void "a builder without a service creates and closes one of the default file system"() {
         given:
         DirectoryWatcher own = DirectoryWatcher.builder().build()
@@ -700,13 +822,28 @@ class DirectoryWatcherSpec extends Specification {
         final Map<Path, ControlledKey> keys = new ConcurrentHashMap<>()
         volatile boolean closed
 
+        final Map<Path, AtomicInteger> registrations = new ConcurrentHashMap<>()
+
+        /**
+         * Registers a directory, with the key it has while that is valid, as the JDK's services do.
+         */
         WatchKey register(Path dir) {
-            return keys.computeIfAbsent(dir.toAbsolutePath().normalize(), { Path p -> new ControlledKey(p) })
+            Path absolute = dir.toAbsolutePath().normalize()
+            registrations.computeIfAbsent(absolute, { Path p -> new AtomicInteger() }).incrementAndGet()
+            return keys.compute(absolute, { Path p, ControlledKey existing -> existing != null && existing.valid ? existing : new ControlledKey(p) })
+        }
+
+        int registrations(Path dir) {
+            return registrations.get(dir.toAbsolutePath().normalize())?.get() ?: 0
         }
 
         void signal(Path dir, boolean resettable, WatchEvent<?>... events) {
             ControlledKey key = keys.get(dir.toAbsolutePath().normalize())
             assert key != null
+            signal(key, resettable, events)
+        }
+
+        void signal(ControlledKey key, boolean resettable, WatchEvent<?>... events) {
             key.offer(resettable, events)
             signalled.add(key)
         }
@@ -715,9 +852,12 @@ class DirectoryWatcherSpec extends Specification {
          * Signals the key and waits until the watcher recorded its events, which it has once it reset the key.
          */
         void signalAndWait(Path dir, boolean resettable, WatchEvent<?>... events) {
-            ControlledKey key = keys.get(dir.toAbsolutePath().normalize())
+            signalAndWait(keys.get(dir.toAbsolutePath().normalize()), resettable, events)
+        }
+
+        void signalAndWait(ControlledKey key, boolean resettable, WatchEvent<?>... events) {
             int resets = key.resets.get()
-            signal(dir, resettable, events)
+            signal(key, resettable, events)
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
             while (key.resets.get() == resets) {
                 assert System.nanoTime() < deadline
