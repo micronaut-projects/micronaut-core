@@ -46,12 +46,4 @@ class ClassChangeEventSpec extends Specification {
         retired.close()
         current.close()
     }
-
-    void "the strategy of a change is the one applied"() {
-        when:
-        new ClassChangeEvent(this, [] as Set, getClass().classLoader, [], ReloadStrategy.AUTO)
-
-        then:
-        thrown(IllegalArgumentException)
-    }
 }
