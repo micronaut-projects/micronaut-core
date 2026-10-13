@@ -145,6 +145,17 @@ class AnnotationTypeClassLoaderSpec extends Specification {
         then: "the registry holds the next generation's copy"
         AnnotationMetadataSupport.getRegisteredAnnotationType(Reloaded.name).get().is(secondCopy)
 
+        when: "the straggling thread makes a proxy of its copy, and resolves a type nothing registered"
+        def unregistered = first.define(Straggling.name)
+        def factory = AnnotationMetadataSupport.getProxyFactory(firstCopy)
+        def resolved = AnnotationMetadataSupport.getAnnotationType(Straggling.name, first)
+
+        then: "it is served, but neither is kept"
+        factory != null
+        resolved.get().is(unregistered)
+        !AnnotationMetadataSupport.ANNOTATION_PROXY_CACHE.containsKey(firstCopy)
+        !AnnotationMetadataSupport.getRegisteredAnnotationType(Straggling.name).isPresent()
+
         cleanup:
         AnnotationMetadataSupport.retireClassLoader(second)
     }

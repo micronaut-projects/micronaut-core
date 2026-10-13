@@ -425,7 +425,10 @@ public final class AnnotationMetadataSupport {
             @SuppressWarnings("unchecked") final Class<? extends Annotation> aClass =
                 (Class<? extends Annotation>) ClassUtils.forName(name, classLoader).orElse(null);
             if (aClass != null && Annotation.class.isAssignableFrom(aClass)) {
-                ANNOTATION_TYPES.put(name, aClass);
+                // a thread still running a retired generation is answered, but does not register its type again
+                if (!(loadersRetired && isRetired(aClass.getClassLoader()))) {
+                    ANNOTATION_TYPES.put(name, aClass);
+                }
                 return Optional.of(aClass);
             }
             return Optional.empty();
@@ -506,8 +509,15 @@ public final class AnnotationMetadataSupport {
             return;
         }
         Class<?> aClass = annotationClassValue.getType().orElse(null);
-        if (aClass != null && Annotation.class.isAssignableFrom(aClass) && !(loadersRetired && isRetired(aClass.getClassLoader()))) {
-            ANNOTATION_TYPES.put(name, (Class<? extends Annotation>) aClass);
+        if (aClass == null || !Annotation.class.isAssignableFrom(aClass) || (loadersRetired && isRetired(aClass.getClassLoader()))) {
+            return;
+        }
+        Class<? extends Annotation> type = (Class<? extends Annotation>) aClass;
+        // atomic, so that two loaders registering at once cannot both take the place of the first
+        if (registered == null) {
+            ANNOTATION_TYPES.putIfAbsent(name, type);
+        } else {
+            ANNOTATION_TYPES.replace(name, registered, type);
         }
     }
 
@@ -590,17 +600,27 @@ public final class AnnotationMetadataSupport {
      * @return The proxy factory
      */
     static Function<InvocationHandler, Object> getProxyFactory(Class<? extends Annotation> annotation) {
-        return ANNOTATION_PROXY_CACHE.computeIfAbsent(annotation, aClass -> {
-            // Annotations loaded by the bootstrap or platform classloader (e.g. java.lang.Deprecated)
-            // cannot see Micronaut's AnnotationValueProvider; in that case fall back to the loader of
-            // AnnotationValueProvider, which still resolves the JDK annotation via parent delegation.
-            ClassLoader annotationLoader = aClass.getClassLoader();
-            ClassLoader proxyLoader = (annotationLoader == null || annotationLoader == ClassLoader.getPlatformClassLoader())
-                ? AnnotationValueProvider.class.getClassLoader()
-                : annotationLoader;
-            Class<?>[] interfaces = {aClass, AnnotationValueProvider.class};
-            return handler -> Proxy.newProxyInstance(proxyLoader, interfaces, handler);
-        });
+        Function<InvocationHandler, Object> factory = ANNOTATION_PROXY_CACHE.get(annotation);
+        if (factory != null) {
+            return factory;
+        }
+        if (loadersRetired && isRetired(annotation.getClassLoader())) {
+            // a thread still running a retired generation gets a factory, which is not cached to keep its loader
+            return newProxyFactory(annotation);
+        }
+        return ANNOTATION_PROXY_CACHE.computeIfAbsent(annotation, AnnotationMetadataSupport::newProxyFactory);
+    }
+
+    private static Function<InvocationHandler, Object> newProxyFactory(Class<? extends Annotation> aClass) {
+        // Annotations loaded by the bootstrap or platform classloader (e.g. java.lang.Deprecated)
+        // cannot see Micronaut's AnnotationValueProvider; in that case fall back to the loader of
+        // AnnotationValueProvider, which still resolves the JDK annotation via parent delegation.
+        ClassLoader annotationLoader = aClass.getClassLoader();
+        ClassLoader proxyLoader = (annotationLoader == null || annotationLoader == ClassLoader.getPlatformClassLoader())
+            ? AnnotationValueProvider.class.getClassLoader()
+            : annotationLoader;
+        Class<?>[] interfaces = {aClass, AnnotationValueProvider.class};
+        return handler -> Proxy.newProxyInstance(proxyLoader, interfaces, handler);
     }
 
     /**
