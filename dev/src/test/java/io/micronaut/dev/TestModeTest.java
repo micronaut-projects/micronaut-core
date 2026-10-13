@@ -127,6 +127,36 @@ class TestModeTest {
     }
 
     @Test
+    void aContextATestRunsWithTheDefaultLoaderSeesTheGeneration() throws Exception {
+        Path test = Files.createDirectories(project.resolve("src/test/java/app"));
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(main.resolve("Greeter.java"), greeter("one"));
+        Files.writeString(main.resolve("Service.java"), "package app; @jakarta.inject.Singleton public class Service { }");
+        Files.writeString(test.resolve("ContextTest.java"), """
+            package app;
+            import io.micronaut.context.ApplicationContext;
+            import org.junit.jupiter.api.Test;
+            import static org.junit.jupiter.api.Assertions.assertEquals;
+            import static org.junit.jupiter.api.Assertions.assertTrue;
+            public class ContextTest {
+                @Test
+                void runs() {
+                    try (ApplicationContext context = ApplicationContext.run()) {
+                        assertEquals("io.micronaut.dev.loader.GenerationClassLoader", context.getEnvironment().getClassLoader().getClass().getName());
+                        assertTrue(context.containsBean(Service.class));
+                    }
+                }
+            }
+            """);
+
+        // the main sources run the annotation processors, so Service has a bean definition in the generation
+        runtime = new MicronautDevMain().launch(manifest("micronaut.dev.compile.java.options=-parameters\n"), new String[0]);
+
+        TestRunSummary first = runtime.lastTestRun().orElseThrow();
+        assertTrue(first.isSuccess(), Files.readString(project.resolve("build/test-results/TEST-app.ContextTest.xml")));
+    }
+
+    @Test
     void aBrokenChangeStaysBrokenUntilFixedAnInlinedConstantRunsEveryTestAndADeletedTestTakesItsReport() throws Exception {
         Path main = Files.createDirectories(project.resolve("src/main/java/app"));
         Path test = Files.createDirectories(project.resolve("src/test/java/app"));
