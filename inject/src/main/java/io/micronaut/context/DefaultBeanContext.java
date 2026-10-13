@@ -304,7 +304,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * lock by {@link #isRetainedOnStop(Object)} once it is.
      */
     @Nullable
-    private volatile Set<Object> retainedOnStopBeans;
+    private volatile Set<Object> retainedOnStopBeans; // NOSONAR java:S3077 published whole once decided, never modified after
     private final List<BeanRegistration<?>> retainedOnStop = new ArrayList<>();
     /**
      * Retained registrations this context has no definition for, destroyed once its listeners exist.
