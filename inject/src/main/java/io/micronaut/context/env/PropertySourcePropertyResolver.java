@@ -918,6 +918,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 return copy;
             }
             if (value instanceof Map<?, ?> map) {
+                @SuppressWarnings("unchecked") // a sorted map is copied with the keys and the order it has
                 Map<Object, Object> copy = map instanceof SortedMap<?, ?> sorted ? new TreeMap<>((SortedMap<Object, Object>) sorted) : new LinkedHashMap<>(map);
                 for (Map.Entry<Object, Object> entry : copy.entrySet()) {
                     Object entryValue = entry.getValue();
@@ -1333,8 +1334,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             if (str.contains(propertyPlaceholderResolver.getPrefix())) {
                 return onState(resolverState, () -> propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(str));
             }
-            // without a placeholder nothing is looked up
-            return propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(str);
+            // without a placeholder there is nothing to resolve
+            return str;
         } else if (value instanceof List<?> list) {
             List<?> newList = new ArrayList<>(list);
             final ListIterator i = newList.listIterator();
