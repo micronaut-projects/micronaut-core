@@ -31,16 +31,6 @@ import java.io.Closeable;
 public interface LiveReloadServer extends Closeable {
 
     /**
-     * The port the LiveReload extensions expect.
-     */
-    int DEFAULT_PORT = 35729;
-
-    /**
-     * The path of the client script the server serves.
-     */
-    String SCRIPT_PATH = "/livereload.js";
-
-    /**
      * @return The port bound
      */
     int port();
@@ -63,14 +53,4 @@ public interface LiveReloadServer extends Closeable {
      */
     @Override
     void close();
-
-    /**
-     * The script tag a page includes to connect to a server on the given port.
-     *
-     * @param port The port
-     * @return The tag
-     */
-    static String scriptTag(int port) {
-        return "<script src=\"http://localhost:" + port + SCRIPT_PATH + "?snipver=1\" async></script>";
-    }
 }

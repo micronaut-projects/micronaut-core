@@ -255,27 +255,35 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
     }
 
     private void link(BeanDependency edge) {
-        byDependent.computeIfAbsent(Key.of(edge.dependent()), k -> ConcurrentHashMap.newKeySet()).add(edge);
-        byDependency.computeIfAbsent(Key.of(edge.dependency()), k -> ConcurrentHashMap.newKeySet()).add(edge);
+        addTo(byDependent, edge.dependentKey(), edge);
+        addTo(byDependency, edge.dependencyKey(), edge);
+    }
+
+    /**
+     * Adds an edge to an index set, inside the map's atomic compute, so that a concurrent
+     * {@link #removeFrom(Map, Key, BeanDependency)} cannot drop the set it is added to.
+     */
+    private static void addTo(Map<Key, Set<BeanDependency>> index, Key key, BeanDependency edge) {
+        index.compute(key, (k, edges) -> {
+            Set<BeanDependency> set = edges != null ? edges : ConcurrentHashMap.newKeySet();
+            set.add(edge);
+            return set;
+        });
+    }
+
+    /**
+     * Removes an edge from an index set and the set once it is empty, in one atomic step of the map.
+     */
+    private static void removeFrom(Map<Key, Set<BeanDependency>> index, Key key, BeanDependency edge) {
+        index.computeIfPresent(key, (k, edges) -> {
+            edges.remove(edge);
+            return edges.isEmpty() ? null : edges;
+        });
     }
 
     private void unlink(BeanDependency edge) {
-        Key dependentKey = Key.of(edge.dependent());
-        Set<BeanDependency> edges = byDependent.get(dependentKey);
-        if (edges != null) {
-            edges.remove(edge);
-            if (edges.isEmpty()) {
-                byDependent.remove(dependentKey, edges);
-            }
-        }
-        Key dependencyKey = Key.of(edge.dependency());
-        Set<BeanDependency> dependents = byDependency.get(dependencyKey);
-        if (dependents != null) {
-            dependents.remove(edge);
-            if (dependents.isEmpty()) {
-                byDependency.remove(dependencyKey, dependents);
-            }
-        }
+        removeFrom(byDependent, edge.dependentKey(), edge);
+        removeFrom(byDependency, edge.dependencyKey(), edge);
     }
 
     /**
@@ -418,7 +426,7 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
                 if (edge.lazy()) {
                     continue;
                 }
-                if (visited.add(Key.of(edge.dependent()))) {
+                if (visited.add(edge.dependentKey())) {
                     result.add(edge.dependent());
                     queue.add(edge.dependent());
                 }
@@ -440,7 +448,7 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
                 if (edge.lazy()) {
                     continue;
                 }
-                if (visited.add(Key.of(edge.dependency()))) {
+                if (visited.add(edge.dependencyKey())) {
                     result.add(edge.dependency());
                     queue.add(edge.dependency());
                 }
@@ -485,18 +493,8 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
             } else {
                 owned.remove(edge);
             }
-            edges.remove(edge);
-            Key dependencyKey = Key.of(edge.dependency());
-            Set<BeanDependency> dependents = byDependency.get(dependencyKey);
-            if (dependents != null) {
-                dependents.remove(edge);
-                if (dependents.isEmpty()) {
-                    byDependency.remove(dependencyKey, dependents);
-                }
-            }
-        }
-        if (edges.isEmpty()) {
-            byDependent.remove(key, edges);
+            removeFrom(byDependent, key, edge);
+            removeFrom(byDependency, edge.dependencyKey(), edge);
         }
     }
 
@@ -514,13 +512,9 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
         }
         for (BeanDependency edge : List.copyOf(edges)) {
             if (edge.reinjectable()) {
-                edges.remove(edge);
                 instances.remove(edge);
-                Key dependencyKey = Key.of(edge.dependency());
-                Set<BeanDependency> dependents = byDependency.get(dependencyKey);
-                if (dependents != null) {
-                    dependents.remove(edge);
-                }
+                removeFrom(byDependent, key, edge);
+                removeFrom(byDependency, edge.dependencyKey(), edge);
             }
         }
     }
@@ -607,33 +601,39 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
 
     /**
      * The identity of a node: the definition class, with the qualifier and bean type of a delegate or runtime definition.
+     * A runtime definition is also identified by the definition object itself, as every runtime definition has the same
+     * class and two registrations of the same type without a qualifier are still different beans.
      *
      * @param definitionClass The class of the definition, or of the definition a delegate wraps
      * @param qualifier The qualifier of a delegate or runtime definition
      * @param beanType The bean type of a delegate or runtime definition
+     * @param runtime The runtime definition, compared by identity, or null for a compiled definition
      */
-    record Key(Class<?> definitionClass, @Nullable Object qualifier, @Nullable Class<?> beanType) {
+    record Key(Class<?> definitionClass, @Nullable Object qualifier, @Nullable Class<?> beanType, @Nullable Object runtime) {
         static Key of(BeanDefinition<?> definition) {
             if (definition instanceof BeanDefinitionDelegate<?> delegate) {
-                return new Key(delegate.getDelegate().getClass(), delegate.getDeclaredQualifier(), delegate.getBeanType());
+                BeanDefinition<?> target = delegate.getDelegate();
+                return new Key(target.getClass(), delegate.getDeclaredQualifier(), delegate.getBeanType(),
+                    target instanceof RuntimeBeanDefinition<?> ? target : null);
             }
             if (definition instanceof RuntimeBeanDefinition<?> runtime) {
-                return new Key(runtime.getClass(), runtime.getDeclaredQualifier(), runtime.getBeanType());
+                return new Key(runtime.getClass(), runtime.getDeclaredQualifier(), runtime.getBeanType(), runtime);
             }
-            return new Key(definition.getClass(), null, null);
+            return new Key(definition.getClass(), null, null, null);
         }
 
         @Override
         public boolean equals(Object o) {
             return o instanceof Key key
                 && definitionClass == key.definitionClass
+                && runtime == key.runtime
                 && Objects.equals(qualifier, key.qualifier)
                 && beanType == key.beanType;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(definitionClass, qualifier, beanType);
+            return Objects.hash(definitionClass, qualifier, beanType, runtime == null ? 0 : System.identityHashCode(runtime));
         }
     }
 }

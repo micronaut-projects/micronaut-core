@@ -15,7 +15,7 @@
  */
 package io.micronaut.dev.livereload.netty;
 
-import io.micronaut.core.annotation.Experimental;
+import io.micronaut.dev.livereload.LiveReloadScript;
 import io.micronaut.dev.livereload.LiveReloadServer;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.Unpooled;
@@ -69,13 +69,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * for pages that do not use a browser extension. It listens on the loopback address only, on an
  * event loop of its own, so it belongs to the launcher and outlives every application context.
  * The socket accepts native clients, the browser extensions and pages of a localhost origin, and refuses other
- * sites and other paths.
+ * sites and other paths. Commands go to the browsers that greeted the server with {@code hello}, as the protocol
+ * has it.
+ *
+ * <p>Started by {@link NettyLiveReloadServerFactory}, which the launcher service-loads.</p>
  *
  * @author graemerocher
  * @since 5.3.0
  */
-@Experimental
-public final class NettyLiveReloadServer implements LiveReloadServer {
+final class NettyLiveReloadServer implements LiveReloadServer {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyLiveReloadServer.class);
     private static final String PROTOCOL = "http://livereload.com/protocols/official-7";
@@ -100,11 +102,13 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
     /**
      * Starts a server on the loopback address.
      *
-     * @param port The port, {@link #DEFAULT_PORT} for the extensions; 0 for any free port
+     * @param port The port, {@link LiveReloadScript#DEFAULT_PORT} for the extensions; 0 for any free port
      * @return The started server
-     * @throws IOException if the port cannot be bound
+     * @throws IOException if the port cannot be bound, or the client script is missing
      */
-    public static NettyLiveReloadServer start(int port) throws IOException {
+    static NettyLiveReloadServer start(int port) throws IOException {
+        // read once: the script does not change while the launcher runs
+        byte[] script = script();
         EventLoopGroup group = new MultiThreadIoEventLoopGroup(1, runnable -> {
             Thread thread = new Thread(runnable, "micronaut-dev-livereload");
             thread.setDaemon(true);
@@ -120,7 +124,7 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
                     socketChannel.pipeline()
                         .addLast(new HttpServerCodec())
                         .addLast(new HttpObjectAggregator(MAX_CONTENT_LENGTH))
-                        .addLast(new ScriptHandler())
+                        .addLast(new ScriptHandler(script))
                         .addLast(new WebSocketServerProtocolHandler(WEBSOCKET_PATH, null, true))
                         .addLast(new ProtocolHandler(browsers));
                 }
@@ -156,7 +160,8 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
     @Override
     public void reload(String path, boolean liveCss) {
         String command = "{\"command\":\"reload\",\"path\":\"" + escape(path) + "\",\"liveCSS\":" + liveCss + "}";
-        browsers.writeAndFlush(new TextWebSocketFrame(command));
+        // only to the browsers that said hello: a client that did not is not speaking the protocol yet
+        browsers.writeAndFlush(new TextWebSocketFrame(command), NettyLiveReloadServer::isGreeted);
     }
 
     @Override
@@ -178,8 +183,38 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
         }
     }
 
-    private static String escape(String text) {
-        return text.replace("\\", "\\\\").replace("\"", "\\\"");
+    private static boolean isGreeted(Channel channel) {
+        return Boolean.TRUE.equals(channel.attr(GREETED).get());
+    }
+
+    /**
+     * The text as the contents of a JSON string: the quote, the backslash and every control character escaped.
+     *
+     * @param text The text
+     * @return The escaped text, without the surrounding quotes
+     */
+    static String escape(String text) {
+        StringBuilder escaped = new StringBuilder(text.length() + 8);
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            switch (c) {
+                case '"' -> escaped.append("\\\"");
+                case '\\' -> escaped.append("\\\\");
+                case '\b' -> escaped.append("\\b");
+                case '\f' -> escaped.append("\\f");
+                case '\n' -> escaped.append("\\n");
+                case '\r' -> escaped.append("\\r");
+                case '\t' -> escaped.append("\\t");
+                default -> {
+                    if (c < 0x20) {
+                        escaped.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        escaped.append(c);
+                    }
+                }
+            }
+        }
+        return escaped.toString();
     }
 
     /**
@@ -218,6 +253,12 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
      */
     private static final class ScriptHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
+        private final byte[] script;
+
+        ScriptHandler(byte[] script) {
+            this.script = script;
+        }
+
         @Override
         protected void channelRead0(ChannelHandlerContext context, FullHttpRequest request) throws IOException {
             // only a WebSocket upgrade goes on to the handshake; a client offering h2c on a plain request, as the
@@ -237,8 +278,9 @@ public final class NettyLiveReloadServer implements LiveReloadServer {
                 return;
             }
             FullHttpResponse response;
-            if (request.method() == HttpMethod.GET && request.uri().startsWith(SCRIPT_PATH)) {
-                response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.wrappedBuffer(script()));
+            // the path alone, without the query a script tag adds, and exactly: /livereload.jsx is no script
+            if (request.method() == HttpMethod.GET && new QueryStringDecoder(request.uri()).path().equals(LiveReloadScript.PATH)) {
+                response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.wrappedBuffer(script));
                 response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/javascript; charset=utf-8");
             } else {
                 response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND, Unpooled.copiedBuffer("LiveReload", StandardCharsets.UTF_8));
