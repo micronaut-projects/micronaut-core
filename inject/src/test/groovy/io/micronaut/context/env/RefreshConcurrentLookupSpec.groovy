@@ -199,6 +199,7 @@ class RefreshConcurrentLookupSpec extends Specification {
                 'copy.blank'     : 'app.blank',
                 'copy.same'      : 'app.same',
                 'copy.overridden': 'app.overridden',
+                'copy.changed'   : 'app.changed',
                 'copy.mixed'     : 'app.mixed'
         ]
         List<String> kept = ['copy.token', 'copy.url', 'copy.blank', 'copy.same']
@@ -225,13 +226,15 @@ class RefreshConcurrentLookupSpec extends Specification {
                 'app.blank'     : '${ random.uuid2 }',
                 'app.same'      : '${random.uuid2}',
                 'app.overridden': '${random.uuid2}',
-                'app.mixed'     : '${app.prefix}-${random.uuid2}',
+                'app.changed'   : '${random.uuid2}',
+                'app.mixed'     : '${random.uuid2}-${app.prefix}-${random.uuid2}',
                 'app.prefix'    : 'early'
         ], 10))
         env.addPropertySource(deriving)
         env.addPropertySource(PropertySource.of('late', [
                 'app.same'      : new String('${random.uuid2}'),
                 'app.overridden': 'late',
+                'app.changed'   : '${random.shortuuid}',
                 'app.prefix'    : 'late'
         ], 20))
 
@@ -243,8 +246,10 @@ class RefreshConcurrentLookupSpec extends Specification {
 
         and: "unless a later property source overrides the property, or one that the text also names"
         env.getProperty('app.overridden', String).get() == 'late'
-        env.getProperty('copy.mixed', String).get().startsWith('early-')
-        env.getProperty('app.mixed', String).get().startsWith('late-')
+        env.getProperty('copy.changed', String).get().length() == 32
+        env.getProperty('app.changed', String).get().length() == 10
+        env.getProperty('copy.mixed', String).get().contains('-early-')
+        env.getProperty('app.mixed', String).get().contains('-late-')
 
         when:
         String token = env.getProperty('app.token', String).get()
@@ -254,7 +259,8 @@ class RefreshConcurrentLookupSpec extends Specification {
         env.getProperty('app.token', String).get() != token
         kept.findAll { env.getProperty(it, Object).get() != env.getProperty(derived[it], Object).get() } == []
         env.getProperty('app.overridden', String).get() == 'late'
-        env.getProperty('app.mixed', String).get().startsWith('late-')
+        env.getProperty('app.changed', String).get().length() == 10
+        env.getProperty('app.mixed', String).get().contains('-late-')
 
         cleanup:
         env.stop()
