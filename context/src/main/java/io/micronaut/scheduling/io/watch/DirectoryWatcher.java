@@ -152,10 +152,12 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
     }
 
     /**
-     * The registrar that registers a {@link Path} for create, delete and modify events.
+     * The registrar that registers a {@link Path} for create, delete and modify events. Internal: it exists for the
+     * platform watch services of Micronaut's own modules.
      *
      * @return The registrar
      */
+    @Internal
     public static WatchKeyRegistrar defaultRegistrar() {
         return (directory, service) -> directory.register(
             service,
@@ -250,8 +252,7 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
      *
      * @return The directories
      */
-    @Internal
-    public synchronized List<Path> watchedDirectories() {
+    synchronized List<Path> watchedDirectories() {
         return List.copyOf(directories.keySet());
     }
 
@@ -559,8 +560,10 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
     }
 
     /**
-     * Registers a directory with a watch service.
+     * Registers a directory with a watch service. Internal: it exists for the platform watch services of Micronaut's
+     * own modules, such as the native macOS service, which need their own kind of registration.
      */
+    @Internal
     @FunctionalInterface
     public interface WatchKeyRegistrar {
 
@@ -591,9 +594,12 @@ public final class DirectoryWatcher implements FileWatcher, Closeable {
         }
 
         /**
+         * Internal: for the platform watch services of Micronaut's own modules.
+         *
          * @param registrar How directories are registered with the service
          * @return This builder
          */
+        @Internal
         public Builder registrar(WatchKeyRegistrar registrar) {
             this.registrar = Objects.requireNonNull(registrar, "registrar");
             return this;
