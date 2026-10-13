@@ -106,6 +106,42 @@ class HealthMonitorTaskAsyncSpec extends Specification {
         status.description.get() == 'Error occurred running health check: thrown'
     }
 
+    void 'the monitor uses the native async results of an indicator, all of them'() {
+        given:
+        HealthIndicator nativeAsync = new HealthIndicator() {
+            @Override
+            Publisher<HealthResult> getResult() {
+                throw new UnsupportedOperationException('publisher not used')
+            }
+
+            @Override
+            CompletionStage<List<HealthResult>> getResultAsync() {
+                return CompletableFuture.completedFuture([up('a'), HealthResult.builder('b', HealthStatus.DOWN.describe('async')).build()])
+            }
+        }
+        def monitor = new HealthMonitorTask(currentHealthStatus, nativeAsync)
+
+        when:
+        monitor.monitor()
+
+        then:
+        currentHealthStatus.next().description.get() == 'async'
+    }
+
+    void 'an indicator stub whose getResultAsync returns null falls back to getResult'() {
+        given:
+        HealthIndicator stub = Stub(HealthIndicator) {
+            getResult() >> Flux.just(up('a'), HealthResult.builder('b', HealthStatus.DOWN.describe('stubbed')).build())
+        }
+        def monitor = new HealthMonitorTask(currentHealthStatus, stub)
+
+        when:
+        monitor.monitor()
+
+        then:
+        currentHealthStatus.next().description.get() == 'stubbed'
+    }
+
     private static HealthResult up(String name) {
         return HealthResult.builder(name, HealthStatus.UP).build()
     }
