@@ -4,7 +4,7 @@ import io.micronaut.dev.CompileFailure;
 import io.micronaut.dev.compile.CompileDiagnostic;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.livereload.LiveReloadServer;
-import io.micronaut.dev.livereload.netty.NettyLiveReloadServer;
+import io.micronaut.dev.livereload.netty.NettyLiveReloadServerFactory;
 import io.micronaut.dev.test.TestFailure;
 import io.micronaut.dev.test.TestId;
 import io.micronaut.dev.test.TestOutcome;
@@ -103,7 +103,7 @@ class HtmlTestReportTest {
 
     @Test
     void theServerServesThePageAndAnOpenPageFollowsTheRunTestByTest(@TempDir Path directory) throws Exception {
-        try (LiveReloadServer server = NettyLiveReloadServer.start(0)) {
+        try (LiveReloadServer server = new NettyLiveReloadServerFactory().start(0)) {
             HtmlTestReport html = new HtmlTestReport(directory, server, List.of(), "/reports/tests/");
             assertEquals("http://localhost:" + server.port() + "/reports/tests/", html.url());
             assertEquals(html.url(), html.location());

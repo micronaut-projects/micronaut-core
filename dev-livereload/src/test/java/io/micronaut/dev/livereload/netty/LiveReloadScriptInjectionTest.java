@@ -3,6 +3,7 @@ package io.micronaut.dev.livereload.netty;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.dev.DevRuntime;
 import io.micronaut.dev.MicronautDevMain;
+import io.micronaut.dev.livereload.LiveReloadScript;
 import io.micronaut.dev.livereload.LiveReloadServer;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -104,7 +105,7 @@ class LiveReloadScriptInjectionTest {
             }
             int port = server.getPort();
             int liveReloadPort = runtime.liveReload().map(LiveReloadServer::port).orElseThrow();
-            String expected = PAGE.replace("</body>", LiveReloadServer.scriptTag(liveReloadPort) + "</body>");
+            String expected = PAGE.replace("</body>", LiveReloadScript.tag(liveReloadPort) + "</body>");
             HttpClient client = HttpClient.newHttpClient();
             for (String path : List.of("/text", "/bytes", "/site/index.html")) {
                 HttpResponse<byte[]> response = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).build(), HttpResponse.BodyHandlers.ofByteArray());

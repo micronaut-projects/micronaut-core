@@ -688,7 +688,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @return True if the launcher may call {@code System.exit}
      * @since 5.3.0
      */
-    protected boolean isExitAllowed(Environment environment) {
+    private static boolean isExitAllowed(Environment environment) {
         return !environment.getActiveNames().contains(Environment.TEST) && !environment.isDevelopmentMode();
     }
 

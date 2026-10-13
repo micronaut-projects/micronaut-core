@@ -16,6 +16,8 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
@@ -419,6 +421,8 @@ public interface ApplicationContextBuilder {
      * @return This builder
      * @since 5.3.0
      */
+    @Internal
+    @Experimental
     default ApplicationContextBuilder retainedRegistrations(Collection<BeanRegistration<?>> registrations) {
         return this;
     }
