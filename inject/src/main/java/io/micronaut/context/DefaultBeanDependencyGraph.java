@@ -255,12 +255,12 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
     }
 
     private void link(BeanDependency edge) {
-        byDependent.computeIfAbsent(Key.of(edge.dependent()), k -> ConcurrentHashMap.newKeySet()).add(edge);
-        byDependency.computeIfAbsent(Key.of(edge.dependency()), k -> ConcurrentHashMap.newKeySet()).add(edge);
+        byDependent.computeIfAbsent(edge.dependentKey(), k -> ConcurrentHashMap.newKeySet()).add(edge);
+        byDependency.computeIfAbsent(edge.dependencyKey(), k -> ConcurrentHashMap.newKeySet()).add(edge);
     }
 
     private void unlink(BeanDependency edge) {
-        Key dependentKey = Key.of(edge.dependent());
+        Key dependentKey = edge.dependentKey();
         Set<BeanDependency> edges = byDependent.get(dependentKey);
         if (edges != null) {
             edges.remove(edge);
@@ -268,7 +268,7 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
                 byDependent.remove(dependentKey, edges);
             }
         }
-        Key dependencyKey = Key.of(edge.dependency());
+        Key dependencyKey = edge.dependencyKey();
         Set<BeanDependency> dependents = byDependency.get(dependencyKey);
         if (dependents != null) {
             dependents.remove(edge);
@@ -407,7 +407,7 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
                 if (edge.lazy()) {
                     continue;
                 }
-                if (visited.add(Key.of(edge.dependent()))) {
+                if (visited.add(edge.dependentKey())) {
                     result.add(edge.dependent());
                     queue.add(edge.dependent());
                 }
@@ -429,7 +429,7 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
                 if (edge.lazy()) {
                     continue;
                 }
-                if (visited.add(Key.of(edge.dependency()))) {
+                if (visited.add(edge.dependencyKey())) {
                     result.add(edge.dependency());
                     queue.add(edge.dependency());
                 }
@@ -475,7 +475,7 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
                 owned.remove(edge);
             }
             edges.remove(edge);
-            Key dependencyKey = Key.of(edge.dependency());
+            Key dependencyKey = edge.dependencyKey();
             Set<BeanDependency> dependents = byDependency.get(dependencyKey);
             if (dependents != null) {
                 dependents.remove(edge);
@@ -505,12 +505,18 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
             if (edge.reinjectable()) {
                 edges.remove(edge);
                 instances.remove(edge);
-                Key dependencyKey = Key.of(edge.dependency());
+                Key dependencyKey = edge.dependencyKey();
                 Set<BeanDependency> dependents = byDependency.get(dependencyKey);
                 if (dependents != null) {
                     dependents.remove(edge);
+                    if (dependents.isEmpty()) {
+                        byDependency.remove(dependencyKey, dependents);
+                    }
                 }
             }
+        }
+        if (edges.isEmpty()) {
+            byDependent.remove(key, edges);
         }
     }
 
@@ -596,33 +602,39 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
 
     /**
      * The identity of a node: the definition class, with the qualifier and bean type of a delegate or runtime definition.
+     * A runtime definition is also identified by the definition object itself, as every runtime definition has the same
+     * class and two registrations of the same type without a qualifier are still different beans.
      *
      * @param definitionClass The class of the definition, or of the definition a delegate wraps
      * @param qualifier The qualifier of a delegate or runtime definition
      * @param beanType The bean type of a delegate or runtime definition
+     * @param runtime The runtime definition, compared by identity, or null for a compiled definition
      */
-    record Key(Class<?> definitionClass, @Nullable Object qualifier, @Nullable Class<?> beanType) {
+    record Key(Class<?> definitionClass, @Nullable Object qualifier, @Nullable Class<?> beanType, @Nullable Object runtime) {
         static Key of(BeanDefinition<?> definition) {
             if (definition instanceof BeanDefinitionDelegate<?> delegate) {
-                return new Key(delegate.getDelegate().getClass(), delegate.getDeclaredQualifier(), delegate.getBeanType());
+                BeanDefinition<?> target = delegate.getDelegate();
+                return new Key(target.getClass(), delegate.getDeclaredQualifier(), delegate.getBeanType(),
+                    target instanceof RuntimeBeanDefinition<?> ? target : null);
             }
             if (definition instanceof RuntimeBeanDefinition<?> runtime) {
-                return new Key(runtime.getClass(), runtime.getDeclaredQualifier(), runtime.getBeanType());
+                return new Key(runtime.getClass(), runtime.getDeclaredQualifier(), runtime.getBeanType(), runtime);
             }
-            return new Key(definition.getClass(), null, null);
+            return new Key(definition.getClass(), null, null, null);
         }
 
         @Override
         public boolean equals(Object o) {
             return o instanceof Key key
                 && definitionClass == key.definitionClass
+                && runtime == key.runtime
                 && Objects.equals(qualifier, key.qualifier)
                 && beanType == key.beanType;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(definitionClass, qualifier, beanType);
+            return Objects.hash(definitionClass, qualifier, beanType, runtime == null ? 0 : System.identityHashCode(runtime));
         }
     }
 }

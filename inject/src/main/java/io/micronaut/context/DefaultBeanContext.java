@@ -274,6 +274,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * The recorded dependency graph, null when the context does not track dependencies. Decided by the configuration
      * as the context is constructed, or by its environment as it starts (see {@link #isBeanDependencyTrackingEnabledOnStart()}),
      * in both cases before the context creates a bean; it only ever goes from null to a graph.
+     *
+     * <p>Not volatile on purpose: it is read on every bean creation, and it is written only inside the synchronized
+     * {@link #start()}, before the context creates its first bean. Another thread that creates beans got the context
+     * through a happens-before edge after that (it started the context, or was handed it by the starter), so it sees
+     * the graph; a thread racing {@code start()} itself is not supported by the context anyway.</p>
      */
     @Nullable
     private DefaultBeanDependencyGraph dependencyGraph;
