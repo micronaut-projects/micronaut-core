@@ -5,14 +5,12 @@ import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.convert.ArgumentConversionContext
-import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention
 import io.micronaut.core.order.Ordered
 import io.micronaut.core.type.Argument
 import io.micronaut.core.util.StringUtils
 import io.micronaut.core.value.PropertyCatalog
-import io.micronaut.core.value.PropertyResolver
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -109,37 +107,6 @@ class RefreshConcurrentLookupSpec extends Specification {
         env.stop()
     }
 
-    void "a lookup made while a refresh rebuilds the catalogs does not see what the refresh writes into a list"() {
-        given: "a list of a retained property source, two later sources that override its element in turn, and a gate between them"
-        List<String> list = ['low']
-        Map<String, String> map = [key: 'low']
-        Gate gate = new Gate(25)
-        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
-        env.addPropertySource(PropertySource.of('low', ['app.list': list, 'app.maps': [map]], 10))
-        env.addPropertySource(PropertySource.of('middle', ['app.list[0]': 'middle', 'app.maps[0].key': 'middle'], 20))
-        env.addPropertySource(gate)
-        env.addPropertySource(PropertySource.of('high', ['app.list[0]': 'high', 'app.maps[0].key': 'high'], 30))
-        env.start()
-
-        when: "the refresh is parked when it has applied the first override only, and the names are looked up for the first time"
-        Map<String, Object> mid = refreshThroughGate(env, gate) {
-            [list: env.getProperty('app.list', List).get(), maps: env.getProperty('app.maps', List).get()]
-        }
-
-        then: "they have the value they had before the refresh and have after it"
-        mid.list == ['high']
-        mid.maps == [[key: 'high']]
-        env.getProperty('app.list', List).get() == ['high']
-        env.getProperty('app.maps', List).get() == [[key: 'high']]
-
-        and: "what the property source holds is not written into"
-        list == ['low']
-        map == [key: 'low']
-
-        cleanup:
-        env.stop()
-    }
-
     @RestoreSystemProperties
     void "a bootstrap enabled context resolves the previous values while its refresh re-reads the bootstrap configuration"() {
         given:
@@ -218,229 +185,6 @@ class RefreshConcurrentLookupSpec extends Specification {
         env.containsProperty('late.key')
         env.getProperty('late.key', String).get() == 'value'
         env.getProperty('shadowed.key', String).get() == 'late'
-
-        cleanup:
-        env.stop()
-    }
-
-    void "a random value that a property source reads while the catalogs are rebuilt is the one that is published"() {
-        given: "a property source, read between two others, that derives its properties from random ones of the earlier source"
-        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
-        Map<String, String> derived = [
-                'copy.token'     : 'app.token',
-                'copy.url'       : 'app.url',
-                'copy.blank'     : 'app.blank',
-                'copy.same'      : 'app.same',
-                'copy.list'      : 'app.tokens',
-                'copy.element'   : 'app.tokens[0]',
-                'copy.indexed'   : 'app.items[0]',
-                'copy.nested'    : 'app.services[0].url',
-                'copy.maps'      : 'app.services',
-                'copy.groups'    : 'app.groups',
-                'copy.keyed'     : 'app.keyed[token]',
-                'copy.overridden': 'app.overridden',
-                'copy.replaced'  : 'app.replaced[0]',
-                'copy.swapped'   : 'app.swapped',
-                'copy.mixed'     : 'app.mixed',
-                'copy.reversed'  : 'app.reversed',
-                'copy.mixedMaps' : 'app.mixedMaps'
-        ]
-        List<String> kept = ['copy.token', 'copy.url', 'copy.blank', 'copy.same', 'copy.list', 'copy.element', 'copy.indexed', 'copy.nested', 'copy.maps', 'copy.groups', 'copy.keyed']
-        PropertySource deriving = new PropertySource() {
-            @Override
-            String getName() { 'deriving' }
-
-            @Override
-            int getOrder() { 15 }
-
-            @Override
-            Object get(String key) {
-                derived.containsKey(key) ? env.getProperty(derived[key], Object).orElse(null) : null
-            }
-
-            @Override
-            Iterator<String> iterator() {
-                derived.keySet().iterator()
-            }
-        }
-        env.addPropertySource(PropertySource.of('early', [
-                'app.token'     : '${random.uuid2}',
-                'app.url'       : 'http://localhost:${random.port}/path',
-                'app.blank'     : '${ random.uuid2 }',
-                'app.same'      : '${random.uuid2}',
-                'app.tokens'    : ['${random.uuid2}', 'plain'],
-                'app.items[0]'  : '${random.uuid2}',
-                'app.services'  : [[url: 'http://localhost:${random.port}/path']],
-                'app.groups'    : [[name: 'plain', tokens: ['${random.uuid2}']]],
-                'app.keyed'     : [token: '${random.uuid2}'],
-                'app.overridden': '${random.uuid2}',
-                'app.replaced'  : ['${random.uuid2}'],
-                'app.swapped'   : [[token: '${random.uuid2}']],
-                'app.mixed'     : '${app.prefix}-${random.uuid2}',
-                'app.reversed'  : '${random.uuid2}-${app.prefix}',
-                'app.mixedMaps' : [[token: '${random.uuid2}', url: '${app.prefix}-${random.uuid2}']],
-                'app.prefix'    : 'early'
-        ], 10))
-        env.addPropertySource(deriving)
-        env.addPropertySource(PropertySource.of('late', [
-                'app.same'            : new String('${random.uuid2}'),
-                'app.overridden'      : 'late',
-                'app.replaced[0]'     : 'late',
-                'app.swapped[0].token': 'late',
-                'app.prefix'          : 'late'
-        ], 20))
-
-        when:
-        env.start()
-
-        then: "the value the property source has read is the one every lookup gets from then on, a later source giving the same expression included"
-        kept.findAll { env.getProperty(it, Object).get() != env.getProperty(derived[it], Object).get() } == []
-
-        and: "unless a later property source overrides the property, or one that the value also names"
-        env.getProperty('app.overridden', String).get() == 'late'
-        env.getProperty('app.replaced[0]', String).get() == 'late'
-        env.getProperty('app.swapped', Object).get() == [[token: 'late']]
-        env.getProperty('copy.mixed', String).get().startsWith('early-')
-        env.getProperty('app.mixed', String).get().startsWith('late-')
-        env.getProperty('app.reversed', String).get().endsWith('-late')
-        env.getProperty('app.mixedMaps', List).get()[0].url.startsWith('late-')
-
-        when:
-        String token = env.getProperty('app.token', String).get()
-        env.refresh()
-
-        then: "a refresh draws the values again, and again publishes the ones that were read while it rebuilt the catalogs"
-        env.getProperty('app.token', String).get() != token
-        kept.findAll { env.getProperty(it, Object).get() != env.getProperty(derived[it], Object).get() } == []
-        env.getProperty('app.overridden', String).get() == 'late'
-        env.getProperty('app.replaced[0]', String).get() == 'late'
-        env.getProperty('app.swapped', Object).get() == [[token: 'late']]
-        env.getProperty('app.mixed', String).get().startsWith('late-')
-        env.getProperty('app.reversed', String).get().endsWith('-late')
-        env.getProperty('app.mixedMaps', List).get()[0].url.startsWith('late-')
-
-        cleanup:
-        env.stop()
-    }
-
-    void "a random value that later property sources change and change back keeps what it has resolved to"() {
-        given: "a property source that reads the values before they are changed, and one that reads them before they are changed back"
-        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
-        Map<String, Object> before = [:]
-        Map<String, Object> between = [:]
-        env.addPropertySource(PropertySource.of('declares', [
-                'app.token': '${random.uuid2}',
-                'app.hosts': ['${random.uuid2}', 'plain'],
-                'app.fixed': '${random.uuid2}'
-        ], 10))
-        env.addPropertySource(reading(env, 'before', 15, before, ['app.token', 'app.hosts', 'app.fixed']))
-        env.addPropertySource(PropertySource.of('changes', ['app.token': 'changed', 'app.hosts[1]': 'changed', 'app.fixed': 'changed'], 20))
-        env.addPropertySource(reading(env, 'between', 25, between, ['app.token', 'app.hosts']))
-        env.addPropertySource(PropertySource.of('changes back', ['app.token': '${random.uuid2}', 'app.hosts[1]': 'plain'], 30))
-
-        when:
-        env.start()
-
-        then: "a lookup between the two sees the change"
-        between['app.token'] == 'changed'
-        between['app.hosts'][1] == 'changed'
-
-        and: "the values that are the same again are what the first property source has read"
-        env.getProperty('app.token', String).get() == before['app.token']
-        env.getProperty('app.hosts', List).get() == before['app.hosts']
-
-        and: "a value that stays changed is not"
-        env.getProperty('app.fixed', String).get() == 'changed'
-
-        when:
-        env.refresh()
-
-        then:
-        between['app.token'] == 'changed'
-        env.getProperty('app.token', String).get() == before['app.token']
-        env.getProperty('app.hosts', List).get() == before['app.hosts']
-        env.getProperty('app.fixed', String).get() == 'changed'
-
-        cleanup:
-        env.stop()
-    }
-
-    void "a random value read while the environment is stopped is the one it has once started again"() {
-        given: "a property source of lower order with keys of the same first letter, one of them a property the other source overrides"
-        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
-        env.addPropertySource(PropertySource.of('lower', ['app.first': 'plain', 'app.layered': 'fixed'], 5))
-        env.addPropertySource(PropertySource.of('declares', [
-                'app.token'  : '${random.uuid2}',
-                'app.my.token': '${random.uuid2}',
-                'app.keys[0]': '${random.uuid2}',
-                'app.hosts'  : ['${random.uuid2}'],
-                'app.layered': '${random.uuid2}'
-        ], 10))
-        env.start()
-        List<String> names = ['app.token', 'app.my-token', 'app.keys[0]', 'app.hosts', 'app.hosts[0]', 'app.layered']
-
-        when: "the names are looked up while the environment is stopped, and again when it has been started"
-        env.stop()
-        Map<String, Object> stopped = names.collectEntries { [it, env.getProperty(it, Object).orElse(null)] }
-        env.start()
-
-        then:
-        !stopped.containsValue(null)
-        names.findAll { env.getProperty(it, Object).orElse(null) != stopped[it] } == []
-
-        cleanup:
-        env.stop()
-    }
-
-    void "a lookup of a list does not fail when a property source extends the list meanwhile"() {
-        given: "a list with an element that, when the lookup reads its text, adds a property source that extends the list"
-        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
-        AtomicBoolean extend = new AtomicBoolean()
-        Closure<String> text = {
-            if (extend.compareAndSet(true, false)) {
-                env.addPropertySource(PropertySource.of('extends', ['app.list[1]': 'added'], 20))
-            }
-            return 'plain'
-        }
-        CharSequence element = "${-> text.call()}"
-        env.addPropertySource(PropertySource.of('declares', ['app.list': [element]], 10))
-        env.start()
-
-        when:
-        extend.set(true)
-        List<?> list = env.getProperty('app.list', List).get()
-
-        then: "it returns the list as it was when the lookup read it"
-        noExceptionThrown()
-        list == ['plain']
-        env.getProperty('app.list[1]', String).get() == 'added'
-
-        cleanup:
-        env.stop()
-    }
-
-    void "a value that another expression resolver resolves follows the property sources processed after it was read"() {
-        given: "an expression resolver whose values are made from a property"
-        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
-        env.placeholderResolver.@expressionResolvers = [new PropertyExpressionResolver() {
-            @Override
-            <T> Optional<T> resolve(PropertyResolver propertyResolver, ConversionService conversionService, String expression, Class<T> requiredType) {
-                expression == 'made.from.base'
-                        ? Optional.of(requiredType.cast('made from ' + propertyResolver.getProperty('app.base', String).orElse(null)))
-                        : Optional.<T> empty()
-            }
-        }]
-        Map<String, Object> read = [:]
-        env.addPropertySource(PropertySource.of('declares', ['app.made': '${made.from.base}', 'app.base': 'early'], 10))
-        env.addPropertySource(reading(env, 'reads', 15, read, ['app.made']))
-        env.addPropertySource(PropertySource.of('late', ['app.base': 'late'], 20))
-
-        when:
-        env.start()
-
-        then: "unlike a random value it is not kept: the property source that was processed later can change it"
-        read['app.made'] == 'made from early'
-        env.getProperty('app.made', String).get() == 'made from late'
 
         cleanup:
         env.stop()
@@ -984,29 +728,6 @@ class RefreshConcurrentLookupSpec extends Specification {
      */
     private static ApplicationContextConfiguration withoutDefaultPropertySources() {
         ApplicationContext.builder().environments('test').enableDefaultPropertySources(false) as ApplicationContextConfiguration
-    }
-
-    /**
-     * A property source without properties that, each time it is processed, looks the given names
-     * up in the environment and notes what it gets.
-     */
-    private static PropertySource reading(Environment env, String sourceName, int sourceOrder, Map<String, Object> read, List<String> names) {
-        return new PropertySource() {
-            @Override
-            String getName() { sourceName }
-
-            @Override
-            int getOrder() { sourceOrder }
-
-            @Override
-            Object get(String key) { null }
-
-            @Override
-            Iterator<String> iterator() {
-                names.each { read[it] = env.getProperty(it, Object).orElse(null) }
-                return Collections.emptyIterator()
-            }
-        }
     }
 
     /**
