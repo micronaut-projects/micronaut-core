@@ -184,7 +184,7 @@ public final class DevRuntime implements Closeable {
      * The service the watcher watches with: after a batch a caller reported, such as an IDE's or a test harness's
      * report of a file it wrote, the worker waits for the service to notice the same write.
      */
-    private volatile @Nullable DevWatchService watchService;
+    private volatile @Nullable DevWatchService watchService; // NOSONAR java:S3077 only the reference is published; the service is thread-safe
     private final Map<Path, FileWatcherRegistration> pinnedWatches = new ConcurrentHashMap<>();
     private @Nullable LiveReloadServer liveReload;
     private @Nullable Instrumentation instrumentation;
