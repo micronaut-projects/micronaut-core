@@ -131,7 +131,7 @@ abstract class CoroutinePropagatedContextTest(private val mode: PropagatedContex
         val context = PropagatedContext.empty().plus(Name("coroutine"))
         runBlocking(KotlinCoroutinePropagation.addPropagatedContext(dispatcher, context)) {
             assertSame(context, PropagatedContext.get())
-            // Already in scope, the callback runs without a new binding
+            // The callback sees the coroutine's context
             assertSame(context, context.propagate(Supplier { PropagatedContext.get() }))
             val wrapped = PropagatedContext.wrapCurrent(Supplier { currentName() })
             assertEquals("coroutine", Executors.newSingleThreadExecutor().let {

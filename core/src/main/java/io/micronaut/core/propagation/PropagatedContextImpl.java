@@ -177,16 +177,18 @@ final class PropagatedContextImpl implements PropagatedContext {
 
     /**
      * Whether this context is already in scope with scoped-value propagation, so that a callback can run directly.
-     * A context only {@link ThreadBoundPropagation bound to the thread} doesn't have its scoped value elements bound.
+     * A context only {@link ThreadBoundPropagation bound to the thread} is not, it must still be bound to the scoped
+     * value so that its scoped value elements are bound and the code it runs, such as subtasks forked by a
+     * {@link java.util.concurrent.StructuredTaskScope}, inherits it.
      *
      * @return true if this context is in scope
      */
     private boolean isScopedValueBound() {
-        PropagatedContext threadBound = ThreadBoundPropagation.get();
-        if (threadBound == null) {
-            return ScopedValues.get() == this;
+        if (ScopedValues.get() != this) {
+            return false;
         }
-        return threadBound == this && !containsScopedValueElements;
+        PropagatedContext threadBound = ThreadBoundPropagation.get();
+        return threadBound == null || threadBound == this;
     }
 
     @Override
@@ -280,7 +282,8 @@ final class PropagatedContextImpl implements PropagatedContext {
             case THREAD_LOCAL -> ThreadContext.propagate(ThreadContext.get(), this);
             // A ScopedValue is only bound for the extent of Carrier.run/call, it cannot be bound now and unbound by a later call
             case SCOPED_VALUE ->
-                throw new IllegalStateException("Scope propagation requires thread-local support. Set 'micronaut.propagation' to 'thread-local'.");
+                throw new IllegalStateException("PropagatedContext.propagate() without a callback requires thread-local propagation. "
+                    + "Use a callback such as propagate(Supplier), or propagateIfSupported(), or set 'micronaut.propagation' to 'thread-local'.");
         };
     }
 

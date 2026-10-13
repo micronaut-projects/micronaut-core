@@ -95,9 +95,35 @@ class ThreadBoundPropagationTest {
             });
             assertSame(bound, PropagatedContext.get());
             assertEquals("bound", THREAD_STATE.get());
-            // Already in scope, runs directly
             assertSame(bound, bound.propagate((Supplier<PropagatedContext>) PropagatedContext::get));
         }
+        assertFalse(PropagatedContext.find().isPresent());
+    }
+
+    @ParameterizedTest
+    @EnumSource(PropagatedContextConfiguration.Mode.class)
+    void propagatingTheBoundContextWithACallbackBindsTheScopedValue(PropagatedContextConfiguration.Mode mode) {
+        PropagatedContextConfiguration.set(mode);
+        PropagatedContext outer = PropagatedContext.empty().plus(new Element("outer"));
+        PropagatedContext bound = PropagatedContext.empty().plus(new Element("bound"));
+
+        outer.propagate(() -> {
+            try (PropagatedContext.Scope _ = ThreadBoundPropagation.bind(bound)) {
+                bound.propagate(() -> {
+                    assertSame(bound, PropagatedContext.get());
+                    if (mode == PropagatedContextConfiguration.Mode.SCOPED_VALUE) {
+                        // Code that only inherits scoped values, such as a forked subtask, sees the same context
+                        assertSame(bound, ScopedValues.get());
+                    }
+                    // Already in scope, runs directly
+                    bound.propagate(() -> assertSame(bound, PropagatedContext.get()));
+                });
+                assertSame(bound, PropagatedContext.get());
+                assertEquals("bound", THREAD_STATE.get());
+            }
+            assertSame(outer, PropagatedContext.get());
+            assertEquals("outer", THREAD_STATE.get());
+        });
         assertFalse(PropagatedContext.find().isPresent());
     }
 

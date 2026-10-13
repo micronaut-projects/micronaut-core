@@ -18,8 +18,12 @@ package io.micronaut.docs.server.suspend
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.MutableHttpRequest
+import io.micronaut.http.annotation.ClientFilter
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.context.ServerRequestContext
@@ -33,8 +37,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
 
 /**
- * A suspend route sees the request it serves before and after suspending and switching dispatchers, in both
- * propagation modes.
+ * A suspend route sees the request it serves before and after suspending, switching dispatchers and calling a
+ * declarative suspend client, whose filters also see it, in both propagation modes.
  */
 @Timeout(value = 30, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 abstract class SuspendPropagatedContextTest {
@@ -44,14 +48,15 @@ abstract class SuspendPropagatedContextTest {
     lateinit var client: HttpClient
 
     @Test
-    fun `the request is propagated across suspensions and dispatcher switches`() {
+    fun `the request is propagated across suspensions, dispatcher switches and client calls`() {
         val path = "/suspend-propagated-context"
-        assertEquals(List(4) { path }.joinToString("|"), client.toBlocking().retrieve(HttpRequest.GET<Any>(path)))
+        // The last value is the caller's path, as seen by the declarative client's filter
+        assertEquals(List(5) { path }.joinToString("|"), client.toBlocking().retrieve(HttpRequest.GET<Any>(path)))
     }
 
     @Requires(property = "spec.name", value = "SuspendPropagatedContextTest")
     @Controller("/suspend-propagated-context")
-    class SuspendPropagatedContextController {
+    class SuspendPropagatedContextController(private val echoClient: EchoClient) {
 
         @Get
         suspend fun index(): String {
@@ -62,8 +67,35 @@ abstract class SuspendPropagatedContextTest {
                 delay(10)
                 currentPath()
             }
-            return listOf(before, afterDelay, onDefault, currentPath()).joinToString("|")
+            val afterSwitch = currentPath()
+            val callerSeenByFilter = echoClient.callerPath()
+            return listOf(before, afterDelay, onDefault, afterSwitch, callerSeenByFilter).joinToString("|")
         }
+
+        @Get("/echo")
+        fun echo(@Header(CALLER_PATH) callerPath: String): String = callerPath
+    }
+
+    @Requires(property = "spec.name", value = "SuspendPropagatedContextTest")
+    @Client("/suspend-propagated-context")
+    interface EchoClient {
+
+        @Get("/echo")
+        suspend fun callerPath(): String
+    }
+
+    @Requires(property = "spec.name", value = "SuspendPropagatedContextTest")
+    @ClientFilter("/suspend-propagated-context/echo")
+    class CallerPathFilter {
+
+        @RequestFilter
+        fun addCallerPath(request: MutableHttpRequest<*>) {
+            request.header(CALLER_PATH, currentPath() ?: "none")
+        }
+    }
+
+    companion object {
+        private const val CALLER_PATH = "X-Caller-Path"
 
         private fun currentPath(): String? =
             ServerRequestContext.currentRequest<Any>().map { it.path }.orElse(null)

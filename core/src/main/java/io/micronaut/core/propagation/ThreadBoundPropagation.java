@@ -41,10 +41,10 @@ import org.jspecify.annotations.Nullable;
 public final class ThreadBoundPropagation {
 
     /**
-     * Set by the first thread that binds a context with scoped-value propagation, before it binds it. A thread that
-     * hasn't bound a context doesn't need to see the write, so this doesn't need to be volatile.
+     * Set by the first thread that binds a context with scoped-value propagation, so that the thread-local is only
+     * looked up once something has been bound.
      */
-    private static boolean used;
+    private static volatile boolean used;
 
     private ThreadBoundPropagation() {
     }
