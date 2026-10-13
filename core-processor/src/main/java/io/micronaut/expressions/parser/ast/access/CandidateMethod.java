@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.isAssignable;
+import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.toUnboxedIfNecessary;
 
 /**
  * Class representing candidate method used in evaluated expression.
@@ -42,6 +43,9 @@ import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompil
 final class CandidateMethod {
     private final MethodElement methodElement;
     private final List<ClassElement> parameterTypes;
+    /**
+     * The argument types, a {@code null} element represents the {@code null} literal.
+     */
     private final List<ClassElement> argumentTypes;
 
     private int varargsIndex = -1;
@@ -138,7 +142,7 @@ final class CandidateMethod {
 
         if (varargsCandidate) {
             // maybe just array argument
-            if (totalArguments == totalParams && isAssignable(lastParameter, lastArgument)) {
+            if (totalArguments == totalParams && isCompatible(lastParameter, lastArgument)) {
                 return true;
             }
 
@@ -158,7 +162,7 @@ final class CandidateMethod {
             ClassElement argumentType = argumentTypes.get(i);
             ClassElement parameterType = parameterTypes.get(i);
 
-            if (!isAssignable(parameterType, argumentType)) {
+            if (!isCompatible(parameterType, argumentType)) {
                 return false;
             }
         }
@@ -173,7 +177,7 @@ final class CandidateMethod {
             if (isLastParameter) {
                 parameterType = parameterType.fromArray();
 
-                if (argumentTypes.size() < paramIndex) {
+                if (argumentTypes.size() <= paramIndex) {
                     // if we got here it means that last parameter is varargs but methods
                     // arguments list doesn't include an argument for varargs parameter, so
                     // an empty array is used as varargs argument, which is treated as a match
@@ -183,7 +187,7 @@ final class CandidateMethod {
                 // check whether all remaining arguments match parameter type
                 for (int argIndex = paramIndex; argIndex < argumentTypes.size(); argIndex++) {
                     ClassElement argumentType = argumentTypes.get(argIndex);
-                    if (!isAssignable(parameterType, argumentType)) {
+                    if (!isCompatible(parameterType, argumentType)) {
                         return false;
                     }
                 }
@@ -192,12 +196,12 @@ final class CandidateMethod {
             }
 
             // too little arguments, no match
-            if (argumentTypes.size() < paramIndex) {
+            if (argumentTypes.size() <= paramIndex) {
                 return false;
             }
 
             // no match if argument is not assignable to parameter
-            if (!isAssignable(parameterType, argumentTypes.get(paramIndex))) {
+            if (!isCompatible(parameterType, argumentTypes.get(paramIndex))) {
                 return false;
             }
         }
@@ -293,8 +297,13 @@ final class CandidateMethod {
      * @return true if this method is at least as specific
      */
     private boolean isMoreSpecificThan(CandidateMethod other) {
+        if (isVarArgs() != other.isVarArgs()) {
+            // fixed and variable arity invocations are never compared, the fixed arity candidates are
+            // selected in an earlier phase. The fixed arity method may also have fewer parameters than the arity
+            return false;
+        }
         int arity = Math.max(argumentTypes.size(), Math.max(parameterTypes.size(), other.parameterTypes.size()));
-        if (!isVarArgs() && !other.isVarArgs()) {
+        if (!isVarArgs()) {
             if (parameterTypes.size() != other.parameterTypes.size()) {
                 return false;
             }
@@ -353,6 +362,10 @@ final class CandidateMethod {
      * @return true if it is
      */
     private static boolean isSubtype(ClassElement type, ClassElement superType) {
+        if (type == null) {
+            // the null type is a subtype of every reference type
+            return isReferenceType(superType);
+        }
         if (type.getArrayDimensions() != superType.getArrayDimensions()) {
             // arrays are only assignable to arrays of the same dimension here, which matches isAssignable
             return false;
@@ -361,6 +374,34 @@ final class CandidateMethod {
             return type.isPrimitive() && superType.isPrimitive() && isPrimitiveSubtype(type.getName(), superType.getName());
         }
         return type.isAssignable(superType);
+    }
+
+    /**
+     * Whether an argument can be passed to a parameter (JLS 5.3): the null literal can be passed to any reference
+     * type, and widening primitive conversions are allowed in addition to the assignability and boxing checks of
+     * {@link io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils#isAssignable(ClassElement, ClassElement)}.
+     *
+     * @param parameter the parameter type
+     * @param argument the argument type or {@code null} for the null literal
+     * @return true if it can
+     */
+    private static boolean isCompatible(ClassElement parameter, ClassElement argument) {
+        if (argument == null) {
+            return isReferenceType(parameter);
+        }
+        if (isAssignable(parameter, argument)) {
+            return true;
+        }
+        if (parameter.isPrimitive() && !parameter.isArray() && !argument.isArray()
+            && toUnboxedIfNecessary(TypeDef.erasure(argument)) instanceof TypeDef.Primitive primitive) {
+            // widening primitive conversion, optionally preceded by unboxing
+            return isPrimitiveSubtype(primitive.name(), parameter.getName());
+        }
+        return false;
+    }
+
+    private static boolean isReferenceType(ClassElement type) {
+        return !type.isPrimitive() || type.isArray();
     }
 
     /**

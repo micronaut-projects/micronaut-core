@@ -125,6 +125,137 @@ class MethodOverloadExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
         ]
     }
 
+    void "test primitive widening and null arguments are matched like Java method invocations"() {
+        given:
+        List<Object> results = evaluateMultipleAgainstContext("""
+            @jakarta.inject.Singleton
+            class Context {
+                Overloads overloads() {
+                    return new Overloads();
+                }
+
+                Integer boxed() {
+                    return 2;
+                }
+            }
+
+            class Overloads {
+                long widening(long value) {
+                    return value;
+                }
+
+                double widening(double first, double second) {
+                    return first + second;
+                }
+
+                String wideningPreferred(long value) {
+                    return "long";
+                }
+
+                String wideningPreferred(Integer value) {
+                    return "Integer";
+                }
+
+                String text(CharSequence value) {
+                    return "CharSequence";
+                }
+
+                String text(String value) {
+                    return "String " + value;
+                }
+
+                String text(Object value) {
+                    return "Object";
+                }
+
+                String primitiveOrObject(int value) {
+                    return "int";
+                }
+
+                String primitiveOrObject(Object value) {
+                    return "Object " + value;
+                }
+
+                String nullVarargs(String first, String... values) {
+                    return first + " " + java.util.Arrays.toString(values);
+                }
+
+                String prefixed(String first, String... values) {
+                    return first + ":" + values.length;
+                }
+            }
+        """,
+                "#{ overloads().widening(1) }",
+                "#{ overloads().widening(boxed()) }",
+                "#{ overloads().widening(1, 2L) }",
+                "#{ overloads().wideningPreferred(1) }",
+                "#{ overloads().text(null) }",
+                "#{ overloads().primitiveOrObject(null) }",
+                "#{ overloads().nullVarargs(null, 'x', null) }",
+                "#{ overloads().prefixed('x') }"
+        )
+
+        expect:
+        results == [
+                1L,
+                2L,
+                3.0d,
+                "long",
+                "String null",
+                "Object null",
+                "null [x, null]",
+                "x:0"
+        ]
+    }
+
+    void "test a method that requires narrowing is not matched"() {
+        when:
+        evaluateAgainstContext("#{ overloads().narrowing(1L) }", """
+            @jakarta.inject.Singleton
+            class Context {
+                Overloads overloads() {
+                    return new Overloads();
+                }
+            }
+
+            class Overloads {
+                int narrowing(int value) {
+                    return value;
+                }
+            }
+        """)
+
+        then:
+        def e = thrown(Exception)
+        e.message.contains("No method [ narrowing(") && e.message.contains("available in class test.Overloads")
+    }
+
+    void "test null arguments are ambiguous without a most specific overload"() {
+        when:
+        evaluateAgainstContext("#{ overloads().text(null) }", """
+            @jakarta.inject.Singleton
+            class Context {
+                Overloads overloads() {
+                    return new Overloads();
+                }
+            }
+
+            class Overloads {
+                String text(String value) {
+                    return "String";
+                }
+
+                String text(Integer value) {
+                    return "Integer";
+                }
+            }
+        """)
+
+        then:
+        def e = thrown(Exception)
+        e.message.contains("Ambiguous method call. Found 2 matching methods")
+    }
+
     void "test overloads inherited from different interfaces"() {
         given:
         Object result = evaluateAgainstContext("#{ headers().contains('Upgrade') }", """
