@@ -14,15 +14,23 @@ import io.micronaut.json.JsonSyntaxException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
+import io.micronaut.http.body.stream.PieceReaders;
 import org.junit.jupiter.api.Test;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
+import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -148,6 +156,46 @@ class JsonPieceReaderTest {
         assertThrows(CodecException.class, () -> handler.read(Argument.listOf(Book.class), MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(),
             NettyByteBufferFactory.DEFAULT.wrap(input)));
         assertEquals(0, input.refCnt());
+    }
+
+    @Test
+    void anUnrequestedValueOfTheLastPieceIsNotDecodedByThePublisher() {
+        AtomicReference<Subscription> subscription = new AtomicReference<>();
+        List<Integer> elements = new ArrayList<>();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        AtomicBoolean complete = new AtomicBoolean();
+        PieceReaders.publisher(Flux.just(piece("[1,null]")), arrayReader(Argument.INT, 1024)).subscribe(new Subscriber<Integer>() {
+            @Override
+            public void onSubscribe(Subscription s) {
+                subscription.set(s);
+            }
+
+            @Override
+            public void onNext(Integer element) {
+                elements.add(element);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                failure.set(t);
+            }
+
+            @Override
+            public void onComplete() {
+                complete.set(true);
+            }
+        });
+
+        subscription.get().request(1);
+        assertEquals(List.of(1), elements);
+        // the null is not decoded before it is requested: the stream stays pending
+        assertNull(failure.get());
+        assertFalse(complete.get());
+
+        subscription.get().request(1);
+        // the null of an int does not decode
+        assertNotNull(failure.get());
+        assertFalse(complete.get());
     }
 
     private static <T> PieceReader<T> arrayReader(Argument<T> type, long maxElementSize) {
