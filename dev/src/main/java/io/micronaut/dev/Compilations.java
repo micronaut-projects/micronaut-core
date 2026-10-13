@@ -193,6 +193,9 @@ final class Compilations {
         boolean compiled = false;
         Set<SourceKind> compiledKinds = new LinkedHashSet<>();
         Set<String> affectedClasses = new LinkedHashSet<>();
+        // what each language already took into account: its own outputs, whose dependents among its sources it
+        // selected itself, and what it was told about
+        Map<SourceKind, Set<String>> known = new EnumMap<>(SourceKind.class);
         for (SourceKind kind : kinds) {
             SourceCompiler compiler = compilers.get(kind);
             if (compiler == null || joint.containsKey(kind) || !embedded(target, kind)) {
@@ -212,24 +215,31 @@ final class Compilations {
             compiled = true;
             compiledKinds.add(kind);
             affectedClasses.addAll(result.compiledClasses());
+            known.computeIfAbsent(kind, k -> new LinkedHashSet<>()).addAll(result.compiledClasses());
             LOG.info("Compiled {} {} source(s) in {} ms", result.compiledSources().size(), kind, result.duration().toMillis());
         }
         // a change in one language reaches the others: their sources that reference a changed class are
         // recompiled too, and fail rather than keep bytecode linked against what is gone
         // until nothing new is produced: a Groovy class recompiled for a Java change may itself be what a
         // Java source depends on, and Java was visited first
-        Set<String> propagated = new LinkedHashSet<>();
-        for (int pass = 0; pass < MAX_PROPAGATION_PASSES && compilers.size() - joint.size() > 1 && !affectedClasses.equals(propagated); pass++) {
-            Set<String> fresh = new LinkedHashSet<>(affectedClasses);
-            fresh.removeAll(propagated);
-            propagated.addAll(affectedClasses);
+        boolean produced = compiledLanguages(compilers, target, joint) > 1;
+        for (int pass = 0; pass < MAX_PROPAGATION_PASSES && produced; pass++) {
+            produced = false;
             for (Map.Entry<SourceKind, SourceCompiler> entry : compilers.entrySet()) {
                 SourceKind kind = entry.getKey();
                 // a language compiled in this batch for its own changes is visited again: an unchanged source of
-                // it that references what another language changed was not selected the first time
+                // it that references what another language changed was not selected the first time. It is told
+                // only what it does not know yet, so it does not recompile the dependents of its own classes
                 if (joint.containsKey(kind) || !embedded(target, kind)) {
                     continue;
                 }
+                Set<String> knownToKind = known.computeIfAbsent(kind, k -> new LinkedHashSet<>());
+                Set<String> fresh = new LinkedHashSet<>(affectedClasses);
+                fresh.removeAll(knownToKind);
+                if (fresh.isEmpty()) {
+                    continue;
+                }
+                knownToKind.addAll(fresh);
                 CompilationRequest request = new CompilationRequest(kind, compilationRoots(target, kind, joint), Set.of(), Set.of(), false, target.compileClasspath(),
                     target.processorPath(), target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint)).withAffectedClasses(fresh);
                 CompilationResult result = entry.getValue().compile(request);
@@ -239,10 +249,29 @@ final class Compilations {
                 if (result.status() == CompilationResult.Status.SUCCESS) {
                     compiledKinds.add(kind);
                     affectedClasses.addAll(result.compiledClasses());
+                    knownToKind.addAll(result.compiledClasses());
+                    produced |= !result.compiledClasses().isEmpty();
                     LOG.info("Compiled {} {} source(s) that depend on the changed classes in {} ms", result.compiledSources().size(), kind, result.duration().toMillis());
                 }
             }
         }
         return new DevRuntime.CompileRound(null, compiled, compiledKinds, affectedClasses);
+    }
+
+    /**
+     * @param compilers The compilers, by language
+     * @param target The manifest whose languages are compiled
+     * @param jointOwners The languages compiled jointly with another, by that other one
+     * @return How many languages the launcher compiles itself: those with a compiler, sources and the embedded mode,
+     * not compiled jointly with another
+     */
+    private static int compiledLanguages(Map<SourceKind, SourceCompiler> compilers, DevManifest target, Map<SourceKind, SourceKind> jointOwners) {
+        int languages = 0;
+        for (SourceKind kind : compilers.keySet()) {
+            if (!jointOwners.containsKey(kind) && embedded(target, kind)) {
+                languages++;
+            }
+        }
+        return languages;
     }
 }

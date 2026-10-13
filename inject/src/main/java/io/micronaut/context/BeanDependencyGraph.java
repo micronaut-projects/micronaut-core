@@ -169,32 +169,72 @@ public interface BeanDependencyGraph {
      *
      * <p>Two dependencies are equal when they join the same nodes, as the graph identifies them (a definition with
      * the qualifier its bean is registered under), in the same way: whichever definition object stands for a node,
-     * a delegate or the definition it wraps, does not matter.</p>
-     *
-     * @param dependent The definition of the bean that received the dependency; for a bean created per qualifier
-     *                  (an {@code @EachBean} member) a delegate carrying that qualifier, so that the member is told apart
-     * @param dependency The definition of the received bean
-     * @param kind How the dependency was injected
-     * @param lazy Whether the dependent received a provider of the dependency rather than the dependency itself. The edge
-     *             names each definition the provider's type argument and qualifier select, as the provider resolves one
-     *             of them on each call and holds none
-     * @param collection Whether the injection point is a collection or array of a type the dependency implements
+     * a delegate or the definition it wraps, does not matter. The definitions themselves are therefore not part of
+     * equality, which is why this is a class and not a record. The node identities are computed once, when the
+     * dependency is created.</p>
      */
-    record BeanDependency(BeanDefinition<?> dependent, BeanDefinition<?> dependency, InjectionKind kind, boolean lazy, boolean collection) {
+    final class BeanDependency {
+        private final BeanDefinition<?> dependent;
+        private final BeanDefinition<?> dependency;
+        private final InjectionKind kind;
+        private final boolean lazy;
+        private final boolean collection;
+        private final DefaultBeanDependencyGraph.Key dependentKey;
+        private final DefaultBeanDependencyGraph.Key dependencyKey;
 
         /**
-         * Validating constructor.
-         *
-         * @param dependent The receiving bean
-         * @param dependency The received bean
-         * @param kind The injection kind
-         * @param lazy Whether resolved through a provider
-         * @param collection Whether part of a collection
+         * @param dependent The definition of the bean that received the dependency; for a bean created per qualifier
+         *                  (an {@code @EachBean} member) a delegate carrying that qualifier, so that the member is told apart
+         * @param dependency The definition of the received bean
+         * @param kind How the dependency was injected
+         * @param lazy Whether the dependent received a provider of the dependency rather than the dependency itself. The edge
+         *             names each definition the provider's type argument and qualifier select, as the provider resolves one
+         *             of them on each call and holds none
+         * @param collection Whether the injection point is a collection or array of a type the dependency implements
          */
-        public BeanDependency {
-            Objects.requireNonNull(dependent, "dependent");
-            Objects.requireNonNull(dependency, "dependency");
-            Objects.requireNonNull(kind, "kind");
+        public BeanDependency(BeanDefinition<?> dependent, BeanDefinition<?> dependency, InjectionKind kind, boolean lazy, boolean collection) {
+            this.dependent = Objects.requireNonNull(dependent, "dependent");
+            this.dependency = Objects.requireNonNull(dependency, "dependency");
+            this.kind = Objects.requireNonNull(kind, "kind");
+            this.lazy = lazy;
+            this.collection = collection;
+            this.dependentKey = DefaultBeanDependencyGraph.Key.of(dependent);
+            this.dependencyKey = DefaultBeanDependencyGraph.Key.of(dependency);
+        }
+
+        /**
+         * @return The definition of the bean that received the dependency
+         */
+        public BeanDefinition<?> dependent() {
+            return dependent;
+        }
+
+        /**
+         * @return The definition of the received bean
+         */
+        public BeanDefinition<?> dependency() {
+            return dependency;
+        }
+
+        /**
+         * @return How the dependency was injected
+         */
+        public InjectionKind kind() {
+            return kind;
+        }
+
+        /**
+         * @return Whether the dependent received a provider of the dependency rather than the dependency itself
+         */
+        public boolean lazy() {
+            return lazy;
+        }
+
+        /**
+         * @return Whether the injection point is a collection or array of a type the dependency implements
+         */
+        public boolean collection() {
+            return collection;
         }
 
         /**
@@ -208,19 +248,33 @@ public interface BeanDependencyGraph {
             return !lazy && (kind == InjectionKind.FIELD || kind == InjectionKind.METHOD);
         }
 
+        DefaultBeanDependencyGraph.Key dependentKey() {
+            return dependentKey;
+        }
+
+        DefaultBeanDependencyGraph.Key dependencyKey() {
+            return dependencyKey;
+        }
+
         @Override
         public boolean equals(Object o) {
             return o instanceof BeanDependency that
                 && kind == that.kind
                 && lazy == that.lazy
                 && collection == that.collection
-                && DefaultBeanDependencyGraph.Key.of(dependent).equals(DefaultBeanDependencyGraph.Key.of(that.dependent))
-                && DefaultBeanDependencyGraph.Key.of(dependency).equals(DefaultBeanDependencyGraph.Key.of(that.dependency));
+                && dependentKey.equals(that.dependentKey)
+                && dependencyKey.equals(that.dependencyKey);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(DefaultBeanDependencyGraph.Key.of(dependent), DefaultBeanDependencyGraph.Key.of(dependency), kind, lazy, collection);
+            return Objects.hash(dependentKey, dependencyKey, kind, lazy, collection);
+        }
+
+        @Override
+        public String toString() {
+            return "BeanDependency[dependent=" + dependent + ", dependency=" + dependency + ", kind=" + kind
+                + ", lazy=" + lazy + ", collection=" + collection + "]";
         }
     }
 }

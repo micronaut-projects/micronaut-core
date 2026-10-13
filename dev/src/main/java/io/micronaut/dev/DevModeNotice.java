@@ -18,7 +18,7 @@ package io.micronaut.dev;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
-import io.micronaut.context.reload.ReloadStrategy;
+import io.micronaut.dev.manifest.DevReloadStrategy;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.http.DevAccessLinks;
 import io.micronaut.dev.livereload.LiveReloadServer;
@@ -58,7 +58,7 @@ final class DevModeNotice {
      * @param generation The generation that runs
      * @param access     The access of the launch, whose token the link carries
      */
-    void logOnce(Logger log, ReloadStrategy strategy, @Nullable LiveReloadServer liveReload, boolean http, boolean script,
+    void logOnce(Logger log, DevReloadStrategy strategy, @Nullable LiveReloadServer liveReload, boolean http, boolean script,
                  ApplicationContext generation, DevAccess access) {
         if (logged.compareAndSet(false, true) && log.isInfoEnabled()) {
             OptionalInt port = liveReload == null ? OptionalInt.empty() : OptionalInt.of(liveReload.port());
@@ -77,7 +77,7 @@ final class DevModeNotice {
      * @param link       The link to the development pages and the server's address, when a server runs
      * @return The note: a framed block of lines that starts on a line of its own
      */
-    static String text(ReloadStrategy strategy, OptionalInt liveReload, boolean http, boolean script, DevAccessLinks.@Nullable Link link) {
+    static String text(DevReloadStrategy strategy, OptionalInt liveReload, boolean http, boolean script, DevAccessLinks.@Nullable Link link) {
         StringBuilder text = new StringBuilder(System.lineSeparator());
         line(text, RULE);
         line(text, "  " + HEADLINE);
