@@ -16,7 +16,6 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.beans.exceptions.IntrospectionException;
-import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
@@ -63,6 +62,11 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
      * The indexes of loaders other than this introspector's own. The values are held softly because a
      * generated reference strongly refers to the loader that is the key, so a strongly held value would
      * keep a retired loader alive; a softly held one is collected under memory pressure and the loader with it.
+     *
+     * <p>Until then a loader that is no longer used stays: a development launcher, the only caller of
+     * {@link #invalidate(ClassLoader)}, invalidates every generation it retires, which removes its entries at once.
+     * Outside development mode the loaders a lookup goes through, the thread context loader and the loaders of
+     * bean types, stay in use and keep their index for as long as they live.</p>
      */
     private final Map<ClassLoader, SoftReference<Map<String, BeanIntrospectionReference<Object>>>> otherIntrospections = Collections.synchronizedMap(new WeakHashMap<>());
     private final Map<ClassLoader, SoftReference<List<BeanIntrospectionFallback>>> otherFallbacks = Collections.synchronizedMap(new WeakHashMap<>());
@@ -193,8 +197,6 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
     public void invalidate(ClassLoader changed) {
         ArgumentUtils.requireNonNull("changed", changed);
         synchronized (this) {
-            // the index is rebuilt from the META-INF/micronaut entries, whose cache one invalidation makes stale
-            MicronautMetaServiceLoaderUtils.invalidate();
             if (sees(classLoader, changed)) {
                 introspectionMap = null;
                 fallbacks = null;

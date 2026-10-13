@@ -31,6 +31,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.junit.jupiter.api.Test;
 
+import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -45,6 +46,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -267,8 +269,53 @@ class BeanWatchTest {
     }
 
     @Test
-    void aProcessorWrittenBeforeWatchesIsFedTheAdditionsThroughTheAdapter() {
+    void aProcessorIsNotAdaptedOutsideDevelopmentModeAndDependencyTracking() {
         try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            LegacyTickProcessor processor = context.getBean(LegacyTickProcessor.class);
+
+            // the startup pass processed the methods as it always has, and nothing watches for the processor
+            assertEquals(Set.of("tick", "tock"), Set.copyOf(processor.processed));
+            assertTrue(beanContext.adaptedProcessors().isEmpty());
+        }
+    }
+
+    @Test
+    void aPrototypeThatRegisteredAWatchIsNotKeptReachableAndItsWatchClosesOnceItIsCollected() throws InterruptedException {
+        try (ApplicationContext context = ApplicationContext.run(PROPERTIES)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            WatchingPrototype prototype = context.getBean(WatchingPrototype.class);
+            BeanWatch watch = prototype.watch;
+            BeanWatch resourceWatch = prototype.resourceWatch;
+            WeakReference<WatchingPrototype> reference = new WeakReference<>(prototype);
+            int before = WatchingPrototype.CHANGES.get();
+            beanContext.notifyConfigurationChange(ConfigurationChange.ofKeys(Set.of("protos.watching.size")));
+            assertEquals(before + 1, WatchingPrototype.CHANGES.get());
+
+            // nobody destroys a prototype: dropped, it is collected, since the registry holds it weakly
+            prototype = null;
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+            while (reference.get() != null && System.nanoTime() < deadline) {
+                System.gc();
+                Thread.sleep(10);
+            }
+            assertNull(reference.get(), "the registry keeps the prototype that registered a watch reachable");
+
+            // and its watches are closed before the next change of any kind is delivered
+            int resourcesBefore = WatchingPrototype.RESOURCE_CHANGES.get();
+            Path root = Path.of("build", "watching-prototype").toAbsolutePath();
+            beanContext.notifyResourceChange(new ResourceChange(ResourceKind.STATIC, List.of(root), List.of(root.resolve("app.css")), List.of(), false));
+            assertFalse(resourceWatch.isActive());
+            assertFalse(watch.isActive());
+            assertEquals(resourcesBefore, WatchingPrototype.RESOURCE_CHANGES.get());
+            beanContext.notifyConfigurationChange(ConfigurationChange.ofKeys(Set.of("protos.watching.size")));
+            assertEquals(before + 1, WatchingPrototype.CHANGES.get());
+        }
+    }
+
+    @Test
+    void aProcessorWrittenBeforeWatchesIsFedTheAdditionsThroughTheAdapter() {
+        try (ApplicationContext context = ApplicationContext.run(DEVELOPMENT)) {
             DefaultBeanContext beanContext = (DefaultBeanContext) context;
             LegacyTickProcessor processor = context.getBean(LegacyTickProcessor.class);
 
@@ -332,6 +379,7 @@ class BeanWatchTest {
         Pool.CREATED.set(0);
         try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).beanDependencyTrackingEnabled(true).start()) {
             WatchableBeanContext beanContext = (WatchableBeanContext) context;
+            assertTrue(beanContext.isRecreateSupported());
             // a singleton not created yet is left alone
             assertFalse(beanContext.recreate(Pool.class, null));
             assertEquals(0, Pool.CREATED.get());
@@ -374,6 +422,7 @@ class BeanWatchTest {
             WatchableBeanContext beanContext = (WatchableBeanContext) context;
             PoolUser user = context.getBean(PoolUser.class);
             // its dependents unknown, the pool is kept rather than leave the user holding a destroyed instance
+            assertFalse(beanContext.isRecreateSupported());
             assertFalse(beanContext.recreate(user.pool));
             assertFalse(beanContext.recreate(Pool.class, null));
             assertEquals(1, Pool.CREATED.get());
@@ -620,6 +669,28 @@ class BeanWatchTest {
             assertFalse(cache.watch.isActive());
             context.publishEvent(classChange());
             assertEquals(List.of(first, second), cache.evicted);
+        } finally {
+            ClassChangeOrder.SEEN.clear();
+        }
+    }
+
+    @Test
+    void anAsynchronousClassChangeReachesTheWatchesOnTheThreadThatNotifiesTheListeners() throws Exception {
+        try (ApplicationContext context = ApplicationContext.run(DEVELOPMENT)) {
+            context.getBean(ClassChangeOrder.class);
+            ClassChangeOrder.SEEN.clear();
+            List<Thread> threads = new CopyOnWriteArrayList<>();
+            ((WatchableBeanContext) context).classChanges().watch(change -> {
+                threads.add(Thread.currentThread());
+                ClassChangeOrder.SEEN.add("watch");
+            });
+
+            context.publishEventAsync(classChange()).get(30, TimeUnit.SECONDS);
+
+            // ahead of the listeners, as a synchronous publication delivers it, and not on the publishing thread
+            assertEquals(List.of("watch", "listener"), ClassChangeOrder.SEEN);
+            assertEquals(1, threads.size());
+            assertNotSame(Thread.currentThread(), threads.get(0));
         } finally {
             ClassChangeOrder.SEEN.clear();
         }
