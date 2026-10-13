@@ -78,11 +78,9 @@ noReflection {
     allowIn("io.micronaut.dev.manifest.DevManifest", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.compile.SourceKind", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.compile.CompileMode", "ENUM_CONSTANTS")
-    // the launcher loads the application's main class through the reloadable loader and invokes it
-    allowIn("io.micronaut.dev.MicronautDevMain", "CLASS_LOADING")
-    allowIn("io.micronaut.dev.MicronautDevMain", "REFLECTIVE_ACCESS")
-    allowIn("io.micronaut.dev.MicronautDevMain", "CLASS_MEMBERS")
+    // MicronautDevMain.launchApplication, which looks up and invokes the application's main, suppresses the check itself
     allowIn("io.micronaut.dev.DevRuntime", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.dev.Compilations", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.DevRuntime", "SERVICE_LOADING")
     allowIn("io.micronaut.dev.DevRuntime", "CLASS_LOADING")
     allowIn("io.micronaut.dev.ManifestRetentionPolicy", "CLASS_LOADING")

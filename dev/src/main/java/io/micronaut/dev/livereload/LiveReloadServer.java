@@ -32,15 +32,6 @@ import java.nio.file.Path;
 public interface LiveReloadServer extends Closeable {
 
     /**
-     * The port the LiveReload extensions expect.
-     */
-    int DEFAULT_PORT = 35729;
-
-    /**
-     * The path of the client script the server serves.
-     */
-    String SCRIPT_PATH = "/livereload.js";
-
     /**
      * The WebSocket path of the event channel: a page connects to {@code /micronaut-dev/events?topic=<topic>} to receive
      * what is {@link #publish published} on that topic. It is apart from the LiveReload socket, whose clients reject a
@@ -109,14 +100,4 @@ public interface LiveReloadServer extends Closeable {
      */
     @Override
     void close();
-
-    /**
-     * The script tag a page includes to connect to a server on the given port.
-     *
-     * @param port The port
-     * @return The tag
-     */
-    static String scriptTag(int port) {
-        return "<script src=\"http://localhost:" + port + SCRIPT_PATH + "?snipver=1\" async></script>";
-    }
 }
