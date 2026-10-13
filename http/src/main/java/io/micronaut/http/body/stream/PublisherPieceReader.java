@@ -51,8 +51,9 @@ final class PublisherPieceReader<T> implements PieceReader<T>, Subscriber<T> {
     private @Nullable Subscription output;
     private boolean requested;
     private boolean ended;
-    private @Nullable Throwable failure;
-    private boolean inCall;
+    private volatile @Nullable Throwable failure;
+    // the thread in a call of the reader: a signal of the chunked reader on any other thread is asynchronous
+    private volatile @Nullable Thread caller;
     private boolean closed;
 
     /**
@@ -61,11 +62,11 @@ final class PublisherPieceReader<T> implements PieceReader<T>, Subscriber<T> {
      */
     PublisherPieceReader(String readerName, Function<Publisher<ByteBuffer<?>>, Publisher<? extends T>> chunked) {
         this.readerName = readerName;
-        inCall = true;
+        caller = Thread.currentThread();
         try {
             chunked.apply(input).subscribe(this);
         } finally {
-            inCall = false;
+            caller = null;
         }
     }
 
@@ -79,11 +80,11 @@ final class PublisherPieceReader<T> implements PieceReader<T>, Subscriber<T> {
         try (piece) {
             buffer = piece.toByteBuffer();
         }
-        inCall = true;
+        caller = Thread.currentThread();
         try {
             input.offer(buffer);
         } finally {
-            inCall = false;
+            caller = null;
         }
         rethrow();
     }
@@ -93,11 +94,11 @@ final class PublisherPieceReader<T> implements PieceReader<T>, Subscriber<T> {
         if (closed) {
             return;
         }
-        inCall = true;
+        caller = Thread.currentThread();
         try {
             input.complete();
         } finally {
-            inCall = false;
+            caller = null;
         }
         rethrow();
     }
@@ -115,11 +116,11 @@ final class PublisherPieceReader<T> implements PieceReader<T>, Subscriber<T> {
         Subscription s = output;
         if (!requested && s != null) {
             requested = true;
-            inCall = true;
+            caller = Thread.currentThread();
             try {
                 s.request(1);
             } finally {
-                inCall = false;
+                caller = null;
             }
             element = elements.poll();
             if (element != null) {
@@ -166,28 +167,47 @@ final class PublisherPieceReader<T> implements PieceReader<T>, Subscriber<T> {
 
     @Override
     public void onNext(T element) {
-        checkSynchronous();
+        if (!checkSynchronous()) {
+            // the element of an asynchronous emission is not read: the reader fails instead
+            if (element instanceof ReferenceCounted counted) {
+                counted.release();
+            }
+            return;
+        }
         requested = false;
         elements.add(element);
     }
 
     @Override
     public void onError(Throwable t) {
-        checkSynchronous();
-        failure = t;
+        if (checkSynchronous()) {
+            failure = t;
+        }
     }
 
     @Override
     public void onComplete() {
-        checkSynchronous();
-        ended = true;
+        if (checkSynchronous()) {
+            ended = true;
+        }
     }
 
-    private void checkSynchronous() {
-        if (!inCall && failure == null) {
+    /**
+     * Whether a signal of the chunked reader happens on the thread of a call of this reader. A
+     * signal on another thread, even one that overlaps such a call, fails the reader and is
+     * dropped, so that the state of the reader is touched only by the thread that calls it.
+     *
+     * @return Whether the signal is synchronous
+     */
+    private boolean checkSynchronous() {
+        if (caller == Thread.currentThread()) {
+            return true;
+        }
+        if (failure == null) {
             failure = new IllegalStateException("The chunked reader " + readerName
                 + " emitted outside of a read: a reader that emits asynchronously must implement openPieceReader");
         }
+        return false;
     }
 
     private void rethrow() throws IOException {
