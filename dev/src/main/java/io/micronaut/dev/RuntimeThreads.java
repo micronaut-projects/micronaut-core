@@ -51,16 +51,15 @@ final class RuntimeThreads {
 
     /**
      * Refuses to wait for a reload on a thread the reload waits for: the reload thread, which runs the reload
-     * listeners, and the main thread of a generation whose context has yet to run.
+     * listeners, and the thread running the current generation's main, which a restart waits to end.
      *
      * @param worker The reload thread
      * @param application The thread running the current generation's main
-     * @param context The current generation's context
      * @throws IllegalStateException if the calling thread is one of them
      */
-    static void refuseOwnThreads(@Nullable Thread worker, @Nullable Thread application, @Nullable ApplicationContext context) {
+    static void refuseOwnThreads(@Nullable Thread worker, @Nullable Thread application) {
         Thread current = Thread.currentThread();
-        if (current == worker || (current == application && (context == null || !context.isRunning()))) {
+        if (current == worker || current == application) {
             throw new IllegalStateException("A reload cannot be requested on " + current.getName() + ", which the reload waits for: request it from another thread");
         }
     }

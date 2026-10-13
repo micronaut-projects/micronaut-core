@@ -312,11 +312,11 @@ public final class DevRuntime implements Closeable {
      * Compiles every source and restarts if any class changed: the manual trigger, for an IDE that
      * saved without the watcher noticing, or after a failed compilation was fixed elsewhere.
      *
-     * @throws IllegalStateException if called on the reload thread, from a reload listener, or on the main thread of a
-     * generation still starting: the reload waits for both
+     * @throws IllegalStateException if called on the reload thread, from a reload listener, or on the thread running the
+     * generation's main: the reload waits for both
      */
     public void reload() {
-        RuntimeThreads.refuseOwnThreads(worker, applicationThread, context);
+        RuntimeThreads.refuseOwnThreads(worker, applicationThread);
         awaitBatch(enqueue(new Pending(Map.of(), Map.of(), true)));
     }
 
@@ -328,18 +328,18 @@ public final class DevRuntime implements Closeable {
      * @param deleted The files deleted
      */
     void sourcesChanged(SourceKind kind, Set<Path> changed, Set<Path> deleted) {
-        RuntimeThreads.refuseOwnThreads(worker, applicationThread, context);
+        RuntimeThreads.refuseOwnThreads(worker, applicationThread);
         awaitBatch(enqueue(new Pending(Map.of(kind, new SourceChanges(changed, deleted)), Map.of(), false)));
     }
 
     /**
      * Restarts the application on a new generation without compiling anything.
      *
-     * @throws IllegalStateException if called on the reload thread, from a reload listener, or on the main thread of a
-     * generation still starting: the reload waits for both
+     * @throws IllegalStateException if called on the reload thread, from a reload listener, or on the thread running the
+     * generation's main: the reload waits for both
      */
     public void restart() {
-        RuntimeThreads.refuseOwnThreads(worker, applicationThread, context);
+        RuntimeThreads.refuseOwnThreads(worker, applicationThread);
         awaitBatch(enqueue(new Pending(Map.of(), Map.of(), false) {
             @Override
             boolean forcesRestart() {
@@ -411,15 +411,16 @@ public final class DevRuntime implements Closeable {
             // a context the generation did not adopt starts with the runtime as a bean too
             return;
         }
+        reportResourceState(applicationContext);
         synchronized (lifecycle) {
             if (closed) {
                 // adopted as the runtime closed, which did not see it start
                 RuntimeThreads.stopOnceStarted(applicationContext);
                 return;
             }
+            // under the lock: a close from now on sees the start and stops the context
+            started.complete(applicationContext);
         }
-        reportResourceState(applicationContext);
-        started.complete(applicationContext);
     }
 
     /**
