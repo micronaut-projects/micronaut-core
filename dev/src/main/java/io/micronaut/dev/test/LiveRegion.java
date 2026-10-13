@@ -145,6 +145,7 @@ final class LiveRegion {
             try {
                 Thread.sleep(FRAME_INTERVAL_MILLIS);
             } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 return;
             }
             synchronized (lock) {

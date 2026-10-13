@@ -1,0 +1,173 @@
+package io.micronaut.dev.test;
+
+import org.junit.jupiter.api.Test;
+
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class LiveRegionTest {
+
+    private static final String TICKER = "micronaut-dev-test-progress";
+
+    private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+    private final Object lock = new Object();
+
+    @Test
+    void theStandardStreamsPrintAboveTheRowsWhileTheyAreShownAndAreGivenBackAfter() {
+        PrintStream out = System.out;
+        PrintStream err = System.err;
+        LiveRegion region = region(40);
+        try {
+            region.start((frame, columns) -> List.of("Running tests"), true);
+            assertNotSame(out, System.out);
+            assertNotSame(err, System.err);
+            System.out.println("from the application");
+            System.err.print("no line separator");
+            System.err.flush();
+            System.out.write('x');
+            System.out.write('\n');
+            System.out.print("a carriage return\r\n");
+            assertEquals("""
+                from the application
+                no line separator
+                x
+                a carriage return
+                Running tests""", screen());
+        } finally {
+            region.stop();
+        }
+        assertSame(out, System.out);
+        assertSame(err, System.err);
+        assertEquals("""
+            from the application
+            no line separator
+            x
+            a carriage return""", screen());
+    }
+
+    @Test
+    void aStreamAnotherToolSetIsLeftToIt() {
+        PrintStream out = System.out;
+        PrintStream err = System.err;
+        PrintStream other = new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8);
+        LiveRegion region = region(40);
+        try {
+            region.start((frame, columns) -> List.of("Running tests"), true);
+            System.setOut(other);
+            region.stop();
+            assertSame(other, System.out);
+            assertSame(err, System.err);
+        } finally {
+            System.setOut(out);
+            System.setErr(err);
+        }
+    }
+
+    @Test
+    void theTickerMovesTheSpinnerAndEndsWhenTheRowsStop() throws InterruptedException {
+        PrintStream out = System.out;
+        LiveRegion region = region(40);
+        Set<Thread> before = tickers();
+        try {
+            region.start((frame, columns) -> List.of("frame " + frame), true);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (!raw().contains("frame 2") && System.nanoTime() < deadline) {
+                Thread.sleep(10);
+            }
+            assertTrue(raw().contains("frame 2"), raw());
+        } finally {
+            Set<Thread> started = tickers();
+            started.removeAll(before);
+            assertEquals(1, started.size(), started::toString);
+            // interrupted asleep or between frames, the ticker ends
+            region.stop();
+            Thread ticker = started.iterator().next();
+            ticker.join(TimeUnit.SECONDS.toMillis(10));
+            assertFalse(ticker.isAlive());
+        }
+        assertSame(out, System.out);
+        assertEquals("", screen());
+    }
+
+    @Test
+    void theRowsAreRepaintedInPlaceAndClampedToTheWidth() {
+        AtomicReference<List<String>> rows = new AtomicReference<>(List.of());
+        LiveRegion region = region(12);
+        // nothing shown yet
+        region.refresh();
+        region.printAbove("first");
+        assertEquals("first", screen());
+
+        region.start((frame, columns) -> rows.get(), false);
+        assertEquals("first", screen());
+        rows.set(List.of(LiveRegion.paint(LiveRegion.BOLD, "a row wider than the terminal"), "second"));
+        region.refresh();
+        assertEquals("first\na row wider\nsecond", screen());
+        assertTrue(raw().contains("\033[1ma row wider\033[0m"), raw());
+
+        rows.set(List.of("one row"));
+        region.printAbove("above");
+        assertEquals("first\nabove\none row", screen());
+
+        // rows that empty are cleared
+        rows.set(List.of());
+        region.refresh();
+        assertEquals("first\nabove", screen());
+        region.stop();
+        assertEquals("first\nabove", screen());
+    }
+
+    @Test
+    void linesAreFittedAndFormatted() {
+        assertEquals("ab", LiveRegion.fit("ab\033[3", 10));
+        assertEquals("\033[31mab\033[0m", LiveRegion.fit("\033[31mabcd\033[0m", 2));
+        assertEquals("text", LiveRegion.paint(null, "text"));
+        assertEquals("", LiveRegion.paint(LiveRegion.RED, ""));
+        assertEquals("1m 05s", LiveRegion.duration(TimeUnit.SECONDS.toNanos(65)));
+        assertEquals("0.0s", LiveRegion.duration(-1));
+        assertEquals("\033[2m[0.0s]\033[0m message", LiveRegion.stamp(0, null, "", "message", null));
+        assertEquals("\033[2m[0.0s]\033[0m message", LiveRegion.stamp(0, null, "", "message", ""));
+        String header = new LiveRegion(new PrintStream(new ByteArrayOutputStream()), false, 80, () -> 0L, lock).headerRow(0, "Running", null, 0, 4);
+        assertEquals("\033[36m-\033[0m \033[1mRunning\033[0m \033[2m0.0s\033[0m", header);
+    }
+
+    @Test
+    void textIsShortenedInTheMiddle() {
+        LiveRegion.Glyphs ascii = LiveRegion.Glyphs.ASCII;
+        assertEquals("", ascii.truncate("CalculatorTest", 0));
+        assertEquals("CalculatorTest", ascii.truncate("CalculatorTest", 20));
+        assertEquals("Ca", ascii.truncate("CalculatorTest", 2));
+        assertEquals("Calc...Test", ascii.truncate("CalculatorTest", 11));
+        assertEquals("Calc…rTest", LiveRegion.Glyphs.UNICODE.truncate("CalculatorTest", 10));
+    }
+
+    private LiveRegion region(int width) {
+        return new LiveRegion(new PrintStream(buffer, true, StandardCharsets.UTF_8), true, width, System::nanoTime, lock);
+    }
+
+    private static Set<Thread> tickers() {
+        return Thread.getAllStackTraces().keySet().stream().filter(thread -> thread.getName().equals(TICKER)).collect(Collectors.toSet());
+    }
+
+    private String raw() {
+        synchronized (lock) {
+            return buffer.toString(StandardCharsets.UTF_8);
+        }
+    }
+
+    private String screen() {
+        return TerminalScreen.render(raw());
+    }
+}

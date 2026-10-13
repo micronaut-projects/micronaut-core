@@ -96,6 +96,7 @@ public final class HtmlTestReport implements TestReportListener {
     private static final String TEMPLATE = "META-INF/micronaut-dev/test-report/index.html";
     private static final String LOGO = "META-INF/micronaut-dev/test-report/micronaut-logo.svg";
     private static final String BRAND = "META-INF/micronaut-dev/test-report/brand.properties";
+    private static final String PAGE = "index.html";
     private static final int MAX_HISTORY = 30;
     // the keys of the report's JSON
     private static final String CLASS_NAME = "className";
@@ -286,7 +287,7 @@ public final class HtmlTestReport implements TestReportListener {
             return url;
         }
         Path target = directory;
-        return target == null ? null : target.resolve("index.html").toUri().toString();
+        return target == null ? null : target.resolve(PAGE).toUri().toString();
     }
 
     /**
@@ -404,7 +405,7 @@ public final class HtmlTestReport implements TestReportListener {
             String page = resource(TEMPLATE)
                 .replace("<!--logo-->", logo(HtmlTestReport.class.getClassLoader()))
                 .replace("/*state*/null", state);
-            replace(target.resolve("index.html"), page);
+            replace(target.resolve(PAGE), page);
         } catch (IOException | UncheckedIOException e) {
             LOG.error("Cannot write the HTML test report to {}: {}", target, e.getMessage(), e);
         }
@@ -441,7 +442,7 @@ public final class HtmlTestReport implements TestReportListener {
             url = liveReload.serve(manifest.testSettings().htmlReportPath(), directory);
             LOG.info("Test report: {}", url);
         } else {
-            LOG.info("Test report: {}", directory.resolve("index.html").toUri());
+            LOG.info("Test report: {}", directory.resolve(PAGE).toUri());
         }
         write();
     }

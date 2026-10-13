@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -54,6 +56,8 @@ public final class TestProgressConsole implements TestReportListener {
     private static final int MAX_STACK_FRAMES = 6;
     private static final int DEFAULT_WIDTH = 80;
     private static final int MIN_WIDTH = 40;
+    // the indent of the lines under a test or a summary line
+    private static final String DETAIL_INDENT = "      ";
     // the frames of the platform, the JDK, the build and test mode itself, which say nothing of the failure
     private static final List<String> HIDDEN_FRAMES = List.of("org.junit.", "java.", "jdk.", "sun.", "com.sun.", "org.opentest4j.",
         "com.gradle.", "org.gradle.", "worker.", "org.apache.maven.", "io.micronaut.dev.", "io.micronaut.test.");
@@ -322,7 +326,7 @@ public final class TestProgressConsole implements TestReportListener {
                 }
             }
             for (String text : trim(lines)) {
-                line("      " + paint(LiveRegion.RED, text), "      " + text);
+                line(DETAIL_INDENT + paint(LiveRegion.RED, text), DETAIL_INDENT + text);
             }
             printKeyHints();
         }
@@ -414,7 +418,7 @@ public final class TestProgressConsole implements TestReportListener {
             return;
         }
         for (String text : failureLines(failure)) {
-            line("      " + paint(LiveRegion.RED, text), "      " + text);
+            line(DETAIL_INDENT + paint(LiveRegion.RED, text), DETAIL_INDENT + text);
         }
     }
 
@@ -506,12 +510,28 @@ public final class TestProgressConsole implements TestReportListener {
          * {@code NO_COLOR} is set
          */
         static Terminal detect() {
-            String term = System.getenv("TERM");
-            boolean interactive = isTerminal() && (term == null || !term.equalsIgnoreCase("dumb")) && System.getenv("NO_COLOR") == null;
+            // a console exists when the streams are redirected too: it tells whether they are a terminal
+            Console console = System.console();
+            return detect(System::getenv, console != null && console.isTerminal(),
+                System.getProperty("stdout.encoding", System.getProperty("native.encoding", Charset.defaultCharset().name())),
+                System.getProperty("os.name", ""), () -> sttyWidth("/bin/sh", "-c", "stty size < /dev/tty"));
+        }
+
+        /**
+         * @param environment The environment variables
+         * @param terminal Whether the standard output is a terminal
+         * @param encoding The encoding of the standard output
+         * @param osName The name of the operating system
+         * @param stty The width {@code stty} tells
+         * @return What the standard output can show
+         */
+        static Terminal detect(Function<String, @Nullable String> environment, boolean terminal, String encoding, String osName, IntSupplier stty) {
+            String term = environment.apply("TERM");
+            boolean interactive = terminal && (term == null || !term.equalsIgnoreCase("dumb")) && environment.apply("NO_COLOR") == null;
             if (!interactive) {
                 return new Terminal(false, false, DEFAULT_WIDTH);
             }
-            return new Terminal(true, isUtf8(System.getProperty("stdout.encoding", System.getProperty("native.encoding", Charset.defaultCharset().name()))), terminalWidth());
+            return new Terminal(true, isUtf8(encoding), width(environment.apply("COLUMNS"), osName, stty));
         }
 
         private static boolean isUtf8(String encoding) {
@@ -522,17 +542,10 @@ public final class TestProgressConsole implements TestReportListener {
             }
         }
 
-        private static boolean isTerminal() {
-            // a console exists when the streams are redirected too: it tells whether they are a terminal
-            Console console = System.console();
-            return console != null && console.isTerminal();
-        }
-
         /**
          * @return The width of the terminal: {@code COLUMNS}, else what {@code stty} tells, else 80 columns
          */
-        private static int terminalWidth() {
-            String columns = System.getenv("COLUMNS");
+        private static int width(@Nullable String columns, String osName, IntSupplier stty) {
             if (columns != null) {
                 try {
                     int value = Integer.parseInt(columns.strip());
@@ -543,11 +556,19 @@ public final class TestProgressConsole implements TestReportListener {
                     // asked of the terminal instead
                 }
             }
-            if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("windows")) {
+            if (osName.toLowerCase(Locale.ROOT).startsWith("windows")) {
                 return DEFAULT_WIDTH;
             }
+            return stty.getAsInt();
+        }
+
+        /**
+         * @param command The command that prints the terminal's size, as {@code stty size} does: rows and columns
+         * @return The columns it prints, else 80 columns
+         */
+        static int sttyWidth(String... command) {
             try {
-                Process process = new ProcessBuilder("/bin/sh", "-c", "stty size < /dev/tty").redirectErrorStream(true).start();
+                Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
                 String size = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
                 if (process.waitFor(2, TimeUnit.SECONDS) && process.exitValue() == 0) {
                     String[] parts = size.split("\\s+");

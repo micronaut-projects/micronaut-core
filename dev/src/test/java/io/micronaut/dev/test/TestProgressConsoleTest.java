@@ -4,6 +4,8 @@ import io.micronaut.dev.CompileFailure;
 import io.micronaut.dev.compile.CompileDiagnostic;
 import io.micronaut.dev.compile.SourceKind;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -11,10 +13,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
+import java.util.function.IntSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -236,6 +240,143 @@ class TestProgressConsoleTest {
         assertEquals("", screen());
     }
 
+    @Test
+    void theSummaryCountsErrorsAndSingleTests() {
+        assertEquals("[1.0s] ✓ 1 test passed (0.0s)", summaryOf(List.of(passed(0)), summary(1, 0, 0, 0, 0, false)));
+        assertEquals("[1.0s] ✗ 1 test passed, 2 errors (0.0s)",
+            summaryOfErrors(List.of(passed(0)), 2, summary(1, 0, 2, 0, 0, false)));
+        assertEquals("[1.0s] ✗ No tests ran, 1 error (0.0s)", summaryOfErrors(List.of(), 1, summary(0, 0, 1, 0, 0, false)));
+        assertEquals("[1.0s] ! Cancelled after 1 test: 0 failed (0.0s)", summaryOf(List.of(passed(0)), summary(1, 0, 0, 0, 0, true)));
+    }
+
+    @Test
+    void theRowsShowAtMostSixRunningTestsAndTheTestsDoneBeyondThoseDiscovered() {
+        TestProgressConsole console = console(true, true, null);
+        // dynamic tests: more done than discovered
+        start(console, 0);
+        for (int i = 0; i < 8; i++) {
+            console.testStarted(test(CALCULATOR, "t" + i));
+        }
+        console.testFinished(test(CALCULATOR, "done"), new TestOutcome(TestStatus.FAILED, Duration.ZERO, null, null));
+        console.testFinished(test(CALCULATOR, "skipped"), new TestOutcome(TestStatus.SKIPPED, Duration.ZERO, null, " "));
+        List<String> lines = screen().lines().toList();
+        assertEquals(List.of("  ✗ CalculatorTest.done() (0.0s)", "  – CalculatorTest.skipped() (skipped)",
+            row("⠋ Running tests · 2 done, 1 failed", "0.0s")), lines.subList(0, 3));
+        assertEquals(row("  └ CalculatorTest.t5()", "0.0s"), lines.get(8));
+        assertEquals("  └ … 2 more", lines.get(9));
+        assertEquals(10, lines.size());
+    }
+
+    @Test
+    void outsideARunOrOnceClosedTheConsoleDrawsNoRows() {
+        TestProgressConsole console = console(true, true, null);
+        console.repaint();
+        console.testStarted(test(CALCULATOR, "adds"));
+        assertEquals("", raw());
+        console.close();
+        console.keyHints("Continuous Testing Active.");
+        console.runStarted(new TestRunStarted("run-2", "junit-platform", TestSelection.all(), Instant.now()));
+        console.testStarted(test(CALCULATOR, "adds"));
+        console.compilationFailed(new CompileFailure(SourceKind.JAVA, List.of(), Instant.now()));
+        assertEquals("", raw());
+    }
+
+    @Test
+    void aChangeThatDoesNotCompileWithoutErrorsShowsItsDiagnostics() {
+        TestProgressConsole console = console(false, false, null);
+        List<CompileDiagnostic> diagnostics = new java.util.ArrayList<>();
+        diagnostics.add(new CompileDiagnostic(CompileDiagnostic.Severity.WARNING, "  ", Path.of("Unknown.java"), 0, 0));
+        for (int i = 0; i < 31; i++) {
+            diagnostics.add(new CompileDiagnostic(CompileDiagnostic.Severity.WARNING, "warning " + i, null, 0, 0));
+        }
+        console.compilationFailed(new CompileFailure(SourceKind.GROOVY, diagnostics, Instant.now()));
+        List<String> lines = raw().lines().toList();
+        assertEquals("COMPILATION FAILED Groovy compilation failed", lines.get(0));
+        assertEquals("      Unknown.java: ", lines.get(1));
+        assertEquals("      warning 0", lines.get(2));
+        assertEquals("        ... (2 more lines in the report)", lines.get(31));
+        assertEquals(32, lines.size());
+    }
+
+    @Test
+    void theFailureLinesKeepPythonMessagesAndFramesOutsideModules() {
+        assertEquals(List.of("def test_index():", ">   assert 1 == 2"),
+            TestProgressConsole.failureLines(new TestFailure("PythonAssertionError", "def test_index():\n>   assert 1 == 2", "")));
+        assertEquals(List.of("AssertionError: expected 1", "  at com.example.Native.call", "  at com.example.A.b(A.java:1/2)"),
+            TestProgressConsole.failureLines(new TestFailure("java.lang.AssertionError", "AssertionError: expected 1",
+                "\tat com.example.Native.call\n\tat com.example.A.b(A.java:1/2)\n")));
+        TestProgressConsole console = console(false, false, null);
+        console.testFinished(test(CALCULATOR, "fails"), new TestOutcome(TestStatus.FAILED, Duration.ZERO, null, null));
+        assertEquals("FAILED CalculatorTest.fails() (0.0s)\n", raw());
+    }
+
+    @Test
+    void testsOfFilesOrWithoutAClassAreNamedByTheirDisplayName() {
+        assertEquals("adds()", TestProgressConsole.name(new TestId("[engine:x]/[test:adds]", "", "adds", "adds()")));
+        assertEquals("test_a", TestProgressConsole.name(new TestId("[engine:x]/[test:a]", "tests\\test_a.py", "test_a", "test_a")));
+        assertEquals("test_a", TestProgressConsole.name(new TestId("[engine:x]/[test:a]", "test_a.py", "test_a", "test_a")));
+        assertEquals("Suite", TestProgressConsole.name(new TestId("[engine:x]/[class:Suite]", "Suite", "Suite", "Suite")));
+        assertEquals("CalculatorTest.adds()", TestProgressConsole.name(test("CalculatorTest", "adds")));
+    }
+
+    @Test
+    void theTerminalIsDetectedFromTheEnvironment() {
+        IntSupplier stty = () -> 132;
+        assertEquals(new TestProgressConsole.Terminal(false, false, 80),
+            TestProgressConsole.Terminal.detect(environment(Map.of()), false, "UTF-8", "Mac OS X", stty));
+        assertEquals(new TestProgressConsole.Terminal(false, false, 80),
+            TestProgressConsole.Terminal.detect(environment(Map.of("TERM", "DUMB")), true, "UTF-8", "Mac OS X", stty));
+        assertEquals(new TestProgressConsole.Terminal(false, false, 80),
+            TestProgressConsole.Terminal.detect(environment(Map.of("NO_COLOR", "1")), true, "UTF-8", "Mac OS X", stty));
+        assertEquals(new TestProgressConsole.Terminal(true, true, 120),
+            TestProgressConsole.Terminal.detect(environment(Map.of("TERM", "xterm-256color", "COLUMNS", " 120 ")), true, "UTF-8", "Linux", stty));
+        // too narrow, or no number: asked of the terminal
+        assertEquals(new TestProgressConsole.Terminal(true, false, 132),
+            TestProgressConsole.Terminal.detect(environment(Map.of("COLUMNS", "30")), true, "US-ASCII", "Linux", stty));
+        assertEquals(new TestProgressConsole.Terminal(true, false, 132),
+            TestProgressConsole.Terminal.detect(environment(Map.of("COLUMNS", "wide")), true, "no-such-encoding", "Linux", stty));
+        // Windows has no stty
+        assertEquals(new TestProgressConsole.Terminal(true, true, 80),
+            TestProgressConsole.Terminal.detect(environment(Map.of()), true, "UTF-8", "Windows 11", () -> {
+                throw new AssertionError("stty asked on Windows");
+            }));
+        // the test JVM prints to no terminal
+        assertFalse(TestProgressConsole.create(() -> null).isInteractive());
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void theWidthIsTheColumnsSttyPrints() {
+        assertEquals(132, TestProgressConsole.Terminal.sttyWidth("/bin/sh", "-c", "echo 24 132"));
+        assertEquals(80, TestProgressConsole.Terminal.sttyWidth("/bin/sh", "-c", "echo 24 20"));
+        assertEquals(80, TestProgressConsole.Terminal.sttyWidth("/bin/sh", "-c", "echo 24 wide"));
+        assertEquals(80, TestProgressConsole.Terminal.sttyWidth("/bin/sh", "-c", "echo 24"));
+        assertEquals(80, TestProgressConsole.Terminal.sttyWidth("/bin/sh", "-c", "echo 24 132; exit 1"));
+        assertEquals(80, TestProgressConsole.Terminal.sttyWidth("/no/such/stty"));
+    }
+
+    private static Function<String, String> environment(Map<String, String> variables) {
+        return variables::get;
+    }
+
+    private String summaryOfErrors(List<TestOutcome> outcomes, int errors, TestRunSummary summary) {
+        buffer.reset();
+        clock.set(0);
+        TestProgressConsole interactive = console(true, true, null);
+        start(interactive, outcomes.size());
+        int i = 0;
+        for (TestOutcome outcome : outcomes) {
+            interactive.testFinished(test(CALCULATOR, "t" + i++), outcome);
+        }
+        for (int e = 0; e < errors; e++) {
+            interactive.testFinished(new TestId("[engine:junit-jupiter]/[class:com.example.Broken" + e + "]/initializationError", "com.example.Broken" + e,
+                JUnitPlatformExecution.CLASS_ERROR, "Broken" + e), failedOutcome(TestStatus.ERRORED));
+        }
+        interactive.runFinished(summary);
+        List<String> lines = screen().lines().toList();
+        return lines.get(lines.size() - 1);
+    }
+
     private String summaryOf(List<TestOutcome> outcomes, TestRunSummary summary) {
         buffer.reset();
         clock.set(0);
@@ -308,76 +449,7 @@ class TestProgressConsoleTest {
         return buffer.toString(StandardCharsets.UTF_8);
     }
 
-    /**
-     * What a terminal shows of the output: the cursor movements and clearing applied, the colours and links dropped,
-     * and the trailing blank lines left out.
-     */
     private String screen() {
-        String out = raw();
-        List<StringBuilder> lines = new ArrayList<>();
-        lines.add(new StringBuilder());
-        int row = 0;
-        int column = 0;
-        int i = 0;
-        while (i < out.length()) {
-            char ch = out.charAt(i);
-            if (ch == '\033' && i + 1 < out.length() && out.charAt(i + 1) == ']') {
-                // OSC 8: up to the string terminator
-                i = out.indexOf("\033\\", i) + 2;
-                continue;
-            }
-            if (ch == '\033') {
-                int end = i + 2;
-                while (!Character.isLetter(out.charAt(end))) {
-                    end++;
-                }
-                String parameter = out.substring(i + 2, end);
-                switch (out.charAt(end)) {
-                    case 'A' -> row = Math.max(0, row - Integer.parseInt(parameter));
-                    case 'J' -> {
-                        StringBuilder line = lines.get(row);
-                        line.setLength(Math.min(line.length(), column));
-                        while (lines.size() > row + 1) {
-                            lines.remove(lines.size() - 1);
-                        }
-                    }
-                    case 'K' -> lines.get(row).setLength(0);
-                    default -> {
-                        // colours
-                    }
-                }
-                i = end + 1;
-                continue;
-            }
-            if (ch == '\r') {
-                column = 0;
-            } else if (ch == '\n') {
-                row++;
-                column = 0;
-                if (lines.size() <= row) {
-                    lines.add(new StringBuilder());
-                }
-            } else {
-                StringBuilder line = lines.get(row);
-                while (line.length() < column) {
-                    line.append(' ');
-                }
-                if (column < line.length()) {
-                    line.setCharAt(column, ch);
-                } else {
-                    line.append(ch);
-                }
-                column++;
-            }
-            i++;
-        }
-        List<String> text = new ArrayList<>();
-        for (StringBuilder line : lines) {
-            text.add(line.toString().stripTrailing());
-        }
-        while (!text.isEmpty() && text.get(text.size() - 1).isEmpty()) {
-            text.remove(text.size() - 1);
-        }
-        return String.join("\n", text);
+        return TerminalScreen.render(raw());
     }
 }

@@ -132,7 +132,7 @@ final class TestSession {
         this.runner = runner(settings.runner());
         this.xml = new JUnitXmlReportWriter(settings.reports());
         this.reports = TestEventListeners.reportListeners(TestSession.class.getClassLoader());
-        this.console = TestProgressConsole.create(this::reportLocation);
+        this.console = TestProgressConsole.create(() -> reportLocation(reports));
     }
 
     /**
@@ -143,9 +143,10 @@ final class TestSession {
     }
 
     /**
+     * @param reports The report listeners
      * @return Where the first report that has one opens, for the console to show
      */
-    private @Nullable String reportLocation() {
+    static @Nullable String reportLocation(List<TestReportListener> reports) {
         for (TestReportListener report : reports) {
             try {
                 String location = report.location();
@@ -708,7 +709,7 @@ final class TestSession {
 
     private void compilationFailed(CompileFailure failure, Map<SourceKind, SourceChanges> sources, Map<SourceKind, SourceChanges> testSources) {
         // the console shows the errors
-        runtime.compilationFailed(failure, false);
+        runtime.compilationFailed(failure);
         console.compilationFailed(failure);
         synchronized (this) {
             compileFailed = true;

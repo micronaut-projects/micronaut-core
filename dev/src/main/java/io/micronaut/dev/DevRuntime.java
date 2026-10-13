@@ -903,15 +903,13 @@ public final class DevRuntime implements Closeable {
         return classLoader.current();
     }
 
+    /**
+     * Records a change of test mode that did not compile, which the test console shows.
+     *
+     * @param failure The failure
+     */
     void compilationFailed(CompileFailure failure) {
-        compilationFailed(failure, true);
-    }
-
-    void compilationFailed(CompileFailure failure, boolean log) {
         lastFailure = failure;
-        if (log && LOG.isErrorEnabled()) {
-            LOG.error("{}", failure.describe().strip());
-        }
     }
 
     void compilationRecovered() {
