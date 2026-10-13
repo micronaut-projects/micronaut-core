@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -461,6 +462,107 @@ class DevRuntimeTest {
             assertEquals("two", otherType.getMethod("value").invoke(null));
         } finally {
             runtime.close();
+        }
+    }
+
+    @Test
+    void aResourceThatIsNotConfigurationUnderTheConfigurationRootReachesTheResourceWatches() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1")).mainClass(Application.class).start();
+                }
+            }
+            """);
+        Path resources = Files.createDirectories(project.resolve("src/main/resources"));
+        Path schema = Files.createDirectories(resources.resolve("graphql")).resolve("schema.graphqls");
+        Files.writeString(schema, "type Query { hello: String }");
+        Path config = resources.resolve("application.properties");
+        Files.writeString(config, "app.label=alpha\n");
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            List<ResourceChange> schemas = new CopyOnWriteArrayList<>();
+            List<ResourceChange> configuration = new CopyOnWriteArrayList<>();
+            ((DefaultBeanContext) first).resources(ResourceKind.CONFIG).include("**/*.graphqls").watch(schemas::add);
+            ((DefaultBeanContext) first).resources(ResourceKind.CONFIG).include("*.properties").watch(configuration::add);
+            assertTrue(schemas.get(0).initial());
+            schemas.clear();
+            configuration.clear();
+
+            // the schema is edited: the watch is told, nothing restarts and the configuration is not what changed
+            Files.writeString(schema, "type Query { hello: String, bye: String }");
+            awaitTrue(() -> schemas.stream().anyMatch(change -> !change.initial() && change.changed().contains(schema.toAbsolutePath())), schemas);
+            assertTrue(configuration.isEmpty(), configuration.toString());
+            assertEquals(1, runtime.generation());
+            assertTrue(first.isRunning());
+
+            // a configuration file refreshes the configuration in place, and a watch of the configuration root is told
+            Files.writeString(config, "app.label=beta\n");
+            awaitTrue(() -> "beta".equals(first.getEnvironment().getProperty("app.label", String.class).orElse(null)), configuration);
+            awaitTrue(() -> configuration.stream().anyMatch(change -> change.changed().contains(config.toAbsolutePath())), configuration);
+            assertEquals(1, runtime.generation());
+
+            // a deleted schema is reported removed
+            schemas.clear();
+            Files.delete(schema);
+            awaitTrue(() -> schemas.stream().anyMatch(change -> change.removed().contains(schema.toAbsolutePath())), schemas);
+            assertEquals(1, runtime.generation());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void theConfigurationFilesAreTheApplicationAndBootstrapFilesAtTheRootAndThePropertySourcesTheEnvironmentRead() {
+        List<Path> roots = List.of(project);
+        Set<String> names = ResourceNotifier.names();
+        Set<String> extensions = Set.of("properties", "yml", "yaml");
+        assertTrue(ResourceNotifier.isConfigurationFile(project.resolve("application.yml"), roots, names, extensions));
+        assertTrue(ResourceNotifier.isConfigurationFile(project.resolve("application-dev.properties"), roots, names, extensions));
+        assertTrue(ResourceNotifier.isConfigurationFile(project.resolve("bootstrap.yaml"), roots, names, extensions));
+        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("schema.graphqls"), roots, names, extensions));
+        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("logback.xml"), roots, names, extensions));
+        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("applications.yml"), roots, names, extensions));
+        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("graphql/application.yml"), roots, names, extensions));
+        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("messages.properties"), roots, names, extensions));
+        // a property source micronaut.config.files names
+        Set<String> origins = Set.of("classpath:custom.yml", "file:" + project.resolve("other/extra.yml").toAbsolutePath());
+        assertTrue(ResourceNotifier.isPropertySource(project.resolve("custom.yml"), roots, origins));
+        assertTrue(ResourceNotifier.isPropertySource(project.resolve("other/extra.yml"), roots, origins));
+        assertFalse(ResourceNotifier.isPropertySource(project.resolve("schema.graphqls"), roots, origins));
+        // a file micronaut.config.import names with classpath*:
+        assertTrue(ResourceNotifier.isPropertySource(project.resolve("shared.yml"), roots, Set.of("classpath*:shared.yml")));
+        // a file micronaut.config.files names relative to the working directory
+        Path relative = Path.of("").toAbsolutePath().relativize(project.resolve("relative.yml").toAbsolutePath());
+        assertTrue(ResourceNotifier.isPropertySource(project.resolve("relative.yml"), roots, Set.of("file:" + relative)));
+    }
+
+    /**
+     * Waits for the file watcher's batch to be handled, which this branch has no direct way to report.
+     */
+    private static void awaitTrue(BooleanSupplier condition, Object state) throws InterruptedException {
+        long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+        while (!condition.getAsBoolean()) {
+            if (System.nanoTime() > deadline) {
+                throw new AssertionError("Timed out: " + state);
+            }
+            Thread.sleep(50);
         }
     }
 
