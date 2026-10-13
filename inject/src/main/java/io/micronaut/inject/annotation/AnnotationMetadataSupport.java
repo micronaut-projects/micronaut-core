@@ -499,6 +499,11 @@ public final class AnnotationMetadataSupport {
     static void registerDefaultValues(String annotation, Map<CharSequence, Object> defaultValues) {
         if (StringUtils.isNotEmpty(annotation) && CollectionUtils.isNotEmpty(defaultValues)) {
             ANNOTATION_DEFAULTS.put(annotation, defaultValues);
+            // checked after the insertion, as for a type: defaults a thread of a retired generation registers after
+            // retireClassLoader swept them are removed again, unless another generation replaced them meanwhile
+            if (loadersRetired && refersToRetired(defaultValues)) {
+                ANNOTATION_DEFAULTS.remove(annotation, defaultValues);
+            }
         }
     }
 
@@ -558,13 +563,16 @@ public final class AnnotationMetadataSupport {
     }
 
     /**
-     * Forgets the annotation types a retired class loader, or a loader below it, defined, and their proxy factories,
-     * so that they do not keep it; and lets the generation that replaced it register its own copies of those types in
+     * Forgets the annotation types a retired class loader, or a loader below it, defined, their proxy factories, and the
+     * registered default values that refer to its classes - a class or enum default, or a nested annotation of one -
+     * so that none of them keeps it, whether or not the name is registered again; and lets the generation that replaced it register its own copies of those types in
      * their place, where the first registration otherwise wins.
      *
      * <p>Only a development launcher, which replaces the application's classes with a new generation of its loader,
      * retires loaders, and it has to retire every generation it replaces: the registry holds the types of a loader
-     * that is not retired for as long as the JVM runs, as it does outside development mode.</p>
+     * that is not retired for as long as the JVM runs, as it does outside development mode. The repeatable containers
+     * are held by name only and keep no loader. The sweep is done here: outside development mode registering and looking
+     * up only read one volatile flag, when a type, default values or a proxy factory are cached.</p>
      *
      * @param retired The class loader whose classes are no longer used
      * @since 5.3.0
@@ -576,6 +584,57 @@ public final class AnnotationMetadataSupport {
         loadersRetired = true;
         ANNOTATION_TYPES.values().removeIf(type -> isRetired(type.getClassLoader()));
         ANNOTATION_PROXY_CACHE.keySet().removeIf(type -> isRetired(type.getClassLoader()));
+        ANNOTATION_DEFAULTS.values().removeIf(AnnotationMetadataSupport::refersToRetired);
+    }
+
+    /**
+     * Whether a registered value refers to a class of a retired loader: a class, a class value, an enum constant or any
+     * other object defined by such a loader, or a map, collection, array or annotation value holding one.
+     *
+     * @param value The value
+     * @return True if it does
+     */
+    private static boolean refersToRetired(@Nullable Object value) {
+        if (value == null) {
+            return false;
+        }
+        if (value instanceof Class<?> type) {
+            return isRetired(type.getClassLoader());
+        }
+        if (isRetired(value.getClass().getClassLoader())) {
+            return true;
+        }
+        if (value instanceof AnnotationClassValue<?> classValue) {
+            return classValue.getType().map(AnnotationMetadataSupport::refersToRetired).orElse(false)
+                || classValue.getInstance().map(AnnotationMetadataSupport::refersToRetired).orElse(false);
+        }
+        if (value instanceof AnnotationValue<?> annotationValue) {
+            return refersToRetired(annotationValue.getValues()) || refersToRetired(annotationValue.getStereotypes());
+        }
+        if (value instanceof Map<?, ?> map) {
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (refersToRetired(entry.getKey()) || refersToRetired(entry.getValue())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (value instanceof Iterable<?> iterable) {
+            for (Object element : iterable) {
+                if (refersToRetired(element)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (value instanceof Object[] array) {
+            for (Object element : array) {
+                if (refersToRetired(element)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
