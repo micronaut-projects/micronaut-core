@@ -25,7 +25,7 @@ import java.util.Set;
 /**
  * What {@link DefaultBeanContext#stopRetaining(RetentionCriteria)} asks about the singletons of the context it stops,
  * for a development launcher restarting the application: the combined answer of the {@link BeanRetentionPolicy}
- * beans and of what the launcher knows about the restart.
+ * beans, which {@link PolicyRetentionCriteria} gives, and of what the launcher knows about the restart.
  *
  * @author graemerocher
  * @since 5.3.0

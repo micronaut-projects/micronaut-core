@@ -20,6 +20,7 @@ import io.micronaut.context.BeanRegistration
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Retain
 import io.micronaut.context.reload.AnnotatedBeanRetentionPolicy
+import io.micronaut.context.reload.PolicyRetentionCriteria
 import spock.lang.Specification
 
 /**
@@ -107,6 +108,45 @@ class RetainAnnotationSpec extends Specification {
 
         cleanup:
         context.close()
+    }
+
+    void "the prefixes the annotation names are the ones whose change releases the bean"() {
+        given:
+        ApplicationContext context = start(List.of())
+        context.getBean(ProducedPool)
+        context.getBean(AnnotatedPool)
+
+        expect:
+        AnnotatedBeanRetentionPolicy.INSTANCE.observedConfigurationPrefixes(context.getBeanRegistration(ProducedPool, null)) == ["my.pool"] as Set
+        AnnotatedBeanRetentionPolicy.INSTANCE.observedConfigurationPrefixes(context.getBeanRegistration(AnnotatedPool, null)).isEmpty()
+
+        cleanup:
+        context.close()
+    }
+
+    void "a change under a prefix the annotation names releases the bean through the policy, not the others"() {
+        given:
+        ApplicationContext first = start(List.of())
+        AnnotatedPool pool = first.getBean(AnnotatedPool)
+        ProducedPool produced = first.getBean(ProducedPool)
+
+        when: "the restart follows a change under my.pool, which the factory method's invalidatedBy names"
+        Collection<BeanRegistration<?>> retained = ((DefaultBeanContext) first).stopRetaining(new PolicyRetentionCriteria(
+            List.of(AnnotatedBeanRetentionPolicy.INSTANCE), { String prefix -> prefix == 'my.pool' }, { Class<?> type -> false }))
+
+        then: "the product is released, and the bean that observes no prefix is retained"
+        !retained*.bean.any { it.is(produced) }
+        retained*.bean.any { it.is(pool) }
+
+        when:
+        ApplicationContext second = start(retained)
+
+        then:
+        !second.getBean(ProducedPool).is(produced)
+        second.getBean(AnnotatedPool).is(pool)
+
+        cleanup:
+        second?.close()
     }
 
     private static ApplicationContext start(Collection<BeanRegistration<?>> retained) {
