@@ -35,6 +35,7 @@ import java.util.concurrent.CompletionStage
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeoutException
 import java.util.function.Supplier
 
 class FilterRunnerSpec extends Specification {
@@ -1491,6 +1492,30 @@ class FilterRunnerSpec extends Specification {
         derived.cancel(false)
         then:
         downstreamCancelled
+    }
+
+    def 'external timeout of a continuation or its dependent stage cancels downstream'(boolean dependent) {
+        given:
+        DelayedExecutionFlow<HttpResponse<?>> downstream = DelayedExecutionFlow.create()
+        CompletableFuture<HttpResponse<?>> pending
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(CompletionStage, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, CompletionStage)]) { FilterContinuation<CompletionStage<HttpResponse<?>>> continuation ->
+                    def original = continuation.proceed().toCompletableFuture()
+                    pending = dependent ? original.thenApply { it } : original
+                    pending
+                }
+        ]
+        def result = filterRunner(filters, { downstream }).run(HttpRequest.GET("/"))
+
+        when:
+        pending.completeExceptionally(new TimeoutException())
+
+        then:
+        downstream.isCancelled()
+        result.tryCompleteError() instanceof TimeoutException
+
+        where:
+        dependent << [false, true]
     }
 
     def 'cancelling the filter chain cancels the downstream of a completion stage continuation'() {

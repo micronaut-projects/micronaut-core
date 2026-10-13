@@ -18,11 +18,13 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.python.ValueCoercible
 import io.micronaut.python.annotation.processing.test.javabases.AbstractCounter
+import io.micronaut.python.annotation.processing.test.javabases.ContentComposite
 import io.micronaut.python.annotation.processing.test.javabases.CtorHookBase
 import io.micronaut.python.annotation.processing.test.javabases.GenericHolder
 import io.micronaut.python.annotation.processing.test.javabases.GreetingBase
 import io.micronaut.python.annotation.processing.test.javabases.LongBase
 import io.micronaut.python.annotation.processing.test.javabases.Services
+import io.micronaut.python.annotation.processing.test.javabases.VarargsBase
 import io.micronaut.python.compiler.PyronautCompiler
 import org.graalvm.polyglot.Context
 
@@ -311,6 +313,49 @@ class Hooked(CtorHookBase):
         ctx?.close()
     }
 
+    void "Python calls inherited varargs methods of a Java base with any number of arguments"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+import java
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import VarargsBase
+
+
+@Singleton
+class PythonCollector(VarargsBase):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def collect(self) -> int:
+        Item = VarargsBase.Item
+        self.add()
+        self.add(Item("one"))
+        self.add(Item("two"), Item("three"), Item("four"))
+        self.add("text")
+        self.addAll()
+        self.addAll(Item("five"))
+        self.addAll(Item("six"), Item("seven"))
+        self.addAll("more")
+        items = java.type("io.micronaut.python.annotation.processing.test.javabases.VarargsBase$Item[]")(2)
+        items[0] = Item("eight")
+        items[1] = Item("nine")
+        self.add(items)
+        return self.sum("none") + self.sum("single", 1) + self.sum("several", 1, 2, 3)
+''', true)
+
+        when:
+        VarargsBase collector = ctx.getBean(VarargsBase)
+
+        then: 'zero, one and several arguments or an array reach the varargs overloads, the others keep theirs'
+        collector.collect() == 7
+        collector.items == ['one', 'two', 'three', 'four', 't:text', 'i:five', 'i:six', 'i:seven', 't:more', 'eight', 'nine', 'none=0', 'single=1', 'several=6']
+
+        cleanup:
+        ctx?.close()
+    }
+
     void "Python number literals reach boxed constructor parameters by widening"() {
         given:
         ApplicationContext ctx = buildContext('''
@@ -353,6 +398,59 @@ class StrHolder(GenericHolder[str]):
         holder.apply('abc') == 'ABC'
         holder.value() == 'ABC'
         holder.transform('x') == 'X'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "a Python class overrides a method returning the bounded type variable of a raw or parameterized Java base"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from micronaut.python.annotation.processing.test.javabases import ContentComposite
+from micronaut.python.annotation.processing.test.javabases.ContentComposite import Panel
+
+
+class RawView(ContentComposite):
+    def initContent(self) -> Panel:
+        return Panel("raw")
+
+    def label(self, part: ContentComposite.Part) -> str:
+        return "label:" + part.describe()
+
+
+class UnhintedView(ContentComposite):
+    def initContent(self):
+        return Panel("unhinted")
+
+
+class BoundHintView(ContentComposite):
+    def initContent(self) -> ContentComposite.Part:
+        return Panel("bound")
+
+
+class ParameterizedView(ContentComposite[Panel]):
+    def initContent(self) -> Panel:
+        return Panel("parameterized")
+''', true)
+
+        when:
+        def view = { String name -> (ContentComposite) ctx.classLoader.loadClass("python.$name").getConstructor().newInstance() }
+        def initContent = { String name -> ctx.classLoader.loadClass("python.$name").getDeclaredMethod('initContent') }
+
+        then: 'the Java base reaches each Python override through its own call of the protected hook'
+        view('RawView').content.describe() == 'panel:raw'
+        view('RawView').describeContent() == 'label:panel:raw'
+        view('UnhintedView').content.describe() == 'panel:unhinted'
+        view('BoundHintView').content.describe() == 'panel:bound'
+        view('ParameterizedView').content.describe() == 'panel:parameterized'
+
+        and: 'the override of a raw base returns the hint when it is within the bound, or else the bound'
+        initContent('RawView').returnType == ContentComposite.Panel
+        initContent('UnhintedView').returnType == ContentComposite.Part
+        initContent('BoundHintView').returnType == ContentComposite.Part
+
+        and: 'the override of a parameterized base returns the type argument'
+        initContent('ParameterizedView').returnType == ContentComposite.Panel
 
         cleanup:
         ctx?.close()

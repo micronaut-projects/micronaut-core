@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /**
@@ -43,6 +44,10 @@ public final class GraalPyContextConfiguration {
     static final String ROOT_LOG_LEVEL_PROPERTY = "logger.levels.root";
     /** Package prefixes Python code can always look up: the JDK, Jakarta and the framework itself. */
     private static final List<String> FRAMEWORK_PACKAGES = List.of("java.", "jakarta.", "io.micronaut.");
+    /** Primitive type names, always visible so that primitive arrays such as {@code byte[]} are. */
+    private static final Set<String> PRIMITIVE_TYPES = Set.of("boolean", "byte", "char", "short", "int", "long", "float", "double", "void");
+    /** The JVM descriptor codes of the primitive array element types, as in {@code [B}. */
+    private static final String PRIMITIVE_DESCRIPTORS = "ZBCSIJFD";
     private static final Logger LOG = LoggerFactory.getLogger(GraalPyContextFactory.class);
 
     @ConfigurationBuilder(prefixes = "", excludes = {
@@ -150,6 +155,13 @@ public final class GraalPyContextConfiguration {
 
     /**
      * The host class filter for {@link Context.Builder#allowHostClassLookup(Predicate)}.
+     * <p>
+     * With {@link #getHostClassLookup()} set, a name is visible when it is in the JDK, Jakarta or
+     * framework packages, or when an entry names its package (or a parent package) or the class
+     * itself (or its enclosing class). Primitive types are always visible, and an array is visible
+     * when its element type is: Truffle checks {@code byte[][]} and then each component,
+     * {@code byte[]} and {@code byte}, and the JVM descriptor form ({@code [B},
+     * {@code [Lcom.example.Foo;}) matches the same way.
      *
      * @return The filter
      */
@@ -162,8 +174,35 @@ public final class GraalPyContextConfiguration {
         List<String> names = hostClassLookup.stream()
             .map(name -> name.endsWith(".") ? name.substring(0, name.length() - 1) : name)
             .toList();
-        return className -> FRAMEWORK_PACKAGES.stream().anyMatch(className::startsWith)
+        Predicate<String> classFilter = className -> FRAMEWORK_PACKAGES.stream().anyMatch(className::startsWith)
             || names.stream().anyMatch(name -> className.equals(name) || className.startsWith(name + '.') || className.startsWith(name + '$'));
+        return className -> isVisible(className, classFilter);
+    }
+
+    /**
+     * Whether a host class name is visible, matching an array by its element type.
+     *
+     * @param className The class name Truffle looks up, for example {@code byte[]} or {@code [B}
+     * @param classFilter The filter for a non-array, non-primitive class name
+     * @return Whether the class is visible
+     */
+    private static boolean isVisible(String className, Predicate<String> classFilter) {
+        String name = className;
+        while (name.endsWith("[]")) {
+            name = name.substring(0, name.length() - 2);
+        }
+        if (name.startsWith("[")) {
+            // a JVM descriptor: [B, [[I, [Lcom.example.Foo;
+            String element = name.substring(name.lastIndexOf('[') + 1);
+            if (element.length() == 1) {
+                return PRIMITIVE_DESCRIPTORS.indexOf(element.charAt(0)) >= 0;
+            }
+            if (element.length() < 3 || element.charAt(0) != 'L' || !element.endsWith(";")) {
+                return false;
+            }
+            name = element.substring(1, element.length() - 1);
+        }
+        return PRIMITIVE_TYPES.contains(name) || classFilter.test(name);
     }
 
     /**
