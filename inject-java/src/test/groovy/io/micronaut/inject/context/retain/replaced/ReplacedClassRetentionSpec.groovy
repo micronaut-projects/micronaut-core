@@ -18,6 +18,7 @@ package io.micronaut.inject.context.retain.replaced
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanRegistration
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.reload.RetentionCriteria
 import spock.lang.Specification
 
 /**
@@ -71,14 +72,14 @@ class ReplacedClassRetentionSpec extends Specification {
     }
 
     private static Collection<BeanRegistration<?>> stopRetaining(ApplicationContext context, Closure<Boolean> replaced) {
-        return ((DefaultBeanContext) context).stopRetaining(new DefaultBeanContext.RetentionCriteria() {
+        return ((DefaultBeanContext) context).stopRetaining(new RetentionCriteria() {
             @Override
             boolean retain(BeanRegistration<?> registration) {
                 return registration.beanType == AuthenticatedClient
             }
 
             @Override
-            Set<String> invalidatedBy(BeanRegistration<?> registration) {
+            Set<String> observedConfigurationPrefixes(BeanRegistration<?> registration) {
                 return Set.of()
             }
 
