@@ -20,7 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Compressing a response initializes Netty's {@code ReferenceCountUtil}, whose static initializer looks up its own
- * declared methods reflectively. The request is written over a plain socket so that the test sees the compressed
+ * declared methods reflectively, as does {@code AdvancedLeakAwareByteBuf} under the paranoid leak detection level that
+ * the build configures for this test suite. The request is written over a plain socket so that the test sees the compressed
  * response as the server sent it.
  */
 @MicronautTest
@@ -67,7 +68,7 @@ class CompressionTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         int pos = 0;
         byte[] crlf = "\r\n".getBytes(StandardCharsets.US_ASCII);
-        while (true) {
+        while (pos < chunked.length) {
             int lineEnd = pos + indexOf(Arrays.copyOfRange(chunked, pos, chunked.length), crlf);
             String sizeLine = new String(chunked, pos, lineEnd - pos, StandardCharsets.US_ASCII);
             int extension = sizeLine.indexOf(';');
@@ -78,6 +79,7 @@ class CompressionTest {
             out.write(chunked, lineEnd + 2, size);
             pos = lineEnd + 2 + size + 2;
         }
+        throw new AssertionError("Chunked body ended without the last chunk");
     }
 
     private static int indexOf(byte[] array, byte[] target) {

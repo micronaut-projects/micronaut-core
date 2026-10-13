@@ -7,6 +7,7 @@ description = "Test suite for Bouncy Castle self signed certificate in native im
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    systemProperty("io.netty.leakDetection.level", "paranoid")
 }
 
 dependencies {
@@ -40,6 +41,11 @@ graalvmNative {
                 buildArgs.add("-H:+SharedArenaSupport")
             }
             resources.autodetect()
+        }
+        named("test") {
+            // Paranoid leak detection wraps buffers in AdvancedLeakAwareByteBuf, whose static initializer also looks up
+            // its own declared methods reflectively (see CompressionTest)
+            runtimeArgs.add("-Dio.netty.leakDetection.level=paranoid")
         }
     }
 }
