@@ -201,6 +201,11 @@ public final class PieceReaders {
         }
 
         @Override
+        public boolean isEmpty() {
+            return next == null;
+        }
+
+        @Override
         public void close() {
             closed = true;
             if (next != null) {

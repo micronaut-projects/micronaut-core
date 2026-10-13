@@ -450,6 +450,11 @@ public final class EventStreams {
         }
 
         @Override
+        public boolean isEmpty() {
+            return events.isEmpty();
+        }
+
+        @Override
         public void close() {
             events.clear();
         }
