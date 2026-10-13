@@ -16,6 +16,8 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
@@ -26,6 +28,7 @@ import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -406,6 +409,21 @@ public interface ApplicationContextBuilder {
      * @since 5.3.0
      */
     default ApplicationContextBuilder beanDependencyTrackingEnabled(boolean enabled) {
+        return this;
+    }
+
+    /**
+     * Singleton registrations of a stopped context the built context adopts when it starts: the bean
+     * instances are registered under their definitions instead of being created again. A development
+     * launcher passes what {@link DefaultBeanContext#stopRetaining(java.util.function.Predicate)} returned.
+     *
+     * @param registrations The registrations to adopt
+     * @return This builder
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    default ApplicationContextBuilder retainedRegistrations(Collection<BeanRegistration<?>> registrations) {
         return this;
     }
 

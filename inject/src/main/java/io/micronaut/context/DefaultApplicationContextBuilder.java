@@ -25,6 +25,8 @@ import io.micronaut.context.env.SystemPropertiesPropertySource;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -97,6 +99,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean eventsEnabled = true;
     @Nullable
     private Boolean beanDependencyTracking;
+    private final List<BeanRegistration<?>> retainedRegistrations = new ArrayList<>();
     @Nullable
     private Predicate<QualifiedBeanType<?>> beansPredicate;
     @Nullable
@@ -243,6 +246,27 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
      */
     boolean isBeanDependencyTrackingSwitchedOff() {
         return Boolean.FALSE.equals(beanDependencyTracking);
+    }
+
+    @Override
+    @Internal
+    @Experimental
+    public Collection<BeanRegistration<?>> getRetainedRegistrations() {
+        // handed over once: the context that is built adopts them, and the builder must not keep the
+        // previous context reachable through them afterwards
+        List<BeanRegistration<?>> handedOver = List.copyOf(retainedRegistrations);
+        retainedRegistrations.clear();
+        return handedOver;
+    }
+
+    @Override
+    @Internal
+    @Experimental
+    public ApplicationContextBuilder retainedRegistrations(Collection<BeanRegistration<?>> registrations) {
+        if (registrations != null) {
+            retainedRegistrations.addAll(registrations);
+        }
+        return this;
     }
 
     @Override
