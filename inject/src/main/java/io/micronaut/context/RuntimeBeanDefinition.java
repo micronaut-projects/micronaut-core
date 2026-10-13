@@ -399,6 +399,32 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @param <V> The looked up type
          */
         <V> Collection<V> getBeansOfType(Argument<V> type, @Nullable Qualifier<V> qualifier);
+
+        /**
+         * A resolver of dependencies owned by the bean this context creates or disposes of.
+         *
+         * <p>Unlike the lookups of this context, the resolver exposes what it resolves as
+         * {@link BeanRegistration registrations}, resolves an exact {@link io.micronaut.inject.BeanDefinition},
+         * and destroys a dependent it created on request with {@link BeanDependencyResolver#destroy(BeanRegistration)}.
+         * A dependent it creates and that is not destroyed earlier lives as long as a dependent resolved by a lookup
+         * of this context: the one of a {@link CreationContext} is destroyed with the created bean, and the one of a
+         * {@link DisposalContext} when the disposer returns. A singleton or custom-scoped bean remains owned by its
+         * scope.</p>
+         *
+         * <p>The resolver of a {@link CreationContext} can be retained by the created bean and used after the
+         * creation, until the destruction of the bean begins. It does not share the resolution path of the creation,
+         * so it must not be used to resolve the bean being created. A bean obtained from
+         * {@link BeanContext#createBean(Class)} has no owner that is destroyed, so neither are the dependents its
+         * resolver creates.</p>
+         *
+         * @return The resolver
+         * @throws UnsupportedOperationException If the bean is not created through a context that tracks the
+         *                                       dependents of a bean
+         * @since 5.3.0
+         */
+        default BeanDependencyResolver getDependencies() {
+            throw new UnsupportedOperationException("Dependency resolution is not supported by this context");
+        }
     }
 
     /**
