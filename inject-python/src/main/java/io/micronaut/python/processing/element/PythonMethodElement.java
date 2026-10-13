@@ -102,6 +102,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     private ElementAnnotationMetadata resolvedMergedMethodAnnotationMetadata;
     private AnnotationMetadata resolvedInheritedMethodAnnotationMetadata;
     private Collection<MethodElement> resolvedOverriddenMethods;
+    private Collection<MethodElement> resolvedDeclaringTypeOverriddenMethods;
     private Boolean resolvedParameterTypeRequired;
     private ParameterElement[] resolvedParameters;
 
@@ -316,7 +317,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     private AnnotationMetadata getOverriddenMethodAnnotationMetadata() {
         AnnotationMetadata inheritedMetadata = AnnotationMetadata.EMPTY_METADATA;
-        for (MethodElement overriddenMethod : getOverriddenMethods()) {
+        for (MethodElement overriddenMethod : getDeclaringTypeOverriddenMethods()) {
             AnnotationMetadata methodMetadata = overriddenMethod.getMethodAnnotationMetadata();
             if (methodMetadata.isEmpty()) {
                 continue;
@@ -511,12 +512,41 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         return resolvedParameterTypeRequired;
     }
 
+    /**
+     * The methods this method overrides as a member of its owning type, as javac reports them for the Java stub:
+     * the methods it overrides in the hierarchy of its declaring type and, for an inherited method, the methods
+     * it implements of the interfaces the owning type introduces.
+     *
+     * @return The overridden methods
+     */
     @Override
     public Collection<MethodElement> getOverriddenMethods() {
         if (resolvedOverriddenMethods == null) {
-            resolvedOverriddenMethods = resolveOverriddenMethods();
+            Collection<MethodElement> overriddenMethods = getDeclaringTypeOverriddenMethods();
+            List<MethodElement> implementedMethods = resolveImplementedMethods();
+            if (implementedMethods.isEmpty()) {
+                resolvedOverriddenMethods = overriddenMethods;
+            } else {
+                List<MethodElement> allOverriddenMethods = new ArrayList<>(overriddenMethods);
+                allOverriddenMethods.addAll(implementedMethods);
+                resolvedOverriddenMethods = List.copyOf(allOverriddenMethods);
+            }
         }
         return resolvedOverriddenMethods;
+    }
+
+    /**
+     * The methods this method overrides in the hierarchy of its declaring type. The method and its parameters
+     * inherit the annotations of these, as a Java method inherits those of the methods it overrides in the type
+     * declaring it.
+     *
+     * @return The overridden methods
+     */
+    Collection<MethodElement> getDeclaringTypeOverriddenMethods() {
+        if (resolvedDeclaringTypeOverriddenMethods == null) {
+            resolvedDeclaringTypeOverriddenMethods = resolveOverriddenMethods();
+        }
+        return resolvedDeclaringTypeOverriddenMethods;
     }
 
     @Override
@@ -529,7 +559,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     private ParameterElement[] resolveParameters() {
         PythonParameterElement[] resolved = parameters;
-        for (MethodElement overriddenMethod : getOverriddenMethods()) {
+        for (MethodElement overriddenMethod : getDeclaringTypeOverriddenMethods()) {
             ParameterElement[] overriddenParameters = overriddenMethod.getParameters();
             if (overriddenParameters.length != resolved.length) {
                 continue;
@@ -572,6 +602,33 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
             }
         }
         return overriddenMethods.isEmpty() ? List.of() : List.copyOf(overriddenMethods);
+    }
+
+    /**
+     * The methods an inherited method implements of the interfaces the owning type, or a class between it and the
+     * declaring type, introduces: the Java stub of the owning type implements them with the inherited method. The
+     * interfaces the declaring type implements itself are covered by its overridden methods.
+     */
+    private List<MethodElement> resolveImplementedMethods() {
+        if (isAbstract() || isStatic() || declaringType.getName().equals(owningType.getName())) {
+            return List.of();
+        }
+        List<MethodElement> implementedMethods = new ArrayList<>();
+        ClassElement type = owningType;
+        while (type != null && !type.getName().equals(declaringType.getName())) {
+            for (ClassElement anInterface : type.getInterfaces()) {
+                if (declaringType.isAssignable(anInterface)) {
+                    continue;
+                }
+                for (MethodElement candidate : anInterface.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance())) {
+                    if (!candidate.isPrivate() && isSubSignature(candidate, parameters) && !implementedMethods.contains(candidate)) {
+                        implementedMethods.add(candidate);
+                    }
+                }
+            }
+            type = type.getSuperType().orElse(null);
+        }
+        return implementedMethods;
     }
 
     private boolean isSubSignature(MethodElement overridden, ParameterElement[] currentParameters) {

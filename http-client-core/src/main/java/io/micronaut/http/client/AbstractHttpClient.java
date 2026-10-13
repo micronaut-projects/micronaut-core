@@ -21,6 +21,8 @@ import io.micronaut.http.client.internal.ElementsStages;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.propagation.ReactivePropagation;
+import io.micronaut.core.async.propagation.ReactorPropagation;
+import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.core.execution.DelayedExecutionFlow;
@@ -101,6 +103,10 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
@@ -530,11 +536,23 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             return ExecutionFlow.error(decorate(new NoHostException("Request URI specifies no host to connect to")));
         }
         ExecutionFlow<ServiceInstance> selected;
-        if (loadBalancer instanceof FixedLoadBalancer fixed) {
+        if (loadBalancer instanceof FixedLoadBalancer fixed && fixed.getClass() == FixedLoadBalancer.class) {
+            // only the built-in one: a subclass of FixedLoadBalancer may override select
             selected = ExecutionFlow.just(fixed.getServiceInstance());
-        } else {
+        } else if (loadBalancer instanceof AsyncLoadBalancer asyncBalancer) {
             // a synchronous balancer (round-robin) completes right away, so the request proceeds
-            // without a Reactor chain
+            // without an asynchronous chain
+            LoadBalancer lb = loadBalancer;
+            Object discriminator = getLoadBalancerDiscriminator(request);
+            // a mock load balancer returns no stage
+            CompletionStage<@Nullable ServiceInstance> selection = CompletionStagePublishers.orElse(
+                asyncBalancer.selectAsync(discriminator),
+                () -> CompletionStagePublishers.first(lb.select(discriminator), null)
+            );
+            selected = toFlow(selection.toCompletableFuture(), PropagatedContext.getOrEmpty());
+        } else {
+            // a synchronous balancer completes right away, so the request proceeds without a
+            // Reactor chain
             selected = ReactiveExecutionFlow.fromPublisherEager(loadBalancer.select(getLoadBalancerDiscriminator(request)), PropagatedContext.getOrEmpty());
         }
 
@@ -554,6 +572,44 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 }
             }
         );
+    }
+
+    /**
+     * The flow of a selection of the load balancer. A selection that is not complete yet is
+     * cancelled when the flow is, if the framework created it, and completes the flow in the
+     * propagated context of the request, so that the steps of the flow run in it, as they did
+     * with the publisher of the selection.
+     *
+     * @param future            The selection
+     * @param propagatedContext The propagated context of the request
+     * @return The flow
+     */
+    private static ExecutionFlow<ServiceInstance> toFlow(CompletableFuture<@Nullable ServiceInstance> future, PropagatedContext propagatedContext) {
+        if (future.isDone()) {
+            try {
+                return ExecutionFlow.just(future.join());
+            } catch (CompletionException | CancellationException e) {
+                return ExecutionFlow.error(CompletionStagePublishers.unwrap(e));
+            }
+        }
+        DelayedExecutionFlow<ServiceInstance> flow = DelayedExecutionFlow.create();
+        future.whenComplete((instance, throwable) -> {
+            if (propagatedContext.isEmpty() || propagatedContext.isBound()) {
+                complete(flow, instance, throwable);
+            } else {
+                propagatedContext.propagate(() -> complete(flow, instance, throwable));
+            }
+        });
+        flow.onCancel(() -> CompletionStagePublishers.cancel(future));
+        return flow;
+    }
+
+    private static void complete(DelayedExecutionFlow<ServiceInstance> flow, @Nullable ServiceInstance instance, @Nullable Throwable throwable) {
+        if (throwable != null) {
+            flow.completeExceptionally(CompletionStagePublishers.unwrap(throwable));
+        } else {
+            flow.complete(instance);
+        }
     }
 
     // ---- filters and redirects
@@ -1075,7 +1131,16 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
 
     @Override
     public <I, O, E> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, @Nullable Argument<O> bodyType, Argument<E> errorType) {
-        return Flux.defer(() -> toMono(exchangeFlow(request, bodyType, errorType, null), PropagatedContext.getOrEmpty()).flux());
+        return Flux.deferContextual(contextView -> {
+            PropagatedContext bound = PropagatedContext.getOrEmpty();
+            PropagatedContext subscriberContext = bound.isEmpty() ? ReactorPropagation.findPropagatedContext(contextView).orElse(null) : null;
+            if (subscriberContext == null || subscriberContext.isEmpty()) {
+                return toMono(exchangeFlow(request, bodyType, errorType, null), bound).flux();
+            }
+            // without a bound context, the request is sent, and the load balancer selects, in the
+            // propagated context of the Reactor subscriber, as the JDK client did
+            return subscriberContext.propagate(() -> toMono(exchangeFlow(request, bodyType, errorType, null), subscriberContext).flux());
+        });
     }
 
     /**

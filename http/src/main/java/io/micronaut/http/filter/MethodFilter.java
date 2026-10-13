@@ -1282,6 +1282,15 @@ record MethodFilter<T>(FilterOrder order,
         }
 
         @Override
+        public boolean completeExceptionally(Throwable error) {
+            boolean completed = super.completeExceptionally(error);
+            if (completed) {
+                downstream.cancel();
+            }
+            return completed;
+        }
+
+        @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
             boolean cancelled = super.cancel(mayInterruptIfRunning);
             if (cancelled) {
