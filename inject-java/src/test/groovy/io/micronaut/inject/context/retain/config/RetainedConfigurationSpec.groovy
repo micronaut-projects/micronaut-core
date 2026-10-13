@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanRegistration
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Retain
+import io.micronaut.context.reload.RetentionCriteria
 import spock.lang.Specification
 
 /**
@@ -67,14 +68,14 @@ class RetainedConfigurationSpec extends Specification {
     }
 
     private static Collection<BeanRegistration<?>> stopRetaining(ApplicationContext context) {
-        return ((DefaultBeanContext) context).stopRetaining(new DefaultBeanContext.RetentionCriteria() {
+        return ((DefaultBeanContext) context).stopRetaining(new RetentionCriteria() {
             @Override
             boolean retain(BeanRegistration<?> registration) {
                 return registration.beanDefinition.annotationMetadata.declaredMetadata.hasStereotype(Retain)
             }
 
             @Override
-            Set<String> invalidatedBy(BeanRegistration<?> registration) {
+            Set<String> observedConfigurationPrefixes(BeanRegistration<?> registration) {
                 return registration.beanDefinition.annotationMetadata.declaredMetadata.stringValues(Retain, 'invalidatedBy') as Set<String>
             }
         })
