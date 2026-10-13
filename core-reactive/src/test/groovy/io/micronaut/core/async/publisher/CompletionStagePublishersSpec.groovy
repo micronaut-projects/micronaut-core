@@ -13,7 +13,6 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
-import java.time.Duration
 
 class CompletionStagePublishersSpec extends Specification {
 
@@ -458,7 +457,8 @@ class CompletionStagePublishersSpec extends Specification {
     void 'a publisher that completes on another thread completes the future in the propagated context'() {
         given:
         def element = new TestElement('request')
-        def publisher = Mono.delay(Duration.ofMillis(10)).map { 'value' }
+        def emitted = new CompletableFuture<String>()
+        def publisher = Mono.fromFuture(emitted)
 
         when:
         def scope = PropagatedContext.getOrEmpty().plus(element).propagate()
@@ -470,8 +470,16 @@ class CompletionStagePublishersSpec extends Specification {
         }
         def seen = future.thenApply { PropagatedContext.find().flatMap { it.find(TestElement) }.map { it.value }.orElse('none') }
 
+        then: 'the publisher emits only once the dependent stage is registered'
+        !future.isDone()
+
+        when:
+        def emitter = Thread.start { emitted.complete('value') }
+        emitter.join()
+
         then:
         seen.get() == 'request'
+        !PropagatedContext.exists()
     }
 
     void 'without a propagated context the publisher is subscribed to as it is'() {
