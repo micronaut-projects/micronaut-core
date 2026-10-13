@@ -141,8 +141,11 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
             if (cancelled) {
                 if (!closed) {
                     closed = true;
-                    elements.close();
                     Throwable failure = badRequest.get();
+                    Throwable closeFailure = closeQuietly();
+                    if (closeFailure != null && failure != null && failure != closeFailure) {
+                        failure.addSuppressed(closeFailure);
+                    }
                     if (failure != null && !done && subscriber != null) {
                         done = true;
                         subscriber.onError(failure);
@@ -238,6 +241,23 @@ public final class BodyElementsPublisher<T> implements Publisher<T>, Subscriptio
             subscriber.onComplete();
         } else {
             subscriber.onError(failure);
+        }
+    }
+
+    /**
+     * Close the elements on cancellation: a failure of the close callback is not thrown to the
+     * caller of {@code cancel} or {@code request}, so that the drain finishes and the elements
+     * that arrive later are still discarded. Nobody else observes it after a cancellation.
+     *
+     * @return The failure of closing, if any
+     */
+    @SuppressWarnings("java:S1181") // A user-supplied close callback must not break the drain.
+    private @Nullable Throwable closeQuietly() {
+        try {
+            elements.close();
+            return null;
+        } catch (Exception | Error e) {
+            return e;
         }
     }
 

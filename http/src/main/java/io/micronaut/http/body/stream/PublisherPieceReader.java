@@ -135,6 +135,12 @@ final class PublisherPieceReader<T> implements PieceReader<T>, Subscriber<T> {
     }
 
     @Override
+    public boolean isEmpty() {
+        // the reactive reader ended without a failure: polling requests no other element
+        return elements.isEmpty() && failure == null && (ended || closed);
+    }
+
+    @Override
     public void close() {
         if (closed) {
             return;
