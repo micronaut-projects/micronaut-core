@@ -16,6 +16,7 @@
 package io.micronaut.dev;
 
 import io.micronaut.dev.loader.GenerationClassLoader;
+import io.micronaut.dev.loader.TestGenerations;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -39,7 +40,7 @@ class ClassFileReplacementTest {
         Path other = root.resolve("app/Other.class");
         Files.write(greeter, new byte[] {1});
         Files.write(other, new byte[] {2});
-        try (GenerationClassLoader generation = new GenerationClassLoader(1, List.of(root), null)) {
+        try (GenerationClassLoader generation = TestGenerations.over(1, List.of(root))) {
             ClassFileReplacement replacement = new ClassFileReplacement(generation);
             replacement.replace("app.Greeter", new byte[] {1}, new byte[] {10});
             replacement.replace("app.Other", new byte[] {2}, new byte[] {20});
