@@ -45,7 +45,7 @@ import java.nio.file.WatchService;
 @Requires(beans = WatchService.class)
 public class MacOsFileWatcher extends DefaultFileWatcher {
 
-    private volatile @Nullable NativeWatchRegistrar registrar;
+    private volatile @Nullable NativeWatchRegistrar registrar; // NOSONAR java:S3077 only the reference is published; the registrar is thread-safe
 
     /**
      * @param watchServices The watch service, obtained by the first registration
