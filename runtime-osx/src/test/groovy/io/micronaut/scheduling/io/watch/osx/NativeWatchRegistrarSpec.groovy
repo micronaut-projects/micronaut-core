@@ -54,13 +54,22 @@ class NativeWatchRegistrarSpec extends Specification {
         subKey.is(rootKey)
         registered == [root]
 
-        when: "the watcher has no directory left for the key"
+        when: "the watcher has no directory left for the key, which goes on reporting changes"
         registrar.cancel(rootKey)
+        ((FakeKey) rootKey).events.add(Stub(WatchEvent))
 
-        then: "the key is kept, and answers a later registration of the root"
+        then: "the key is kept, and answers a later registration of the root without what changed meanwhile"
         rootKey.valid
         registrar.register(root, null).is(rootKey)
+        ((FakeKey) rootKey).events.isEmpty()
         registered == [root]
+
+        when: "a key in use reports a change while another directory under it is registered"
+        ((FakeKey) rootKey).events.add(Stub(WatchEvent))
+        registrar.register(sub, null)
+
+        then: "the change stays for the watcher to drain"
+        ((FakeKey) rootKey).events.size() == 1
 
         when: "the root is deleted, so the service cancelled its key"
         rootKey.cancel()
@@ -176,6 +185,7 @@ class NativeWatchRegistrarSpec extends Specification {
 
     static class FakeKey implements WatchKey {
         final Path directory
+        final List<WatchEvent<?>> events = new CopyOnWriteArrayList<>()
         volatile boolean valid = true
 
         FakeKey(Path directory) {
@@ -189,7 +199,9 @@ class NativeWatchRegistrarSpec extends Specification {
 
         @Override
         List<WatchEvent<?>> pollEvents() {
-            return []
+            List<WatchEvent<?>> polled = List.copyOf(events)
+            events.clear()
+            return polled
         }
 
         @Override

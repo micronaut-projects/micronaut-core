@@ -24,8 +24,10 @@ import java.nio.file.Path;
 import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Registers directories with the native macOS service of directory-watcher, whose FSEvents stream of a directory
@@ -46,6 +48,10 @@ final class NativeWatchRegistrar implements DirectoryWatcher.WatchKeyRegistrar {
      * The keys of the directories registered natively, by directory. Guarded by {@code this}.
      */
     private final Map<Path, WatchKey> roots = new LinkedHashMap<>();
+    /**
+     * The keys the watcher released, whose stream went on queueing events nobody was told of. Guarded by {@code this}.
+     */
+    private final Set<WatchKey> released = new HashSet<>();
     private final DirectoryWatcher.WatchKeyRegistrar natively;
 
     NativeWatchRegistrar() {
@@ -68,9 +74,16 @@ final class NativeWatchRegistrar implements DirectoryWatcher.WatchKeyRegistrar {
     public synchronized WatchKey register(Path directory, WatchService watchService) throws IOException {
         // a deleted directory: the service closed its stream and forgot it
         roots.values().removeIf(key -> !key.isValid());
+        released.removeIf(key -> !key.isValid());
         for (Map.Entry<Path, WatchKey> root : roots.entrySet()) {
             if (directory.startsWith(root.getKey())) {
-                return root.getValue();
+                WatchKey key = root.getValue();
+                if (released.remove(key)) {
+                    // what changed while nothing was watched is not for the new registration; the watcher registers
+                    // under its own lock, so it is not draining the key meanwhile
+                    key.pollEvents();
+                }
+                return key;
             }
         }
         WatchKey key = natively.register(directory, watchService);
@@ -79,8 +92,9 @@ final class NativeWatchRegistrar implements DirectoryWatcher.WatchKeyRegistrar {
     }
 
     @Override
-    public void cancel(WatchKey key) {
+    public synchronized void cancel(WatchKey key) {
         // kept: cancelling would stop no stream, and would leave the directory and its tree unwatchable for this service
+        released.add(key);
     }
 
     /**
@@ -92,5 +106,6 @@ final class NativeWatchRegistrar implements DirectoryWatcher.WatchKeyRegistrar {
             key.cancel();
         }
         roots.clear();
+        released.clear();
     }
 }
