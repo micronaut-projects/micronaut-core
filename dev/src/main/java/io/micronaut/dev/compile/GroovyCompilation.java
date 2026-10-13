@@ -31,6 +31,8 @@ import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -45,6 +47,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * One run of groovyc. Everything that touches a Groovy type is here, loaded only when Groovy is
@@ -55,6 +58,10 @@ import java.util.Set;
  */
 @Internal
 final class GroovyCompilation {
+
+    private static final Logger LOG = LoggerFactory.getLogger(GroovyCompilation.class);
+    // the options already reported, so that each is reported once rather than on every compilation
+    private static final Set<String> IGNORED_OPTIONS = ConcurrentHashMap.newKeySet();
 
     private GroovyCompilation() {
     }
@@ -69,6 +76,10 @@ final class GroovyCompilation {
         configuration.setTargetDirectory(staging.toFile());
         configuration.setSourceEncoding("UTF-8");
         configuration.setParameters(true);
+        // Groovy reads the class files it compiles against through a process-wide cache of decompiled stubs keyed
+        // by URL, which never notices that the file changed: a class another language recompiled in this JVM would
+        // be seen as it was. Resolving through the compilation's own class loader, new for every run, sees it as it is
+        configuration.getOptimizationOptions().put("asmResolving", Boolean.FALSE);
         List<String> classpath = new ArrayList<>();
         for (Path entry : request.compileClasspath()) {
             classpath.add(entry.toString());
@@ -113,6 +124,10 @@ final class GroovyCompilation {
             configuration.setParameters(false);
         } else if (option.startsWith("--script-base-class=")) {
             configuration.setScriptBaseClass(option.substring("--script-base-class=".length()));
+        } else if (IGNORED_OPTIONS.add(option) && LOG.isWarnEnabled()) {
+            // invokedynamic, configuration scripts and the like change how the build compiles: say so rather
+            // than compile differently without a word
+            LOG.warn("The development compiler does not support the groovyc option {}: it is ignored", option);
         }
     }
 
