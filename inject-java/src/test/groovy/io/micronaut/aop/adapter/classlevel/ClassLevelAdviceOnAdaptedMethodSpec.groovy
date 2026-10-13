@@ -75,7 +75,7 @@ class ClassLevelAdviceOnAdaptedMethodSpec extends Specification {
         then: 'the scheduled method runs and is intercepted on the declaring bean only'
             bean.latch.await(10, TimeUnit.SECONDS)
             LoggedInterceptor.INSTANCES.get() == 1
-            LoggedInterceptor.INVOCATIONS.every { it.endsWith('#everyNow') }
+            invocations().every { it.endsWith('#everyNow') }
 
         and: 'no adapter bean was generated for it'
             ctx.getAllBeanDefinitions().findAll { it.stringValue(Adapter, 'adaptedBean').orElse(null) == LoggedScheduledBean.name }.isEmpty()
@@ -108,5 +108,15 @@ class ClassLevelAdviceOnAdaptedMethodSpec extends Specification {
 
         cleanup:
             ctx.close()
+    }
+
+    /**
+     * The invocations recorded so far, copied under the list's lock: a scheduled method keeps adding to the list
+     * while a spec iterates it.
+     */
+    private static List<String> invocations() {
+        synchronized (LoggedInterceptor.INVOCATIONS) {
+            return new ArrayList<>(LoggedInterceptor.INVOCATIONS)
+        }
     }
 }
