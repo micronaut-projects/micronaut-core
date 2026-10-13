@@ -127,23 +127,10 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     private final List<BeanConfiguration> additionalBeanConfigurations = new ArrayList<>();
 
     /**
-     * Creates a new bean definition service with the given configuration.
-     *
-     * @param contextConfiguration The context configuration
-     */
-    public DefaultBeanDefinitionService(BeanContextConfiguration contextConfiguration) {
-        this(contextConfiguration, Objects.requireNonNull(
-            contextConfiguration.beanResolutionCustomizer(),
-            "Bean resolution customizer cannot be null"
-        ));
-    }
-
-    /**
      * Creates a new bean definition service with the given configuration and the customizer serving the context.
      *
      * @param contextConfiguration The context configuration
      * @param beanResolutionCustomizer The bean resolution customizer of the context
-     * @since 5.3.0
      */
     public DefaultBeanDefinitionService(BeanContextConfiguration contextConfiguration, BeanResolutionCustomizer beanResolutionCustomizer) {
         Set<Class<? extends Annotation>> eagerInitAnnotated = contextConfiguration.getEagerInitAnnotated();
