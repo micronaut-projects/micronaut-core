@@ -18,7 +18,6 @@ package io.micronaut.dev;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.reload.RetentionCriteria;
 import io.micronaut.context.BeanRegistration;
-import io.micronaut.context.ConfigurableBeanContext;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.reload.AnnotatedBeanRetentionPolicy;
 import io.micronaut.context.reload.BeanRetentionPolicy;
@@ -54,7 +53,6 @@ import io.micronaut.dev.manifest.DevReloadStrategy;
 import io.micronaut.dev.manifest.ResourceRoot;
 import io.micronaut.dev.test.TestRunSummary;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher;
 import io.micronaut.runtime.context.scope.refresh.RefreshResult;
 import io.micronaut.runtime.EmbeddedApplication;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
@@ -1324,7 +1322,7 @@ public final class DevRuntime implements Closeable {
             // rebound, the refreshable beans disposed of, the watches told; a watch that cannot apply its change
             // answers REQUIRES_RESTART, and a bean retained across restarts that watched a touched prefix is not
             // kept when the restart comes
-            RefreshResult refresh = refreshConfiguration(current);
+            RefreshResult refresh = ConfigurationStaleness.refreshConfiguration(current);
             if (refresh == null) {
                 configurationChange = ConfigurationChange.ofAll();
             } else {
@@ -1357,24 +1355,6 @@ public final class DevRuntime implements Closeable {
             return;
         }
         restart(changeSet, configurationChange, start);
-    }
-
-    /**
-     * Refreshes the configuration of the running context.
-     *
-     * @return The result, or null when the context is not running or has no refresher, which restarts instead
-     */
-    @Nullable
-    static RefreshResult refreshConfiguration(@Nullable ApplicationContext current) {
-        if (current == null || !current.isRunning()) {
-            return null;
-        }
-        try {
-            return current.findBean(ConfigurationRefresher.class).map(ConfigurationRefresher::refresh).orElse(null);
-        } catch (RuntimeException e) {
-            LOG.warn("The configuration could not be refreshed in place ({}): restarting instead", e.getMessage());
-            return null;
-        }
     }
 
     /**
@@ -1638,7 +1618,7 @@ public final class DevRuntime implements Closeable {
         }
         startFailed = false;
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
-        List<BeanDefinition<?>> added = definitionsNamed(fresh, changeSet.classNames());
+        List<BeanDefinition<?>> added = ConfigurationStaleness.definitionsNamed(fresh, changeSet.classNames());
         fresh.publishEvent(new ReloadCompletedEvent(this, new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));
         LOG.info("Reloaded: generation {} started in {} ms ({} class(es) changed, {} bean(s) retained)", classLoader.generation(), elapsed.toMillis(), changeSet.classes().size(), retainedCount);
         LiveReloadServer server = liveReload;
@@ -1834,19 +1814,6 @@ public final class DevRuntime implements Closeable {
             }
             defaultBeanContext.notifyResourceChange(new ResourceChange(kind, roots, files, List.of(), true));
         }
-    }
-
-    private static List<BeanDefinition<?>> definitionsNamed(ApplicationContext applicationContext, Set<String> classNames) {
-        List<BeanDefinition<?>> definitions = new ArrayList<>();
-        if (classNames.isEmpty()) {
-            return definitions;
-        }
-        for (BeanDefinition<?> definition : applicationContext.getAllBeanDefinitions()) {
-            if (classNames.contains(definition.getBeanType().getName())) {
-                definitions.add(definition);
-            }
-        }
-        return definitions;
     }
 
     void detectLeaks() {
