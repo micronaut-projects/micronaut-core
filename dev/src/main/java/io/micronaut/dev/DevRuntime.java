@@ -440,10 +440,15 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
-     * @return The roots the runtime watches
+     * @return The roots the runtime watches, those of the manifest and the directories the application pinned
      */
     public List<Path> watchedRoots() {
-        return watchedRoots;
+        if (pinnedWatches.isEmpty()) {
+            return watchedRoots;
+        }
+        List<Path> roots = new ArrayList<>(watchedRoots);
+        roots.addAll(pinnedWatches.keySet());
+        return List.copyOf(roots);
     }
 
     /**
