@@ -108,6 +108,44 @@ class DefaultWatchThreadSpec extends Specification {
         ((DefaultFileWatcher) fileWatcher).@watcher == null
     }
 
+    void "the FileWatcher applies the check interval and the quiet period without the watch paths"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(
+            'micronaut.io.watch.check-interval': '70ms',
+            'micronaut.io.watch.quiet-period': '2s',
+            'spec.name': 'DefaultWatchThreadSpec'
+        )
+
+        expect: "the configuration is a bean although no watch paths are set, which still leave out the watch thread"
+        context.containsBean(FileWatchConfiguration)
+        context.getBean(FileWatchConfiguration).quietPeriod.toSeconds() == 2
+        !context.containsBean(DefaultWatchThread)
+
+        when:
+        FileWatcher fileWatcher = context.getBean(FileWatcher)
+        List<FileChangeBatch> batches = new CopyOnWriteArrayList<>()
+        def registration = fileWatcher.directory(root).watch(batches::add)
+        DirectoryWatcher watcher = ((DefaultFileWatcher) fileWatcher).@watcher
+
+        then:
+        watcher.@quietPeriod.toSeconds() == 2
+        watcher.@checkInterval.toMillis() == 70
+
+        when:
+        Files.writeString(root.resolve("quiet.txt"), "x")
+        Thread.sleep(1000)
+
+        then: "nothing is delivered before the configured quiet period, rather than after the default 120 milliseconds"
+        batches.isEmpty()
+        new PollingConditions(timeout: 30, delay: 0.1).eventually {
+            assert batches.any { it.paths().contains(root.resolve("quiet.txt").toAbsolutePath().normalize()) }
+        }
+
+        cleanup:
+        registration?.close()
+        context.close()
+    }
+
     void "switching the watch off removes the FileWatcher"() {
         given:
         ApplicationContext context = ApplicationContext.run((FileWatchConfiguration.ENABLED): false)
