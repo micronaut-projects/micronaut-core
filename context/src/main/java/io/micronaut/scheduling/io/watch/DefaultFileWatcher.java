@@ -54,7 +54,7 @@ public class DefaultFileWatcher implements FileWatcher, Closeable {
     private final BeanProvider<WatchService> watchServices;
     private final @Nullable FileWatchConfiguration configuration;
     // written under the lock, read without it by isWatching
-    private volatile @Nullable DirectoryWatcher watcher;
+    private volatile @Nullable DirectoryWatcher watcher; // NOSONAR java:S3077 only the reference is published; the watcher is thread-safe
     private boolean closed;
 
     /**
