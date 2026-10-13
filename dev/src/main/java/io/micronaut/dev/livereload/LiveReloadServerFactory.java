@@ -34,7 +34,7 @@ public interface LiveReloadServerFactory {
     /**
      * Starts a server on the loopback address.
      *
-     * @param port The port, {@link LiveReloadServer#DEFAULT_PORT} for the extensions; 0 for any free port
+     * @param port The port, 35729 for the extensions; 0 for any free port
      * @return The started server
      * @throws IOException if the port cannot be bound
      */

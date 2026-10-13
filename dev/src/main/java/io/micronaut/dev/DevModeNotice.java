@@ -17,7 +17,7 @@ package io.micronaut.dev;
 
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
-import io.micronaut.context.reload.ReloadStrategy;
+import io.micronaut.dev.manifest.DevReloadStrategy;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.livereload.LiveReloadServer;
 import org.jspecify.annotations.Nullable;
@@ -52,7 +52,7 @@ final class DevModeNotice {
      * @param http       Whether the application defines an HTTP server, whose requests the gate filter answers
      * @param script     Whether the LiveReload script is added to the server's HTML pages
      */
-    void logOnce(Logger log, ReloadStrategy strategy, @Nullable LiveReloadServer liveReload, boolean http, boolean script) {
+    void logOnce(Logger log, DevReloadStrategy strategy, @Nullable LiveReloadServer liveReload, boolean http, boolean script) {
         if (logged.compareAndSet(false, true) && log.isInfoEnabled()) {
             OptionalInt port = liveReload == null ? OptionalInt.empty() : OptionalInt.of(liveReload.port());
             log.info("{}", text(strategy, port, http, script));
@@ -68,7 +68,7 @@ final class DevModeNotice {
      * @param script     Whether the LiveReload script is added to the server's HTML pages
      * @return The note: a framed block of lines that starts on a line of its own
      */
-    static String text(ReloadStrategy strategy, OptionalInt liveReload, boolean http, boolean script) {
+    static String text(DevReloadStrategy strategy, OptionalInt liveReload, boolean http, boolean script) {
         StringBuilder text = new StringBuilder(System.lineSeparator());
         line(text, RULE);
         line(text, "  " + HEADLINE);
