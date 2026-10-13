@@ -166,7 +166,7 @@ Add `micronaut-dev-livereload` to the development runtime classpath and the laun
 * reload when the application restarted or a template changed;
 * swap a stylesheet in place when only a stylesheet changed.
 
-Pages get the client script appended before their closing body tag; set `micronaut.dev.livereload.inject-script=false` if you use a browser extension. A api:dev.livereload.LiveReloadTrigger[] bean lets a module ask for a refresh.
+Pages get the client script appended before their closing body tag, except a page with a Content-Security-Policy, in a header or a `<meta http-equiv>` element, which would block it; set `micronaut.dev.livereload.inject-script=false` if you use a browser extension. A api:dev.livereload.LiveReloadTrigger[] bean lets a module ask for a refresh.
 
 The server listens on the loopback address only, and its socket accepts the clients LiveReload is made for:
 
