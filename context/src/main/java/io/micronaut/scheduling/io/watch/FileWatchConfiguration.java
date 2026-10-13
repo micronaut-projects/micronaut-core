@@ -16,7 +16,6 @@
 package io.micronaut.scheduling.io.watch;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
 import java.nio.file.Path;
@@ -28,11 +27,15 @@ import java.util.List;
 /**
  * Configuration for the file watch service.
  *
+ * <p>The configuration is present without {@link #PATHS}, so that the {@link FileWatcher} of the context applies the
+ * {@link #getCheckInterval() check interval} and the {@link #getQuietPeriod() quiet period}; only publishing
+ * {@link io.micronaut.scheduling.io.watch.event.FileChangedEvent}s for the watch paths, by {@link DefaultWatchThread},
+ * requires them.</p>
+ *
  * @author graemerocher
  * @since 1.1.0
  */
 @ConfigurationProperties(FileWatchConfiguration.PREFIX)
-@Requires(property = FileWatchConfiguration.PATHS)
 public class FileWatchConfiguration implements Toggleable {
 
     /**
