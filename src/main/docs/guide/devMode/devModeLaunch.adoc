@@ -70,7 +70,7 @@ endpoints:
     sensitive: false
 ----
 
-The reload is a JSON request. It is refused with a 403 when a browser marks it as coming from another site, or when its `Origin` is not the server's own as its host resolution gives it (behind a proxy, from the forwarding headers). A page the developer visits therefore cannot trigger it with a form:
+The reload is a JSON request. It is refused with a 403 when a browser marks it as coming from another site, or when its `Origin` is not the server's own: `localhost`, a `*.localhost` name or the loopback address, on the port the request arrived on. The `Host` the request names plays no part, since a page of another site can make its own name resolve to the machine. A page the developer visits therefore cannot trigger it with a form; a client that is no page, such as curl or an IDE, sends no `Origin`:
 
 [source,bash]
 ----
@@ -103,7 +103,7 @@ Add `micronaut-dev-livereload` to the development runtime classpath and the laun
 * reload when the application restarted or a template changed;
 * swap a stylesheet in place when only a stylesheet changed.
 
-Pages get the client script appended before their closing body tag; set `micronaut.dev.livereload.inject-script=false` if you use a browser extension. A api:dev.livereload.LiveReloadTrigger[] bean lets a module ask for a refresh.
+Pages get the client script appended before their closing body tag, except a page with a Content-Security-Policy, in a header or a `<meta http-equiv>` element, which would block it; set `micronaut.dev.livereload.inject-script=false` if you use a browser extension. A api:dev.livereload.LiveReloadTrigger[] bean lets a module ask for a refresh.
 
 The server listens on the loopback address only, and its socket accepts the clients LiveReload is made for:
 

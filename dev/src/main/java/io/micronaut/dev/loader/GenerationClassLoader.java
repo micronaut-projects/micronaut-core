@@ -91,7 +91,7 @@ public final class GenerationClassLoader extends URLClassLoader {
      * @param roots The class and resource directories, searched in order
      * @param parent The parent loader, holding the libraries
      */
-    public GenerationClassLoader(int generation, List<Path> roots, @Nullable ClassLoader parent) {
+    GenerationClassLoader(int generation, List<Path> roots, @Nullable ClassLoader parent) {
         this(generation, roots, roots, 0, null, parent);
     }
 
@@ -105,7 +105,7 @@ public final class GenerationClassLoader extends URLClassLoader {
      * @return The generation
      * @throws UncheckedIOException if the directories cannot be copied
      */
-    public static GenerationClassLoader snapshot(int generation, List<Path> sources, Path snapshotDir, @Nullable ClassLoader parent) {
+    static GenerationClassLoader snapshot(int generation, List<Path> sources, Path snapshotDir, @Nullable ClassLoader parent) {
         return snapshot(generation, List.of(), sources, snapshotDir, parent);
     }
 
@@ -122,7 +122,7 @@ public final class GenerationClassLoader extends URLClassLoader {
      * @return The generation
      * @throws UncheckedIOException if the directories cannot be copied
      */
-    public static GenerationClassLoader snapshot(int generation, List<Path> liveRoots, List<Path> sources, Path snapshotDir, @Nullable ClassLoader parent) {
+    static GenerationClassLoader snapshot(int generation, List<Path> liveRoots, List<Path> sources, Path snapshotDir, @Nullable ClassLoader parent) {
         List<Path> roots = new ArrayList<>(liveRoots.size() + sources.size());
         roots.addAll(liveRoots);
         try {
