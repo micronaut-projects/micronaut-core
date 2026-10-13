@@ -52,6 +52,22 @@ class BeanWatchRegistryCreationSpec extends Specification {
         unowned?.close()
     }
 
+    void "the thread keeps no creation state once its outermost creation ended"() {
+        when:
+        registry.beginCreation(outer)
+        registry.beginCreation(inner)
+        registry.endCreation(inner, new Object())
+
+        then: "a creation is still in progress"
+        registry.@creating.get() != null
+
+        when:
+        registry.endCreation(outer, new Object())
+
+        then: "the thread local entry is removed"
+        registry.@creating.get() == null
+    }
+
     void "an end that pairs with no creation in progress leaves the creations in progress alone"() {
         given:
         Object outerBean = new Object()
