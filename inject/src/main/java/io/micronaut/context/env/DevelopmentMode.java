@@ -59,4 +59,16 @@ public final class DevelopmentMode {
         // the same test as the @Requires of DevelopmentActive and DevelopmentInactive
         return propertyResolver.getProperty(PROPERTY, String.class).map(StringUtils.TRUE::equalsIgnoreCase).orElse(false);
     }
+
+    /**
+     * Whether development mode is active according to the system properties.
+     *
+     * <p>A launcher sets the system property before the application context exists, so components that
+     * run before the environment is available can consult it.</p>
+     *
+     * @return True if the system property is set to {@code true}
+     */
+    public static boolean isEnabledBySystemProperty() {
+        return StringUtils.TRUE.equalsIgnoreCase(System.getProperty(PROPERTY));
+    }
 }
