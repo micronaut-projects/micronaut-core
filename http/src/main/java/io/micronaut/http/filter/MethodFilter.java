@@ -17,6 +17,7 @@ package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.propagation.ReactivePropagation;
+import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -43,6 +44,7 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.ReleasableRequestBody;
+import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.form.FormPart;
 import io.micronaut.http.form.FormParts;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
@@ -52,6 +54,7 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.NonBlocking;
+import reactor.util.context.Context;
 import reactor.util.context.ContextView;
 
 import java.util.Arrays;
@@ -232,9 +235,9 @@ record MethodFilter<T>(FilterOrder order,
                     // CompletionStage or CompletableFuture: a returned stage is completed with the
                     // context of the continuation
                     if (returnType.isAsync() && isResponse(returnType.getWrappedType())) {
-                        continuationCreator = ResultAwareCompletionStageContinuationImpl::new;
+                        continuationCreator = (StageContinuationCreator) ResultAwareCompletionStageContinuationImpl::new;
                     } else {
-                        continuationCreator = CompletionStageContinuationImpl::new;
+                        continuationCreator = (StageContinuationCreator) CompletionStageContinuationImpl::new;
                     }
                     resultContinuationType = continuationReturnType.getType() == CompletableFuture.class ? "CompletableFuture" : "CompletionStage";
                     fulfilled[i] = ctx -> ctx.continuation;
@@ -441,23 +444,32 @@ record MethodFilter<T>(FilterOrder order,
         if (continuationCreator == null) {
             throw new IllegalStateException("Downstream method shouldn't be called when continuation is missing!");
         }
+        if (context.reactive() && continuationCreator instanceof StageContinuationCreator) {
+            // proceed() of a stage continuation subscribes to the downstream: the method runs when
+            // the upstream reactive filter subscribes, so that the downstream filters and the route
+            // see the Reactor context of that subscription. Every subscription runs the method
+            // with a new continuation
+            return ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView ->
+                Mono.from(ReactiveExecutionFlow.toPublisher(() -> processRequestFilter(context, downstream, contextView)))
+            ));
+        }
+        return processRequestFilter(context, downstream, null);
+    }
+
+    private ExecutionFlow<FilterContext> processRequestFilter(FilterContext context,
+                                                              Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
+                                                              @Nullable ContextView contextView) {
         MutablePropagatedContext mutablePropagatedContext = MutablePropagatedContext.of(context.propagatedContext());
         InternalFilterContinuation<?> continuation = createContinuation(downstream, context, mutablePropagatedContext);
+        if (contextView != null && continuation instanceof CompletionStageContinuationImpl stageContinuation) {
+            stageContinuation.upstreamContextView = contextView;
+        }
         FilterMethodContext filterMethodContext = new FilterMethodContext(
             mutablePropagatedContext,
             context.request(),
             context.response(),
             null,
             continuation);
-        if (context.reactive() && continuation instanceof CompletionStageContinuationImpl stageContinuation) {
-            // proceed() of a stage continuation subscribes to the downstream: the method runs when
-            // the upstream reactive filter subscribes, so that the downstream filters and the route
-            // see the Reactor context of that subscription
-            return ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
-                stageContinuation.contextView.set(contextView);
-                return Mono.from(ReactiveExecutionFlow.toPublisher(() -> filter(context, filterMethodContext, null, false)));
-            }));
-        }
         return filter(context, filterMethodContext, null, false);
     }
 
@@ -875,6 +887,13 @@ record MethodFilter<T>(FilterOrder order,
 
     }
 
+    /**
+     * The creator of a {@link CompletionStageContinuationImpl}, which subscribes to the downstream
+     * itself.
+     */
+    private interface StageContinuationCreator extends ContinuationCreator {
+    }
+
     private interface FilterReturnHandler {
         /**
          * Void method that accepts a continuation.
@@ -1152,7 +1171,8 @@ record MethodFilter<T>(FilterOrder order,
         /**
          * The Reactor context of the upstream reactive filter that subscribed to the method, if any.
          */
-        private final AtomicReference<@Nullable ContextView> contextView = new AtomicReference<>();
+        @Nullable
+        private ContextView upstreamContextView;
 
         private CompletionStageContinuationImpl(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
                                                 FilterContext filterContext,
@@ -1190,11 +1210,10 @@ record MethodFilter<T>(FilterOrder order,
             } catch (Exception e) {
                 return CompletableFuture.failedFuture(e);
             }
-            ContextView upstreamContextView = contextView.get();
             if (upstreamContextView != null && !upstreamContextView.isEmpty() && flow instanceof ReactiveExecutionFlow<FilterContext> reactiveFlow) {
                 // the downstream is subscribed to here, not by the upstream reactive filter: it
                 // gets the Reactor context of that filter's subscription
-                flow = ReactiveExecutionFlow.fromPublisher(Mono.from(reactiveFlow.toPublisher()).contextWrite(upstreamContextView));
+                flow = ReactiveExecutionFlow.fromPublisher(Mono.from(reactiveFlow.toPublisher()).contextWrite(downstreamReactorContext(upstreamContextView, context)));
             }
             ExecutionFlow<HttpResponse<?>> responseFlow = flow.map(newFilterContext -> {
                 filterContext.set(newFilterContext);
@@ -1219,6 +1238,26 @@ record MethodFilter<T>(FilterOrder order,
                 }
             });
             return future;
+        }
+
+        /**
+         * The Reactor context of the upstream subscription, with the propagated context and the
+         * request this continuation proceeds with: the upstream values are stale once the filter
+         * changed them.
+         *
+         * @param contextView The Reactor context of the upstream subscription
+         * @param context     The context the downstream runs with
+         * @return The Reactor context of the downstream
+         */
+        private static Context downstreamReactorContext(ContextView contextView, FilterContext context) {
+            Context reactorContext = Context.of(contextView);
+            if (contextView.hasKey(ReactorPropagation.PROPAGATED_CONTEXT_REACTOR_CONTEXT_VIEW_KEY)) {
+                reactorContext = ReactorPropagation.addPropagatedContext(reactorContext, context.propagatedContext());
+            }
+            if (contextView.hasKey(ServerRequestContext.KEY)) {
+                reactorContext = reactorContext.put(ServerRequestContext.KEY, context.request());
+            }
+            return reactorContext;
         }
 
         /**
