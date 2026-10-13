@@ -56,13 +56,16 @@ import java.util.stream.Stream;
 /**
  * Builds {@link Argument}s from the types read reflectively from parameters, fields, return types and type
  * hierarchies, in the shape the annotation processors give the arguments they generate: the raw type, the type
- * arguments recursively, the type variables as {@link GenericPlaceholder}s with every bound they declare, the
- * wildcards as {@link WildcardArgument}s with their bounds, and the annotations of the element and of every
- * level of its type as metadata built by {@link ReflectionAnnotations}.
+ * arguments recursively, the type variables as {@link GenericPlaceholder}s with every bound they declare, and
+ * the annotations of the element and of every level of its type as metadata built by
+ * {@link ReflectionAnnotations}. A wildcard is read as the type it is bounded by and a generic array as the
+ * array of its raw component; {@link #ofExact(Type)} keeps both instead, as {@link WildcardArgument}s and as
+ * arrays carrying their component.
  *
  * <p>The reverse direction, {@link #toType(Argument)}, renders an argument as a {@link Type} for the APIs
- * defined on {@code java.lang.reflect}, either keeping an unresolved type variable and a wildcard or rendering
- * them as the type they are bounded by.</p>
+ * defined on {@code java.lang.reflect}, either keeping an unresolved type variable or rendering it as the type
+ * it is bounded by; {@link #toExactType(Argument)} renders every shape an argument can hold, wildcards and
+ * generic arrays included, back as the type it was read from.</p>
  *
  * @author Denis Stepanov
  * @since 5.2.0
@@ -97,17 +100,61 @@ public final class ReflectionArguments {
 
     /**
      * Converts a type to an {@link Argument}. Unlike {@link Argument#of(Type)}, a type variable is converted to
-     * a {@link GenericPlaceholder} of the type it erases to that keeps every bound the variable declares, a
-     * wildcard to a {@link WildcardArgument} of the type it is bounded by that keeps its upper and lower bounds,
-     * and a generic array to the array of its component, carrying the type arguments or the variable of the
-     * component. A generic type named without its type arguments is a {@link Argument#isRawType() raw} argument.
-     * The conversion is lossless: {@link #toType(Argument)} renders the argument back as an equal type.
+     * a {@link GenericPlaceholder} of the type it erases to, keeping every bound the variable declares, a
+     * wildcard to its bound and a generic array to the array of its raw component.
      *
      * @param type The type
      * @return The argument
+     * @see #ofExact(Type) to keep a wildcard and the component of a generic array
      */
     public static Argument<?> of(Type type) {
         return toArgument(null, type, Map.of());
+    }
+
+    /**
+     * Converts a type to an {@link Argument} that keeps every shape of the type: a type variable is a
+     * {@link GenericPlaceholder} of the type it erases to with every bound the variable declares, a wildcard a
+     * {@link WildcardArgument} of the type it is bounded by with its upper and lower bounds, a generic array the
+     * array of its component carrying the type arguments or the variable of the component, and a generic type
+     * named without its type arguments a {@link Argument#isRawType() raw} argument. The conversion is lossless:
+     * {@link #toExactType(Argument)} renders the argument back as an equal type.
+     *
+     * <p>Unlike {@link #of(Type)}, which reads a wildcard as its bound and a generic array as the array of its
+     * raw component, the argument tells {@code List<? extends Number>} from {@code List<Number>} and
+     * {@code Map<K, V>[]} from {@code Map[]}, which a specification whose type rules do - CDI's - needs.</p>
+     *
+     * @param type The type
+     * @return The argument
+     * @since 5.3.0
+     */
+    public static Argument<?> ofExact(Type type) {
+        return toArgument(null, type, Map.of(), Set.of(), true, true);
+    }
+
+    /**
+     * Converts a type to a named {@link Argument} that keeps every shape of the type.
+     *
+     * @param name The name of the argument, can be {@code null}
+     * @param type The type
+     * @return The argument
+     * @see #ofExact(Type)
+     * @since 5.3.0
+     */
+    public static Argument<?> ofExact(@Nullable String name, Type type) {
+        return toArgument(name, type, Map.of(), Set.of(), true, true);
+    }
+
+    /**
+     * Converts an annotated type to an {@link Argument} that keeps every shape of the type, with the type-use
+     * annotations of each level.
+     *
+     * @param annotatedType The annotated type
+     * @return The argument
+     * @see #ofExact(Type)
+     * @since 5.3.0
+     */
+    public static Argument<?> ofExact(AnnotatedType annotatedType) {
+        return toArgument(null, annotatedType, Map.of(), Set.of(), true);
     }
 
     /**
@@ -245,7 +292,7 @@ public final class ReflectionArguments {
      */
     static Argument<?> of(@Nullable String name, Field field, Class<?> context) {
         return withElementAnnotations(
-            toArgument(name, field.getAnnotatedType(), bindings(context, field.getDeclaringClass()), Set.of()), field);
+            toArgument(name, field.getAnnotatedType(), bindings(context, field.getDeclaringClass()), Set.of(), false), field);
     }
 
     /**
@@ -255,7 +302,7 @@ public final class ReflectionArguments {
     static Argument<?> of(@Nullable String name, Parameter parameter, Class<?> context) {
         Class<?> declaringType = parameter.getDeclaringExecutable().getDeclaringClass();
         return withElementAnnotations(
-            toArgument(name, parameter.getAnnotatedType(), bindings(context, declaringType), Set.of()), parameter);
+            toArgument(name, parameter.getAnnotatedType(), bindings(context, declaringType), Set.of(), false), parameter);
     }
 
     /**
@@ -269,7 +316,7 @@ public final class ReflectionArguments {
      */
     static Argument<?> ofType(@Nullable String name, Parameter parameter, Class<?> context) {
         Class<?> declaringType = parameter.getDeclaringExecutable().getDeclaringClass();
-        return toArgument(name, parameter.getAnnotatedType(), bindings(context, declaringType), Set.of());
+        return toArgument(name, parameter.getAnnotatedType(), bindings(context, declaringType), Set.of(), false);
     }
 
     /**
@@ -279,7 +326,7 @@ public final class ReflectionArguments {
      * a property read through a getter.
      */
     static Argument<?> returnOf(@Nullable String name, Method method, Class<?> context) {
-        return toArgument(name, method.getAnnotatedReturnType(), bindings(context, method.getDeclaringClass()), Set.of());
+        return toArgument(name, method.getAnnotatedReturnType(), bindings(context, method.getDeclaringClass()), Set.of(), false);
     }
 
     /**
@@ -330,56 +377,82 @@ public final class ReflectionArguments {
     }
 
     /**
-     * Renders an argument as a {@link Type}, the way the declaration wrote it: the raw class when it has no
-     * type argument or is raw, a {@link ParameterizedType} otherwise, a {@link WildcardType} with its bounds
-     * for a {@link WildcardArgument}, a {@link TypeVariable} with every bound it declares for an unresolved
-     * {@link GenericPlaceholder}, the type itself for a {@link GenericPlaceholder#isResolved() resolved} one,
-     * and a {@link GenericArrayType} for an array of a parameterized type or of a variable.
-     *
-     * <p>The owner of a nested type is its declaring class: an argument does not carry the type arguments of
-     * the {@code Outer<X>} of an {@code Outer<X>.Inner<Y>}.</p>
+     * Renders an argument as a {@link Type}: the raw class when it has no type argument, a
+     * {@link ParameterizedType} otherwise, and a {@link TypeVariable} bounded by either when the argument is a
+     * {@link GenericPlaceholder}.
      *
      * @param argument The argument
      * @return The type
-     * @see #toType(Argument, boolean) to render a placeholder and a wildcard as the type they are bounded by instead
+     * @see #toType(Argument, boolean) to render a placeholder as the type it is bounded by instead
+     * @see #toExactType(Argument) to render a wildcard, every bound of a variable and a generic array too
      */
     public static Type toType(Argument<?> argument) {
         return toType(argument, true);
     }
 
     /**
-     * Renders an argument as a {@link Type}, choosing what an unresolved type variable and a wildcard become.
+     * Renders an argument as a {@link Type}, choosing what an unresolved type variable becomes.
      *
      * <p>An API that describes a declaration - the type of an injection point, of an observed event - wants the
-     * variable itself, so that it can tell {@code List<T>} from {@code List<String>}, and the wildcard with its
-     * bounds, so that it can tell {@code List<? extends Number>} from {@code List<Number>}; an API that compares
-     * types by assignability wants the type either is bounded by, which is what the erasure of the declaration
-     * yields. The generated metadata carries a {@link GenericPlaceholder} or a {@link WildcardArgument} for both
-     * cases, so the caller says which of the two it means.</p>
+     * variable itself, so that it can tell {@code List<T>} from {@code List<String>}; an API that compares types
+     * by assignability wants the type the variable is bounded by, which is what the erasure of the declaration
+     * yields. The generated metadata carries a {@link GenericPlaceholder} for both cases, so the caller says
+     * which of the two it means.</p>
      *
      * @param argument      The argument
-     * @param typeVariables Whether a {@link GenericPlaceholder} is rendered as a {@link TypeVariable} and a
-     *                      {@link WildcardArgument} as a {@link WildcardType}, rather than as the type they are
-     *                      bounded by
+     * @param typeVariables Whether a {@link GenericPlaceholder} is rendered as a {@link TypeVariable} rather
+     *                      than as the type it is bounded by
      * @return The type
      */
     public static Type toType(Argument<?> argument, boolean typeVariables) {
-        return toType(argument, typeVariables, Map.of());
+        Argument<?>[] typeParameters = argument.getTypeParameters();
+        Type[] arguments = new Type[typeParameters.length];
+        for (int i = 0; i < arguments.length; i++) {
+            arguments[i] = toType(typeParameters[i], typeVariables);
+        }
+        Class<?> rawType = argument.getType();
+        // a raw argument keeps the type arguments the type declares, and renders back as the bare type it
+        // was written as, not as one parameterized by the variables it kept
+        Type type = arguments.length == 0 || argument.isRawType() ? rawType : new ReflectionParameterizedType(rawType, arguments);
+        if (typeVariables && argument instanceof GenericPlaceholder<?> placeholder) {
+            return new ReflectionTypeVariable(placeholder.getVariableName(), type);
+        }
+        return type;
+    }
+
+    /**
+     * Renders an argument as a {@link Type}, the way the declaration wrote it: the raw class when it has no
+     * type argument or is raw, a {@link ParameterizedType} otherwise, a {@link WildcardType} with its bounds
+     * for a {@link WildcardArgument}, a {@link TypeVariable} with every bound it declares for an unresolved
+     * {@link GenericPlaceholder}, the type itself for a {@link GenericPlaceholder#isResolved() resolved} one,
+     * and a {@link GenericArrayType} for an array of a parameterized type or of a variable. The inverse of
+     * {@link #ofExact(Type)}.
+     *
+     * <p>The owner of a nested type is its declaring class: an argument does not carry the type arguments of
+     * the {@code Outer<X>} of an {@code Outer<X>.Inner<Y>}. A rendered variable has no declaration, and is
+     * equal to another rendered variable of the same name whose bounds erase to the same classes.</p>
+     *
+     * @param argument The argument
+     * @return The type
+     * @see #toType(Argument, boolean) to render a placeholder and a wildcard as the type they are bounded by instead
+     * @since 5.3.0
+     */
+    public static Type toExactType(Argument<?> argument) {
+        return toExactType(argument, Map.of());
     }
 
     /**
      * Renders an argument as a type inside the bounds of the given variables: a variable named again within its
      * own bounds, the {@code T} of {@code T extends Comparable<T>}, is that variable.
      */
-    private static Type toType(Argument<?> argument, boolean typeVariables, Map<String, ReflectionTypeVariable> bounding) {
-        if (typeVariables && argument instanceof WildcardArgument<?> wildcard) {
+    private static Type toExactType(Argument<?> argument, Map<String, ReflectionTypeVariable> bounding) {
+        if (argument instanceof WildcardArgument<?> wildcard) {
             return new ReflectionWildcardType(
-                toTypes(wildcard.getUpperBounds(), bounding),
-                toTypes(wildcard.getLowerBounds(), bounding));
+                toExactTypes(wildcard.getUpperBounds(), bounding),
+                toExactTypes(wildcard.getLowerBounds(), bounding));
         }
         Class<?> type = argument.getType();
-        if (typeVariables && argument instanceof GenericPlaceholder<?> placeholder
-            && !(argument instanceof WildcardArgument<?>) && !placeholder.isResolved()) {
+        if (argument instanceof GenericPlaceholder<?> placeholder && !placeholder.isResolved()) {
             String name = placeholder.getVariableName();
             ReflectionTypeVariable variable = bounding.get(name);
             if (variable == null) {
@@ -387,7 +460,7 @@ public final class ReflectionArguments {
                 variable = new ReflectionTypeVariable(name);
                 Map<String, ReflectionTypeVariable> within = new HashMap<>(bounding);
                 within.put(name, variable);
-                variable.bounds = toTypes(placeholder.getBounds(), within);
+                variable.bounds = toExactTypes(placeholder.getBounds(), within);
             }
             // the placeholder of an array of a variable is an array of the variable
             return arrayOf(variable, type);
@@ -400,7 +473,7 @@ public final class ReflectionArguments {
         }
         Type[] arguments = new Type[typeParameters.length];
         for (int i = 0; i < arguments.length; i++) {
-            arguments[i] = toType(typeParameters[i], typeVariables, bounding);
+            arguments[i] = toExactType(typeParameters[i], bounding);
         }
         Class<?> component = type;
         while (component.isArray()) {
@@ -410,10 +483,10 @@ public final class ReflectionArguments {
         return arrayOf(new ReflectionParameterizedType(component, arguments), type);
     }
 
-    private static Type[] toTypes(List<Argument<?>> arguments, Map<String, ReflectionTypeVariable> bounding) {
+    private static Type[] toExactTypes(List<Argument<?>> arguments, Map<String, ReflectionTypeVariable> bounding) {
         Type[] types = new Type[arguments.size()];
         for (int i = 0; i < types.length; i++) {
-            types[i] = toType(arguments.get(i), true, bounding);
+            types[i] = toExactType(arguments.get(i), bounding);
         }
         return types;
     }
@@ -433,8 +506,8 @@ public final class ReflectionArguments {
      * The type closure of an argument: the argument itself, then every class and interface above its type, each
      * once, with the type arguments the argument gives carried into them - the closure of {@code ArrayList<String>}
      * holds {@code List<String>}, {@code Collection<String>} and {@code Iterable<String>}, and ends with
-     * {@code Object}. A super type is read as the argument of it, with the type-use annotations of the
-     * {@code extends} and {@code implements} clauses that reach it, as {@link #resolveGenericToArgument(Class, Class)}
+     * {@code Object}. A super type is read as {@link #ofExact(Type)} reads one, with the type-use annotations of
+     * the {@code extends} and {@code implements} clauses that reach it, as {@link #resolveGenericToArgument(Class, Class)}
      * reads one.
      *
      * <p>The super types of a variable or of a wildcard are those of the type it is bounded by, and the closure
@@ -442,6 +515,7 @@ public final class ReflectionArguments {
      *
      * @param argument The argument
      * @return The closure, the argument first
+     * @since 5.3.0
      */
     public static List<Argument<?>> typeClosureOf(Argument<?> argument) {
         List<Argument<?>> closure = new ArrayList<>();
@@ -453,7 +527,7 @@ public final class ReflectionArguments {
         Set<Class<?>> collected = new HashSet<>();
         collected.add(type);
         Map<TypeVariable<?>, AnnotatedType> substitutions = new HashMap<>();
-        collectTypeSubstitutions(toType(argument, true), substitutions);
+        collectTypeSubstitutions(toExactType(argument), substitutions);
         collectSupertypes(type, substitutions, closure, collected);
         if (collected.add(Object.class)) {
             // an interface has no superclass to reach it through
@@ -472,7 +546,7 @@ public final class ReflectionArguments {
                 continue;
             }
             AnnotatedType resolved = substitutions.isEmpty() ? supertype : new LazySubstitutingType(supertype, substitutions);
-            closure.add(toArgument(null, resolved, Map.of()));
+            closure.add(toArgument(null, resolved, Map.of(), Set.of(), true));
             Map<TypeVariable<?>, AnnotatedType> own = new HashMap<>();
             collectTypeSubstitutions(resolved, own);
             collectSupertypes(raw, own, closure, collected);
@@ -554,7 +628,7 @@ public final class ReflectionArguments {
     private static Argument<?>[] toArguments(AnnotatedType[] types, Map<TypeVariable<?>, AnnotatedType> substitutions, Set<TypeVariable<?>> resolving) {
         Argument<?>[] arguments = new Argument[types.length];
         for (int i = 0; i < types.length; i++) {
-            arguments[i] = toArgument(null, types[i], substitutions, resolving);
+            arguments[i] = toArgument(null, types[i], substitutions, resolving, true);
         }
         return arguments;
     }
@@ -562,7 +636,7 @@ public final class ReflectionArguments {
     private static Argument<?>[] toArguments(Type[] types, Map<TypeVariable<?>, AnnotatedType> substitutions, Set<TypeVariable<?>> resolving) {
         Argument<?>[] arguments = new Argument[types.length];
         for (int i = 0; i < types.length; i++) {
-            arguments[i] = toArgument(null, types[i], substitutions, resolving, false);
+            arguments[i] = toArgument(null, types[i], substitutions, resolving, false, true);
         }
         return arguments;
     }
@@ -652,7 +726,7 @@ public final class ReflectionArguments {
      * @return The converted argument
      */
     private static Argument<?> toArgument(@Nullable String name, AnnotatedType annotatedType, Map<TypeVariable<?>, AnnotatedType> substitutions) {
-        return toArgument(name, annotatedType, substitutions, Set.of());
+        return toArgument(name, annotatedType, substitutions, Set.of(), false);
     }
 
     /**
@@ -663,30 +737,51 @@ public final class ReflectionArguments {
      * @param substitutions Type variables to replace
      * @param resolving     The type variables whose bounds are being converted, so that a variable named by its
      *                      own bound is not converted for ever
+     * @param exact         Whether a wildcard keeps its bounds and a generic array its component, rather than
+     *                      being read as the bound and as the array of the raw component
      * @return The converted argument
      */
     private static Argument<?> toArgument(@Nullable String name,
                                           AnnotatedType annotatedType,
                                           Map<TypeVariable<?>, AnnotatedType> substitutions,
-                                          Set<TypeVariable<?>> resolving) {
+                                          Set<TypeVariable<?>> resolving,
+                                          boolean exact) {
         if (annotatedType instanceof AnnotatedParameterizedType apt) {
             Class<?> rawType = getRawType(apt.getType());
             TypeVariable<?>[] variables = rawType.getTypeParameters();
             AnnotatedType[] actualTypeArguments = apt.getAnnotatedActualTypeArguments();
             Argument<?>[] typeArgs = new Argument[actualTypeArguments.length];
             for (int i = 0; i < typeArgs.length; i++) {
-                typeArgs[i] = toArgument(variables.length > i ? variables[i].getName() : null, actualTypeArguments[i], substitutions, resolving);
+                typeArgs[i] = toArgument(variables.length > i ? variables[i].getName() : null, actualTypeArguments[i], substitutions, resolving, exact);
             }
             return Argument.of(rawType, name, ReflectionAnnotations.metadataOf(apt), typeArgs);
         } else if (annotatedType instanceof AnnotatedArrayType aat) {
-            Argument<?> component = toArgument(null, aat.getAnnotatedGenericComponentType(), substitutions, resolving);
+            Argument<?> component = toArgument(null, aat.getAnnotatedGenericComponentType(), substitutions, resolving, exact);
             AnnotationMetadata combined = combine(component.getAnnotationMetadata(), ReflectionAnnotations.metadataOf(aat));
-            return arrayOf(component, name, combined);
+            if (exact) {
+                return arrayOf(component, name, combined);
+            }
+            // the type arguments of the component are the ones of the array: a `List<String>[]` is a `List[]`
+            // of `E -> String`, as the processors write it, and an array of a raw component is raw the same way
+            Class<?> arrayType = Array.newInstance(component.getType(), 0).getClass();
+            return component.isRawType()
+                ? Argument.ofRawType(arrayType, name, combined, component.getTypeParameters())
+                : Argument.of(arrayType, name, combined, component.getTypeParameters());
         } else if (annotatedType instanceof AnnotatedWildcardType awt) {
-            return wildcardOf(name,
-                toArguments(awt.getAnnotatedUpperBounds(), substitutions, resolving),
-                toArguments(awt.getAnnotatedLowerBounds(), substitutions, resolving),
-                ReflectionAnnotations.metadataOf(annotatedType));
+            if (exact) {
+                return wildcardOf(name,
+                    toArguments(awt.getAnnotatedUpperBounds(), substitutions, resolving),
+                    toArguments(awt.getAnnotatedLowerBounds(), substitutions, resolving),
+                    ReflectionAnnotations.metadataOf(annotatedType));
+            }
+            // a wildcard is the type it is bounded by, the lower bound first: `? super Book` is `Book`, which is
+            // what the processors resolve it to, and only an unbounded wildcard is `Object`
+            AnnotatedType[] lowerBounds = awt.getAnnotatedLowerBounds();
+            AnnotatedType[] bounds = lowerBounds.length == 0 ? awt.getAnnotatedUpperBounds() : lowerBounds;
+            Argument<?> bound = bounds.length == 0
+                ? Argument.OBJECT_ARGUMENT
+                : toArgument(null, bounds[0], substitutions, resolving, false);
+            return rebuild(bound, name, combine(bound.getAnnotationMetadata(), ReflectionAnnotations.metadataOf(annotatedType)), bound.getTypeParameters());
         } else if (annotatedType instanceof LazySubstitutingType lst) {
             Map<TypeVariable<?>, AnnotatedType> newSubstitutions;
             if (substitutions.isEmpty()) {
@@ -696,12 +791,12 @@ public final class ReflectionArguments {
                 newSubstitutions.putAll(substitutions);
                 newSubstitutions.putAll(lst.substitutions);
             }
-            return toArgument(name, lst.actual, newSubstitutions, resolving);
+            return toArgument(name, lst.actual, newSubstitutions, resolving, exact);
         } else if (annotatedType instanceof MergedAnnotatedType mat) {
-            Argument<?> argument = toArgument(null, mat.actual, substitutions, resolving);
+            Argument<?> argument = toArgument(null, mat.actual, substitutions, resolving, exact);
             return rebuild(argument, name, combine(argument.getAnnotationMetadata(), ReflectionAnnotations.metadataOf(mat)), argument.getTypeParameters());
         } else {
-            Argument<?> simple = toArgument(null, annotatedType.getType(), substitutions, resolving, false);
+            Argument<?> simple = toArgument(null, annotatedType.getType(), substitutions, resolving, false, exact);
             AnnotationMetadata annotations = ReflectionAnnotations.metadataOf(annotatedType);
             return rebuild(simple, name, combine(annotations, simple.getAnnotationMetadata()), simple.getTypeParameters());
         }
@@ -716,7 +811,7 @@ public final class ReflectionArguments {
      * @return The converted argument
      */
     private static Argument<?> toArgument(@Nullable String name, Type type, Map<TypeVariable<?>, AnnotatedType> substitutions) {
-        return toArgument(name, type, substitutions, Set.of(), true);
+        return toArgument(name, type, substitutions, Set.of(), true, false);
     }
 
     /**
@@ -727,30 +822,41 @@ public final class ReflectionArguments {
      * @param substitutions Type variables to replace
      * @param resolving     The type variables whose bounds are being converted
      * @param declaration   Whether a type variable is the declaration of the variable rather than a use of it
+     * @param exact         Whether a wildcard keeps its bounds and a generic array its component, rather than
+     *                      being read as the bound and as the array of the raw component
      * @return The converted argument
      */
     private static Argument<?> toArgument(@Nullable String name,
                                           Type type,
                                           Map<TypeVariable<?>, AnnotatedType> substitutions,
                                           Set<TypeVariable<?>> resolving,
-                                          boolean declaration) {
+                                          boolean declaration,
+                                          boolean exact) {
         if (type instanceof ParameterizedType pt) {
             Class<?> rawType = getRawType(pt.getRawType());
             TypeVariable<?>[] variables = rawType.getTypeParameters();
             Type[] actualTypeArguments = pt.getActualTypeArguments();
             Argument<?>[] typeArgs = new Argument[actualTypeArguments.length];
             for (int i = 0; i < typeArgs.length; i++) {
-                typeArgs[i] = toArgument(variables.length > i ? variables[i].getName() : null, actualTypeArguments[i], substitutions, resolving, false);
+                typeArgs[i] = toArgument(variables.length > i ? variables[i].getName() : null, actualTypeArguments[i], substitutions, resolving, false, exact);
             }
             return Argument.of(rawType, name, typeArgs);
         } else if (type instanceof GenericArrayType gat) {
-            Argument<?> component = toArgument(null, gat.getGenericComponentType(), substitutions, resolving, false);
-            return arrayOf(component, name, component.getAnnotationMetadata());
+            Argument<?> component = toArgument(null, gat.getGenericComponentType(), substitutions, resolving, false, exact);
+            if (exact) {
+                return arrayOf(component, name, component.getAnnotationMetadata());
+            }
+            return Argument.of(Array.newInstance(component.getType(), 0).getClass(), name, component.getAnnotationMetadata());
         } else if (type instanceof WildcardType wt) {
-            return wildcardOf(name,
-                toArguments(wt.getUpperBounds(), substitutions, resolving),
-                toArguments(wt.getLowerBounds(), substitutions, resolving),
-                AnnotationMetadata.EMPTY_METADATA);
+            if (exact) {
+                return wildcardOf(name,
+                    toArguments(wt.getUpperBounds(), substitutions, resolving),
+                    toArguments(wt.getLowerBounds(), substitutions, resolving),
+                    AnnotationMetadata.EMPTY_METADATA);
+            }
+            Type[] lowerBounds = wt.getLowerBounds();
+            Type[] bounds = lowerBounds.length == 0 ? wt.getUpperBounds() : lowerBounds;
+            return toArgument(name, bounds.length == 0 ? Object.class : bounds[0], substitutions, resolving, false, false);
         } else if (type instanceof Class<?> cl) {
             TypeVariable<?>[] variables = cl.getTypeParameters();
             if (variables.length == 0) {
@@ -760,13 +866,13 @@ public final class ReflectionArguments {
             // arguments the type declares, the way the processors write it
             Argument<?>[] typeArgs = new Argument[variables.length];
             for (int i = 0; i < typeArgs.length; i++) {
-                typeArgs[i] = toArgument(variables[i].getName(), variables[i], Map.of(), resolving, true);
+                typeArgs[i] = toArgument(variables[i].getName(), variables[i], Map.of(), resolving, true, exact);
             }
             return Argument.ofRawType(cl, name, null, typeArgs);
         } else if (type instanceof TypeVariable<?> tv) {
             AnnotatedType sub = substitutions.get(tv);
             if (sub != null) {
-                return toArgument(name, sub, Map.of(), resolving);
+                return toArgument(name, sub, Map.of(), resolving, exact);
             }
             // a variable is an annotated element of its own: `class Bean<@Mark T>` annotates the declaration
             // of the variable rather than any use of it, so only an argument standing for the declaration
@@ -783,7 +889,7 @@ public final class ReflectionArguments {
             AnnotatedType[] annotatedBounds = tv.getAnnotatedBounds();
             Argument<?>[] bounds = new Argument[annotatedBounds.length];
             for (int i = 0; i < annotatedBounds.length; i++) {
-                bounds[i] = toArgument(null, annotatedBounds[i], Map.of(), nested);
+                bounds[i] = toArgument(null, annotatedBounds[i], Map.of(), nested, exact);
             }
             Argument<?> bound = bounds[0];
             return Argument.ofTypeVariable(bound.getType(), name, tv.getName(),
@@ -1089,6 +1195,11 @@ public final class ReflectionArguments {
 
         ReflectionTypeVariable(String name) {
             this.name = name;
+        }
+
+        ReflectionTypeVariable(String name, Type bound) {
+            this.name = name;
+            this.bounds = new Type[]{bound};
         }
 
         @Override

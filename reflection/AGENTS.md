@@ -44,7 +44,7 @@ Consequences for how the code is written:
 | --- | --- |
 | `ReflectionAnnotations` | `AnnotationMetadata` / `AnnotationValue` from an `AnnotatedElement` or annotation instances: stereotypes, repeatable containers, registered defaults, `@NonBinding`; `synthesize` builds an annotation back from a value |
 | `ReflectionAnnotationCustomizer` | the runtime counterpart of the processors' annotation mappers, as a service |
-| `ReflectionArguments` | `Argument` from `AnnotatedType`, `Parameter`, `Field`, `Type`; type variables become placeholders with every bound, wildcards `WildcardArgument`s with their bounds, generic arrays the array of their component; generic super type resolution and `typeClosureOf`; `toType` back to an equal `java.lang.reflect.Type` |
+| `ReflectionArguments` | `Argument` from `AnnotatedType`, `Parameter`, `Field`, `Type`; type variables become placeholders with every bound, wildcards their bound, generic arrays their raw array, and `ofExact` keeps wildcards (`WildcardArgument`) and array components instead; generic super type resolution and `typeClosureOf`; `toType` back to `java.lang.reflect.Type`, `toExactType` back to an equal one |
 | `ReflectionExecutableMethod`, `ReflectionBeanConstructor`, `IntrospectedExecutableMethod` | executables over a `Method`, a `Constructor`, a `BeanMethod` |
 | `ReflectionExecutables` | a `Method` resolved to the best metadata available: bean definition, then introspection, then reflection |
 | `ReflectionBeanIntrospection`, `ReflectiveIntrospection`, `SupplementedBeanIntrospection`, `ReflectionBeanIntrospector`, `MethodHierarchy` | an introspection over a class, and what each level of a method hierarchy declares |

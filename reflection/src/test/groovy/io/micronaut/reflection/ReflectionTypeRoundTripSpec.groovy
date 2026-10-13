@@ -14,10 +14,12 @@ import java.lang.reflect.WildcardType
 import java.util.function.Consumer
 
 /**
- * A type read into an {@link Argument} by {@link ReflectionArguments#of(Type)} renders back, through
- * {@link ReflectionArguments#toType(Argument)}, as the type it was read from: a wildcard keeps its bounds, a
- * variable every bound it declares, an array its component, a raw type stays bare, and a nested type keeps its
- * owner. The argument read is also the one the processors generate for the same declaration.
+ * A type read into an {@link Argument} by {@link ReflectionArguments#ofExact(Type)} renders back, through
+ * {@link ReflectionArguments#toExactType(Argument)}, as the type it was read from: a wildcard keeps its bounds,
+ * a variable every bound it declares, an array its component, a raw type stays bare, and a nested type keeps
+ * its owner. The argument read is also the one the processors generate for the same declaration, while
+ * {@link ReflectionArguments#of(Type)} and {@link ReflectionArguments#toType(Argument)} keep reading a wildcard
+ * as its bound and a generic array as the array of its raw component.
  */
 class ReflectionTypeRoundTripSpec extends AbstractTypeElementSpec {
 
@@ -27,7 +29,7 @@ class ReflectionTypeRoundTripSpec extends AbstractTypeElementSpec {
 
     void "a wildcard bounded above keeps its bound"() {
         given:
-        def argument = ReflectionArguments.of(typeOf("extendsNumber"))
+        def argument = ReflectionArguments.ofExact(typeOf("extendsNumber"))
         def wildcard = argument.typeParameters[0]
 
         expect: "the argument is of the bound, as the processors compile it"
@@ -39,7 +41,7 @@ class ReflectionTypeRoundTripSpec extends AbstractTypeElementSpec {
         ((WildcardArgument) wildcard).lowerBounds.isEmpty()
 
         and: "and renders back as the type it was read from"
-        def rendered = ReflectionArguments.toType(argument)
+        def rendered = ReflectionArguments.toExactType(argument)
         rendered == typeOf("extendsNumber")
         rendered.hashCode() == typeOf("extendsNumber").hashCode()
         rendered.typeName == "java.util.List<? extends java.lang.Number>"
@@ -51,7 +53,7 @@ class ReflectionTypeRoundTripSpec extends AbstractTypeElementSpec {
 
     void "a wildcard bounded below keeps both bounds"() {
         given:
-        def argument = ReflectionArguments.of(typeOf("superBook"))
+        def argument = ReflectionArguments.ofExact(typeOf("superBook"))
         def wildcard = (WildcardArgument) argument.typeParameters[0]
 
         expect: "the argument is of the lower bound, which is what the processors resolve ? super Book to"
@@ -60,7 +62,7 @@ class ReflectionTypeRoundTripSpec extends AbstractTypeElementSpec {
         wildcard.upperBounds*.type == [Object]
 
         and: "and renders back with both"
-        def rendered = ReflectionArguments.toType(argument)
+        def rendered = ReflectionArguments.toExactType(argument)
         rendered == typeOf("superBook")
         rendered.typeName == "java.util.function.Consumer<? super io.micronaut.reflection.Book>"
         ReflectionArguments.toType(argument, false).typeName == "java.util.function.Consumer<io.micronaut.reflection.Book>"
@@ -68,20 +70,20 @@ class ReflectionTypeRoundTripSpec extends AbstractTypeElementSpec {
 
     void "an unbounded wildcard is bounded by Object"() {
         given:
-        def argument = ReflectionArguments.of(typeOf("unbounded"))
+        def argument = ReflectionArguments.ofExact(typeOf("unbounded"))
         def wildcard = (WildcardArgument) argument.typeParameters[0]
 
         expect:
         wildcard.type == Object
         !wildcard.hasLowerBound()
-        ReflectionArguments.toType(argument) == typeOf("unbounded")
-        ReflectionArguments.toType(argument).typeName == "java.util.List<?>"
+        ReflectionArguments.toExactType(argument) == typeOf("unbounded")
+        ReflectionArguments.toExactType(argument).typeName == "java.util.List<?>"
     }
 
     void "a variable keeps every bound it declares, one of them naming it"() {
         given:
         def method = RoundTripTypes.getDeclaredMethod("several")
-        def argument = (GenericPlaceholder) ReflectionArguments.of(method.genericReturnType)
+        def argument = (GenericPlaceholder) ReflectionArguments.ofExact(method.genericReturnType)
 
         expect: "the argument erases to the first bound and keeps both"
         argument.type == Comparable
@@ -90,7 +92,7 @@ class ReflectionTypeRoundTripSpec extends AbstractTypeElementSpec {
         argument.bounds[0].typeParameters[0] instanceof GenericPlaceholder
 
         when:
-        def rendered = (TypeVariable) ReflectionArguments.toType(argument)
+        def rendered = (TypeVariable) ReflectionArguments.toExactType(argument)
 
         then: "the variable renders with both bounds"
         rendered.name == "T"
@@ -102,8 +104,8 @@ class ReflectionTypeRoundTripSpec extends AbstractTypeElementSpec {
         ((ParameterizedType) rendered.bounds[0]).actualTypeArguments[0].is(rendered)
 
         and: "a variable rendered twice is equal to itself"
-        ReflectionArguments.toType(argument) == rendered
-        ReflectionArguments.toType(argument).hashCode() == rendered.hashCode()
+        ReflectionArguments.toExactType(argument) == rendered
+        ReflectionArguments.toExactType(argument).hashCode() == rendered.hashCode()
 
         and: "the erasing rendering is the first bound, the variable inside it erased too"
         ReflectionArguments.toType(argument, false).typeName == "java.lang.Comparable<java.lang.Comparable>"
@@ -111,8 +113,8 @@ class ReflectionTypeRoundTripSpec extends AbstractTypeElementSpec {
 
     void "an array of a variable is a placeholder of the variable"() {
         given:
-        def parameter = ReflectionArguments.argumentsOf(RoundTripTypes.getDeclaredMethod("arrayOfSeveral", Comparable[]))[0]
-        def field = ReflectionArguments.of(typeOf("keys"))
+        def parameter = ReflectionArguments.ofExact(RoundTripTypes.getDeclaredMethod("arrayOfSeveral", Comparable[]).parameters[0].annotatedType)
+        def field = ReflectionArguments.ofExact(typeOf("keys"))
 
         expect:
         parameter instanceof GenericPlaceholder
@@ -123,19 +125,19 @@ class ReflectionTypeRoundTripSpec extends AbstractTypeElementSpec {
         ((GenericPlaceholder) field).variableName == "K"
 
         and: "and renders as an array of the variable"
-        def rendered = ReflectionArguments.toType(parameter)
+        def rendered = ReflectionArguments.toExactType(parameter)
         rendered instanceof GenericArrayType
         rendered.typeName == "T[]"
         ((TypeVariable) ((GenericArrayType) rendered).genericComponentType).bounds*.typeName == ["java.lang.Comparable<T>", "java.io.Serializable"]
-        ReflectionArguments.toType(field).typeName == "K[]"
+        ReflectionArguments.toExactType(field).typeName == "K[]"
         ReflectionArguments.toType(field, false) == Object[]
     }
 
     void "an array of a parameterized type carries the type arguments of its component"() {
         given:
-        def variables = ReflectionArguments.of(typeOf("variableMaps"))
-        def strings = ReflectionArguments.of(typeOf("stringMaps"))
-        def matrix = ReflectionArguments.of(typeOf("matrix"))
+        def variables = ReflectionArguments.ofExact(typeOf("variableMaps"))
+        def strings = ReflectionArguments.ofExact(typeOf("stringMaps"))
+        def matrix = ReflectionArguments.ofExact(typeOf("matrix"))
 
         expect: "the array has the arguments of its component, as the processors write it"
         variables.type == Map[]
@@ -147,45 +149,43 @@ class ReflectionTypeRoundTripSpec extends AbstractTypeElementSpec {
         matrix.typeParameters*.type == [String]
 
         and: "and renders back as a generic array"
-        ReflectionArguments.toType(variables).typeName == "java.util.Map<K, V>[]"
-        ReflectionArguments.toType(variables) instanceof GenericArrayType
-        ReflectionArguments.toType(strings) == typeOf("stringMaps")
-        ReflectionArguments.toType(strings).hashCode() == typeOf("stringMaps").hashCode()
-        ReflectionArguments.toType(matrix) == typeOf("matrix")
-        ReflectionArguments.toType(matrix).typeName == "java.util.List<java.lang.String>[][]"
+        ReflectionArguments.toExactType(variables).typeName == "java.util.Map<K, V>[]"
+        ReflectionArguments.toExactType(variables) instanceof GenericArrayType
+        ReflectionArguments.toExactType(strings) == typeOf("stringMaps")
+        ReflectionArguments.toExactType(strings).hashCode() == typeOf("stringMaps").hashCode()
+        ReflectionArguments.toExactType(matrix) == typeOf("matrix")
+        ReflectionArguments.toExactType(matrix).typeName == "java.util.List<java.lang.String>[][]"
 
-        and: "the erasing rendering is the array of the erased component"
-        ReflectionArguments.toType(variables, false).typeName == "java.util.Map<java.lang.Object, java.lang.Object>[]"
     }
 
     void "a raw type stays bare"() {
         given:
-        def argument = ReflectionArguments.of(typeOf("raw"))
+        def argument = ReflectionArguments.ofExact(typeOf("raw"))
 
         expect: "the argument keeps the variable the type declares, and says it is raw"
         argument.rawType
         argument.typeParameters*.name == ["E"]
 
         and: "and renders back as the bare class"
-        ReflectionArguments.toType(argument) == List
+        ReflectionArguments.toExactType(argument) == List
         ReflectionArguments.toType(argument, false) == List
     }
 
     void "a nested type keeps its owner"() {
         given:
-        def nested = ReflectionArguments.of(typeOf("nested"))
-        def inner = ReflectionArguments.of(typeOf("inner"))
+        def nested = ReflectionArguments.ofExact(typeOf("nested"))
+        def inner = ReflectionArguments.ofExact(typeOf("inner"))
 
         expect: "a type nested in a bare owner renders back equal"
         nested.type == RoundTripTypes.Outer.Nested
         nested.typeParameters*.type == [Integer]
-        ReflectionArguments.toType(nested) == typeOf("nested")
-        ((ParameterizedType) ReflectionArguments.toType(nested)).ownerType == RoundTripTypes.Outer
+        ReflectionArguments.toExactType(nested) == typeOf("nested")
+        ((ParameterizedType) ReflectionArguments.toExactType(nested)).ownerType == RoundTripTypes.Outer
 
         and: "an inner type of a parameterized owner renders with the raw owner: an argument carries no owner arguments"
         inner.type == RoundTripTypes.Outer.Inner
         inner.typeParameters*.type == [Integer]
-        def rendered = (ParameterizedType) ReflectionArguments.toType(inner)
+        def rendered = (ParameterizedType) ReflectionArguments.toExactType(inner)
         rendered.rawType == RoundTripTypes.Outer.Inner
         rendered.actualTypeArguments == [Integer] as Type[]
         rendered.ownerType == RoundTripTypes.Outer
@@ -199,9 +199,9 @@ class ReflectionTypeRoundTripSpec extends AbstractTypeElementSpec {
         expect:
         argument.typeParameters[0] instanceof GenericPlaceholder
         ((GenericPlaceholder) argument.typeParameters[0]).resolved
-        ReflectionArguments.toType(argument) == Types.getDeclaredField("names").genericType
-        ReflectionArguments.toType(argument).typeName == "java.util.List<java.lang.String>"
-        ReflectionArguments.toType(Argument.listOf(String)).typeName == "java.util.List<java.lang.String>"
+        ReflectionArguments.toExactType(argument) == Types.getDeclaredField("names").genericType
+        ReflectionArguments.toExactType(argument).typeName == "java.util.List<java.lang.String>"
+        ReflectionArguments.toExactType(Argument.listOf(String)).typeName == "java.util.List<java.lang.String>"
     }
 
     void "the wildcard read reflectively is the one the processor generates"() {
@@ -227,7 +227,6 @@ class Shelf {
     public void setUnbounded(List<?> unbounded) { this.unbounded = unbounded; }
 }
 ''')
-        BeanIntrospection<?> reflective = ReflectionBeanIntrospection.of(generated.beanType)
 
         expect: "the processor generates a wildcard argument with its bounds"
         def extendsNumber = (WildcardArgument) generated.getRequiredProperty("extendsNumber", List).asArgument().typeParameters[0]
@@ -239,17 +238,39 @@ class Shelf {
         superString.lowerBounds*.type == [String]
         superString.upperBounds*.type == [Object]
 
-        and: "and reflection reads the same"
+        and: "and the exact reading of the field is the same"
         ["extendsNumber", "superString", "unbounded"].every { name ->
             def own = (WildcardArgument) generated.getRequiredProperty(name, Object).asArgument().typeParameters[0]
-            def other = (WildcardArgument) reflective.getRequiredProperty(name, Object).asArgument().typeParameters[0]
+            def other = (WildcardArgument) ReflectionArguments.ofExact(generated.beanType.getDeclaredField(name).annotatedType).typeParameters[0]
             assert other.type == own.type
             assert other.name == own.name
             assert other.upperBounds*.type == own.upperBounds*.type
             assert other.lowerBounds*.type == own.lowerBounds*.type
-            assert ReflectionArguments.toType(other) == ReflectionArguments.toType(own)
+            assert ReflectionArguments.toExactType(other) == ReflectionArguments.toExactType(own)
             true
         }
+    }
+
+    void "the plain conversion keeps reading a wildcard as its bound and a generic array as its raw array"() {
+        given:
+        def wildcard = ReflectionArguments.of(typeOf("extendsNumber"))
+        def lower = ReflectionArguments.of(typeOf("superBook"))
+        def array = ReflectionArguments.of(typeOf("variableMaps"))
+        def field = ReflectionArguments.of(RoundTripTypes.getDeclaredField("keys"))
+
+        expect: "as it did before the exact conversion existed"
+        !(wildcard.typeParameters[0] instanceof WildcardArgument)
+        wildcard.typeParameters[0].type == Number
+        lower.typeParameters[0].type == Book
+        array.type == Map[]
+        array.typeParameters.length == 0
+        !(field instanceof GenericPlaceholder)
+        field.type == Object[]
+
+        and: "and renders a variable with its first bound only"
+        def several = ReflectionArguments.ofExact(RoundTripTypes.getDeclaredMethod("several").genericReturnType)
+        ((TypeVariable) ReflectionArguments.toType(several)).bounds*.typeName == ["java.lang.Comparable<T>"]
+        ReflectionArguments.toType(wildcard) == typeOf("number")
     }
 
     void "the closure of a type carries its arguments into every type above it"() {
@@ -262,22 +283,22 @@ class Shelf {
         closure*.type.containsAll([ArrayList, List, Collection, Iterable, Comparable, Object, RandomAccess, Serializable])
 
         and: "each with the arguments the type gives it"
-        ReflectionArguments.toType(closure.find { it.type == List }).typeName == "java.util.List<io.micronaut.reflection.Book>"
-        ReflectionArguments.toType(closure.find { it.type == Iterable }).typeName == "java.lang.Iterable<io.micronaut.reflection.Book>"
-        ReflectionArguments.toType(closure.find { it.type == Comparable }).typeName == "java.lang.Comparable<io.micronaut.reflection.RoundTripTypes\$Books>"
+        ReflectionArguments.toExactType(closure.find { it.type == List }).typeName == "java.util.List<io.micronaut.reflection.Book>"
+        ReflectionArguments.toExactType(closure.find { it.type == Iterable }).typeName == "java.lang.Iterable<io.micronaut.reflection.Book>"
+        ReflectionArguments.toExactType(closure.find { it.type == Comparable }).typeName == "java.lang.Comparable<io.micronaut.reflection.RoundTripTypes\$Books>"
 
         and: "the arguments of the argument itself are carried, a wildcard among them"
-        def wild = ReflectionArguments.typeClosureOf(ReflectionArguments.of(typeOf("extendsNumber")))
+        def wild = ReflectionArguments.typeClosureOf(ReflectionArguments.ofExact(typeOf("extendsNumber")))
         wild*.type.containsAll([List, Collection, Iterable, Object])
         wild.last().type == Object
-        ReflectionArguments.toType(wild.find { it.type == Iterable }).typeName == "java.lang.Iterable<? extends java.lang.Number>"
+        ReflectionArguments.toExactType(wild.find { it.type == Iterable }).typeName == "java.lang.Iterable<? extends java.lang.Number>"
 
         and: "an interface reaches Object too, and a primitive stands alone"
         ReflectionArguments.typeClosureOf(Argument.of(int))*.type == [int]
         ReflectionArguments.typeClosureOf(Argument.listOf(String)).last().type == Object
 
         and: "a variable has the super types of the type it is bounded by"
-        def variable = ReflectionArguments.typeClosureOf(ReflectionArguments.of(RoundTripTypes.getDeclaredMethod("several").genericReturnType))
+        def variable = ReflectionArguments.typeClosureOf(ReflectionArguments.ofExact(RoundTripTypes.getDeclaredMethod("several").genericReturnType))
         variable[0] instanceof GenericPlaceholder
         variable*.type == [Comparable, Object]
     }
