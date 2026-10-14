@@ -3,6 +3,7 @@ package io.micronaut.docs.server.functional
 // tag::imports[]
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Value
+import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
@@ -21,6 +22,7 @@ import java.time.Instant
 class ConditionRoutes implements HttpRoutes {
 
     private static final Set<String> SHOPS = ["north", "south"] as Set
+    private static final Argument<Map<String, Object>> ORDER = Argument.mapOf(String, Object)
 
     private final int managementPort
 
@@ -59,6 +61,19 @@ class ConditionRoutes implements HttpRoutes {
             .constrain("file", ValueMatcher.endsWith(".zip")) // <4>
             .handle { request, pathVariables -> text("download " + pathVariables.getString("file")) }
         // end::matchers[]
+
+        // tag::body[]
+        routes.POST("/orders")
+            .where(RouteCondition.body(ORDER) { Map<String, Object> order -> order.kind == "express" }) // <1>
+            .order(-1) // <2>
+            .body(ORDER)
+            .handle { request, pathVariables, Map<String, Object> order -> text("express order " + order.id) }
+        routes.POST("/orders").body(ORDER).handle { request, pathVariables, Map<String, Object> order -> text("order " + order.id) } // <3>
+        routes.POST("/imports")
+            .where(RouteCondition.bodyText { String text -> text.startsWith("id,") }.maxBytes(1024)) // <4>
+            .consumesAll()
+            .handle { request, pathVariables -> text("csv import") }
+        // end::body[]
         // tag::attributes[]
         routes.path("/reports") { reports ->
             reports.attribute("role", "auditor") // <1>

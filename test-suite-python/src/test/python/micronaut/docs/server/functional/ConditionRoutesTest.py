@@ -3,7 +3,7 @@ from typing import Annotated
 import java
 from jakarta.inject import Inject
 from micronaut.context.annotation import Property
-from micronaut.http import HttpRequest, HttpStatus
+from micronaut.http import HttpRequest, HttpStatus, MediaType
 from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.http.client.exceptions import HttpClientResponseException
@@ -15,6 +15,7 @@ from org.junit.jupiter.api import Test
 from .ConditionRoutes import ConditionRoutes
 
 URI = java.type("java.net.URI")
+Map = java.type("java.util.Map")
 
 
 @Property(name="spec.name", value="ConditionRoutesTest")
@@ -57,6 +58,15 @@ class ConditionRoutesTest:
         assert http.retrieve(HttpRequest.GET("/downloads/app.zip").header("X-Channel", "beta").header("X-Forwarded-For", "203.0.113.9")) == "download app.zip"
         assert self._status(HttpRequest.GET("/downloads/app.zip")) == HttpStatus.NOT_FOUND
         assert self._status(HttpRequest.GET("/downloads/app.txt").header("X-Channel", "beta")) == HttpStatus.NOT_FOUND
+
+    @Test
+    def a_condition_on_the_body_selects_the_route(self):
+        http = self.client.toBlocking()
+        assert http.retrieve(HttpRequest.POST("/orders", Map.of("kind", "express", "id", 1))) == "express order 1"
+        assert http.retrieve(HttpRequest.POST("/orders", Map.of("kind", "standard", "id", 2))) == "order 2"
+        assert http.retrieve(HttpRequest.POST("/imports", "id,name\n1,lamp").contentType(MediaType.TEXT_PLAIN_TYPE)) == "csv import"
+        assert self._status(HttpRequest.POST("/imports", "name,id").contentType(MediaType.TEXT_PLAIN_TYPE)) == HttpStatus.NOT_FOUND
+        assert self._status(HttpRequest.POST("/imports", "id," + "x" * 2048).contentType(MediaType.TEXT_PLAIN_TYPE)) == HttpStatus.NOT_FOUND
 
     @Test
     def a_filter_reads_the_attributes_of_the_route(self):

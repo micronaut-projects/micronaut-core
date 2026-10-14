@@ -3,6 +3,7 @@ package io.micronaut.docs.server.functional
 // tag::imports[]
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Value
+import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
@@ -49,6 +50,19 @@ class ConditionRoutes(@Value("\${management.port}") private val managementPort: 
             .constrain("file", ValueMatcher.endsWith(".zip")) // <4>
             .handle { request, pathVariables -> text("download " + pathVariables.getString("file")) }
         // end::matchers[]
+
+        // tag::body[]
+        routes.POST("/orders")
+            .where(RouteCondition.body(ORDER) { order -> order["kind"] == "express" }) // <1>
+            .order(-1) // <2>
+            .body(ORDER)
+            .handle { request, pathVariables, order -> text("express order " + order["id"]) }
+        routes.POST("/orders").body(ORDER).handle { request, pathVariables, order -> text("order " + order["id"]) } // <3>
+        routes.POST("/imports")
+            .where(RouteCondition.bodyText { text -> text.startsWith("id,") }.maxBytes(1024)) // <4>
+            .consumesAll()
+            .handle { request, pathVariables -> text("csv import") }
+        // end::body[]
         // tag::attributes[]
         routes.path("/reports") { reports ->
             reports.attribute("role", "auditor") // <1>
@@ -74,6 +88,7 @@ class ConditionRoutes(@Value("\${management.port}") private val managementPort: 
 
     companion object {
         private val SHOPS = setOf("north", "south")
+        private val ORDER: Argument<Map<String, Any>> = Argument.mapOf(String::class.java, Any::class.java)
 
         private fun text(text: String): HttpResponse<*> = HttpResponse.ok(text).contentType(MediaType.TEXT_PLAIN_TYPE)
     }

@@ -5,17 +5,20 @@ from typing import Annotated
 import java
 from jakarta.inject import Singleton
 from micronaut.context.annotation import Value
+from micronaut.core.type import Argument
 from micronaut.http import HttpResponse, HttpStatus, MediaType
 from micronaut.web.router import RouteAttributes
 from micronaut.web.router.builder import HttpRouteBuilder, HttpRoutes, RouteCondition, ValueMatcher
 
 Instant = java.type("java.time.Instant")
 Long = java.type("java.lang.Long")
+Object = java.type("java.lang.Object")
 Set = java.type("java.util.Set")
 String = java.type("java.lang.String")
 # end::imports[]
 
 SHOPS = Set.of("north", "south")
+ORDER = Argument.mapOf(String, Object)
 
 
 def text(text: str) -> HttpResponse:
@@ -60,6 +63,18 @@ class ConditionRoutes(HttpRoutes):
             .constrain("file", ValueMatcher.endsWith(".zip"))  # <4>
             .handle(lambda request, path_variables: text("download " + path_variables.getString("file"))))
         # end::matchers[]
+        # tag::body[]
+        (routes.POST("/orders")
+            .where(RouteCondition.body(ORDER, lambda order: order.get("kind") == "express"))  # <1>
+            .order(-1)  # <2>
+            .body(ORDER)
+            .handle(lambda request, path_variables, order: text(f"express order {order.get('id')}")))
+        routes.POST("/orders").body(ORDER).handle(lambda request, path_variables, order: text(f"order {order.get('id')}"))  # <3>
+        (routes.POST("/imports")
+            .where(RouteCondition.bodyText(lambda body: body.startswith("id,")).maxBytes(1024))  # <4>
+            .consumesAll()
+            .handle(lambda request, path_variables: text("csv import")))
+        # end::body[]
         # tag::attributes[]
         def report_routes(reports):
             reports.attribute("role", "auditor")  # <1>
