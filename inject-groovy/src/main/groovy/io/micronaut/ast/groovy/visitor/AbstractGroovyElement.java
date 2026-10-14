@@ -346,7 +346,9 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
         ClassNode placeholderClassNode = placeholderUse != null ? placeholderUse : genericsType.getType();
         String variableName = genericsType.getName();
 
-        ClassElement resolvedBound = parentTypeArguments.get(variableName);
+        // the variables of a type written raw are its own, whatever the parent binds a variable of the same name to:
+        // a Child<V> extends HashMap keeps the V of HashMap raw
+        ClassElement resolvedBound = isRawType ? null : parentTypeArguments.get(variableName);
         List<GroovyClassElement> bounds = null;
         Element declaredElement = this;
         GroovyClassElement resolved = null;
