@@ -1,6 +1,41 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== Buffered JSON stream responses require a list type (5.3)
+
+The JDK HTTP client now uses the shared JSON stream message body reader. For an `application/x-json-stream` response, `retrieve(request, Book.class)` no longer returns only the first JSON value. Retrieve `Argument.listOf(Book.class)` to read the complete stream, or use `jsonStream(request, Book.class)` to consume individual values as they arrive.
+
+=== The application context is built with the loader of the main class (5.3)
+
+`Micronaut.run(Application.class)`, and any `ApplicationContextBuilder.mainClass(...)`, now builds the context with the class loader of the main class when that loader is the loader of `micronaut-inject` or one of its descendants, unless a class loader was set explicitly with `classLoader(...)`, by the caller or by an api:context.ApplicationContextConfigurer[]. Previously the builder always used the loader of `micronaut-inject`. This only changes anything for an application whose main class is loaded by a child of that loader, for example by a plugin or deployment class loader: its beans, configuration files and services are now found through that loader. A main class of a parent loader, or of a loader beside it, still leaves the loader of `micronaut-inject`.
+
+=== The shared bean introspector indexes the introspections of each class loader once (5.3)
+
+The introspections that the shared api:core.beans.BeanIntrospector[] finds through a class loader other than its own, the thread context loader when `micronaut.introspections.use.context.classloader` is set or the loader of a bean type, are now indexed once per loader instead of on every lookup. An introspection that a class loader only makes visible after the first lookup through it, for example in a jar added to a `URLClassLoader` later, is not found until that loader is invalidated, which only a development launcher does.
+
+=== `FileChangedEvent` paths are absolute, and changes are coalesced and delayed (5.3)
+
+The api:scheduling.io.watch.DefaultWatchThread[] that publishes a api:scheduling.io.watch.event.FileChangedEvent[] for the directories of `micronaut.io.watch.paths` now registers them with the api:scheduling.io.watch.FileWatcher[] of the context, which changes the events it publishes:
+
+* The path of an event is absolute and normalized. Previously it was the path the watch service reports, relative to the directory the file is in, for example `application.yml` rather than `/home/me/app/src/main/resources/application.yml`. A listener that compares the path with a relative one should resolve that one first, for example with `Path.toAbsolutePath().normalize()`.
+* Events are coalesced. Several events for the same path in quick succession are published as one: a file created and then modified as `CREATE`, a file modified and then deleted as `DELETE`, a file deleted and created again as `MODIFY`, and a file created and deleted again is not published at all.
+* Events are published once no further change was seen for the quiet period, `micronaut.io.watch.quiet-period` (120 milliseconds by default), instead of as soon as the watch service reports them, so that the events of one save are published together.
+
+The api:scheduling.io.watch.FileWatcher[] is a bean whenever a watch service is, that is unless `micronaut.io.watch.enabled` is `false`, and no longer requires `micronaut.io.watch.paths`. Nor does api:scheduling.io.watch.FileWatchConfiguration[], so that the check interval and the quiet period apply to the file watcher without watch paths; a bean that required the configuration to tell whether watch paths are set should require `micronaut.io.watch.paths` instead. The watch service bean, created by api:scheduling.io.watch.WatchServiceFactory[] (or the factory of `micronaut-runtime-osx`), no longer requires the paths either; it is only created when it is injected, and the file watcher only obtains it, and starts its thread, when a component first registers a directory. The constructors of `DefaultWatchThread` and `MacOsWatchThread` that take a `WatchService`, and the methods `getWatchService()`, `registerPath(Path)` and `closeWatchService()` they use, are deprecated: the thread registers with the file watcher instead.
+
+=== The built-in load balancers look up the discovery clients without a Reactor chain (5.3)
+
+The built-in load balancers and composite clients implement the new experimental `AsyncLoadBalancer`, `AsyncDiscoveryClient` and `AsyncConfigurationClient` interfaces, and `DefaultAsyncFunctionDiscoveryClient` serves the `@FunctionClient` methods that return a `CompletionStage` or a value. They call the `DiscoveryClient` beans that do not implement `AsyncDiscoveryClient` through their publishers, with a plain subscriber. When such a publisher is a Reactor publisher, its Reactor context holds the propagated context of the request, but no longer the other entries of the Reactor context of the caller. The `LoadBalancer`, `DiscoveryClient`, `ConfigurationClient` and `FunctionDiscoveryClient` interfaces are unchanged, and a load balancer that does not implement `AsyncLoadBalancer` is selected through its publisher as before.
+
+=== The management endpoints call the `CompletionStage` methods of their SPIs (5.3)
+
+`HealthIndicator`, `HealthAggregator`, `InfoSource`, `InfoAggregator` and `LoggersManager` have experimental `CompletionStage` counterparts of their publisher methods (`getResultAsync`, `aggregateAsync`, `getSourceAsync`, `getLoggersAsync` and `getLoggerAsync`), which adapt the publisher methods by default. The health, info and loggers endpoints call them, and still return a single result `Publisher`.
+
+* `DefaultHealthAggregator`, `ReactiveInfoAggregator`, `DiscoveryClientHealthIndicator` and `JdbcIndicator` combine the stages without a publisher. A subclass of them is called through its publisher methods, including `aggregateResults`, so that its overrides keep working.
+* The results of the indicators are aggregated in the order of the indicators rather than in the order they complete. When two results have the same name, the one of the later indicator is kept.
+* A mock indicator, source, aggregator or loggers manager that stubs only the publisher methods does not run the default `*Async` methods: a Spock or Mockito mock returns `null`, or a stage completed with `null`, and the endpoints then call the publisher methods instead.
+* An indicator that throws from `getResult()` fails the aggregation, rather than throwing out of `aggregate(..)`.
+
 === Refreshing the Logback configuration follows Logback's own lookup (5.3)
 
 When any `logger.*` property is set, the Micronaut framework resets Logback and configures it again. Previously that refresh used the first `Configurator` service regardless of its rank and of the status it returned, and otherwise the file set with `logback.configurationFile` or `logger.config`, or `logback.xml`. Now, unless a Logback XML configuration file is set in Micronaut configuration, the refresh configures Logback the same way Logback configures itself at startup:
@@ -16,6 +51,18 @@ A `logback.xml` file in the working directory is still used when nothing else se
 A file set with `logger.config`, or with `logback.configurationFile` in Micronaut configuration unless its value is exactly that of the JVM system property of the same name, now takes precedence over any `Configurator` service, and startup still fails when it does not exist or cannot be parsed. The logging system of the loggers management endpoint now honors `logback.configurationFile` as well.
 
 That logging system, `io.micronaut.management.endpoint.loggers.impl.LogbackLoggingSystem`, is created by the Micronaut framework when the loggers endpoint is enabled. Its public constructor, which reads only `logger.config`, is deprecated for removal, and with `null` it no longer defaults to `logback.xml`: the refresh then configures Logback the way Logback configures itself at startup. Do not construct the class: obtain the bean from the application context, for example by injecting `LoggingSystem` or `ManagedLoggingSystem`, or replace it with a bean of your own that implements both, annotated with `@Replaces(LogbackLoggingSystem.class)`, rather than extending it.
+
+=== The event streams of the HTTP client follow the Server-Sent Events specification (5.3)
+
+The `eventStream` methods of api:http.client.sse.SseClient[] in the Netty client now decode the body as the https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation[event stream interpretation] of the Server-Sent Events specification, like `exchangeEventStream` and the server-sent events of the api:http.client.AsyncStreamingHttpClient[]. The body is still read as an event stream whatever the content type of the response, and an error status still fails the stream. A subscriber can observe these changes:
+
+* A comment line, such as a `: ping` heartbeat, is ignored. Previously a comment followed by a blank line was emitted as an event with empty data.
+* The `id` of an event carries over to the events that follow it until another `id` line, as the last event id of the specification. Previously only the event with the `id` line had an id.
+* The name of an `event:` line and the value of an `id:` line are no longer trimmed: only the one space after the colon is removed.
+* A `data` line without a colon adds an empty line to the data of the event, and a blank line after an event without data no longer fails the stream with a `NullPointerException`: an event without data is not emitted.
+* A carriage return alone ends a line, as a line feed or a carriage return followed by a line feed does. A leading byte order mark is skipped, an `id` containing a null character and a `retry` that is not a number are ignored.
+* When the request accepts an event stream, `dataStream` and `exchangeStream` split the body into lines at a carriage return alone as well.
+* The line limit (`micronaut.http.client.max-content-length`) applies to each line and to the data of one event. Exceeding it fails `eventStream` with a api:http.client.exceptions.ContentLengthExceededException[], an `HttpClientException`, instead of an `HttpClientException` ("Error consuming Server Sent Events") that wraps a `BufferLengthExceededException`.
 
 === Construct advice no longer wraps injection and `@PostConstruct` (5.3)
 
@@ -552,3 +599,13 @@ If the previous behavior is desired, configure the retryable annotation explicit
 In Micronaut Framework 4, a Kotlin `suspend` route ignored ann:scheduling.annotation.ExecuteOn[] and the `micronaut.server.thread-selection` setting: the route ran on the event loop and resumed on `Dispatchers.Default`. In Micronaut 5 the selected executor is applied, and it is also the dispatcher the coroutine resumes on.
 
 This changes which thread a `suspend` route runs on for applications that annotate one with ann:scheduling.annotation.ExecuteOn[], or that set `micronaut.server.thread-selection` to `AUTO`, `IO` or `BLOCKING` (the default is `MANUAL`, which selects no executor and is unaffected). To keep a `suspend` route on the event loop under `AUTO`, annotate it with ann:core.annotation.NonBlocking[].
+
+==== JDK HTTP client pipeline options
+
+The JDK HTTP client preserves its existing redirect, request-timeout, and error-body behaviour by default. The following experimental options enable the corresponding shared-pipeline behaviour:
+
+* `micronaut.http.client.jdk.apply-request-timeout`: applies the configured `request-timeout` to the entire exchange.
+* `micronaut.http.client.jdk.use-micronaut-redirects`: uses Micronaut redirect handling, including its redirect limit and method rewriting rules.
+* `micronaut.http.client.jdk.decode-error-type`: decodes error responses using the exchange's error type.
+
+All three options default to `false`. The JDK client also exposes `toAsyncStreaming()` for pulled JSON, byte, and event streams.
