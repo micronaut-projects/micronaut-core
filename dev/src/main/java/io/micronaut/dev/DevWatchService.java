@@ -24,7 +24,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
 import java.nio.file.WatchService;
+import java.util.Locale;
 
 /**
  * The watch service the launcher watches with. On macOS the JDK's service polls, every ten seconds
@@ -51,7 +53,7 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      */
     static DevWatchService create() throws IOException {
         ClassLoader loader = DevWatchService.class.getClassLoader();
-        if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac") && ClassUtils.isPresent(MAC_SERVICE, loader)) {
+        if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac") && ClassUtils.isPresent(MAC_SERVICE, loader)) {
             try {
                 return MacOs.create();
             } catch (Exception | LinkageError e) {
@@ -83,7 +85,7 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
         static DirectoryWatcher.WatchKeyRegistrar registrar() {
             return (directory, service) -> directory.register(
                 service,
-                new java.nio.file.WatchEvent.Kind<?>[] {StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY},
+                new WatchEvent.Kind<?>[] {StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY},
                 com.sun.nio.file.SensitivityWatchEventModifier.HIGH
             );
         }
