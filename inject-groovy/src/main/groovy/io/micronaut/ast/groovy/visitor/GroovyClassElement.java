@@ -373,7 +373,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         if (ArrayUtils.isNotEmpty(interfaces)) {
             return Arrays.stream(interfaces)
                 .filter(inf -> !inf.getName().equals("groovy.lang.GroovyObject"))
-                .map(inf -> newClassElement(inf, getTypeArguments()))
+                .map(inf -> newClassElement(asSupertypeUsage(inf), getTypeArguments()))
                 .toList();
         }
         return Collections.emptyList();
@@ -383,9 +383,25 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     public Optional<ClassElement> getSuperType() {
         final ClassNode superClass = classNode.getUnresolvedSuperClass();
         if (superClass != null && !superClass.equals(ClassHelper.OBJECT_TYPE)) {
-            return Optional.of(newClassElement(superClass, getTypeArguments()));
+            return Optional.of(newClassElement(asSupertypeUsage(superClass), getTypeArguments()));
         }
         return Optional.empty();
+    }
+
+    /**
+     * The node of a supertype as the usage it was written as. A generic supertype written with its type arguments
+     * resolves to a node of its own, with those arguments, that redirects to the declaration; one written raw
+     * resolves to the node of the declaration itself, whose generics types are the declared variables. A plain
+     * reference to the declaration carries no generics types, which is how a raw usage is told apart.
+     *
+     * @param supertype The resolved supertype node
+     * @return The usage
+     */
+    private static ClassNode asSupertypeUsage(ClassNode supertype) {
+        if (supertype.redirect() == supertype && ArrayUtils.isNotEmpty(supertype.getGenericsTypes())) {
+            return supertype.getPlainNodeReference();
+        }
+        return supertype;
     }
 
     @NonNull
