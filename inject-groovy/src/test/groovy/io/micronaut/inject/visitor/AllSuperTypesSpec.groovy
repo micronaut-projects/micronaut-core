@@ -139,6 +139,26 @@ class Child extends Holder<java.util.List> {}
         !object.isAssignable(Runnable)
     }
 
+    void "a lattice of diamonds is walked once"() {
+        given:
+        ClassElement top = buildClassElement('test.Top', '''
+package test
+
+interface A0 {}\ninterface B0 {}\ninterface A1 extends A0, B0 {}\ninterface B1 extends A0, B0 {}\ninterface A2 extends A1, B1 {}\ninterface B2 extends A1, B1 {}\ninterface A3 extends A2, B2 {}\ninterface B3 extends A2, B2 {}\ninterface A4 extends A3, B3 {}\ninterface B4 extends A3, B3 {}\ninterface A5 extends A4, B4 {}\ninterface B5 extends A4, B4 {}\ninterface A6 extends A5, B5 {}\ninterface B6 extends A5, B5 {}\ninterface A7 extends A6, B6 {}\ninterface B7 extends A6, B6 {}\ninterface A8 extends A7, B7 {}\ninterface B8 extends A7, B7 {}\ninterface A9 extends A8, B8 {}\ninterface B9 extends A8, B8 {}\ninterface A10 extends A9, B9 {}\ninterface B10 extends A9, B9 {}\ninterface A11 extends A10, B10 {}\ninterface B11 extends A10, B10 {}\ninterface A12 extends A11, B11 {}\ninterface B12 extends A11, B11 {}\ninterface A13 extends A12, B12 {}\ninterface B13 extends A12, B12 {}\ninterface A14 extends A13, B13 {}\ninterface B14 extends A13, B13 {}
+class Top implements A14, B14 {}
+''')
+
+        when:
+        def types = top.getAllSuperTypes()
+
+        then:
+        types.size() == 32
+        types.collect { it.name }.toUnique() == types.collect { it.name }
+        types[1].name == 'test.A14'
+        types[2].name == 'test.A13'
+        types.last().name == 'java.lang.Object'
+    }
+
     private static ClassElement field(ClassElement holder, String name) {
         holder.getEnclosedElements(ElementQuery.ALL_FIELDS).find { it.name == name }.genericType
     }

@@ -128,6 +128,26 @@ class Holder {
         answers == [true, true, true, true, true]
     }
 
+    void "a lattice of diamonds is walked once"() {
+        given:
+        List<String> names = []
+        buildClassElement('test.Top', '''
+package test
+
+interface A0\ninterface B0\ninterface A1 : A0, B0\ninterface B1 : A0, B0\ninterface A2 : A1, B1\ninterface B2 : A1, B1\ninterface A3 : A2, B2\ninterface B3 : A2, B2\ninterface A4 : A3, B3\ninterface B4 : A3, B3\ninterface A5 : A4, B4\ninterface B5 : A4, B4\ninterface A6 : A5, B5\ninterface B6 : A5, B5\ninterface A7 : A6, B6\ninterface B7 : A6, B6\ninterface A8 : A7, B7\ninterface B8 : A7, B7\ninterface A9 : A8, B8\ninterface B9 : A8, B8\ninterface A10 : A9, B9\ninterface B10 : A9, B9\ninterface A11 : A10, B10\ninterface B11 : A10, B10\ninterface A12 : A11, B11\ninterface B12 : A11, B11\ninterface A13 : A12, B12\ninterface B13 : A12, B12\ninterface A14 : A13, B13\ninterface B14 : A13, B13
+class Top : A14, B14
+''') { top ->
+            names.addAll(top.getAllSuperTypes().collect { it.name })
+        }
+
+        expect:
+        names.size() == 32
+        names.toUnique() == names
+        names[1] == 'test.A14'
+        names[2] == 'test.A13'
+        names.last() == 'java.lang.Object'
+    }
+
     private static ClassElement field(ClassElement holder, String name) {
         holder.getEnclosedElements(ElementQuery.ALL_FIELDS).find { it.name == name }.genericType
     }

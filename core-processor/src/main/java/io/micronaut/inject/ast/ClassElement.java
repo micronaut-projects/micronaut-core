@@ -763,7 +763,8 @@ public interface ClassElement extends TypedElement {
      * All the super types of this type: the type itself first, then every interface it implements and class it
      * extends, transitively, each with its type arguments written in the type arguments of this type, and
      * {@code Object} last. The super types are listed as they are declared, the interfaces of a type before its
-     * super class, and a type reached more than once, as the two sides of a diamond reach it, is listed once.
+     * super class, and a type reached more than once, as the two sides of a diamond reach it, is listed once,
+     * where it is reached first.
      *
      * <p>The arguments of a super type are resolved against the path that reaches it, as
      * {@link #getAllTypeArguments()} resolves them: a {@code Child} that extends {@code Base} with {@code String}
@@ -776,6 +777,9 @@ public interface ClassElement extends TypedElement {
      * arguments, and answers {@code true} to {@link #isRawType()}. An array has no super type but {@code Object},
      * and its element type is not walked; a primitive has none at all.</p>
      *
+     * <p>No language reports {@code Object} as a super type element, so it is listed as {@link #of(Class)}
+     * answers it: by name and assignability, without its members.</p>
+     *
      * @return The type and its super types, in declaration order and with {@code Object} last
      * @since 5.3.0
      */
@@ -783,44 +787,65 @@ public interface ClassElement extends TypedElement {
     default List<ClassElement> getAllSuperTypes() {
         List<ClassElement> result = new ArrayList<>();
         result.add(this);
-        boolean object = Object.class.getName().equals(getName()) && !isArray();
-        if (!object && !isArray() && !isPrimitive()) {
+        if (isArray()) {
+            // Only Object
+        } else if (isPrimitive()) {
+            return result;
+        } else if (Object.class.getName().equals(getName())) {
+            return result;
+        } else {
             Set<String> seen = new HashSet<>();
             seen.add(superTypeKey(this));
-            boolean raw = isRawType();
-            // Every super type comes back written in the variables of the type that reaches it, and this type
-            // binds those variables, so one binding brings each super type into this type's arguments
-            Map<String, ClassElement> ownTypeArguments = getTypeArguments();
-            Stream.concat(
-                getInterfaces().stream(),
-                getSuperType().stream()
-            ).forEach(superType -> {
-                for (ClassElement type : superType.getAllSuperTypes()) {
-                    if (Object.class.getName().equals(type.getName()) && !type.isArray()) {
-                        continue;
-                    }
-                    Map<String, ClassElement> typeArguments = type.getTypeArguments();
-                    ClassElement resolved = type;
-                    if (raw) {
-                        if (!typeArguments.isEmpty()) {
-                            resolved = type.withTypeArguments(Collections.emptyMap());
-                        }
-                    } else {
-                        Map<String, ClassElement> bound = TypeVariableBinder.bind(typeArguments, ownTypeArguments);
-                        if (bound != typeArguments) {
-                            resolved = type.withTypeArguments(bound);
-                        }
-                    }
-                    if (seen.add(superTypeKey(resolved))) {
-                        result.add(resolved);
-                    }
-                }
-            });
+            collectSuperTypes(this, getTypeArguments(), isRawType(), seen, result);
         }
-        if (!object && (isArray() || !isPrimitive())) {
-            result.add(ClassElement.of(Object.class));
-        }
+        result.add(ClassElement.of(Object.class));
         return result;
+    }
+
+    /**
+     * Collects the super types of a type into the result, each written in the arguments of the type the walk
+     * started from, through one walk of the hierarchy: a super type reached again, by another path, is neither
+     * listed nor walked again.
+     *
+     * @param type     The type whose direct super types are collected
+     * @param bindings What the variables of the type are bound to, by name, in the arguments of the first type
+     * @param raw      Whether the type is raw, or is reached through a raw type, which erases its super types
+     * @param seen     The keys of the types listed so far
+     * @param result   The types listed so far
+     */
+    private static void collectSuperTypes(ClassElement type,
+                                          Map<String, ClassElement> bindings,
+                                          boolean raw,
+                                          Set<String> seen,
+                                          List<ClassElement> result) {
+        Stream.concat(
+            type.getInterfaces().stream(),
+            type.getSuperType().stream()
+        ).forEach(superType -> {
+            if (Object.class.getName().equals(superType.getName()) && !superType.isArray()) {
+                return;
+            }
+            // The arguments of a direct super type are written in the variables of the type, which the bindings
+            // resolve, so one binding brings the super type into the arguments of the first type
+            Map<String, ClassElement> typeArguments = superType.getTypeArguments();
+            Map<String, ClassElement> resolvedArguments = typeArguments;
+            ClassElement resolved = superType;
+            if (raw) {
+                if (!typeArguments.isEmpty()) {
+                    resolvedArguments = Collections.emptyMap();
+                    resolved = superType.withTypeArguments(resolvedArguments);
+                }
+            } else {
+                resolvedArguments = TypeVariableBinder.bind(typeArguments, bindings);
+                if (resolvedArguments != typeArguments) {
+                    resolved = superType.withTypeArguments(resolvedArguments);
+                }
+            }
+            if (seen.add(superTypeKey(resolved))) {
+                result.add(resolved);
+                collectSuperTypes(superType, resolvedArguments, raw || superType.isRawType(), seen, result);
+            }
+        });
     }
 
     /**
