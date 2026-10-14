@@ -26,3 +26,4 @@ io.micronaut.python.annotation.processing.test.AnnotationMemberDefaultsSpec$Defa
 io.micronaut.python.annotation.processing.test.ProduceBeansSpec$ProducerModuleVisitor
 io.micronaut.python.annotation.processing.test.bridge.PublicMethodCallerVisitor
 io.micronaut.python.annotation.processing.test.visitorintegration.OptionsRecordingVisitor
+io.micronaut.python.annotation.processing.test.annotate.SubclassMemberAnnotationMutationSpec$MarkingVisitor
