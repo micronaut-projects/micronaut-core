@@ -230,15 +230,21 @@ abstract class AbstractJdkHttpClient {
         // the redirects are followed by the JDK client, as they always were, unless the client
         // pipeline follows them, see AbstractHttpClient, with the configuration and the options
         // of an exchange
-        this.jdkConfiguration = configuration instanceof JdkHttpClientConfiguration jdkClientConfiguration
-            ? jdkClientConfiguration.getJdk()
-            : Objects.requireNonNullElseGet(defaultJdkConfiguration, JdkHttpClientConfiguration.JdkConfiguration::new);
+        this.jdkConfiguration = jdkConfiguration(configuration, defaultJdkConfiguration);
         this.micronautRedirects = jdkConfiguration.isUseMicronautRedirects();
         HttpClient.Redirect redirect = configuration.isFollowRedirects() && !micronautRedirects ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER;
         this.client = buildClient(redirect, true);
         Supplier<HttpClient> rawNoRedirect = SupplierUtil.memoized(() -> buildClient(HttpClient.Redirect.NEVER, false));
         this.rawClient = redirect == HttpClient.Redirect.NORMAL ? SupplierUtil.memoized(() -> buildClient(redirect, false)) : rawNoRedirect;
         this.rawNoRedirectClient = rawNoRedirect;
+    }
+
+    private static JdkHttpClientConfiguration.JdkConfiguration jdkConfiguration(HttpClientConfiguration configuration,
+                                                                       JdkHttpClientConfiguration.@Nullable JdkConfiguration defaultJdkConfiguration) {
+        if (configuration instanceof JdkHttpClientConfiguration jdkClientConfiguration) {
+            return jdkClientConfiguration.getJdk();
+        }
+        return defaultJdkConfiguration != null ? defaultJdkConfiguration : new JdkHttpClientConfiguration.JdkConfiguration();
     }
 
     private HttpClient buildClient(HttpClient.Redirect redirect, boolean cookies) {
