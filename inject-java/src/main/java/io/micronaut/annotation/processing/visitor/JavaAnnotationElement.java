@@ -20,10 +20,12 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.ast.AnnotationElement;
 import io.micronaut.inject.ast.AnnotationMemberElement;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.utils.DefaultAnnotationMemberElement;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
@@ -58,13 +60,33 @@ final class JavaAnnotationElement extends JavaClassElement implements Annotation
     JavaAnnotationElement(JavaNativeElement.Class nativeElement,
                           ElementAnnotationMetadataFactory annotationMetadataFactory,
                           JavaVisitorContext visitorContext) {
-        super(nativeElement, annotationMetadataFactory, visitorContext);
+        this(nativeElement, annotationMetadataFactory, visitorContext, 0, null);
+    }
+
+    /**
+     * @param nativeElement The native element
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext The visitor context
+     * @param arrayDimensions The number of array dimensions
+     * @param doc The optional documentation
+     */
+    JavaAnnotationElement(JavaNativeElement.Class nativeElement,
+                          ElementAnnotationMetadataFactory annotationMetadataFactory,
+                          JavaVisitorContext visitorContext,
+                          int arrayDimensions,
+                          @Nullable String doc) {
+        // an annotation type cannot be generic, so the type arguments can be ignored
+        super(nativeElement, annotationMetadataFactory, visitorContext, Collections.emptyList(), Collections.emptyMap(), arrayDimensions, false, doc);
     }
 
     @Override
     protected JavaClassElement copyThis() {
-        // an annotation type cannot be generic, so the type arguments can be ignored
-        return new JavaAnnotationElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext);
+        return copyArrayTypeAnnotations(new JavaAnnotationElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions, doc));
+    }
+
+    @Override
+    public ClassElement withArrayDimensions(int arrayDimensions) {
+        return copyArrayTypeAnnotations(new JavaAnnotationElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions, doc));
     }
 
     @Override

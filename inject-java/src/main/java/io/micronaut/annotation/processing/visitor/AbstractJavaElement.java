@@ -339,7 +339,9 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                     return new JavaAnnotationElement(
                         new JavaNativeElement.Class(typeElement, type, owner),
                         elementAnnotationMetadataFactory,
-                        visitorContext
+                        visitorContext,
+                        0,
+                        doc
                     );
                 }
                 return new JavaClassElement(
