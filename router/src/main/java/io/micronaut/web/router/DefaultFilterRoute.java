@@ -55,6 +55,7 @@ final class DefaultFilterRoute implements FilterRoute {
     private final boolean isPreMatching;
     private @Nullable String matchingAnnotation;
     // computed from the patterns and the pattern style on the first match, reset when they change
+    @SuppressWarnings("java:S3077") // the matcher is immutable, only the reference is written
     private volatile @Nullable FilterPatternMatcher patternMatcher;
 
     DefaultFilterRoute(Supplier<GenericHttpFilter> filter, AnnotationMetadataResolver annotationMetadataResolver, boolean isPreMatching) {
