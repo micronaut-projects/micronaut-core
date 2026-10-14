@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
@@ -133,9 +134,10 @@ final class GroovyWildcardElement extends GroovyClassElement implements Wildcard
     @Override
     public boolean hasExplicitUpperBound() {
         // An unbounded wildcard is given Object as its only upper bound; the resolved type
-        // may still be the bound of the type parameter the wildcard stands for
+        // may still be the bound of the type parameter the wildcard stands for. A bound that is a type
+        // variable is named after its erasure, Object for an unbounded one, and is still a bound
         return lowerBounds.isEmpty()
-            && !(upperBounds.size() == 1 && upperBounds.get(0).getName().equals("java.lang.Object"));
+            && !(upperBounds.size() == 1 && !(upperBounds.get(0) instanceof GenericPlaceholderElement) && upperBounds.get(0).getName().equals("java.lang.Object"));
     }
 
     @Override

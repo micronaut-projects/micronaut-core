@@ -16,6 +16,8 @@
 package io.micronaut.context.propagation.instrument.execution
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Bean
+import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.BeanCreatedEvent
@@ -24,15 +26,18 @@ import io.micronaut.core.order.Ordered
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.scheduling.instrument.InstrumentedExecutorService
 import io.micronaut.scheduling.instrument.InstrumentedScheduledExecutorService
+import jakarta.inject.Named
+import jakarta.inject.Singleton
 import spock.lang.Issue
 import spock.lang.Specification
 
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 
 class ExecutorServiceInstrumenterSpec extends Specification {
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/11653")
-    void "test ExecutorServiceInstrumenter instruments executor service if other instrumentations are present"() {
+    void "test the context propagation of an ExecutorFactory executor is kept when other instrumentations are present"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run([
                 'spec.name': 'ExecutorServiceInstrumenterSpec'
@@ -40,22 +45,26 @@ class ExecutorServiceInstrumenterSpec extends Specification {
 
         when:
         ExecutorService io = applicationContext.getBean(ExecutorService, Qualifiers.byName("io"))
+        ExecutorService first = (io as InstrumentedExecutorService).getTarget()
 
         then:"The last instrumentation is applied"
         io instanceof InstrumentedExecutorService
-
-        and:"The context propagation instrumentation is applied"
-        (io as InstrumentedExecutorService).getTarget() instanceof ContextPropagatingExecutorService
+        !(io instanceof ContextPropagatingExecutorService)
 
         and:"The first instrumentation is applied"
-        ((io as InstrumentedExecutorService).getTarget() as InstrumentedExecutorService).getTarget() instanceof InstrumentedExecutorService
+        first instanceof InstrumentedExecutorService
+        !(first instanceof ContextPropagatingExecutorService)
+
+        and:"The context propagation instrumentation is applied by the factory, innermost, so the other instrumentations run with the context on the worker"
+        (first as InstrumentedExecutorService).getTarget() instanceof ContextPropagatingExecutorService
+        ContextPropagatingExecutorService.isInstrumented(io)
 
         cleanup:
         applicationContext.close()
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/11653")
-    void "test ExecutorServiceInstrumenter instruments scheduled executor service if other instrumentations are present"() {
+    void "test the context propagation of an ExecutorFactory scheduled executor is kept when other instrumentations are present"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run([
                 'spec.name': 'ExecutorServiceInstrumenterSpec'
@@ -63,18 +72,55 @@ class ExecutorServiceInstrumenterSpec extends Specification {
 
         when:
         ExecutorService scheduled = applicationContext.getBean(ExecutorService, Qualifiers.byName("scheduled"))
+        ExecutorService first = (scheduled as InstrumentedExecutorService).getTarget()
 
         then:"The last instrumentation is applied"
         scheduled instanceof InstrumentedScheduledExecutorService
-
-        and:"The context propagation instrumentation is applied"
-        (scheduled as InstrumentedExecutorService).getTarget() instanceof ContextPropagatingScheduledExecutorService
+        !(scheduled instanceof ContextPropagatingExecutorService)
 
         and:"The first instrumentation is applied"
-        ((scheduled as InstrumentedExecutorService).getTarget() as InstrumentedExecutorService).getTarget() instanceof InstrumentedScheduledExecutorService
+        first instanceof InstrumentedScheduledExecutorService
+        !(first instanceof ContextPropagatingExecutorService)
+
+        and:"The context propagation instrumentation is applied by the factory, innermost"
+        (first as InstrumentedExecutorService).getTarget() instanceof ContextPropagatingScheduledExecutorService
 
         cleanup:
         applicationContext.close()
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/11653")
+    void "test ExecutorServiceInstrumenter instruments an application executor service if other instrumentations are present"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run([
+                'spec.name': 'ExecutorServiceInstrumenterSpec'
+        ])
+
+        when:
+        ExecutorService custom = applicationContext.getBean(ExecutorService, Qualifiers.byName("custom"))
+
+        then:"The last instrumentation is applied"
+        custom instanceof InstrumentedExecutorService
+
+        and:"The context propagation instrumentation is applied"
+        (custom as InstrumentedExecutorService).getTarget() instanceof ContextPropagatingExecutorService
+
+        and:"The first instrumentation is applied"
+        ((custom as InstrumentedExecutorService).getTarget() as InstrumentedExecutorService).getTarget() instanceof InstrumentedExecutorService
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    @Requires(property = 'spec.name', value = 'ExecutorServiceInstrumenterSpec')
+    @Factory
+    static class CustomExecutorFactory {
+        @Singleton
+        @Named("custom")
+        @Bean(preDestroy = "shutdown")
+        ExecutorService custom() {
+            return Executors.newSingleThreadExecutor()
+        }
     }
 
     abstract static class ExecutorServiceInstrumentation implements BeanCreatedEventListener<ExecutorService>, Ordered {
