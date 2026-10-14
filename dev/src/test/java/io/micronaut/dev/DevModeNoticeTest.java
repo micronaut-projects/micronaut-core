@@ -4,7 +4,6 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import io.micronaut.dev.manifest.DevReloadStrategy;
 import io.micronaut.dev.http.DevAccessLinks;
 import io.micronaut.dev.manifest.DevManifest;
 import org.junit.jupiter.api.AfterEach;
@@ -81,17 +80,11 @@ class DevModeNoticeTest {
             assertEquals(Level.INFO, notice.getLevel());
             assertEquals(DevRuntime.class.getName(), notice.getLoggerName());
             String text = notice.getFormattedMessage();
-            assertTrue(text.contains("'dev' environment is active, with micronaut.dev.enabled=true"), text);
-            assertTrue(text.contains("strategy: restart"), text);
-            // the application has an HTTP server, whose requests a failed compilation answers
-            assertTrue(text.contains("answered with the compiler's"), text);
-            assertTrue(text.contains("in production"), text);
-            // the link to the development pages with this launch's token: the endpoint, since there is no Control Panel
+            // the link to the development pages with this launch's token: the endpoint, since there is no Control Panel;
+            // the launcher binds the server to the loopback address, so no warning, and no LiveReload server runs
             int port = runtime.awaitGeneration(1, Duration.ofSeconds(1)).getBean(io.micronaut.runtime.server.EmbeddedServer.class).getPort();
-            assertTrue(text.contains("      http://localhost:" + port + "/dev?token=" + runtime.access().token() + System.lineSeparator()), text);
-            // the launcher binds the server to the loopback address unless told otherwise
-            assertTrue(text.contains("    - the HTTP server listens on localhost:" + port + System.lineSeparator()), text);
-            assertFalse(text.contains("other machines"), text);
+            assertEquals(DevModeNotice.HEADLINE + System.lineSeparator()
+                + "Development pages: http://localhost:" + port + "/dev?token=" + runtime.access().token(), text);
             assertEquals("localhost", runtime.awaitGeneration(1, Duration.ofSeconds(1)).getEnvironment().getProperty("micronaut.server.host", String.class).orElseThrow());
 
             // a reload starts generation two without logging the note again
@@ -106,18 +99,10 @@ class DevModeNoticeTest {
     }
 
     @Test
-    void theNoticeListsOnlyWhatTheLaunchHas() {
-        String text = DevModeNotice.text(DevReloadStrategy.RELOAD, OptionalInt.empty(), false, false, null);
-        assertTrue(text.contains(DevModeNotice.HEADLINE), text);
-        assertTrue(text.contains("strategy: reload"), text);
-        assertFalse(text.contains("compiler's"), text);
-        assertFalse(text.contains("LiveReload"), text);
-        String withServer = DevModeNotice.text(DevReloadStrategy.RESTART, OptionalInt.of(35729), true, true, null);
-        assertTrue(withServer.contains("a LiveReload server listens on port 35729, and HTML pages load its script"), withServer);
-        // micronaut.dev.livereload.inject-script=false: the server runs, the pages are left alone
-        String noScript = DevModeNotice.text(DevReloadStrategy.RESTART, OptionalInt.of(35729), true, false, null);
-        assertTrue(noScript.contains("a LiveReload server listens on port 35729" + System.lineSeparator()), noScript);
-        assertFalse(noScript.contains("load its script"), noScript);
+    void theNoticeIsTheHeadlineAndTheLiveReloadServerWhenItRuns() {
+        assertEquals(DevModeNotice.HEADLINE, DevModeNotice.text(OptionalInt.empty(), null));
+        assertEquals(DevModeNotice.HEADLINE + System.lineSeparator() + "LiveReload server listening on port 35729",
+            DevModeNotice.text(OptionalInt.of(35729), null));
     }
 
     private List<ILoggingEvent> notices() {
@@ -138,20 +123,19 @@ class DevModeNoticeTest {
     }
 
     @Test
-    void theNoticeShowsTheLinkWithTheTokenAndTheAddressTheServerListensOn() {
-        String text = DevModeNotice.text(DevReloadStrategy.RESTART, OptionalInt.empty(), true, false,
-            new DevAccessLinks.Link("http://localhost:8080/control-panel?token=abc", "localhost:8080", false, true));
-        assertTrue(text.contains("    - the HTTP server listens on localhost:8080" + System.lineSeparator()), text);
-        assertTrue(text.contains("    - the development pages need this launch's access token; open:" + System.lineSeparator()
-            + "      http://localhost:8080/control-panel?token=abc" + System.lineSeparator()), text);
-        assertFalse(text.contains("other machines"), text);
+    void theNoticeShowsOneLineWithTheTokenAndWarnsOnlyWhenOtherMachinesReachTheServer() {
+        String text = DevModeNotice.text(OptionalInt.of(35729),
+            new DevAccessLinks.Link("http://localhost:8080/control-panel?token=abc", "localhost:8080", false));
+        assertEquals(DevModeNotice.HEADLINE + System.lineSeparator()
+            + "Development pages: http://localhost:8080/control-panel?token=abc" + System.lineSeparator()
+            + "LiveReload server listening on port 35729", text);
 
-        String everywhere = DevModeNotice.text(DevReloadStrategy.RESTART, OptionalInt.empty(), true, false,
-            new DevAccessLinks.Link("http://localhost:8080/dev", "all interfaces (*:8080)", true, false));
-        assertTrue(everywhere.contains("listens on all interfaces (*:8080): other machines can reach it;"), everywhere);
-        assertTrue(everywhere.contains("set micronaut.server.host=localhost"), everywhere);
-        assertTrue(everywhere.contains("need no access token (micronaut.dev.access-token.enabled=false)"), everywhere);
-        assertTrue(everywhere.contains("      http://localhost:8080/dev" + System.lineSeparator()), everywhere);
+        String everywhere = DevModeNotice.text(OptionalInt.empty(),
+            new DevAccessLinks.Link("http://localhost:8080/dev", "all interfaces (*:8080)", true));
+        assertEquals(DevModeNotice.HEADLINE + System.lineSeparator()
+            + "Development pages: http://localhost:8080/dev" + System.lineSeparator()
+            + "HTTP server listening on all interfaces (*:8080), reachable from other machines: set micronaut.server.host=localhost to restrict it",
+            everywhere);
     }
 
     @Test
@@ -160,7 +144,7 @@ class DevModeNoticeTest {
         try {
             int port = runtime.awaitGeneration(1, Duration.ofSeconds(1)).getBean(io.micronaut.runtime.server.EmbeddedServer.class).getPort();
             String text = notices().get(0).getFormattedMessage();
-            assertTrue(text.contains("    - the HTTP server listens on all interfaces (*:" + port + "): other machines can reach it;"), text);
+            assertTrue(text.contains("HTTP server listening on all interfaces (*:" + port + "), reachable from other machines"), text);
             assertTrue(runtime.awaitGeneration(1, Duration.ofSeconds(1)).getEnvironment().getProperty("micronaut.server.host", String.class).isEmpty());
         } finally {
             runtime.close();
@@ -173,8 +157,9 @@ class DevModeNoticeTest {
         try {
             int port = runtime.awaitGeneration(1, Duration.ofSeconds(1)).getBean(io.micronaut.runtime.server.EmbeddedServer.class).getPort();
             String text = notices().get(0).getFormattedMessage();
-            assertTrue(text.contains("    - the HTTP server listens on 127.0.0.1:" + port + System.lineSeparator()), text);
-            assertTrue(text.contains("      http://127.0.0.1:" + port + "/dev?token="), text);
+            // a loopback address: the link names it, and no warning
+            assertTrue(text.contains("Development pages: http://127.0.0.1:" + port + "/dev?token="), text);
+            assertFalse(text.contains("reachable from other machines"), text);
         } finally {
             runtime.close();
         }
