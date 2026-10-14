@@ -170,7 +170,7 @@ internal open class KotlinClassElement(
 
     private val declaredNativeProperties: List<PropertyElement> by lazy {
         declaration.getDeclaredProperties()
-            .filter { !it.isPrivate() && !hasAnnotation(it, JvmField::class.java) }
+            .filter { !it.isPrivate() && it.extensionReceiver == null && !hasAnnotation(it, JvmField::class.java) }
             .map {
                 KotlinPropertyElement(
                     this,
@@ -351,7 +351,7 @@ internal open class KotlinClassElement(
             return declaredNativeProperties
         }
         return declaration.getDeclaredProperties()
-            .filter { !it.isPrivate() && !hasAnnotation(it, JvmField::class.java) }
+            .filter { !it.isPrivate() && it.extensionReceiver == null && !hasAnnotation(it, JvmField::class.java) }
             .map {
                 KotlinPropertyElement(
                     owningType,
@@ -945,8 +945,10 @@ internal open class KotlinClassElement(
                 }
 
                 PropertyElement::class.java -> {
+                    // A member extension property compiles to accessors taking the receiver
+                    // as a parameter, so like a Java getter with a parameter it is not a property
                     classNode.getDeclaredProperties().filter {
-                        !it.isJavaPackagePrivate() && !it.annotations.any { ann -> ann.shortName.asString() == JvmField::class.java.simpleName }
+                        it.extensionReceiver == null && !it.isJavaPackagePrivate() && !it.annotations.any { ann -> ann.shortName.asString() == JvmField::class.java.simpleName }
                     }.toList()
                 }
 
