@@ -52,7 +52,7 @@ public final class TypeHierarchies {
     public static final String RECORD_SUFFIX = "$TypeHierarchy";
 
     private static final String SERVICE_NAME = TypeHierarchy.class.getName();
-    private static final String ENCODED_PREFIX = "$$";
+    private static final String RELOCATED_PREFIX = "$$";
 
     // the names of the records of a class loader, by the name of the type each describes; strings only, so that the
     // loader stays collectable
@@ -122,9 +122,11 @@ public final class TypeHierarchies {
 
     /**
      * The name of the record of a type. A record written into the package of the type is named after the type,
-     * {@code com.example.$Foo$TypeHierarchy} for {@code com.example.Foo}; one written into another package, as a record
-     * of a public class of a library or of the JDK is, carries the whole name of the type encoded in its own, with
-     * {@code _} for a dot and {@code __} for an underscore, {@code com.example.$$java_util_ArrayList$TypeHierarchy}.
+     * {@code com.example.$Foo$TypeHierarchy} for {@code com.example.Foo}. A record written into another package, as a
+     * record of a public class of a library or of the JDK is, goes into a sub-package of that package named after
+     * the package of the type, with {@code $$} in front of its first segment: {@code com.example.$$java.util.$ArrayList$TypeHierarchy}.
+     * Every segment stays a Java identifier, so no character of a type name is escaped and the type name reads back
+     * without ambiguity; a source package whose segment starts with {@code $$} is not expected.
      *
      * @param typeName      The name of the type
      * @param recordPackage The package the record is written into
@@ -134,11 +136,14 @@ public final class TypeHierarchies {
     public static String recordClassName(String typeName, String recordPackage) {
         int lastDot = typeName.lastIndexOf('.');
         String typePackage = lastDot < 0 ? "" : typeName.substring(0, lastDot);
-        String prefix = recordPackage.isEmpty() ? "" : recordPackage + '.';
-        if (typePackage.equals(recordPackage)) {
-            return prefix + '$' + typeName.substring(lastDot + 1) + RECORD_SUFFIX;
+        String simpleName = typeName.substring(lastDot + 1);
+        if (typePackage.equals(recordPackage) || typePackage.isEmpty()) {
+            // a type of the default package cannot be named from another package: its record stays there
+            String prefix = typePackage.isEmpty() ? "" : typePackage + '.';
+            return prefix + '$' + simpleName + RECORD_SUFFIX;
         }
-        return prefix + ENCODED_PREFIX + typeName.replace("_", "__").replace('.', '_') + RECORD_SUFFIX;
+        String prefix = recordPackage.isEmpty() ? "" : recordPackage + '.';
+        return prefix + RELOCATED_PREFIX + typePackage + ".$" + simpleName + RECORD_SUFFIX;
     }
 
     /**
@@ -153,33 +158,22 @@ public final class TypeHierarchies {
             return null;
         }
         String name = recordClassName.substring(0, recordClassName.length() - RECORD_SUFFIX.length());
-        int dollar = name.indexOf('$');
-        if (dollar < 0 || (dollar > 0 && name.charAt(dollar - 1) != '.')) {
+        int lastDot = name.lastIndexOf('.');
+        String lastSegment = name.substring(lastDot + 1);
+        if (lastSegment.length() < 2 || lastSegment.charAt(0) != '$') {
             return null;
         }
-        String recordPackage = dollar == 0 ? "" : name.substring(0, dollar - 1);
-        String rest = name.substring(dollar + 1);
-        if (rest.isEmpty()) {
+        String simpleName = lastSegment.substring(1);
+        String packages = lastDot < 0 ? "" : name.substring(0, lastDot);
+        int relocated = packages.startsWith(RELOCATED_PREFIX) ? 0 : packages.indexOf("." + RELOCATED_PREFIX);
+        if (relocated < 0) {
+            return packages.isEmpty() ? simpleName : packages + '.' + simpleName;
+        }
+        String typePackage = packages.substring(relocated == 0 ? RELOCATED_PREFIX.length() : relocated + 1 + RELOCATED_PREFIX.length());
+        if (typePackage.isEmpty() || typePackage.startsWith(".")) {
             return null;
         }
-        if (rest.charAt(0) != '$') {
-            return recordPackage.isEmpty() ? rest : recordPackage + '.' + rest;
-        }
-        StringBuilder typeName = new StringBuilder(rest.length());
-        for (int i = 1; i < rest.length(); i++) {
-            char c = rest.charAt(i);
-            if (c == '_') {
-                if (i + 1 < rest.length() && rest.charAt(i + 1) == '_') {
-                    typeName.append('_');
-                    i++;
-                } else {
-                    typeName.append('.');
-                }
-            } else {
-                typeName.append(c);
-            }
-        }
-        return typeName.toString();
+        return typePackage + '.' + simpleName;
     }
 
     private static Map<String, String> index(ClassLoader classLoader) {
