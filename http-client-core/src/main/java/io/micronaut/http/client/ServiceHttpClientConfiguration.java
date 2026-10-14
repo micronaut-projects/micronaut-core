@@ -166,7 +166,8 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         if (sslConfiguration != null) {
             setSslConfiguration(sslConfiguration);
         }
-        this.connectionPoolConfiguration = Objects.requireNonNullElseGet(connectionPoolConfiguration, ServiceConnectionPoolConfiguration::new);
+        this.connectionPoolConfiguration = connectionPoolConfiguration == null ?
+                new ServiceConnectionPoolConfiguration(defaultHttpClientConfiguration) : connectionPoolConfiguration;
         this.webSocketCompressionConfiguration = Objects.requireNonNullElseGet(webSocketCompressionConfiguration, ServiceWebSocketCompressionConfiguration::new);
         this.http2Configuration = http2Configuration == null ?
                 new ServiceHttp2ClientConfiguration(defaultHttpClientConfiguration) : http2Configuration;
@@ -310,6 +311,21 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      */
     @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
     public static class ServiceConnectionPoolConfiguration extends ConnectionPoolConfiguration {
+        /**
+         * Default constructor.
+         */
+        public ServiceConnectionPoolConfiguration() {
+        }
+
+        /**
+         * Creates a service configuration initialized from the default HTTP client configuration.
+         *
+         * @param defaultConfiguration The default HTTP client configuration
+         */
+        @Inject
+        public ServiceConnectionPoolConfiguration(HttpClientConfiguration defaultConfiguration) {
+            super(defaultConfiguration.getConnectionPoolConfiguration());
+        }
     }
 
     /**
