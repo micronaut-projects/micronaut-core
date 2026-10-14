@@ -20,6 +20,7 @@ import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.conditions.MatchesDynamicCondition;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
@@ -87,6 +88,7 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
      * @param failedInitialization        The failure of the static initialization, if any
      * @since 5.3.0
      */
+    @UsedByGeneratedCode
     protected AbstractInitializableBeanDefinitionAndReference(Class<T> beanType,
                                                               @Nullable MethodOrFieldReference constructor,
                                                               @Nullable AnnotationMetadata annotationMetadata,
