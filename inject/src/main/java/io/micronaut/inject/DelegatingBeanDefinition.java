@@ -167,6 +167,11 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
+    default List<Argument<?>> getTypeClosure() {
+        return getTarget().getTypeClosure();
+    }
+
+    @Override
     default Argument<T> getDeclaredBeanType() {
         // the declaration is the target's: a raw type or a variable is only known to it
         return getTarget().getDeclaredBeanType();

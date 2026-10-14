@@ -38,6 +38,7 @@ import io.micronaut.inject.qualifiers.EachBeanQualifier;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -102,6 +103,30 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
     public List<Argument<?>> getTypeArguments(String type) {
         List<Argument<?>> arguments = typeArgumentsMap.get(type);
         return arguments == null ? getTarget().getTypeArguments(type) : arguments;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The closure of the target, with the arguments this delegate remaps in place of the recorded ones.</p>
+     */
+    @Override
+    public List<Argument<?>> getTypeClosure() {
+        List<Argument<?>> closure = getTarget().getTypeClosure();
+        if (typeArgumentsMap.isEmpty()) {
+            return closure;
+        }
+        List<Argument<?>> remapped = new ArrayList<>(closure.size());
+        for (Argument<?> superType : closure) {
+            Class<?> keyType = superType.getType();
+            while (keyType.isArray()) {
+                keyType = keyType.getComponentType();
+            }
+            List<Argument<?>> arguments = typeArgumentsMap.get(keyType.getName());
+            remapped.add(arguments == null || superType.getType().isArray() ? superType
+                : Argument.of(superType.getType(), superType.getAnnotationMetadata(), arguments.toArray(Argument.ZERO_ARGUMENTS)));
+        }
+        return remapped;
     }
 
     @Override
