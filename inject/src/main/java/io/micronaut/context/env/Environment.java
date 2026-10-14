@@ -391,6 +391,39 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, R
     }
 
     /**
+     * The configuration files the environment looked for when it last read its property sources, whether it found
+     * them or not: the application and bootstrap files of each configuration location, of each active environment
+     * and in each format a {@link PropertySourceLoader} reads, the files {@code micronaut.config.files} names, and
+     * the files a {@code micronaut.config.import} imports from the class path or the file system, an optional import
+     * of a file that did not exist included. Creating, changing or deleting one of these files changes what a
+     * refresh reads.
+     *
+     * <p>A location is {@code classpath:} followed by the path of a resource below the root of the class path, or
+     * {@code file:} followed by an absolute path, with forward slashes in both.</p>
+     *
+     * @return The locations
+     * @since 5.3.0
+     */
+    @Experimental
+    default Set<String> getConfigurationLocations() {
+        return Set.of();
+    }
+
+    /**
+     * Whether a location is one of the {@link #getConfigurationLocations() configuration locations}: a
+     * {@code classpath:} or {@code classpath*:} resource path, or a {@code file:} path or a plain file path, which
+     * a relative path names from the working directory.
+     *
+     * @param location The location
+     * @return Whether the environment looked for configuration there
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean isConfigurationLocation(String location) {
+        return getConfigurationLocations().contains(location);
+    }
+
+    /**
      * Retrieves the conversion service instance associated with the environment.
      *
      * @return A {@link io.micronaut.core.convert.ConversionService} that allows adding new type converters.
