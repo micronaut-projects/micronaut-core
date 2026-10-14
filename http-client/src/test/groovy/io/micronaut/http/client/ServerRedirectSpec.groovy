@@ -51,43 +51,43 @@ class ServerRedirectSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer httpsServer =
-            ApplicationContext.run(EmbeddedServer, [
-                    'spec.name': 'ServerRedirectSpec.https',
-                    'micronaut.server.ssl.enabled': true,
-                    'micronaut.server.ssl.buildSelfSigned': true,
-                    'micronaut.server.ssl.port': -1,
-            ])
-
-    @Shared
-    @AutoCleanup
     EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer, [
                     'spec.name': 'ServerRedirectSpec',
-                    'micronaut.http.services.https-redirect.url': httpsServer.getURL().toString(),
-                    // SSL of a service client is not enabled by default in 4.x
-                    'micronaut.http.services.https-redirect.ssl.enabled': true,
-                    'micronaut.http.services.https-redirect.ssl.insecure-trust-all-certificates': true,
-                    'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
             ])
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/217")
     void "test https redirect"() {
 
-        given:"An HTTPS URL issues an HTTPS redirect"
-        HttpsRedirectClient httpsRedirectClient = embeddedServer.getApplicationContext().getBean(HttpsRedirectClient)
-        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient, httpsServer.getURL())
-        String declarativeResult = Mono.from(httpsRedirectClient.test()).block()
-        String response = client
-                .toBlocking().retrieve("/")
+        given:"An HTTPS server that redirects to an absolute HTTPS URL"
+        EmbeddedServer httpsServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'ServerRedirectSpec.https',
+                'micronaut.server.ssl.enabled': true,
+                'micronaut.server.ssl.build-self-signed': true,
+                'micronaut.server.ssl.port': -1,
+        ])
+        ApplicationContext clientContext = ApplicationContext.run([
+                'spec.name': 'ServerRedirectSpec.https-client',
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'micronaut.http.services.https-redirect.url': httpsServer.URL.toString(),
+                'micronaut.http.services.https-redirect.ssl.enabled': true,
+                'micronaut.http.services.https-redirect.ssl.insecure-trust-all-certificates': true,
+        ])
+        HttpsRedirectClient declarativeClient = clientContext.getBean(HttpsRedirectClient)
+        HttpClient client = clientContext.createBean(HttpClient, httpsServer.URL)
 
-        expect:"The response was returned and doesn't loop"
-        httpsServer.getURL().toString().startsWith("https://")
-        response == 'secure good'
-        declarativeResult == 'secure good'
+        when:
+        String declarativeResult = Mono.from(declarativeClient.test()).block()
+        String response = client.toBlocking().retrieve(HttpRequest.GET('/https-redirect').accept(MediaType.TEXT_PLAIN_TYPE))
+
+        then:"The response was returned and doesn't loop"
+        response == 'redirected'
+        declarativeResult == 'redirected'
 
         cleanup:
-        client.close()
+        client?.close()
+        clientContext?.close()
+        httpsServer?.close()
     }
 
     @Unroll
@@ -356,31 +356,30 @@ class ServerRedirectSpec extends Specification {
     }
 
     @Requires(property = 'spec.name', value = 'ServerRedirectSpec.https')
-    @Controller
+    @Controller('/https-redirect')
     static class HttpsRedirectController {
-
         private final BeanProvider<EmbeddedServer> embeddedServer
 
         HttpsRedirectController(BeanProvider<EmbeddedServer> embeddedServer) {
             this.embeddedServer = embeddedServer
         }
 
-        @Get
-        HttpResponse home() {
-            // absolute HTTPS location, as a public HTTPS site would send
-            HttpResponse.redirect(embeddedServer.get().getURI().resolve('/secure'))
+        @Get(produces = MediaType.TEXT_PLAIN)
+        HttpResponse<?> index() {
+            // an absolute https URL, like the one www.youtube.com used to answer with
+            HttpResponse.permanentRedirect(UriBuilder.of(embeddedServer.get().URI).path('/https-redirect/target').build())
         }
 
-        @Get("/secure")
-        String secure() {
-            return "secure good"
+        @Get(uri = '/target', produces = MediaType.TEXT_PLAIN)
+        String target() {
+            'redirected'
         }
     }
 
-    @Requires(property = 'spec.name', value = 'ServerRedirectSpec')
-    @Client(id = "https-redirect")
+    @Requires(property = 'spec.name', value = 'ServerRedirectSpec.https-client')
+    @Client(id = 'https-redirect', path = '/https-redirect')
     static interface HttpsRedirectClient {
-        @Get
+        @Get(consumes = MediaType.TEXT_PLAIN)
         @SingleResult
         Publisher<String> test()
     }
