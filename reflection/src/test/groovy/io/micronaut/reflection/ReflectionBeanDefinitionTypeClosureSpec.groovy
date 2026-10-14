@@ -31,4 +31,16 @@ class ReflectionBeanDefinitionTypeClosureSpec extends Specification {
         closure[0].typeParameters[0] instanceof GenericPlaceholder
         closure[0].typeParameters[0].variableName == 'T'
     }
+
+    void "the super types reached through a raw type are raw, as a compiled definition records them"() {
+        given:
+        def closure = ReflectionBeanDefinition.of(RawBox).typeClosure
+
+        expect:
+        closure*.type == [RawBox, Box, View, Object]
+        !closure[0].isRawType()
+        closure[1].isRawType()
+        closure[2].isRawType()
+        closure[2].typeParameters*.type == [Object]
+    }
 }
