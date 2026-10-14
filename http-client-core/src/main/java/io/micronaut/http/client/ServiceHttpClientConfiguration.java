@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.context.ClientContextPathProvider;
@@ -394,15 +393,6 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         this.loadBalancerKeyHeader = loadBalancerKeyHeader;
     }
 
-    /** @param configuration JDK-specific settings for this client */
-    @Inject
-    @Internal
-    public void configureJdk(@Nullable ServiceJdkConfiguration configuration) {
-        if (configuration != null) {
-            setJdk(configuration);
-        }
-    }
-
     /**
      * The default connection pool configuration.
      */
@@ -516,19 +506,4 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         public static class DefaultTrustStoreConfiguration extends SslConfiguration.TrustStoreConfiguration {
         }
     }
-
-    /** JDK-specific client settings. */
-    @ConfigurationProperties("jdk")
-    public static class ServiceJdkConfiguration extends JdkConfiguration {
-        /** Default settings. */
-        public ServiceJdkConfiguration() {
-        }
-
-        /** @param defaults Default client settings */
-        @Inject
-        public ServiceJdkConfiguration(HttpClientConfiguration defaults) {
-            super(defaults.getJdk());
-        }
-    }
-
 }
