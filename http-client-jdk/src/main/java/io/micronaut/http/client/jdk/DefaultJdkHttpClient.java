@@ -105,6 +105,33 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
         JdkClientSslBuilder sslBuilder,
         CookieDecoder cookieDecoder
     ) {
+        this(loadBalancer, httpVersion, configuration, contextPath, filterResolver, clientFilterEntries, mediaTypeCodecRegistry,
+            messageBodyHandlerRegistry, requestBinderRegistry, clientId, conversionService, sslBuilder, cookieDecoder, null);
+    }
+
+    /**
+     * A client whose configuration, when it is not a {@link JdkHttpClientConfiguration}, uses the
+     * given JDK settings: those of the default client of the context, for the clients of the registry.
+     */
+    @SuppressWarnings({"java:S107", "checkstyle:parameternumber"}) // too many parameters
+    DefaultJdkHttpClient(
+        @Nullable LoadBalancer loadBalancer,
+        @Nullable HttpVersionSelection httpVersion,
+        HttpClientConfiguration configuration,
+        @Nullable String contextPath,
+        @Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
+        @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries,
+        @Nullable
+        MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        MessageBodyHandlerRegistry messageBodyHandlerRegistry,
+        RequestBinderRegistry requestBinderRegistry,
+        @Nullable
+        String clientId,
+        ConversionService conversionService,
+        JdkClientSslBuilder sslBuilder,
+        CookieDecoder cookieDecoder,
+        JdkHttpClientConfiguration.@Nullable JdkConfiguration defaultJdkConfiguration
+    ) {
         super(
             configuration,
             LoggerFactory.getLogger(DefaultJdkHttpClient.class),
@@ -125,7 +152,8 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
             clientId,
             conversionService,
             sslBuilder,
-            cookieDecoder
+            cookieDecoder,
+            defaultJdkConfiguration
         );
         this.transport.http = this;
         this.asyncClient = super.toAsyncStreaming();
@@ -301,19 +329,19 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
      * {@link HttpRequestFactory}, and a body that keeps coming is read to its end, as before
      * the JDK client shared the pipeline: no overall timeout is derived from the read timeout,
      * and the request timeout only applies when the configuration opts in, see
-     * {@link HttpClientConfiguration.JdkConfiguration#isApplyRequestTimeout()}.
+     * {@link JdkHttpClientConfiguration.JdkConfiguration#isApplyRequestTimeout()}.
      *
      * @return The request timeout, or {@code null}
      */
     @Override
     protected @Nullable Duration requestTimeout() {
-        return configuration.getJdk().isApplyRequestTimeout() ? configuration.getRequestTimeout() : null;
+        return transport.jdkConfiguration.isApplyRequestTimeout() ? configuration.getRequestTimeout() : null;
     }
 
     /**
      * The JDK client follows the redirects itself, as it always did, unless the configuration
      * opts in to the redirects of the pipeline, see
-     * {@link HttpClientConfiguration.JdkConfiguration#isUseMicronautRedirects()}.
+     * {@link JdkHttpClientConfiguration.JdkConfiguration#isUseMicronautRedirects()}.
      *
      * @param request The request
      * @return Whether its redirects are followed by the pipeline
@@ -354,7 +382,7 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
         // the JDK client returns the response of an error status, decoded into the body type, when
         // it does not fail on an error status
         boolean error = response.code() >= 400 && configuration.isExceptionOnErrorStatus();
-        boolean decodeErrorType = configuration.getJdk().isDecodeErrorType();
+        boolean decodeErrorType = transport.jdkConfiguration.isDecodeErrorType();
         HttpResponseAdapter<O> full = new HttpResponseAdapter<>(
             new BufferedJdkResponse(response.jdkResponse(), bytes),
             error && decodeErrorType ? null : bodyType,
@@ -438,8 +466,9 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
                   @Nullable String clientId,
                   ConversionService conversionService,
                   JdkClientSslBuilder sslBuilder,
-                  CookieDecoder cookieDecoder) {
-            super(log, configuration, mediaTypeCodecRegistry, messageBodyHandlerRegistry, clientId, conversionService, sslBuilder, cookieDecoder);
+                  CookieDecoder cookieDecoder,
+                  JdkHttpClientConfiguration.@Nullable JdkConfiguration defaultJdkConfiguration) {
+            super(log, configuration, mediaTypeCodecRegistry, messageBodyHandlerRegistry, clientId, conversionService, sslBuilder, cookieDecoder, defaultJdkConfiguration);
         }
     }
 
