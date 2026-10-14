@@ -207,7 +207,9 @@ public interface BeanDefinitionRegistry {
      * <p>A single candidate is resolved as it is, and no candidates, or none the qualifier accepts, resolve
      * to empty. When the rules leave more than one candidate the result is a
      * {@link io.micronaut.context.exceptions.NonUniqueBeanException}, unless the qualifier is
-     * {@link io.micronaut.context.annotation.Any}, which takes the first of them.</p>
+     * {@link io.micronaut.context.annotation.Any}, which takes the first of them. Candidates that are all
+     * secondary and that no later rule decides among are non-unique whatever the qualifier, as they are for
+     * a lookup.</p>
      *
      * @param beanType   The requested bean type
      * @param candidates The candidate definitions to choose among
@@ -217,9 +219,11 @@ public interface BeanDefinitionRegistry {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When the rules leave more than one candidate
      * @since 5.3.0
      */
-    <T> Optional<BeanDefinition<T>> findBeanDefinition(Argument<T> beanType,
-                                                       Collection<BeanDefinition<T>> candidates,
-                                                       @Nullable Qualifier<T> qualifier);
+    default <T> Optional<BeanDefinition<T>> findBeanDefinition(Argument<T> beanType,
+                                                               Collection<BeanDefinition<T>> candidates,
+                                                               @Nullable Qualifier<T> qualifier) {
+        throw new UnsupportedOperationException("This implementation of BeanDefinitionRegistry doesn't support resolving among candidate bean definitions");
+    }
 
     /**
      * Obtain a {@link BeanRegistration} for the given bean.
