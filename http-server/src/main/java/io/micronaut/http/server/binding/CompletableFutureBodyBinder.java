@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.binders;
+package io.micronaut.http.server.binding;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -38,18 +38,18 @@ import java.util.concurrent.Future;
  * @since 1.0
  */
 @Internal
-final class NettyCompletableFutureBodyBinder
+public final class CompletableFutureBodyBinder
     implements NonBlockingBodyArgumentBinder<CompletableFuture<?>> {
 
     private static final Argument<CompletableFuture<?>> TYPE = (Argument) Argument.of(CompletableFuture.class);
 
-    private final NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder;
+    private final ServerBodyAnnotationBinder<Object> bodyAnnotationBinder;
 
     /**
-     * @param nettyBodyAnnotationBinder The body binder
+     * @param bodyAnnotationBinder The body binder
      */
-    NettyCompletableFutureBodyBinder(NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder) {
-        this.nettyBodyAnnotationBinder = nettyBodyAnnotationBinder;
+    public CompletableFutureBodyBinder(ServerBodyAnnotationBinder<Object> bodyAnnotationBinder) {
+        this.bodyAnnotationBinder = bodyAnnotationBinder;
     }
 
     @Override
@@ -64,7 +64,7 @@ final class NettyCompletableFutureBodyBinder
 
     @Override
     public BindingResult<CompletableFuture<?>> bind(ArgumentConversionContext<CompletableFuture<?>> context, HttpRequest<?> source) {
-        ServerHttpRequest<?> server = NettyBodyAnnotationBinder.bodyOf(source);
+        ServerHttpRequest<?> server = bodyAnnotationBinder.bodyOf(source);
         if (server != null) {
             ByteBody rootBody = server.byteBody();
             if (rootBody.expectedLength().orElse(-1) == 0) {
@@ -73,12 +73,18 @@ final class NettyCompletableFutureBodyBinder
 
             Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
             Argument<?> targetType = firstTypeParameter.orElse(Argument.OBJECT_ARGUMENT);
-            CompletableFuture<Object> future = InternalByteBody.bufferFlow(rootBody)
-                .map(bytes -> {
+            var flow = InternalByteBody.bufferFlow(rootBody)
+                .flatMap(bytes -> {
                     //noinspection unchecked
-                    Optional<Object> value = nettyBodyAnnotationBinder.transform(source, server, (ArgumentConversionContext<Object>) context.with(targetType), bytes);
-                    return value.orElseThrow(() -> NettyPublisherBodyBinder.extractError(null, context));
-                }).toCompletableFuture();
+                    return bodyAnnotationBinder.transform(source, server, (ArgumentConversionContext<Object>) context.with(targetType), bytes)
+                        .map(value -> value.orElseThrow(() -> PublisherBodyBinder.extractError(null, context)));
+                });
+            CompletableFuture<Object> future = flow.toCompletableFuture();
+            future.whenComplete((value, error) -> {
+                if (future.isCancelled()) {
+                    flow.cancel();
+                }
+            });
             return () -> Optional.of(future);
         } else {
             return BindingResult.empty();

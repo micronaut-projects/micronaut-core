@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.binders;
+package io.micronaut.http.server.binding;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
@@ -32,7 +32,7 @@ import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
-import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.form.FormCapableHttpRequest;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
@@ -48,21 +48,25 @@ import java.util.Optional;
  * @since 4.0.0
  */
 @Internal
-final class NettyPublisherPartUploadBinder implements TypedRequestArgumentBinder<Publisher<?>>, NettyRequestArgumentBinder<Publisher<?>> {
+public final class PublisherPartUploadBinder implements TypedRequestArgumentBinder<Publisher<?>>, FormRequestArgumentBinder<Publisher<?>> {
 
     private static final Argument<Publisher<?>> PUBLISHER_ARGUMENT = (Argument) Argument.of(Publisher.class);
 
     private final ConversionService conversionService;
     private final BeanProvider<FormFactory> formFactory;
 
-    NettyPublisherPartUploadBinder(ConversionService conversionService, BeanProvider<FormFactory> formFactory) {
+    /**
+     * @param conversionService Conversion service
+     * @param formFactory Form utilities
+     */
+    public PublisherPartUploadBinder(ConversionService conversionService, BeanProvider<FormFactory> formFactory) {
         this.conversionService = conversionService;
         this.formFactory = formFactory;
     }
 
     @Override
-    public BindingResult<Publisher<?>> bindForNettyRequest(ArgumentConversionContext<Publisher<?>> context,
-                                                           NettyHttpRequest<?> request) {
+    public BindingResult<Publisher<?>> bindForFormRequest(ArgumentConversionContext<Publisher<?>> context,
+                                                        FormCapableHttpRequest<?> request) {
         if (!request.hasFormBody()) {
             return BindingResult.unsatisfied();
         }
