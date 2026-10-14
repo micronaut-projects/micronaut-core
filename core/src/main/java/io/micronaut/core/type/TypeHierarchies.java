@@ -74,11 +74,12 @@ public final class TypeHierarchies {
         if (classLoader == null) {
             classLoader = TypeHierarchies.class.getClassLoader();
         }
-        Optional<TypeHierarchy> hierarchy = find(type.getName(), classLoader);
+        Optional<TypeHierarchy> hierarchy = find(type.getName(), classLoader).filter(found -> found.getType() == type);
         if (hierarchy.isEmpty()) {
             ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
             if (contextClassLoader != null && contextClassLoader != classLoader) {
-                hierarchy = find(type.getName(), contextClassLoader);
+                // another loader can define a class of the same name: a record of that class is not one of this type
+                hierarchy = find(type.getName(), contextClassLoader).filter(found -> found.getType() == type);
             }
         }
         return hierarchy;
