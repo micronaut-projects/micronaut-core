@@ -261,7 +261,7 @@ public final class EventStreams {
                                                    Argument<B> eventType,
                                                    Headers headers,
                                                    long maxBufferSize) {
-        return EventReader.of(new EventStreamDecoder(maxBufferSize), dataReader(handlerRegistry, eventType, MediaType.APPLICATION_JSON_TYPE, headers));
+        return new EventReader<>(new EventStreamDecoder(maxBufferSize), dataReader(handlerRegistry, eventType, MediaType.APPLICATION_JSON_TYPE, headers));
     }
 
     /**
@@ -463,14 +463,7 @@ public final class EventStreams {
          */
         private byte[] scratch = new byte[0];
 
-        /**
-         * A reader whose ownership passes to the caller, which closes it.
-         */
-        static <B> EventReader<B> of(EventStreamDecoder decoder, Function<byte[], B> dataReader) {
-            return new EventReader<>(decoder, dataReader);
-        }
-
-        private EventReader(EventStreamDecoder decoder, Function<byte[], B> dataReader) {
+        EventReader(EventStreamDecoder decoder, Function<byte[], B> dataReader) {
             this.decoder = decoder;
             this.dataReader = dataReader;
         }

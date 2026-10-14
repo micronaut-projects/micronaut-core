@@ -119,6 +119,84 @@ class AsyncStreamingHttpClientTest {
         assertInstanceOf(AsyncStreamingHttpClient.class, ((StreamingHttpClient) httpClient).toAsyncStreaming());
     }
 
+    @Test
+    void legacyJsonStreamReadsAnArrayAsOneCollection() {
+        List<List<Book>> arrays = Flux.from(((StreamingHttpClient) httpClient).jsonStream(
+            HttpRequest.GET("/async-stream/books-array"), Argument.listOf(Book.class)))
+            .collectList().block(TIMEOUT);
+        assertEquals(1, arrays.size());
+        assertEquals(2, arrays.get(0).size());
+    }
+
+    @Test
+    void legacyJsonStreamSupportsAsynchronousReadersAndTheirContext() {
+        List<DelayedValue> values = Flux.from(((StreamingHttpClient) httpClient).jsonStream(
+            HttpRequest.GET("/async-stream/books-array"), Argument.of(DelayedValue.class)))
+            .contextWrite(reactor.util.context.Context.of("tenant", "expected"))
+            .collectList().block(TIMEOUT);
+        assertEquals(List.of(new DelayedValue("expected")), values);
+    }
+
+    @Test
+    void readerSetupFailureDiscardsTheResponseBody() throws Exception {
+        DelayedReader.failSetup = true;
+        StreamController.setupBodyCancelled = new java.util.concurrent.CountDownLatch(1);
+        try {
+            Exception failure = assertThrows(Exception.class, () -> await(((StreamingHttpClient) httpClient)
+                .toAsyncStreaming().jsonStream(HttpRequest.GET("/async-stream/setup-failure"), DelayedValue.class)));
+            assertTrue(failure.getMessage().contains("reader setup"));
+            assertTrue(StreamController.setupBodyCancelled.await(10, TimeUnit.SECONDS));
+        } finally {
+            DelayedReader.failSetup = false;
+        }
+    }
+
+    @io.micronaut.core.annotation.Internal
+    record DelayedValue(String tenant) {
+    }
+
+    @io.micronaut.core.annotation.Internal
+    @jakarta.inject.Singleton
+    @Requires(property = "spec.name", value = SPEC)
+    @io.micronaut.http.annotation.Consumes(MediaType.APPLICATION_JSON)
+    @io.micronaut.core.annotation.Order(-1000)
+    static class DelayedReader implements io.micronaut.http.body.ChunkedMessageBodyReader<DelayedValue> {
+        static volatile boolean failSetup;
+
+        @Override
+        public io.micronaut.http.body.PieceReader<DelayedValue> openPieceReader(Argument<DelayedValue> type,
+                                                                              MediaType mediaType,
+                                                                              io.micronaut.core.type.Headers headers,
+                                                                              long maxElementSize) {
+            if (failSetup) {
+                throw new IllegalStateException("reader setup");
+            }
+            return null;
+        }
+
+        @Override
+        public boolean isReadable(Argument<DelayedValue> type, MediaType mediaType) {
+            return type.getType() == DelayedValue.class;
+        }
+
+        @Override
+        public DelayedValue read(Argument<DelayedValue> type, MediaType mediaType,
+                                 io.micronaut.core.type.Headers headers, java.io.InputStream input) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Publisher<? extends DelayedValue> readChunked(Argument<DelayedValue> type, MediaType mediaType,
+                                                             io.micronaut.core.type.Headers headers, Publisher<ByteBuffer<?>> input) {
+            return Flux.deferContextual(context -> Flux.from(input).doOnNext(buffer -> {
+                if (buffer instanceof ReferenceCounted counted) {
+                    counted.release();
+                }
+            }).then(reactor.core.publisher.Mono.just(new DelayedValue(context.getOrDefault("tenant", "missing"))))
+                .delayElement(Duration.ofMillis(10)));
+        }
+    }
+
     @ParameterizedTest(autoCloseArguments = false) // closing the view closes the shared client
     @MethodSource("clients")
     void dataStreamReadsTheBody(AsyncStreamingHttpClient client) throws Exception {
@@ -289,6 +367,13 @@ class AsyncStreamingHttpClientTest {
     @Controller("/async-stream")
     static class StreamController {
         static final int MANY = 10_000;
+        static volatile java.util.concurrent.CountDownLatch setupBodyCancelled;
+
+        @Get(value = "/setup-failure", produces = MediaType.APPLICATION_JSON)
+        Publisher<byte[]> setupFailure() {
+            return Flux.just("{}".getBytes(StandardCharsets.UTF_8)).concatWith(Flux.never())
+                .doOnCancel(() -> setupBodyCancelled.countDown());
+        }
 
         private static final AtomicReference<CompletableFuture<Sinks.Many<byte[]>>> SINK =
             new AtomicReference<>(new CompletableFuture<>());
