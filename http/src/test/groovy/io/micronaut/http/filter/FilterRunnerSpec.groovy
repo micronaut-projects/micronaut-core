@@ -35,6 +35,7 @@ import java.util.concurrent.CompletionStage
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeoutException
 import java.util.function.Supplier
 
 class FilterRunnerSpec extends Specification {
@@ -1493,6 +1494,30 @@ class FilterRunnerSpec extends Specification {
         downstreamCancelled
     }
 
+    def 'external timeout of a continuation or its dependent stage cancels downstream'(boolean dependent) {
+        given:
+        DelayedExecutionFlow<HttpResponse<?>> downstream = DelayedExecutionFlow.create()
+        CompletableFuture<HttpResponse<?>> pending
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(CompletionStage, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, CompletionStage)]) { FilterContinuation<CompletionStage<HttpResponse<?>>> continuation ->
+                    def original = continuation.proceed().toCompletableFuture()
+                    pending = dependent ? original.thenApply { it } : original
+                    pending
+                }
+        ]
+        def result = filterRunner(filters, { downstream }).run(HttpRequest.GET("/"))
+
+        when:
+        pending.completeExceptionally(new TimeoutException())
+
+        then:
+        downstream.isCancelled()
+        result.tryCompleteError() instanceof TimeoutException
+
+        where:
+        dependent << [false, true]
+    }
+
     def 'cancelling the filter chain cancels the downstream of a completion stage continuation'() {
         given:
         DelayedExecutionFlow<HttpResponse<?>> downstream = DelayedExecutionFlow.create()
@@ -1846,6 +1871,96 @@ class FilterRunnerSpec extends Specification {
         then:
         marked == [false]
         flow.tryComplete().value.body() == "resp1"
+    }
+
+    def 'the downstream of a completion stage continuation sees the Reactor context of an upstream #kind filter'(boolean legacy, String kind) {
+        given:
+        def req = HttpRequest.GET("/req1")
+        List<GenericHttpFilter> filters = [
+                around(legacy) { request, chain ->
+                    return Mono.from(chain.proceed(request)).contextWrite { it.put('tenant', 'acme') }
+                },
+                before(ReturnType.of(CompletionStage, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, CompletionStage)]) { FilterContinuation<CompletionStage<HttpResponse<?>>> continuation ->
+                    continuation.proceed()
+                }
+        ]
+
+        when:
+        def result = await(filterRunner(filters, {
+            ReactiveExecutionFlow.fromPublisher(Mono.deferContextual { ctx -> Mono.just(HttpResponse.ok(ctx.getOrDefault('tenant', 'MISSING'))) })
+        }).run(req))
+        then:
+        result.value.body() == 'acme'
+
+        where:
+        legacy << [false, true]
+        kind = legacy ? 'legacy' : 'method'
+    }
+
+    def 'the downstream of a completion stage continuation sees the request and propagated context the stage filter changed'() {
+        given:
+        def req = HttpRequest.GET("/req1")
+        def req2 = HttpRequest.GET("/req2")
+        def stageElement = new TestContextElement()
+        def seen = [:]
+        List<GenericHttpFilter> filters = [
+                around(false) { request, chain ->
+                    // the upstream filter stores its propagated context and request in the Reactor context
+                    return Mono.from(chain.proceed(request)).contextWrite {
+                        ReactorPropagation.addPropagatedContext(it, PropagatedContext.getOrEmpty())
+                                .put(ServerRequestContext.KEY, request)
+                                .put('tenant', 'acme')
+                    }
+                },
+                before(ReturnType.of(CompletionStage, Argument.of(HttpResponse)), [Argument.of(io.micronaut.core.propagation.MutablePropagatedContext), Argument.of(FilterContinuation, CompletionStage)]) { mutable, FilterContinuation<CompletionStage<HttpResponse<?>>> continuation ->
+                    mutable.add(stageElement)
+                    continuation.request(req2).proceed()
+                }
+        ]
+
+        when:
+        def result = await(filterRunner(filters, {
+            ReactiveExecutionFlow.fromPublisher(Mono.deferContextual { ctx ->
+                seen.tenant = ctx.getOrDefault('tenant', 'MISSING')
+                seen.element = ReactorPropagation.findContextElement(ctx, TestContextElement).orElse(null)
+                seen.request = ServerRequestContext.currentRequest(ctx).orElse(null)
+                Mono.just(HttpResponse.ok())
+            })
+        }).run(req))
+        then:
+        result.value.status() == HttpStatus.OK
+        seen.tenant == 'acme'
+        seen.element.is(stageElement)
+        seen.request.is(req2)
+    }
+
+    def 'an upstream reactive filter can subscribe again to a downstream with a completion stage continuation'() {
+        given:
+        def invocations = 0
+        def responses = 0
+        List<GenericHttpFilter> filters = [
+                around(false) { request, chain ->
+                    def proceeded = Mono.from(chain.proceed(request)).contextWrite { it.put('tenant', 'acme') }
+                    return proceeded.then(proceeded)
+                },
+                before(ReturnType.of(CompletionStage, Argument.of(HttpResponse)), [Argument.of(FilterContinuation, CompletionStage)]) { FilterContinuation<CompletionStage<HttpResponse<?>>> continuation ->
+                    invocations++
+                    continuation.proceed()
+                }
+        ]
+
+        when:
+        def result = await(filterRunner(filters, {
+            ReactiveExecutionFlow.fromPublisher(Mono.deferContextual { ctx ->
+                responses++
+                Mono.just(HttpResponse.ok(ctx.getOrDefault('tenant', 'MISSING')))
+            })
+        }).run(HttpRequest.GET("/req1")))
+        then:
+        result.error == null
+        result.value.body() == 'acme'
+        invocations == 2
+        responses == 2
     }
 
     private def after(ReturnType returnType, List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {

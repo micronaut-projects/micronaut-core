@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.io.watch.DefaultWatchThread;
 import io.micronaut.scheduling.io.watch.FileWatchCondition;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
+import io.micronaut.scheduling.io.watch.FileWatcher;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.io.IOException;
@@ -47,13 +49,34 @@ import java.nio.file.WatchService;
 @Requires(classes = {MacOSXListeningWatchService.class, Library.class})
 @Singleton
 public class MacOsWatchThread extends DefaultWatchThread {
+
     /**
-     * Default constructor.
+     * Creates the thread over the file watcher of the context, which registers with the native service through
+     * {@link MacOsFileWatcher}.
+     *
+     * @param eventPublisher The event publisher
+     * @param configuration the configuration
+     * @param fileWatcher the file watcher of the context
+     * @since 5.3.0
+     */
+    @Inject
+    public MacOsWatchThread(
+        ApplicationEventPublisher eventPublisher,
+        FileWatchConfiguration configuration,
+        FileWatcher fileWatcher) {
+        super(eventPublisher, configuration, fileWatcher);
+    }
+
+    /**
+     * Creates a thread that watches the native service with a watcher of its own.
      *
      * @param eventPublisher The event publisher
      * @param configuration the configuration
      * @param watchService the watch service
+     * @deprecated Use {@link #MacOsWatchThread(ApplicationEventPublisher, FileWatchConfiguration, FileWatcher)}, so
+     * that the context has one watcher
      */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     public MacOsWatchThread(
         ApplicationEventPublisher eventPublisher,
         FileWatchConfiguration configuration,
@@ -62,6 +85,7 @@ public class MacOsWatchThread extends DefaultWatchThread {
     }
 
     @Override
+    @Deprecated(since = "5.3.0", forRemoval = true)
     protected WatchKey registerPath(Path dir) throws IOException {
         WatchablePath watchPath = new WatchablePath(dir);
         return watchPath.register(
@@ -73,6 +97,7 @@ public class MacOsWatchThread extends DefaultWatchThread {
     }
 
     @Override
+    @Deprecated(since = "5.3.0", forRemoval = true)
     protected void closeWatchService() {
         // no-op - for some reason this causes a JVM crash if not overridden
     }

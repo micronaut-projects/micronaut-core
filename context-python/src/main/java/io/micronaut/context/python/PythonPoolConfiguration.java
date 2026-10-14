@@ -31,6 +31,7 @@ import java.util.List;
  * @param warnWait   The amount of time to wait for a pooled context before a warning is printed. Defaults to two seconds; zero or a negative duration turns the warning off.
  * @param maxEventLoopContexts The most Netty event loops that get a dedicated asyncio context; {@code 0}, the default, gives every event loop one. Event loops beyond the cap run Python through the shared pool and block while a coroutine runs.
  * @param ignoreDependencies The singleton Python dependencies of pooled types not to warn about, by simple or qualified type name; {@code *} warns about none. Read when the Python sources are processed, not at run time: Pyronaut passes it to the compiler as the {@code micronaut.python.pool.ignoreDependencies} annotation processor option.
+ * @param prestart   The number of pooled contexts to create on a background thread once the application has started, so that the first requests find a context ready instead of waiting for one to initialize. Defaults to {@code 1}, or to {@code 0} in the {@code test} environment; {@code 0} turns it off. At most {@code size} contexts are created.
  */
 @ConfigurationProperties(PythonPoolConfiguration.PREFIX)
 @Experimental
@@ -39,7 +40,8 @@ public record PythonPoolConfiguration(
     @Bindable(defaultValue = "0") int size,
     @Bindable(defaultValue = "2s") @Nullable Duration warnWait,
     @Bindable(defaultValue = "0") int maxEventLoopContexts,
-    @Nullable List<String> ignoreDependencies
+    @Nullable List<String> ignoreDependencies,
+    @Nullable Integer prestart
 ) {
     /** The configuration prefix. */
     public static final String PREFIX = "micronaut.python.pool";
@@ -53,6 +55,19 @@ public record PythonPoolConfiguration(
      * @param maxEventLoopContexts The most Netty event loops that get a dedicated asyncio context
      */
     public PythonPoolConfiguration(boolean enabled, int size, @Nullable Duration warnWait, int maxEventLoopContexts) {
-        this(enabled, size, warnWait, maxEventLoopContexts, null);
+        this(enabled, size, warnWait, maxEventLoopContexts, null, null);
+    }
+
+    /**
+     * The configuration with the default number of contexts to pre-start.
+     *
+     * @param enabled Whether pooling is enabled
+     * @param size The size of the pool
+     * @param warnWait The amount of time to wait for a pooled context before a warning is printed
+     * @param maxEventLoopContexts The most Netty event loops that get a dedicated asyncio context
+     * @param ignoreDependencies The singleton Python dependencies of pooled types not to warn about
+     */
+    public PythonPoolConfiguration(boolean enabled, int size, @Nullable Duration warnWait, int maxEventLoopContexts, @Nullable List<String> ignoreDependencies) {
+        this(enabled, size, warnWait, maxEventLoopContexts, ignoreDependencies, null);
     }
 }

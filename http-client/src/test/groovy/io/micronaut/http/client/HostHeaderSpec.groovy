@@ -38,9 +38,31 @@ class HostHeaderSpec extends Specification {
     @Shared
     String host = Optional.ofNullable(System.getenv(Environment.HOSTNAME)).orElse(SocketUtils.LOCALHOST)
 
+    void "fixed-port availability requires permission to bind"() {
+        expect:
+        canBind(0)
+
+        when:
+        def occupied = new ServerSocket(0)
+
+        then:
+        !canBind(occupied.localPort)
+
+        cleanup:
+        occupied?.close()
+    }
+
+    private static boolean canBind(int port) {
+        try {
+            new ServerSocket(port).withCloseable { true }
+        } catch (IOException ignored) {
+            false
+        }
+    }
+
     // Unix-like environments (e.g. Travis) may not allow to bind on reserved ports without proper privileges.
     @IgnoreIf({ os.linux })
-    @Requires({ SocketUtils.isTcpPortAvailable(80) })
+    @Requires({ canBind(80) })
     void "test host header with server on 80"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder(['spec.name': 'HostHeaderSpec', 'micronaut.server.port': 80]).run(EmbeddedServer)
@@ -83,7 +105,7 @@ class HostHeaderSpec extends Specification {
 
     // Unix-like environments (e.g. Travis) may not allow to bind on reserved ports without proper privileges.
     @IgnoreIf({ os.linux })
-    @Requires({ SocketUtils.isTcpPortAvailable(80) })
+    @Requires({ canBind(80) })
     void "test host header with client authority"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder(['spec.name': 'HostHeaderSpec', 'micronaut.server.port': 80]).run(EmbeddedServer)
@@ -106,7 +128,7 @@ class HostHeaderSpec extends Specification {
 
     // Unix-like environments (e.g. Travis) may not allow to bind on reserved ports without proper privileges.
     @IgnoreIf({ os.linux })
-    @Requires({ SocketUtils.isTcpPortAvailable(443) })
+    @Requires({ canBind(443) })
     void "test host header with https server on 443"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder([
