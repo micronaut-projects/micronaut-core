@@ -18,6 +18,7 @@ package io.micronaut.http.client;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -120,7 +121,8 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
 
     /** @param configuration JDK-specific settings for this client */
     @Inject
-    void configureJdk(DefaultJdkConfiguration configuration) {
+    @Internal
+    public void configureJdk(DefaultJdkConfiguration configuration) {
         setJdk(configuration);
     }
 
