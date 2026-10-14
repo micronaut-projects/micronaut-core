@@ -355,6 +355,20 @@ class TestProgressConsoleTest {
         assertEquals(80, TestProgressConsole.Terminal.sttyWidth("/no/such/stty"));
     }
 
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void anSttyThatHangsCannotBlockTheStartPastItsTimeout() {
+        long start = System.nanoTime();
+        assertEquals(80, TestProgressConsole.Terminal.sttyWidth("/bin/sh", "-c", "sleep 30"));
+        long elapsed = System.nanoTime() - start;
+        assertTrue(elapsed < Duration.ofSeconds(4).toNanos(), "blocked for " + Duration.ofNanos(elapsed));
+        // a process left holding the output open does not hold up the width the command printed
+        start = System.nanoTime();
+        assertEquals(132, TestProgressConsole.Terminal.sttyWidth("/bin/sh", "-c", "echo 24 132; sleep 5 &"));
+        elapsed = System.nanoTime() - start;
+        assertTrue(elapsed < Duration.ofSeconds(4).toNanos(), "blocked for " + Duration.ofNanos(elapsed));
+    }
+
     private static Function<String, String> environment(Map<String, String> variables) {
         return variables::get;
     }

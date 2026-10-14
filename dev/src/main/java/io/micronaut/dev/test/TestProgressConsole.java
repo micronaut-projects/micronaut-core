@@ -25,6 +25,8 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,6 +57,7 @@ public final class TestProgressConsole implements TestReportListener {
     private static final int MAX_FAILURE_LINES = 30;
     private static final int MAX_STACK_FRAMES = 6;
     private static final int DEFAULT_WIDTH = 80;
+    private static final long STTY_TIMEOUT_SECONDS = 2;
     private static final int MIN_WIDTH = 40;
     // the indent of the lines under a test or a summary line
     private static final String DETAIL_INDENT = "      ";
@@ -567,11 +570,18 @@ public final class TestProgressConsole implements TestReportListener {
          * @return The columns it prints, else 80 columns
          */
         static int sttyWidth(String... command) {
+            Path output = null;
             try {
-                Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
-                String size = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
-                if (process.waitFor(2, TimeUnit.SECONDS) && process.exitValue() == 0) {
-                    String[] parts = size.split("\\s+");
+                // to a file rather than a pipe: the output is read once the command ended, and a command that hangs, or
+                // leaves a process holding its output open, cannot block test mode's start past the timeout
+                output = Files.createTempFile("micronaut-dev-stty", ".txt");
+                Process process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(output.toFile()).start();
+                if (!process.waitFor(STTY_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    process.destroyForcibly();
+                    return DEFAULT_WIDTH;
+                }
+                if (process.exitValue() == 0) {
+                    String[] parts = Files.readString(output, StandardCharsets.UTF_8).strip().split("\\s+");
                     int value = parts.length == 2 ? Integer.parseInt(parts[1]) : 0;
                     return value >= MIN_WIDTH ? value : DEFAULT_WIDTH;
                 }
@@ -579,6 +589,14 @@ public final class TestProgressConsole implements TestReportListener {
                 return DEFAULT_WIDTH;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+            } finally {
+                if (output != null) {
+                    try {
+                        Files.deleteIfExists(output);
+                    } catch (IOException e) {
+                        // a temporary file left behind
+                    }
+                }
             }
             return DEFAULT_WIDTH;
         }
