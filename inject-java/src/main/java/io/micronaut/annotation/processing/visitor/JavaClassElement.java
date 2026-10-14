@@ -878,9 +878,12 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
 
     @Override
     public boolean isRawType() {
-        return typeArguments != null
-            && typeArguments.isEmpty()
-            && !classElement.getTypeParameters().isEmpty();
+        if (classElement.getTypeParameters().isEmpty()) {
+            return false;
+        }
+        // Declared without arguments, or copied without any by withTypeArguments
+        return typeArguments != null && typeArguments.isEmpty()
+            || resolvedTypeArguments != null && resolvedTypeArguments.isEmpty();
     }
 
     @Override

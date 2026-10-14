@@ -24,8 +24,10 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.Introduction;
@@ -57,6 +59,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import io.micronaut.inject.ast.SuperTypeCollector;
 import io.micronaut.inject.ast.TypeVariableBinder;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.writer.MethodGenUtils;
@@ -976,6 +979,34 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         }
         result.put(getName(), getTypeArguments());
         return result;
+    }
+
+    @Override
+    public List<ClassElement> getAllSuperTypes() {
+        // Python can have multiple concrete bases, so the walk stays on the native bases, in declaration order,
+        // instead of the one super type and the interfaces ClassElement's default implementation walks. An open
+        // generic type binds its bases with its own variables, which its arguments answer as their bounds, and a
+        // Java base is walked as it is declared: resolving its variables to the variables of this type loses the
+        // names its own super types bind them by, as getAllTypeArguments() avoids too
+        return SuperTypeCollector.collect(
+            this,
+            typeVariableBindings(),
+            type -> type instanceof PythonClassElement pythonClass
+                ? pythonClass.resolvedBases()
+                : SuperTypeCollector.declared(type),
+            type -> type instanceof PythonClassElement ? type : type.getRawClassElement());
+    }
+
+    /**
+     * The bases of the class, as written and in order, each with its arguments resolved in this class's variables,
+     * after the introduction interfaces the class is given.
+     */
+    private Stream<ClassElement> resolvedBases() {
+        Stream<ClassElement> bases = getNativeType().bases().stream().map(base -> {
+            ClassElement baseElement = findPythonClass(base);
+            return baseElement == null ? toJavaType(base).orElse(null) : resolveTypeArguments(baseElement, base);
+        }).filter(Objects::nonNull);
+        return Stream.concat(introductionInterfaces.stream(), bases);
     }
 
     @Override
