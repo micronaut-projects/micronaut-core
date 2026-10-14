@@ -2,6 +2,7 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.exceptions.BufferLengthExceededException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import io.micronaut.http.body.stream.BodySizeLimits;
@@ -16,6 +17,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 class ReactiveByteBufferByteBodyTest {
     @Test
@@ -81,5 +83,35 @@ class ReactiveByteBufferByteBodyTest {
         streaming.sharedBuffer().add(bbf.readBufferFactory().copyOf("a", StandardCharsets.UTF_8));
         assertEquals("ab", first.get(10, TimeUnit.SECONDS));
         assertEquals("ab", second.get(10, TimeUnit.SECONDS));
+    }
+
+    @Test
+    @Timeout(10)
+    public void bodyClosedReentrantlyWhenBufferingHitsTheLimit() throws Exception {
+        // the buffering of a split fails on the buffer limit while the upstream adds the bytes,
+        // and its failure closes the body in that same call, e.g. on a servlet container
+        ByteBodyFactory bbf = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
+        ByteBodyFactory.StreamingBody streaming = bbf.createStreamingBody(new BodySizeLimits(Long.MAX_VALUE, 4), new BufferConsumer.Upstream() {
+            @Override
+            public void onBytesConsumed(long bytesConsumed) {
+                // the test adds the bytes itself, whatever the demand
+            }
+
+            @Override
+            public void allowDiscard() {
+                // nothing to discard
+            }
+        });
+        CloseableByteBody root = streaming.rootBody();
+        CompletableFuture<Throwable> failure = new CompletableFuture<>();
+        InternalByteBody.bufferFlow(root.split(ByteBody.SplitBackpressureMode.FASTEST)).onComplete((cabb, e) -> {
+            if (cabb != null) {
+                cabb.close();
+            }
+            root.close();
+            failure.complete(e);
+        });
+        streaming.sharedBuffer().add(bbf.readBufferFactory().copyOf("too large", StandardCharsets.UTF_8));
+        assertInstanceOf(BufferLengthExceededException.class, failure.get(10, TimeUnit.SECONDS));
     }
 }
