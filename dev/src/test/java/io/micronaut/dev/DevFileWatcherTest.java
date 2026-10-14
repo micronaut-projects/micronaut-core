@@ -2,16 +2,21 @@ package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.dev.manifest.DevManifest;
+import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import io.micronaut.scheduling.io.watch.FileWatcher;
 import io.micronaut.scheduling.io.watch.FileWatcherRegistration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -90,6 +95,36 @@ class DevFileWatcherTest {
             assertEquals(1, runtime.generation());
         } finally {
             runtime.close();
+        }
+    }
+
+    @Test
+    void aDirectoryCoveredOnlyByTheNonRecursiveTriggerWatchIsStillPinnedForTheProcess() throws Exception {
+        Path trigger = Files.createDirectories(project.resolve("build/dev"));
+        Path assets = Files.createDirectories(trigger.resolve("assets"));
+        Path css = Files.createDirectories(assets.resolve("css"));
+        Path resources = Files.createDirectories(project.resolve("src/main/resources"));
+        Path staticRoot = Files.createDirectories(resources.resolve("static"));
+        try (DirectoryWatcher watcher = DirectoryWatcher.builder(FileSystems.getDefault().newWatchService()).build().start()) {
+            // the runtime's own registrations: the trigger's directory alone, and a resource root with its tree
+            watcher.directory(trigger).recursive(false).include("compiled").watch(batch -> { });
+            watcher.directory(resources).watch(batch -> { });
+            Map<Path, FileWatcherRegistration> pinned = new ConcurrentHashMap<>();
+            DevFileWatcher view = new DevFileWatcher(watcher, pinned, directory -> directory.startsWith(resources.toAbsolutePath().normalize()), getClass().getClassLoader());
+
+            // an entry of the trigger's directory and the directory itself are covered, but nothing below them is: both
+            // are pinned, the entry first, as nothing pinned covers it yet
+            view.directory(assets).watch(batch -> { });
+            view.directory(trigger).watch(batch -> { });
+            // below a recursive root a registration is a listener and needs no pin
+            view.directory(staticRoot).watch(batch -> { });
+            assertEquals(Set.of(trigger.toAbsolutePath().normalize(), assets.toAbsolutePath().normalize()), pinned.keySet());
+
+            // the view's registrations close with its context; the pins keep the tree registered for the next one
+            view.stop();
+            assertEquals(0, view.openRegistrations());
+            assertTrue(pinned.values().stream().allMatch(FileWatcherRegistration::isActive));
+            assertTrue(watcher.isWatching(css.resolve("site.css")));
         }
     }
 
