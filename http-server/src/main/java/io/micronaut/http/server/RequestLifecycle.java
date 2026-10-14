@@ -55,10 +55,12 @@ import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.web.router.AnyMethodRoutes;
 import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.DefaultUriRouteMatch;
+import io.micronaut.web.router.PendingRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteMatch;
+import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -92,6 +94,16 @@ public class RequestLifecycle {
     private final boolean multipartEnabled;
     @Nullable
     private HttpRequest<?> request;
+    /**
+     * The matches that depend on the body of the request, see {@link #matchRoute(HttpRequest)}.
+     */
+    @Nullable
+    private PendingRouteMatch<Object, Object> pendingMatch;
+    /**
+     * Whether the request matched routes without its body, but its body met the body conditions
+     * of none of them.
+     */
+    private boolean bodyUnmatched;
 
     /**
      * @param routeExecutor The route executor to use for route resolution
@@ -506,7 +518,20 @@ public class RequestLifecycle {
                 protected @Nullable ExecutionFlow<?> doRouteMatchAsync(HttpRequest<?> request) {
                     try {
                         doRouteMatch(request);
-                        return null;
+                        PendingRouteMatch<Object, Object> pending = pendingMatch;
+                        if (pending == null) {
+                            return null;
+                        }
+                        // the route depends on the body: read it, and choose
+                        pendingMatch = null;
+                        return routeExecutor.bodyRouteSelector()
+                            .select(request, pending, PropagatedContext.getOrEmpty())
+                            .map(chosen -> {
+                                routeMatch = chosen.orElse(null);
+                                bodyUnmatched = chosen.isEmpty();
+                                matched(request);
+                                return Boolean.TRUE;
+                            });
                     } catch (RuntimeException e) {
                         CompletionStage<?> pending = RouteLocator.pendingLocation(e);
                         if (pending == null) {
@@ -527,6 +552,13 @@ public class RequestLifecycle {
                     // Store it a field because RouteExecutor#findRouteMatch in some cases stores and sets something different
                     // This can be corrected after Cors / Options stuff migrated to pre-matching
                     routeMatch = matchRoute(request);
+                    if (pendingMatch == null) {
+                        matched(request);
+                    }
+                }
+
+                private void matched(HttpRequest<?> request) {
+                    UriRouteMatch<Object, Object> routeMatch = this.routeMatch;
                     if (routeMatch == null) {
                         if (LOG.isTraceEnabled()) {
                             LOG.trace("Not matched route for request {} - {}", request.getMethodName(), request.getUri().getPath());
@@ -562,13 +594,21 @@ public class RequestLifecycle {
      * pass on, and before the filters that apply to the matched route. A failure is answered
      * like a failure of the route.
      *
+     * <p>When the route depends on the body of the request, see
+     * {@link io.micronaut.web.router.builder.RouteCondition.Body}, no match is returned, and the
+     * route is chosen once the body is read.</p>
+     *
      * @param request The request, after the pre-matching filters
-     * @return The match of the route, or {@code null} if no route matches
+     * @return The match of the route, or {@code null} if no route matches, or it depends on the body
      * @since 5.3.0
      */
     @Internal
     protected @Nullable UriRouteMatch<Object, Object> matchRoute(HttpRequest<?> request) {
-        return routeExecutor.findRouteMatch(request);
+        Router router = routeExecutor.router;
+        if (!router.hasBodyConditions()) {
+            return routeExecutor.findRouteMatch(request);
+        }
+        return router.findClosest(request, (PendingRouteMatch<Object, Object> pending) -> pendingMatch = pending);
     }
 
     /**
@@ -591,6 +631,11 @@ public class RequestLifecycle {
             FileCustomizableResponseType fileCustomizableResponseType = findFile(request);
             if (fileCustomizableResponseType != null) {
                 return ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType));
+            }
+            if (bodyUnmatched) {
+                // as for a condition the request does not meet: never a 405, 415 or 406 of the
+                // routes whose body conditions the body did not meet
+                return onStatusError(request, new NotFoundException(), null, propagatedContext);
             }
             return onRouteMiss(request, propagatedContext);
         }
