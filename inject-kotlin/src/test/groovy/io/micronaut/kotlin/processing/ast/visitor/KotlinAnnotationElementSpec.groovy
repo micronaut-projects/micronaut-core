@@ -207,6 +207,9 @@ class MyBean
         and: "a copy of a member answers the metadata it was given, and the original keeps its own"
         MembersVisitor.EMPTIED_COPY_NON_BINDING['test.MyAnn'] == []
         MembersVisitor.NON_BINDING['test.MyAnn'] == ['description']
+
+        and: "the properties of the annotation class still answer the read and write type metadata"
+        MembersVisitor.TYPE_METADATA['test.MyAnn'] == true
     }
 
     static class MembersVisitor implements TypeElementVisitor<Object, Object> {
@@ -222,10 +225,11 @@ class MyBean
         static final Map<String, Map<String, List<String>>> ARRAY_COMPONENT_MEMBERS = [:]
         static final Map<String, List<String>> PRIMITIVES = [:]
         static final Map<String, List<String>> EMPTIED_COPY_NON_BINDING = [:]
+        static final Map<String, Boolean> TYPE_METADATA = [:]
 
         static void clear() {
             [NAMES, MEMBERS, TYPES, DECLARING, NON_BINDING, ANNOTATION_TYPED, ARRAYS, MARKED, ARRAY_COMPONENT_MEMBERS,
-             PRIMITIVES, EMPTIED_COPY_NON_BINDING]*.clear()
+             PRIMITIVES, EMPTIED_COPY_NON_BINDING, TYPE_METADATA]*.clear()
         }
 
         @Override
@@ -251,6 +255,10 @@ class MyBean
             PRIMITIVES.put(name, members.findAll { it.isPrimitive() }*.getName())
             EMPTIED_COPY_NON_BINDING.put(name, members
                 .findAll { it.withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA).hasAnnotation('test.NonBinding') }*.getName())
+            def properties = element.getSyntheticBeanProperties()
+            TYPE_METADATA.put(name, !properties.isEmpty() && properties.every {
+                it.getReadTypeAnnotationMetadata().isPresent() && it.getWriteTypeAnnotationMetadata().isPresent()
+            })
             // the annotation class carries the marker; the first member is given it, which the others must not see
             if (!members.isEmpty() && element.hasAnnotation('test.Marker')) {
                 members[0].annotate('test.Marker')
