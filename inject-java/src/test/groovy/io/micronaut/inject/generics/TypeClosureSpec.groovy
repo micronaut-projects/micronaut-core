@@ -319,7 +319,7 @@ class ArrayFactory {
         definition.getTypeArguments(List)*.type == [String]
         definition.getTypeArguments('java.util.List')*.type == [String]
         definition.getTypeArguments(List[]).isEmpty()
-        definition.typeArgumentKeys.toSet() == [List.name, SequencedCollection.name, Collection.name, Iterable.name].toSet()
+        definition.typeArgumentKeys.toSet() == [List.name, SequencedCollection.name, Collection.name, Iterable.name, Cloneable.name, Serializable.name].toSet()
 
         cleanup:
         context.close()
