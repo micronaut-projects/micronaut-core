@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.websocket;
 
 import io.netty.channel.DefaultEventLoop;
 import io.netty.channel.EventLoop;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -33,49 +34,45 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class WebSocketHandlerCompletionTest {
 
+    private final EventLoop eventLoop = new DefaultEventLoop();
+
+    @AfterEach
+    void shutDown() throws InterruptedException {
+        eventLoop.shutdownGracefully(0, 0, TimeUnit.SECONDS).sync();
+    }
+
     @Test
     void completionOnTheEventLoopIsCountedInline() throws Exception {
-        EventLoop eventLoop = new DefaultEventLoop();
-        try {
-            List<Thread> ranOn = new CopyOnWriteArrayList<>();
-            CompletableFuture<Integer> ranBeforeReturn = new CompletableFuture<>();
-            eventLoop.execute(() -> {
-                NettyServerWebSocketHandler.runOnEventLoop(eventLoop, () -> ranOn.add(Thread.currentThread()));
-                ranBeforeReturn.complete(ranOn.size());
-            });
+        List<Thread> ranOn = new CopyOnWriteArrayList<>();
+        CompletableFuture<Integer> ranBeforeReturn = new CompletableFuture<>();
+        eventLoop.execute(() -> {
+            NettyServerWebSocketHandler.runOnEventLoop(eventLoop, () -> ranOn.add(Thread.currentThread()));
+            ranBeforeReturn.complete(ranOn.size());
+        });
 
-            assertEquals(1, ranBeforeReturn.get(10, TimeUnit.SECONDS));
-            assertEquals(1, ranOn.size());
-            assertTrue(eventLoop.inEventLoop(ranOn.getFirst()));
-        } finally {
-            eventLoop.shutdownGracefully(0, 0, TimeUnit.SECONDS).sync();
-        }
+        assertEquals(1, ranBeforeReturn.get(10, TimeUnit.SECONDS));
+        assertEquals(1, ranOn.size());
+        assertTrue(eventLoop.inEventLoop(ranOn.getFirst()));
     }
 
     @Test
     void completionOffTheEventLoopIsCountedOnTheEventLoop() throws Exception {
-        EventLoop eventLoop = new DefaultEventLoop();
-        try {
-            List<Thread> ranOn = new CopyOnWriteArrayList<>();
-            CompletableFuture<Void> ran = new CompletableFuture<>();
-            NettyServerWebSocketHandler.runOnEventLoop(eventLoop, () -> {
-                ranOn.add(Thread.currentThread());
-                ran.complete(null);
-            });
+        List<Thread> ranOn = new CopyOnWriteArrayList<>();
+        CompletableFuture<Void> ran = new CompletableFuture<>();
+        NettyServerWebSocketHandler.runOnEventLoop(eventLoop, () -> {
+            ranOn.add(Thread.currentThread());
+            ran.complete(null);
+        });
 
-            ran.get(10, TimeUnit.SECONDS);
-            // the event loop runs its tasks in order: once this one ran, the task ran just once
-            eventLoop.submit(() -> { }).sync();
-            assertEquals(1, ranOn.size());
-            assertTrue(eventLoop.inEventLoop(ranOn.getFirst()));
-        } finally {
-            eventLoop.shutdownGracefully(0, 0, TimeUnit.SECONDS).sync();
-        }
+        ran.get(10, TimeUnit.SECONDS);
+        // the event loop runs its tasks in order: once this one ran, the task ran just once
+        eventLoop.submit(() -> { }).sync();
+        assertEquals(1, ranOn.size());
+        assertTrue(eventLoop.inEventLoop(ranOn.getFirst()));
     }
 
     @Test
     void completionAfterTheEventLoopShutDownIsCountedInline() throws Exception {
-        EventLoop eventLoop = new DefaultEventLoop();
         eventLoop.shutdownGracefully(0, 0, TimeUnit.SECONDS).sync();
 
         List<Thread> ranOn = new CopyOnWriteArrayList<>();
