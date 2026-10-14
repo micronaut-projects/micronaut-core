@@ -71,6 +71,19 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
  * or call {@code StaticOptimizations.set(...)}. Measure startup with and without it: it helps
  * mostly without a JDK AOT cache.</p>
  *
+ * <p><b>Experimental:</b> the system property {@code micronaut.bean-definitions.lazy=true} makes
+ * every context read its bean definitions lazily. A definition whose {@code META-INF/micronaut}
+ * entry carries the descriptor that the processors of Micronaut 5.3 write is loaded only when a
+ * lookup needs it: its flags, types, annotations, qualifiers and the conditions checked before
+ * loading are answered from the descriptor. Other definitions are loaded as before. When the
+ * common pool has more than one thread, the definitions a context is most likely to need are
+ * loaded on it in the background; {@code micronaut.bean-definitions.lazy.warm-up=false} turns that
+ * off. A definition that fails to initialize fails the first lookup that needs it, not the start.
+ * Relocating the classes that bean definitions name (with Shadow or Maven Shade) without rewriting
+ * their entries is not supported. {@code micronaut.bean-definitions.lazy.verify=true} also checks
+ * every descriptor against its definition, for tests. It is off by default, read when a context is
+ * created, and may change or be removed.</p>
+ *
  * @author Graeme Rocher
  * @since 1.0
  */

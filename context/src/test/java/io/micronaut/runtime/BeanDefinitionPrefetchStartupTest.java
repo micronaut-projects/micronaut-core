@@ -82,6 +82,9 @@ class BeanDefinitionPrefetchStartupTest {
     private static final String THREE_THREADS = PARALLELISM + "3";
     private static final String TASK = BeanDefinitionPrefetch.class.getName();
     private static final String WORKER_PREFIX = "ForkJoinPool.commonPool-worker-";
+    private static final String LAZY = "-Dmicronaut.bean-definitions.lazy=true";
+    // A bean definition class, as -verbose:class prints its load
+    private static final Pattern DEFINITION_LOADED = Pattern.compile("\\[class,load\\] (\\S+\\$Definition) source:");
 
     @TempDir
     Path temp;
@@ -107,6 +110,38 @@ class BeanDefinitionPrefetchStartupTest {
         assertEquals(TASK, started.value("PROVIDER"), started.output());
         assertEquals(off.value("REFERENCES"), started.value("REFERENCES"));
         assertNotEquals("org.slf4j.helpers.NOPLogger", started.value("REFLECTION_LOGGER"));
+    }
+
+    /**
+     * With lazy bean definitions, the task reads the descriptors and loads no class of a definition that has one:
+     * preloading them would load what lazy references load only when a lookup needs them. The context still gets
+     * the task's references, and they are the ones a context reads without the prefetch.
+     */
+    @Test
+    void withLazyDefinitionsTheTaskLoadsNoDefinitionThatHasADescriptor() {
+        ChildJvm initialized = run(List.of(), "-Dprefetch-test.mode=init", ON, LAZY, THREE_THREADS, "-Dprefetch-test.await=true", "-verbose:class");
+        ChildJvm started = run(List.of(), ON, LAZY, THREE_THREADS);
+        ChildJvm off = run(List.of(), THREE_THREADS);
+
+        assertEquals("true", initialized.value("TASK_DONE"), initialized.output());
+        List<String> loaded = initialized.output().lines()
+            .map(DEFINITION_LOADED::matcher)
+            .filter(Matcher::find)
+            .map(matcher -> matcher.group(1))
+            .toList();
+        List<String> described = loaded.stream().filter(name -> hasContent(REFERENCES + name)).toList();
+        assertEquals(List.of(), described, initialized.output());
+        assertEquals(TASK, started.value("PROVIDER"), started.output());
+        // a lazy reference is not the class of its definition, but it is named after it
+        assertEquals(off.value("DEFINITION_NAMES"), started.value("DEFINITION_NAMES"));
+    }
+
+    private static boolean hasContent(String entry) {
+        try (var in = BeanDefinitionPrefetchStartupTest.class.getClassLoader().getResourceAsStream(entry)) {
+            return in != null && in.read() != -1;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Test
@@ -316,6 +351,13 @@ class BeanDefinitionPrefetchStartupTest {
             Files.writeString(directory.resolve(service.getKey().getName()), service.getValue().getName());
         }
         return root;
+    }
+
+    private static void awaitQuiescentPool() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+        while (!ForkJoinPool.commonPool().isQuiescent() && System.nanoTime() < deadline) {
+            Thread.sleep(5);
+        }
     }
 
     private static ChildJvm run(List<Path> extraClassPath, String... jvmArgs) {
@@ -606,6 +648,11 @@ class BeanDefinitionPrefetchStartupTest {
             Class.forName(Micronaut.class.getName(), true, Main.class.getClassLoader());
             if ("init".equals(System.getProperty("prefetch-test.mode"))) {
                 System.out.println("POOL_SIZE=" + ForkJoinPool.commonPool().getPoolSize());
+                if (Boolean.getBoolean("prefetch-test.await")) {
+                    // what the task loads, once it has run
+                    awaitQuiescentPool();
+                    System.out.println("TASK_DONE=true");
+                }
                 return;
             }
             if (Boolean.getBoolean("prefetch-test.await")) {
@@ -622,6 +669,10 @@ class BeanDefinitionPrefetchStartupTest {
             try (ApplicationContext context = micronaut.start()) {
                 System.out.println("PROVIDER=" + micronaut.getBeanDefinitionsProvider().getClass().getName());
                 System.out.println("REFERENCES=" + String.join(",", names(context.getBeanDefinitionReferences())));
+                System.out.println("DEFINITION_NAMES=" + context.getBeanDefinitionReferences().stream()
+                    .map(BeanDefinitionReference::getBeanDefinitionName)
+                    .sorted()
+                    .collect(java.util.stream.Collectors.joining(",")));
                 System.out.println("REFLECTION_LOGGER=" + ClassUtils.REFLECTION_LOGGER.getClass().getName());
                 System.out.println("OPTIMIZATIONS_THREAD=" + StaticServices.thread);
                 System.out.println("REGISTRAR_THREAD=" + ContextClassLoaderRegistrar.thread);

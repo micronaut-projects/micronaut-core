@@ -220,6 +220,10 @@ final class TrainingLoad {
             return null;
         }
         BeanDefinition<Object> definition = reference.load(context);
+        if (definition == null) {
+            // a lazy reference whose definition cannot be linked
+            return null;
+        }
         boolean definitionEnabled = definition instanceof AbstractInitializableBeanDefinitionAndReference<Object> definitionAndReference
             ? definitionAndReference.isEnabled(context, null, false)
             : definition.isEnabled(context);

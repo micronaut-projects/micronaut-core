@@ -69,6 +69,12 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
     static final String PROPERTY = "micronaut.bean-definitions.prefetch";
 
     /**
+     * The system property of lazy bean definition references: with it on, the prefetch reads the descriptors and
+     * does not load the reference classes, which lazy references load only when a lookup needs them.
+     */
+    static final String LAZY_PROPERTY = "micronaut.bean-definitions.lazy";
+
+    /**
      * The fewest common pool threads the prefetch starts with: what a JVM with four processors
      * has. Micronaut loads the references on the pool threads and on the thread that asks for
      * them. With the prefetch, the thread that asks is a pool thread and the main thread only
@@ -83,6 +89,7 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
     @Nullable
     private final ClassLoader contextClassLoader;
     private final ClassLoader classLoader;
+    private final boolean lazy;
     private final CountDownLatch converted = new CountDownLatch(1);
     private volatile boolean converting;
     // Written before converted counts down, read after it has
@@ -97,8 +104,13 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
     private Throwable failure;
 
     BeanDefinitionPrefetch(@Nullable ClassLoader contextClassLoader, ClassLoader classLoader) {
+        this(contextClassLoader, classLoader, false);
+    }
+
+    BeanDefinitionPrefetch(@Nullable ClassLoader contextClassLoader, ClassLoader classLoader, boolean lazy) {
         this.contextClassLoader = contextClassLoader;
         this.classLoader = classLoader;
+        this.lazy = lazy;
     }
 
     /**
@@ -117,8 +129,12 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
         if (NativeImageUtils.inImageCode() || ForkJoinPool.getCommonPoolParallelism() < MINIMUM_PARALLELISM) {
             return null;
         }
-        ForkJoinPool.commonPool().execute(new Preload(classLoader, null));
-        return new BeanDefinitionPrefetch(Thread.currentThread().getContextClassLoader(), classLoader);
+        boolean lazy = Boolean.getBoolean(LAZY_PROPERTY) || Boolean.getBoolean(LAZY_PROPERTY + ".verify");
+        if (!lazy) {
+            // lazy references load only the classes a lookup needs, so preloading all of them would undo that
+            ForkJoinPool.commonPool().execute(new Preload(classLoader, null));
+        }
+        return new BeanDefinitionPrefetch(Thread.currentThread().getContextClassLoader(), classLoader, lazy);
     }
 
     /**
@@ -154,7 +170,7 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
         Throwable thrown = null;
         try {
             if (convert()) {
-                references = new DefaultBeanDefinitionsProvider().provide(classLoader);
+                references = new DefaultBeanDefinitionsProvider().provide(classLoader, lazy);
             }
         } catch (Throwable t) {
             thrown = t;
@@ -231,7 +247,7 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
     @SuppressWarnings("ReferenceEquality") // The task read the references with this very class loader
     public List<BeanDefinitionReference<?>> provide(ClassLoader classLoader) {
         if (classLoader != this.classLoader || !handOver()) {
-            return new DefaultBeanDefinitionsProvider().provide(classLoader);
+            return new DefaultBeanDefinitionsProvider().provide(classLoader, lazy);
         }
         // compute() catches everything, so this returns normally
         join();
