@@ -2644,7 +2644,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         }
 
         // The type arguments by name, in full when the closure is not written, and for the types the closure left
-        // out otherwise, so that a name lookup of a type the definition cannot name still answers
+        // out otherwise, with or without arguments, so that the name of a type the definition cannot name is still
+        // among the keys and a lookup by it still answers; a consumer that can load the class does so itself
         Map<String, Map<String, ClassElement>> typeArgumentsToRecord = typeArguments;
         if (typeClosureField != null && typeArguments != null) {
             Set<String> recordedNames = new HashSet<>();
@@ -2654,14 +2655,14 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 }
             }
             typeArgumentsToRecord = new LinkedHashMap<>();
-            for (Map.Entry<String, Map<String, ClassElement>> entry : typeArguments.entrySet()) {
-                if (!recordedNames.contains(entry.getKey()) && !entry.getValue().isEmpty()) {
-                    typeArgumentsToRecord.put(entry.getKey(), entry.getValue());
+            for (ClassElement element : typeClosure) {
+                if (!recordedNames.contains(element.getName()) && !isObjectType(element)) {
+                    typeArgumentsToRecord.put(element.getName(), typeArguments.getOrDefault(element.getName(), element.getTypeArguments()));
                 }
             }
         }
         boolean hasTypeArguments = !superBeanDefinition && typeArgumentsToRecord != null && !typeArgumentsToRecord.isEmpty()
-            && typeArgumentsToRecord.values().stream().anyMatch(e -> !e.isEmpty());
+            && (typeClosureField != null || typeArgumentsToRecord.values().stream().anyMatch(e -> !e.isEmpty()));
         if (hasTypeArguments) {
             typeArgumentsField = FieldDef.builder(FIELD_TYPE_ARGUMENTS, Map.class)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
