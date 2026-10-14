@@ -15,6 +15,7 @@
  */
 package io.micronaut.context
 
+import io.micronaut.context.generics.Both
 import io.micronaut.context.generics.IntRepo
 import io.micronaut.context.generics.KeyedDefinition
 import io.micronaut.context.generics.Marker
@@ -53,6 +54,9 @@ class RuntimeBeanDefinitionTypeClosureSpec extends Specification {
 
         and: 'a hierarchy without type arguments is recorded all the same'
         definitionOf(Plain).typeClosure*.type == [Plain, Marker, Object]
+
+        and: 'the super class and its own super types come before the interfaces, as a compiled definition orders them'
+        definitionOf(Both).typeClosure*.type == [Both, NumberRepo, Repo, Marker, Object]
     }
 
     void 'the interface default answers the bean type, the keys it can turn into an exposed type, and Object'() {

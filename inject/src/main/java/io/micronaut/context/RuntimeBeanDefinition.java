@@ -157,7 +157,8 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
     }
 
     /**
-     * The given type and every super class and interface above it, excluding {@link Object}.
+     * The given type and every super class and interface above it, excluding {@link Object}, the super class
+     * before the interfaces.
      *
      * @param beanType The type to walk
      * @return The types, the given one first
@@ -172,10 +173,11 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
         if (type == null || type == Object.class || !collected.add(type)) {
             return;
         }
+        // the super class before the interfaces, the order the type closure documents
+        collectSuperTypes(type.getSuperclass(), collected);
         for (Class<?> anInterface : type.getInterfaces()) {
             collectSuperTypes(anInterface, collected);
         }
-        collectSuperTypes(type.getSuperclass(), collected);
     }
 
     @Override
