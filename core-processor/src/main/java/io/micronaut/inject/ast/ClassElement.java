@@ -37,7 +37,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -786,107 +785,7 @@ public interface ClassElement extends TypedElement {
      */
     @Experimental
     default List<ClassElement> getAllSuperTypes() {
-        List<ClassElement> result = new ArrayList<>();
-        result.add(this);
-        if (isArray()) {
-            result.add(ClassElement.of(Cloneable.class));
-            result.add(ClassElement.of(java.io.Serializable.class));
-        } else if (isPrimitive()) {
-            return result;
-        } else if (Object.class.getName().equals(getName())) {
-            return result;
-        } else {
-            Set<String> seen = new HashSet<>();
-            seen.add(superTypeKey(this));
-            collectSuperTypes(this, getTypeArguments(), isRawType(), seen, result);
-        }
-        result.add(ClassElement.of(Object.class));
-        return result;
-    }
-
-    /**
-     * Collects the super types of a type into the result, each written in the arguments of the type the walk
-     * started from, through one walk of the hierarchy: a super type reached again, by another path, is neither
-     * listed nor walked again.
-     *
-     * @param type     The type whose direct super types are collected
-     * @param bindings What the variables of the type are bound to, by name, in the arguments of the first type
-     * @param raw      Whether the type is raw, or is reached through a raw type, which erases its super types
-     * @param seen     The keys of the types listed so far
-     * @param result   The types listed so far
-     */
-    private static void collectSuperTypes(ClassElement type,
-                                          Map<String, ClassElement> bindings,
-                                          boolean raw,
-                                          Set<String> seen,
-                                          List<ClassElement> result) {
-        Stream.concat(
-            type.getInterfaces().stream(),
-            type.getSuperType().stream()
-        ).forEach(superType -> {
-            if (Object.class.getName().equals(superType.getName()) && !superType.isArray()) {
-                return;
-            }
-            // The arguments of a direct super type are written in the variables of the type, which the bindings
-            // resolve, so one binding brings the super type into the arguments of the first type
-            Map<String, ClassElement> typeArguments = superType.getTypeArguments();
-            Map<String, ClassElement> resolvedArguments = typeArguments;
-            ClassElement resolved = superType;
-            if (raw) {
-                if (!typeArguments.isEmpty()) {
-                    resolvedArguments = Collections.emptyMap();
-                    resolved = superType.withTypeArguments(resolvedArguments);
-                }
-            } else {
-                resolvedArguments = TypeVariableBinder.bind(typeArguments, bindings);
-                if (resolvedArguments != typeArguments) {
-                    resolved = superType.withTypeArguments(resolvedArguments);
-                }
-            }
-            if (seen.add(superTypeKey(resolved))) {
-                result.add(resolved);
-                collectSuperTypes(superType, resolvedArguments, raw || superType.isRawType(), seen, result);
-            }
-        });
-    }
-
-    /**
-     * The key a super type is listed once by: its name and its type arguments, a raw type by its name alone.
-     *
-     * @param type The type
-     * @return The key
-     */
-    private static String superTypeKey(ClassElement type) {
-        if (type instanceof GenericPlaceholderElement placeholder) {
-            return placeholder.getResolved()
-                .map(ClassElement::superTypeKey)
-                .orElseGet(() -> placeholder.getVariableName() + "[]".repeat(type.getArrayDimensions()));
-        }
-        if (type instanceof WildcardElement wildcard) {
-            StringBuilder key = new StringBuilder("?");
-            for (ClassElement bound : wildcard.getUpperBounds()) {
-                key.append(" extends ").append(superTypeKey(bound));
-            }
-            for (ClassElement bound : wildcard.getLowerBounds()) {
-                key.append(" super ").append(superTypeKey(bound));
-            }
-            return key.toString();
-        }
-        StringBuilder key = new StringBuilder(type.getName());
-        key.append("[]".repeat(type.getArrayDimensions()));
-        if (!type.isRawType() && !type.getTypeArguments().isEmpty()) {
-            key.append('<');
-            boolean first = true;
-            for (ClassElement argument : type.getTypeArguments().values()) {
-                if (!first) {
-                    key.append(',');
-                }
-                first = false;
-                key.append(superTypeKey(argument));
-            }
-            key.append('>');
-        }
-        return key.toString();
+        return SuperTypeCollector.collect(this, SuperTypeCollector::declared);
     }
 
     /**
