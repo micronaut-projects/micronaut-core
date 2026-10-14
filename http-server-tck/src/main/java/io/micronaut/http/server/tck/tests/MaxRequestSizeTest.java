@@ -27,10 +27,14 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.TestScenario;
+import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.scheduling.annotation.ExecuteOn;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Flux;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Map;
 
 /**
@@ -96,6 +100,22 @@ public class MaxRequestSizeTest {
             .run();
     }
 
+    @Test
+    void aChunkedBodyOverTheLimitReadFromAnInputStreamIsRefusedWith413() throws IOException {
+        byte[] chunk = new byte[512];
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .configuration(CONFIGURATION)
+            // a publisher body has no content length, so the limit is only hit while the route reads the stream
+            .request(HttpRequest.POST("/max-request-size/input-stream", Flux.range(0, 8).map(i -> chunk))
+                .contentType(MediaType.APPLICATION_OCTET_STREAM_TYPE))
+            .assertion((server, request) -> AssertionUtils.assertThrows(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.REQUEST_ENTITY_TOO_LARGE)
+                    .build()))
+            .run();
+    }
+
     @Controller("/max-request-size")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class MaxRequestSizeController {
@@ -118,6 +138,16 @@ public class MaxRequestSizeTest {
         @Produces(MediaType.TEXT_PLAIN)
         String form(String value) {
             return String.valueOf(value.length());
+        }
+
+        @Post("/input-stream")
+        @Consumes(MediaType.APPLICATION_OCTET_STREAM)
+        @Produces(MediaType.TEXT_PLAIN)
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        String inputStream(@Body InputStream body) throws IOException {
+            try (InputStream in = body) {
+                return String.valueOf(in.readAllBytes().length);
+            }
         }
     }
 }

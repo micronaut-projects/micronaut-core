@@ -25,6 +25,8 @@ import io.micronaut.http.exceptions.ContentLengthExceededException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FilterInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.Optional;
 
@@ -59,7 +61,7 @@ public final class InputStreamBodyBinder implements NonBlockingBodyArgumentBinde
                 return BindingResult.empty();
             }
             try {
-                InputStream s = server.byteBody().toInputStream();
+                InputStream s = new SizeLimitInputStream(server.byteBody().toInputStream());
                 return () -> Optional.of(s);
             } catch (ContentLengthExceededException t) {
                 if (LOG.isTraceEnabled()) {
@@ -69,5 +71,50 @@ public final class InputStreamBodyBinder implements NonBlockingBodyArgumentBinde
             }
         }
         return BindingResult.empty();
+    }
+
+    /**
+     * Surfaces a read that fails on {@code micronaut.server.max-request-size} as the
+     * {@link ContentLengthExceededException} itself rather than the {@link IOException} wrapping it, so that a route
+     * that lets the read failure propagate is answered with 413 like any other body over the limit, instead of 500.
+     */
+    private static final class SizeLimitInputStream extends FilterInputStream {
+        SizeLimitInputStream(InputStream in) {
+            super(in);
+        }
+
+        @Override
+        public int read() throws IOException {
+            try {
+                return super.read();
+            } catch (IOException e) {
+                throw unwrap(e);
+            }
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            try {
+                return super.read(b, off, len);
+            } catch (IOException e) {
+                throw unwrap(e);
+            }
+        }
+
+        @Override
+        public long skip(long n) throws IOException {
+            try {
+                return super.skip(n);
+            } catch (IOException e) {
+                throw unwrap(e);
+            }
+        }
+
+        private static IOException unwrap(IOException e) {
+            if (e.getCause() instanceof ContentLengthExceededException exceeded) {
+                throw exceeded;
+            }
+            return e;
+        }
     }
 }
