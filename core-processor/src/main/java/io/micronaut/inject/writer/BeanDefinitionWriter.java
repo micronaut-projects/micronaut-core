@@ -111,6 +111,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.version.VersionUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -1675,6 +1676,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         if (hasPostLoadConditions) {
             flags |= BeanDefinitionDescriptor.FLAG_POST_LOAD_CONDITIONS;
         }
+        if (!indexedTypeNames.isEmpty()) {
+            flags |= BeanDefinitionDescriptor.FLAG_DECLARED_INDEXES;
+        }
 
         AnnotationMetadata runtimeMetadata = AnnotationMetadataGenUtils.runtimeMetadata(annotationMetadata);
         Set<String> annotationNames = new LinkedHashSet<>(runtimeMetadata.getAnnotationNames());
@@ -1711,7 +1715,11 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             new TreeMap<>(AnnotationMetadataGenUtils.repeatableAnnotationContainers(annotationMetadataDefaults)),
             List.of(AnnotationUtil.resolveNonBindingMembers(declaredMetadata)),
             new ArrayList<>(AnnotationUtil.findQualifierAnnotations(declaredMetadata)),
-            preLoadConditions
+            preLoadConditions,
+            beanDefinitionName,
+            OrderUtil.getOrder(annotationMetadata),
+            Objects.requireNonNullElse(VersionUtils.MICRONAUT_VERSION, ""),
+            BeanDefinitionDescriptor.REVISION
         );
     }
 

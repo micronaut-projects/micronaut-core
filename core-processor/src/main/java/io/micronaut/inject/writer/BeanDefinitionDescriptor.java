@@ -59,8 +59,9 @@ import java.util.TreeSet;
  * {@code META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/<definition name>} entry.
  *
  * <p>The entry is empty for a definition that has no descriptor: one compiled before descriptors existed, or one
- * this format cannot describe. Nothing reads the content at run time yet; the entry names alone are what the
- * definitions are found by.</p>
+ * this format cannot describe. A context reads the content only when lazy bean definitions are switched on
+ * ({@code micronaut.bean-definitions.lazy}); otherwise the entry names alone are what the definitions are found
+ * by.</p>
  *
  * <p>The content is a header and a payload, written as {@link java.io.DataOutput} writes them:</p>
  * <pre>
@@ -77,6 +78,10 @@ import java.util.TreeSet;
  * ushort n, utf[n]                              nonBindingMembers
  * ushort n, annotation[n]                       qualifiers
  * ushort n, condition[n]                        preLoadConditions
+ * utf    definitionName                         appended: the name of the definition class, as the entry is named
+ * int    order                                  appended
+ * utf    writer                                 appended: the Micronaut version of the processor, empty if unknown
+ * ushort revision                               appended: {@link #REVISION}
  *
  * annotation = utf name, ushort n, (utf member, value)[n]
  * value      = ubyte kind, then: 1 utf | 2 boolean | 3 byte | 4 char | 5 short | 6 int | 7 long | 8 float | 9 double
@@ -96,7 +101,14 @@ import java.util.TreeSet;
  *
  * <p>A reader uses a descriptor only when the magic and the version are the ones it knows and the entry is as long
  * as the header says. A later addition appends to the payload and keeps the version: the fields are read in order
- * and the bytes after the last one known are ignored. A change to what is already there takes a new version.</p>
+ * and the bytes after the last one known are ignored. A change to what is already there takes a new version. The
+ * fields from {@code definitionName} on were appended this way, before any release wrote a descriptor; a runtime
+ * that reads descriptors requires them, and treats a descriptor without them as none.</p>
+ *
+ * <p>A change to what a field answers, such as a flag computed differently, another membership rule, or a condition
+ * moved between the conditions checked before and after loading, keeps the format but must increase
+ * {@link #REVISION}, so that a runtime can refuse the descriptors of a revision found to be wrong after its release
+ * and load those definitions as it would without a descriptor.</p>
  *
  * <p>{@link #read(byte[])} gives {@code null} for an empty entry and for every entry it does not know, and a reader
  * that gets {@code null} loads the definition as a runtime without descriptors does. So does a reader that finds no
@@ -115,6 +127,10 @@ import java.util.TreeSet;
  * @param qualifiers           The qualifier annotations declared on the bean, with the values of their members
  * @param preLoadConditions    The conditions that can be checked before the definition is loaded, in the order they
  *                             are checked
+ * @param definitionName       The name of the definition class, which is the name of its entry
+ * @param order                What {@link io.micronaut.core.order.Ordered#getOrder()} answers
+ * @param writer               The Micronaut version of the processor that wrote the descriptor, empty if unknown
+ * @param revision             The revision of what the fields answer, {@link #REVISION} when written
  * @author Álvaro Sánchez-Mariscal
  * @since 5.3.0
  */
@@ -127,7 +143,11 @@ record BeanDefinitionDescriptor(int flags,
                                 SortedMap<String, String> repeatableContainers,
                                 List<String> nonBindingMembers,
                                 List<AnnotationValue<?>> qualifiers,
-                                List<Condition> preLoadConditions) {
+                                List<Condition> preLoadConditions,
+                                String definitionName,
+                                int order,
+                                String writer,
+                                int revision) {
 
     /**
      * The first four bytes of a descriptor: {@code MNBD}.
@@ -138,6 +158,12 @@ record BeanDefinitionDescriptor(int flags,
      * The version of the format.
      */
     static final int VERSION = 1;
+
+    /**
+     * The revision of what the fields answer. Increase it whenever a field answers differently for the same
+     * definition, so that a runtime can tell the descriptors of a revision found to be wrong from the others.
+     */
+    static final int REVISION = 1;
 
     /**
      * {@link io.micronaut.inject.BeanDefinitionReference#isContextScope()}.
@@ -188,6 +214,14 @@ record BeanDefinitionDescriptor(int flags,
      * The bean has conditions that can only be checked once the definition is loaded.
      */
     static final int FLAG_POST_LOAD_CONDITIONS = 1 << 9;
+
+    /**
+     * The indexes are the ones the bean declares with {@link io.micronaut.core.annotation.Indexed}, which a definition
+     * answers all or none of: none when one of the types does not load. Without the flag, the indexes are the ones of
+     * the {@link io.micronaut.core.annotation.Indexes} of the annotation metadata, of a factory for instance, which
+     * are read as class values.
+     */
+    static final int FLAG_DECLARED_INDEXES = 1 << 10;
 
     /**
      * {@link io.micronaut.core.annotation.AnnotationMetadata#hasDeclaredAnnotation(String)}.
@@ -344,6 +378,10 @@ record BeanDefinitionDescriptor(int flags,
         for (Condition condition : preLoadConditions) {
             writeCondition(out, condition);
         }
+        out.writeUTF(definitionName);
+        out.writeInt(order);
+        out.writeUTF(writer);
+        out.writeShort(revision);
     }
 
     private static BeanDefinitionDescriptor readPayload(DataInputStream in) throws IOException {
@@ -372,7 +410,8 @@ record BeanDefinitionDescriptor(int flags,
         for (int i = 0; i < count; i++) {
             preLoadConditions.add(readCondition(in));
         }
-        return new BeanDefinitionDescriptor(flags, beanType, exposedTypes, indexes, annotations, repeatableContainers, nonBindingMembers, qualifiers, preLoadConditions);
+        return new BeanDefinitionDescriptor(flags, beanType, exposedTypes, indexes, annotations, repeatableContainers, nonBindingMembers, qualifiers, preLoadConditions,
+            in.readUTF(), in.readInt(), in.readUTF(), in.readUnsignedShort());
     }
 
     private static void writeCount(DataOutputStream out, int count) throws IOException {

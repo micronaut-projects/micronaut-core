@@ -73,7 +73,11 @@ class BeanDefinitionDescriptorSpec extends Specification {
                 new AnnotationValue<>("jakarta.inject.Named", [value: "one"] as Map<CharSequence, Object>),
                 new AnnotationValue<>("a.Marker")
             ],
-            EVERY_CONDITION
+            EVERY_CONDITION,
+            'a.$Bean$Definition',
+            -5,
+            "5.3.0",
+            BeanDefinitionDescriptor.REVISION
         )
 
         when:
@@ -100,6 +104,10 @@ class BeanDefinitionDescriptorSpec extends Specification {
         read.qualifiers()*.annotationName == ["jakarta.inject.Named", "a.Marker"]
         read.qualifiers()[0].stringValue().get() == "one"
         read.preLoadConditions() == EVERY_CONDITION
+        read.definitionName() == 'a.$Bean$Definition'
+        read.order() == -5
+        read.writer() == "5.3.0"
+        read.revision() == BeanDefinitionDescriptor.REVISION
 
         and: "the header says what follows"
         def header = ByteBuffer.wrap(content)
@@ -290,6 +298,7 @@ class BeanDefinitionDescriptorSpec extends Specification {
         "added to"                     | valid().toList() + [(byte) 0]
         "two descriptors"              | valid().toList() + valid().toList()
         "a payload that ends early"    | withPayload(new byte[3])
+        "no appended fields"           | withPayload(payloadEnding(0))
         "an unknown condition"         | withPayload(payloadEnding(1, 99))
         "an unknown value"             | withPayload(payloadEndingWithQualifierValue(99))
         "an unknown array"             | withPayload(payloadEndingWithQualifierValue(12, 99, 0, 0))
@@ -314,10 +323,10 @@ class BeanDefinitionDescriptorSpec extends Specification {
         given: "collections whose order of iteration is not the order of the names"
         def one = new BeanDefinitionDescriptor(0, "a.Bean", ["c", "a", "b"], [], new TreeMap<String, Integer>([x: 1, y: 2]), new TreeMap<String, String>([r: "c", q: "d"]), [], [], [
             new MatchesCurrentOsCondition(new LinkedHashSet<>([Requires.Family.WINDOWS, Requires.Family.LINUX]))
-        ])
+        ], 'a.$Bean$Definition', 0, "", 1)
         def other = new BeanDefinitionDescriptor(0, "a.Bean", ["b", "c", "a", "a"], [], new TreeMap<String, Integer>([y: 2, x: 1]), new TreeMap<String, String>([q: "d", r: "c"]), [], [], [
             new MatchesCurrentOsCondition(EnumSet.of(Requires.Family.LINUX, Requires.Family.WINDOWS))
-        ])
+        ], 'a.$Bean$Definition', 0, "", 1)
 
         expect:
         one.toByteArray() == other.toByteArray()
@@ -346,7 +355,7 @@ class BeanDefinitionDescriptorSpec extends Specification {
     }
 
     private static BeanDefinitionDescriptor describe(List<AnnotationValue<?>> qualifiers, List<Condition> conditions) {
-        new BeanDefinitionDescriptor(0, "a.Bean", ["a.Bean"], [], new TreeMap<String, Integer>(), new TreeMap<String, String>(), [], qualifiers, conditions)
+        new BeanDefinitionDescriptor(0, "a.Bean", ["a.Bean"], [], new TreeMap<String, Integer>(), new TreeMap<String, String>(), [], qualifiers, conditions, 'a.$Bean$Definition', 0, "", BeanDefinitionDescriptor.REVISION)
     }
 
     private static AnnotationValue<?> qualifier(Object value) {

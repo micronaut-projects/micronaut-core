@@ -33,6 +33,7 @@ import java.lang.reflect.Field
 import static io.micronaut.inject.writer.BeanDefinitionDescriptor.FLAG_CONFIGURATION_PROPERTIES
 import static io.micronaut.inject.writer.BeanDefinitionDescriptor.FLAG_CONTAINER_TYPE
 import static io.micronaut.inject.writer.BeanDefinitionDescriptor.FLAG_CONTEXT_SCOPE
+import static io.micronaut.inject.writer.BeanDefinitionDescriptor.FLAG_DECLARED_INDEXES
 import static io.micronaut.inject.writer.BeanDefinitionDescriptor.FLAG_PARALLEL
 import static io.micronaut.inject.writer.BeanDefinitionDescriptor.FLAG_POST_LOAD_CONDITIONS
 import static io.micronaut.inject.writer.BeanDefinitionDescriptor.FLAG_PRIMARY
@@ -70,7 +71,8 @@ class BeanDefinitionDescriptors {
         CONFIGURATION_PROPERTIES  : FLAG_CONFIGURATION_PROPERTIES,
         CONTAINER_TYPE            : FLAG_CONTAINER_TYPE,
         REQUIRES_METHOD_PROCESSING: FLAG_REQUIRES_METHOD_PROCESSING,
-        POST_LOAD_CONDITIONS      : FLAG_POST_LOAD_CONDITIONS
+        POST_LOAD_CONDITIONS      : FLAG_POST_LOAD_CONDITIONS,
+        DECLARED_INDEXES          : FLAG_DECLARED_INDEXES
     ]
 
     /**
@@ -182,6 +184,9 @@ class BeanDefinitionDescriptors {
         }
 
         check("flags", flagNames(descriptor.flags()), flagNames(flags(reference)))
+        check("definitionName", descriptor.definitionName(), reference.getBeanDefinitionName())
+        check("order", descriptor.order(), reference.getOrder())
+        check("revision", descriptor.revision(), BeanDefinitionDescriptor.REVISION)
         check("beanType", descriptor.beanType(), typeName(reference.getBeanType()))
         check("exposedTypes", descriptor.exposedTypes(), reference.getExposedTypes().collect { Class<?> type -> typeName(type) }.sort())
         // a definition answers no indexes at all when one of its @Indexed types is missing, so that the missing
@@ -251,7 +256,19 @@ class BeanDefinitionDescriptors {
             (reference.isConfigurationProperties() ? FLAG_CONFIGURATION_PROPERTIES : 0) |
             (reference.isContainerType() ? FLAG_CONTAINER_TYPE : 0) |
             (reference.requiresMethodProcessing() ? FLAG_REQUIRES_METHOD_PROCESSING : 0) |
-            (postLoadConditions != null && postLoadConditions.length > 0 ? FLAG_POST_LOAD_CONDITIONS : 0)
+            (postLoadConditions != null && postLoadConditions.length > 0 ? FLAG_POST_LOAD_CONDITIONS : 0) |
+            (declaresIndexes(reference) ? FLAG_DECLARED_INDEXES : 0)
+    }
+
+    /**
+     * Whether the indexes of a reference are the ones it declares, which a generated class holds in a field of its
+     * own, rather than the ones of its annotation metadata.
+     *
+     * @param reference The reference
+     * @return Whether its class declares the field of its indexes
+     */
+    private static boolean declaresIndexes(BeanDefinitionReference<?> reference) {
+        reference.getClass().declaredFields.any { it.name == '$INDEXES' }
     }
 
     /**
