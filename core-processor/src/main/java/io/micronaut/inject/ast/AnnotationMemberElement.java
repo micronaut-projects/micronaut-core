@@ -51,7 +51,9 @@ public interface AnnotationMemberElement extends MemberElement, TypedElement {
      * <p>The value is the one {@link io.micronaut.inject.visitor.VisitorContext#getAnnotationDefaultValues(String)}
      * answers for the member, so an empty string default is reported. Under KSP the defaults of an annotation
      * class are only visible on a use of the annotation, so a member of a Kotlin annotation that no element of the
-     * compilation is annotated with reports no default.</p>
+     * compilation is annotated with reports no default. A Python declared annotation is visited before its
+     * generated annotation type exists, and until then its defaults keep the shape the Python processor reports
+     * and the metadata records: a class by its name as a {@link String}, a list as a {@link java.util.List}.</p>
      *
      * @return The default value, or empty when the member declares none or it cannot be resolved
      * @since 5.3.0
