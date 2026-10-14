@@ -59,16 +59,21 @@ final class BeanSelection {
         if (candidates.size() < 2) {
             return List.copyOf(candidates);
         }
-        List<BeanDefinition<T>> remaining = primaryCandidates(candidates);
-        if (remaining.size() == 1) {
-            return remaining;
+        List<BeanDefinition<T>> primary = candidates.stream()
+            .filter(BeanDefinition::isPrimary)
+            .toList();
+        if (primary.size() == 1) {
+            return primary;
         }
+        // the customizer is handed the caller's own collection where no primary narrowed it, as it always was
+        Collection<BeanDefinition<T>> considered = primary.isEmpty() ? candidates : primary;
         if (beanType != null) {
-            Optional<BeanDefinition<T>> customResolved = customizer.resolveNonUniqueBean(beanType, qualifier, remaining);
+            Optional<BeanDefinition<T>> customResolved = customizer.resolveNonUniqueBean(beanType, qualifier, considered);
             if (customResolved.isPresent()) {
                 return List.of(customResolved.get());
             }
         }
+        List<BeanDefinition<T>> remaining = List.copyOf(considered);
         List<BeanDefinition<T>> notSecondary = remaining.stream()
             .filter(candidate -> !candidate.hasDeclaredStereotype(Secondary.class))
             .toList();
