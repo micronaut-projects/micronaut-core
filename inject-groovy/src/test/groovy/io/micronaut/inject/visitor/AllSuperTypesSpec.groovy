@@ -76,14 +76,14 @@ class Holder {
         erased[1].rawType
     }
 
-    void "an array is followed by Object alone and a primitive by nothing"() {
+    void "an array has Cloneable, Serializable and Object as its super types, and a primitive none"() {
         given:
         ClassElement holder = buildClassElement('test.Holder', TYPES)
 
         expect:
-        closure(field(holder, 'strings')) == ['java.lang.String[]', 'java.lang.Object']
-        closure(field(holder, 'boxes')) == ['test.Box<java.lang.String>[]', 'java.lang.Object']
-        closure(field(holder, 'ints')) == ['int[][]', 'java.lang.Object']
+        closure(field(holder, 'strings')) == ['java.lang.String[]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object']
+        closure(field(holder, 'boxes')) == ['test.Box<java.lang.String>[]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object']
+        closure(field(holder, 'ints')) == ['int[][]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object']
         closure(field(holder, 'primitive')) == ['int']
     }
 

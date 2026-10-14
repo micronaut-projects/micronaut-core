@@ -68,12 +68,12 @@ class Holder {
         raw == [true, true, false, false]
     }
 
-    void "an array is followed by Object alone and a primitive by nothing"() {
+    void "an array has Cloneable, Serializable and Object as its super types, and a primitive none"() {
         expect:
         closures('test.Holder', 'strings', 'boxes', 'ints', 'primitive') == [
-            ['java.lang.String[]', 'java.lang.Object'],
-            ['test.Box<java.lang.String>[]', 'java.lang.Object'],
-            ['int[][]', 'java.lang.Object'],
+            ['java.lang.String[]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object'],
+            ['test.Box<java.lang.String>[]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object'],
+            ['int[][]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object'],
             ['int'],
         ]
     }

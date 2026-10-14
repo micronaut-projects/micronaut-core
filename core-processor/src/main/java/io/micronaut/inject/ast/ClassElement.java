@@ -774,11 +774,12 @@ public interface ClassElement extends TypedElement {
      *
      * <p>The super types of a {@link #isRawType() raw type} are raw, as the language has them (JLS 4.8): a raw
      * {@code Box}, where {@code Box} implements {@code View} of its variable, lists a {@code View} without type
-     * arguments, and answers {@code true} to {@link #isRawType()}. An array has no super type but {@code Object},
-     * and its element type is not walked; a primitive has none at all.</p>
+     * arguments, and answers {@code true} to {@link #isRawType()}. An array has the super types the language gives
+     * it (JLS 10.8), {@code Cloneable}, {@code Serializable} and {@code Object}, and its element type is not
+     * walked; a primitive has none.</p>
      *
-     * <p>No language reports {@code Object} as a super type element, so it is listed as {@link #of(Class)}
-     * answers it: by name and assignability, without its members.</p>
+     * <p>No language reports {@code Object}, {@code Cloneable} or {@code Serializable} as a super type element, so
+     * they are listed as {@link #of(Class)} answers them: by name and assignability, without their members.</p>
      *
      * @return The type and its super types, in declaration order and with {@code Object} last
      * @since 5.3.0
@@ -788,7 +789,8 @@ public interface ClassElement extends TypedElement {
         List<ClassElement> result = new ArrayList<>();
         result.add(this);
         if (isArray()) {
-            // Only Object
+            result.add(ClassElement.of(Cloneable.class));
+            result.add(ClassElement.of(java.io.Serializable.class));
         } else if (isPrimitive()) {
             return result;
         } else if (Object.class.getName().equals(getName())) {
