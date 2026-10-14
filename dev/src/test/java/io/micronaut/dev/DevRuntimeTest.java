@@ -1,22 +1,28 @@
 package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.env.Environment;
-import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.manifest.DevManifest;
+import io.micronaut.dev.manifest.DevReloadStrategy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -216,7 +222,7 @@ class DevRuntimeTest {
             Class<?> type = first.getClassLoader().loadClass("app.Greeter");
             Object bean = first.getBean(type);
             assertEquals("one", type.getMethod("greet").invoke(bean));
-            assertEquals(io.micronaut.dev.manifest.DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            assertEquals(DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
 
             // a body-only edit: the same generation, the same context, the same bean, a new body
             Files.writeString(greeter, greeter("two"));
@@ -457,31 +463,6 @@ class DevRuntimeTest {
     }
 
     @Test
-    void theConfigurationFilesAreTheApplicationAndBootstrapFilesAtTheRootAndThePropertySourcesTheEnvironmentRead() {
-        List<Path> roots = List.of(project);
-        Set<String> names = ResourceNotifier.names();
-        Set<String> extensions = Set.of("properties", "yml", "yaml");
-        assertTrue(ResourceNotifier.isConfigurationFile(project.resolve("application.yml"), roots, names, extensions));
-        assertTrue(ResourceNotifier.isConfigurationFile(project.resolve("application-dev.properties"), roots, names, extensions));
-        assertTrue(ResourceNotifier.isConfigurationFile(project.resolve("bootstrap.yaml"), roots, names, extensions));
-        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("schema.graphqls"), roots, names, extensions));
-        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("logback.xml"), roots, names, extensions));
-        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("applications.yml"), roots, names, extensions));
-        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("graphql/application.yml"), roots, names, extensions));
-        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("messages.properties"), roots, names, extensions));
-        // a property source micronaut.config.files names
-        Set<String> origins = Set.of("classpath:custom.yml", "file:" + project.resolve("other/extra.yml").toAbsolutePath());
-        assertTrue(ResourceNotifier.isPropertySource(project.resolve("custom.yml"), roots, origins));
-        assertTrue(ResourceNotifier.isPropertySource(project.resolve("other/extra.yml"), roots, origins));
-        assertFalse(ResourceNotifier.isPropertySource(project.resolve("schema.graphqls"), roots, origins));
-        // a file micronaut.config.import names with classpath*:
-        assertTrue(ResourceNotifier.isPropertySource(project.resolve("shared.yml"), roots, Set.of("classpath*:shared.yml")));
-        // a file micronaut.config.files names relative to the working directory
-        Path relative = Path.of("").toAbsolutePath().relativize(project.resolve("relative.yml").toAbsolutePath());
-        assertTrue(ResourceNotifier.isPropertySource(project.resolve("relative.yml"), roots, Set.of("file:" + relative)));
-    }
-
-    @Test
     void aLateReportOfAWriteOfADeletedStaticFileIsSettledAsADeletion() throws Exception {
         Path src = Files.createDirectories(project.resolve("src/main/java/app"));
         Files.writeString(src.resolve("Application.java"), """
@@ -664,49 +645,82 @@ class DevRuntimeTest {
     }
 
     @Test
-    void theConfigurationFilesIncludeThoseOfOverriddenLocationsAndOfImportsNotLoadedYet() {
+    void theConfigurationFilesAreThoseTheEnvironmentLookedFor() throws Exception {
         List<Path> roots = List.of(project);
-        Set<String> names = ResourceNotifier.names();
-        Set<String> extensions = Set.of("properties", "yml", "yaml");
-        // overrideConfigLocations("classpath:config/"): the environment records only application.yml as the origin
-        List<String> locations = List.of("classpath:config/", "file:" + project.resolve("external"));
-        assertTrue(ResourceNotifier.isConfigurationFile(project.resolve("config/application.yml"), roots, locations, names, extensions));
-        assertTrue(ResourceNotifier.isConfigurationFile(project.resolve("external/application-dev.yml"), roots, locations, names, extensions));
-        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("application.yml"), roots, locations, names, extensions));
-        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("config/schema.graphqls"), roots, locations, names, extensions));
-        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("config/application.yml"), roots, names, extensions));
+        Path absolute = project.resolve("abs.properties").toAbsolutePath();
+        // this class path reads properties files only
+        Files.writeString(project.resolve("application.properties"), """
+            micronaut.config.import[0]=optional:classpath://feature
+            micronaut.config.import[1]=optional:classpath://late.properties
+            micronaut.config.import[2]=optional:file://%s
+            """.formatted(absolute.toString().replace('\\', '/')));
+        Files.writeString(project.resolve("application-scalar.properties"), "micronaut.config.import=optional:classpath://scalar/one.properties\n");
+        Files.writeString(project.resolve("application-structured.properties"), """
+            micronaut.config.import[0].provider=classpath
+            micronaut.config.import[0].resource-path=nested/structured.properties
+            micronaut.config.import[0].optional=true
+            """);
+        try (ApplicationContext context = configurationContext().environments("dev", "scalar", "structured").start()) {
+            Environment environment = context.getEnvironment();
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("application.properties"), roots));
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("application-dev.properties"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("schema.graphqls"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("logback.xml"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("applications.yml"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("graphql/application.yml"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("messages.properties"), roots));
+            // imports of files that did not exist when the context started: indexed, scalar and structured
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("late.properties"), roots));
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("abs.properties"), roots));
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("scalar/one.properties"), roots));
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("nested/structured.properties"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("notlate.properties"), roots));
+            // an import without an extension, of a file in any format a loader reads
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("feature.properties"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("feature.graphqls"), roots));
+        }
+    }
 
-        // imports declared whether or not their files existed when the context started
-        Set<String> imports = ResourceNotifier.imports(List.of(
-            PropertySource.of("application", Map.of(
-                "micronaut.config.import", List.of("optional:classpath://feature", "optional:classpath://late.yml", "optional:file://" + project.resolve("abs.yml").toAbsolutePath()))),
-            PropertySource.of("indexed", Map.of("micronaut.config.import[0]", "optional:classpath://indexed/one.yml")),
-            PropertySource.of("structured", Map.of(
-                "micronaut.config.import[0].provider", "classpath",
-                "micronaut.config.import[0].resource-path", "nested/structured.yml",
-                "micronaut.config.import[0].optional", true)),
-            PropertySource.of("nested", Map.of("micronaut.config.import", "optional:classpath://sibling.yml"), PropertySource.Origin.of("classpath:config/app.yml")),
-            PropertySource.of("structured-nested", Map.of(
-                "micronaut.config.import[0].provider", "classpath",
-                "micronaut.config.import[0].resource-path", "shared.yml"), PropertySource.Origin.of("classpath:config/other.yml")),
-            PropertySource.of("other", Map.of("micronaut.config.importance", "classpath://unrelated.yml", "app.name", "test"))));
-        assertTrue(ResourceNotifier.isImport(project.resolve("late.yml"), roots, imports, extensions));
-        assertTrue(ResourceNotifier.isImport(project.resolve("abs.yml"), roots, imports, extensions));
-        assertTrue(ResourceNotifier.isImport(project.resolve("indexed/one.yml"), roots, imports, extensions));
-        assertTrue(ResourceNotifier.isImport(project.resolve("nested/structured.yml"), roots, imports, extensions));
-        // an import resolves against the location of the property source that declares it, and names that file only
-        assertTrue(ResourceNotifier.isImport(project.resolve("config/sibling.yml"), roots, imports, extensions));
-        assertFalse(ResourceNotifier.isImport(project.resolve("sibling.yml"), roots, imports, extensions));
-        assertFalse(ResourceNotifier.isImport(project.resolve("config/late.yml"), roots, imports, extensions));
-        // a structured import resolves from the class path root, wherever it is declared
-        assertTrue(ResourceNotifier.isImport(project.resolve("shared.yml"), roots, imports, extensions));
-        assertFalse(ResourceNotifier.isImport(project.resolve("config/shared.yml"), roots, imports, extensions));
-        assertFalse(ResourceNotifier.isImport(project.resolve("unrelated.yml"), roots, imports, extensions));
-        assertFalse(ResourceNotifier.isImport(project.resolve("schema.graphqls"), roots, imports, extensions));
-        assertFalse(ResourceNotifier.isImport(project.resolve("notlate.yml"), roots, imports, extensions));
-        // an import without an extension, of a file in any format a loader reads
-        assertTrue(ResourceNotifier.isImport(project.resolve("feature.yml"), roots, imports, extensions));
-        assertFalse(ResourceNotifier.isImport(project.resolve("feature.graphqls"), roots, imports, extensions));
+    @Test
+    void theConfigurationFilesOfOverriddenLocations() throws Exception {
+        List<Path> roots = List.of(project);
+        Path external = project.resolve("external");
+        try (ApplicationContext context = configurationContext().environments("dev").overrideConfigLocations("classpath:config/", "file:" + external).start()) {
+            Environment environment = context.getEnvironment();
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("config/application.properties"), roots));
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, external.resolve("application-dev.properties"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("application.properties"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("config/schema.graphqls"), roots));
+        }
+    }
+
+    @Test
+    void noRunningContextHasNoRefresh() {
+        assertNull(ConfigurationStaleness.refreshConfiguration(null));
+    }
+
+    /**
+     * A context reading its configuration from the project only: the configuration files of the test class path
+     * stay out, and the service descriptors are read from it.
+     */
+    private ApplicationContextBuilder configurationContext() throws MalformedURLException {
+        ClassLoader services = new ClassLoader(DevRuntimeTest.class.getClassLoader()) {
+            @Override
+            public URL getResource(String name) {
+                return name.startsWith("META-INF/") ? super.getResource(name) : null;
+            }
+
+            @Override
+            public Enumeration<URL> getResources(String name) throws IOException {
+                return name.startsWith("META-INF/") ? super.getResources(name) : Collections.emptyEnumeration();
+            }
+        };
+        return ApplicationContext.builder()
+            .classLoader(new URLClassLoader(new URL[] {project.toUri().toURL()}, services))
+            .deduceEnvironment(false)
+            .deduceCloudEnvironment(false)
+            .environmentPropertySource(false)
+            .banner(false);
     }
 
     private static String other(String value) {
@@ -754,7 +768,7 @@ class DevRuntimeTest {
         try {
             ApplicationContext first = runtime.context().orElseThrow();
             assertEquals("one", greet(first));
-            assertEquals(io.micronaut.dev.manifest.DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            assertEquals(DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
             refuseRedefinitions(runtime);
             GenerationClassLoader generation = runtime.classLoader().current();
             byte[] greeterBefore = InPlaceUpdates.classFile(generation.roots(), "app.Greeter");
