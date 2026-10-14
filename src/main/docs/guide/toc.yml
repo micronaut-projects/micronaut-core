@@ -327,6 +327,11 @@ messaging:
   kafka: Kafka Support
   rabbitmq: RabbitMQ Support
   nats: Nats.io Support
+devMode:
+  title: Development Mode
+  devModeLaunch: Launching in Development Mode
+  devModeReload: What a Change Does
+  devModeWatch: Watching Beans, Configuration and Resources
 commandLineApps:
   title: Standalone Command Line Applications
   picocli:
