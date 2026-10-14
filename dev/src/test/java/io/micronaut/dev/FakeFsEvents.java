@@ -42,6 +42,10 @@ final class FakeFsEvents implements FsEventsApi {
     volatile boolean startFails;
     volatile RuntimeException runFailure;
     volatile Thread runLoopThread;
+    /**
+     * Run when a stream starts, before it reports any change.
+     */
+    volatile Runnable onStart = () -> { };
     private volatile boolean running;
 
     @Override
@@ -149,6 +153,7 @@ final class FakeFsEvents implements FsEventsApi {
         @Override
         public boolean start() {
             record("start " + realPath);
+            onStart.run();
             started = !startFails;
             return started;
         }

@@ -54,6 +54,30 @@ class FsEventsWatchServiceLifecycleTest {
     Path base;
 
     @Test
+    void aChangeMadeWhileTheStreamStartsIsReportedRatherThanTakenForTheFirstState() throws Exception {
+        Path root = Files.createDirectories(base.resolve("root"));
+        FakeFsEvents fake = new FakeFsEvents();
+        // after the directory is read and before the stream reports anything: no event announces this change
+        fake.onStart = () -> {
+            try {
+                Files.writeString(root.resolve("during.txt"), "x");
+            } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        };
+        try (FsEventsWatchService service = new FsEventsWatchService(fake, DevWatchService.MAC_LATENCY_SECONDS, FALLBACK)) {
+            WatchKey rootKey = service.register(root);
+            assertTrue(Files.exists(root.resolve("during.txt")));
+            // compared once the stream runs, before registering returns
+            WatchKey key = service.poll();
+            assertSame(rootKey, key);
+            List<WatchEvent<?>> events = key.pollEvents();
+            assertEquals("ENTRY_CREATE during.txt", events.get(0).kind().name() + " " + events.get(0).context());
+        }
+        assertEquals(List.of(), fake.violations);
+    }
+
+    @Test
     void aReportedDirectoryIsComparedAtOnceRatherThanAtTheSafetyInterval() throws Exception {
         Path root = Files.createDirectories(base.resolve("root"));
         Path nested = Files.createDirectories(root.resolve("nested"));

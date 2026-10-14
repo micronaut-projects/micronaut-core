@@ -118,6 +118,18 @@ final class PollingWatchService implements WatchService {
     }
 
     /**
+     * Compares a registered directory at once, on the calling thread: a native service that starts reporting changes
+     * after the directory was read calls it, so that a change made in between is signalled before registering returns.
+     *
+     * @param key The key of the directory
+     */
+    void compareNow(WatchKey key) {
+        if (!closed && key instanceof Key registered) {
+            registered.compare();
+        }
+    }
+
+    /**
      * Compares the directories at another interval from the next comparison on.
      *
      * @param interval How long to wait between two comparisons

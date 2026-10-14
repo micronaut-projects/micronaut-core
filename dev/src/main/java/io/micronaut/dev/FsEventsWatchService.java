@@ -102,15 +102,20 @@ final class FsEventsWatchService implements WatchService {
      * @throws IOException if the directory cannot be read or watched
      */
     WatchKey register(Path directory) throws IOException {
-        // the stream first: a change made before the directory is read is in its first state, one made after is reported
+        // the directory is read first, then the stream starts, then the directory is compared once, before this
+        // returns: a change made before the stream reports changes, which no event announces, is found by that
+        // comparison rather than lost in the first state
+        Path absolute = directory.toAbsolutePath().normalize();
+        WatchKey key = polling.register(absolute);
         try {
-            streams.watch(directory.toAbsolutePath().normalize());
+            streams.watch(absolute);
         } catch (ClosedWatchServiceException e) {
             throw e;
         } catch (IOException e) {
             fallBack(polling, fallbackInterval, String.valueOf(e.getMessage()));
         }
-        return polling.register(directory);
+        polling.compareNow(key);
+        return key;
     }
 
     /**
