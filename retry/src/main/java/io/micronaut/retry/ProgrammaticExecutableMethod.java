@@ -54,6 +54,11 @@ record ProgrammaticExecutableMethod(String name) implements ExecutableMethod<Obj
     }
 
     @Override
+    public boolean hasTargetMethod() {
+        return false;
+    }
+
+    @Override
     public ReturnType<Object> getReturnType() {
         return ReturnType.of(Object.class);
     }

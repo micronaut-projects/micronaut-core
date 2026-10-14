@@ -48,13 +48,13 @@ class PropagatedContext2Spec extends Specification {
         })
 
         then: "Should be called 1x on the propagate() method and 1x by the ExecutorServiceInstrumenter"
-        contextForIo.state() == 1
+        contextForIo.state() == 2
 
         and: "Should be called 1x on the propagate() method and 1x by the ExecutorServiceInstrumenter"
-        contextForVirtual.state() == 1
+        contextForVirtual.state() == 2
 
         and: "Should be called 1x on the propagate() method and 1x by the ExecutorServiceInstrumenter"
-        contextForBlocking.state() == 1
+        contextForBlocking.state() == 2
 
         cleanup:
         applicationContext.stop()

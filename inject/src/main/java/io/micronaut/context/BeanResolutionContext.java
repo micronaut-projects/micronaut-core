@@ -154,6 +154,26 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType);
 
     /**
+     * Resolves the registration of the bean of the given definition as the given bean type, on behalf of the bean
+     * this context resolves for.
+     *
+     * <p>This is {@link #getBean(BeanDefinition, Argument)} with the registration kept: the bean is resolved within
+     * this context, so what is created for it sees this context's path, and a bean that has no scope of its own is a
+     * dependent of the bean this context resolves for and is destroyed with it. The registration is
+     * the one {@link BeanDefinitionRegistry#getBeanRegistration(BeanDefinition, Argument)} returns when the
+     * resolution starts no context of its own, with that ownership.</p>
+     *
+     * @param definition The bean definition
+     * @param beanType   The potentially parameterized bean type to resolve the definition as
+     * @param <T>        The bean type
+     * @return The bean registration
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the bean
+     *                                                             type
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType);
+
+    /**
      * Obtains the bean registrations for the given type and qualifier.
      *
      * @param beanType          The bean type
@@ -190,6 +210,29 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 5.3.0
      */
     default @Nullable BeanDependencyGroup getBeanDependencyGroup() {
+        return null;
+    }
+
+    /**
+     * Returns a resolver owned by the bean the current segment of the path belongs to: the bean a field, constructor
+     * argument or method argument is being injected into, or the bean itself when it is resolved by a lookup rather
+     * than injected.
+     *
+     * <p>A bean built for the injection point it is injected into, such as one of an
+     * {@link io.micronaut.inject.provider.AbstractInjectionPointBeanDefinition}, uses it to resolve dependencies on
+     * behalf of the bean it is injected into: a dependent the resolver creates is destroyed with that bean, under the
+     * rules of an injected {@link BeanDependencyResolver}, and can be destroyed earlier with
+     * {@link BeanDependencyResolver#destroy(BeanRegistration)}. The resolver can be retained after the injection.</p>
+     *
+     * <p>The resolver does not share the path of this context: it must not be used to resolve the bean it is owned by
+     * while that bean is being created.</p>
+     *
+     * @return The resolver, or {@code null} if there is no current segment, the bean of the segment is not being
+     * created through this context, or the context does not track bean ownership
+     * @since 5.3.0
+     */
+    @Experimental
+    default @Nullable BeanDependencyResolver getDependencyResolver() {
         return null;
     }
 
@@ -447,6 +490,35 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      */
     @UsedByGeneratedCode
     default void markDependentAsFactory() {
+    }
+
+    /**
+     * Resolves the factory bean a produced bean is instantiated from, and marks it as the dependent
+     * factory, as {@link #markDependentAsFactory()} does. Generated definitions call this rather than
+     * {@code getBean} followed by {@link #markDependentAsFactory()}.
+     *
+     * <p>When the context records a {@link BeanDependencyGraph}, the lookup is attributed to the produced
+     * definition: the factory is a dependency of the bean it produces, not of whatever bean happened to be
+     * resolving the produced one, which is what a lookup with no segment of its own would record. A context
+     * that records no graph does nothing more than the {@code getBean} and {@link #markDependentAsFactory()}
+     * it replaces.</p>
+     *
+     * <p>Definitions compiled against an earlier version keep calling {@code getBean} and
+     * {@link #markDependentAsFactory()}: in development mode, their factory is recorded as a dependency of the
+     * bean resolving the product rather than of the product, until they are compiled again.</p>
+     *
+     * @param producedDefinition The definition of the bean the factory produces
+     * @param factoryType The factory type
+     * @param qualifier The factory's qualifier, if any
+     * @param <F> The factory type
+     * @return The factory bean
+     * @since 5.3.0
+     */
+    @UsedByGeneratedCode
+    default <F> F getFactoryBean(BeanDefinition<?> producedDefinition, Class<F> factoryType, @Nullable Qualifier<F> qualifier) {
+        F factory = getBean(factoryType, qualifier);
+        markDependentAsFactory();
+        return factory;
     }
 
     /**
