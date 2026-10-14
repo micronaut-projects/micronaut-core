@@ -41,11 +41,14 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
 /**
@@ -58,13 +61,14 @@ import java.util.function.UnaryOperator;
  * int    length   the bytes that follow
  * int flags, utf beanType, utf[] exposedTypes, utf[] indexes, (utf, ubyte)[] annotations,
  * (utf, utf)[] repeatableContainers, utf[] nonBindingMembers, annotation[] qualifiers, condition[] preLoadConditions,
- * utf definitionName, int order, utf writer, ushort revision
+ * utf definitionName, int order, utf writer, ushort revision, annotation[] qualifierDefaults
  * </pre>
  *
  * <p>Reading never throws. An entry gives no data, and its definition is loaded as without descriptors, when it is
  * empty, is not a descriptor of this version, is shorter or longer than its header says, ends before the last field
- * this reader knows, names another definition than the entry does, names no exposed type, or holds a kind of value or
- * condition this reader does not know. Bytes after the last field are ignored, as the format requires.</p>
+ * this reader knows, names another definition than the entry does, names no exposed type, is of a revision this
+ * reader does not know, or holds a kind of value or condition this reader does not know. Bytes after the last field
+ * are ignored, as the format requires.</p>
  *
  * @author Álvaro Sánchez-Mariscal
  * @since 5.3.0
@@ -86,9 +90,19 @@ final class BeanDefinitionDescriptorReader {
      */
     static final Object MISSING = new Object();
 
+    /**
+     * The latest revision of what the fields answer that this reader knows, the {@code REVISION} of the writer: a
+     * descriptor of a later revision answers in a way this runtime does not, so it is not used.
+     */
+    static final int REVISION = 1;
+
     private static final int MAGIC = 0x4D4E4244;
     private static final int VERSION = 1;
     private static final int HEADER_LENGTH = 10;
+    /**
+     * The longest payload read: a header that announces more is damaged, and is not given a buffer of that size.
+     */
+    private static final int MAX_LENGTH = 1 << 20;
 
     private static final int VALUE_STRING = 1;
     private static final int VALUE_BOOLEAN = 2;
@@ -124,8 +138,7 @@ final class BeanDefinitionDescriptorReader {
      * What was read from the entries of one class loader, kept while the loader lives and the service entries cached
      * for it are not invalidated: the bootstrap context and the contexts of a test suite read each entry once.
      */
-    @Nullable
-    private static volatile Cache cache;
+    private static final AtomicReference<@Nullable Cache> CACHE = new AtomicReference<>();
 
     private BeanDefinitionDescriptorReader() {
     }
@@ -150,14 +163,22 @@ final class BeanDefinitionDescriptorReader {
         return found;
     }
 
+    /**
+     * The cache of a class loader. The readers that ask first, on several threads at once, all get the cache one of
+     * them published.
+     */
     private static Cache cache(ClassLoader classLoader) {
         long generation = MicronautMetaServiceLoaderUtils.generation();
-        Cache current = cache;
-        if (current == null || current.classLoader.get() != classLoader || current.generation != generation) {
-            current = new Cache(new WeakReference<>(classLoader), generation, new ConcurrentHashMap<>(), new ConcurrentHashMap<>());
-            cache = current;
+        while (true) {
+            Cache current = CACHE.get();
+            if (current != null && current.classLoader.get() == classLoader && current.generation == generation) {
+                return current;
+            }
+            Cache candidate = new Cache(new WeakReference<>(classLoader), generation, new ConcurrentHashMap<>(), new ConcurrentHashMap<>());
+            if (CACHE.compareAndSet(current, candidate)) {
+                return candidate;
+            }
         }
-        return current;
     }
 
     private static Object readEntry(ClassLoader classLoader, String name, Cache current) {
@@ -166,12 +187,39 @@ final class BeanDefinitionDescriptorReader {
             if (in == null) {
                 return MISSING;
             }
-            content = in.readAllBytes();
+            content = readContent(in);
         } catch (IOException | RuntimeException e) {
+            return UNUSABLE;
+        }
+        if (content == null) {
             return UNUSABLE;
         }
         BeanDefinitionDescriptorData data = read(content, name, current::intern);
         return data != null ? data : UNUSABLE;
+    }
+
+    /**
+     * Reads the header of an entry and then exactly the payload it announces, into one array of that size, rather
+     * than through the buffer of {@link InputStream#readAllBytes()}.
+     *
+     * @return The content, or {@code null} if it is not a descriptor of this version or not as long as it says
+     */
+    private static byte @Nullable [] readContent(InputStream in) throws IOException {
+        byte[] header = new byte[HEADER_LENGTH];
+        if (in.readNBytes(header, 0, HEADER_LENGTH) != HEADER_LENGTH) {
+            return null;
+        }
+        ByteBuffer fields = ByteBuffer.wrap(header);
+        int length = fields.getInt(6);
+        if (fields.getInt(0) != MAGIC || Short.toUnsignedInt(fields.getShort(4)) != VERSION || length < 0 || length > MAX_LENGTH) {
+            return null;
+        }
+        byte[] content = Arrays.copyOf(header, HEADER_LENGTH + length);
+        if (in.readNBytes(content, HEADER_LENGTH, length) != length || in.read() != -1) {
+            // shorter or longer than the header says
+            return null;
+        }
+        return content;
     }
 
     /**
@@ -235,8 +283,14 @@ final class BeanDefinitionDescriptorReader {
         int order = in.readInt();
         String writer = intern.apply(in.readUTF());
         int revision = in.readUnsignedShort();
-        if (!definitionName.equals(name) || exposedTypes.length == 0) {
-            // content copied from another entry, or a bean the index would find under no type
+        count = count(in);
+        AnnotationValue<?>[] qualifierDefaults = new AnnotationValue<?>[count];
+        for (int i = 0; i < count; i++) {
+            qualifierDefaults[i] = readAnnotation(in, intern);
+        }
+        if (!definitionName.equals(name) || exposedTypes.length == 0 || revision < 1 || revision > REVISION) {
+            // content copied from another entry, a bean the index would find under no type, or a revision that
+            // answers in a way this reader does not know
             return null;
         }
         return new BeanDefinitionDescriptorData(
@@ -253,7 +307,8 @@ final class BeanDefinitionDescriptorReader {
             name,
             order,
             writer,
-            revision
+            revision,
+            qualifierDefaults
         );
     }
 

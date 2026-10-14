@@ -31,6 +31,44 @@ import java.util.List;
 @Internal
 public final class DefaultBeanDefinitionsProvider implements BeanDefinitionsProvider {
 
+    /**
+     * The experimental system property that switches lazy bean definition references on when it is {@code true}.
+     *
+     * @since 5.3.0
+     */
+    public static final String LAZY_PROPERTY = "micronaut.bean-definitions.lazy";
+
+    /**
+     * The system property that switches lazy bean definition references on, with the verification of every descriptor
+     * against its definition, when it is {@code true}.
+     *
+     * @since 5.3.0
+     */
+    public static final String LAZY_VERIFY_PROPERTY = LAZY_PROPERTY + ".verify";
+
+    /**
+     * The file the verification appends the differences it finds to.
+     *
+     * @since 5.3.0
+     */
+    public static final String LAZY_VERIFY_REPORT_PROPERTY = LAZY_VERIFY_PROPERTY + ".report";
+
+    /**
+     * The system property that turns the warm-up of lazy references off when it is {@code false}, and extends it to
+     * every reference whose conditions are only of classes when it is {@code all}.
+     *
+     * @since 5.3.0
+     */
+    public static final String LAZY_WARM_UP_PROPERTY = LAZY_PROPERTY + ".warm-up";
+
+    /**
+     * The system property that lists, comma separated, the writers ({@code 5.3.0}) and the revisions ({@code r1})
+     * whose descriptors are not used.
+     *
+     * @since 5.3.0
+     */
+    public static final String LAZY_IGNORE_WRITERS_PROPERTY = LAZY_PROPERTY + ".ignore-writers";
+
     @Override
     public List<BeanDefinitionReference<?>> provide(ClassLoader classLoader) {
         List<BeanDefinitionReference> result = MicronautMetaServiceLoaderUtils.findMetaMicronautServiceEntries(

@@ -52,6 +52,7 @@ import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +62,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -87,12 +89,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         ConversionService.class
     );
 
-    /**
-     * The system property that switches lazy bean definition references on, read when the service is created.
-     */
-    private static final String LAZY_PROPERTY = "micronaut.bean-definitions.lazy";
-    private static final String LAZY_VERIFY_PROPERTY = LAZY_PROPERTY + ".verify";
-    private static final String LAZY_WARM_UP_PROPERTY = LAZY_PROPERTY + ".warm-up";
+    private static final String WARM_UP_ALL = "all";
 
     private final String[] eagerInitStereotypes;
     private final boolean eagerInitStereotypesPresent;
@@ -106,7 +103,11 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     private final boolean lazy;
     private final boolean warmUp;
     /**
-     * In lazy mode, the references as the provider gave them, which carry what it counted.
+     * Whether the warm-up also loads every lazy reference whose conditions are only of classes that are present.
+     */
+    private final boolean warmUpAll;
+    /**
+     * In lazy mode, the references as the provider gave them, which carry what it counted, until the service is reset.
      */
     @Nullable
     private List<BeanDefinitionReference<?>> providedReferences;
@@ -116,9 +117,10 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     @Nullable
     private volatile Object runningWarmUp;
     /**
-     * In lazy mode, the disabled beans of lazy references, built when they are read.
+     * In lazy mode, the disabled beans of lazy references, built when they are read; {@code null} otherwise.
      */
-    private final CopyOnWriteArrayList<Object> deferredDisabledBeans = new CopyOnWriteArrayList<>();
+    @Nullable
+    private final CopyOnWriteArrayList<Object> deferredDisabledBeans;
 
     // The collection should be modified only when new bean definition is added
     // That shouldn't happen that often, so we can use CopyOnWriteArrayList
@@ -129,14 +131,6 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         // Keep an anonymous class for performance
         @Override
         public List<BeanDefinitionProducer> apply(Class<?> indexedType) {
-            return new ArrayList<>(20);
-        }
-    };
-
-    private static final Function<String, List<BeanDefinitionProducer>> COMPUTE_NAME_INDEXES_FN = new Function<String, List<BeanDefinitionProducer>>() {
-        // Keep an anonymous class for performance
-        @Override
-        public List<BeanDefinitionProducer> apply(String indexedType) {
             return new ArrayList<>(20);
         }
     };
@@ -187,8 +181,12 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         this.beanDefinitionReferencesProvider = contextConfiguration.getBeanDefinitionsProvider();
         this.beanResolutionCustomizer = Objects.requireNonNull(beanResolutionCustomizer, "Bean resolution customizer cannot be null");
         this.classLoader = contextConfiguration.getClassLoader();
-        this.lazy = (Boolean.getBoolean(LAZY_PROPERTY) || Boolean.getBoolean(LAZY_VERIFY_PROPERTY)) && !NativeImageUtils.inImageCode();
-        this.warmUp = lazy && ForkJoinPool.getCommonPoolParallelism() > 1 && !StringUtils.FALSE.equals(System.getProperty(LAZY_WARM_UP_PROPERTY));
+        this.lazy = (Boolean.getBoolean(DefaultBeanDefinitionsProvider.LAZY_PROPERTY) || Boolean.getBoolean(DefaultBeanDefinitionsProvider.LAZY_VERIFY_PROPERTY))
+            && !NativeImageUtils.inImageCode();
+        String warmUpProperty = lazy ? System.getProperty(DefaultBeanDefinitionsProvider.LAZY_WARM_UP_PROPERTY) : null;
+        this.warmUp = lazy && ForkJoinPool.getCommonPoolParallelism() > 1 && !StringUtils.FALSE.equals(warmUpProperty);
+        this.warmUpAll = warmUp && WARM_UP_ALL.equals(warmUpProperty);
+        this.deferredDisabledBeans = lazy ? new CopyOnWriteArrayList<>() : null;
         if (beans == null) {
             beans = createBeans(resolveBeanDefinitionReferences(), List.of());
         }
@@ -203,7 +201,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         }
         Beans created = LazyBeans.createBeans(beanDefinitionReferences, beanConfigurations);
         if (warmUp) {
-            runningWarmUp = LazyBeans.warmUp(created);
+            runningWarmUp = LazyBeans.warmUp(created, warmUpAll);
         }
         return created;
     }
@@ -274,6 +272,14 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                                                               @Nullable Predicate<BeanDefinitionReference<B>> refPredicate,
                                                               @Nullable Predicate<BeanDefinition<B>> defPredicate) {
         return getBeanDefinitions(resolveProducersForBeanType(beanType), beanContext, null, beanType, refPredicate, defPredicate);
+    }
+
+    @Override
+    public List<BeanDefinitionReference<Object>> getPresentBeanReferences() {
+        if (lazy && beans != null) {
+            return LazyBeans.presentReferences(beans.all);
+        }
+        return getBeanReferences();
     }
 
     @Override
@@ -462,11 +468,16 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         if (lazy) {
             Object warmingUp = runningWarmUp;
             runningWarmUp = null;
-            LazyBeans.stop(warmingUp, getBeanReferences());
+            // the provided references, which also have the ones a condition dropped since, and which a stopped
+            // context that is still referenced must not keep
+            List<BeanDefinitionReference<?>> provided = providedReferences;
+            providedReferences = null;
+            LazyBeans.stop(warmingUp, provided != null ? provided : getBeanReferences());
+            Objects.requireNonNull(deferredDisabledBeans).clear();
         }
         beans = null;
+        producersByDefinitionName = null;
         disabledBeans.clear();
-        deferredDisabledBeans.clear();
         additionalBeanDefinitions.clear();
         additionalBeanConfigurations.clear();
     }
@@ -491,7 +502,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
     @Override
     public void trackDisabled(QualifiedBeanType<?> beanType, List<String> reasons) {
-        if (lazy && LazyBeans.deferDisabled(deferredDisabledBeans, beanType, reasons)) {
+        if (lazy && LazyBeans.deferDisabled(Objects.requireNonNull(deferredDisabledBeans), beanType, reasons)) {
             return;
         }
         try {
@@ -546,7 +557,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             .filter(Objects::nonNull)
             .collect(Collectors.toList());
         if (lazy) {
-            disabled.addAll(LazyBeans.disabledBeans(deferredDisabledBeans, null));
+            disabled.addAll(LazyBeans.disabledBeans(Objects.requireNonNull(deferredDisabledBeans), null));
         }
         return disabled;
     }
@@ -560,8 +571,8 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             .map(producer -> (DisabledBean<?>) producer.reference)
             .filter(Objects::nonNull)
             .collect(Collectors.toList());
-        // only the ones a lookup of the type finds by name are built
-        disabled.addAll(LazyBeans.disabledBeans(deferredDisabledBeans, beanType.getType().getName()));
+        // only the ones a lookup of the type can find are built
+        disabled.addAll(LazyBeans.disabledBeans(Objects.requireNonNull(deferredDisabledBeans), beanType.getType()));
         return disabled;
     }
 
@@ -576,7 +587,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         Beans current = Objects.requireNonNull(beans);
         Map<String, List<BeanDefinitionProducer>> nameIndex = current.nameIndex;
         if (nameIndex != null) {
-            return nameIndex.computeIfAbsent(indexedType.getName(), COMPUTE_NAME_INDEXES_FN);
+            return LazyBeans.typeIndex(nameIndex, indexedType);
         }
         return current.beanIndex.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN);
     }
@@ -1045,7 +1056,15 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                                                      @Nullable Predicate<BeanDefinition<T>> defPredicate) {
             Object defObject = this.definition;
             if (defObject != DEFINITION_DISABLED_SENTINEL && defObject != null) {
-                return super.getDefinitionIfEnabled(context, resolutionContext, beanResolutionCustomizer, beanType, refPredicate, defPredicate);
+                if (refPredicate != null) {
+                    // eager mode asks the reference it holds, which for a compiled definition is the definition, not
+                    // the descriptor
+                    BeanDefinitionReference instance = reference == null ? null : lazy.instantiate();
+                    if (instance == null || !refPredicate.test(instance)) {
+                        return null;
+                    }
+                }
+                return super.getDefinitionIfEnabled(context, resolutionContext, beanResolutionCustomizer, beanType, null, defPredicate);
             }
             BeanDefinitionReference<T> ref = getReferenceIfEnabled(context, resolutionContext);
             if (ref == null) {
@@ -1068,7 +1087,10 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                     }
                 }
                 if (refPredicate != null) {
-                    if (!refPredicate.test(ref)) {
+                    boolean described = refPredicate.test(ref);
+                    // with the verification on, the definition is asked too, which finds a bean the descriptor leaves out
+                    lazy.verifyPredicate(refPredicate, described);
+                    if (!described) {
                         return null;
                     }
                     // the descriptor selected it: ask the instance, as eager mode does, which a definition whose
@@ -1118,7 +1140,52 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
      */
     private static final class LazyBeans {
 
+        private static final Function<String, List<BeanDefinitionProducer>> COMPUTE_NAME_INDEXES_FN = new Function<String, List<BeanDefinitionProducer>>() {
+            // Keep an anonymous class for performance
+            @Override
+            public List<BeanDefinitionProducer> apply(String indexedType) {
+                return new ArrayList<>(20);
+            }
+        };
+
         private LazyBeans() {
+        }
+
+        /**
+         * The producers indexed under the name of a type, created when there are none.
+         */
+        static Collection<BeanDefinitionProducer> typeIndex(Map<String, List<BeanDefinitionProducer>> nameIndex, Class<?> type) {
+            return nameIndex.computeIfAbsent(type.getName(), COMPUTE_NAME_INDEXES_FN);
+        }
+
+        /**
+         * The references of the producers that are present, as eager mode, which drops the ones that cannot be linked
+         * when it reads them, lists them: a lazy reference is loaded for that, and its producer disabled when it is
+         * not present.
+         */
+        @SuppressWarnings({"unchecked", "java:S1181"})
+        static List<BeanDefinitionReference<Object>> presentReferences(List<BeanDefinitionProducer> all) {
+            List<BeanDefinitionReference<Object>> references = new ArrayList<>(all.size());
+            for (BeanDefinitionProducer producer : all) {
+                BeanDefinitionReference<?> reference = producer.reference;
+                if (reference instanceof LazyBeanDefinitionReference<?> lazy) {
+                    BeanDefinitionReference<?> instance;
+                    try {
+                        instance = lazy.instantiate();
+                    } catch (Throwable e) {
+                        // present, with a failure the lookup that needs it meets, as it would have failed the start
+                        instance = lazy;
+                    }
+                    if (instance == null) {
+                        producer.disable();
+                        continue;
+                    }
+                }
+                if (reference != null) {
+                    references.add((BeanDefinitionReference<Object>) reference);
+                }
+            }
+            return references;
         }
 
         static BeanDefinitionProducer producer(BeanDefinitionReference<?> reference) {
@@ -1303,14 +1370,14 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
          * Builds the disabled beans of lazy references.
          *
          * @param deferred The beans kept by {@link #deferDisabled(List, QualifiedBeanType, List)}
-         * @param typeName The name of the type a lookup asked for, to build only the ones it finds, or {@code null}
+         * @param type     The type a lookup asked for, to build only the ones it can find, or {@code null}
          * @return The disabled beans that could be built
          */
-        static List<DisabledBean<?>> disabledBeans(List<Object> deferred, @Nullable String typeName) {
+        static List<DisabledBean<?>> disabledBeans(List<Object> deferred, @Nullable Class<?> type) {
             List<DisabledBean<?>> disabled = new ArrayList<>(deferred.size());
             for (Object entry : deferred) {
                 DeferredDisabledBean bean = (DeferredDisabledBean) entry;
-                if (typeName == null || bean.reference.isFoundBy(typeName)) {
+                if (type == null || bean.reference.isFoundBy(type.getName()) || isAssignable(type, bean.reference)) {
                     DisabledBean<?> built = bean.build();
                     if (built != null) {
                         disabled.add(built);
@@ -1321,10 +1388,29 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         }
 
         /**
-         * Starts the warm-up, when the common pool has more than one thread.
+         * Whether the bean type is a subtype of the type: eager mode lists a disabled bean for such a lookup, as a
+         * disabled bean exposes no type of its own. Only an error path asks, and building the entry loads the bean type
+         * anyway.
          */
-        static Object warmUp(Beans beans) {
-            Map<BeanDefinitionReference<?>, Boolean> ordered = new java.util.IdentityHashMap<>();
+        @SuppressWarnings("java:S1181")
+        private static boolean isAssignable(Class<?> type, LazyBeanDefinitionReference<?> reference) {
+            try {
+                return type.isAssignableFrom(reference.getBeanType());
+            } catch (LinkageError e) {
+                return false;
+            }
+        }
+
+        /**
+         * Starts the warm-up, when the common pool has more than one thread, on threads of its own, as many as the pool
+         * has, so that the pool stays free for the work the context and the application give it as they start.
+         *
+         * @param beans The producers
+         * @param all   Whether to also load every other reference whose conditions are only of classes that are present
+         * @return The warm-up, to cancel
+         */
+        static Object warmUp(Beans beans, boolean all) {
+            Map<BeanDefinitionReference<?>, Boolean> ordered = new IdentityHashMap<>();
             List<LazyBeanDefinitionReference<?>> first = new ArrayList<>();
             // the beans the context creates or processes as it starts, and the infrastructure it looks up first
             addLazy(first, ordered, beans.eagerInitBeans);
@@ -1337,12 +1423,15 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                     addLazy(first, ordered, producers);
                 }
             }
-            // then every other one whose conditions are of classes that load
+            // then, when asked to, every other one whose conditions are of classes that load
             List<LazyBeanDefinitionReference<?>> rest = new ArrayList<>();
-            addLazy(rest, ordered, beans.all);
+            if (all) {
+                addLazy(rest, ordered, beans.all);
+            }
             WarmUp warmUp = new WarmUp(first, rest);
-            for (int i = 0; i < ForkJoinPool.getCommonPoolParallelism(); i++) {
-                ForkJoinPool.commonPool().execute(warmUp);
+            int threads = Math.min(ForkJoinPool.getCommonPoolParallelism(), first.size() + rest.size());
+            for (int i = 0; i < threads; i++) {
+                Thread.ofPlatform().daemon().name("micronaut-lazy-warm-up-" + i).start(warmUp);
             }
             return warmUp;
         }
@@ -1365,7 +1454,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         /**
          * Stops the warm-up, and with the verification on, loads and compares every definition no lookup needed.
          */
-        static void stop(@Nullable Object warmUp, List<BeanDefinitionReference<Object>> references) {
+        static void stop(@Nullable Object warmUp, Collection<? extends BeanDefinitionReference<?>> references) {
             if (warmUp instanceof WarmUp running) {
                 running.cancelled = true;
             }
@@ -1406,15 +1495,15 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     /**
-     * Instantiates lazy references on the common pool, without a context, in the order given: the definitions the
-     * context needs first, then every other one whose conditions are only of classes, which hold. The workers share a
-     * cursor, so the order holds across them. A reference a lookup instantiated meanwhile is skipped.
+     * Instantiates lazy references on threads of its own, without a context, in the order given: the definitions the
+     * context needs first, then, when asked to, every other one whose conditions are only of classes, which hold. The
+     * threads share a cursor, so the order holds across them. A reference a lookup instantiated meanwhile is skipped.
      */
     private static final class WarmUp implements Runnable {
 
         private final LazyBeanDefinitionReference<?>[] references;
         private final int first;
-        private final java.util.concurrent.atomic.AtomicInteger cursor = new java.util.concurrent.atomic.AtomicInteger();
+        private final AtomicInteger cursor = new AtomicInteger();
         volatile boolean cancelled;
 
         WarmUp(List<LazyBeanDefinitionReference<?>> first, List<LazyBeanDefinitionReference<?>> rest) {

@@ -25,6 +25,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataSupport;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Repeatable;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Map;
@@ -42,13 +43,16 @@ import static io.micronaut.context.BeanDefinitionDescriptorData.MEMBERSHIP_STERE
  * <ul>
  *     <li>whether the bean has an annotation or a stereotype, declared or not, by name or by class, where a class
  *     that is repeatable is looked up by its container, as the generated metadata does;</li>
- *     <li>the container of a repeatable annotation, from the registry every descriptor's containers were added to;</li>
+ *     <li>the container of a repeatable annotation, from the registry every descriptor's containers were added to,
+ *     and none by name when the bean's metadata has property expressions, as the metadata that resolves them answers;</li>
  *     <li>the values of an annotation the bean does not have, which are none;</li>
- *     <li>the members a qualifier the bean declares gives, and none of the others, which take defaults the descriptor
- *     does not carry.</li>
+ *     <li>the members a qualifier the bean declares gives, and none of the others, whose defaults the descriptor
+ *     carries and its read registered.</li>
  * </ul>
  *
- * <p>Every other method loads the definition and answers from its metadata, through
+ * <p>Once the definition of a bean whose metadata has property expressions is loaded, the values are answered by
+ * its metadata, which resolves them in the environment the definition was configured with, as eager mode answers.
+ * Every other method loads the definition and answers from its metadata, through
  * {@link AnnotationMetadataDelegate}. The methods {@link AnnotationMetadataDelegate} leaves to the defaults of
  * {@link AnnotationMetadata} are declared here, so that no default answers for a definition.</p>
  *
@@ -251,7 +255,7 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
 
     @Override
     public Optional<String> findRepeatableAnnotation(String annotation) {
-        Optional<String> answered = data.annotationNames.length == 0 ? Optional.empty() : Optional.ofNullable(AnnotationMetadataSupport.getRepeatableAnnotation(annotation));
+        Optional<String> answered = repeatableAnswer(annotation);
         if (reference.answers != null) {
             record("findRepeatableAnnotation(" + annotation + ")", answered, m -> m.findRepeatableAnnotation(annotation));
         }
@@ -260,6 +264,14 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
 
     @Override
     public Optional<String> findRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        if (data.is(BeanDefinitionDescriptorData.FLAG_PROPERTY_EXPRESSIONS)) {
+            // the metadata that resolves property expressions answers a class from its own annotation
+            Optional<String> answered = Optional.ofNullable(annotation.getAnnotation(Repeatable.class)).map(repeatable -> repeatable.value().getName());
+            if (reference.answers != null) {
+                record("findRepeatableAnnotation(" + annotation.getName() + ".class)", answered, m -> m.findRepeatableAnnotation(annotation));
+            }
+            return answered;
+        }
         return findRepeatableAnnotation(annotation.getName());
     }
 
@@ -270,13 +282,30 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
 
     @Override
     public boolean isRepeatableAnnotation(Class<? extends Annotation> annotation) {
-        return findRepeatableAnnotation(annotation.getName()).isPresent();
+        return findRepeatableAnnotation(annotation).isPresent();
+    }
+
+    /**
+     * What {@link #findRepeatableAnnotation(String)} answers, without keeping the answer for the verification.
+     *
+     * @param annotation The name of the annotation
+     * @return Its container
+     */
+    Optional<String> repeatableAnswer(String annotation) {
+        if (data.annotationNames.length == 0 || data.is(BeanDefinitionDescriptorData.FLAG_PROPERTY_EXPRESSIONS)) {
+            // no metadata, or the one that resolves property expressions, which knows no container by name
+            return Optional.empty();
+        }
+        return Optional.ofNullable(AnnotationMetadataSupport.getRepeatableAnnotation(annotation));
     }
 
     // --- values of absent annotations, and of the declared qualifiers
 
     @Override
     public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
+        if (resolvesExpressions()) {
+            return getAnnotationMetadata().findAnnotation(annotation);
+        }
         AnnotationValue<?> qualifier = data.qualifier(annotation);
         if (qualifier != null) {
             Optional<AnnotationValue<T>> answered = Optional.of(withDefaults(annotation, qualifier));
@@ -296,6 +325,9 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
 
     @Override
     public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(String annotation) {
+        if (resolvesExpressions()) {
+            return getAnnotationMetadata().findDeclaredAnnotation(annotation);
+        }
         AnnotationValue<?> qualifier = data.qualifier(annotation);
         if (qualifier != null && data.has(annotation, DECLARED)) {
             Optional<AnnotationValue<T>> answered = Optional.of(withDefaults(annotation, qualifier));
@@ -325,6 +357,9 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
 
     @Override
     public Map<CharSequence, Object> getValues(String annotation) {
+        if (resolvesExpressions()) {
+            return getAnnotationMetadata().getValues(annotation);
+        }
         AnnotationValue<?> qualifier = data.qualifier(annotation);
         if (qualifier != null) {
             Map<CharSequence, Object> answered = Collections.unmodifiableMap(qualifier.getValues());
@@ -431,6 +466,9 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
      */
     @SuppressWarnings({"java:S2789", "OptionalAssignedToNull"}) // null means the definition has to answer
     private @Nullable Optional<Object> declaredValue(String annotation, String member) {
+        if (resolvesExpressions()) {
+            return null;
+        }
         AnnotationValue<?> qualifier = data.qualifier(annotation);
         if (qualifier != null) {
             Object value = qualifier.getValues().get(member);
@@ -441,6 +479,14 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
             return AnnotationUtil.NON_BINDING_ATTRIBUTE.equals(member) ? Optional.empty() : null;
         }
         return isAbsent(annotation, ANY) ? Optional.empty() : null;
+    }
+
+    /**
+     * Whether the values are the loaded definition's to answer: a definition whose metadata has property expressions
+     * answers them resolved once a context configured it, which the descriptor cannot.
+     */
+    boolean resolvesExpressions() {
+        return data.is(BeanDefinitionDescriptorData.FLAG_PROPERTY_EXPRESSIONS) && reference.isInstantiated();
     }
 
     /**
@@ -491,9 +537,8 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
     }
 
     private void record(String what, Object answered, Function<AnnotationMetadata, Object> replay) {
-        Map<String, LazyBeanDefinitionVerifier.Answer> answers = reference.answers;
-        if (answers != null) {
-            LazyBeanDefinitionVerifier.record(answers, what, answered, loaded -> replay.apply(loaded.getAnnotationMetadata()));
+        if (reference.answers != null) {
+            LazyBeanDefinitionVerifier.record(reference, what, answered, loaded -> replay.apply(loaded.getAnnotationMetadata()));
         }
     }
 }

@@ -77,7 +77,9 @@ class BeanDefinitionDescriptorSpec extends Specification {
             'a.$Bean$Definition',
             -5,
             "5.3.0",
-            BeanDefinitionDescriptor.REVISION
+            BeanDefinitionDescriptor.REVISION,
+            [new AnnotationValue<>("a.Marker", [size: "large", count: 2, types: [new AnnotationClassValue<>("a.Default")] as AnnotationClassValue[],
+                                                 detail: new AnnotationValue<>("a.Detail", [value: "none"] as Map<CharSequence, Object>)] as Map<CharSequence, Object>)]
         )
 
         when:
@@ -108,6 +110,9 @@ class BeanDefinitionDescriptorSpec extends Specification {
         read.order() == -5
         read.writer() == "5.3.0"
         read.revision() == BeanDefinitionDescriptor.REVISION
+        read.qualifierDefaults()*.annotationName == ["a.Marker"]
+        read.qualifierDefaults()[0].stringValue("size").get() == "large"
+        read.qualifierDefaults()[0].intValue("count").asInt == 2
 
         and: "the header says what follows"
         def header = ByteBuffer.wrap(content)
@@ -280,6 +285,7 @@ class BeanDefinitionDescriptorSpec extends Specification {
         "an expression in a nested annotation" | describe([qualifier(new AnnotationValue<>("a.Nested", [value: new EvaluatedExpressionReference("#{1}", "a.Nested", "value", "a.\$Expr")] as Map<CharSequence, Object>))], [])
         "a condition of another kind"          | describe([], [{ ConditionContext context -> true } as Condition])
         "an instance in a condition"           | describe([], [new MatchesPresenceOfClassesCondition([new AnnotationClassValue<>(new Object())] as AnnotationClassValue[])])
+        "a qualifier default with defaults"    | describe([qualifier("x")], [], [new AnnotationValue<>("a.Qualifier", [inner: new AnnotationValue<>("a.Inner", [:], [size: 1] as Map<CharSequence, Object>)] as Map<CharSequence, Object>)])
         "a string of more than 65535 bytes"    | describe([qualifier("x" * 70_000)], [])
         "more than 65535 elements"             | describe([qualifier(new int[70_000])], [])
     }
@@ -299,6 +305,7 @@ class BeanDefinitionDescriptorSpec extends Specification {
         "two descriptors"              | valid().toList() + valid().toList()
         "a payload that ends early"    | withPayload(new byte[3])
         "no appended fields"           | withPayload(payloadEnding(0))
+        "no qualifier defaults"        | withPayload(valid()[10..-3] as byte[])
         "an unknown condition"         | withPayload(payloadEnding(1, 99))
         "an unknown value"             | withPayload(payloadEndingWithQualifierValue(99))
         "an unknown array"             | withPayload(payloadEndingWithQualifierValue(12, 99, 0, 0))
@@ -323,10 +330,10 @@ class BeanDefinitionDescriptorSpec extends Specification {
         given: "collections whose order of iteration is not the order of the names"
         def one = new BeanDefinitionDescriptor(0, "a.Bean", ["c", "a", "b"], [], new TreeMap<String, Integer>([x: 1, y: 2]), new TreeMap<String, String>([r: "c", q: "d"]), [], [], [
             new MatchesCurrentOsCondition(new LinkedHashSet<>([Requires.Family.WINDOWS, Requires.Family.LINUX]))
-        ], 'a.$Bean$Definition', 0, "", 1)
+        ], 'a.$Bean$Definition', 0, "", 1, [])
         def other = new BeanDefinitionDescriptor(0, "a.Bean", ["b", "c", "a", "a"], [], new TreeMap<String, Integer>([y: 2, x: 1]), new TreeMap<String, String>([q: "d", r: "c"]), [], [], [
             new MatchesCurrentOsCondition(EnumSet.of(Requires.Family.LINUX, Requires.Family.WINDOWS))
-        ], 'a.$Bean$Definition', 0, "", 1)
+        ], 'a.$Bean$Definition', 0, "", 1, [])
 
         expect:
         one.toByteArray() == other.toByteArray()
@@ -352,10 +359,12 @@ class BeanDefinitionDescriptorSpec extends Specification {
         "nonBindingMembers"    | { BeanDefinitionDescriptor d -> d.nonBindingMembers().add("x") }
         "qualifiers"           | { BeanDefinitionDescriptor d -> d.qualifiers().clear() }
         "preLoadConditions"    | { BeanDefinitionDescriptor d -> d.preLoadConditions().clear() }
+        "qualifierDefaults"    | { BeanDefinitionDescriptor d -> d.qualifierDefaults().clear() }
     }
 
-    private static BeanDefinitionDescriptor describe(List<AnnotationValue<?>> qualifiers, List<Condition> conditions) {
-        new BeanDefinitionDescriptor(0, "a.Bean", ["a.Bean"], [], new TreeMap<String, Integer>(), new TreeMap<String, String>(), [], qualifiers, conditions, 'a.$Bean$Definition', 0, "", BeanDefinitionDescriptor.REVISION)
+    private static BeanDefinitionDescriptor describe(List<AnnotationValue<?>> qualifiers, List<Condition> conditions,
+                                                     List<AnnotationValue<?>> qualifierDefaults = []) {
+        new BeanDefinitionDescriptor(0, "a.Bean", ["a.Bean"], [], new TreeMap<String, Integer>(), new TreeMap<String, String>(), [], qualifiers, conditions, 'a.$Bean$Definition', 0, "", BeanDefinitionDescriptor.REVISION, qualifierDefaults)
     }
 
     private static AnnotationValue<?> qualifier(Object value) {

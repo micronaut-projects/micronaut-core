@@ -35,16 +35,21 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
+import java.net.URL;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * The reference of a bean definition whose {@code META-INF/micronaut} entry carries a descriptor, which a context
@@ -110,7 +115,13 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
     private volatile Class<?> @Nullable [] indexes;
     @SuppressWarnings({"java:S3077", "OptionalUsedAsFieldOrParameterType"}) // immutable once published; empty means none
     @Nullable
-    private volatile Optional<io.micronaut.context.Qualifier<T>> declaredQualifier;
+    private volatile Optional<Qualifier<T>> declaredQualifier;
+    /**
+     * With the verification on, the difference found between the descriptor and the definition when it was loaded,
+     * which every lookup that reaches the reference fails with, whichever thread loaded it.
+     */
+    @Nullable
+    private volatile String difference;
 
     LazyBeanDefinitionReference(BeanDefinitionDescriptorData data, ClassLoader classLoader, LazyBeanDefinitions definitions) {
         this.data = data;
@@ -234,7 +245,7 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
     }
 
     @Override
-    public boolean hasStereotypeNonRepeating(Class<? extends java.lang.annotation.Annotation> annotation) {
+    public boolean hasStereotypeNonRepeating(Class<? extends Annotation> annotation) {
         return metadata.hasStereotypeNonRepeating(annotation);
     }
 
@@ -244,12 +255,12 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
     }
 
     @Override
-    public <E extends Enum<E>> java.util.EnumSet<E> enumValuesSet(String annotation, String member, Class<E> enumType) {
+    public <E extends Enum<E>> EnumSet<E> enumValuesSet(String annotation, String member, Class<E> enumType) {
         return metadata.enumValuesSet(annotation, member, enumType);
     }
 
     @Override
-    public <E extends Enum<E>> java.util.EnumSet<E> enumValuesSet(Class<? extends java.lang.annotation.Annotation> annotation, String member, Class<E> enumType) {
+    public <E extends Enum<E>> EnumSet<E> enumValuesSet(Class<? extends Annotation> annotation, String member, Class<E> enumType) {
         return metadata.enumValuesSet(annotation, member, enumType);
     }
 
@@ -258,7 +269,7 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
         Class<T> type = beanType;
         if (type == null) {
             @SuppressWarnings("unchecked")
-            Class<T> loaded = (Class<T>) loadClass(data.beanTypeName);
+            Class<T> loaded = (Class<T>) loadBeanType();
             if (loaded == null) {
                 // as the constructor of the definition would have failed on it
                 STATE.compareAndSet(this, null, ABSENT);
@@ -320,6 +331,10 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
 
     @Override
     public Optional<String> getBeanName() {
+        if (metadata.resolvesExpressions()) {
+            // the name can be a property expression, which the loaded definition resolves
+            return loaded("getBeanName").getBeanName();
+        }
         int named = data.membership(AnnotationUtil.NAMED);
         if ((named & BeanDefinitionDescriptorData.MEMBERSHIP_DECLARED_ANNOTATION) == 0 && (named & BeanDefinitionDescriptorData.MEMBERSHIP_DECLARED_STEREOTYPE) == 0) {
             return record("getBeanName", Optional.empty(), BeanDefinitionReference::getBeanName);
@@ -333,21 +348,25 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
     }
 
     @Override
-    public io.micronaut.context.@Nullable Qualifier<T> getDeclaredQualifier() {
-        Optional<io.micronaut.context.Qualifier<T>> qualifier = declaredQualifier;
+    public @Nullable Qualifier<T> getDeclaredQualifier() {
+        if (metadata.resolvesExpressions()) {
+            // its values can be property expressions, which the loaded definition resolves
+            return loaded("getDeclaredQualifier").getDeclaredQualifier();
+        }
+        Optional<Qualifier<T>> qualifier = declaredQualifier;
         if (qualifier == null) {
             qualifier = Optional.ofNullable(declaredQualifierOf());
             declaredQualifier = qualifier;
         }
-        io.micronaut.context.Qualifier<T> answered = qualifier.orElse(null);
+        Qualifier<T> answered = qualifier.orElse(null);
         if (answers != null) {
-            LazyBeanDefinitionVerifier.record(answers, "getDeclaredQualifier", answered, reference -> reference.getDeclaredQualifier());
+            LazyBeanDefinitionVerifier.record(this, "getDeclaredQualifier", answered, BeanDefinitionReference::getDeclaredQualifier);
         }
         return answered;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private io.micronaut.context.@Nullable Qualifier<T> declaredQualifierOf() {
+    private @Nullable Qualifier<T> declaredQualifierOf() {
         AnnotationValue<?>[] qualifiers = data.qualifiers;
         if (qualifiers.length == 0) {
             // the declared metadata can name the bean with a @Named that is not read as a qualifier annotation
@@ -357,14 +376,14 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
         }
         if (qualifiers.length == 1) {
             AnnotationValue qualifier = qualifiers[0];
-            if (qualifier.getAnnotationName().equals(io.micronaut.context.Qualifier.PRIMARY)) {
+            if (qualifier.getAnnotationName().equals(Qualifier.PRIMARY)) {
                 return null;
             }
-            return (io.micronaut.context.Qualifier<T>) Qualifiers.byDeclaredAnnotation(metadata, qualifier);
+            return (Qualifier<T>) Qualifiers.byDeclaredAnnotation(metadata, qualifier);
         }
-        io.micronaut.context.Qualifier<T>[] declared = new io.micronaut.context.Qualifier[qualifiers.length];
+        Qualifier<T>[] declared = new Qualifier[qualifiers.length];
         for (int i = 0; i < qualifiers.length; i++) {
-            declared[i] = (io.micronaut.context.Qualifier<T>) Qualifiers.byDeclaredAnnotation(metadata, (AnnotationValue) qualifiers[i]);
+            declared[i] = (Qualifier<T>) Qualifiers.byDeclaredAnnotation(metadata, (AnnotationValue) qualifiers[i]);
         }
         return Qualifiers.byQualifiers(declared);
     }
@@ -372,7 +391,7 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
     @Override
     @Deprecated(since = "5.0", forRemoval = true)
     @SuppressWarnings("removal")
-    public io.micronaut.context.@Nullable Qualifier<T> resolveDynamicQualifier() {
+    public @Nullable Qualifier<T> resolveDynamicQualifier() {
         return loaded("resolveDynamicQualifier").resolveDynamicQualifier();
     }
 
@@ -415,6 +434,54 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
      */
     boolean isInstantiated() {
         return state instanceof BeanDefinitionReference<?>;
+    }
+
+    /**
+     * @return The reference the entry names, if it was loaded, without failing on a difference the verification found
+     */
+    @Nullable
+    BeanDefinitionReference<?> loadedInstance() {
+        return state instanceof BeanDefinitionReference<?> reference ? reference : null;
+    }
+
+    /**
+     * Keeps a difference the verification found once the definition was loaded, which every later lookup that reaches
+     * the reference fails with.
+     *
+     * @param message The difference
+     */
+    void differs(String message) {
+        if (difference == null) {
+            difference = message;
+        }
+    }
+
+    /**
+     * With the verification on, asks a reference predicate of a lookup of the definition too, which eager mode asks,
+     * and fails the lookup when the two answers differ: a descriptor that wrongly leaves a bean out is found this way.
+     *
+     * @param predicate The predicate
+     * @param described What it answered for this reference
+     */
+    @SuppressWarnings({"unchecked", "rawtypes", "java:S1181"})
+    public void verifyPredicate(Predicate predicate, boolean described) {
+        if (!definitions.verify) {
+            return;
+        }
+        BeanDefinitionReference<?> loaded;
+        try {
+            loaded = instance("the verification of a lookup", false);
+        } catch (Throwable e) {
+            // a definition that fails to load is not what this checks
+            return;
+        }
+        String found = difference;
+        if (found != null) {
+            throw new IllegalStateException(found);
+        }
+        if (loaded != null) {
+            LazyBeanDefinitionVerifier.comparePredicate(this, loaded, described, predicate.test(loaded));
+        }
     }
 
     /**
@@ -496,31 +563,15 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
         try {
             PUBLIC_LOOKUP.findConstructor(Class.forName(data.definitionName, false, classLoader), NO_ARGUMENTS);
             return true;
-        } catch (ClassNotFoundException | LinkageError | NoSuchMethodException | IllegalAccessException e) {
+        } catch (ClassNotFoundException | NoClassDefFoundError | NoSuchMethodException | IllegalAccessException | IllegalAccessError e) {
+            // what the eager read drops
             STATE.compareAndSet(this, null, ABSENT);
             return false;
-        }
-    }
-
-    /**
-     * Whether the bean type loads: a reference whose bean type does not is not present.
-     *
-     * @return Whether it does
-     */
-    public boolean beanTypeLoads() {
-        try {
-            getBeanType();
+        } catch (LinkageError e) {
+            // what the eager read fails on: kept, and met by the lookup that needs the definition
+            STATE.compareAndSet(this, null, new Failed(e));
             return true;
-        } catch (NoClassDefFoundError e) {
-            return false;
         }
-    }
-
-    /**
-     * @return The name of the bean type, as {@link Class#getName()} gives it
-     */
-    public String beanTypeName() {
-        return data.beanTypeName;
     }
 
     /**
@@ -615,14 +666,26 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
     }
 
     /**
-     * The loader that defines the class of an entry under parent-first delegation: the top-most ancestor that sees the
-     * entry. The class literals of a definition resolve through that loader, so the names of the descriptor do too.
+     * The loader that defines the class of an entry: the top-most ancestor that serves the very entry the provider's
+     * loader finds, as under parent-first delegation. A child-first loader that holds its own copy of the entry, as a
+     * web application loader can, defines the class itself. The class literals of a definition resolve through that
+     * loader, so the names of the descriptor do too.
      */
     private static ClassLoader ownerOf(ClassLoader classLoader, String entry) {
         ClassLoader current = classLoader;
         ClassLoader parent = current.getParent();
         ClassLoader platform = ClassLoader.getPlatformClassLoader();
-        while (parent != null && parent != platform && parent.getResource(entry) != null) {
+        if (parent == null || parent == platform) {
+            return current;
+        }
+        URL found = classLoader.getResource(entry);
+        // compared by their external forms, as URL#equals can resolve host names
+        String own = found == null ? null : found.toExternalForm();
+        while (parent != null && parent != platform) {
+            URL theirs = parent.getResource(entry);
+            if (theirs == null || !theirs.toExternalForm().equals(own)) {
+                break;
+            }
             current = parent;
             parent = current.getParent();
         }
@@ -648,6 +711,24 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
         }
     }
 
+    /**
+     * Loads the bean type, as the definition does: a class that is not found means the bean is not present, while
+     * another linkage error, such as a class of a later version, is thrown.
+     *
+     * @return The bean type, or {@code null} if it is not found
+     */
+    private @Nullable Class<?> loadBeanType() {
+        Optional<Class<?>> primitive = ClassUtils.getPrimitiveType(data.beanTypeName);
+        if (primitive.isPresent()) {
+            return primitive.get();
+        }
+        try {
+            return Class.forName(data.beanTypeName, false, owner());
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            return null;
+        }
+    }
+
     private Class<?> @Nullable [] loadClasses(String[] names) {
         Class<?>[] classes = new Class<?>[names.length];
         for (int i = 0; i < names.length; i++) {
@@ -663,11 +744,7 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
     /**
      * @return The conditions of the descriptor, with the classes they name resolved
      */
-    Condition[] resolvedPreLoadConditions() {
-        return resolvedConditions();
-    }
-
-    private Condition[] resolvedConditions() {
+    Condition[] resolvedConditions() {
         Condition[] resolved = conditions;
         if (resolved == null) {
             Condition[] described = data.conditions;
@@ -709,9 +786,10 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
     /**
      * Keeps an answer for the verification, when it is on.
      */
-    private <V> V record(String what, V answered, java.util.function.Function<BeanDefinitionReference<T>, V> replay) {
+    @SuppressWarnings("unchecked")
+    private <V> V record(String what, V answered, Function<BeanDefinitionReference<T>, V> replay) {
         if (answers != null) {
-            LazyBeanDefinitionVerifier.record(answers, what, answered, reference -> replay.apply((BeanDefinitionReference<T>) reference));
+            LazyBeanDefinitionVerifier.record(this, what, answered, reference -> replay.apply((BeanDefinitionReference<T>) reference));
         }
         return answered;
     }
@@ -748,15 +826,26 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
     private BeanDefinitionReference<T> instance(String cause, boolean failOnDifference) {
         Object current = state;
         if (current == null) {
-            current = create();
-            if (STATE.compareAndSet(this, null, current)) {
-                loaded(current, cause, failOnDifference);
+            Object created = create();
+            if (STATE.compareAndSet(this, null, created)) {
+                current = created;
+                loaded(current, cause);
             } else {
                 // another thread won: there is one instance per reference
                 current = state;
+                if (created instanceof Failed mine && mine.cause() instanceof ExceptionInInitializerError
+                    && current instanceof Failed kept && kept.cause() instanceof NoClassDefFoundError
+                    && STATE.compareAndSet(this, current, created)) {
+                    // the thread that ran the static initializer keeps its failure, not the one that waited for it
+                    current = created;
+                }
             }
         }
         if (current instanceof BeanDefinitionReference<?> reference) {
+            String found = difference;
+            if (failOnDifference && found != null) {
+                throw new IllegalStateException(found);
+            }
             return (BeanDefinitionReference<T>) reference;
         }
         if (current instanceof Failed failed) {
@@ -787,9 +876,8 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
         }
     }
 
-    private void loaded(Object current, String cause, boolean failOnDifference) {
+    private void loaded(Object current, String cause) {
         if (current instanceof BeanDefinitionReference<?> reference) {
-            definitions.loaded.incrementAndGet();
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Loaded the bean definition [{}] for {}", data.definitionName, cause);
             }
@@ -800,7 +888,7 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
                     data.definitionName, data.beanTypeName, definition.getBeanType().getName());
             }
             if (definitions.verify) {
-                LazyBeanDefinitionVerifier.verify(this, reference, failOnDifference);
+                difference = LazyBeanDefinitionVerifier.verify(this, reference);
             }
         } else if (current == ABSENT && LOG.isDebugEnabled()) {
             LOG.debug("The bean definition [{}] cannot be linked and is not present", data.definitionName);

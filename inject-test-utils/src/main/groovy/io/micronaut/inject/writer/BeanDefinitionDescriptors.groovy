@@ -25,8 +25,10 @@ import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils
 import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.inject.BeanDefinitionReference
+import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.annotation.AnnotationMetadataSupport
+import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata
 
 import java.lang.reflect.Field
 
@@ -37,6 +39,7 @@ import static io.micronaut.inject.writer.BeanDefinitionDescriptor.FLAG_DECLARED_
 import static io.micronaut.inject.writer.BeanDefinitionDescriptor.FLAG_PARALLEL
 import static io.micronaut.inject.writer.BeanDefinitionDescriptor.FLAG_POST_LOAD_CONDITIONS
 import static io.micronaut.inject.writer.BeanDefinitionDescriptor.FLAG_PRIMARY
+import static io.micronaut.inject.writer.BeanDefinitionDescriptor.FLAG_PROPERTY_EXPRESSIONS
 import static io.micronaut.inject.writer.BeanDefinitionDescriptor.FLAG_PROXIED_BEAN
 import static io.micronaut.inject.writer.BeanDefinitionDescriptor.FLAG_PROXY_TARGET
 import static io.micronaut.inject.writer.BeanDefinitionDescriptor.FLAG_REQUIRES_METHOD_PROCESSING
@@ -72,7 +75,8 @@ class BeanDefinitionDescriptors {
         CONTAINER_TYPE            : FLAG_CONTAINER_TYPE,
         REQUIRES_METHOD_PROCESSING: FLAG_REQUIRES_METHOD_PROCESSING,
         POST_LOAD_CONDITIONS      : FLAG_POST_LOAD_CONDITIONS,
-        DECLARED_INDEXES          : FLAG_DECLARED_INDEXES
+        DECLARED_INDEXES          : FLAG_DECLARED_INDEXES,
+        PROPERTY_EXPRESSIONS      : FLAG_PROPERTY_EXPRESSIONS
     ]
 
     /**
@@ -231,6 +235,19 @@ class BeanDefinitionDescriptors {
         }
         check("qualifiers", descriptor.qualifiers().collect { shape(it) }, AnnotationUtil.findQualifierAnnotations(declared).collect { shape(it) })
         check("nonBindingMembers", descriptor.nonBindingMembers(), AnnotationUtil.resolveNonBindingMembers(declared).toList())
+        // the defaults the reference registered when it was loaded, for the qualifier annotations that have some
+        Map<String, Object> registered = new TreeMap<>()
+        for (String name : AnnotationUtil.findQualifierAnnotations(declared).collect { AnnotationValue<?> qualifier -> qualifier.annotationName }.toSet()) {
+            Map<CharSequence, Object> defaults = AnnotationMetadataSupport.getDefaultValuesOrNull(name)
+            if (defaults && !AnnotationMetadataSupport.getCoreAnnotationDefaults().containsKey(name)) {
+                registered.put(name, defaultsShape(defaults))
+            }
+        }
+        Map<String, Object> described = new TreeMap<>()
+        for (AnnotationValue<?> defaults : descriptor.qualifierDefaults()) {
+            described.put(defaults.annotationName, defaultsShape(defaults.getValues()))
+        }
+        check("qualifierDefaults", described, registered)
 
         if (reference instanceof AbstractInitializableBeanDefinitionAndReference) {
             Object[] preLoadConditions = (Object[]) field(reference, "preLoadConditions")
@@ -257,7 +274,55 @@ class BeanDefinitionDescriptors {
             (reference.isContainerType() ? FLAG_CONTAINER_TYPE : 0) |
             (reference.requiresMethodProcessing() ? FLAG_REQUIRES_METHOD_PROCESSING : 0) |
             (postLoadConditions != null && postLoadConditions.length > 0 ? FLAG_POST_LOAD_CONDITIONS : 0) |
-            (declaresIndexes(reference) ? FLAG_DECLARED_INDEXES : 0)
+            (declaresIndexes(reference) ? FLAG_DECLARED_INDEXES : 0) |
+            (answersThroughEnvironment(reference) ? FLAG_PROPERTY_EXPRESSIONS : 0)
+    }
+
+    /**
+     * Whether a reference answers through the metadata that resolves property expressions, which a definition wraps its
+     * annotation metadata in when the metadata has some.
+     *
+     * @param reference The reference
+     * @return Whether it does
+     */
+    private static boolean answersThroughEnvironment(BeanDefinitionReference<?> reference) {
+        AnnotationMetadata metadata = reference.getAnnotationMetadata()
+        if (metadata instanceof EvaluatedAnnotationMetadata) {
+            metadata = ((EvaluatedAnnotationMetadata) metadata).getAnnotationMetadata()
+        }
+        return metadata instanceof AbstractEnvironmentAnnotationMetadata
+    }
+
+    /**
+     * Default values in a shape that compares by content: a class by its name, whether it was loaded or not, as the
+     * descriptor names it and a loaded definition holds it.
+     *
+     * @param defaults The default values
+     * @return Them, by the name of the member
+     */
+    private static Map<String, Object> defaultsShape(Map<CharSequence, Object> defaults) {
+        Map<String, Object> shaped = new TreeMap<>()
+        for (Map.Entry<CharSequence, Object> member : defaults.entrySet()) {
+            shaped.put(member.key.toString(), defaultShape(member.value))
+        }
+        return shaped
+    }
+
+    private static Object defaultShape(Object value) {
+        if (value instanceof AnnotationClassValue) {
+            return "class " + ((AnnotationClassValue<?>) value).name
+        }
+        if (value instanceof Enum) {
+            return ((Enum<?>) value).name()
+        }
+        if (value != null && value.getClass().isArray()) {
+            List<Object> elements = []
+            for (int i = 0; i < java.lang.reflect.Array.getLength(value); i++) {
+                elements.add(defaultShape(java.lang.reflect.Array.get(value, i)))
+            }
+            return elements
+        }
+        return value
     }
 
     /**

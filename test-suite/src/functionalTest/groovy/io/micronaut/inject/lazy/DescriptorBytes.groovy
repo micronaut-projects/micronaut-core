@@ -66,29 +66,41 @@ class DescriptorBytes {
 
     /**
      * @return The fields appended after the conditions, if there are any: the definition name, the order, the
-     * writer and the revision
+     * writer and the revision; the qualifier defaults that follow are kept as bytes
      */
     Map<String, Object> appendedFields() {
         if (appended.length == 0) {
             return null
         }
         def input = new DataInputStream(new ByteArrayInputStream(appended))
-        return [definitionName: input.readUTF(), order: input.readInt(), writer: input.readUTF(), revision: input.readUnsignedShort()] as Map<String, Object>
+        def fields = [definitionName: input.readUTF(), order: input.readInt(), writer: input.readUTF(), revision: input.readUnsignedShort()] as Map<String, Object>
+        fields.qualifierDefaults = Arrays.copyOfRange(appended, appended.length - input.available(), appended.length)
+        return fields
     }
 
     /**
-     * Replaces the appended fields.
+     * Replaces the appended fields, keeping the qualifier defaults there were, or with none.
      */
     DescriptorBytes withAppended(String definitionName, int order, String writer, int revision) {
+        byte[] qualifierDefaults = appended.length == 0 ? [0, 0] as byte[] : (byte[]) appendedFields().qualifierDefaults
         def out = new ByteArrayOutputStream()
         def data = new DataOutputStream(out)
         data.writeUTF(definitionName)
         data.writeInt(order)
         data.writeUTF(writer)
         data.writeShort(revision)
+        data.write(qualifierDefaults)
         data.flush()
         appended = out.toByteArray()
         return this
+    }
+
+    /**
+     * Replaces the revision of the appended fields.
+     */
+    DescriptorBytes withRevision(int revision) {
+        def fields = appendedFields()
+        return withAppended((String) fields.definitionName, (int) fields.order, (String) fields.writer, revision)
     }
 
     byte[] toByteArray() {

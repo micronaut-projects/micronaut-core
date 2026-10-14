@@ -86,7 +86,8 @@ class BeanDefinitionDescriptorReaderSpec extends Specification {
             'a.$Bean$Definition',
             -7,
             "5.3.0",
-            BeanDefinitionDescriptor.REVISION
+            BeanDefinitionDescriptor.REVISION,
+            [new AnnotationValue<>("a.Qualifier", [size: "large", count: 2, kinds: ["x"] as String[], type: new AnnotationClassValue<>("a.Default")] as Map<CharSequence, Object>)]
         )
 
         when:
@@ -110,10 +111,16 @@ class BeanDefinitionDescriptorReaderSpec extends Specification {
         data.order == -7
         data.writer == "5.3.0"
         data.revision == BeanDefinitionDescriptor.REVISION
+        shape(data.qualifierDefaults as List) == shape(descriptor.qualifierDefaults())
 
         and: "an entry of another name, or without an exposed type, is not used"
         BeanDefinitionDescriptorReader.read(descriptor.toByteArray(), 'a.$Other$Definition', SAME) == null
         BeanDefinitionDescriptorReader.read(copy(descriptor, []).toByteArray(), 'a.$Bean$Definition', SAME) == null
+
+        and: "the reader knows the revision the writer writes, and no later one"
+        BeanDefinitionDescriptorReader.REVISION == BeanDefinitionDescriptor.REVISION
+        BeanDefinitionDescriptorReader.read(withRevision(descriptor, BeanDefinitionDescriptor.REVISION + 1).toByteArray(), 'a.$Bean$Definition', SAME) == null
+        BeanDefinitionDescriptorReader.read(withRevision(descriptor, 0).toByteArray(), 'a.$Bean$Definition', SAME) == null
     }
 
     void "the reader agrees with the processor on every descriptor of the test classes of this module"() {
@@ -199,7 +206,13 @@ class BeanDefinitionDescriptorReaderSpec extends Specification {
     private static Object copy(descriptor, List<String> exposedTypes) {
         new BeanDefinitionDescriptor(descriptor.flags(), descriptor.beanType(), exposedTypes, descriptor.indexes(), descriptor.annotations(),
             descriptor.repeatableContainers(), descriptor.nonBindingMembers(), descriptor.qualifiers(), descriptor.preLoadConditions(),
-            descriptor.definitionName(), descriptor.order(), descriptor.writer(), descriptor.revision())
+            descriptor.definitionName(), descriptor.order(), descriptor.writer(), descriptor.revision(), descriptor.qualifierDefaults())
+    }
+
+    private static Object withRevision(descriptor, int revision) {
+        new BeanDefinitionDescriptor(descriptor.flags(), descriptor.beanType(), descriptor.exposedTypes(), descriptor.indexes(), descriptor.annotations(),
+            descriptor.repeatableContainers(), descriptor.nonBindingMembers(), descriptor.qualifiers(), descriptor.preLoadConditions(),
+            descriptor.definitionName(), descriptor.order(), descriptor.writer(), revision, descriptor.qualifierDefaults())
     }
 
     private static boolean agree(written, BeanDefinitionDescriptorData read) {
@@ -216,7 +229,8 @@ class BeanDefinitionDescriptorReaderSpec extends Specification {
             read.definitionName == written.definitionName() &&
             read.order == written.order() &&
             read.writer == written.writer() &&
-            read.revision == written.revision()
+            read.revision == written.revision() &&
+            shape(read.qualifierDefaults as List) == shape(written.qualifierDefaults())
     }
 
     /**

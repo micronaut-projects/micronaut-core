@@ -47,6 +47,7 @@ final class BeanDefinitionDescriptorData {
     static final int FLAG_REQUIRES_METHOD_PROCESSING = 1 << 8;
     static final int FLAG_POST_LOAD_CONDITIONS = 1 << 9;
     static final int FLAG_DECLARED_INDEXES = 1 << 10;
+    static final int FLAG_PROPERTY_EXPRESSIONS = 1 << 11;
 
     static final int MEMBERSHIP_DECLARED_ANNOTATION = 1;
     static final int MEMBERSHIP_ANNOTATION = 1 << 1;
@@ -70,6 +71,11 @@ final class BeanDefinitionDescriptorData {
     final int order;
     final String writer;
     final int revision;
+    /**
+     * The default values the definition registers for its qualifier annotations, as the values of one annotation
+     * for each.
+     */
+    final AnnotationValue<?>[] qualifierDefaults;
 
     @SuppressWarnings("java:S107") // one argument for each field of the format
     BeanDefinitionDescriptorData(int flags,
@@ -85,7 +91,8 @@ final class BeanDefinitionDescriptorData {
                                  String definitionName,
                                  int order,
                                  String writer,
-                                 int revision) {
+                                 int revision,
+                                 AnnotationValue<?>[] qualifierDefaults) {
         this.flags = flags;
         this.beanTypeName = beanTypeName;
         this.exposedTypeNames = exposedTypeNames;
@@ -100,6 +107,7 @@ final class BeanDefinitionDescriptorData {
         this.order = order;
         this.writer = writer;
         this.revision = revision;
+        this.qualifierDefaults = qualifierDefaults;
     }
 
     /**

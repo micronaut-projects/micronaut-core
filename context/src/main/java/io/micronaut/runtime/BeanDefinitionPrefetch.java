@@ -69,12 +69,6 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
     static final String PROPERTY = "micronaut.bean-definitions.prefetch";
 
     /**
-     * The system property of lazy bean definition references: with it on, the prefetch reads the descriptors and
-     * does not load the reference classes, which lazy references load only when a lookup needs them.
-     */
-    static final String LAZY_PROPERTY = "micronaut.bean-definitions.lazy";
-
-    /**
      * The fewest common pool threads the prefetch starts with: what a JVM with four processors
      * has. Micronaut loads the references on the pool threads and on the thread that asks for
      * them. With the prefetch, the thread that asks is a pool thread and the main thread only
@@ -129,7 +123,9 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
         if (NativeImageUtils.inImageCode() || ForkJoinPool.getCommonPoolParallelism() < MINIMUM_PARALLELISM) {
             return null;
         }
-        boolean lazy = Boolean.getBoolean(LAZY_PROPERTY) || Boolean.getBoolean(LAZY_PROPERTY + ".verify");
+        // with lazy bean definition references, the prefetch reads the descriptors and does not load the reference
+        // classes, which lazy references load only when a lookup needs them
+        boolean lazy = Boolean.getBoolean(DefaultBeanDefinitionsProvider.LAZY_PROPERTY) || Boolean.getBoolean(DefaultBeanDefinitionsProvider.LAZY_VERIFY_PROPERTY);
         if (!lazy) {
             // lazy references load only the classes a lookup needs, so preloading all of them would undo that
             ForkJoinPool.commonPool().execute(new Preload(classLoader, null));

@@ -111,9 +111,7 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @return The disabled beans
      * @since 5.3.0
      */
-    default List<DisabledBean<?>> getDisabledBeans(BeanContext beanContext, Argument<?> beanType) {
-        return getDisabledBeans(beanContext);
-    }
+    List<DisabledBean<?>> getDisabledBeans(BeanContext beanContext, Argument<?> beanType);
 
     /**
      * The targets of proxies a lookup of a type reports: every one, unless lazy references let the service leave out
@@ -124,9 +122,7 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @return The targets
      * @since 5.3.0
      */
-    default Iterable<BeanDefinition<Object>> getTargetProxyBeans(BeanContext beanContext, Argument<?> beanType) {
-        return getTargetProxyBeans(beanContext);
-    }
+    Iterable<BeanDefinition<Object>> getTargetProxyBeans(BeanContext beanContext, Argument<?> beanType);
 
     /**
      * Called once the context has started.
@@ -134,8 +130,7 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @param beanContext The bean context
      * @since 5.3.0
      */
-    default void started(BeanContext beanContext) {
-    }
+    void started(BeanContext beanContext);
 
     /**
      * Returns whether at least one bean definition exists for the given raw type.
@@ -230,6 +225,16 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @return a list of all known bean definition references
      */
     List<BeanDefinitionReference<Object>> getBeanReferences();
+
+    /**
+     * Returns the bean references that are present, as {@link io.micronaut.context.BeanDefinitionRegistry#getBeanDefinitionReferences()}
+     * reports them: with lazy references, the ones whose definitions cannot be linked are left out, which loads the
+     * definitions; otherwise the same as {@link #getBeanReferences()}.
+     *
+     * @return The references
+     * @since 5.3.0
+     */
+    List<BeanDefinitionReference<Object>> getPresentBeanReferences();
 
     /**
      * Finds the bean definition that was compiled as the given definition class.

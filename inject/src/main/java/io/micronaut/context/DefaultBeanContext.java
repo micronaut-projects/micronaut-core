@@ -2520,7 +2520,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     @Override
     public Collection<BeanDefinitionReference<Object>> getBeanDefinitionReferences() {
-        return beanDefinitionProvider.getBeanReferences();
+        return beanDefinitionProvider.getPresentBeanReferences();
     }
 
     @Override

@@ -804,15 +804,15 @@ public final class MicronautMetaServiceLoaderUtils {
                 Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName, index);
                 size = serviceEntries.size();
                 for (String serviceEntry : serviceEntries) {
-                    // the factory's task is typed as its superclass here, so that verifying this class does not load it
-                    final RecursiveActionValuesCollector<S> task;
+                    // each task in a branch of its own, with no variable of a type both are assigned to: verifying this
+                    // class then loads neither task class
                     if (factory == null) {
-                        task = new ServiceInstanceLoader<>(classLoader, serviceEntry, predicate);
+                        final ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(classLoader, serviceEntry, predicate);
+                        tasks.add(task);
+                        task.fork();
                     } else {
-                        task = DescribedEntryLoader.task(classLoader, serviceEntry, predicate, factory);
+                        tasks.add(DescribedEntryLoader.fork(classLoader, serviceEntry, predicate, factory));
                     }
-                    tasks.add(task);
-                    task.fork();
                 }
             } catch (IOException e) {
                 throw new ServiceConfigurationError("Failed to load resources for service: " + serviceName, e);
@@ -926,8 +926,15 @@ public final class MicronautMetaServiceLoaderUtils {
             this.factory = factory;
         }
 
-        static <S> RecursiveActionValuesCollector<S> task(ClassLoader classLoader, String className, @Nullable Predicate<S> predicate, BiFunction<ClassLoader, String, @Nullable S> factory) {
-            return new DescribedEntryLoader<>(classLoader, className, predicate, factory);
+        /**
+         * Creates the task of an entry and forks it.
+         *
+         * @return The task, typed as its superclass for the caller's list
+         */
+        static <S> RecursiveActionValuesCollector<S> fork(ClassLoader classLoader, String className, @Nullable Predicate<S> predicate, BiFunction<ClassLoader, String, @Nullable S> factory) {
+            DescribedEntryLoader<S> task = new DescribedEntryLoader<>(classLoader, className, predicate, factory);
+            task.fork();
+            return task;
         }
 
         @Nullable

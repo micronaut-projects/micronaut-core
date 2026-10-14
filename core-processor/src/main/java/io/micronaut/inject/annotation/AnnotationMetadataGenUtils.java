@@ -333,6 +333,32 @@ public final class AnnotationMetadataGenUtils {
     }
 
     /**
+     * The default values of an annotation that a generated class registers when it is initialised: the ones
+     * {@link #addAnnotationDefaults(List, AnnotationMetadata, Function)} writes for the metadata. The defaults of the
+     * core annotations, which the runtime registers itself, are not written, and neither are they given here.
+     *
+     * @param annotationMetadata The annotation metadata
+     * @param annotation         The name of the annotation
+     * @return The default values by the name of the member, empty when none are registered
+     * @since 5.3.0
+     */
+    public static Map<CharSequence, Object> annotationDefaults(AnnotationMetadata annotationMetadata, String annotation) {
+        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
+            annotationMetadata = annotationMetadataHierarchy.merge();
+        }
+        if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata
+            && mutableAnnotationMetadata.annotationDefaultValues != null
+            && !AnnotationMetadataSupport.getCoreAnnotationDefaults().containsKey(annotation)) {
+            Map<CharSequence, Object> defaults = mutableAnnotationMetadata.annotationDefaultValues.get(annotation);
+            if (defaults != null) {
+                return Collections.unmodifiableMap(defaults);
+            }
+        }
+        return Collections.emptyMap();
+    }
+
+    /**
      * The containers of the repeatable annotations that a generated class registers when it is initialised: the
      * ones {@link #addAnnotationDefaults(List, AnnotationMetadata, Function)} writes for the metadata.
      *

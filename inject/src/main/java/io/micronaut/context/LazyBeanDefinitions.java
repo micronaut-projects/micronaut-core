@@ -15,21 +15,22 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.annotation.AnnotationMetadataSupport;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 /**
  * One read of the bean definitions with lazy references: the references it gave, the switches it read, and what it
@@ -39,33 +40,6 @@ import java.util.stream.Collectors;
  * @since 5.3.0
  */
 final class LazyBeanDefinitions {
-
-    /**
-     * The system property that switches lazy bean definition references on when it is {@code true}.
-     */
-    static final String PROPERTY = "micronaut.bean-definitions.lazy";
-
-    /**
-     * The system property that adds the verification of every descriptor against its definition when it is
-     * {@code true}.
-     */
-    static final String VERIFY = PROPERTY + ".verify";
-
-    /**
-     * The file the verification appends what it finds to.
-     */
-    static final String REPORT = VERIFY + ".report";
-
-    /**
-     * The system property that turns the warm-up off when it is {@code false}.
-     */
-    static final String WARM_UP = PROPERTY + ".warm-up";
-
-    /**
-     * The system property that lists the writers ({@code 5.3.0}) and revisions ({@code r1}) whose descriptors are
-     * not used, comma separated.
-     */
-    static final String IGNORE_WRITERS = PROPERTY + ".ignore-writers";
 
     /**
      * The revisions of the descriptor format found to describe definitions wrongly once released. Their descriptors are
@@ -80,29 +54,37 @@ final class LazyBeanDefinitions {
     final AtomicInteger described = new AtomicInteger();
     final AtomicInteger undescribed = new AtomicInteger();
     final AtomicInteger missing = new AtomicInteger();
-    final AtomicInteger loaded = new AtomicInteger();
     final AtomicBoolean relocationReported = new AtomicBoolean();
     private final Set<String> ignoredWriters;
+    private final Set<Integer> ignoredRevisions;
     private final Map<String, String> repeatableContainers = new ConcurrentHashMap<>();
+    private final Map<String, Map<CharSequence, Object>> qualifierDefaults = new ConcurrentHashMap<>();
 
     private LazyBeanDefinitions(ClassLoader classLoader) {
         this.classLoader = classLoader;
-        this.verify = Boolean.getBoolean(VERIFY);
-        this.report = System.getProperty(REPORT);
-        String ignored = System.getProperty(IGNORE_WRITERS);
-        this.ignoredWriters = ignored == null ? Set.of() : Arrays.stream(ignored.split(","))
-            .map(String::trim)
-            .filter(s -> !s.isEmpty())
-            .collect(Collectors.toUnmodifiableSet());
-    }
-
-    /**
-     * Whether a context reads its bean definitions lazily.
-     *
-     * @return Whether the switch is on, with or without the verification
-     */
-    static boolean isEnabled() {
-        return Boolean.getBoolean(PROPERTY) || Boolean.getBoolean(VERIFY);
+        this.verify = Boolean.getBoolean(DefaultBeanDefinitionsProvider.LAZY_VERIFY_PROPERTY);
+        this.report = System.getProperty(DefaultBeanDefinitionsProvider.LAZY_VERIFY_REPORT_PROPERTY);
+        Set<String> writers = new HashSet<>();
+        Set<Integer> revisions = new HashSet<>();
+        String ignored = System.getProperty(DefaultBeanDefinitionsProvider.LAZY_IGNORE_WRITERS_PROPERTY);
+        if (ignored != null) {
+            for (String entry : ignored.split(",")) {
+                String trimmed = entry.trim();
+                if (trimmed.length() > 1 && trimmed.charAt(0) == 'r' && Character.isDigit(trimmed.charAt(1))) {
+                    try {
+                        revisions.add(Integer.parseInt(trimmed.substring(1)));
+                        continue;
+                    } catch (NumberFormatException e) {
+                        // not a revision: a writer
+                    }
+                }
+                if (!trimmed.isEmpty()) {
+                    writers.add(trimmed);
+                }
+            }
+        }
+        this.ignoredWriters = Set.copyOf(writers);
+        this.ignoredRevisions = Set.copyOf(revisions);
     }
 
     /**
@@ -121,10 +103,18 @@ final class LazyBeanDefinitions {
             BeanDefinitionReference::isPresent,
             definitions::reference
         );
+        // what each definition registers once it is loaded, and what the metadata of every bean reads: the Class
+        // overloads look a repeatable annotation up by its container, and a qualifier compared by its values fills
+        // the members a bean leaves at their defaults
         if (!definitions.repeatableContainers.isEmpty()) {
-            // what each definition registers once it is loaded, which the Class overloads of every metadata read
             DefaultAnnotationMetadata.registerRepeatableAnnotations(definitions.repeatableContainers);
         }
+        definitions.qualifierDefaults.forEach((annotation, defaults) -> {
+            // a definition loaded already registered them, as it would again
+            if (AnnotationMetadataSupport.getDefaultValuesOrNull(annotation) == null) {
+                DefaultAnnotationMetadata.registerAnnotationDefaults(annotation, defaults);
+            }
+        });
         References references = new References(found.size(), definitions);
         references.addAll((Collection) found);
         return references;
@@ -149,6 +139,9 @@ final class LazyBeanDefinitions {
             if (!data.repeatableContainers.isEmpty()) {
                 repeatableContainers.putAll(data.repeatableContainers);
             }
+            for (AnnotationValue<?> defaults : data.qualifierDefaults) {
+                qualifierDefaults.putIfAbsent(defaults.getAnnotationName(), defaults.getValues());
+            }
             return new LazyBeanDefinitionReference<>(data, loader, this);
         }
         if (found == BeanDefinitionDescriptorReader.MISSING) {
@@ -161,14 +154,14 @@ final class LazyBeanDefinitions {
 
     private boolean isDenied(BeanDefinitionDescriptorData data) {
         return DENIED_REVISIONS.contains(data.revision)
-            || ignoredWriters.contains("r" + data.revision)
+            || ignoredRevisions.contains(data.revision)
             || (!data.writer.isEmpty() && ignoredWriters.contains(data.writer));
     }
 
     /**
      * What a context logs once it has started.
      *
-     * @param references The references of the context
+     * @param references The references the context holds
      * @return The line
      */
     String summary(Collection<? extends BeanDefinitionReference<?>> references) {
@@ -182,8 +175,13 @@ final class LazyBeanDefinitions {
                 }
             }
         }
-        return "Lazy bean definitions: loaded " + instantiated + " of " + lazy + " described (" + (undescribed.get() + missing.get())
-            + " eager: " + undescribed.get() + " without a usable descriptor, " + missing.get() + " without an entry)";
+        int read = described.get() + undescribed.get() + missing.get();
+        if (read == 0 && references.size() > lazy) {
+            // a static service loader answered, without reading an entry
+            return "Lazy bean definitions: off, a static service loader provides the " + references.size() + " references";
+        }
+        return "Lazy bean definitions: " + instantiated + " of " + lazy + " held lazy references loaded; "
+            + described.get() + " described, " + undescribed.get() + " without a usable descriptor, " + missing.get() + " without an entry";
     }
 
     /**

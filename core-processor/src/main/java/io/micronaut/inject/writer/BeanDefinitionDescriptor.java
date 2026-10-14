@@ -82,6 +82,7 @@ import java.util.TreeSet;
  * int    order                                  appended
  * utf    writer                                 appended: the Micronaut version of the processor, empty if unknown
  * ushort revision                               appended: {@link #REVISION}
+ * ushort n, annotation[n]                       appended: qualifierDefaults
  *
  * annotation = utf name, ushort n, (utf member, value)[n]
  * value      = ubyte kind, then: 1 utf | 2 boolean | 3 byte | 4 char | 5 short | 6 int | 7 long | 8 float | 9 double
@@ -96,14 +97,17 @@ import java.util.TreeSet;
  * annotation member or of a condition is named as {@link Class#getName()} names it, {@code [I} or
  * {@code [Ljava.lang.String;} for an array, because the definition holds that value by a class literal.</p>
  *
- * <p>The qualifiers carry the members that are declared. The default values of their other members are not part
- * of the descriptor: a definition registers them when it is loaded.</p>
+ * <p>The qualifiers carry the members that are declared. The default values of their other members are in
+ * {@code qualifierDefaults}, one annotation for each qualifier annotation whose defaults the definition registers when
+ * it is loaded, holding those defaults as its values. A default that is an annotation with defaults of its own, which
+ * the definition registers too, makes the definition undescribable.</p>
  *
  * <p>A reader uses a descriptor only when the magic and the version are the ones it knows and the entry is as long
  * as the header says. A later addition appends to the payload and keeps the version: the fields are read in order
  * and the bytes after the last one known are ignored. A change to what is already there takes a new version. The
  * fields from {@code definitionName} on were appended this way, before any release wrote a descriptor; a runtime
- * that reads descriptors requires them, and treats a descriptor without them as none.</p>
+ * that reads descriptors requires them, and treats a descriptor without them as none. A runtime also treats a
+ * descriptor of a revision later than the ones it knows as none.</p>
  *
  * <p>A change to what a field answers, such as a flag computed differently, another membership rule, or a condition
  * moved between the conditions checked before and after loading, keeps the format but must increase
@@ -131,6 +135,8 @@ import java.util.TreeSet;
  * @param order                What {@link io.micronaut.core.order.Ordered#getOrder()} answers
  * @param writer               The Micronaut version of the processor that wrote the descriptor, empty if unknown
  * @param revision             The revision of what the fields answer, {@link #REVISION} when written
+ * @param qualifierDefaults    The default values the definition registers for its qualifier annotations: an
+ *                             annotation for each one that has defaults, with the defaults as its values
  * @author Álvaro Sánchez-Mariscal
  * @since 5.3.0
  */
@@ -147,7 +153,8 @@ record BeanDefinitionDescriptor(int flags,
                                 String definitionName,
                                 int order,
                                 String writer,
-                                int revision) {
+                                int revision,
+                                List<AnnotationValue<?>> qualifierDefaults) {
 
     /**
      * The first four bytes of a descriptor: {@code MNBD}.
@@ -224,6 +231,13 @@ record BeanDefinitionDescriptor(int flags,
     static final int FLAG_DECLARED_INDEXES = 1 << 10;
 
     /**
+     * The annotation metadata of the bean has property expressions, so that a definition answers it through a
+     * metadata that resolves them, which knows no repeatable annotation by name:
+     * {@link io.micronaut.core.annotation.AnnotationMetadata#findRepeatableAnnotation(String)} answers empty.
+     */
+    static final int FLAG_PROPERTY_EXPRESSIONS = 1 << 11;
+
+    /**
      * {@link io.micronaut.core.annotation.AnnotationMetadata#hasDeclaredAnnotation(String)}.
      */
     static final int MEMBERSHIP_DECLARED_ANNOTATION = 1;
@@ -286,6 +300,7 @@ record BeanDefinitionDescriptor(int flags,
         nonBindingMembers = List.copyOf(nonBindingMembers);
         qualifiers = List.copyOf(qualifiers);
         preLoadConditions = List.copyOf(preLoadConditions);
+        qualifierDefaults = List.copyOf(qualifierDefaults);
     }
 
     /**
@@ -382,6 +397,16 @@ record BeanDefinitionDescriptor(int flags,
         out.writeInt(order);
         out.writeUTF(writer);
         out.writeShort(revision);
+        writeCount(out, qualifierDefaults.size());
+        for (AnnotationValue<?> defaults : qualifierDefaults) {
+            for (Object value : defaults.getValues().values()) {
+                if (value instanceof AnnotationValue<?> annotation && CollectionUtils.isNotEmpty(annotation.getDefaultValues())) {
+                    // the definition registers the defaults of such a value too, which these bytes do not give
+                    throw new UndescribableException();
+                }
+            }
+            writeAnnotation(out, defaults);
+        }
     }
 
     private static BeanDefinitionDescriptor readPayload(DataInputStream in) throws IOException {
@@ -410,8 +435,17 @@ record BeanDefinitionDescriptor(int flags,
         for (int i = 0; i < count; i++) {
             preLoadConditions.add(readCondition(in));
         }
+        String definitionName = in.readUTF();
+        int order = in.readInt();
+        String writer = in.readUTF();
+        int revision = in.readUnsignedShort();
+        count = in.readUnsignedShort();
+        List<AnnotationValue<?>> qualifierDefaults = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            qualifierDefaults.add(readAnnotation(in));
+        }
         return new BeanDefinitionDescriptor(flags, beanType, exposedTypes, indexes, annotations, repeatableContainers, nonBindingMembers, qualifiers, preLoadConditions,
-            in.readUTF(), in.readInt(), in.readUTF(), in.readUnsignedShort());
+            definitionName, order, writer, revision, qualifierDefaults);
     }
 
     private static void writeCount(DataOutputStream out, int count) throws IOException {

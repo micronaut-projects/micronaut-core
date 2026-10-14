@@ -1681,6 +1681,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         }
 
         AnnotationMetadata runtimeMetadata = AnnotationMetadataGenUtils.runtimeMetadata(annotationMetadata);
+        if (runtimeMetadata.hasPropertyExpressions()) {
+            // the definition answers through a metadata that resolves them, see AbstractInitializableBeanDefinition
+            flags |= BeanDefinitionDescriptor.FLAG_PROPERTY_EXPRESSIONS;
+        }
         Set<String> annotationNames = new LinkedHashSet<>(runtimeMetadata.getAnnotationNames());
         annotationNames.addAll(runtimeMetadata.getDeclaredAnnotationNames());
         annotationNames.addAll(runtimeMetadata.getStereotypeAnnotationNames());
@@ -1705,6 +1709,17 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
         // the qualifiers are the ones of what the bean declares, as QualifiedBeanType#getDeclaredQualifier reads them
         AnnotationMetadata declaredMetadata = runtimeMetadata instanceof AnnotationMetadataHierarchy hierarchy ? hierarchy.getDeclaredMetadata() : runtimeMetadata;
+        List<AnnotationValue<?>> qualifiers = new ArrayList<>(AnnotationUtil.findQualifierAnnotations(declaredMetadata));
+        // a qualifier compared by its values fills the members left at their defaults from the defaults the
+        // definition registers when it is loaded
+        Map<String, AnnotationValue<?>> qualifierDefaults = new TreeMap<>();
+        for (AnnotationValue<?> qualifier : qualifiers) {
+            String name = qualifier.getAnnotationName();
+            Map<CharSequence, Object> defaults = AnnotationMetadataGenUtils.annotationDefaults(annotationMetadataDefaults, name);
+            if (!defaults.isEmpty()) {
+                qualifierDefaults.putIfAbsent(name, new AnnotationValue<>(name, defaults));
+            }
+        }
 
         return new BeanDefinitionDescriptor(
             flags,
@@ -1714,12 +1729,13 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             annotations,
             new TreeMap<>(AnnotationMetadataGenUtils.repeatableAnnotationContainers(annotationMetadataDefaults)),
             List.of(AnnotationUtil.resolveNonBindingMembers(declaredMetadata)),
-            new ArrayList<>(AnnotationUtil.findQualifierAnnotations(declaredMetadata)),
+            qualifiers,
             preLoadConditions,
             beanDefinitionName,
             OrderUtil.getOrder(annotationMetadata),
             Objects.requireNonNullElse(VersionUtils.MICRONAUT_VERSION, ""),
-            BeanDefinitionDescriptor.REVISION
+            BeanDefinitionDescriptor.REVISION,
+            new ArrayList<>(qualifierDefaults.values())
         );
     }
 

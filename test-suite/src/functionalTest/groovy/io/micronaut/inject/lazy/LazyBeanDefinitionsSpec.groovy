@@ -1,6 +1,9 @@
 package io.micronaut.inject.lazy
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.exceptions.NoSuchBeanException
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.type.Argument
 import io.micronaut.fixtures.context.ApplicationUnderTest
 import io.micronaut.inject.BeanDefinition
@@ -11,6 +14,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.TempDir
 
+import java.lang.ref.WeakReference
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CopyOnWriteArrayList
@@ -116,8 +120,8 @@ class LazyBeanDefinitionsSpec extends Specification {
         FixtureLoader lazyLoader = loader(classes)
         ApplicationContext lazy = start(lazyLoader, LAZY_ONLY)
 
-        when:
-        BeanDefinitionReference<?> v6 = lazy.beanDefinitionReferences.find { it.beanDefinitionName == 'demo.$V6$Definition' }
+        when: "the reference as the context holds it: the references it reports as present are loaded to tell"
+        BeanDefinitionReference<?> v6 = lazy.beanDefinitionProvider.beanReferences.find { it.beanDefinitionName == 'demo.$V6$Definition' }
 
         then:
         v6 != null
@@ -156,7 +160,7 @@ class LazyBeanDefinitionsSpec extends Specification {
         Class<?> needsX = loader.loadClass('demo.NeedsX')
 
         when: "the reference is loaded, as the warm-up does, and the check of the enabled beans runs after it"
-        context.beanDefinitionReferences.find { it.beanDefinitionName == definition('demo.NeedsX') }.load()
+        context.beanDefinitionProvider.beanReferences.find { it.beanDefinitionName == definition('demo.NeedsX') }.load()
         for (def ignored : context.beanDefinitionProvider.getBeanReferences(context)) {
         }
         context.registerSingleton(loader.loadClass('demo.X').getDeclaredConstructor().newInstance())
@@ -178,6 +182,20 @@ class LazyBeanDefinitionsSpec extends Specification {
         !singletons(lazy).contains('demo.Broken')
         references(lazy) == references(eager)
         !references(lazy).contains('demo.$Broken$Definition')
+    }
+
+    void "the references a context reports leave out the ones that cannot link, as eager mode, whatever was looked up before"() {
+        given:
+        FixtureLoader eagerLoader = loader(classes)
+        ApplicationContext eager = start(eagerLoader, EAGER)
+        FixtureLoader lazyLoader = loader(classes)
+        ApplicationContext lazy = start(lazyLoader, LAZY_ONLY)
+
+        expect: "as the first call; which conditional ones are still listed depends on when the background check of the enabled beans ran, in both modes"
+        !references(eager).contains('demo.$Broken$Definition')
+        !references(lazy).contains('demo.$Broken$Definition')
+        references(lazy).containsAll(['demo.$V6$Definition', 'demo.$V8$Definition', 'demo.$HandlerA$Definition'])
+        lazy.beanDefinitionReferences.every { it.isPresent() }
     }
 
     void "the first failure of a reference is kept and thrown again, where eager mode fails the start"() {
@@ -270,6 +288,7 @@ class LazyBeanDefinitionsSpec extends Specification {
         edit(entries, 'demo.V12') { byte[] content -> v6 }
         edit(entries, 'demo.V12Turbo') { byte[] content -> DescriptorBytes.read(content).tap { appended = new byte[0] }.toByteArray() }
         edit(entries, 'demo.HandlerA') { byte[] content -> lengthFixed(concat(content, [1, 2, 3] as byte[])) }
+        edit(entries, 'demo.Unused5') { byte[] content -> DescriptorBytes.read(content).withRevision(2).toByteArray() }
         Path location = shape == 'jar' ? jar(mixed, temp.resolve('mixed.jar')) : mixed
 
         FixtureLoader eagerLoader = loader(location)
@@ -277,9 +296,9 @@ class LazyBeanDefinitionsSpec extends Specification {
         FixtureLoader lazyLoader = loader(location)
         ApplicationContext lazy = start(lazyLoader, LAZY_ONLY)
 
-        expect: "the entries without a usable descriptor were loaded at the start, the others were not"
-        ['demo.Unused1', 'demo.Unused2', 'demo.Unused3', 'demo.Unused4', 'demo.HandlerB', 'demo.V12', 'demo.V12Turbo'].every { lazyLoader.loaded(definition(it)) }
-        ['demo.HandlerA', 'demo.V6', 'demo.V8', 'demo.Unused5', 'demo.NeedsGone'].every { !lazyLoader.loaded(definition(it)) }
+        expect: "the entries without a usable descriptor, a later revision included, were loaded at the start, the others were not"
+        ['demo.Unused1', 'demo.Unused2', 'demo.Unused3', 'demo.Unused4', 'demo.Unused5', 'demo.HandlerB', 'demo.V12', 'demo.V12Turbo'].every { lazyLoader.loaded(definition(it)) }
+        ['demo.HandlerA', 'demo.V6', 'demo.V8', 'demo.NeedsGone'].every { !lazyLoader.loaded(definition(it)) }
 
         and: "the context answers as an eager one"
         engines(lazy, lazyLoader) == engines(eager, eagerLoader)
@@ -317,23 +336,131 @@ class LazyBeanDefinitionsSpec extends Specification {
         ApplicationContext verified = start(verifyLoader, LAZY_ONLY + [(VERIFY): 'true', (VERIFY + '.report'): report.toString()])
         stereotyped(verified, verifyLoader, 'demo.Handler')
 
-        then: "the lookup that loads the definition the descriptor wrongly selects fails"
+        then: "the lookup fails on the first of the two it meets: the bean the descriptor wrongly selects, or the one it wrongly leaves out"
         IllegalStateException e = thrown()
-        e.message.contains('demo.$Unused1$Definition')
-        e.message.contains('annotation demo.Handler')
+        e.message.contains('demo.$Unused1$Definition') || e.message.contains('demo.$HandlerB$Definition')
 
         when: "the context stops"
         verified.close()
 
-        then: "the definition no lookup loaded is compared too, and the report has both"
+        then: "both are in the report"
         Files.readString(report).contains('demo.$Unused1$Definition')
         Files.readString(report).contains('demo.$HandlerB$Definition')
     }
 
-    void "the warm-up loads the definitions with no condition in the background, and never one whose conditions fail"() {
+    void "with the verifier and the warm-up, a difference found while the warm-up loads the definition fails every lookup that reaches it"() {
+        given: "a descriptor that says Unused1 is a Handler"
+        Path wrong = copy(classes, temp.resolve('wrong'))
+        edit(wrong.resolve(ENTRIES), 'demo.Unused1') { byte[] content ->
+            DescriptorBytes.read(content).tap { annotations.put('demo.Handler', 8) }.toByteArray()
+        }
+        Path report = temp.resolve('report.txt')
+        FixtureLoader loader = loader(wrong)
+        ApplicationContext context = start(loader, [(VERIFY): 'true', (WARM_UP): 'all', (VERIFY + '.report'): report.toString()])
+
+        expect: "the warm-up loaded it, and found the difference"
+        ForkJoinPool.commonPoolParallelism > 1
+        eventually(10) { loader.loaded(definition('demo.Unused1')) && Files.exists(report) && Files.readString(report).contains('demo.$Unused1$Definition') }
+
+        when:
+        Throwable first = failure { stereotyped(context, loader, 'demo.Handler') }
+        Throwable second = failure { context.getBean(loader.loadClass('demo.Unused1')) }
+
+        then:
+        first instanceof IllegalStateException
+        first.message.contains('demo.$Unused1$Definition')
+        cause(second, IllegalStateException)?.message?.contains('demo.$Unused1$Definition')
+    }
+
+    void "a repeatable stereotype with a property expression is answered as eager mode answers it, also once its definition is loaded"() {
+        given:
+        FixtureLoader eagerLoader = loader(classes)
+        ApplicationContext eager = start(eagerLoader, EAGER)
+        FixtureLoader lazyLoader = loader(classes)
+        ApplicationContext lazy = start(lazyLoader, LAZY_ONLY)
+
+        expect: "before the definition is loaded"
+        stereotyped(lazy, lazyLoader, 'demo.Tag') == stereotyped(eager, eagerLoader, 'demo.Tag')
+        stereotypedByName(lazy, 'demo.Tag') == stereotypedByName(eager, 'demo.Tag')
+
+        when: "a lookup that loads it"
+        def tags = stereotyped(lazy, lazyLoader, 'demo.Tags')
+
+        then: "and after"
+        tags == stereotyped(eager, eagerLoader, 'demo.Tags')
+        lazyLoader.loaded(definition('demo.TaggedWithExpr'))
+        stereotyped(lazy, lazyLoader, 'demo.Tag') == stereotyped(eager, eagerLoader, 'demo.Tag')
+        stereotypedByName(lazy, 'demo.Tag') == stereotypedByName(eager, 'demo.Tag')
+    }
+
+    void "a qualifier compared by its values matches a bean that leaves a member at its default, as eager mode, without loading it first"() {
+        given:
+        FixtureLoader eagerLoader = loader(classes)
+        ApplicationContext eager = start(eagerLoader, EAGER)
+        FixtureLoader lazyLoader = loader(classes)
+        ApplicationContext lazy = start(lazyLoader, LAZY_ONLY)
+        def large = AnnotationValue.builder('demo.Flavor').value('vanilla').member('size', 'large').build()
+        def small = AnnotationValue.builder('demo.Flavor').value('vanilla').member('size', 'small').build()
+
+        expect: "as the first lookup"
+        byAnnotation(lazy, large) == byAnnotation(eager, large)
+        byAnnotation(lazy, large).contains('demo.VanillaLarge')
+        byAnnotation(lazy, small) == byAnnotation(eager, small)
+        byAnnotation(lazy, small).contains('demo.VanillaSmall')
+        !byAnnotation(lazy, small).contains('demo.VanillaLarge')
+    }
+
+    void "a disabled bean of a type it is not exposed as is reported when that type is looked up, as in eager mode"() {
+        given:
+        FixtureLoader eagerLoader = loader(classes)
+        ApplicationContext eager = start(eagerLoader, EAGER)
+        FixtureLoader lazyLoader = loader(classes)
+        ApplicationContext lazy = start(lazyLoader, LAZY_ONLY)
+
+        when:
+        String eagerMessage = failure { eager.getBean(eagerLoader.loadClass('demo.TypedDisabled')) }.message
+        String lazyMessage = failure { lazy.getBean(lazyLoader.loadClass('demo.TypedDisabled')) }.message
+
+        then:
+        eagerMessage.contains('is disabled because')
+        lazyMessage == eagerMessage
+    }
+
+    void "a stopped context that is still referenced keeps none of its lazy references"() {
+        given:
+        FixtureLoader loader = loader(classes)
+        ApplicationContext context = start(loader, LAZY_ONLY)
+        WeakReference<Object> reference = new WeakReference<>(heldReference(context, 'demo.$V6$Definition'))
+        String held = reference.get()?.getClass()?.simpleName
+
+        when:
+        context.stop()
+
+        then: "the context is still referenced here"
+        held == 'LazyBeanDefinitionReference'
+        context != null
+        eventually(10) { System.gc(); reference.get() == null }
+    }
+
+    void "the warm-up loads the definitions the context starts with, on threads of its own, and the others only when asked to"() {
         given:
         FixtureLoader loader = loader(classes)
         ApplicationContext context = start(loader, [(LAZY): 'true'])
+
+        expect: "it has finished"
+        ForkJoinPool.commonPoolParallelism > 1
+        eventually(10) { !Thread.allStackTraces.keySet().any { it.name.startsWith('micronaut-lazy-warm-up-') } }
+
+        and: "the application has none of those, so none of its definitions was loaded"
+        !loader.loaded('demo.$Unused5$Definition')
+        !loader.loaded('demo.$HandlerA$Definition')
+        context.getBean(loader.loadClass('demo.V8')) != null
+    }
+
+    void "the whole warm-up loads the definitions with no condition in the background, and never one whose conditions fail"() {
+        given:
+        FixtureLoader loader = loader(classes)
+        ApplicationContext context = start(loader, [(LAZY): 'true', (WARM_UP): 'all'])
 
         expect:
         ForkJoinPool.commonPoolParallelism > 1
@@ -344,20 +471,33 @@ class LazyBeanDefinitionsSpec extends Specification {
         context.getBean(loader.loadClass('demo.V8')) != null
     }
 
-    void "with the switch off, no class of the lazy mode is loaded and the application answers as before"() {
+    void "with the switch off, no class of the lazy mode is loaded and the application answers as before (#processors)"() {
         given:
         String java = Path.of(System.getProperty('java.home'), 'bin', 'java').toString()
         String classPath = System.getProperty('java.class.path') + File.pathSeparator + classes
-        def process = new ProcessBuilder(java, '--enable-preview', '-verbose:class', '-cp', classPath, LazyOffMain.name)
+        List<String> command = [java, '--enable-preview', '-verbose:class']
+        if (processors != 'all') {
+            command << '-XX:ActiveProcessorCount=' + processors
+        }
+        def process = new ProcessBuilder(command + ['-cp', classPath, LazyOffMain.name])
             .redirectErrorStream(true)
             .start()
         String output = process.inputStream.text
+        boolean pool = processors == 'all' ? ForkJoinPool.commonPoolParallelism > 1 : Integer.parseInt(processors) > 2
 
         expect:
         process.waitFor() == 0
         output.contains('ANSWER v8=demo.V8 handlers=[demo.HandlerA, demo.HandlerB]')
         output.contains('[class,load] io.micronaut.context.DefaultBeanContext ')
         !(output =~ LAZY_CLASSES)
+
+        and: "exactly the nested classes the code without lazy references loads"
+        nested(output, 'io.micronaut.context.beans.DefaultBeanDefinitionService') == ['$1', '$2', '$2$1', '$3', '$3$1', '$BeanDefinitionProducer', '$Beans'] as Set
+        nested(output, 'io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils') ==
+            (['$1', '$CacheEntry', '$MicronautServiceCollector', '$RecursiveActionValuesCollector'] + (pool ? ['$ServiceInstanceLoader'] : [])) as Set
+
+        where:
+        processors << ['all', '1']
     }
 
     // --- the application
@@ -443,6 +583,33 @@ public class Counter {
     public static final AtomicInteger INSTANCES = new AtomicInteger();
     public Counter() { INSTANCES.incrementAndGet(); }
 }''',
+            'demo/Tag.java'          : '''package demo;
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+@Repeatable(Tags.class) @Retention(RetentionPolicy.RUNTIME)
+public @interface Tag { String value(); }''',
+            'demo/Tags.java'         : '''package demo;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+@Retention(RetentionPolicy.RUNTIME)
+public @interface Tags { Tag[] value(); }''',
+            'demo/Tagged.java'       : 'package demo; @jakarta.inject.Singleton @Tag("c") public class Tagged { }',
+            'demo/TaggedWithExpr.java': 'package demo; @jakarta.inject.Singleton @Tag("${demo.tag:a}") @Tag("b") public class TaggedWithExpr { }',
+            'demo/Flavor.java'       : '''package demo;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+@jakarta.inject.Qualifier @Retention(RetentionPolicy.RUNTIME)
+public @interface Flavor { String value(); String size() default "large"; }''',
+            'demo/IceCream.java'     : 'package demo; public interface IceCream { }',
+            'demo/VanillaLarge.java' : 'package demo; @jakarta.inject.Singleton @Flavor("vanilla") public class VanillaLarge implements IceCream { }',
+            'demo/VanillaSmall.java' : 'package demo; @jakarta.inject.Singleton @Flavor(value = "vanilla", size = "small") public class VanillaSmall implements IceCream { }',
+            'demo/Svc.java'          : 'package demo; public interface Svc { }',
+            'demo/TypedDisabled.java': '''package demo;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Requires;
+@jakarta.inject.Singleton @Bean(typed = Svc.class) @Requires(property = "demo.typed")
+public class TypedDisabled implements Svc { }''',
             'demo/Boom.java'         : '''package demo;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
@@ -534,6 +701,28 @@ public final class Boom implements BeanDefinitionReference<Boom> {
     @groovy.transform.CompileStatic
     private static List<String> stereotyped(ApplicationContext context, ClassLoader loader, String stereotype) {
         names(context.getBeanDefinitions(Qualifiers.byStereotype((Class) loader.loadClass(stereotype)))).sort()
+    }
+
+    private static Object heldReference(ApplicationContext context, String name) {
+        context.beanDefinitionProvider.beanReferences.find { it.beanDefinitionName == name }
+    }
+
+    @groovy.transform.CompileStatic
+    private static List<String> stereotypedByName(ApplicationContext context, String stereotype) {
+        names(context.getBeanDefinitions(Qualifiers.byStereotype(stereotype))).findAll { String name -> name.startsWith('demo.') }.sort()
+    }
+
+    @groovy.transform.CompileStatic
+    private static List<String> byAnnotation(ApplicationContext context, AnnotationValue<?> value) {
+        names(context.getBeanDefinitions(Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA, (AnnotationValue) value))).findAll { String name -> name.startsWith('demo.') }.sort()
+    }
+
+    /**
+     * @return The names of the nested classes of a class that a {@code -verbose:class} output says were loaded
+     */
+    private static Set<String> nested(String output, String outer) {
+        def matcher = output =~ ('\\[class,load\\] ' + java.util.regex.Pattern.quote(outer) + '(\\$[^ ]+) ')
+        matcher.collect { (String) ((List) it)[1] } as Set
     }
 
     @groovy.transform.CompileStatic
