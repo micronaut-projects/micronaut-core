@@ -85,7 +85,7 @@ public final class DevApplicationContextConfigurer implements ApplicationContext
         if (watcher != null && runtime.manifest().mode() != DevMode.TEST) {
             // the context's own watch thread is off: modules register with the engine's one watcher instead, through a
             // view that closes their registrations when this context stops
-            applicationContext.registerSingleton(FileWatcher.class, new DevFileWatcher(watcher, runtime.pinnedWatches(), applicationContext.getClassLoader()));
+            applicationContext.registerSingleton(FileWatcher.class, new DevFileWatcher(watcher, runtime.pinnedWatches(), DevFileWatcher.runtimeTrees(runtime), applicationContext.getClassLoader()));
         }
     }
 
