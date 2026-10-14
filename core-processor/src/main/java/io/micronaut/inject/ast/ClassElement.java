@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -756,6 +757,109 @@ public interface ClassElement extends TypedElement {
         });
         result.put(getName(), getTypeArguments());
         return result;
+    }
+
+    /**
+     * All the super types of this type: the type itself first, then every interface it implements and class it
+     * extends, transitively, each with its type arguments written in the type arguments of this type, and
+     * {@code Object} last. The super types are listed as they are declared, the interfaces of a type before its
+     * super class, and a type reached more than once, as the two sides of a diamond reach it, is listed once.
+     *
+     * <p>The arguments of a super type are resolved against the path that reaches it, as
+     * {@link #getAllTypeArguments()} resolves them: a {@code Child} that extends {@code Base} with {@code String}
+     * lists the {@code Named} that {@code Base} implements with its variable as {@code String}, and a variable of
+     * this type that reaches a super type unbound stays a {@link GenericPlaceholderElement}, with its bounds. A
+     * wildcard argument is kept as it is written.</p>
+     *
+     * <p>The super types of a {@link #isRawType() raw type} are raw, as the language has them (JLS 4.8): a raw
+     * {@code Box}, where {@code Box} implements {@code View} of its variable, lists a {@code View} without type
+     * arguments, and answers {@code true} to {@link #isRawType()}. An array has no super type but {@code Object},
+     * and its element type is not walked; a primitive has none at all.</p>
+     *
+     * @return The type and its super types, in declaration order and with {@code Object} last
+     * @since 5.3.0
+     */
+    @Experimental
+    default List<ClassElement> getAllSuperTypes() {
+        List<ClassElement> result = new ArrayList<>();
+        result.add(this);
+        boolean object = Object.class.getName().equals(getName()) && !isArray();
+        if (!object && !isArray() && !isPrimitive()) {
+            Set<String> seen = new HashSet<>();
+            seen.add(superTypeKey(this));
+            boolean raw = isRawType();
+            // Every super type comes back written in the variables of the type that reaches it, and this type
+            // binds those variables, so one binding brings each super type into this type's arguments
+            Map<String, ClassElement> ownTypeArguments = getTypeArguments();
+            Stream.concat(
+                getInterfaces().stream(),
+                getSuperType().stream()
+            ).forEach(superType -> {
+                for (ClassElement type : superType.getAllSuperTypes()) {
+                    if (Object.class.getName().equals(type.getName()) && !type.isArray()) {
+                        continue;
+                    }
+                    Map<String, ClassElement> typeArguments = type.getTypeArguments();
+                    ClassElement resolved = type;
+                    if (raw) {
+                        if (!typeArguments.isEmpty()) {
+                            resolved = type.withTypeArguments(Collections.emptyMap());
+                        }
+                    } else {
+                        Map<String, ClassElement> bound = TypeVariableBinder.bind(typeArguments, ownTypeArguments);
+                        if (bound != typeArguments) {
+                            resolved = type.withTypeArguments(bound);
+                        }
+                    }
+                    if (seen.add(superTypeKey(resolved))) {
+                        result.add(resolved);
+                    }
+                }
+            });
+        }
+        if (!object && (isArray() || !isPrimitive())) {
+            result.add(ClassElement.of(Object.class));
+        }
+        return result;
+    }
+
+    /**
+     * The key a super type is listed once by: its name and its type arguments, a raw type by its name alone.
+     *
+     * @param type The type
+     * @return The key
+     */
+    private static String superTypeKey(ClassElement type) {
+        if (type instanceof GenericPlaceholderElement placeholder) {
+            return placeholder.getResolved()
+                .map(ClassElement::superTypeKey)
+                .orElseGet(() -> placeholder.getVariableName() + "[]".repeat(type.getArrayDimensions()));
+        }
+        if (type instanceof WildcardElement wildcard) {
+            StringBuilder key = new StringBuilder("?");
+            for (ClassElement bound : wildcard.getUpperBounds()) {
+                key.append(" extends ").append(superTypeKey(bound));
+            }
+            for (ClassElement bound : wildcard.getLowerBounds()) {
+                key.append(" super ").append(superTypeKey(bound));
+            }
+            return key.toString();
+        }
+        StringBuilder key = new StringBuilder(type.getName());
+        key.append("[]".repeat(type.getArrayDimensions()));
+        if (!type.isRawType() && !type.getTypeArguments().isEmpty()) {
+            key.append('<');
+            boolean first = true;
+            for (ClassElement argument : type.getTypeArguments().values()) {
+                if (!first) {
+                    key.append(',');
+                }
+                first = false;
+                key.append(superTypeKey(argument));
+            }
+            key.append('>');
+        }
+        return key.toString();
     }
 
     /**
