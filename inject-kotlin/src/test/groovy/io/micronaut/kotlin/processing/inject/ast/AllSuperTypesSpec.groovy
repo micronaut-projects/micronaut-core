@@ -2,6 +2,7 @@ package io.micronaut.kotlin.processing.inject.ast
 
 import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.WildcardElement
 
@@ -112,7 +113,7 @@ class Holder {
     }
 
     private static ClassElement field(ClassElement holder, String name) {
-        holder.getFields().find { it.name == name }.genericType
+        holder.getEnclosedElements(ElementQuery.ALL_FIELDS).find { it.name == name }.genericType
     }
 
     /**

@@ -373,9 +373,14 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         if (redirectTypes == null || redirectTypes.length == 0) {
             return false;
         }
-        // Written without arguments, or copied without any by withTypeArguments
+        // Copied without any arguments by withTypeArguments
         Map<String, ClassElement> typeArguments = getTypeArguments();
-        return typeArguments.isEmpty() || typeArguments.values().stream()
+        if (typeArguments.isEmpty()) {
+            return true;
+        }
+        // Written without arguments: the resolver then leaves every variable as a raw placeholder. A type written
+        // with arguments is not raw, whatever its arguments resolve to
+        return classNode.getGenericsTypes() == null && typeArguments.values().stream()
             .allMatch(argument -> argument instanceof GenericPlaceholderElement placeholder && placeholder.isRawType());
     }
 

@@ -2,6 +2,7 @@ package io.micronaut.visitors
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.WildcardElement
 
@@ -175,8 +176,30 @@ abstract class Box<T> implements View<T>, Named {}
         wild.getAllSuperTypes()[2].typeArguments['V'].typeArguments['E'] instanceof WildcardElement
     }
 
+    void "an argument resolved to a raw type does not make the type that carries it raw"() {
+        given:
+        ClassElement child = buildClassElement('''
+package test;
+
+class Child extends Holder<java.util.List> {}
+class Holder<X> {
+    Box<X> box;
+}
+interface View<V> {}
+interface Named {}
+abstract class Box<T> implements View<T>, Named {}
+''')
+
+        when:
+        def box = field(child, 'box')
+
+        then:
+        !box.rawType
+        closure(box) == ['test.Box<java.util.List>', 'test.View<java.util.List>', 'test.Named', 'java.lang.Object']
+    }
+
     private static ClassElement field(ClassElement holder, String name) {
-        holder.getFields().find { it.name == name }.genericType
+        holder.getEnclosedElements(ElementQuery.ALL_FIELDS).find { it.name == name }.genericType
     }
 
     /**
