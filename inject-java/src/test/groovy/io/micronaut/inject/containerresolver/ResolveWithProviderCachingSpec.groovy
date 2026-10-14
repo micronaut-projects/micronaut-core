@@ -74,6 +74,7 @@ class ResolveWithProviderCachingSpec extends AbstractTypeElementSpec {
     @Override
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
         contextBuilder.beanResolutionTrace(BeanResolutionTraceMode.STANDARD_OUT, 'test\\.providercache\\.(Consumer|Other)')
+        contextBuilder.beanDependencyTrackingEnabled(true)
     }
 
     void 'a singleton provider is resolved once for every marked point of every bean created'() {
@@ -111,6 +112,26 @@ class ResolveWithProviderCachingSpec extends AbstractTypeElementSpec {
 
         then:
         ownedProviderType.destroyed == 5 * 2
+
+        cleanup:
+        context.close()
+    }
+
+    void 'a held provider is recorded as a dependency of every bean injected after it'() {
+        given:
+        def context = buildContext('test.providercache.Consumer', SOURCE)
+        def consumerType = context.classLoader.loadClass('test.providercache.Consumer')
+        def otherType = context.classLoader.loadClass('test.providercache.Other')
+        def providerType = context.classLoader.loadClass('test.providercache.SharedProvider')
+
+        when: 'the provider is held by the first bean, then injected into a bean of another definition'
+        context.getBean(consumerType)
+        context.getBean(otherType)
+        def graph = context.findDependencyGraph().get()
+
+        then:
+        graph.dependenciesOf(context.getBeanDefinition(consumerType)).any { it.dependency().beanType == providerType }
+        graph.dependenciesOf(context.getBeanDefinition(otherType)).any { it.dependency().beanType == providerType }
 
         cleanup:
         context.close()
