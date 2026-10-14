@@ -43,7 +43,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -226,10 +225,7 @@ public abstract class ProxyingBeanDefinitionWriter implements ElementProxyBuilde
         proxyBeanDefinitionWriter.setExposes(interfaceTypes);
         proxyBeanDefinitionWriter.addOriginatingElement(interfaceElement);
 
-        Map<String, ClassElement> typeArguments = interfaceElement.getTypeArguments();
-        if (!typeArguments.isEmpty()) {
-            proxyBeanDefinitionWriter.addTypeArguments(Map.of(interfaceElement.getName(), typeArguments));
-        }
+        proxyBeanDefinitionWriter.addAssignableType(interfaceElement);
 
         interfaceElement.getEnclosedElements(ElementQuery.ALL_METHODS)
             .forEach(methodElement -> {
