@@ -73,13 +73,16 @@ class BeanDefinitionDescriptorFallbackSpec extends MicronautApplicationTest {
         ApplicationContext context = Micronaut.build().classLoader(loader).mainClass(loader.loadClass('demo.Application')).build().start()
         try {
             Class<?> engine = loader.loadClass('demo.Engine')
+            // asked first: a lookup that finds the disabled bean drops its reference, which the check of the enabled
+            // beans on the common pool does too, at a time that depends on what else the pool runs
+            boolean disabled = context.containsBean(loader.loadClass('demo.Disabled'))
             Map<String, Object> answers = [
                 references: context.beanDefinitionReferences*.beanDefinitionName.findAll { it.startsWith('demo.') }.sort(),
                 v6        : context.getBean(engine, Qualifiers.byName('v6')).getClass().name,
                 primary   : context.getBean(engine).getClass().name,
                 engines   : context.getBean(loader.loadClass('demo.Engines')).count(),
                 wheel     : context.getBean(loader.loadClass('demo.Wheel'), Qualifiers.byName('front')).getClass().name,
-                disabled  : context.containsBean(loader.loadClass('demo.Disabled')),
+                disabled  : disabled,
                 greeting  : context.getBean(loader.loadClass('demo.Greeter')).greet('hello')
             ]
             try {

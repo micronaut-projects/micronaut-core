@@ -126,7 +126,8 @@ class BeanDefinitionPrefetchTest {
         builder.beanDefinitionsProvider(task);
 
         try (ApplicationContext context = builder.build(); ApplicationContext plain = ApplicationContext.builder().build()) {
-            assertEquals(names(plain.getBeanDefinitionReferences()), names(context.getBeanDefinitionReferences()));
+            // by the names of the definitions: with lazy bean definitions on, the plain context's references are lazy
+            assertEquals(definitionNames(plain.getBeanDefinitionReferences()), definitionNames(context.getBeanDefinitionReferences()));
             context.start();
             List<BeanDefinitionReference<?>> handedOver = List.copyOf(context.getBeanDefinitionReferences());
             context.stop();
@@ -296,6 +297,14 @@ class BeanDefinitionPrefetchTest {
         Field result = BeanDefinitionPrefetch.class.getDeclaredField("result");
         result.setAccessible(true);
         return result.get(task);
+    }
+
+    static List<String> definitionNames(Collection<? extends BeanDefinitionReference<?>> references) {
+        List<String> names = new ArrayList<>(references.size());
+        for (BeanDefinitionReference<?> reference : references) {
+            names.add(reference.getBeanDefinitionName());
+        }
+        return names;
     }
 
     static List<String> names(Collection<? extends BeanDefinitionReference<?>> references) {

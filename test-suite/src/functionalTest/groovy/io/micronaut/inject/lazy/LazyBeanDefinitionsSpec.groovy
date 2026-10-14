@@ -480,7 +480,13 @@ public final class Boom implements BeanDefinitionReference<Boom> {
         return loader
     }
 
+    /**
+     * Starts a context with exactly the given switches, whatever the JVM runs with, as the test tasks may switch lazy
+     * mode or its verification on for every test.
+     */
     private ApplicationContext start(ClassLoader loader, Map<String, String> switches) {
+        Map<String, String> previous = [LAZY, VERIFY, WARM_UP, VERIFY + '.report'].collectEntries { [(it): System.getProperty(it)] }
+        previous.keySet().each { System.clearProperty(it) }
         switches.each { key, value -> System.setProperty(key, value) }
         try {
             ApplicationContext context = ApplicationContext.builder()
@@ -491,7 +497,13 @@ public final class Boom implements BeanDefinitionReference<Boom> {
             closeables << context
             return context
         } finally {
-            switches.keySet().each { System.clearProperty(it) }
+            previous.each { key, value ->
+                if (value == null) {
+                    System.clearProperty(key)
+                } else {
+                    System.setProperty(key, value)
+                }
+            }
         }
     }
 
