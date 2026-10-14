@@ -15,6 +15,7 @@
  */
 package io.micronaut.dev.http;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.context.env.Environment;
@@ -35,6 +36,7 @@ import io.micronaut.http.cookie.SameSite;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.Router;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
@@ -44,8 +46,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Guards the development pages of a launch: the {@code /dev} endpoint, wherever its route is, and the Control Panel,
- * under {@code micronaut.control-panel.path}. A request for them must name an allowed host, see
+ * Guards the development pages of a launch: the {@code /dev} endpoint, wherever its route is, when it is routed, and the
+ * Control Panel, under {@code micronaut.control-panel.path}, when it is there. An application's own routes at those
+ * paths, without them, pass. A request for them must name an allowed host, see
  * {@link DevAccess#allowsHost(String)}, or is refused with a 403; and must carry the launch's access token, in the cookie
  * the link the launcher logs at startup sets or in the {@value DevAccess#TOKEN_HEADER} header, or is refused with a 401.
  * The link's {@code ?token=} sets the cookie and redirects to the same page without it.
@@ -69,19 +72,16 @@ public final class DevAccessFilter implements Ordered {
         + DevAccess.TOKEN_HEADER + " header.\n";
 
     private final DevAccess access;
-    private final List<String> guarded;
+    private final Environment environment;
+    private final BeanProvider<Router> routers;
+    private volatile @Nullable Router router; // NOSONAR java:S3077 the primary router, resolved once
+    private volatile @Nullable Guarded guarded; // NOSONAR java:S3077 replaced whole when the route table is
 
-    DevAccessFilter(DevRuntime runtime, Environment environment) {
+    DevAccessFilter(DevRuntime runtime, Environment environment, BeanProvider<Router> routers) {
         this.access = runtime.access();
-        String contextPath = DevAccessLinks.normalizedPath(environment.getProperty(DevAccessLinks.CONTEXT_PATH, String.class).orElse(""));
-        List<String> paths = new ArrayList<>();
-        paths.add("/" + DevEndpoint.NAME);
-        paths.add(DevAccessLinks.controlPanelPath(environment));
-        if (!contextPath.isEmpty()) {
-            paths.add(contextPath + "/" + DevEndpoint.NAME);
-            paths.add(contextPath + DevAccessLinks.controlPanelPath(environment));
-        }
-        this.guarded = List.copyOf(paths);
+        this.environment = environment;
+        // resolved at the first request: the router creates the filters it routes through
+        this.routers = routers;
     }
 
     /**
@@ -93,10 +93,60 @@ public final class DevAccessFilter implements Ordered {
      */
     @RequestFilter
     public @Nullable HttpResponse<?> guard(HttpRequest<?> request) {
-        if (!isGuarded(request, guarded)) {
+        if (!isGuarded(request, guardedPaths())) {
             return null;
         }
         return admit(request, access);
+    }
+
+    /**
+     * The paths guarded for the route table requests are routed by now, worked out once per table: a rebuild of the
+     * development router makes a new one.
+     */
+    private List<String> guardedPaths() {
+        Router primary = router;
+        if (primary == null) {
+            primary = routers.find(null).orElse(null);
+            if (primary == null) {
+                return List.of();
+            }
+            router = primary;
+        }
+        Router table = primary instanceof DevRouter devRouter ? devRouter.current() : primary;
+        Guarded current = guarded;
+        if (current == null || current.table() != table) {
+            current = new Guarded(table, guardedPaths(table, environment));
+            guarded = current;
+        }
+        return current.paths();
+    }
+
+    /**
+     * The paths of the development pages a route table has: the development endpoint's when it is routed, and the
+     * Control Panel's when it is there. An application's own routes at {@code /dev} or at the Control Panel's path,
+     * without them, are not guarded.
+     *
+     * @param router The route table
+     * @param environment The configuration
+     * @return The paths, with the context path too when one is set
+     */
+    static List<String> guardedPaths(Router router, Environment environment) {
+        String contextPath = DevAccessLinks.normalizedPath(environment.getProperty(DevAccessLinks.CONTEXT_PATH, String.class).orElse(""));
+        List<String> paths = new ArrayList<>();
+        for (String path : DevAccessLinks.devEndpointPaths(router)) {
+            paths.add(path);
+            if (!contextPath.isEmpty() && !isUnder(path, contextPath)) {
+                paths.add(contextPath + path);
+            }
+        }
+        String controlPanel = DevAccessLinks.controlPanelPath(environment);
+        List<String> candidates = contextPath.isEmpty() ? List.of(controlPanel) : List.of(controlPanel, contextPath + controlPanel);
+        for (String candidate : candidates) {
+            if (DevAccessLinks.hasControlPanel(router, candidate)) {
+                paths.add(candidate);
+            }
+        }
+        return List.copyOf(paths);
     }
 
     @Override
@@ -232,7 +282,7 @@ public final class DevAccessFilter implements Ordered {
      * Whether a path is a guarded path or under it: {@code /dev}, {@code /dev/reload} and {@code /dev;x} are, and
      * {@code /devices} is not.
      */
-    private static boolean isUnder(String path, String guarded) {
+    static boolean isUnder(String path, String guarded) {
         if (!path.startsWith(guarded)) {
             return false;
         }
@@ -284,5 +334,14 @@ public final class DevAccessFilter implements Ordered {
             .contentType(MediaType.TEXT_PLAIN_TYPE)
             .header(HttpHeaders.CACHE_CONTROL, "no-store")
             .body(message);
+    }
+
+    /**
+     * The guarded paths of a route table.
+     *
+     * @param table The route table
+     * @param paths The paths
+     */
+    private record Guarded(Router table, List<String> paths) {
     }
 }

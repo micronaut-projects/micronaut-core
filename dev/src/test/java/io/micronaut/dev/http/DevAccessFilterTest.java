@@ -141,6 +141,27 @@ class DevAccessFilterTest {
     }
 
     @Test
+    void onlyTheDevelopmentPagesARouteTableHasAreGuarded() {
+        Class<?> panel = io.micronaut.controlpanel.ui.TestPanel.class;
+        try (io.micronaut.context.ApplicationContext context = io.micronaut.context.ApplicationContext.run()) {
+            io.micronaut.context.env.Environment environment = context.getEnvironment();
+            // the application's own routes at /dev and /control-panel, without the endpoint or the Control Panel
+            assertEquals(List.of(), DevAccessFilter.guardedPaths(router(route("/dev"), route("/control-panel/api/beans")), environment));
+            // the endpoint, wherever its route is, and the Control Panel, told by its package
+            assertEquals(List.of("/management/dev", "/control-panel"), DevAccessFilter.guardedPaths(
+                router(route("/management/dev", io.micronaut.dev.management.DevEndpoint.class), route("/management/dev/{action}", io.micronaut.dev.management.DevEndpoint.class),
+                    route("/control-panel/api/beans", panel)), environment));
+        }
+        // at the configured path only, and with the context path
+        try (io.micronaut.context.ApplicationContext context = io.micronaut.context.ApplicationContext.run(
+            java.util.Map.of("micronaut.control-panel.path", "/admin", "micronaut.server.context-path", "/app"))) {
+            io.micronaut.context.env.Environment configured = context.getEnvironment();
+            assertEquals(List.of(), DevAccessFilter.guardedPaths(router(route("/app/control-panel", panel)), configured));
+            assertEquals(List.of("/app/admin"), DevAccessFilter.guardedPaths(router(route("/app/admin", panel)), configured));
+        }
+    }
+
+    @Test
     void theControlPanelPathIsNormalized() {
         assertEquals("/admin", DevAccessLinks.normalizedPath("admin/"));
         assertEquals("/admin/panel", DevAccessLinks.normalizedPath("//admin//panel//"));
@@ -154,14 +175,30 @@ class DevAccessFilterTest {
     }
 
     private static io.micronaut.web.router.UriRouteInfo<?, ?> route(String template) {
+        return route(template, Object.class);
+    }
+
+    private static io.micronaut.web.router.UriRouteInfo<?, ?> route(String template, Class<?> declaringType) {
         io.micronaut.http.uri.UriMatchTemplate uriTemplate = io.micronaut.http.uri.UriMatchTemplate.of(template);
         return (io.micronaut.web.router.UriRouteInfo<?, ?>) java.lang.reflect.Proxy.newProxyInstance(DevAccessFilterTest.class.getClassLoader(),
             new Class<?>[] {io.micronaut.web.router.UriRouteInfo.class},
             (proxy, method, args) -> switch (method.getName()) {
                 case "getUriMatchTemplate" -> uriTemplate;
+                case "getDeclaringType" -> declaringType;
                 case "hashCode" -> System.identityHashCode(proxy);
                 case "equals" -> proxy == args[0];
                 case "toString" -> template;
+                default -> throw new UnsupportedOperationException(method.getName());
+            });
+    }
+
+    private static io.micronaut.web.router.Router router(io.micronaut.web.router.UriRouteInfo<?, ?>... routes) {
+        return (io.micronaut.web.router.Router) java.lang.reflect.Proxy.newProxyInstance(DevAccessFilterTest.class.getClassLoader(),
+            new Class<?>[] {io.micronaut.web.router.Router.class},
+            (proxy, method, args) -> switch (method.getName()) {
+                case "uriRoutes" -> java.util.Arrays.stream(routes);
+                case "hashCode" -> System.identityHashCode(proxy);
+                case "equals" -> proxy == args[0];
                 default -> throw new UnsupportedOperationException(method.getName());
             });
     }
