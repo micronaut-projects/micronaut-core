@@ -89,7 +89,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         ConversionService.class
     );
 
-    private static final String WARM_UP_ALL = "all";
+    private static final String WARM_UP_START = "start";
 
     private final String[] eagerInitStereotypes;
     private final boolean eagerInitStereotypesPresent;
@@ -103,7 +103,8 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     private final boolean lazy;
     private final boolean warmUp;
     /**
-     * Whether the warm-up also loads every lazy reference whose conditions are only of classes that are present.
+     * Whether the warm-up also loads every lazy reference whose conditions are only of classes that are present, which
+     * it does unless asked to warm only the references the context starts with.
      */
     private final boolean warmUpAll;
     /**
@@ -185,7 +186,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             && !NativeImageUtils.inImageCode();
         String warmUpProperty = lazy ? System.getProperty(DefaultBeanDefinitionsProvider.LAZY_WARM_UP_PROPERTY) : null;
         this.warmUp = lazy && ForkJoinPool.getCommonPoolParallelism() > 1 && !StringUtils.FALSE.equals(warmUpProperty);
-        this.warmUpAll = warmUp && WARM_UP_ALL.equals(warmUpProperty);
+        this.warmUpAll = warmUp && !WARM_UP_START.equals(warmUpProperty);
         this.deferredDisabledBeans = lazy ? new CopyOnWriteArrayList<>() : null;
         if (beans == null) {
             beans = createBeans(resolveBeanDefinitionReferences(), List.of());
@@ -1423,7 +1424,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                     addLazy(first, ordered, producers);
                 }
             }
-            // then, when asked to, every other one whose conditions are of classes that load
+            // then, unless asked to warm only those, every other one whose conditions are of classes that load
             List<LazyBeanDefinitionReference<?>> rest = new ArrayList<>();
             if (all) {
                 addLazy(rest, ordered, beans.all);
@@ -1496,8 +1497,9 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
     /**
      * Instantiates lazy references on threads of its own, without a context, in the order given: the definitions the
-     * context needs first, then, when asked to, every other one whose conditions are only of classes, which hold. The
-     * threads share a cursor, so the order holds across them. A reference a lookup instantiated meanwhile is skipped.
+     * context needs first, then, unless asked not to, every other one whose conditions are only of classes, which
+     * hold. The threads share a cursor, so the order holds across them. A reference a lookup instantiated meanwhile is
+     * skipped.
      */
     private static final class WarmUp implements Runnable {
 

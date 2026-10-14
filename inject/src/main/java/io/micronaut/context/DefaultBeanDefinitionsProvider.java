@@ -54,8 +54,8 @@ public final class DefaultBeanDefinitionsProvider implements BeanDefinitionsProv
     public static final String LAZY_VERIFY_REPORT_PROPERTY = LAZY_VERIFY_PROPERTY + ".report";
 
     /**
-     * The system property that turns the warm-up of lazy references off when it is {@code false}, and extends it to
-     * every reference whose conditions are only of classes when it is {@code all}.
+     * The system property that turns the warm-up of lazy references off when it is {@code false}, and limits it to the
+     * references a context starts with when it is {@code start}.
      *
      * @since 5.3.0
      */

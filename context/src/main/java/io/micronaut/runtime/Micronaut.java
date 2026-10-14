@@ -77,22 +77,23 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
  * lookup needs it: its flags, types, annotations, qualifiers and the conditions checked before
  * loading are answered from the descriptor. Other definitions are loaded as before. When the
  * common pool has more than one thread, the definitions a context creates or processes as it
- * starts, and its converters, listeners and resource loaders, are loaded in the background on
- * threads of their own; {@code micronaut.bean-definitions.lazy.warm-up=all} also loads every
- * definition whose only conditions are classes that are present, and {@code =false} turns the
- * warm-up off. A definition that fails to initialize fails the first lookup that needs it, not
- * the start, and {@code isEnabled} of a lazy reference checks only the conditions that can be
- * checked before its definition is loaded. Relocating the classes that bean definitions name
- * (with Shadow or Maven Shade) without rewriting their entries is not supported.
+ * starts, its converters, listeners and resource loaders, and then every definition whose only
+ * conditions are classes that are present are loaded in the background on threads of their own;
+ * {@code micronaut.bean-definitions.lazy.warm-up=start} limits that to the first ones, and
+ * {@code =false} turns the warm-up off. A definition that fails to initialize fails the first
+ * lookup that needs it, not the start, and {@code isEnabled} of a lazy reference checks only the
+ * conditions that can be checked before its definition is loaded. Relocating the classes that
+ * bean definitions name (with Shadow or Maven Shade) without rewriting their entries is not
+ * supported.
  * {@code micronaut.bean-definitions.lazy.ignore-writers=<version>,r<revision>} ignores the
  * descriptors written by those Micronaut versions or of those revisions, so that those definitions
  * load as they would without lazy references. {@code micronaut.bean-definitions.lazy.verify=true}
  * also checks every descriptor against its definition, for tests. Lazy references are not used in
  * a native image, nor for the references an application's own {@code BeanDefinitionsProvider}
- * gives. Measure before using it: so far it has not made startup faster on a JVM with several
- * processors or with a JDK AOT cache, it raises peak memory, and the definitions it loads late
- * make the first requests slower. It is off by default, read when a context is created, and may
- * change or be removed.</p>
+ * gives. Measure before using it: in measurements so far it has not made an application ready
+ * for its first request sooner, with one to twelve processors or with a JDK AOT cache, and it
+ * raised peak memory. It is off by default, read when a context is created, and may change or
+ * be removed.</p>
  *
  * @author Graeme Rocher
  * @since 1.0

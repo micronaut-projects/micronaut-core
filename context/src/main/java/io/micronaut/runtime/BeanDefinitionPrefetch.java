@@ -125,7 +125,8 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
         }
         // with lazy bean definition references, the prefetch reads the descriptors and does not load the reference
         // classes, which lazy references load only when a lookup needs them
-        boolean lazy = Boolean.getBoolean(DefaultBeanDefinitionsProvider.LAZY_PROPERTY) || Boolean.getBoolean(DefaultBeanDefinitionsProvider.LAZY_VERIFY_PROPERTY);
+        boolean lazy = Boolean.getBoolean(DefaultBeanDefinitionsProvider.LAZY_PROPERTY)
+            || Boolean.getBoolean(DefaultBeanDefinitionsProvider.LAZY_VERIFY_PROPERTY);
         if (!lazy) {
             // lazy references load only the classes a lookup needs, so preloading all of them would undo that
             ForkJoinPool.commonPool().execute(new Preload(classLoader, null));

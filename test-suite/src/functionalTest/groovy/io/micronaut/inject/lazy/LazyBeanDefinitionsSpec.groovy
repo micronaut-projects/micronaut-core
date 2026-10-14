@@ -353,7 +353,7 @@ class LazyBeanDefinitionsSpec extends Specification {
         }
         Path report = temp.resolve('report.txt')
         FixtureLoader loader = loader(wrong)
-        ApplicationContext context = start(loader, [(VERIFY): 'true', (WARM_UP): 'all', (VERIFY + '.report'): report.toString()])
+        ApplicationContext context = start(loader, [(VERIFY): 'true', (VERIFY + '.report'): report.toString()])
 
         expect: "the warm-up loaded it, and found the difference"
         ForkJoinPool.commonPoolParallelism > 1
@@ -441,10 +441,10 @@ class LazyBeanDefinitionsSpec extends Specification {
         eventually(10) { System.gc(); reference.get() == null }
     }
 
-    void "the warm-up loads the definitions the context starts with, on threads of its own, and the others only when asked to"() {
+    void "the start-up warm-up loads only the definitions the context starts with, on threads of its own"() {
         given:
         FixtureLoader loader = loader(classes)
-        ApplicationContext context = start(loader, [(LAZY): 'true'])
+        ApplicationContext context = start(loader, [(LAZY): 'true', (WARM_UP): 'start'])
 
         expect: "it has finished"
         ForkJoinPool.commonPoolParallelism > 1
@@ -456,10 +456,10 @@ class LazyBeanDefinitionsSpec extends Specification {
         context.getBean(loader.loadClass('demo.V8')) != null
     }
 
-    void "the whole warm-up loads the definitions with no condition in the background, and never one whose conditions fail"() {
+    void "the warm-up loads the definitions with no condition in the background, and never one whose conditions fail"() {
         given:
         FixtureLoader loader = loader(classes)
-        ApplicationContext context = start(loader, [(LAZY): 'true', (WARM_UP): 'all'])
+        ApplicationContext context = start(loader, [(LAZY): 'true'])
 
         expect:
         ForkJoinPool.commonPoolParallelism > 1
