@@ -49,18 +49,20 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * Writes the record of the generic hierarchy of a type, a {@link TypeHierarchy} found at run time with
  * {@link TypeHierarchies}. See {@link VisitorContext#recordTypeHierarchy(ClassElement, Element...)}.
  *
- * <p>A record is a class with a constructor and nothing else, which passes the type, its variables and its supertypes,
- * built with the argument factories from class constants, to {@link GeneratedTypeHierarchy}. It is written into the
- * package of the first originating element, or into the package of the type when the type, a bound or a supertype of
- * it is not public, so that the class constants of the record resolve.</p>
+ * <p>A record is a class with a constructor and nothing else, which passes the type, its variables, its direct super
+ * types and {@link ClassElement#getAllSuperTypes() all its super types}, built with the argument factories from class
+ * constants, to {@link GeneratedTypeHierarchy}. It is written into the package of the first originating element, or
+ * into the package of the type when the type, a bound or a super type of it is a non-public class of that package,
+ * so that the class constants of the record resolve. A super type that is not public and of another package, which no
+ * record could name, is left out of the record; a type whose own declaration names such a class is refused.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -69,7 +71,7 @@ import java.util.function.Function;
 public final class TypeHierarchyWriter {
 
     private static final Constructor<?> SUPER_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
-        GeneratedTypeHierarchy.class, Class.class, Argument[].class, Argument.class, Argument[].class);
+        GeneratedTypeHierarchy.class, Class.class, Argument[].class, Argument.class, Argument[].class, Argument[].class);
     // the exceptions of javac and of KSP for a class written twice, by name: neither compiler is a dependency here
     private static final Set<String> ALREADY_WRITTEN = Set.of("javax.annotation.processing.FilerException", "kotlin.io.FileAlreadyExistsException");
     private static final int MAX_DEPTH = 16;
@@ -102,7 +104,7 @@ public final class TypeHierarchyWriter {
      */
     public static void write(ClassElement type, String recordName, VisitorContext context, Element... originatingElements) {
         Element origin = originatingElements[0];
-        ClassDef classDef = build(type, recordName);
+        ClassDef classDef = build(type, recordName, origin);
         // the class first: a compiler that refuses to write a class twice says so here, before the service entry
         try (OutputStream outputStream = context.visitClass(recordName, originatingElements)) {
             outputStream.write(ByteCodeWriterUtils.writeByteCode(classDef, context));
@@ -117,7 +119,8 @@ public final class TypeHierarchyWriter {
         context.visitServiceDescriptor(TypeHierarchy.class, recordName, origin);
     }
 
-    private static ClassDef build(ClassElement type, String recordName) {
+    private static ClassDef build(ClassElement type, String recordName, Element origin) {
+        String recordPackage = recordName.substring(0, Math.max(0, recordName.lastIndexOf('.')));
         ClassTypeDef recordType = ClassTypeDef.of(recordName);
         Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
         Function<String, ExpressionDef> loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(recordType, loadTypeMethods);
@@ -125,15 +128,28 @@ public final class TypeHierarchyWriter {
 
         List<ExpressionDef> variables = new ArrayList<>();
         for (GenericPlaceholderElement variable : type.getDeclaredGenericPlaceholders()) {
+            if (!isNameableFrom(variable, recordPackage)) {
+                throw new ProcessingException(origin, "The hierarchy of [" + type.getName() + "] cannot be recorded: the bounds of its variable "
+                    + variable.getVariableName() + " name a type that is not public and not of the package " + recordPackage);
+            }
             variables.add(argument(defaults, type, recordType, variable.getVariableName(), variable, loadClassValueExpressionFn));
         }
         ExpressionDef superclass = type.getSuperType()
-            .filter(superType -> !type.isInterface() && !superType.getName().equals(Object.class.getName()))
+            .filter(superType -> !type.isInterface() && !superType.getName().equals(Object.class.getName()) && isNameableFrom(superType, recordPackage))
             .map(superType -> argument(defaults, type, recordType, superType.getSimpleName(), superType, loadClassValueExpressionFn))
             .orElseGet(ExpressionDef::nullValue);
         List<ExpressionDef> interfaces = new ArrayList<>();
         for (ClassElement anInterface : type.getInterfaces()) {
-            interfaces.add(argument(defaults, type, recordType, anInterface.getSimpleName(), anInterface, loadClassValueExpressionFn));
+            if (isNameableFrom(anInterface, recordPackage)) {
+                interfaces.add(argument(defaults, type, recordType, anInterface.getSimpleName(), anInterface, loadClassValueExpressionFn));
+            }
+        }
+        // the closure the compiler walked, the type itself left out: the record is of the type
+        List<ExpressionDef> superTypes = new ArrayList<>();
+        for (ClassElement superType : type.getAllSuperTypes()) {
+            if (!superType.getName().equals(type.getName()) && isNameableFrom(superType, recordPackage)) {
+                superTypes.add(argument(defaults, type, recordType, superType.getSimpleName(), superType, loadClassValueExpressionFn));
+            }
         }
 
         ClassDef.ClassDefBuilder builder = ClassDef.builder(recordName)
@@ -146,7 +162,8 @@ public final class TypeHierarchyWriter {
                     ExpressionDef.constant(TypeDef.erasure(type)),
                     arrayOrNull(variables),
                     superclass,
-                    arrayOrNull(interfaces)
+                    arrayOrNull(interfaces),
+                    arrayOrNull(superTypes)
                 ))));
         loadTypeMethods.values().forEach(builder::addMethod);
         return builder.build();
@@ -168,17 +185,23 @@ public final class TypeHierarchyWriter {
     }
 
     /**
-     * The package the record is written into: that of the origin, unless the record names a type that is not public,
-     * which only a class of the package of the type can name.
+     * The package the record is written into: that of the origin, unless the record names a class of the package of
+     * the type that is not public, which only a class of that package can name. A type of a package of the JDK that
+     * is itself not public has no package a record can be written into.
      */
     private static String recordPackage(ClassElement type, Element origin) {
         String typePackage = type.getPackageName();
         String originPackage = packageOf(origin);
-        if (typePackage.equals(originPackage) || !namesNonPublicType(type)) {
-            return originPackage;
+        if (typePackage.equals(originPackage)) {
+            return typePackage;
         }
-        if (typePackage.startsWith("java.")) {
-            throw new ProcessingException(origin, "The hierarchy of [" + type.getName() + "] cannot be recorded: it names a type that is not public, and a record cannot be written into a package of the JDK");
+        Set<String> visited = new HashSet<>();
+        if (isPublic(type, visited)) {
+            if (!namesNonPublicTypeOf(type, typePackage)) {
+                return originPackage;
+            }
+        } else if (typePackage.startsWith("java.")) {
+            throw new ProcessingException(origin, "The hierarchy of [" + type.getName() + "] cannot be recorded: the type is not public, and a record cannot be written into a package of the JDK");
         }
         return typePackage;
     }
@@ -197,52 +220,65 @@ public final class TypeHierarchyWriter {
             + "]: the first originating element must be a class, a member or a package");
     }
 
-    private static boolean namesNonPublicType(ClassElement type) {
+    /**
+     * Whether the declaration of a type names a class of the given package that is not public: in the bounds of its
+     * variables, in its direct super types or anywhere in its closure.
+     */
+    private static boolean namesNonPublicTypeOf(ClassElement type, String packageName) {
         Set<String> visited = new HashSet<>();
-        if (!isPublic(type, visited)) {
-            return true;
-        }
         for (GenericPlaceholderElement variable : type.getDeclaredGenericPlaceholders()) {
-            if (namesNonPublicType(variable, visited, 0)) {
+            if (namesNonPublicTypeOf(variable, packageName, visited, 0)) {
                 return true;
             }
         }
-        Optional<ClassElement> superType = type.getSuperType();
-        if (superType.isPresent() && namesNonPublicType(superType.get(), visited, 0)) {
-            return true;
-        }
-        for (ClassElement anInterface : type.getInterfaces()) {
-            if (namesNonPublicType(anInterface, visited, 0)) {
+        for (ClassElement superType : type.getAllSuperTypes()) {
+            if (!superType.getName().equals(type.getName()) && namesNonPublicTypeOf(superType, packageName, visited, 0)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean namesNonPublicType(ClassElement element, Set<String> visited, int depth) {
+    /**
+     * Whether every class a type names, itself, its type arguments and the bounds of its variables and wildcards, can
+     * be named from a package: it is public, or of that package.
+     */
+    private static boolean isNameableFrom(ClassElement element, String packageName) {
+        // a non-public class is nameable from its own package only
+        return !namesNonPublicTypeMatching(element, aClass -> !aClass.getPackageName().equals(packageName), new HashSet<>(), 0);
+    }
+
+    private static boolean namesNonPublicTypeOf(ClassElement element, String packageName, Set<String> visited, int depth) {
+        return namesNonPublicTypeMatching(element, aClass -> aClass.getPackageName().equals(packageName), visited, depth);
+    }
+
+    private static boolean namesNonPublicTypeMatching(ClassElement element, Predicate<ClassElement> matches, Set<String> visited, int depth) {
         if (depth > MAX_DEPTH) {
             return false;
         }
         if (element instanceof WildcardElement wildcard) {
-            return namesNonPublicType(wildcard.getUpperBounds(), visited, depth) || namesNonPublicType(wildcard.getLowerBounds(), visited, depth);
+            return namesNonPublicTypeMatching(wildcard.getUpperBounds(), matches, visited, depth) || namesNonPublicTypeMatching(wildcard.getLowerBounds(), matches, visited, depth);
         }
         if (element instanceof GenericPlaceholderElement placeholder) {
             // the bounds of a variable within its own bounds are not visited again
-            return visited.add("<" + placeholder.getVariableName() + ">") && namesNonPublicType(placeholder.getBounds(), visited, depth);
+            return visited.add("<" + placeholder.getVariableName() + ">") && namesNonPublicTypeMatching(placeholder.getBounds(), matches, visited, depth);
         }
-        ClassElement type = element.isArray() ? element.fromArray() : element;
+        ClassElement type = element;
         while (type.isArray()) {
             type = type.fromArray();
         }
-        if (!type.isPrimitive() && !isPublic(type, visited)) {
+        if (!type.isPrimitive() && !isPublic(type, new HashSet<>()) && matches.test(type)) {
             return true;
         }
-        return namesNonPublicType(type.getTypeArguments().values(), visited, depth + 1);
+        if (!visited.add(type.getName())) {
+            return false;
+        }
+        return namesNonPublicTypeMatching(type.getTypeArguments().values(), matches, visited, depth + 1);
     }
 
-    private static boolean namesNonPublicType(Collection<? extends ClassElement> elements, Set<String> visited, int depth) {
+    private static boolean namesNonPublicTypeMatching(Collection<? extends ClassElement> elements, Predicate<ClassElement> matches, Set<String> visited, int depth) {
         for (ClassElement element : elements) {
-            if (namesNonPublicType(element, visited, depth)) {
+            if (namesNonPublicTypeMatching(element, matches, visited, depth)) {
                 return true;
             }
         }

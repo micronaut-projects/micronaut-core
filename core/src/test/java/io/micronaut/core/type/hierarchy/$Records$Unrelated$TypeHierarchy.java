@@ -22,7 +22,7 @@ public final class $Records$Unrelated$TypeHierarchy extends GeneratedTypeHierarc
     public static final AtomicInteger LOADED = new AtomicInteger();
 
     public $Records$Unrelated$TypeHierarchy() {
-        super(Records.Unrelated.class, null, null, null);
+        super(Records.Unrelated.class, null, null, null, null);
         LOADED.incrementAndGet();
     }
 }

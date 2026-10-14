@@ -26,7 +26,8 @@ public final class $ArrayList$TypeHierarchy extends GeneratedTypeHierarchy {
     public $ArrayList$TypeHierarchy() {
         super(ArrayList.class, new Argument[]{variable("E")},
             of(AbstractList.class, variable("E")),
-            new Argument[]{of(List.class, variable("E")), Argument.of(RandomAccess.class), Argument.of(Cloneable.class), Argument.of(Serializable.class)});
+            new Argument[]{of(List.class, variable("E")), Argument.of(RandomAccess.class), Argument.of(Cloneable.class), Argument.of(Serializable.class)},
+            Records.concat(Records.arrayListSuperTypes(variable("E")), List.of(Argument.OBJECT_ARGUMENT)).toArray(Argument.ZERO_ARGUMENTS));
         LOADED.incrementAndGet();
     }
 }

@@ -10,7 +10,6 @@ import spock.lang.TempDir
 
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.function.Function
 
 import static io.micronaut.core.type.hierarchy.Records.*
 import static io.micronaut.core.type.hierarchy.TypeStrings.string
@@ -20,11 +19,6 @@ class TypeHierarchySpec extends Specification {
 
     @TempDir
     Path tempDir
-
-    static final Map<Class<?>, TypeHierarchy> KNOWN = [PAYLOAD, ARRAY_LIST, ABSTRACT_LIST, LIST, COLLECTION, TOP, LEFT, RIGHT, DIAMOND, ARRAYS, RAW_SUB]
-        .collectEntries { [(it.type): it] }
-    static final Function<Class<?>, Optional<TypeHierarchy>> RESOLVER = { Class<?> type -> Optional.ofNullable(KNOWN[type]) }
-    static final Function<Class<?>, Optional<TypeHierarchy>> NONE = { Class<?> type -> Optional.empty() }
 
     void "the declaration is the type parameterized by its variables"() {
         expect:
@@ -36,17 +30,17 @@ class TypeHierarchySpec extends Specification {
 
     void "a parameterization substitutes the variables along the path, Object last"() {
         when:
-        def closure = PAYLOAD.getTypeClosure(Argument.of(Payload, Integer), RESOLVER)
+        def closure = PAYLOAD.getTypeClosure(Argument.of(Payload, Integer))
 
         then:
-        strings(closure) == ['Payload<Integer>', 'ArrayList<Integer>', 'AbstractList<Integer>', 'AbstractCollection<Integer>', 'List<Integer>',
-                             'Collection<Integer>', 'Iterable<Integer>', 'RandomAccess', 'Cloneable', 'Serializable', 'Supplier<List<Integer>>', 'Object']
+        strings(closure) == ['Payload<Integer>', 'ArrayList<Integer>', 'AbstractList<Integer>', 'AbstractCollection<Integer>', 'Collection<Integer>',
+                             'Iterable<Integer>', 'List<Integer>', 'RandomAccess', 'Cloneable', 'Serializable', 'Supplier<List<Integer>>', 'Object']
         closure.last().is(Argument.OBJECT_ARGUMENT)
     }
 
     void "a wildcard argument stays a wildcard"() {
         when:
-        def closure = PAYLOAD.getTypeClosure(of(Payload, extendsWildcard(Number)), RESOLVER)
+        def closure = PAYLOAD.getTypeClosure(of(Payload, extendsWildcard(Number)))
 
         then:
         strings(closure).take(3) == ['Payload<? extends Number>', 'ArrayList<? extends Number>', 'AbstractList<? extends Number>']
@@ -55,7 +49,7 @@ class TypeHierarchySpec extends Specification {
 
     void "a diamond is deduplicated"() {
         when:
-        def closure = DIAMOND.getTypeClosure(Argument.of(Diamond), RESOLVER)
+        def closure = DIAMOND.getTypeClosure(Argument.of(Diamond))
 
         then:
         strings(closure) == ['Diamond', 'Left<String>', 'Top<String>', 'Right<String>', 'Object']
@@ -63,10 +57,10 @@ class TypeHierarchySpec extends Specification {
 
     void "a raw parameterization erases the supertypes"() {
         when:
-        def closure = PAYLOAD.getTypeClosure(Argument.of(Payload), RESOLVER)
+        def closure = PAYLOAD.getTypeClosure(Argument.of(Payload))
 
         then:
-        strings(closure) == ['Payload', 'ArrayList', 'AbstractList', 'AbstractCollection', 'List', 'Collection', 'Iterable', 'RandomAccess', 'Cloneable', 'Serializable', 'Supplier', 'Object']
+        strings(closure) == ['Payload', 'ArrayList', 'AbstractList', 'AbstractCollection', 'Collection', 'Iterable', 'List', 'RandomAccess', 'Cloneable', 'Serializable', 'Supplier', 'Object']
         closure[1].isRawType()
         closure[4].isRawType()
         !closure[7].isRawType()
@@ -74,40 +68,32 @@ class TypeHierarchySpec extends Specification {
 
     void "a raw extends erases the supertypes of the supertype"() {
         when:
-        def closure = RAW_SUB.getTypeClosure(Argument.of(RawSub), RESOLVER)
+        def closure = RAW_SUB.getTypeClosure(Argument.of(RawSub))
 
         then:
-        strings(closure) == ['RawSub', 'ArrayList', 'AbstractList', 'AbstractCollection', 'List', 'Collection', 'Iterable', 'RandomAccess', 'Cloneable', 'Serializable', 'Object']
+        strings(closure) == ['RawSub', 'ArrayList', 'AbstractList', 'AbstractCollection', 'Collection', 'Iterable', 'List', 'RandomAccess', 'Cloneable', 'Serializable', 'Object']
         closure[1].isRawType()
         closure[4].isRawType()
     }
 
     void "an array of a variable becomes an array of the argument"() {
         when:
-        def closure = ARRAYS.getTypeClosure(Argument.of(Arrays, String), RESOLVER)
+        def closure = ARRAYS.getTypeClosure(Argument.of(Arrays, String))
 
         then:
         strings(closure) == ['Arrays<String>', 'Supplier<String[]>', 'Object']
         closure[1].typeParameters[0].type == String[]
 
         when:
-        closure = ARRAYS.getTypeClosure(of(Arrays, extendsWildcard(Number)), RESOLVER)
+        closure = ARRAYS.getTypeClosure(of(Arrays, extendsWildcard(Number)))
 
         then:
         strings(closure) == ['Arrays<? extends Number>', 'Supplier<? extends Number[]>', 'Object']
     }
 
-    void "a supertype without a record ends its branch"() {
-        when:
-        def closure = PAYLOAD.getTypeClosure(Argument.of(Payload, Integer), NONE)
-
-        then:
-        strings(closure) == ['Payload<Integer>', 'ArrayList<Integer>', 'Supplier<List<Integer>>', 'Object']
-    }
-
     void "a parameterization of another type is refused"() {
         when:
-        PAYLOAD.getTypeClosure(Argument.of(ArrayList, Integer), RESOLVER)
+        PAYLOAD.getTypeClosure(Argument.of(ArrayList, Integer))
 
         then:
         thrown(IllegalArgumentException)
@@ -167,11 +153,11 @@ class TypeHierarchySpec extends Specification {
         strings(arrayList.get().genericInterfaces) == ['List<E>', 'RandomAccess', 'Cloneable', 'Serializable']
         $Records$Unrelated$TypeHierarchy.LOADED.get() == 0
 
-        when: "the closure resolves the supertypes through the records"
-        def closure = payload.get().getTypeClosure(Argument.of(Payload, Long), { Class<?> type -> TypeHierarchies.find(type.name, classLoader) } as Function)
+        when: "the closure is the recorded super types with the arguments substituted"
+        def closure = payload.get().getTypeClosure(Argument.of(Payload, Long))
 
         then:
-        strings(closure) == ['Payload<Long>', 'ArrayList<Long>', 'AbstractList<Long>', 'List<Long>', 'RandomAccess', 'Cloneable', 'Serializable', 'Supplier<List<Long>>', 'Object']
+        strings(closure) == ['Payload<Long>', 'ArrayList<Long>', 'AbstractList<Long>', 'AbstractCollection<Long>', 'Collection<Long>', 'Iterable<Long>', 'List<Long>', 'RandomAccess', 'Cloneable', 'Serializable', 'Supplier<List<Long>>', 'Object']
 
         and: "a type without a record"
         TypeHierarchies.find(Diamond.name, classLoader).empty

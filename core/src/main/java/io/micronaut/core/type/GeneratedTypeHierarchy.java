@@ -19,14 +19,13 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 /**
  * The {@link TypeHierarchy} a generated record extends: a class with a single constructor, which the record calls with
- * the type, its variables and its supertypes built as {@link Argument}s from constants, so that a record is as small
- * as that one call.
+ * the type, its variables, its direct super types and all its super types built as {@link Argument}s from constants,
+ * so that a record is as small as that one call.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -39,22 +38,26 @@ public class GeneratedTypeHierarchy implements TypeHierarchy {
     @Nullable
     private final Argument<?> superclass;
     private final List<Argument<?>> interfaces;
+    private final List<Argument<?>> superTypes;
 
     /**
      * @param type          The type
      * @param typeVariables The type variables, or {@code null} for none
      * @param superclass    The generic superclass, or {@code null} for none
      * @param interfaces    The generic interfaces, or {@code null} for none
+     * @param superTypes    All the super types, {@link Object} last, or {@code null} for {@link Object} alone
      */
     @UsedByGeneratedCode
     protected GeneratedTypeHierarchy(Class<?> type,
                                      Argument<?> @Nullable [] typeVariables,
                                      @Nullable Argument<?> superclass,
-                                     Argument<?> @Nullable [] interfaces) {
+                                     Argument<?> @Nullable [] interfaces,
+                                     Argument<?> @Nullable [] superTypes) {
         this.type = type;
         this.typeVariables = typeVariables == null ? List.of() : List.of(typeVariables);
         this.superclass = superclass;
         this.interfaces = interfaces == null ? List.of() : List.of(interfaces);
+        this.superTypes = superTypes == null ? List.of(Argument.OBJECT_ARGUMENT) : List.of(superTypes);
     }
 
     @Override
@@ -78,10 +81,13 @@ public class GeneratedTypeHierarchy implements TypeHierarchy {
     }
 
     @Override
+    public final List<Argument<?>> getSuperTypes() {
+        return superTypes;
+    }
+
+    @Override
     public String toString() {
-        return "TypeHierarchy[" + getDeclaration().getTypeString(false)
-            + (superclass == null ? "" : " extends " + superclass.getTypeString(false))
-            + (interfaces.isEmpty() ? "" : " implements " + Arrays.toString(interfaces.stream().map(i -> i.getTypeString(false)).toArray()))
-            + ']';
+        return "TypeHierarchy[" + getDeclaration().getTypeString(false) + " : "
+            + superTypes.stream().map(superType -> superType.getTypeString(false)).toList() + ']';
     }
 }

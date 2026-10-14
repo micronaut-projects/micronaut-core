@@ -19,11 +19,11 @@ import io.micronaut.core.annotation.Experimental;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
 
 /**
  * The generic hierarchy of a type as it was declared: its type variables with their bounds, its generic superclass
- * and its generic interfaces, with their type arguments written in terms of those variables.
+ * and generic interfaces, and every super type it has, transitively, with their type arguments written in terms of
+ * those variables.
  *
  * <p>A hierarchy is recorded at compile time, by the Micronaut processors, for the types a compilation asks for with
  * {@link io.micronaut.core.annotation.RecordTypeHierarchy} or through
@@ -33,11 +33,13 @@ import java.util.function.Function;
  * compilation sees, a class of a library or of the JDK included, and describes nothing but the declaration of the
  * type.</p>
  *
- * <p>The arguments keep what the declaration says: a type variable is a {@link GenericPlaceholder} with its bounds, a
- * wildcard is a {@link WildcardArgument}, a type used without its type arguments is a raw type
- * ({@link Argument#isRawType()}), and an array of a variable is a placeholder whose type is the array of the
- * erasure of the variable. The supertypes are the direct ones; {@link #getTypeClosure(Argument)} walks the
- * hierarchies of the supertypes to give the whole closure of a parameterization of the type.</p>
+ * <p>The super types are the ones {@code ClassElement.getAllSuperTypes()} lists at compile time, so the hierarchy is
+ * walked once, by the compiler: the super class before the interfaces, each followed by its own super types in
+ * declaration order, a type reached twice listed once, {@link Object} last. The arguments keep what the declaration
+ * says: a type variable is a {@link GenericPlaceholder} with its bounds, a wildcard is a {@link WildcardArgument}, a
+ * type used without its type arguments is a raw type ({@link Argument#isRawType()}) and so are its super types, and
+ * an array of a variable is a placeholder whose type is the array of the erasure of the variable.
+ * {@link #getTypeClosure(Argument)} substitutes the actual arguments of a parameterization into each entry.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -74,6 +76,16 @@ public interface TypeHierarchy {
     List<Argument<?>> getGenericInterfaces();
 
     /**
+     * Every super type of the type, transitively, with its type arguments written in the
+     * {@link #getTypeVariables() type variables} of the type along the path that reaches it: the super class and its
+     * super types first, then each interface and its super types, each type once, {@link Object} last. A super type
+     * that could not be named from the record, a package-private class of another package, is left out.
+     *
+     * @return The super types, in declaration order and with {@link Object} last
+     */
+    List<Argument<?>> getSuperTypes();
+
+    /**
      * The type parameterized by its own type variables, {@code Foo<T>} for {@code class Foo<T>}, or the plain type
      * when it declares none.
      *
@@ -88,37 +100,21 @@ public interface TypeHierarchy {
     }
 
     /**
-     * The type closure of a parameterization of the type: the parameterization itself, then every supertype with the
-     * actual type arguments substituted along the path, each distinct type once, and {@link Object} last. The
-     * hierarchies of the supertypes are found with {@link TypeHierarchies#find(Class)}; a supertype that has no record
-     * ends its branch of the walk and is still part of the closure, without its own supertypes.
-     *
-     * @param parameterization The type with its type arguments, or raw
-     * @return The closure
-     * @see #getTypeClosure(Argument, Function)
-     */
-    default List<Argument<?>> getTypeClosure(Argument<?> parameterization) {
-        return getTypeClosure(parameterization, TypeHierarchies::find);
-    }
-
-    /**
-     * The type closure of a parameterization of the type, as {@link #getTypeClosure(Argument)}, with the hierarchies
-     * of the supertypes found by the given function, which lets a caller add a source of hierarchies of its own, such
-     * as one that reads the signatures of a class reflectively for the types no compilation recorded.
+     * The type closure of a parameterization of the type: the parameterization itself, then each of the
+     * {@link #getSuperTypes() super types} with the actual type arguments substituted for the type variables, in the
+     * same order, {@link Object} last.
      *
      * <p>The substitution follows the Java Language Specification. A type variable is replaced by the actual type
      * argument at its position, an array of a variable by an array of that argument, and a wildcard argument is kept
      * as a wildcard. A raw parameterization of a generic type, one with no type arguments or
-     * {@link Argument#isRawType() marked raw}, erases every supertype (JLS 4.8), and so does a raw {@code extends}
-     * or {@code implements} along the path. A variable the hierarchy of a supertype names but the parameterization
-     * does not resolve is kept as it is.</p>
+     * {@link Argument#isRawType() marked raw}, erases every super type (JLS 4.8). A variable the record does not
+     * declare is kept as it is.</p>
      *
      * @param parameterization The type with its type arguments, or raw
-     * @param hierarchies      The hierarchies of the supertypes, by type
      * @return The closure
      * @throws IllegalArgumentException if the parameterization is not of {@link #getType() the type}
      */
-    default List<Argument<?>> getTypeClosure(Argument<?> parameterization, Function<Class<?>, Optional<TypeHierarchy>> hierarchies) {
-        return TypeClosure.of(this, parameterization, hierarchies);
+    default List<Argument<?>> getTypeClosure(Argument<?> parameterization) {
+        return TypeClosure.of(this, parameterization);
     }
 }

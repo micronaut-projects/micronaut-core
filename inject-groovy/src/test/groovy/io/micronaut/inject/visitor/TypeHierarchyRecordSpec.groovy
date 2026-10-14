@@ -6,7 +6,6 @@ import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.core.type.TypeHierarchies
 import io.micronaut.core.type.TypeHierarchy
 
-import java.util.function.Function
 
 import static io.micronaut.inject.visitor.TypeStrings.string
 import static io.micronaut.inject.visitor.TypeStrings.strings
@@ -19,16 +18,6 @@ class TypeHierarchyRecordSpec extends AbstractBeanDefinitionSpec {
 
     static int size(ClassLoader classLoader, String recordName) {
         ((Map<String, byte[]>) classLoader.generatedClasses)[recordName].length
-    }
-
-    static Function<Class<?>, Optional<TypeHierarchy>> resolver(ClassLoader classLoader) {
-        return { Class<?> type ->
-            try {
-                Optional.of(record(classLoader, type.name, 'test'))
-            } catch (ClassNotFoundException e) {
-                Optional.empty()
-            }
-        } as Function
     }
 
     void "a generic class with a bounded variable"() {
@@ -59,11 +48,12 @@ class Payload<T extends Number & Comparable<T>> extends ArrayList<T> implements 
         string(hierarchy.declaration) == 'Payload<T>'
 
         when:
-        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, Integer), resolver(classLoader))
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, Integer))
 
         then:
-        strings(closure) == ['Payload<Integer>', 'ArrayList<Integer>', 'Supplier<List<? extends Integer>>', 'Object']
-        size(classLoader, TypeHierarchies.recordClassName('test.Payload', 'test')) < 2048
+        strings(closure) - ['SequencedCollection<Integer>'] == ['Payload<Integer>', 'ArrayList<Integer>', 'AbstractList<Integer>', 'AbstractCollection<Integer>', 'Collection<Integer>', 'Iterable<Integer>',
+                             'List<Integer>', 'RandomAccess', 'Cloneable', 'Serializable', 'Supplier<List<? extends Integer>>', 'Object']
+        size(classLoader, TypeHierarchies.recordClassName('test.Payload', 'test')) < 4096
     }
 
     void "diamond interfaces are deduplicated and a requested JDK class is recorded"() {
@@ -94,12 +84,12 @@ class Diamond extends ArrayList<Integer> implements Left<String>, Right<String> 
         strings(arrayList.genericInterfaces) == ['List<E>', 'RandomAccess', 'Cloneable', 'Serializable']
 
         when:
-        def closure = diamond.getTypeClosure(Argument.of(diamond.type), resolver(classLoader))
+        def closure = diamond.getTypeClosure(Argument.of(diamond.type))
 
         then: "the interfaces List adds in later JDKs aside"
         strings(closure) - ['SequencedCollection<Integer>'] == ['Diamond', 'ArrayList<Integer>', 'AbstractList<Integer>', 'AbstractCollection<Integer>', 'Collection<Integer>', 'Iterable<Integer>',
                              'List<Integer>', 'RandomAccess', 'Cloneable', 'Serializable', 'Left<String>', 'Top<String>', 'Right<String>', 'Object']
-        size(classLoader, TypeHierarchies.recordClassName('java.util.ArrayList', 'test')) < 2048
+        size(classLoader, TypeHierarchies.recordClassName('java.util.ArrayList', 'test')) < 4096
     }
 
     void "a raw subtype erases the supertypes"() {
@@ -122,14 +112,14 @@ class Raw extends ArrayList implements Comparable {
         raw.genericInterfaces[0].isRawType()
 
         when:
-        def closure = raw.getTypeClosure(Argument.of(raw.type), resolver(classLoader))
+        def closure = raw.getTypeClosure(Argument.of(raw.type))
 
         then:
-        strings(closure) == ['Raw', 'ArrayList', 'AbstractList', 'AbstractCollection', 'List', 'RandomAccess', 'Cloneable', 'Serializable', 'Comparable', 'Object']
+        strings(closure) - ['SequencedCollection'] == ['Raw', 'ArrayList', 'AbstractList', 'AbstractCollection', 'Collection', 'Iterable', 'List', 'RandomAccess', 'Cloneable', 'Serializable', 'Comparable', 'Object']
         closure[1].isRawType()
         closure[2].isRawType()
-        closure[4].isRawType()
-        !closure[5].isRawType()
+        closure[6].isRawType()
+        !closure[closure.size() - 5].isRawType()
     }
 
     void "a generic array argument"() {
@@ -153,7 +143,7 @@ class Payload<T> implements Supplier<T[]> {
         hierarchy.genericInterfaces[0].typeParameters[0].isTypeVariable()
 
         when:
-        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, String), resolver(classLoader))
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, String))
 
         then:
         strings(closure) == ['Payload<String>', 'Supplier<String[]>', 'Object']

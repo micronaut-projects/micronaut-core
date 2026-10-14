@@ -6,7 +6,6 @@ import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.core.type.TypeHierarchies
 import io.micronaut.core.type.TypeHierarchy
 
-import java.util.function.Function
 
 import static io.micronaut.kotlin.processing.visitor.TypeStrings.string
 import static io.micronaut.kotlin.processing.visitor.TypeStrings.strings
@@ -20,10 +19,6 @@ class TypeHierarchyRecordSpec extends AbstractKotlinCompilerSpec {
 
     static int size(ClassLoader classLoader, String recordName) {
         classLoader.getResourceAsStream(recordName.replace('.', '/') + ".class").bytes.length
-    }
-
-    static Function<Class<?>, Optional<TypeHierarchy>> resolver(ClassLoader classLoader) {
-        return { Class<?> type -> TypeHierarchies.find(type.name, classLoader) } as Function
     }
 
     void "a generic class with a bounded variable is found through the service entries"() {
@@ -54,12 +49,13 @@ open class Payload<T> : ArrayList<T>(), Supplier<List<out T>> where T : Number, 
         string(hierarchy.declaration) == 'Payload<T>'
 
         when:
-        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, Integer), resolver(classLoader))
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, Integer))
 
         then:
-        strings(closure) == ['Payload<Integer>', 'ArrayList<Integer>', 'Supplier<List<? extends Integer>>', 'Object']
+        strings(closure) - ['SequencedCollection<Integer>'] == ['Payload<Integer>', 'ArrayList<Integer>', 'AbstractList<Integer>', 'AbstractCollection<Integer>', 'Collection<Integer>', 'Iterable<Integer>',
+                             'List<Integer>', 'RandomAccess', 'Cloneable', 'Serializable', 'Supplier<List<? extends Integer>>', 'Object']
         println('record bytes test.Payload: ' + size(classLoader, TypeHierarchies.recordClassName('test.Payload', 'test')))
-        size(classLoader, TypeHierarchies.recordClassName('test.Payload', 'test')) < 2048
+        size(classLoader, TypeHierarchies.recordClassName('test.Payload', 'test')) < 4096
     }
 
     void "diamond interfaces are deduplicated and a requested JDK class is recorded"() {
@@ -90,7 +86,7 @@ class Diamond : java.util.ArrayList<Int>(), Left<String>, Right<String>
         strings(arrayList.genericInterfaces) as Set == ['List<E>', 'RandomAccess', 'Cloneable', 'Serializable'] as Set
 
         when:
-        def closure = diamond.getTypeClosure(Argument.of(diamond.type), resolver(classLoader))
+        def closure = diamond.getTypeClosure(Argument.of(diamond.type))
 
         then: "KSP reads the interfaces of a class of the JDK in its own order, and List adds interfaces in later JDKs"
         strings(closure) - ['SequencedCollection<Integer>'] as Set == ['Diamond', 'ArrayList<Integer>', 'AbstractList<Integer>', 'AbstractCollection<Integer>', 'Collection<Integer>', 'Iterable<Integer>',
@@ -98,7 +94,7 @@ class Diamond : java.util.ArrayList<Int>(), Left<String>, Right<String>
         strings(closure).first() == 'Diamond'
         strings(closure).last() == 'Object'
         println('record bytes java.util.ArrayList: ' + size(classLoader, TypeHierarchies.recordClassName('java.util.ArrayList', 'test')) + ', test.Diamond: ' + size(classLoader, TypeHierarchies.recordClassName('test.Diamond', 'test')) + ', test.Top: ' + size(classLoader, TypeHierarchies.recordClassName('test.Top', 'test')))
-        size(classLoader, TypeHierarchies.recordClassName('java.util.ArrayList', 'test')) < 2048
+        size(classLoader, TypeHierarchies.recordClassName('java.util.ArrayList', 'test')) < 4096
 
         and: "a type without a record"
         TypeHierarchies.find('test.Missing', classLoader).empty
@@ -125,7 +121,7 @@ class Payload<T> : Supplier<Array<T>> {
         hierarchy.genericInterfaces[0].typeParameters[0].isTypeVariable()
 
         when:
-        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, String), resolver(classLoader))
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, String))
 
         then:
         strings(closure) == ['Payload<String>', 'Supplier<String[]>', 'Object']

@@ -24,7 +24,9 @@ public final class $Records$Payload$TypeHierarchy extends GeneratedTypeHierarchy
     public $Records$Payload$TypeHierarchy() {
         super(Records.Payload.class, new Argument[]{variable("T", Number.class)},
             of(ArrayList.class, variable("T", Number.class)),
-            new Argument[]{of(Supplier.class, of(List.class, variable("T", Number.class)))});
+            new Argument[]{of(Supplier.class, of(List.class, variable("T", Number.class)))},
+            Records.concat(Records.concat(List.of(of(ArrayList.class, variable("T", Number.class))), Records.arrayListSuperTypes(variable("T", Number.class))),
+                List.of(of(Supplier.class, of(List.class, variable("T", Number.class))), Argument.OBJECT_ARGUMENT)).toArray(Argument.ZERO_ARGUMENTS));
         LOADED.incrementAndGet();
     }
 }

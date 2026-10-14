@@ -74,26 +74,36 @@ public final class Records {
         return Argument.ofWildcard(bound, null, null, null, new Argument[]{Argument.of(bound)}, null);
     }
 
-    public static TypeHierarchy hierarchy(Class<?> type, List<Argument<?>> variables, Argument<?> superclass, List<Argument<?>> interfaces) {
-        return new GeneratedTypeHierarchy(type, variables.toArray(Argument.ZERO_ARGUMENTS), superclass, interfaces.toArray(Argument.ZERO_ARGUMENTS)) {
+    public static TypeHierarchy hierarchy(Class<?> type, List<Argument<?>> variables, Argument<?> superclass, List<Argument<?>> interfaces, List<Argument<?>> superTypes) {
+        return new GeneratedTypeHierarchy(type, variables.toArray(Argument.ZERO_ARGUMENTS), superclass, interfaces.toArray(Argument.ZERO_ARGUMENTS),
+            superTypes.toArray(Argument.ZERO_ARGUMENTS)) {
         };
+    }
+
+    /** The super types of {@code ArrayList<E>} as the compiler lists them, {@code E} being the given argument. */
+    public static List<Argument<?>> arrayListSuperTypes(Argument<?> e) {
+        return List.of(of(AbstractList.class, e), of(AbstractCollection.class, e), of(Collection.class, e), of(Iterable.class, e), of(List.class, e),
+            Argument.of(RandomAccess.class), Argument.of(Cloneable.class), Argument.of(Serializable.class));
+    }
+
+    public static List<Argument<?>> concat(List<Argument<?>> first, List<Argument<?>> second) {
+        List<Argument<?>> all = new java.util.ArrayList<>(first);
+        all.addAll(second);
+        return all;
     }
 
     public static final TypeHierarchy PAYLOAD = hierarchy(Payload.class, List.of(variable("T", Number.class)),
         of(ArrayList.class, variable("T", Number.class)),
-        List.of(of(Supplier.class, of(List.class, variable("T", Number.class)))));
-    public static final TypeHierarchy ARRAY_LIST = hierarchy(ArrayList.class, List.of(variable("E")),
-        of(AbstractList.class, variable("E")),
-        List.of(of(List.class, variable("E")), Argument.of(RandomAccess.class), Argument.of(Cloneable.class), Argument.of(Serializable.class)));
-    public static final TypeHierarchy ABSTRACT_LIST = hierarchy(AbstractList.class, List.of(variable("E")),
-        of(AbstractCollection.class, variable("E")), List.of(of(List.class, variable("E"))));
-    public static final TypeHierarchy LIST = hierarchy(List.class, List.of(variable("E")), null, List.of(of(Collection.class, variable("E"))));
-    public static final TypeHierarchy COLLECTION = hierarchy(Collection.class, List.of(variable("E")), null, List.of(of(Iterable.class, variable("E"))));
-    public static final TypeHierarchy TOP = hierarchy(Top.class, List.of(variable("T")), null, List.of());
-    public static final TypeHierarchy LEFT = hierarchy(Left.class, List.of(variable("T")), null, List.of(of(Top.class, variable("T"))));
-    public static final TypeHierarchy RIGHT = hierarchy(Right.class, List.of(variable("T")), null, List.of(of(Top.class, variable("T"))));
-    public static final TypeHierarchy DIAMOND = hierarchy(Diamond.class, List.of(), null, List.of(of(Left.class, Argument.STRING), of(Right.class, Argument.STRING)));
+        List.of(of(Supplier.class, of(List.class, variable("T", Number.class)))),
+        concat(concat(List.of(of(ArrayList.class, variable("T", Number.class))), arrayListSuperTypes(variable("T", Number.class))),
+            List.of(of(Supplier.class, of(List.class, variable("T", Number.class))), Argument.OBJECT_ARGUMENT)));
+    public static final TypeHierarchy DIAMOND = hierarchy(Diamond.class, List.of(), null, List.of(of(Left.class, Argument.STRING), of(Right.class, Argument.STRING)),
+        List.of(of(Left.class, Argument.STRING), of(Top.class, Argument.STRING), of(Right.class, Argument.STRING), Argument.OBJECT_ARGUMENT));
     public static final TypeHierarchy ARRAYS = hierarchy(Arrays.class, List.of(variable("T")), null,
-        List.of(of(Supplier.class, Argument.ofTypeVariable(Object[].class, "T"))));
-    public static final TypeHierarchy RAW_SUB = hierarchy(RawSub.class, List.of(), raw(ArrayList.class, variable("E")), List.of());
+        List.of(of(Supplier.class, Argument.ofTypeVariable(Object[].class, "T"))),
+        List.of(of(Supplier.class, Argument.ofTypeVariable(Object[].class, "T")), Argument.OBJECT_ARGUMENT));
+    public static final TypeHierarchy RAW_SUB = hierarchy(RawSub.class, List.of(), raw(ArrayList.class, variable("E")), List.of(),
+        concat(List.of(raw(ArrayList.class, variable("E"))), concat(List.of(raw(AbstractList.class, variable("E")), raw(AbstractCollection.class, variable("E")),
+            raw(Collection.class, variable("E")), raw(Iterable.class, variable("E")), raw(List.class, variable("E"))),
+            List.of(Argument.of(RandomAccess.class), Argument.of(Cloneable.class), Argument.of(Serializable.class), Argument.OBJECT_ARGUMENT))));
 }

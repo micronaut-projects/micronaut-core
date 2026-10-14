@@ -21,7 +21,6 @@ import io.micronaut.core.type.TypeHierarchies
 import io.micronaut.core.type.TypeHierarchy
 import io.micronaut.python.compiler.PyronautCompiler
 
-import java.util.function.Function
 
 import static io.micronaut.python.annotation.processing.test.TypeStrings.string
 import static io.micronaut.python.annotation.processing.test.TypeStrings.strings
@@ -34,16 +33,6 @@ class TypeHierarchyRecordSpec extends AbstractPythonTypeElementSpec {
 
     static TypeHierarchy record(ClassLoader classLoader, String typeName, String recordPackage = typeName.substring(0, typeName.lastIndexOf('.'))) {
         (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName(typeName, recordPackage)).getConstructor().newInstance()
-    }
-
-    static Function<Class<?>, Optional<TypeHierarchy>> resolver(ClassLoader classLoader) {
-        return { Class<?> type ->
-            try {
-                Optional.of(record(classLoader, type.name, 'python'))
-            } catch (ClassNotFoundException e) {
-                Optional.empty()
-            }
-        } as Function
     }
 
     void "a generic Python class with a bounded variable is recorded"() {
@@ -78,9 +67,9 @@ class Payload(Base[T], Supplier[T], Generic[T]):
         strings(hierarchy.genericInterfaces) == ['Supplier<T>']
 
         when:
-        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, Integer), resolver(classLoader))
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, Integer))
 
-        then: "Base has no record: its branch ends there"
+        then:
         strings(closure) == ['Payload<Integer>', 'Base<Integer>', 'Supplier<Integer>', 'Object']
     }
 
@@ -134,13 +123,13 @@ class Diamond(Left[str], Right[str]):
         strings(arrayList.genericInterfaces) == ['List<E>', 'RandomAccess', 'Cloneable', 'Serializable']
 
         when:
-        def closure = diamond.getTypeClosure(Argument.of(diamond.type), resolver(classLoader))
+        def closure = diamond.getTypeClosure(Argument.of(diamond.type))
 
         then:
         strings(closure) == ['Diamond', 'Left<String>', 'Top<String>', 'Right<String>', 'Object']
 
         when:
-        closure = arrayList.getTypeClosure(Argument.of(ArrayList, Integer), resolver(classLoader))
+        closure = arrayList.getTypeClosure(Argument.of(ArrayList, Integer))
 
         then: "the interfaces List adds in later JDKs aside"
         strings(closure) - ['SequencedCollection<Integer>'] == ['ArrayList<Integer>', 'AbstractList<Integer>', 'AbstractCollection<Integer>', 'Collection<Integer>',
