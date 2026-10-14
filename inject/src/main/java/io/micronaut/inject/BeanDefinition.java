@@ -46,6 +46,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static io.micronaut.core.annotation.AnnotationUtil.ANN_ADAPTER;
@@ -507,6 +508,58 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      */
     default Collection<String> getTypeArgumentKeys() {
         return Collections.emptySet();
+    }
+
+    /**
+     * The types this bean is assignable to, as the compiler resolved them: the bean type first, then every super
+     * class and interface above it, each once, and {@code Object} last.
+     *
+     * <p>Each entry is an {@link Argument} whose {@link Argument#getType()} is the super type and whose
+     * {@link Argument#getTypeParameters()} are the arguments the bean gives it along the path from the bean type:
+     * a {@code StringRepo extends AbstractRepo<String>} with {@code AbstractRepo<T> implements Repo<T>} answers
+     * {@code StringRepo}, {@code AbstractRepo<String>}, {@code Repo<String>}, {@code Object}. A type parameter the
+     * bean leaves open stays a variable with its bounds, a wildcard stays a wildcard, and the super types of a
+     * type written raw are raw as the language has them. A super type that declares no type parameter is recorded
+     * all the same, so a consumer that needs the hierarchy reads it here without loading a class by name.</p>
+     *
+     * <p>The order is the super class before the interfaces, each with its own super types before the next, in
+     * declaration order; a type reached twice (a diamond) is recorded where it was first reached.</p>
+     *
+     * <p>A factory-produced bean answers the closure of the type the factory method or field produces; a
+     * {@link ProxyBeanDefinition} answers for the type it proxies, not for the generated proxy class, while an
+     * introduction generated as a bean of its own answers for the generated class, which is its bean type. This is
+     * what the bean <em>is</em> and is unrelated to what it is <em>exposed</em> as: a bean restricted with
+     * {@code @Bean(typed = ...)} is still assignable to every type here while {@link #getExposedTypes()} names only
+     * the types it can be looked up by.</p>
+     *
+     * <p>A definition computed at build time records the closure. A definition that does not answers what it can
+     * without loading a class by name: the bean type with its own type arguments, each recorded key of
+     * {@link #getTypeArgumentKeys()} that names one of {@link #getExposedTypes()}, and {@code Object}.</p>
+     *
+     * @return The type closure, the bean type first, never empty
+     * @since 5.3.0
+     */
+    @Experimental
+    default List<Argument<?>> getTypeClosure() {
+        Class<T> beanType = getBeanType();
+        List<Argument<?>> closure = new ArrayList<>();
+        closure.add(Argument.of(beanType, getTypeArguments(beanType).toArray(Argument.ZERO_ARGUMENTS)));
+        Set<Class<?>> exposedTypes = getExposedTypes();
+        for (String key : getTypeArgumentKeys()) {
+            if (key.equals(beanType.getName())) {
+                continue;
+            }
+            for (Class<?> exposedType : exposedTypes) {
+                if (exposedType != beanType && exposedType != Object.class && key.equals(exposedType.getName())) {
+                    closure.add(Argument.of(exposedType, getTypeArguments(key).toArray(Argument.ZERO_ARGUMENTS)));
+                    break;
+                }
+            }
+        }
+        if (beanType != Object.class) {
+            closure.add(Argument.OBJECT_ARGUMENT);
+        }
+        return closure;
     }
 
     /**
