@@ -5,6 +5,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.core.type.TypeHierarchies
 import io.micronaut.core.type.TypeHierarchy
+import io.micronaut.inject.ast.ClassElement
 
 import java.util.function.Function
 
@@ -219,6 +220,55 @@ class Two {
 
         expect:
         record(classLoader, 'java.util.ArrayList', 'test').type == ArrayList
+    }
+
+    void "a parameterized usage records the declaration"() {
+        given: "a visitor that records the generic type of each field of FieldHolder"
+        def classLoader = buildClassLoader('test.FieldHolder', '''
+package test;
+
+import java.util.function.Supplier;
+
+class Box<T> implements Supplier<T> {
+    public T get() { return null; }
+}
+
+class FieldHolder {
+    Box<String> strings;
+}
+''')
+        def box = record(classLoader, 'test.Box')
+
+        expect: "the record is of Box<T>, not of the Box<String> that was passed"
+        string(box.declaration) == 'Box<T>'
+        strings(box.genericInterfaces) == ['Supplier<T>']
+
+        when:
+        def closure = box.getTypeClosure(Argument.of(box.type, Integer), resolver(classLoader))
+
+        then:
+        strings(closure) == ['Box<Integer>', 'Supplier<Integer>', 'Object']
+    }
+
+    @Override
+    protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
+        // local visitors replace the ones found as services: the annotation visitor is kept
+        return [new TypeHierarchyVisitor(), new FieldTypeRecordingVisitor()]
+    }
+
+    static class FieldTypeRecordingVisitor implements TypeElementVisitor<Object, Object> {
+
+        @Override
+        void visitClass(ClassElement element, VisitorContext context) {
+            if (element.simpleName == 'FieldHolder') {
+                element.fields.each { field -> context.recordTypeHierarchy(field.genericType, element) }
+            }
+        }
+
+        @Override
+        TypeElementVisitor.VisitorKind getVisitorKind() {
+            return TypeElementVisitor.VisitorKind.ISOLATING
+        }
     }
 
     protected ClassLoader buildClassLoader(JavaFiles files) {
