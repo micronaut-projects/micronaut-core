@@ -28,7 +28,7 @@ import java.nio.charset.StandardCharsets
  */
 class Http2ResetRequestLeakSpec extends Specification {
 
-    void "request data is released: #route, reset #reset"() {
+    void "request data is released: #route, reset #reset (#iteration)"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
                 'spec.name'                      : 'Http2ResetRequestLeakSpec',
@@ -59,9 +59,9 @@ class Http2ResetRequestLeakSpec extends Specification {
         when:
         socket.outputStream.write(bytes.toByteArray())
         socket.outputStream.flush()
-        Thread.sleep(1000)
+        Thread.sleep(200)
         socket.close()
-        Thread.sleep(1000)
+        Thread.sleep(200)
         // stop the server, so that anything it still holds can be collected and reported by this test
         server.stop()
 
@@ -73,9 +73,8 @@ class Http2ResetRequestLeakSpec extends Specification {
         server.stop()
 
         where:
-        route              | reset
-        '/h2reset/string'  | true
-        '/h2reset/string'  | false
+        // repeated, because whether the body reaches the route before the stream closes is timing dependent
+        [route, reset, iteration] << [['/h2reset/string'], [true, false], (1..5)].combinations()
     }
 
     @Requires(property = 'spec.name', value = 'Http2ResetRequestLeakSpec')

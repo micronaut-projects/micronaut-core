@@ -127,8 +127,15 @@ class H2cSpec extends Specification {
         given:
         def responseFuture = requestUpgrade(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/h2c/test'))
 
-        expect:
-        responseFuture.get(10, TimeUnit.SECONDS) != null
+        when:
+        def response = responseFuture.get(10, TimeUnit.SECONDS)
+
+        then:
+        response != null
+
+        cleanup:
+        // the client handler retains the response for this test
+        ReferenceCountUtil.release(response)
     }
 
     void 'test using micronaut http client: retrieve'() {

@@ -599,6 +599,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         routeResponse
                 .contextWrite(ctx -> ctx.put(ServerRequestContext.KEY, request))
                 .subscribe(new CompletionAwareSubscriber<HttpResponse<?>>() {
+            private boolean responded;
+
             @Override
             protected void doOnSubscribe(Subscription subscription) {
                 subscription.request(1);
@@ -606,6 +608,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             @Override
             protected void doOnNext(HttpResponse<?> message) {
+                responded = true;
                 encodeHttpResponse(
                         context,
                         request,
@@ -618,6 +621,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             @Override
             protected void doOnError(Throwable throwable) {
+                responded = true;
                 final MutableHttpResponse<?> defaultErrorResponse = routeExecutor
                         .createDefaultErrorResponse(request, throwable);
                 encodeHttpResponse(
@@ -631,7 +635,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             @Override
             protected void doOnComplete() {
-                // assume exactly one message has been sent (onNext)
+                // usually exactly one message has been sent (onNext), and the request is released
+                // once it is written. There is no response if the route failed with an ignorable
+                // error, e.g. the client disconnected while the body was read: release the
+                // request and the body data it holds now, nothing else will
+                if (!responded) {
+                    cleanupRequest(context, request);
+                }
             }
         });
     }

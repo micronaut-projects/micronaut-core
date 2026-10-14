@@ -17,6 +17,7 @@ package io.micronaut.http.client
 
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanProvider
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.*
 import io.micronaut.http.annotation.Body
@@ -52,19 +53,35 @@ class ServerRedirectSpec extends Specification {
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/217")
     void "test https redirect"() {
 
-        given:"An HTTPS URL issues an HTTPS"
-        YoutubeClient youtubeClient=  embeddedServer.getApplicationContext().getBean(YoutubeClient)
-        HttpClient client = HttpClient.create(new URL("https://www.youtube.com"))
-        String declarativeResult = Mono.from(youtubeClient.test()).block()
-        String response= client
-                .toBlocking().retrieve("/")
-//
-        expect:"The response was returned and doesn't loop"
-        response
-        declarativeResult
+        given:"An HTTPS server that redirects to an absolute HTTPS URL"
+        EmbeddedServer httpsServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'ServerRedirectSpec.https',
+                'micronaut.server.ssl.enabled': true,
+                'micronaut.server.ssl.build-self-signed': true,
+                'micronaut.server.ssl.port': -1,
+        ])
+        ApplicationContext clientContext = ApplicationContext.run([
+                'spec.name': 'ServerRedirectSpec.https-client',
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'micronaut.http.services.https-redirect.url': httpsServer.URL.toString(),
+                'micronaut.http.services.https-redirect.ssl.enabled': true,
+                'micronaut.http.services.https-redirect.ssl.insecure-trust-all-certificates': true,
+        ])
+        HttpsRedirectClient declarativeClient = clientContext.getBean(HttpsRedirectClient)
+        HttpClient client = clientContext.createBean(HttpClient, httpsServer.URL)
+
+        when:
+        String declarativeResult = Mono.from(declarativeClient.test()).block()
+        String response = client.toBlocking().retrieve(HttpRequest.GET('/https-redirect').accept(MediaType.TEXT_PLAIN_TYPE))
+
+        then:"The response was returned and doesn't loop"
+        response == 'redirected'
+        declarativeResult == 'redirected'
 
         cleanup:
-        client.close()
+        client?.close()
+        clientContext?.close()
+        httpsServer?.close()
     }
 
     @Unroll
@@ -332,10 +349,31 @@ class ServerRedirectSpec extends Specification {
         }
     }
 
-    @Requires(property = 'spec.name', value = 'ServerRedirectSpec')
-    @Client("https://www.youtube.com")
-    static interface YoutubeClient {
-        @Get
+    @Requires(property = 'spec.name', value = 'ServerRedirectSpec.https')
+    @Controller('/https-redirect')
+    static class HttpsRedirectController {
+        private final BeanProvider<EmbeddedServer> embeddedServer
+
+        HttpsRedirectController(BeanProvider<EmbeddedServer> embeddedServer) {
+            this.embeddedServer = embeddedServer
+        }
+
+        @Get(produces = MediaType.TEXT_PLAIN)
+        HttpResponse<?> index() {
+            // an absolute https URL, like the one www.youtube.com used to answer with
+            HttpResponse.permanentRedirect(UriBuilder.of(embeddedServer.get().URI).path('/https-redirect/target').build())
+        }
+
+        @Get(uri = '/target', produces = MediaType.TEXT_PLAIN)
+        String target() {
+            'redirected'
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'ServerRedirectSpec.https-client')
+    @Client(id = 'https-redirect', path = '/https-redirect')
+    static interface HttpsRedirectClient {
+        @Get(consumes = MediaType.TEXT_PLAIN)
         @SingleResult
         Publisher<String> test()
     }
