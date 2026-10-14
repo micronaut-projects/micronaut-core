@@ -256,6 +256,11 @@ class Outer {
         members[0].getType().getName() == 'java.lang.String'
         members[2].getType().getName() == 'int'
         members[3].getType().getName() == 'java.lang.Class'
+        members[2].isPrimitive()
+        !members[0].isPrimitive()
+        members[5].isArray()
+        members[5].getArrayDimensions() == 1
+        !members[0].isArray()
         members[4].getType().getName() == ElementType.name
         members[5].getType().isArray()
         members[5].getType().fromArray().getName() == 'java.lang.String'

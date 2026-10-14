@@ -163,6 +163,7 @@ class MyBean
         ]
         MembersVisitor.ARRAYS['test.MyAnn'] == ['tags', 'list']
 
+        MembersVisitor.PRIMITIVES['test.MyAnn'] == ['priority']
         and: "the defaults, as the metadata records them"
         members['name'] == Optional.empty()
         members['description'] == Optional.of('')
@@ -216,9 +217,12 @@ class MyBean
         static final Map<String, Map<String, List<String>>> ARRAY_COMPONENT_MEMBERS = [:]
 
         static void clear() {
-            [NAMES, MEMBERS, TYPES, DECLARING, NON_BINDING, ANNOTATION_TYPED, ARRAYS, MARKED, ARRAY_COMPONENT_MEMBERS]*.clear()
+            [NAMES, MEMBERS, TYPES, DECLARING, NON_BINDING, ANNOTATION_TYPED, ARRAYS, MARKED, ARRAY_COMPONENT_MEMBERS,
+             PRIMITIVES, EMPTIED_COPY_NON_BINDING]*.clear()
         }
 
+        static final Map<String, List<String>> PRIMITIVES = [:]
+        static final Map<String, List<String>> EMPTIED_COPY_NON_BINDING = [:]
         @Override
         void start(VisitorContext visitorContext) {
             def names = ['test.MyAnn', 'test.Outer$Nested', 'test.UnusedAnn', Named.name, Singleton.name, Property.name]

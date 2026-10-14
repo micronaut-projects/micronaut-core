@@ -201,6 +201,8 @@ class Test:
             assert members[5].getType().isArray()
             assert members[5].getType().fromArray().getName() == 'java.lang.String'
 
+            assert members[5].isArray() && members[5].getArrayDimensions() == 1
+            assert members[2].isPrimitive() && !members[0].isPrimitive()
             // the defaults, as the metadata records them: the Python class is visited before its generated
             // annotation type exists, so a class value is the class name and a list value a List, the shapes
             // AnnotationMemberDefaultsSpec documents for the written metadata

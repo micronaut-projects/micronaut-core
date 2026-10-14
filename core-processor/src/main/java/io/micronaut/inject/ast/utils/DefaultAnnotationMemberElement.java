@@ -67,6 +67,26 @@ public final class DefaultAnnotationMemberElement implements AnnotationMemberEle
     }
 
     @Override
+    public boolean isPrimitive() {
+        return type.isPrimitive();
+    }
+
+    @Override
+    public boolean isVoid() {
+        return type.isVoid();
+    }
+
+    @Override
+    public boolean isArray() {
+        return type.isArray();
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return type.getArrayDimensions();
+    }
+
+    @Override
     public Optional<Object> getDefaultValue() {
         return Optional.ofNullable(defaultValues.get().get(member.getName()));
     }
