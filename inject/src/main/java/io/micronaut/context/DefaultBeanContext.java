@@ -4529,6 +4529,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return pickOneBean(beanType, qualifier, false, candidates);
     }
 
+    @Override
+    public <T> Optional<BeanDefinition<T>> findBeanDefinition(Argument<T> beanType,
+                                                              Collection<BeanDefinition<T>> candidates,
+                                                              @Nullable Qualifier<T> qualifier) {
+        Objects.requireNonNull(beanType, "Bean type cannot be null");
+        Objects.requireNonNull(candidates, "Candidates cannot be null");
+        return pickOneBean(beanType, qualifier, true, candidates);
+    }
+
     private <T> Optional<BeanDefinition<T>> pickOneBean(Argument<T> beanType,
                                                         @Nullable Qualifier<T> qualifier,
                                                         boolean throwNonUnique,

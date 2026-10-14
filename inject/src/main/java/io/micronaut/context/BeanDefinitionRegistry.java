@@ -184,6 +184,44 @@ public interface BeanDefinitionRegistry {
     }
 
     /**
+     * Resolve one bean definition among candidates the caller has already selected, applying the same
+     * rules a lookup by type applies once it has collected its candidates. The candidates are not
+     * checked against the bean type: the caller chose them, and this method only picks among them.
+     *
+     * <p>The candidates are narrowed by the qualifier where one is given, and then the first rule that
+     * singles out one definition decides, in this precedence:</p>
+     * <ol>
+     *     <li>The {@link io.micronaut.context.annotation.Primary} candidates, where there are any: the
+     *     later rules apply to them alone.</li>
+     *     <li>The choice of the {@link BeanResolutionCustomizer#resolveNonUniqueBean} the context was
+     *     configured with.</li>
+     *     <li>The candidates that are not {@link io.micronaut.context.annotation.Secondary}. Where every
+     *     candidate is secondary they all stay in.</li>
+     *     <li>The candidate of the highest precedence by {@link io.micronaut.core.order.Ordered} order, unless
+     *     it shares its order with the next one.</li>
+     *     <li>The candidate that is the {@link io.micronaut.context.annotation.DefaultImplementation} of the
+     *     first candidate's type.</li>
+     *     <li>The one candidate whose bean type is exactly the requested type.</li>
+     * </ol>
+     *
+     * <p>A single candidate is resolved as it is, and no candidates, or none the qualifier accepts, resolve
+     * to empty. When the rules leave more than one candidate the result is a
+     * {@link io.micronaut.context.exceptions.NonUniqueBeanException}, unless the qualifier is
+     * {@link io.micronaut.context.annotation.Any}, which takes the first of them.</p>
+     *
+     * @param beanType   The requested bean type
+     * @param candidates The candidate definitions to choose among
+     * @param qualifier  The qualifier, or {@code null}
+     * @param <T>        The bean type
+     * @return The one definition, or empty
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When the rules leave more than one candidate
+     * @since 5.3.0
+     */
+    <T> Optional<BeanDefinition<T>> findBeanDefinition(Argument<T> beanType,
+                                                       Collection<BeanDefinition<T>> candidates,
+                                                       @Nullable Qualifier<T> qualifier);
+
+    /**
      * Obtain a {@link BeanRegistration} for the given bean.
      *
      * @param bean The bean

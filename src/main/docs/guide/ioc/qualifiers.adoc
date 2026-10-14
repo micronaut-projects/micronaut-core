@@ -120,6 +120,10 @@ If multiple possible candidates are present and no `@Primary` is defined a api:c
 
 In addition to `@Primary`, there is also a api:context.annotation.Secondary[] annotation which causes the opposite effect and allows de-prioritizing a bean.
 
+When several candidates remain, Micronaut picks one in this precedence: the `@Primary` candidates, if there are any, are the only ones the later rules consider; then the api:context.BeanResolutionCustomizer[] the context was configured with may choose; then the candidates that are not `@Secondary`; then the candidate with the highest `@Order` precedence, unless it shares its order with the next; then the ann:context.annotation.DefaultImplementation[] of the requested type; then the one candidate whose type is exactly the requested type. Anything left after that is a api:context.exceptions.NonUniqueBeanException[].
+
+The same selection is available to code that has collected candidates by its own rules through api:context.BeanDefinitionRegistry[]'s `findBeanDefinition(Argument, Collection, Qualifier)`, so that a custom lookup and injection agree on the bean they pick.
+
 TIP: See the guide for https://guides.micronaut.io/latest/micronaut-patterns-composite.html[Micronaut Patterns - Composite] to learn more.
 
 == Injecting Any Bean
