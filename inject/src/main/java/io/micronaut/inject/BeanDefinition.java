@@ -523,7 +523,11 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * all the same, so a consumer that needs the hierarchy reads it here without loading a class by name.</p>
      *
      * <p>The order is the super class before the interfaces, each with its own super types before the next, in
-     * declaration order; a type reached twice (a diamond) is recorded where it was first reached.</p>
+     * declaration order; a type reached twice (a diamond) is recorded where it was first reached. A super type the
+     * definition cannot name - package-private in another package - is left out, as {@link #getExposedTypes()}
+     * leaves it out, while the types above it are kept. An array bean is assignable to the arrays of its
+     * component's closure, {@code List<String>[]} to {@code Collection<String>[]} and {@code Object[]}, and answers
+     * the type argument lookups for the component as before.</p>
      *
      * <p>A factory-produced bean answers the closure of the type the factory method or field produces; a
      * {@link ProxyBeanDefinition} answers for the type it proxies, not for the generated proxy class, while an
