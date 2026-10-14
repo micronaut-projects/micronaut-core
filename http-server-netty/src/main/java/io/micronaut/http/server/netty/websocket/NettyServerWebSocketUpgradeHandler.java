@@ -43,9 +43,12 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
+import io.micronaut.web.router.DefaultRouter;
 import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.web.router.websocket.WebSocketRouteEndpoint;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
@@ -74,10 +77,12 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Handles WebSocket upgrade requests.
@@ -250,7 +255,13 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 .map(rm -> (UriRouteMatch<Object, Object>) rm)
                 .orElseThrow(() -> new IllegalStateException("Route match is required!"));
             //Adding new handler to the existing pipeline to handle WebSocket Messages
-            WebSocketBean<?> webSocketBean = webSocketBeanRegistry.getWebSocket(routeMatch.getTarget().getClass());
+            // a WebSocket route of handler functions carries its endpoint, a @ServerWebSocket route is to a bean
+            WebSocketRouteEndpoint routeEndpoint = routeMatch.getRouteInfo()
+                .getAttribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, WebSocketRouteEndpoint.class)
+                .orElse(null);
+            WebSocketBean<?> webSocketBean = routeEndpoint != null
+                ? routeEndpoint
+                : webSocketBeanRegistry.getWebSocket(routeMatch.getTarget().getClass());
 
             ChannelPipeline pipeline = ctx.pipeline();
 
@@ -269,7 +280,10 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                     ctx,
                     serverConfiguration,
                     routeExecutor.getExecutorSelector(),
-                    routeExecutor.getCoroutineHelper().orElse(null));
+                    routeExecutor.getCoroutineHelper().orElse(null),
+                    routeEndpoint,
+                    // the handlers of a WebSocket route run on the executor of the route
+                    routeEndpoint == null ? null : routeMatch.getRouteInfo().getExecutor(serverConfiguration));
                 pipeline.addBefore(ctx.name(), NettyServerWebSocketHandler.ID, webSocketHandler);
 
                 pipeline.remove(ctx.name());
@@ -278,8 +292,9 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 } catch (NoSuchElementException ignored) {
                 }
 
-                // websocket needs auto read for now
-                ctx.channel().config().setAutoRead(true);
+                // the connection of a WebSocket route reads once its handlers are done, see
+                // NettyServerWebSocketHandler, the connection of a bean all the time
+                ctx.channel().config().setAutoRead(routeEndpoint == null);
             } catch (Throwable e) {
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Error opening WebSocket: {}", e.getMessage(), e);
@@ -335,13 +350,10 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         int maxFramePayloadLength = webSocketBean.messageMethod()
                 .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
                 .orElse(65536)).orElse(65536);
-        String subprotocols = webSocketBean.getBeanDefinition().stringValue(ServerWebSocket.class, "subprotocols")
-                                           .filter(s -> !StringUtils.isEmpty(s))
-                                           .orElse(null);
         WebSocketServerHandshakerFactory wsFactory =
                 new WebSocketServerHandshakerFactory(
                         getWebSocketURL(ctx, req),
-                        subprotocols,
+                        findSubprotocols(webSocketBean),
                         true,
                         maxFramePayloadLength
                 );
@@ -375,6 +387,55 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         } finally {
             responseRequest.set(null);
         }
+    }
+
+    /**
+     * Find the WebSocket route of an upgrade request. A WebSocket route of the route builder is
+     * preferred: of the ones that accept the port and the conditions of the request, e.g. their
+     * where predicates, the closest route, then the first of the lowest order, like the route of
+     * any other request. Otherwise, the first route of a {@code @ServerWebSocket} bean whose
+     * template matches.
+     *
+     * @param router The router
+     * @param request The upgrade request
+     * @return The WebSocket route, if any
+     */
+    private static Optional<UriRouteMatch<Object, Object>> findWebSocketRoute(Router router, HttpRequest<?> request) {
+        List<UriRouteMatch<Object, Object>> functionalRoutes = router.<Object, Object>findAny(request.getPath(), request)
+            .filter(rm -> rm.getHttpMethod() == HttpMethod.GET && isFunctionalWebSocketRoute(rm))
+            .toList();
+        if (!functionalRoutes.isEmpty()) {
+            return DefaultRouter.resolveAmbiguity(request, functionalRoutes).stream()
+                .min(Comparator.comparingInt(rm -> rm.getRouteInfo().getOrder()));
+        }
+        return router.<Object, Object>find(HttpMethod.GET, request.getPath(), request)
+            .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
+            .filter(rm -> !isFunctionalWebSocketRoute(rm))
+            .filter(rm -> rm.getRouteInfo().matching(request))
+            .findFirst();
+    }
+
+    /**
+     * @param webSocketBean The WebSocket bean
+     * @return The subprotocols the WebSocket supports, comma separated, or {@code null} if none
+     */
+    private static @Nullable String findSubprotocols(WebSocketBean<?> webSocketBean) {
+        if (webSocketBean instanceof WebSocketRouteEndpoint) {
+            List<String> supported = webSocketBean.getSubprotocols();
+            return supported.isEmpty() ? null : String.join(",", supported);
+        }
+        return webSocketBean.getBeanDefinition().stringValue(ServerWebSocket.class, "subprotocols")
+            .filter(s -> !StringUtils.isEmpty(s))
+            .orElse(null);
+    }
+
+    /**
+     * @param routeMatch A route match
+     * @return Whether it is a WebSocket route of the route builder, rather than of a
+     * {@code @ServerWebSocket} bean
+     */
+    private static boolean isFunctionalWebSocketRoute(RouteMatch<?> routeMatch) {
+        return routeMatch.getRouteInfo().getAttributes().get(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE) instanceof WebSocketRouteEndpoint;
     }
 
     /**
@@ -441,11 +502,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             // context, apply to the upgrade request. Router.find(HttpMethod, path, request) only
             // matches the method and the path, so the conditions are tested here, once
             return PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request))
-                .propagate(() -> router.<Object, Object>find(HttpMethod.GET, request.getPath(), request)
-                    .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
-                    .filter(rm -> rm.getRouteInfo().matching(request))
-                    .findFirst()
-                    .orElse(null));
+                .propagate(() -> findWebSocketRoute(router, request).orElse(null));
         }
 
         @Override
