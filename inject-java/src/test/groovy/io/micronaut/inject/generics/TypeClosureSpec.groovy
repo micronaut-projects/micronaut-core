@@ -123,6 +123,10 @@ class RawBox extends Box {}
         closure[1].isRawType()
         closure[2].isRawType()
         closure[0].typeParameters.length == 0
+
+        and: 'each raw type keeps the variable it erases to, so a lookup of View<Object> still matches as it did'
+        definition.getTypeArguments('closure.View')*.type == [Object]
+        definition.isCandidateBean(Argument.of(definition.beanType.classLoader.loadClass('closure.View'), Object))
     }
 
     void "test a wildcard is kept as written"() {

@@ -1029,6 +1029,20 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         }
     }
 
+    /**
+     * The type arguments a type of the closure is written with: its own, or for a raw type the variables the
+     * recorded type arguments erase it to, so that a raw {@code View} stays {@code Argument.ofRawType} with the
+     * declared variable as {@link Argument#getTypeParameters()} and a lookup of {@code View<Object>} still matches
+     * it, as it did when the type arguments alone were recorded.
+     */
+    private Map<String, ClassElement> typeArgumentsOf(ClassElement superType) {
+        Map<String, ClassElement> own = superType.getTypeArguments();
+        if (own.isEmpty() && superType.isRawType() && typeArguments != null) {
+            return typeArguments.getOrDefault(superType.getName(), own);
+        }
+        return own;
+    }
+
     private static boolean isObjectType(ClassElement element) {
         return !element.isArray() && Object.class.getName().equals(element.getName());
     }
@@ -2637,7 +2651,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                         null,
                         superType,
                         AnnotationMetadata.EMPTY_METADATA,
-                        superType.getTypeArguments(),
+                        typeArgumentsOf(superType),
                         loadClassValueExpressionFn
                     )).toList())));
             failStatements.add(beanDefinitionTypeDef.getStaticField(typeClosureField).put(ExpressionDef.nullValue()));
