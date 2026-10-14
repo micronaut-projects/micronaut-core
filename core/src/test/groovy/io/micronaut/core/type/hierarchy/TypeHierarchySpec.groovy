@@ -4,6 +4,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.core.type.TypeHierarchies
 import io.micronaut.core.type.TypeHierarchy
+import io.micronaut.core.type.hierarchy.$$java.util.$ArrayList$TypeHierarchy
 import spock.lang.Specification
 import spock.lang.TempDir
 
@@ -121,11 +122,14 @@ class TypeHierarchySpec extends Specification {
         typeName                       | recordPackage     | recordName
         'com.example.Foo'              | 'com.example'     | 'com.example.$Foo$TypeHierarchy'
         'com.example.Outer$Inner'      | 'com.example'     | 'com.example.$Outer$Inner$TypeHierarchy'
-        'java.util.ArrayList'          | 'com.example'     | 'com.example.$$java_util_ArrayList$TypeHierarchy'
-        'com.my_lib.Foo_Bar$In_ner'    | 'com.example'     | 'com.example.$$com_my__lib_Foo__Bar$In__ner$TypeHierarchy'
+        'com.example.$Odd'             | 'com.example'     | 'com.example.$$Odd$TypeHierarchy'
+        'java.util.ArrayList'          | 'com.example'     | 'com.example.$$java.util.$ArrayList$TypeHierarchy'
+        'java.util.Map$Entry'          | 'com.example'     | 'com.example.$$java.util.$Map$Entry$TypeHierarchy'
+        'a._Foo'                       | 'other'           | 'other.$$a.$_Foo$TypeHierarchy'
+        'a_.Foo'                       | 'other'           | 'other.$$a_.$Foo$TypeHierarchy'
         'Foo'                          | ''                | '$Foo$TypeHierarchy'
-        'Foo'                          | 'com.example'     | 'com.example.$$Foo$TypeHierarchy'
-        'com.example.Foo'              | ''                | '$$com_example_Foo$TypeHierarchy'
+        'Foo'                          | 'com.example'     | '$Foo$TypeHierarchy'
+        'com.example.Foo'              | ''                | '$$com.example.$Foo$TypeHierarchy'
     }
 
     void "names that are not records are not decoded"() {
@@ -133,14 +137,14 @@ class TypeHierarchySpec extends Specification {
         TypeHierarchies.recordedTypeName(name) == null
 
         where:
-        name << ['com.example.Foo', 'com.example.Foo$TypeHierarchy', 'com.example.$TypeHierarchy', 'com.example.$$TypeHierarchy']
+        name << ['com.example.Foo', 'com.example.Foo$TypeHierarchy', 'com.example.$TypeHierarchy', 'com.example.$$.$Foo$TypeHierarchy']
     }
 
     void "a lookup loads the record of the type asked for and no other"() {
         given:
         def serviceDir = tempDir.resolve("META-INF/micronaut/" + TypeHierarchy.name)
         Files.createDirectories(serviceDir)
-        [$Records$Payload$TypeHierarchy, $Records$Unrelated$TypeHierarchy, $$java_util_ArrayList$TypeHierarchy].each { Files.createFile(serviceDir.resolve(it.name)) }
+        [$Records$Payload$TypeHierarchy, $Records$Unrelated$TypeHierarchy, $ArrayList$TypeHierarchy].each { Files.createFile(serviceDir.resolve(it.name)) }
         def classLoader = new URLClassLoader([tempDir.toUri().toURL()] as URL[], getClass().classLoader)
         TypeHierarchies.invalidate()
 
