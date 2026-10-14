@@ -94,6 +94,7 @@ noReflection {
     allowIn("io.micronaut.core.type.DefaultArgument", "CLASS_NAMES", "GENERIC_SIGNATURES")
     allowIn("io.micronaut.core.type.DefaultArgumentValue", "ANNOTATION_SYNTHESIS")
     allowIn("io.micronaut.core.type.RuntimeTypeInformation", "SERVICE_LOADING")
+    allowIn("io.micronaut.core.type.TypeHierarchies", "SERVICE_LOADING")
     allowIn("io.micronaut.core.type.TypeInformation", "CLASS_NAMES", "GENERIC_SIGNATURES")
     allowIn("io.micronaut.core.util.ArrayUtils", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.core.util.CollectionUtils", "CLASS_MEMBERS", "ENUM_CONSTANTS", "REFLECTIVE_ACCESS")
