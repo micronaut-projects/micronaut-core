@@ -50,7 +50,16 @@ class ResolveWithProviderCachingSpec extends AbstractTypeElementSpec {
             }
         }
         @Singleton class SharedProvider extends ResolvingProvider {
+            static SharedProvider lastUsed;
+            public <T> T get(BeanResolutionContext context, Argument<T> argument,
+                io.micronaut.context.Qualifier<T> qualifier, boolean nullable) {
+                lastUsed = this;
+                return super.get(context, argument, qualifier, nullable);
+            }
             public String toString() { return "SHARED_PROVIDER_RESOLVED"; }
+        }
+        @Prototype class Other {
+            @Inject @ResolveWith(SharedProvider.class) Value value;
         }
         @Prototype class OwnedProvider extends ResolvingProvider {
             static int destroyed;
@@ -64,7 +73,7 @@ class ResolveWithProviderCachingSpec extends AbstractTypeElementSpec {
 
     @Override
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
-        contextBuilder.beanResolutionTrace(BeanResolutionTraceMode.STANDARD_OUT, 'test\\.providercache\\.Consumer')
+        contextBuilder.beanResolutionTrace(BeanResolutionTraceMode.STANDARD_OUT, 'test\\.providercache\\.(Consumer|Other)')
     }
 
     void 'a singleton provider is resolved once for every marked point of every bean created'() {
@@ -102,6 +111,39 @@ class ResolveWithProviderCachingSpec extends AbstractTypeElementSpec {
 
         then:
         ownedProviderType.destroyed == 5 * 2
+
+        cleanup:
+        context.close()
+    }
+
+    void 'a held provider is resolved again once its singleton is destroyed'() {
+        given:
+        def context = buildContext('test.providercache.Consumer', SOURCE)
+        def consumerType = context.classLoader.loadClass('test.providercache.Consumer')
+        def providerType = context.classLoader.loadClass('test.providercache.SharedProvider')
+        def standardOut = System.out
+        def captured = new ByteArrayOutputStream()
+
+        when: 'the provider is held, destroyed, and a bean is created after that'
+        System.setOut(new PrintStream(captured, true))
+        def first
+        def second
+        try {
+            context.getBean(consumerType)
+            first = providerType.lastUsed
+            context.destroyBean(context.getBeanRegistration(providerType, null))
+            context.getBean(consumerType)
+            second = providerType.lastUsed
+        } finally {
+            System.setOut(standardOut)
+        }
+        def trace = captured.toString()
+
+        then: 'the bean is injected through the provider the scope holds now, resolved once more'
+        first != null
+        !second.is(first)
+        second.is(context.getBean(providerType))
+        trace.count('SHARED_PROVIDER_RESOLVED') == 2
 
         cleanup:
         context.close()

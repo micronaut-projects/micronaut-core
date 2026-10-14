@@ -5262,8 +5262,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     /**
      * Resolves the {@link BeanInjectionProvider} a {@link io.micronaut.context.annotation.ResolveWith} injection point
      * names. A singleton provider is resolved once per context and then held by its type, so the injection points of
-     * every bean share that one lookup; it is still recorded as a dependency of each bean injected. A provider of any
-     * other scope is never held: it is resolved on every injection, as a dependent of the bean injected.
+     * every bean share that one lookup; it is still recorded as a dependency of each bean injected, and it is let go
+     * of once the singleton scope no longer holds it. A provider of any other scope is never held: it is resolved on
+     * every injection, as a dependent of the bean injected.
      *
      * @param resolutionContext The resolution context of the bean injected
      * @param providerType      The provider type
@@ -5276,19 +5277,24 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     final <P extends BeanInjectionProvider> P getInjectionProvider(BeanResolutionContext resolutionContext, Class<P> providerType) {
         HeldInjectionProvider held = injectionProviders.get(providerType);
         if (held != null && held.registration != null) {
-            recordDependency(resolutionContext, held.registration.beanDefinition, null);
-            return (P) held.registration.bean;
+            BeanRegistration<? extends BeanInjectionProvider> registration = held.registration;
+            if (singletonScope.findBeanRegistration(registration.beanDefinition) == registration) {
+                recordDependency(resolutionContext, registration.beanDefinition, null);
+                return (P) registration.bean;
+            }
+            // the scope no longer holds it: the singleton was destroyed, or a listener replaced it on adoption
+            injectionProviders.remove(providerType, held);
+            held = null;
         }
         Argument<P> argument = Argument.of(providerType);
         P provider = resolutionContext.getBean(argument, null);
         if (held == null) {
-            // held only as the instance the singleton scope keeps for the definition the type resolves to; the
-            // resolution above may itself have put the type here, which is kept
+            // held only as the instance the singleton scope keeps for the definition the type resolves to
             BeanRegistration<P> singleton = findBeanDefinition(resolutionContext, argument, null)
                 .map(singletonScope::findBeanRegistration)
                 .filter(registration -> registration.bean == provider)
                 .orElse(null);
-            injectionProviders.putIfAbsent(providerType, new HeldInjectionProvider(singleton));
+            injectionProviders.put(providerType, new HeldInjectionProvider(singleton));
         }
         return provider;
     }
