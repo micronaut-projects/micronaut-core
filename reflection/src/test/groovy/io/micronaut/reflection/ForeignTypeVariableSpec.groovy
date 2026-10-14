@@ -70,6 +70,29 @@ class ForeignTypeVariableSpec extends Specification {
         argument.typeParameters[0].name == "E"
     }
 
+    void "a variable with several bounds, one naming itself, keeps every bound"() {
+        given: "T extends Number & Comparable<T>, reported through getBounds() only"
+        def variable = new ForeignTypeVariable("T")
+        def comparable = new ParameterizedType() {
+            Type[] getActualTypeArguments() { [variable] as Type[] }
+            Type getRawType() { Comparable }
+            Type getOwnerType() { null }
+        }
+        variable.bounds = [Number, comparable] as Type[]
+
+        when:
+        def argument = (GenericPlaceholder) ReflectionArguments.ofExact(variable)
+
+        then:
+        argument.type == Number
+        argument.variableName == "T"
+        argument.bounds*.type == [Number, Comparable]
+
+        and: "inside its own bound the variable stands for the erasure of its first bound"
+        argument.bounds[1].typeParameters[0] instanceof GenericPlaceholder
+        argument.bounds[1].typeParameters[0].type == Number
+    }
+
     void "a variable with no annotated bounds also reads through the lossy conversion"() {
         when:
         def argument = ReflectionArguments.of(new ForeignTypeVariable("T"))
@@ -81,7 +104,7 @@ class ForeignTypeVariableSpec extends Specification {
     private static final class ForeignTypeVariable implements TypeVariable<GenericDeclaration> {
 
         private final String name
-        private final Type[] bounds
+        private Type[] bounds
 
         ForeignTypeVariable(String name, Type... bounds) {
             this.name = name
