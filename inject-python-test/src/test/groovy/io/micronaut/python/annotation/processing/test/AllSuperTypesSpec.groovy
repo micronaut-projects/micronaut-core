@@ -56,6 +56,9 @@ class Unparameterized(Box):
 
 class Ordered(Box[T], Generic[T]):
     pass
+
+class Swapped(dict[V, T], Generic[T, V]):
+    pass
 '''
 
     void "the closure of a class binds the variables of its bases along the path"() {
@@ -78,16 +81,28 @@ class Ordered(Box[T], Generic[T]):
         closure('Unparameterized') == ['python.Unparameterized', 'python.Box<java.lang.Object>', 'python.View<java.lang.Object>', 'python.Named', 'java.lang.Object']
     }
 
-    void "the variables of an open generic class are listed as their bounds, as the Python element answers them"() {
+    void "the variables of an open generic class reach its bases as placeholders"() {
         given:
         List<String> lines = []
         buildClassElement(TYPES, 'Ordered') { ClassElement element ->
             lines.addAll(closure(element))
-            lines << (element.typeArguments['T'] instanceof GenericPlaceholderElement ? 'placeholder' : 'bound')
+            lines << (element.getAllSuperTypes()[2].typeArguments['T'] instanceof GenericPlaceholderElement ? 'placeholder' : 'bound')
         }
 
         expect:
-        lines == ['python.Ordered<java.lang.Object>', 'python.Box<java.lang.Object>', 'python.View<java.lang.Object>', 'python.Named', 'java.lang.Object', 'bound']
+        lines == ['python.Ordered<java.lang.Object>', 'python.Box<T>', 'python.View<T>', 'python.Named', 'java.lang.Object', 'placeholder']
+    }
+
+    void "a Java base of an open generic class binds the variables of its own super types by position"() {
+        given:
+        List<String> lines = []
+        buildClassElement(TYPES, 'Swapped') { ClassElement element ->
+            lines.addAll(closure(element))
+        }
+
+        expect:
+        // dict is java.util.Map: Map<V, T> in the variables of Swapped, not Map<K, V> in its own
+        lines == ['python.Swapped<java.lang.Object, java.lang.Object>', 'java.util.Map<V, T>', 'java.lang.Object']
     }
 
     void "a Java base is walked as the Java element declares it"() {

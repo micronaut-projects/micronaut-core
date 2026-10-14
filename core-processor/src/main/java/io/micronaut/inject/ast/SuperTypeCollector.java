@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 
 /**
@@ -68,6 +69,28 @@ public final class SuperTypeCollector {
     @NonNull
     public static List<ClassElement> collect(@NonNull ClassElement type,
                                              @NonNull Function<ClassElement, Stream<ClassElement>> directSuperTypes) {
+        return collect(type, type.getTypeArguments(), directSuperTypes, UnaryOperator.identity());
+    }
+
+    /**
+     * The type and its super types, as {@link ClassElement#getAllSuperTypes()} lists them, for a language that
+     * binds the variables of the type itself, or walks a super type, other than as the element answers.
+     *
+     * @param type             The type
+     * @param bindings         What the variables of the type are bound to, by name: its own arguments, or its
+     *                         declared variables for a type whose arguments answer their bounds
+     * @param directSuperTypes The direct super types of a type reached by the walk, as the language declares them,
+     *                         with their arguments written in the variables of that type
+     * @param declaration      The element to ask for the direct super types of a listed super type: the super type
+     *                         itself when its super types come back written in its own variables, or its declaration
+     *                         when a resolved variable of another language would lose the name they are bound by
+     * @return The type first, its super types, and {@code Object} last
+     */
+    @NonNull
+    public static List<ClassElement> collect(@NonNull ClassElement type,
+                                             @NonNull Map<String, ClassElement> bindings,
+                                             @NonNull Function<ClassElement, Stream<ClassElement>> directSuperTypes,
+                                             @NonNull UnaryOperator<ClassElement> declaration) {
         List<ClassElement> result = new ArrayList<>();
         result.add(type);
         if (type.isArray()) {
@@ -80,7 +103,7 @@ public final class SuperTypeCollector {
                 dimensions++;
             }
             if (!component.isPrimitive()) {
-                List<ClassElement> componentSuperTypes = collect(component, directSuperTypes);
+                List<ClassElement> componentSuperTypes = collect(component, component.getTypeArguments(), directSuperTypes, declaration);
                 for (int i = 1; i < componentSuperTypes.size(); i++) {
                     ClassElement array = componentSuperTypes.get(i);
                     for (int j = 0; j < dimensions; j++) {
@@ -98,7 +121,7 @@ public final class SuperTypeCollector {
         } else {
             Set<String> seen = new HashSet<>();
             seen.add(key(type));
-            collect(type, type.getTypeArguments(), type.isRawType(), directSuperTypes, seen, result);
+            collect(type, bindings, type.isRawType(), directSuperTypes, declaration, seen, result);
         }
         result.add(ClassElement.of(Object.class));
         return result;
@@ -116,6 +139,7 @@ public final class SuperTypeCollector {
      * @param bindings         What the variables of the type are bound to, by name, in the arguments of the first type
      * @param raw              Whether the type is raw, or is reached through a raw type, which erases its super types
      * @param directSuperTypes The direct super types of a type
+     * @param declaration      The element to walk for a listed super type
      * @param seen             The keys of the types listed so far
      * @param result           The types listed so far
      */
@@ -123,6 +147,7 @@ public final class SuperTypeCollector {
                                 Map<String, ClassElement> bindings,
                                 boolean raw,
                                 Function<ClassElement, Stream<ClassElement>> directSuperTypes,
+                                UnaryOperator<ClassElement> declaration,
                                 Set<String> seen,
                                 List<ClassElement> result) {
         directSuperTypes.apply(type).forEach(superType -> {
@@ -147,7 +172,7 @@ public final class SuperTypeCollector {
             }
             if (seen.add(key(resolved))) {
                 result.add(resolved);
-                collect(superType, resolvedArguments, raw || superType.isRawType(), directSuperTypes, seen, result);
+                collect(declaration.apply(superType), resolvedArguments, raw || superType.isRawType(), directSuperTypes, declaration, seen, result);
             }
         });
     }

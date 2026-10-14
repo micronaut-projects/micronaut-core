@@ -984,10 +984,17 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
     @Override
     public List<ClassElement> getAllSuperTypes() {
         // Python can have multiple concrete bases, so the walk stays on the native bases, in declaration order,
-        // instead of the one super type and the interfaces ClassElement's default implementation walks
-        return SuperTypeCollector.collect(this, type -> type instanceof PythonClassElement pythonClass
-            ? pythonClass.resolvedBases()
-            : SuperTypeCollector.declared(type));
+        // instead of the one super type and the interfaces ClassElement's default implementation walks. An open
+        // generic type binds its bases with its own variables, which its arguments answer as their bounds, and a
+        // Java base is walked as it is declared: resolving its variables to the variables of this type loses the
+        // names its own super types bind them by, as getAllTypeArguments() avoids too
+        return SuperTypeCollector.collect(
+            this,
+            typeVariableBindings(),
+            type -> type instanceof PythonClassElement pythonClass
+                ? pythonClass.resolvedBases()
+                : SuperTypeCollector.declared(type),
+            type -> type instanceof PythonClassElement ? type : type.getRawClassElement());
     }
 
     /**
