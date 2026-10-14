@@ -10,10 +10,10 @@ If you use the https://micronaut-projects.github.io/micronaut-gradle-plugin/late
 .build.gradle.kts
 ----
 plugins {
-    id("org.jetbrains.kotlin.jvm") version "1.9.20"
-    id("com.google.devtools.ksp") version "1.9.20-1.0.13"
-    id("org.jetbrains.kotlin.plugin.allopen") version "1.9.20"
-    id("io.micronaut.application") version "4.4.4" // get latest version from https://plugins.gradle.org/plugin/io.micronaut.application
+    id("org.jetbrains.kotlin.jvm") version "2.4.10"
+    id("com.google.devtools.ksp") version "2.3.12"
+    id("org.jetbrains.kotlin.plugin.allopen") version "2.4.10"
+    id("io.micronaut.application") version "5.0.2" // get latest version from https://plugins.gradle.org/plugin/io.micronaut.application
 }
 version = "0.1"
 group = "example.micronaut"
@@ -50,8 +50,11 @@ kspTest(platform("io.micronaut.platform:micronaut-platform:$micronautVersion"))
 kspTest("io.micronaut:micronaut-inject-kotlin")
 ----
 
-Unfortunately, KSP doesn't see the changes in the classes made by other compiler plugins, which breaks integration with the `allopen` plugin.
-To make the integration work, we have introduced an experimental KSP property `kotlin.allopen.annotations` for the annotation processor. The property expects a list of annotations that are open, separated by `|`. It's also supported to use the system property of the same name, but that might be unreliable considering build daemons can be cached.
+NOTE: Since KSP 2.3, the KSP version is no longer tied to the Kotlin version. In a Kotlin Multiplatform project, use the target-specific configurations such as `kspJvm` and `kspJvmTest` instead of `ksp`, which KSP deprecates there.
+
+KSP runs before the Kotlin compilation and doesn't see the changes made to classes by compiler plugins, so it doesn't see the classes the `allopen` plugin opens.
+Micronaut treats a class annotated with an AOP annotation (an annotation stereotyped with `@Around`, `@Introduction` or an interceptor binding) as open, so the usual `allopen` configuration with `io.micronaut.aop.Around` needs no extra KSP configuration. You still need the `allopen` plugin itself: it is what makes the compiled class open.
+For any other annotation you configure for the `allopen` plugin, use the experimental KSP property `kotlin.allopen.annotations`. The property expects a list of annotations that are open, separated by `|` or `,`. It's also supported to use the system property of the same name, but that might be unreliable considering build daemons can be cached.
 
 .Kotlin All-Open plugin configuration
 [source, groovy]
