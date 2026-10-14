@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
@@ -88,7 +89,7 @@ public class StaticResourceConfiguration implements Toggleable {
         if (enabled) {
             List<ResourceLoader> loaders = new ArrayList<>(paths.size());
             for (String path : paths) {
-                if (path.equals("classpath:")) {
+                if (path.equals(ClassPathResourceLoader.PREFIX)) {
                     throw new ConfigurationException("A path value of [classpath:] will allow access to class files!");
                 }
                 Optional<ResourceLoader> loader = resourceResolver.getLoaderForBasePath(path);
