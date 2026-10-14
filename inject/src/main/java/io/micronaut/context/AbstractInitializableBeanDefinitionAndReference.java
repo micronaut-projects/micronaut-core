@@ -67,7 +67,40 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
                                                               Condition @Nullable [] preLoadConditions,
                                                               Condition @Nullable [] postLoadConditions,
                                                               @Nullable Throwable failedInitialization) {
-        super(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, annotationInjection, executableMethodsDefinition, typeArgumentsMap, precalculatedInfo);
+        this(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, annotationInjection, executableMethodsDefinition, typeArgumentsMap, null, precalculatedInfo, preLoadConditions, postLoadConditions, failedInitialization);
+    }
+
+    /**
+     * @param beanType                    The bean type
+     * @param constructor                 The constructor
+     * @param annotationMetadata          The annotation metadata
+     * @param methodInjection             The method injection points
+     * @param fieldInjection              The field injection points
+     * @param annotationInjection         The annotation injection points
+     * @param executableMethodsDefinition The executable methods
+     * @param typeArgumentsMap            The type arguments by super type name, {@code null} when the type closure
+     *                                    is given
+     * @param typeClosure                 The type closure, see {@link #getTypeClosure()}
+     * @param precalculatedInfo           The precalculated info
+     * @param preLoadConditions           The conditions checked before the bean is loaded
+     * @param postLoadConditions          The conditions checked after the bean is loaded
+     * @param failedInitialization        The failure of the static initialization, if any
+     * @since 5.3.0
+     */
+    protected AbstractInitializableBeanDefinitionAndReference(Class<T> beanType,
+                                                              @Nullable MethodOrFieldReference constructor,
+                                                              @Nullable AnnotationMetadata annotationMetadata,
+                                                              MethodReference @Nullable [] methodInjection,
+                                                              FieldReference @Nullable [] fieldInjection,
+                                                              AnnotationReference @Nullable [] annotationInjection,
+                                                              @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
+                                                              @Nullable Map<String, Argument<?> @Nullable []> typeArgumentsMap,
+                                                              Argument<?> @Nullable [] typeClosure,
+                                                              PrecalculatedInfo precalculatedInfo,
+                                                              Condition @Nullable [] preLoadConditions,
+                                                              Condition @Nullable [] postLoadConditions,
+                                                              @Nullable Throwable failedInitialization) {
+        super(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, annotationInjection, executableMethodsDefinition, typeArgumentsMap, typeClosure, precalculatedInfo);
         this.failedInitialization = failedInitialization;
         this.preLoadConditions = preLoadConditions;
         this.postLoadConditions = postLoadConditions;

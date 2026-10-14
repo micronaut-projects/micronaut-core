@@ -121,6 +121,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     private final ExecutableMethodsDefinition<T> executableMethodsDefinition;
     @Nullable
     private final Map<String, Argument<?> @Nullable []> typeArgumentsMap;
+    private final Argument<?> @Nullable [] typeClosure;
     private AnnotationReference @Nullable [] annotationInjection;
     @Nullable
     private Environment environment;
@@ -157,6 +158,34 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
             @Nullable Map<String, Argument<?> @Nullable []> typeArgumentsMap,
             PrecalculatedInfo precalculatedInfo) {
+        this(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, annotationInjection, executableMethodsDefinition, typeArgumentsMap, null, precalculatedInfo);
+    }
+
+    /**
+     * @param beanType                    The bean type
+     * @param constructor                 The constructor
+     * @param annotationMetadata          The annotation metadata
+     * @param methodInjection             The method injection points
+     * @param fieldInjection              The field injection points
+     * @param annotationInjection         The annotation injection points
+     * @param executableMethodsDefinition The executable methods
+     * @param typeArgumentsMap            The type arguments by super type name, {@code null} when the type closure
+     *                                    is given, which answers the same lookups
+     * @param typeClosure                 The type closure, see {@link #getTypeClosure()}
+     * @param precalculatedInfo           The precalculated info
+     * @since 5.3.0
+     */
+    protected AbstractInitializableBeanDefinition(
+            Class<T> beanType,
+            @Nullable MethodOrFieldReference constructor,
+            @Nullable AnnotationMetadata annotationMetadata,
+            MethodReference @Nullable [] methodInjection,
+            FieldReference @Nullable [] fieldInjection,
+            AnnotationReference @Nullable [] annotationInjection,
+            @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
+            @Nullable Map<String, Argument<?> @Nullable []> typeArgumentsMap,
+            Argument<?> @Nullable [] typeClosure,
+            PrecalculatedInfo precalculatedInfo) {
         this.type = beanType;
         if (annotationMetadata == null || annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
             this.annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
@@ -175,6 +204,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         this.annotationInjection = annotationInjection;
         this.executableMethodsDefinition = executableMethodsDefinition;
         this.typeArgumentsMap = typeArgumentsMap;
+        this.typeClosure = typeClosure;
         this.precalculatedInfo = precalculatedInfo;
     }
 
@@ -238,8 +268,35 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
+    public List<Argument<?>> getTypeArguments(@Nullable Class<?> type) {
+        if (type == null) {
+            return Collections.emptyList();
+        }
+        if (typeClosure != null) {
+            for (Argument<?> superType : typeClosure) {
+                if (superType.getType() == type) {
+                    return typeParametersOf(superType);
+                }
+            }
+            return Collections.emptyList();
+        }
+        return getTypeArguments(type.getName());
+    }
+
+    @Override
     public final List<Argument<?>> getTypeArguments(@Nullable String type) {
-        if (type == null || typeArgumentsMap == null) {
+        if (type == null) {
+            return Collections.emptyList();
+        }
+        if (typeClosure != null) {
+            for (Argument<?> superType : typeClosure) {
+                if (superType.getType().getName().equals(type)) {
+                    return typeParametersOf(superType);
+                }
+            }
+            return Collections.emptyList();
+        }
+        if (typeArgumentsMap == null) {
             return Collections.emptyList();
         }
         Argument<?>[] arguments = typeArgumentsMap.get(type);
@@ -249,12 +306,51 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         return Collections.emptyList();
     }
 
+    private static List<Argument<?>> typeParametersOf(Argument<?> superType) {
+        Argument<?>[] typeParameters = superType.getTypeParameters();
+        return typeParameters.length == 0 ? Collections.emptyList() : Arrays.asList(typeParameters);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Derived from the recorded {@link #getTypeClosure() type closure} where the definition carries one: the
+     * name of every type in it other than {@code Object}, or nothing at all when none of them carries a type
+     * argument, which is what a definition recording the type arguments alone answers.</p>
+     */
     @Override
     public final Collection<String> getTypeArgumentKeys() {
+        if (typeClosure != null) {
+            boolean anyArguments = false;
+            for (Argument<?> superType : typeClosure) {
+                if (superType.getTypeParameters().length > 0) {
+                    anyArguments = true;
+                    break;
+                }
+            }
+            if (!anyArguments) {
+                return Collections.emptySet();
+            }
+            Set<String> keys = CollectionUtils.newLinkedHashSet(typeClosure.length);
+            for (Argument<?> superType : typeClosure) {
+                if (superType.getType() != Object.class) {
+                    keys.add(superType.getType().getName());
+                }
+            }
+            return Collections.unmodifiableSet(keys);
+        }
         if (typeArgumentsMap == null) {
             return Collections.emptySet();
         }
         return Collections.unmodifiableSet(typeArgumentsMap.keySet());
+    }
+
+    @Override
+    public List<Argument<?>> getTypeClosure() {
+        if (typeClosure != null) {
+            return Collections.unmodifiableList(Arrays.asList(typeClosure));
+        }
+        return InstantiatableBeanDefinition.super.getTypeClosure();
     }
 
     @Override

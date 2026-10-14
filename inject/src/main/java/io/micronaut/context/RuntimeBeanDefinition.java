@@ -30,6 +30,7 @@ import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -135,6 +136,24 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
             keys.add(superType.getName());
         }
         return Collections.unmodifiableSet(keys);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A runtime definition resolves its hierarchy reflectively, so it answers the whole closure: the bean type
+     * and every super class and interface above it, each with the arguments {@link #getTypeArguments(Class)}
+     * resolves for it, and {@code Object} last.</p>
+     */
+    @Override
+    default List<Argument<?>> getTypeClosure() {
+        Collection<Class<?>> superTypes = superTypeClosure(getBeanType());
+        List<Argument<?>> closure = new ArrayList<>(superTypes.size() + 1);
+        for (Class<?> superType : superTypes) {
+            closure.add(Argument.of(superType, getTypeArguments(superType).toArray(Argument.ZERO_ARGUMENTS)));
+        }
+        closure.add(Argument.OBJECT_ARGUMENT);
+        return closure;
     }
 
     /**
