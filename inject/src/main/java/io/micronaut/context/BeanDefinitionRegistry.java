@@ -27,6 +27,7 @@ import io.micronaut.inject.ProxyBeanDefinition;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -184,45 +185,41 @@ public interface BeanDefinitionRegistry {
     }
 
     /**
-     * Resolve one bean definition among candidates the caller has already selected, applying the same
-     * rules a lookup by type applies once it has collected its candidates. The candidates are not
-     * checked against the bean type: the caller chose them, and this method only picks among them.
+     * Select among candidate bean definitions the caller has already chosen, with the rules a lookup by type
+     * applies once it has collected its candidates, so that a selection made by other rules and an injection
+     * point agree on the bean they pick. The candidates are not looked up, filtered or checked against the
+     * bean type, and nothing is cached: the caller chose them, and this method only picks among them.
      *
-     * <p>The candidates are narrowed by the qualifier where one is given, and then the first rule that
-     * singles out one definition decides, in this precedence:</p>
+     * <p>The first rule that singles out one candidate decides, in this precedence:</p>
      * <ol>
      *     <li>The {@link io.micronaut.context.annotation.Primary} candidates, where there are any: the
      *     later rules apply to them alone.</li>
-     *     <li>The choice of the {@link BeanResolutionCustomizer#resolveNonUniqueBean} the context was
-     *     configured with.</li>
+     *     <li>The choice of the {@link BeanResolutionCustomizer#resolveNonUniqueBean} of the context.</li>
      *     <li>The candidates that are not {@link io.micronaut.context.annotation.Secondary}. Where every
      *     candidate is secondary they all stay in.</li>
      *     <li>The candidate of the highest precedence by {@link io.micronaut.core.order.Ordered} order, unless
      *     it shares its order with the next one.</li>
-     *     <li>The candidate that is the {@link io.micronaut.context.annotation.DefaultImplementation} of the
-     *     first candidate's type.</li>
+     *     <li>The candidate that is the {@link io.micronaut.context.annotation.DefaultImplementation} the
+     *     first remaining candidate declares.</li>
      *     <li>The one candidate whose bean type is exactly the requested type.</li>
      * </ol>
      *
-     * <p>A single candidate is resolved as it is, and no candidates, or none the qualifier accepts, resolve
-     * to empty. When the rules leave more than one candidate the result is a
-     * {@link io.micronaut.context.exceptions.NonUniqueBeanException}, unless the qualifier is
-     * {@link io.micronaut.context.annotation.Any}, which takes the first of them. Candidates that are all
-     * secondary and that no later rule decides among are non-unique whatever the qualifier, as they are for
-     * a lookup.</p>
+     * <p>The result is one definition when a rule decides, and otherwise the candidates the rules left,
+     * so that the caller can tell ambiguity from a choice without an exception. One candidate or none is
+     * returned as it is. When the requested type is not known the customizer and the exact type are not
+     * consulted. A lookup by type applies the same rules and then throws
+     * {@link io.micronaut.context.exceptions.NonUniqueBeanException} for what is left, or takes the first
+     * under {@link io.micronaut.context.annotation.Any}.</p>
      *
-     * @param beanType   The requested bean type
+     * @param beanType   The requested bean type, or {@code null} when it is not known
      * @param candidates The candidate definitions to choose among
-     * @param qualifier  The qualifier, or {@code null}
      * @param <T>        The bean type
-     * @return The one definition, or empty
-     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When the rules leave more than one candidate
+     * @return The one definition the rules picked, or the candidates they left
      * @since 5.3.0
      */
-    default <T> Optional<BeanDefinition<T>> findBeanDefinition(Argument<T> beanType,
-                                                               Collection<BeanDefinition<T>> candidates,
-                                                               @Nullable Qualifier<T> qualifier) {
-        throw new UnsupportedOperationException("This implementation of BeanDefinitionRegistry doesn't support resolving among candidate bean definitions");
+    @Experimental
+    default <T> List<BeanDefinition<T>> selectAmong(@Nullable Argument<T> beanType, Collection<BeanDefinition<T>> candidates) {
+        return BeanSelection.select(beanType, null, candidates, BeanResolutionCustomizer.DEFAULT);
     }
 
     /**

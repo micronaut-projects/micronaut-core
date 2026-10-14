@@ -4529,15 +4529,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return pickOneBean(beanType, qualifier, false, candidates);
     }
 
-    @Override
-    public <T> Optional<BeanDefinition<T>> findBeanDefinition(Argument<T> beanType,
-                                                              Collection<BeanDefinition<T>> candidates,
-                                                              @Nullable Qualifier<T> qualifier) {
-        Objects.requireNonNull(beanType, "Bean type cannot be null");
-        Objects.requireNonNull(candidates, "Candidates cannot be null");
-        return pickOneBean(beanType, qualifier, true, candidates);
-    }
-
     private <T> Optional<BeanDefinition<T>> pickOneBean(Argument<T> beanType,
                                                         @Nullable Qualifier<T> qualifier,
                                                         boolean throwNonUnique,
@@ -4576,70 +4567,30 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return Optional.ofNullable(definition);
     }
 
+    @Override
+    public final <T> List<BeanDefinition<T>> selectAmong(@Nullable Argument<T> beanType, Collection<BeanDefinition<T>> candidates) {
+        Objects.requireNonNull(candidates, "Candidates cannot be null");
+        return BeanSelection.select(beanType, null, candidates, beanResolutionCustomizer);
+    }
+
     @Nullable
     private <T> BeanDefinition<T> lastChanceResolve(Argument<T> beanType,
                                                     @Nullable Qualifier<T> qualifier,
                                                     boolean throwNonUnique,
                                                     Collection<BeanDefinition<T>> candidates) {
-        if (candidates.size() > 1) {
-            List<BeanDefinition<T>> primary = candidates.stream()
-                .filter(BeanDefinition::isPrimary)
-                .toList();
-            if (!primary.isEmpty()) {
-                candidates = primary;
-            }
-        }
-        if (candidates.size() == 1) {
-            return candidates.iterator().next();
-        }
-        Optional<BeanDefinition<T>> customResolved = beanResolutionCustomizer.resolveNonUniqueBean(beanType, qualifier, candidates);
-        if (customResolved.isPresent()) {
-            return customResolved.get();
-        }
-        Collection<BeanDefinition<T>> originalCandidates = candidates;
-        candidates = candidates.stream().filter(candidate -> !candidate.hasDeclaredStereotype(Secondary.class)).toList();
-        if (candidates.size() == 1) {
-            return candidates.iterator().next();
-        }
-        // When every candidate is @Secondary none of them is preferable to another, but lowering the
-        // precedence of all of them shouldn't remove the ability to decide between them: carry on with
-        // the original candidates so that the order and @DefaultImplementation still get a say.
-        boolean allSecondary = candidates.isEmpty();
-        if (allSecondary) {
-            candidates = originalCandidates;
-        }
-        // pick the bean with the highest priority
-        ArrayList<BeanDefinition<T>> listCandidates = new ArrayList<>(candidates);
-        listCandidates.sort(OrderUtil.ORDERED_COMPARATOR);
-        Iterator<BeanDefinition<T>> iterator = listCandidates.iterator();
-        final BeanDefinition<T> bean = iterator.next();
-        final BeanDefinition<T> next = iterator.next();
-        // We should have at least two beans - no need for next checks
-        // Check there are not 2 beans with the same order
-        if (bean.getOrder() != next.getOrder()) {
-            LOG.debug("Picked bean {} with the highest precedence for type {} and qualifier {}", bean, beanType, null);
+        List<BeanDefinition<T>> remaining = BeanSelection.select(beanType, qualifier, candidates, beanResolutionCustomizer);
+        if (remaining.size() == 1) {
+            BeanDefinition<T> bean = remaining.get(0);
+            LOG.debug("Picked bean {} with the highest precedence for type {} and qualifier {}", bean, beanType, qualifier);
             return bean;
         }
-
-        // try resolve @DefaultImplementation
-        BeanDefinition<T> first = candidates.iterator().next();
-        Class<?> defaultImplementation = first.getDefaultImplementation();
-        if (defaultImplementation != null) {
-            for (BeanDefinition<T> bd : candidates) {
-                if (bd.getBeanType().equals(defaultImplementation)) {
-                    return bd;
-                }
-            }
-        }
-        Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType.getType(), candidates);
-        if (exactMatches.size() == 1) {
-            return exactMatches.iterator().next();
-        }
+        List<BeanDefinition<T>> considered = BeanSelection.primaryCandidates(candidates);
+        boolean allSecondary = considered.stream().allMatch(candidate -> candidate.hasDeclaredStereotype(Secondary.class));
         if (allSecondary) {
-            throw new NonUniqueBeanException(beanType.getType(), originalCandidates.iterator());
+            throw new NonUniqueBeanException(beanType.getType(), considered.iterator());
         }
         if (throwNonUnique) {
-            return findConcreteCandidate(beanType.getType(), qualifier, candidates);
+            return findConcreteCandidate(beanType.getType(), qualifier, remaining);
         }
         return null;
     }
@@ -4651,16 +4602,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 registerConfiguration(beanConfiguration);
             }
         }
-    }
-
-    private <T> Collection<BeanDefinition<T>> filterExactMatch(final Class<T> beanType, Collection<BeanDefinition<T>> candidates) {
-        List<BeanDefinition<T>> list = new ArrayList<>(candidates.size());
-        for (BeanDefinition<T> candidate : candidates) {
-            if (candidate.getBeanType() == beanType) {
-                list.add(candidate);
-            }
-        }
-        return list;
     }
 
     private void configureAndStartContext() {
