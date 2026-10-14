@@ -20,6 +20,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.ServerHttpRequest;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.InternalByteBody;
@@ -73,6 +74,13 @@ public final class CompletableFutureBodyBinder
 
             Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
             Argument<?> targetType = firstTypeParameter.orElse(Argument.OBJECT_ARGUMENT);
+            Optional<String> bodyComponent = context.getAnnotationMetadata().stringValue(Body.class);
+            if (bodyComponent.isPresent()) {
+                // the named component of the body, like a @Body("name") argument of the component type
+                //noinspection unchecked
+                return bodyAnnotationBinder.bindBodyPart((ArgumentConversionContext<Object>) context.with(targetType), source, bodyComponent.get())
+                    .flatMap(value -> () -> Optional.of(CompletableFuture.completedFuture(value)));
+            }
             var flow = InternalByteBody.bufferFlow(rootBody)
                 .flatMap(bytes -> {
                     //noinspection unchecked

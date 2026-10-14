@@ -27,8 +27,11 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.ServerHttpRequest;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.stream.BodyElementsPublisher;
 import io.micronaut.http.body.stream.ReactorInterop;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.InternalByteBody;
@@ -41,8 +44,10 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * A {@link io.micronaut.http.annotation.Body} argument binder for a reactive streams {@link Publisher}.
@@ -91,8 +96,13 @@ public final class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<
             }
             @SuppressWarnings("unchecked")
             Argument<Object> targetType = (Argument<Object>) context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            boolean single = Publishers.isSingle(context.getArgument().getType()) || context.getArgument().isSpecifiedSingle();
+            Optional<String> bodyComponent = context.getAnnotationMetadata().stringValue(Body.class);
+            if (bodyComponent.isPresent()) {
+                return bindBodyComponent(context, source, targetType, single, bodyComponent.get());
+            }
             MediaType mediaType = source.getContentType().orElse(null);
-            if (!Publishers.isSingle(context.getArgument().getType()) && !context.getArgument().isSpecifiedSingle() && mediaType != null) {
+            if (!single && mediaType != null) {
                 // the route reads the elements of its body argument with a reader specialized for them
                 Optional<ChunkedMessageBodyReader<Object>> reader = RouteAttributes.getRouteInfo(source)
                     .map(RouteInfo::getMessageBodyReader)
@@ -115,6 +125,28 @@ public final class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<
             return () -> Optional.of(convertPublisher(future, context));
         }
         return BindingResult.empty();
+    }
+
+    /**
+     * Bind the named component of the body, like a {@code @Body("name")} argument of the
+     * element type, or of a list of the elements for a publisher of many elements.
+     */
+    private BindingResult<Publisher<?>> bindBodyComponent(ArgumentConversionContext<Publisher<?>> context, HttpRequest<?> source,
+                                                          Argument<Object> elementType, boolean single, String bodyComponent) {
+        if (single) {
+            return bodyAnnotationBinder.bindBodyPart(context.with(elementType), source, bodyComponent)
+                .flatMap(value -> () -> Optional.of(convertPublisher(Publishers.just(value), context)));
+        }
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        Argument<Object> listType = (Argument) Argument.listOf(elementType);
+        return bodyAnnotationBinder.bindBodyPart(context.with(listType), source, bodyComponent)
+            .flatMap(value -> () -> Optional.of(convertPublisher(elements((Iterable<?>) value), context)));
+    }
+
+    private static Publisher<?> elements(Iterable<?> values) {
+        Iterator<?> iterator = values.iterator();
+        return new BodyElementsPublisher<>(BodyElements.of(() ->
+            CompletableFuture.completedFuture(iterator.hasNext() ? Optional.ofNullable(iterator.next()) : Optional.empty())));
     }
 
     private Publisher<?> convertPublisher(Publisher<?> source, ArgumentConversionContext<Publisher<?>> context) {
