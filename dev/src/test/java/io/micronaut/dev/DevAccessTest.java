@@ -80,8 +80,10 @@ class DevAccessTest {
                 }
             }
             """);
-        Files.writeString(src.resolve("PanelController.java"), """
-            package app;
+        // in the Control Panel's package, by which the launcher tells it from a route of the application's own
+        Path panel = Files.createDirectories(project.resolve("src/main/java/io/micronaut/controlpanel/ui"));
+        Files.writeString(panel.resolve("PanelController.java"), """
+            package io.micronaut.controlpanel.ui;
             @io.micronaut.http.annotation.Controller("${micronaut.control-panel.path:/control-panel}")
             public class PanelController {
                 @io.micronaut.http.annotation.Get(produces = "text/plain")
@@ -164,6 +166,64 @@ class DevAccessTest {
             assertEquals(token, runtime.access().token());
             assertEquals("200 again", status(get("/hello", local, "")));
             assertEquals("200 panel", status(get("/admin", local, header(token))));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void theApplicationsOwnRoutesAtTheDevelopmentPathsPassWithoutTheEndpointOrTheControlPanel() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args)
+                        .properties(java.util.Map.of("spec.name", "DevAccessTest", "micronaut.server.port", args[0]))
+                        .mainClass(Application.class)
+                        .start();
+                }
+            }
+            """);
+        Files.writeString(src.resolve("OwnController.java"), """
+            package app;
+            @io.micronaut.http.annotation.Controller
+            public class OwnController {
+                @io.micronaut.http.annotation.Get(value = "/dev", produces = "text/plain")
+                public String dev() { return "own dev"; }
+                @io.micronaut.http.annotation.Get(value = "/dev/status", produces = "text/plain")
+                public String status() { return "own status"; }
+                @io.micronaut.http.annotation.Get(value = "/control-panel", produces = "text/plain")
+                public String panel() { return "own panel"; }
+                @io.micronaut.http.annotation.Get(value = "/control-panel/api/beans", produces = "text/plain")
+                public String beans() { return "own beans"; }
+            }
+            """);
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Path manifestFile = project.resolve("dev.properties");
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.java.output=build/classes
+            micronaut.dev.patch-in-place=false
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[] {String.valueOf(port)});
+        try {
+            // no development endpoint and no Control Panel: nothing is guarded, without the token or from another host
+            String local = "localhost:" + port;
+            assertEquals("200 own dev", status(get("/dev", local, "")));
+            assertEquals("200 own status", status(get("/dev/status", local, "")));
+            assertEquals("200 own panel", status(get("/control-panel", local, "")));
+            assertEquals("200 own beans", status(get("/control-panel/api/beans", "rebind.attacker.example:" + port, "")));
+            // the link of the startup note does not lead to the application's own page as if it were the Control Panel
+            String notice = logged.list.stream().map(ILoggingEvent::getFormattedMessage).filter(message -> message.contains(DevModeNotice.HEADLINE))
+                .findFirst().orElseThrow();
+            assertFalse(notice.contains("/control-panel?token="), notice);
         } finally {
             runtime.close();
         }
