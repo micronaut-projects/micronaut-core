@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -80,6 +81,10 @@ final class UriRouteSet {
      * Whether a route has constraints on its path variables.
      */
     private final boolean constrained;
+    /**
+     * Whether a route has conditions on the body, see {@link UriRouteInfo#getBodyConditions()}.
+     */
+    private final boolean bodyConditioned;
     private final boolean noRoutes;
 
     private UriRouteSet(Map<HttpMethod, List<UriRouteInfo<Object, Object>>> routesByMethod,
@@ -114,6 +119,8 @@ final class UriRouteSet {
         this.hasDynamicTargets = hasDynamicTargets;
         this.constrained = customMethodMap.values().stream().flatMap(Arrays::stream)
             .anyMatch(route -> route instanceof DefaultUrlRouteInfo<?, ?> info && info.isConstrained());
+        this.bodyConditioned = customMethodMap.values().stream().flatMap(Arrays::stream)
+            .anyMatch(route -> !route.getBodyConditions().isEmpty());
         this.noRoutes = customMethodMap.isEmpty();
     }
 
@@ -218,7 +225,55 @@ final class UriRouteSet {
      * @throws DuplicateRouteException if several routes match equally closely
      */
     @Nullable <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request, @Nullable Set<Integer> ports) throws DuplicateRouteException {
-        UriRouteMatch<T, R> match = findClosestRoute(request, ports);
+        String path = request.getPath();
+        return resolveDynamic(request, closestRoute(path, request, findMatches(request, path, ports)));
+    }
+
+    /**
+     * @return Whether a route of the set has conditions on the body
+     */
+    boolean hasBodyConditions() {
+        return bodyConditioned;
+    }
+
+    /**
+     * The closest match of the request, or the matches still pending on its body, see
+     * {@link Router#findClosest(HttpRequest, Consumer)}.
+     *
+     * @param request The request
+     * @param ports   The default ports, or {@code null}
+     * @param pending Given the matches that depend on the body of the request
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The match, or {@code null} if there is none or it depends on the body
+     * @throws DuplicateRouteException if several routes match equally closely
+     */
+    @Nullable <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request,
+                                                     @Nullable Set<Integer> ports,
+                                                     Consumer<? super PendingRouteMatch<T, R>> pending) throws DuplicateRouteException {
+        if (!bodyConditioned) {
+            return findClosest(request, ports);
+        }
+        String path = request.getPath();
+        List<UriRouteMatch<T, R>> matches = findMatches(request, path, ports);
+        if (!PendingRouteMatch.anyHasBodyConditions(matches)) {
+            return resolveDynamic(request, closestRoute(path, request, matches));
+        }
+        List<List<UriRouteMatch<T, R>>> ranks = BodyFallThrough.DEFAULT.rank(request, matches);
+        if (!PendingRouteMatch.anyHasBodyConditions(ranks.get(0))) {
+            // the body does not decide: as without body conditions
+            return resolveDynamic(request, closest(path, ranks.get(0)));
+        }
+        pending.accept(new PendingRouteMatch<>(path, ranks, hasDynamicTargets ? this::resolveDynamicMatch : null));
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private @Nullable UriRouteMatch<?, ?> resolveDynamicMatch(HttpRequest<?> request, UriRouteMatch<?, ?> match) {
+        return resolveDynamic(request, (UriRouteMatch<Object, Object>) match);
+    }
+
+    private @Nullable <T, R> UriRouteMatch<T, R> resolveDynamic(HttpRequest<?> request, @Nullable UriRouteMatch<T, R> match) {
         if (hasDynamicTargets && match != null) {
             DynamicRouteTarget target = DynamicRouteTarget.of(match.getRouteInfo());
             if (target != null) {
@@ -228,9 +283,7 @@ final class UriRouteSet {
         return match;
     }
 
-    private @Nullable <T, R> UriRouteMatch<T, R> findClosestRoute(HttpRequest<?> request, @Nullable Set<Integer> ports) throws DuplicateRouteException {
-        String path = request.getPath();
-        List<UriRouteMatch<T, R>> uriRoutes = findMatches(request, path, ports);
+    private static @Nullable <T, R> UriRouteMatch<T, R> closestRoute(String path, HttpRequest<?> request, List<UriRouteMatch<T, R>> uriRoutes) throws DuplicateRouteException {
         int size = uriRoutes.size();
         if (size == 0) {
             return null;

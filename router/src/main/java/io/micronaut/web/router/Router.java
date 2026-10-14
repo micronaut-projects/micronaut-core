@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.web.router;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -25,6 +26,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -183,6 +185,53 @@ public interface Router {
         } else if (uriRoutes.size() == 1) {
             return uriRoutes.get(0);
         }
+        return null;
+    }
+
+    /**
+     * Whether a route of the router has conditions on the body, see
+     * {@link UriRouteInfo#getBodyConditions()}: then the route of a request may depend on its
+     * body, see {@link #findClosest(HttpRequest, Consumer)}.
+     *
+     * @return Whether a route has conditions on the body
+     * @since 5.3.0
+     */
+    @Internal
+    default boolean hasBodyConditions() {
+        return false;
+    }
+
+    /**
+     * Finds the closest match for the given request, like {@link #findClosest(HttpRequest)}, or
+     * the matches that depend on its body: when the closest routes of the request without its
+     * body have {@link UriRouteInfo#getBodyConditions() body conditions}, the ranked matches of
+     * the request are given to {@code pending}, and no match is returned. The server reads the
+     * body and chooses the match, see {@link PendingRouteMatch}.
+     *
+     * @param request The request
+     * @param pending Given the matches that depend on the body of the request
+     * @param <T>     The target type
+     * @param <R>     The type
+     * @return A match, or {@code null} if there is none or it depends on the body
+     * @throws DuplicateRouteException if several routes match equally closely
+     * @since 5.3.0
+     */
+    @Internal
+    default <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request,
+                                                             Consumer<? super PendingRouteMatch<T, R>> pending) throws DuplicateRouteException {
+        if (!hasBodyConditions()) {
+            return findClosest(request);
+        }
+        List<UriRouteMatch<T, R>> matches = this.<T, R>find(request, request.getPath()).toList();
+        if (matches.isEmpty()) {
+            return null;
+        }
+        List<List<UriRouteMatch<T, R>>> ranks = BodyFallThrough.DEFAULT.rank(request, matches);
+        if (!PendingRouteMatch.anyHasBodyConditions(ranks.get(0))) {
+            // the body does not decide: as without body conditions
+            return UriRouteSet.closest(request.getPath(), ranks.get(0));
+        }
+        pending.accept(new PendingRouteMatch<>(request.getPath(), ranks, null));
         return null;
     }
 

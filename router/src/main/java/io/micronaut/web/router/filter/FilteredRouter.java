@@ -94,6 +94,11 @@ public class FilteredRouter implements Router {
     }
 
     @Override
+    public boolean hasBodyConditions() {
+        return router.hasBodyConditions();
+    }
+
+    @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
         // filter before resolving the ambiguity, otherwise a route removed by the filter can hide a less specific one;
         // the decorated router filters the routes of a located target too

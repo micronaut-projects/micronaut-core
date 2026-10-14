@@ -45,6 +45,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -246,6 +247,17 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     @Override
     public @Nullable <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request) throws DuplicateRouteException {
         return routes.findClosest(request, ports.get());
+    }
+
+    @Override
+    public boolean hasBodyConditions() {
+        return routes.hasBodyConditions();
+    }
+
+    @Override
+    public <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request,
+                                                            Consumer<? super PendingRouteMatch<T, R>> pending) throws DuplicateRouteException {
+        return routes.findClosest(request, ports.get(), pending);
     }
 
     @Override

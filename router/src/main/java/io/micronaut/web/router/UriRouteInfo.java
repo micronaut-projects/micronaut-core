@@ -150,4 +150,20 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
     default List<io.micronaut.web.router.builder.RouteCondition> getConditions() {
         return List.of();
     }
+
+    /**
+     * The conditions on the body among the {@link #getConditions() conditions} of the route, see
+     * {@link io.micronaut.web.router.builder.RouteCondition.Body}. The router matches a request
+     * without its body: the routes whose body conditions decide the match are left pending, see
+     * {@link Router#findClosest(io.micronaut.http.HttpRequest, java.util.function.Consumer)}, and
+     * the server chooses among them once it read the body.
+     *
+     * @return The body conditions, empty if the route has none
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    default List<io.micronaut.web.router.builder.RouteCondition.Body<?>> getBodyConditions() {
+        return List.of();
+    }
 }

@@ -76,6 +76,8 @@ public final class RouteConditions {
     private static final int COST_REGEX = 3;
     private static final int COST_RESOLVED = 3;
     private static final int COST_CUSTOM = 4;
+    // evaluated by the server once it read the body, after the conditions of every route
+    private static final int COST_BODY = 5;
 
     private static final Comparator<RouteCondition> BY_COST = Comparator.comparingInt(RouteConditions::cost);
     private static final Comparator<ValueMatcher> MATCHERS_BY_COST = Comparator.comparingInt(RouteConditions::cost);
@@ -103,6 +105,24 @@ public final class RouteConditions {
      */
     public static List<RouteCondition> conjuncts(RouteCondition condition) {
         return condition instanceof AllOf allOf ? allOf.conditions() : List.of(condition);
+    }
+
+    /**
+     * @param condition A normalized condition
+     * @return The body conditions among the parts of the condition that must all be met, in
+     * the order they are evaluated, empty if it has none
+     */
+    public static List<RouteCondition.Body<?>> bodyConditions(RouteCondition condition) {
+        List<RouteCondition.Body<?>> bodyConditions = null;
+        for (RouteCondition part : conjuncts(condition)) {
+            if (part instanceof RouteCondition.Body<?> body) {
+                if (bodyConditions == null) {
+                    bodyConditions = new ArrayList<>(2);
+                }
+                bodyConditions.add(body);
+            }
+        }
+        return bodyConditions == null ? List.of() : List.copyOf(bodyConditions);
     }
 
     /**
@@ -138,6 +158,7 @@ public final class RouteConditions {
             case PeerAddress peerAddress -> peerAddress;
             case TimeWindow timeWindow -> timeWindow;
             case Custom custom -> custom;
+            case RouteCondition.Body<?> body -> body;
         };
     }
 
@@ -250,6 +271,7 @@ public final class RouteConditions {
             case AllOf allOf -> maxCost(allOf.conditions());
             case AnyOf anyOf -> maxCost(anyOf.conditions());
             case Custom _ -> COST_CUSTOM;
+            case RouteCondition.Body<?> _ -> COST_BODY;
         };
     }
 
@@ -302,6 +324,8 @@ public final class RouteConditions {
 
     /**
      * Whether a request meets a condition.
+     * A {@link RouteCondition.Body body condition} is met: the server evaluates it once it
+     * read the body, see {@link #bodyConditions(RouteCondition)}.
      *
      * @param condition The condition
      * @param request   The request
@@ -336,6 +360,8 @@ public final class RouteConditions {
             }
             case Not not -> !matches(not.condition(), request, context);
             case Custom custom -> custom.predicate().test(request);
+            // met by the body, which the server reads for the routes left after the other conditions
+            case RouteCondition.Body<?> _ -> true;
         };
     }
 

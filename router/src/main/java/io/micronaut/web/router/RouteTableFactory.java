@@ -141,7 +141,12 @@ public final class RouteTableFactory {
         if (!assembly.exposedPorts().isEmpty()) {
             throw new IllegalArgumentException("Located routes cannot expose ports: " + assembly.exposedPorts());
         }
-        return new DefaultRouteTable(UriRouteSet.of(assembly.uriRoutes()), targetType);
+        UriRouteSet routeSet = UriRouteSet.of(assembly.uriRoutes());
+        if (routeSet.hasBodyConditions()) {
+            // the router resolves a located route without its body
+            throw new IllegalArgumentException("Located routes cannot have body conditions, RouteCondition.body(...): " + routes);
+        }
+        return new DefaultRouteTable(routeSet, targetType);
     }
 
     /**

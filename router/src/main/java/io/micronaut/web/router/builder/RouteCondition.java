@@ -16,6 +16,7 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import org.jspecify.annotations.Nullable;
@@ -51,6 +52,14 @@ import java.util.function.Predicate;
  * the clock of the application. Conditions combine with {@link #and(RouteCondition)},
  * {@link #or(RouteCondition)} and {@link #negate()}; a lambda is a {@link #custom(Predicate)}
  * condition.</p>
+ *
+ * <p>A {@link Body} condition, see {@link #body(Class, Predicate)}, is met by the body of the
+ * request: the server reads the body, from a copy, for the routes the request matched without
+ * it, and evaluates the body conditions last, see {@link Body}. A body condition is a part every
+ * request of the route meets: a condition of a route or a group, or a part of
+ * {@link #all(RouteCondition...)} or {@link #and(RouteCondition)}. It cannot be a part of
+ * {@link #any(RouteCondition...)}, {@link #or(RouteCondition)} or {@link #negate()}, which fail
+ * with an {@link IllegalArgumentException}.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -326,6 +335,54 @@ public sealed interface RouteCondition {
     }
 
     /**
+     * A request whose body, decoded to the type, meets the predicate, e.g.
+     * {@code body(Order.class, order -> order.total() > 1000)}. The body is decoded like a
+     * {@code @Body} argument, by the message body readers of its content type; a body that does
+     * not decode, or is larger than the limit, see {@link Body#maxBytes(int)}, does not meet it.
+     *
+     * @param type      The type
+     * @param predicate The predicate, which must be fast and must not block
+     * @param <T>       The type
+     * @return The condition
+     */
+    static <T> Body<T> body(Class<T> type, Predicate<? super T> predicate) {
+        return body(Argument.of(Objects.requireNonNull(type, "type")), predicate);
+    }
+
+    /**
+     * A request whose body, decoded to the type, meets the predicate, see
+     * {@link #body(Class, Predicate)}.
+     *
+     * @param type      The type
+     * @param predicate The predicate, which must be fast and must not block
+     * @param <T>       The type
+     * @return The condition
+     */
+    static <T> Body<T> body(Argument<T> type, Predicate<? super T> predicate) {
+        return new Body<>(type, predicate, Body.SERVER_LIMIT);
+    }
+
+    /**
+     * A request whose body, as text in the charset of its content type, meets the predicate.
+     *
+     * @param predicate The predicate, which must be fast and must not block
+     * @return The condition
+     */
+    static Body<String> bodyText(Predicate<? super String> predicate) {
+        return body(Argument.STRING, predicate);
+    }
+
+    /**
+     * A request whose body, as bytes, meets the predicate.
+     *
+     * @param predicate The predicate, which must be fast and must not block
+     * @return The condition
+     */
+    static Body<byte[]> bodyBytes(Predicate<? super byte[]> predicate) {
+        return body(Argument.of(byte[].class), predicate);
+    }
+
+    /**
      * @param other Another condition, see {@link #custom(Predicate)} for a lambda
      * @return A condition met when both are
      */
@@ -354,6 +411,25 @@ public sealed interface RouteCondition {
      * @param name  The name
      * @param value The matcher of the value
      */
+    /**
+     * Checks that a part of a combination a request of the route may not meet has no body condition.
+     *
+     * @param condition   The part
+     * @param combination The combination, for the message
+     */
+    private static void requireNoBody(RouteCondition condition, String combination) {
+        if (condition instanceof Body<?>) {
+            throw new IllegalArgumentException("A body condition is met by every request of its route: it can be a part of "
+                + "all(...) or and(...), not of " + combination + ": " + condition);
+        }
+        if (condition instanceof AllOf allOf) {
+            for (RouteCondition part : allOf.conditions()) {
+                requireNoBody(part, combination);
+            }
+        }
+        // the parts of any(...) and not(...) were checked when they were created
+    }
+
     private static void requireNameAndValue(String name, ValueMatcher value) {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(value, "value");
@@ -502,6 +578,9 @@ public sealed interface RouteCondition {
     record AnyOf(List<RouteCondition> conditions) implements RouteCondition {
         public AnyOf {
             conditions = List.copyOf(conditions);
+            for (RouteCondition condition : conditions) {
+                requireNoBody(condition, "any(...) or or(...)");
+            }
         }
     }
 
@@ -513,6 +592,7 @@ public sealed interface RouteCondition {
     record Not(RouteCondition condition) implements RouteCondition {
         public Not {
             Objects.requireNonNull(condition, "condition");
+            requireNoBody(condition, "not(...) or negate()");
         }
     }
 
@@ -525,6 +605,67 @@ public sealed interface RouteCondition {
     record Custom(Predicate<? super HttpRequest<?>> predicate) implements RouteCondition {
         public Custom {
             Objects.requireNonNull(predicate, "predicate");
+        }
+    }
+
+    /**
+     * A request whose body, read as the type, meets the predicate: the body as text for
+     * {@code String}, as bytes for {@code byte[]}, and otherwise decoded by the message body
+     * readers of its content type, like a {@code @Body} argument.
+     *
+     * <p>The router matches a request without its body, and leaves the routes whose body
+     * conditions decide the match pending. The server reads the body once, without blocking, from
+     * a copy, so the chosen route still reads the body in any way, evaluates the body conditions,
+     * and chooses among the routes whose body conditions the body meets. A request whose body
+     * meets the conditions of none of its best routes falls through to the next routes, and two
+     * equally good routes whose conditions the body both meets make the request ambiguous.</p>
+     *
+     * <p>The body is held in memory, up to {@code micronaut.server.max-request-buffer-size}, or up
+     * to the lower limit of {@link #maxBytes(int)}: a larger body does not meet the condition. A
+     * limit lowers the limit of the server and cannot raise it: a route with a condition whose
+     * limit is above it fails the startup of the server.</p>
+     *
+     * @param type      The type the body is read as
+     * @param predicate The predicate, which must be fast and must not block
+     * @param maxBytes  The limit of the body, or {@link #SERVER_LIMIT} for the limit of the server
+     * @param <T>       The type
+     */
+    record Body<T>(Argument<T> type, Predicate<? super T> predicate, int maxBytes) implements RouteCondition {
+
+        /**
+         * The limit of the server for buffered request content, {@code micronaut.server.max-request-buffer-size}.
+         */
+        public static final int SERVER_LIMIT = -1;
+
+        public Body {
+            Objects.requireNonNull(type, "type");
+            Objects.requireNonNull(predicate, "predicate");
+            if (maxBytes < 0 && maxBytes != SERVER_LIMIT) {
+                throw new IllegalArgumentException("The limit of a body condition must not be negative: " + maxBytes);
+            }
+        }
+
+        /**
+         * Read at most a number of bytes of the body for this condition: a larger body does not
+         * meet it. The limit lowers the limit of the server, {@code micronaut.server.max-request-buffer-size},
+         * and cannot raise it: a route with a limit above it fails the startup of the server.
+         *
+         * @param maxBytes The limit
+         * @return The condition with the limit
+         */
+        public Body<T> maxBytes(int maxBytes) {
+            if (maxBytes < 0) {
+                throw new IllegalArgumentException("The limit of a body condition must not be negative: " + maxBytes);
+            }
+            return new Body<>(type, predicate, maxBytes);
+        }
+
+        /**
+         * @param serverLimit The limit of the server, {@code micronaut.server.max-request-buffer-size}
+         * @return The number of bytes the condition reads at most
+         */
+        public int effectiveMaxBytes(int serverLimit) {
+            return maxBytes == SERVER_LIMIT ? serverLimit : Math.min(maxBytes, serverLimit);
         }
     }
 }
