@@ -16,10 +16,12 @@
 package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.BeanDependencyGraph;
 import io.micronaut.context.reload.RetentionCriteria;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.ConfigurableBeanContext;
 import io.micronaut.context.DefaultBeanContext;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.reload.AnnotatedBeanRetentionPolicy;
 import io.micronaut.context.reload.BeanRetentionPolicy;
 import io.micronaut.context.reload.ClassChangeEvent;
@@ -28,9 +30,11 @@ import io.micronaut.context.reload.ReloadStrategy;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.context.watch.ResourceChange;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.type.Argument;
 import io.micronaut.context.reload.ClassChange;
 import io.micronaut.dev.agent.DynamicAttach;
 import io.micronaut.dev.change.ChangeSet;
@@ -50,6 +54,10 @@ import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.dev.manifest.DevReloadStrategy;
 import io.micronaut.dev.manifest.ResourceRoot;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.FieldInjectionPoint;
+import io.micronaut.inject.MethodInjectionPoint;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher;
 import io.micronaut.runtime.context.scope.refresh.RefreshResult;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
@@ -62,6 +70,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.instrument.ClassDefinition;
@@ -76,6 +85,7 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -283,7 +293,7 @@ public final class DevRuntime implements Closeable {
         Path absolute = file.toAbsolutePath().normalize();
         Path root = mostSpecificRoot(absolute);
         String relative = root != null ? root.relativize(absolute).toString() : absolute.getFileName().toString();
-        return "/" + relative.replace(java.io.File.separatorChar, '/');
+        return "/" + relative.replace(File.separatorChar, '/');
     }
 
     /**
@@ -1055,8 +1065,8 @@ public final class DevRuntime implements Closeable {
         // the singletons, and through the graph what they hold: a prototype a singleton received and keeps
         // is as stale as the singleton would be
         Set<BeanDefinition<?>> definitions = new LinkedHashSet<>();
-        Optional<io.micronaut.context.BeanDependencyGraph> graph = current instanceof ConfigurableBeanContext configurable ? configurable.findDependencyGraph() : Optional.empty();
-        for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(io.micronaut.inject.qualifiers.Qualifiers.any())) {
+        Optional<BeanDependencyGraph> graph = current instanceof ConfigurableBeanContext configurable ? configurable.findDependencyGraph() : Optional.empty();
+        for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(Qualifiers.any())) {
             BeanDefinition<?> definition = registration.getBeanDefinition();
             definitions.add(definition);
             graph.ifPresent(g -> definitions.addAll(g.transitiveDependenciesOf(definition)));
@@ -1069,8 +1079,8 @@ public final class DevRuntime implements Closeable {
                 return definition.getBeanType().getName() + " injects a changed property directly";
             }
         }
-        for (io.micronaut.inject.BeanDefinitionReference<?> reference : current.getBeanDefinitionReferences()) {
-            for (io.micronaut.core.annotation.AnnotationValue<io.micronaut.context.annotation.Requires> requires : reference.getAnnotationMetadata().getAnnotationValuesByType(io.micronaut.context.annotation.Requires.class)) {
+        for (BeanDefinitionReference<?> reference : current.getBeanDefinitionReferences()) {
+            for (AnnotationValue<Requires> requires : reference.getAnnotationMetadata().getAnnotationValuesByType(Requires.class)) {
                 String property = requires.stringValue("property").orElse(null);
                 if (property != null && change.touches(property)) {
                     return reference.getBeanDefinitionName() + " requires a changed property";
@@ -1081,58 +1091,22 @@ public final class DevRuntime implements Closeable {
     }
 
     private static boolean injectsChangedProperty(BeanDefinition<?> definition, ConfigurationChange change) {
-        for (io.micronaut.core.type.Argument<?> argument : definition.getConstructor().getArguments()) {
-            if (mentionsChangedProperty(argument.getAnnotationMetadata(), change)) {
+        for (Argument<?> argument : definition.getConstructor().getArguments()) {
+            if (change.mentions(argument.getAnnotationMetadata())) {
                 return true;
             }
         }
-        for (io.micronaut.inject.FieldInjectionPoint<?, ?> field : definition.getInjectedFields()) {
-            if (mentionsChangedProperty(field.getAnnotationMetadata(), change)) {
+        for (FieldInjectionPoint<?, ?> field : definition.getInjectedFields()) {
+            if (change.mentions(field.getAnnotationMetadata())) {
                 return true;
             }
         }
-        for (io.micronaut.inject.MethodInjectionPoint<?, ?> method : definition.getInjectedMethods()) {
-            for (io.micronaut.core.type.Argument<?> argument : method.getArguments()) {
-                if (mentionsChangedProperty(argument.getAnnotationMetadata(), change)) {
+        for (MethodInjectionPoint<?, ?> method : definition.getInjectedMethods()) {
+            for (Argument<?> argument : method.getArguments()) {
+                if (change.mentions(argument.getAnnotationMetadata())) {
                     return true;
                 }
             }
-        }
-        return false;
-    }
-
-    /**
-     * Whether an injection point names a changed property: {@code @Property(name = "key")}, or a
-     * {@code @Value} expression with a {@code ${key}} or {@code ${key:default}} placeholder.
-     */
-    static boolean mentionsChangedProperty(io.micronaut.core.annotation.AnnotationMetadata metadata, ConfigurationChange change) {
-        // the raw values: a string value read through the metadata has its placeholders resolved already
-        Object property = metadata.getValues(io.micronaut.context.annotation.Property.class.getName()).get("name");
-        if (property != null && change.touches(property.toString())) {
-            return true;
-        }
-        Object raw = metadata.getValues(io.micronaut.context.annotation.Value.class.getName()).get("value");
-        if (raw == null) {
-            return false;
-        }
-        String expression = raw.toString();
-        if (expression.contains("#{") && expression.contains("env")) {
-            // an evaluated expression reading the environment: which keys it reads is not known, so any change counts
-            return true;
-        }
-        int start = expression.indexOf("${");
-        while (start >= 0) {
-            int end = expression.indexOf('}', start);
-            if (end < 0) {
-                break;
-            }
-            String placeholder = expression.substring(start + 2, end);
-            int colon = placeholder.indexOf(':');
-            String key = (colon >= 0 ? placeholder.substring(0, colon) : placeholder).trim();
-            if (!key.isEmpty() && change.touches(key)) {
-                return true;
-            }
-            start = expression.indexOf("${", end);
         }
         return false;
     }
@@ -1325,7 +1299,7 @@ public final class DevRuntime implements Closeable {
             return;
         }
         boolean onlyCss = !changes.changed().isEmpty() && changes.deleted().isEmpty()
-            && changes.changed().stream().allMatch(path -> path.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".css"));
+            && changes.changed().stream().allMatch(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".css"));
         if (onlyCss) {
             for (Path stylesheet : changes.changed()) {
                 server.reload(publicPathOf(stylesheet), true);
