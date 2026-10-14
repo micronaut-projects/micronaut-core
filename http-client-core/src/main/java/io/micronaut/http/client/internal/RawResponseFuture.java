@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client;
+package io.micronaut.http.client.internal;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -22,6 +22,11 @@ import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.client.AsyncProxyHttpClient;
+import io.micronaut.http.client.AsyncRawHttpClient;
+import io.micronaut.http.client.ProxyHttpClient;
+import io.micronaut.http.client.RawHttpClient;
+import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;

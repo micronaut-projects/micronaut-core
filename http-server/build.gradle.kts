@@ -18,6 +18,7 @@ dependencies {
     testImplementation(libs.managed.kotlinx.coroutines.core)
     testImplementation(projects.micronautContextPropagation)
     testImplementation(projects.micronautJsonCore)
+    testImplementation(projects.micronautJacksonDatabind)
 
     testAnnotationProcessor(projects.micronautInjectJava)
     testAnnotationProcessor(platform(libs.test.boms.micronaut.validation))

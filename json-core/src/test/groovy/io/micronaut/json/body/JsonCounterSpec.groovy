@@ -1,11 +1,9 @@
-package io.micronaut.http.netty.body
+package io.micronaut.json.body
 
 import tools.jackson.core.json.JsonFactory
 import tools.jackson.core.JsonParser
 import tools.jackson.core.JsonToken
 import io.micronaut.json.JsonSyntaxException
-import io.netty.buffer.ByteBufUtil
-import io.netty.buffer.Unpooled
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
@@ -40,7 +38,8 @@ class JsonCounterSpec extends Specification {
 
         when:
         def counter = new JsonCounter()
-        counter.feed(Unpooled.wrappedBuffer(input.getBytes(StandardCharsets.UTF_8)))
+        def bytes = input.getBytes(StandardCharsets.UTF_8)
+        counter.feed(bytes, 0, bytes.length)
         then:
         !counter.isBuffering()
         counter.pollFlushedRegion() == new JsonCounter.BufferRegion(0, input.length())
@@ -56,18 +55,18 @@ class JsonCounterSpec extends Specification {
             counter.unwrapTopLevelArray()
         }
         int sectionStart = 0
-        def buf = Unpooled.wrappedBuffer(s)
+        int i = 0
         def bias = counter.position()
-        while (buf.isReadable()) {
-            counter.feed(buf)
+        while (i < s.length) {
+            i = counter.feed(s, i, s.length)
             def flushedRegion = counter.pollFlushedRegion()
             if (flushedRegion != null) {
-                parts.add(ByteBufUtil.getBytes(buf.slice((int) (flushedRegion.start() - bias), (int) (flushedRegion.end() - flushedRegion.start()))))
+                parts.add(Arrays.copyOfRange(s, (int) (flushedRegion.start() - bias), (int) (flushedRegion.end() - bias)))
             }
         }
         if (counter.isBuffering()) {
             def start = (int) (counter.bufferStart() - bias)
-            parts.add(ByteBufUtil.getBytes(buf.slice(start, buf.writerIndex() - start)))
+            parts.add(Arrays.copyOfRange(s, start, s.length))
         }
         counter.noMoreInput()
         return parts
@@ -85,15 +84,16 @@ class JsonCounterSpec extends Specification {
         }
         def pending = new ByteArrayOutputStream()
         for (int offset = 0; offset < s.length; offset += chunkSize) {
-            def buf = Unpooled.wrappedBuffer(Arrays.copyOfRange(s, offset, (int) Math.min(offset + chunkSize, s.length)))
+            def buf = Arrays.copyOfRange(s, offset, (int) Math.min(offset + chunkSize, s.length))
             def initialPosition = counter.position()
-            def bias = initialPosition - buf.readerIndex()
-            while (buf.isReadable()) {
-                counter.feed(buf)
+            def bias = initialPosition
+            int i = 0
+            while (i < buf.length) {
+                i = counter.feed(buf, i, buf.length)
                 def flushedRegion = counter.pollFlushedRegion()
                 if (flushedRegion != null) {
                     def start = Math.max(initialPosition, flushedRegion.start())
-                    def bytes = ByteBufUtil.getBytes(buf.slice((int) (start - bias), (int) (flushedRegion.end() - start)))
+                    def bytes = Arrays.copyOfRange(buf, (int) (start - bias), (int) (flushedRegion.end() - bias))
                     pending.write(bytes, 0, bytes.length)
                     parts.add(pending.toByteArray())
                     pending.reset()
@@ -101,7 +101,7 @@ class JsonCounterSpec extends Specification {
             }
             if (counter.isBuffering()) {
                 def start = (int) (Math.max(initialPosition, counter.bufferStart()) - bias)
-                def bytes = ByteBufUtil.getBytes(buf.slice(start, buf.writerIndex() - start))
+                def bytes = Arrays.copyOfRange(buf, start, buf.length)
                 pending.write(bytes, 0, bytes.length)
             }
         }
@@ -222,18 +222,16 @@ class JsonCounterSpec extends Specification {
 
     def 'non-zero reader index'() {
         when: "a buffer that only becomes legal UTF-8 JSON at its reader index"
-        def buf = Unpooled.wrappedBuffer([0, 0, 0, 0, 0x7b, 0x7d] as byte[])
-        buf.readerIndex(4)
+        def buf = [0, 0, 0, 0, 0x7b, 0x7d] as byte[]
         def counter = new JsonCounter()
-        counter.feed(buf)
+        counter.feed(buf, 4, buf.length)
 
         then: "the bytes before the reader index are not part of the input"
         counter.pollFlushedRegion() == new JsonCounter.BufferRegion(0, 2)
 
         when: "a buffer that is utf-16 at its reader index"
-        def utf16 = Unpooled.wrappedBuffer([0x78, 0x78, 0x78, 0x78, 0x22, 0x00, 0x22, 0x5b, 0x22, 0x00] as byte[])
-        utf16.readerIndex(4)
-        new JsonCounter().feed(utf16)
+        def utf16 = [0x78, 0x78, 0x78, 0x78, 0x22, 0x00, 0x22, 0x5b, 0x22, 0x00] as byte[]
+        new JsonCounter().feed(utf16, 4, utf16.length)
 
         then:
         thrown JsonSyntaxException

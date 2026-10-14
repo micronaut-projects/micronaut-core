@@ -28,43 +28,33 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.server.exceptions.UnsupportedMediaException;
 import io.micronaut.http.simple.SimpleHttpRequest;
-import io.micronaut.json.JsonMapper;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The elements of a body on a server without micronaut-http-netty, which provides the readers
- * that decode the elements of JSON one at a time: this module's tests do not have it.
+ * JSON elements on a server without micronaut-http-netty: the readers live in json-core.
  */
 class AsyncRequestBodyWithoutNettyTest {
 
     private static final ByteBodyFactory BODIES = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
 
     @Test
-    void theElementsOfJsonNeedTheChunkedJsonReader() throws Exception {
-        Throwable failure = firstElementFailure("[{\"a\":1}]", MediaType.APPLICATION_JSON_TYPE);
-
-        // not a 415: the media type is supported, the reader is missing
-        UnsupportedOperationException e = assertInstanceOf(UnsupportedOperationException.class, failure);
-        assertTrue(e.getMessage().contains("micronaut-http-netty"), e.getMessage());
-        assertTrue(e.getMessage().contains(MediaType.APPLICATION_JSON), e.getMessage());
+    void theElementsOfJsonAreReadWithoutNetty() throws Exception {
+        assertJsonElements("[{\"a\":1},{\"a\":2}]", MediaType.APPLICATION_JSON_TYPE);
     }
 
     @Test
-    void theElementsOfAJsonStreamNeedTheChunkedJsonReader() throws Exception {
-        Throwable failure = firstElementFailure("{\"a\":1}\n", MediaType.APPLICATION_JSON_STREAM_TYPE);
-
-        UnsupportedOperationException e = assertInstanceOf(UnsupportedOperationException.class, failure);
-        assertTrue(e.getMessage().contains("micronaut-http-netty"), e.getMessage());
+    void theElementsOfAJsonStreamAreReadWithoutNetty() throws Exception {
+        assertJsonElements("{\"a\":1}\n{\"a\":2}\n", MediaType.APPLICATION_JSON_STREAM_TYPE);
     }
 
     @Test
@@ -75,17 +65,26 @@ class AsyncRequestBodyWithoutNettyTest {
     }
 
     private static Throwable firstElementFailure(String content, MediaType contentType) throws Exception {
-        // a JSON mapper, which the JSON message body handler of json-core takes: this module's
-        // tests have none, and reading the elements must not use it
-        JsonMapper mapper = (JsonMapper) Proxy.newProxyInstance(JsonMapper.class.getClassLoader(), new Class<?>[]{JsonMapper.class}, (proxy, method, args) -> {
-            throw new AssertionError("Not used: " + method);
-        });
-        try (ApplicationContext ctx = ApplicationContext.builder().singletons(mapper).start();
+        try (ApplicationContext ctx = ApplicationContext.run();
              OtherServerRequest server = request(content, contentType)) {
             DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyArgumentBinder.class));
             try (BodyElements<Map> elements = body.elements(Map.class)) {
                 ExecutionException e = assertThrows(ExecutionException.class, () -> elements.next().toCompletableFuture().get(10, TimeUnit.SECONDS));
                 return e.getCause();
+            } finally {
+                body.releaseBody().toCompletableFuture().get(10, TimeUnit.SECONDS);
+            }
+        }
+    }
+
+    private static void assertJsonElements(String content, MediaType contentType) throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run();
+             OtherServerRequest server = request(content, contentType)) {
+            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyArgumentBinder.class));
+            try (BodyElements<Map> elements = body.elements(Map.class)) {
+                assertEquals(Optional.of(Map.of("a", 1)), elements.next().toCompletableFuture().get(10, TimeUnit.SECONDS));
+                assertEquals(Optional.of(Map.of("a", 2)), elements.next().toCompletableFuture().get(10, TimeUnit.SECONDS));
+                assertEquals(Optional.empty(), elements.next().toCompletableFuture().get(10, TimeUnit.SECONDS));
             } finally {
                 body.releaseBody().toCompletableFuture().get(10, TimeUnit.SECONDS);
             }

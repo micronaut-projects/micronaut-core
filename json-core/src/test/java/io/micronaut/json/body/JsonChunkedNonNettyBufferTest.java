@@ -1,4 +1,4 @@
-package io.micronaut.http.netty.body;
+package io.micronaut.json.body;
 
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -38,7 +38,7 @@ class JsonChunkedNonNettyBufferTest {
 
     @Test
     void theJsonHandlerReadsTheValuesOfBuffersThatAreNotNettyBuffers() {
-        NettyJsonHandler<Map> handler = new NettyJsonHandler<>(MAPPER);
+        JsonMessageHandler<Map> handler = new JsonMessageHandler<>(MAPPER);
         CountedBuffer first = buffer("[{\"a\":1},{\"b\"");
         CountedBuffer second = buffer(":2}]");
 
@@ -47,14 +47,14 @@ class JsonChunkedNonNettyBufferTest {
             .block();
 
         assertEquals(List.of(Map.of("a", 1), Map.of("b", 2)), values);
-        // copied into Netty buffers, and released
+        // shared with the values, not copied, and released once
         assertEquals(1, first.released);
         assertEquals(1, second.released);
     }
 
     @Test
     void theJsonStreamHandlerReadsTheValuesOfBuffersThatAreNotNettyBuffers() {
-        NettyJsonStreamHandler<Map> handler = new NettyJsonStreamHandler<>(MAPPER);
+        JsonStreamMessageHandler<Map> handler = new JsonStreamMessageHandler<>(MAPPER);
         CountedBuffer first = buffer("{\"a\":1}\n{\"b\"");
         CountedBuffer second = buffer(":2}\n");
 
@@ -69,7 +69,7 @@ class JsonChunkedNonNettyBufferTest {
 
     @Test
     void theValuesStartAtTheReaderIndexOfABuffer() {
-        NettyJsonHandler<Map> handler = new NettyJsonHandler<>(MAPPER);
+        JsonMessageHandler<Map> handler = new JsonMessageHandler<>(MAPPER);
         CountedBuffer buffer = buffer("xx[{\"a\":1}]");
         // the first two bytes were read before
         buffer.readerIndex(2);
@@ -132,7 +132,7 @@ class JsonChunkedNonNettyBufferTest {
         for (int i = 0; i < MORE_THAN_PREFETCHED; i++) {
             buffers.add(buffer("{\"a\":" + i + "}\n"));
         }
-        NettyJsonStreamHandler<Map> handler = new NettyJsonStreamHandler<>(MAPPER);
+        JsonStreamMessageHandler<Map> handler = new JsonStreamMessageHandler<>(MAPPER);
 
         Map first = Flux.from(handler.readChunked(Argument.of(Map.class), MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>fromIterable(buffers), 1024))
             .next()
@@ -168,7 +168,7 @@ class JsonChunkedNonNettyBufferTest {
     }
 
     private static Flux<Map> read(List<CountedBuffer> buffers, long maxElementSize) {
-        NettyJsonHandler<Map> handler = new NettyJsonHandler<>(MAPPER);
+        JsonMessageHandler<Map> handler = new JsonMessageHandler<>(MAPPER);
         return Flux.from(handler.readChunked(Argument.of(Map.class), MediaType.APPLICATION_JSON_TYPE, new SimpleHttpHeaders(), Flux.<ByteBuffer<?>>fromIterable(buffers), maxElementSize));
     }
 

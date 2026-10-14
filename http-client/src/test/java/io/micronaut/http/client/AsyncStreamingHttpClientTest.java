@@ -113,6 +113,23 @@ class AsyncStreamingHttpClientTest {
         return bytes.toString(StandardCharsets.UTF_8);
     }
 
+    @ParameterizedTest(autoCloseArguments = false)
+    @MethodSource("clients")
+    void ownedReadBuffersWorkForNativeAndReactiveClients(AsyncStreamingHttpClient client) throws Exception {
+        HttpResponse<BodyElements<io.micronaut.core.io.buffer.ReadBuffer>> response =
+            await(client.exchangeReadBuffers(HttpRequest.GET("/async-stream/books-array")));
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (BodyElements<io.micronaut.core.io.buffer.ReadBuffer> pieces = response.body()) {
+            await(pieces.forEach(piece -> {
+                try (piece) {
+                    bytes.writeBytes(piece.toArray());
+                }
+                return CompletableFuture.completedStage(null);
+            }));
+        }
+        assertTrue(bytes.toString(StandardCharsets.UTF_8).contains("title"));
+    }
+
     @Test
     void nettyClientIsNotTheAdapter() {
         assertFalse(((StreamingHttpClient) httpClient).toAsyncStreaming() instanceof DefaultAsyncOverReactiveStreamingHttpClient);

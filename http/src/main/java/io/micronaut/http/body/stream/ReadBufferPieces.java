@@ -54,6 +54,11 @@ final class ReadBufferPieces implements PieceReader<ReadBuffer> {
     }
 
     @Override
+    public boolean isEmpty() {
+        return pieces.isEmpty();
+    }
+
+    @Override
     public void close() {
         ReadBuffer piece;
         while ((piece = pieces.poll()) != null) {

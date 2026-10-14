@@ -34,6 +34,7 @@ import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.ResponseLifecycle;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.util.LeakPresenceDetector;
 import org.jspecify.annotations.Nullable;
@@ -89,6 +90,11 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
     @Override
     protected CloseableByteBody concatenate(Publisher<ByteBody> items) {
         return NettyConcatenatingSubscriber.concatenate(byteBodyFactory(), ConcatenatingSubscriber.Separators.NONE, items);
+    }
+
+    @Override
+    protected boolean isJsonFormattable(io.micronaut.core.type.Argument<?> type) {
+        return !ByteBuf.class.isAssignableFrom(type.getType()) && super.isJsonFormattable(type);
     }
 
     @Override

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client;
+package io.micronaut.http.client.internal;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -138,8 +138,19 @@ public final class ElementsStages {
         return future;
     }
 
+    /**
+     * Map the result of a stage. Cancelling the mapped stage cancels the source, and a result
+     * that arrives after that is discarded.
+     *
+     * @param stage   The source stage
+     * @param mapper  Maps the result
+     * @param discard Releases a result nobody reads
+     * @param <S>     The source type
+     * @param <R>     The mapped type
+     * @return The mapped stage
+     */
     @SuppressWarnings("java:S1181") // Mapper errors must fail the returned stage and release its response.
-    static <S, R extends @Nullable Object> CompletionStage<R> map(CompletionStage<S> stage,
+    public static <S, R extends @Nullable Object> CompletionStage<R> map(CompletionStage<S> stage,
                                                  Function<? super S, ? extends R> mapper,
                                                  Consumer<S> discard) {
         CompletableFuture<R> mapped = new CompletableFuture<>();

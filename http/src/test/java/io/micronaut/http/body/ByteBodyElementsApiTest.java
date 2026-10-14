@@ -33,6 +33,29 @@ class ByteBodyElementsApiTest {
     private static final ReadBufferFactory BUFFERS = ReadBufferFactory.getJdkFactory();
 
     @Test
+    void adaptingUnreadAvailablePiecesDoesNotRebuffer() throws Exception {
+        BodyElements<ReadBuffer> elements = FACTORY.adapt("hello".getBytes(StandardCharsets.UTF_8)).toReadBufferElements();
+        try (CloseableByteBody body = FACTORY.adapt(elements)) {
+            Assertions.assertInstanceOf(AvailableByteBody.class, body);
+            Assertions.assertThrows(IllegalStateException.class, elements::next);
+            elements.close(); // ownership has moved; this must not close the new body
+            try (CloseableAvailableByteBody available = body.buffer().get(10, TimeUnit.SECONDS)) {
+                Assertions.assertEquals("hello", new String(available.toByteArray(), StandardCharsets.UTF_8));
+            }
+        }
+    }
+
+    @Test
+    void adaptingPartlyReadPiecesKeepsOnlyTheRemainingBytes() throws Exception {
+        BodyElements<ReadBuffer> elements = FACTORY.adapt("hello".getBytes(StandardCharsets.UTF_8)).toReadBufferElements();
+        Assertions.assertEquals("hello", nextString(elements));
+        try (CloseableByteBody body = FACTORY.adapt(elements);
+             CloseableAvailableByteBody available = body.buffer().get(10, TimeUnit.SECONDS)) {
+            Assertions.assertEquals(0, available.toByteArray().length);
+        }
+    }
+
+    @Test
     void anAvailableBodyIsOneElement() throws Exception {
         try (BodyElements<ReadBuffer> elements = FACTORY.adapt("hello".getBytes(StandardCharsets.UTF_8)).toReadBufferElements()) {
             Assertions.assertEquals("hello", nextString(elements));

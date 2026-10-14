@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.http.client.internal.RawResponseFuture;
+
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;

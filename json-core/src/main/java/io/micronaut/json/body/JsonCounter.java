@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2023 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.netty.body;
+package io.micronaut.json.body;
 
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.json.JsonSyntaxException;
-import io.netty.buffer.ByteBuf;
 
 /**
  * This class takes in JSON data and does simple parsing to detect boundaries between json nodes.
  * For example, this class can recognize the separation between the two JSON objects in
- * {@code {"foo":"bar"} {"bar":"baz"}}.<br>
+ * {@code {"foo":"bar"} {"bar":"baz"}}. It reads plain byte arrays: the input is not bound to
+ * any buffer implementation.<br>
  * Public for fuzzing.
  */
 @SuppressWarnings({"BooleanMethodIsAlwaysInverted", "InnerAssignment"})
@@ -68,14 +68,18 @@ public final class JsonCounter {
     private BufferRegion lastFlushedRegion;
 
     /**
-     * Parse some input data. If {@code buf} is readable, this method always advances (always
+     * Parse some input data. If the range is not empty, this method always advances (always
      * consumes at least one byte).
      *
-     * @param buf The input buffer
+     * @param buf   The input bytes
+     * @param start The index of the first byte to parse
+     * @param end   The index after the last byte to parse
+     * @return The index of the first byte that was not consumed: {@code end}, or earlier when a
+     * JSON node completed, which can then be {@link #pollFlushedRegion() polled}
      * @throws JsonSyntaxException If there is a syntax error in the JSON. Note that not all syntax
      *                             errors are detected by this class.
      */
-    public void feed(ByteBuf buf) throws JsonSyntaxException {
+    public int feed(byte[] buf, int start, int end) throws JsonSyntaxException {
         if (position < 4) {
             // RFC 4627 allows JSON to be encoded as UTF-8, UTF-16 or UTF-32. It also specifies a
             // charset detection algorithm using 0x00 bytes.
@@ -86,21 +90,22 @@ public final class JsonCounter {
             // If the input is utf-16 or utf-32, one of the first four bytes will be 0. Checking
             // this separately and only for four bytes allows us to avoid the work in the hot loops
             // below.
-            int i = buf.readerIndex();
-            // only look at the bytes of this buffer that are among the first four bytes of the input
-            int end = i + Math.min(buf.readableBytes(), 4 - (int) position);
-            for (; i < end; i++) {
-                if (buf.getByte(i) == 0) {
+            // only look at the bytes of this range that are among the first four bytes of the input
+            int checkEnd = start + Math.min(end - start, 4 - (int) position);
+            for (int i = start; i < checkEnd; i++) {
+                if (buf[i] == 0) {
                     throw new JsonSyntaxException("Input must be legal UTF-8 JSON");
                 }
             }
         }
+        int i = start;
         if (!isBuffering()) {
-            proceedUntilBuffering(buf);
+            i = proceedUntilBuffering(buf, i, end);
         }
         if (isBuffering()) {
-            proceedUntilNonBuffering(buf);
+            i = proceedUntilNonBuffering(buf, i, end);
         }
+        return i;
     }
 
     /**
@@ -145,52 +150,49 @@ public final class JsonCounter {
      * Proceed until {@link #isBuffering()} becomes false.
      */
     @SuppressWarnings("java:S3776")
-    private void proceedUntilNonBuffering(ByteBuf buf) throws JsonSyntaxException {
+    private int proceedUntilNonBuffering(byte[] buf, int i, int end) throws JsonSyntaxException {
         assert isBuffering();
-        int end = buf.writerIndex();
-
-        int i = buf.readerIndex();
         while (i < end && bufferStart != -1) {
             int start = i;
             if (state == State.BASE) {
                 assert depth > 0 : depth;
                 for (; i < end; i++) {
-                    if (!skipBufferingBase(buf.getByte(i))) {
+                    if (!skipBufferingBase(buf[i])) {
                         break;
                     }
                 }
                 this.position += i - start;
                 if (i < end) {
-                    handleBufferingBaseSpecial(buf.getByte(i));
+                    handleBufferingBaseSpecial(buf[i]);
                     i++;
                     position++;
                 }
             } else if (state == State.STRING) {
                 for (; i < end; i++) {
-                    if (!skipString(buf.getByte(i))) {
+                    if (!skipString(buf[i])) {
                         break;
                     }
                 }
                 this.position += i - start;
                 if (i < end) {
-                    handleStringSpecial(buf.getByte(i));
+                    handleStringSpecial(buf[i]);
                     i++;
                     position++;
                 }
             } else if (state == State.ESCAPE) {
-                handleEscape(buf.getByte(i));
+                handleEscape(buf[i]);
                 i++;
                 position++;
             } else if (state == State.TOP_LEVEL_SCALAR) {
                 assert depth == 0 : depth;
                 for (; i < end; i++) {
-                    if (!skipTopLevelScalar(buf.getByte(i))) {
+                    if (!skipTopLevelScalar(buf[i])) {
                         break;
                     }
                 }
                 this.position += i - start;
                 if (i < end) {
-                    handleTopLevelScalarSpecial(buf.getByte(i));
+                    handleTopLevelScalarSpecial(buf[i]);
                     i++;
                     position++;
                 }
@@ -201,7 +203,7 @@ public final class JsonCounter {
                 throw new AssertionError(state);
             }
         }
-        buf.readerIndex(i);
+        return i;
     }
 
     /**
@@ -209,12 +211,10 @@ public final class JsonCounter {
      * is the case, to make the implementation simpler.
      */
     @SuppressWarnings("java:S3776")
-    private void proceedUntilBuffering(ByteBuf buf) throws JsonSyntaxException {
+    private int proceedUntilBuffering(byte[] buf, int start, int end) throws JsonSyntaxException {
         assert !isBuffering();
         assert depth == 0 : depth;
 
-        int start = buf.readerIndex();
-        int end = buf.writerIndex();
         int i = start;
 
         if (state == State.AFTER_UNWRAP_ARRAY) {
@@ -227,7 +227,7 @@ public final class JsonCounter {
             // normal path
             assert state == State.BASE || state == State.BEFORE_UNWRAP_ARRAY : state;
 
-            if (position == 0 && i < end && buf.getByte(i) == (byte) 0xef) {
+            if (position == 0 && i < end && buf[i] == (byte) 0xef) {
                 throw new JsonSyntaxException("UTF-8 BOM not allowed");
             }
 
@@ -235,7 +235,7 @@ public final class JsonCounter {
             if (unwrappingArray) {
                 i = skipWs(buf, i, end);
                 if (i < end && expectUnwrappingArrayComma) {
-                    byte b = buf.getByte(i);
+                    byte b = buf[i];
                     if (b == ',') {
                         expectUnwrappingArrayComma = false;
                         i = skipWs(buf, i + 1, end);
@@ -245,7 +245,7 @@ public final class JsonCounter {
                 }
                 // also checked right after a comma consumed above, so that a stray comma is
                 // rejected the same way whether or not it arrives in the same buffer
-                if (i < end && !expectUnwrappingArrayComma && buf.getByte(i) == ',') {
+                if (i < end && !expectUnwrappingArrayComma && buf[i] == ',') {
                     failUnexpectedComma();
                 }
             }
@@ -253,14 +253,14 @@ public final class JsonCounter {
             this.position += i - start;
 
             if (i < end) {
-                byte b = buf.getByte(i);
+                byte b = buf[i];
                 handleNonBufferingBase(b);
                 i++;
                 position++;
             }
         }
 
-        buf.readerIndex(i);
+        return i;
     }
 
     /**
@@ -270,9 +270,9 @@ public final class JsonCounter {
      * @param end The maximum index
      * @return The first non-whitespace character index, or {@code end}
      */
-    private static int skipWs(ByteBuf buf, int i, int end) {
+    private static int skipWs(byte[] buf, int i, int end) {
         for (; i < end; i++) {
-            if (!ws(buf.getByte(i))) {
+            if (!ws(buf[i])) {
                 break;
             }
         }
@@ -424,7 +424,7 @@ public final class JsonCounter {
     }
 
     /**
-     * Check for any new flushed data from the last {@link #feed(ByteBuf)} operation.
+     * Check for any new flushed data from the last {@link #feed(byte[], int, int)} operation.
      *
      * @return The region that contains a JSON node, relative to {@link #position()}, or
      * {@code null} if the JSON node has not completed yet.

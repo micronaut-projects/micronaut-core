@@ -33,7 +33,7 @@ import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.body.stream.ByteBodyElements;
 import io.micronaut.http.body.stream.PulledBodyElements;
-import io.micronaut.http.client.ElementsResponse;
+import io.micronaut.http.client.internal.ElementsResponse;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.sse.Event;

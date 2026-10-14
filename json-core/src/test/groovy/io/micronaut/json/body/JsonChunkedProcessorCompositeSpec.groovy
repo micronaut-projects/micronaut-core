@@ -1,7 +1,6 @@
-package io.micronaut.http.netty.body
+package io.micronaut.json.body
 
-import io.micronaut.core.io.buffer.ByteBuffer
-import io.micronaut.core.io.buffer.ReferenceCounted
+import io.micronaut.core.io.buffer.ReadBuffer
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.Unpooled
@@ -25,8 +24,8 @@ class JsonChunkedProcessorCompositeSpec extends Specification {
         processor.counter.unwrapTopLevelArray()
         List<String> values = []
         JsonChunkedFlux.process(processor, Flux.fromIterable(chunks)).doOnNext {
-            values << ((ByteBuffer<?>) it).toString(StandardCharsets.UTF_8)
-            ((ReferenceCounted) it).release()
+            // consumes the value, which releases it
+            values << ((ReadBuffer) it).toString(StandardCharsets.UTF_8)
         }.blockLast()
         return values
     }

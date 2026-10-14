@@ -1,6 +1,6 @@
-package io.micronaut.http.netty.body;
+package io.micronaut.json.body;
 
-import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.junit.jupiter.api.Test;
@@ -23,7 +23,7 @@ class JsonChunkedProcessorTest {
         ByteBuf input = Unpooled.copiedBuffer("{\"a\":1} {\"b\":2} {\"c\"", StandardCharsets.UTF_8);
         int[] refCntAfterCancel = new int[1];
         List<String> received = new ArrayList<>();
-        JsonChunkedFlux.process(new JsonChunkedProcessor(), Flux.just(input)).subscribe(new Subscriber<ByteBuffer<?>>() {
+        JsonChunkedFlux.process(new JsonChunkedProcessor(), Flux.just(input)).subscribe(new Subscriber<ReadBuffer>() {
             private Subscription subscription;
 
             @Override
@@ -33,10 +33,9 @@ class JsonChunkedProcessorTest {
             }
 
             @Override
-            public void onNext(ByteBuffer<?> buffer) {
-                ByteBuf buf = (ByteBuf) buffer.asNativeBuffer();
-                received.add(buf.toString(StandardCharsets.UTF_8));
-                buf.release();
+            public void onNext(ReadBuffer buffer) {
+                // consumes the value, which releases it
+                received.add(buffer.toString(StandardCharsets.UTF_8));
                 // the value is emitted while the input is processed: cancelling here releases
                 // what is buffered, not the value that was just emitted
                 subscription.cancel();
@@ -64,9 +63,7 @@ class JsonChunkedProcessorTest {
         ByteBuf second = Unpooled.copiedBuffer(":2} {\"c\":3}", StandardCharsets.UTF_8);
         List<String> received = new ArrayList<>();
         JsonChunkedFlux.process(new JsonChunkedProcessor(), Flux.just(first, second)).doOnNext(buffer -> {
-            ByteBuf buf = (ByteBuf) buffer.asNativeBuffer();
-            received.add(buf.toString(StandardCharsets.UTF_8));
-            buf.release();
+            received.add(buffer.toString(StandardCharsets.UTF_8));
         }).blockLast();
         assertEquals(List.of("{\"a\":1}", "{\"b\":2}", "{\"c\":3}"), received);
         assertEquals(0, first.refCnt());
