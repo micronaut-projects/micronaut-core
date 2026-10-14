@@ -147,13 +147,49 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
      */
     @Override
     default List<Argument<?>> getTypeClosure() {
-        Collection<Class<?>> superTypes = superTypeClosure(getBeanType());
-        List<Argument<?>> closure = new ArrayList<>(superTypes.size() + 1);
-        for (Class<?> superType : superTypes) {
-            closure.add(Argument.of(superType, getTypeArguments(superType).toArray(Argument.ZERO_ARGUMENTS)));
+        Class<T> beanType = getBeanType();
+        List<Argument<?>> closure = new ArrayList<>();
+        if (beanType.isArray()) {
+            // the arrays of the component's closure, then of fewer dimensions of what every array is
+            int dimensions = 0;
+            Class<?> component = beanType;
+            while (component.isArray()) {
+                component = component.getComponentType();
+                dimensions++;
+            }
+            List<Class<?>> componentClosure = new ArrayList<>(component.isPrimitive() ? List.of(component) : superTypeClosure(component));
+            if (!component.isPrimitive()) {
+                componentClosure.add(Object.class);
+            }
+            Set<Class<?>> arrays = new LinkedHashSet<>();
+            for (Class<?> type : componentClosure) {
+                arrays.add(arrayOf(type, dimensions));
+            }
+            for (int fewer = dimensions - 1; fewer >= 0; fewer--) {
+                for (Class<?> arrayType : new Class<?>[] {Object.class, Cloneable.class, java.io.Serializable.class}) {
+                    if (fewer > 0 || arrayType != Object.class) {
+                        arrays.add(arrayOf(arrayType, fewer));
+                    }
+                }
+            }
+            for (Class<?> array : arrays) {
+                closure.add(Argument.of(array, getTypeArguments(array).toArray(Argument.ZERO_ARGUMENTS)));
+            }
+        } else {
+            for (Class<?> superType : superTypeClosure(beanType)) {
+                closure.add(Argument.of(superType, getTypeArguments(superType).toArray(Argument.ZERO_ARGUMENTS)));
+            }
         }
         closure.add(Argument.OBJECT_ARGUMENT);
         return closure;
+    }
+
+    private static Class<?> arrayOf(Class<?> type, int dimensions) {
+        Class<?> array = type;
+        for (int i = 0; i < dimensions; i++) {
+            array = array.arrayType();
+        }
+        return array;
     }
 
     /**
