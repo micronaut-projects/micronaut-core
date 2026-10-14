@@ -337,7 +337,8 @@ final class LiveRegion {
 
     /**
      * The columns a code point takes on a terminal, as {@code wcwidth} tells: none for a combining mark, a format or
-     * control character, two for a wide or fullwidth East Asian character or an emoji, one otherwise.
+     * control character, two for a wide or fullwidth East Asian character or an emoji presented as one by default,
+     * one otherwise.
      *
      * @param codePoint The code point
      * @return 0, 1 or 2
@@ -348,7 +349,8 @@ final class LiveRegion {
             || type == Character.CONTROL) {
             return 0;
         }
-        return isWide(codePoint) ? 2 : 1;
+        // an emoji shown as one by default is wide wherever it is, as the East Asian width of Unicode 9 on tells
+        return isWide(codePoint) || Character.isEmojiPresentation(codePoint) ? 2 : 1;
     }
 
     private static boolean isWide(int codePoint) {

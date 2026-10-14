@@ -160,6 +160,11 @@ class LiveRegionTest {
         assertEquals(1, LiveRegion.columns('a'));
         assertEquals(0, LiveRegion.columns('\u0301'));
         assertEquals(2, LiveRegion.columns("😀".codePointAt(0)));
+        // emoji outside the pictograph blocks: a newer one and one in the technical symbols
+        assertEquals(2, LiveRegion.columns(0x1FA77));
+        assertEquals(2, LiveRegion.columns(0x231A));
+        // a symbol shown as text by default stays narrow
+        assertEquals(1, LiveRegion.columns(0x2764));
         assertEquals(10, LiveRegion.width("加算テスト"));
         assertEquals(4, LiveRegion.width("cafe\u0301"));
         assertEquals(3, LiveRegion.width("a😀"));
