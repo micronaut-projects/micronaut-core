@@ -43,8 +43,9 @@ class Observation:
         where:
         decorators                  | type   | value                | getter
         '@dataclass'                | 'bool' | 'self.error is None' | 'isOk'
-        '@dataclass'                | 'str'  | 'self.tool'          | 'getOk'
+        '@dataclass'                | 'str'  | 'self.tool'          | 'ok'
         '@Introspected\n@dataclass' | 'bool' | 'self.error is None' | 'isOk'
+        '@Introspected\n@dataclass' | 'str'  | 'self.tool'          | 'ok'
         '@Introspected'             | 'bool' | 'self.error is None' | 'isOk'
         ''                          | 'bool' | 'self.error is None' | 'isOk'
     }

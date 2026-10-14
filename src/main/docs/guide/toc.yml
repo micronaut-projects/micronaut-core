@@ -52,6 +52,7 @@ ioc:
     accessKind: Bean Fields
     introspectedProperty: Explicit Bean Properties
     propertyMembers: Bean Property Members
+    introspectionHierarchy: Type Hierarchy
     atCreator: Constructor Methods
     staticAtCreator: Static Creator Methods
     introspectionConstructors: Describing Constructors
@@ -205,6 +206,7 @@ httpServer:
     functionalRoutesRespond: Responses Without a Handler
     functionalRoutesBody: Reading the Request Body
     functionalRoutesForms: Forms and File Uploads
+    functionalRoutesStreaming: Server-Sent Events and Streamed Responses
     functionalRoutesGroups: Route Groups and Path Prefixes
     functionalRoutesFilters: Route, Group and Server Filters
     functionalRoutesConditions: Conditions, Order, Ports and Attributes
@@ -325,6 +327,11 @@ messaging:
   kafka: Kafka Support
   rabbitmq: RabbitMQ Support
   nats: Nats.io Support
+devMode:
+  title: Development Mode
+  devModeLaunch: Launching in Development Mode
+  devModeReload: What a Change Does
+  devModeWatch: Watching Beans, Configuration and Resources
 commandLineApps:
   title: Standalone Command Line Applications
   picocli:

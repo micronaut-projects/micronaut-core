@@ -130,6 +130,21 @@ methods of the type are reported in"
         ReflectionExecutables.targetMethod(reference) == ExecHandlers.getDeclaredMethod("register", String)
     }
 
+    void "a reference that stands for no method has no target method"() {
+        given: "a reference of a lifecycle event the bean declares no callback for"
+        def reference = [
+                getDeclaringType : { ExecHandlers },
+                getMethodName    : { "initialize" },
+                getArguments     : { [] as Argument[] },
+                getArgumentTypes : { [] as Class[] },
+                getTargetMethod  : { throw new AssertionError("not looked up") },
+                hasTargetMethod  : { false }
+        ] as MethodReference
+
+        expect:
+        ReflectionExecutables.targetMethod(reference) == null
+    }
+
     void "the exception a method throws is the exception the caller catches"() {
         given:
         def bean = new ExecThrowing()

@@ -39,6 +39,11 @@ internal class KotlinTypeArgumentElement(
     false
 ), GenericElement {
 
+    init {
+        // The dimensions of an array type argument are those of the array it resolves to
+        arrayTypeAnnotations = resolved.arrayTypeAnnotations
+    }
+
     private val resolvedTypeAnnotationMetadata: ElementAnnotationMetadata by lazy {
         class KotlinTypeArgumentElementAnnotationMetadata(
             private val typeArgumentElement: KotlinTypeArgumentElement,
@@ -87,19 +92,28 @@ internal class KotlinTypeArgumentElement(
 
     override fun getGenericNativeType() = internalGenericNativeType
 
-    override fun getAnnotationMetadataToWrite() = resolvedGenericTypeAnnotationMetadata
+    override fun getAnnotationMetadataToWrite(): MutableAnnotationMetadataDelegate<*> =
+        arrayDimensionTypeAnnotationMetadata() ?: resolvedGenericTypeAnnotationMetadata
 
     override fun getGenericTypeAnnotationMetadata() = resolvedGenericTypeAnnotationMetadata
 
-    override fun getTypeAnnotationMetadata() = resolvedTypeAnnotationMetadata
+    override fun getTypeAnnotationMetadata(): MutableAnnotationMetadataDelegate<AnnotationMetadata> =
+        arrayDimensionTypeAnnotationMetadata() ?: resolvedTypeAnnotationMetadata
 
     override fun getAnnotationMetadata() = resolvedAnnotationMetadata
 
-    override fun withArrayDimensions(arrayDimensions: Int) = KotlinTypeArgumentElement(
-        genericNativeType,
-        resolved,
-        visitorContext,
-        arrayDimensions
-    )
+    override fun withArrayDimensions(arrayDimensions: Int): KotlinClassElement {
+        if (arrayDimensions < resolved.arrayDimensions) {
+            // A component of an array type argument is not the type argument: the annotations of the occurrence
+            // belong to the array
+            return resolved.withArrayDimensions(arrayDimensions)
+        }
+        return copyArrayTypeAnnotations(KotlinTypeArgumentElement(
+            genericNativeType,
+            resolved,
+            visitorContext,
+            arrayDimensions
+        ))
+    }
 
 }

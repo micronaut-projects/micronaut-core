@@ -23,7 +23,12 @@ import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.FormFieldMetadata;
 import io.micronaut.http.multipart.RawFormField;
+import io.micronaut.http.server.multipart.ReleasingFieldPublisher;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
 import reactor.core.publisher.Sinks;
 
 import java.io.IOException;
@@ -31,7 +36,9 @@ import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -42,9 +49,10 @@ class FormDataArgumentBinderTest {
     private static final ByteBodyFactory BODY_FACTORY = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
     private static final UploadContext CONTEXT = new UploadContext(Runnable::run, BODY_FACTORY, StandardCharsets.UTF_8, 1024, Long.MAX_VALUE);
 
-    @Test
-    void fieldsQueuedBehindTheOneBeingReadAreClosedWhenTheCollectionIsCancelled() {
-        Fields fields = new Fields();
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void fieldsQueuedBehindTheOneBeingReadAreClosedWhenTheCollectionIsCancelled(boolean delegating) {
+        Fields fields = new Fields(delegating);
         FormDataArgumentBinder.Collection collection = FormDataArgumentBinder.start(CONTEXT, null, ConversionService.SHARED, fields.request());
         fields.emit("first");
         Upstream queued = fields.emit("second");
@@ -54,9 +62,10 @@ class FormDataArgumentBinderTest {
         fields.releaseAll();
     }
 
-    @Test
-    void fieldsQueuedBehindTheOneBeingReadAreClosedWhenTheBodyFails() {
-        Fields fields = new Fields();
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void fieldsQueuedBehindTheOneBeingReadAreClosedWhenTheBodyFails(boolean delegating) {
+        Fields fields = new Fields(delegating);
         FormDataArgumentBinder.Collection collection = FormDataArgumentBinder.start(CONTEXT, null, ConversionService.SHARED, fields.request());
         fields.emit("first");
         Upstream queued = fields.emit("second");
@@ -70,9 +79,10 @@ class FormDataArgumentBinderTest {
         fields.releaseAll();
     }
 
-    @Test
-    void fieldsQueuedBehindTheOneBeingReadAreClosedWhenTheRequestEnds() {
-        Fields fields = new Fields();
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void fieldsQueuedBehindTheOneBeingReadAreClosedWhenTheRequestEnds(boolean delegating) {
+        Fields fields = new Fields(delegating);
         FormDataArgumentBinder.start(CONTEXT, null, ConversionService.SHARED, fields.request());
         fields.emit("first");
         Upstream queued = fields.emit("second");
@@ -81,19 +91,43 @@ class FormDataArgumentBinderTest {
         fields.releaseAll();
     }
 
+    @Test
+    void fieldsOfAPublisherThatReleasesThemAreReadWithoutReactor() {
+        AtomicReference<Subscriber<?>> subscriber = new AtomicReference<>();
+        ReleasingFieldPublisher<RawFormField> source = subscriber::set;
+        FormCapableHttpRequest<?> request = (FormCapableHttpRequest<?>) Proxy.newProxyInstance(FormDataArgumentBinderTest.class.getClassLoader(), new Class<?>[]{FormCapableHttpRequest.class}, (proxy, method, args) -> {
+            if (method.getName().equals("getRawFormFields")) {
+                return source;
+            }
+            if (method.getName().equals("addDisposalResource")) {
+                return null;
+            }
+            throw new UnsupportedOperationException(method.getName());
+        });
+        FormDataArgumentBinder.start(CONTEXT, null, ConversionService.SHARED, request);
+        assertInstanceOf(FormFieldFlows.Concat.class, subscriber.get(), "subscribed without a Reactor operator");
+    }
+
     /**
      * Text fields whose content never ends, so that the first one is being read while the
-     * others wait.
+     * others wait. The fields come from a Reactor publisher, or from a publisher that delegates
+     * to one, which releases them with the discard hook of the subscriber too.
      */
     private static final class Fields {
         final Sinks.Many<RawFormField> sink = Sinks.many().unicast().onBackpressureBuffer();
+        final boolean delegating;
         final List<Runnable> disposal = new ArrayList<>();
         final List<ByteBodyFactory.StreamingBody> bodies = new ArrayList<>();
 
+        Fields(boolean delegating) {
+            this.delegating = delegating;
+        }
+
         FormCapableHttpRequest<?> request() {
+            Publisher<RawFormField> fields = delegating ? s -> sink.asFlux().subscribe(s) : sink.asFlux();
             return (FormCapableHttpRequest<?>) Proxy.newProxyInstance(FormDataArgumentBinderTest.class.getClassLoader(), new Class<?>[]{FormCapableHttpRequest.class}, (proxy, method, args) -> {
                 if (method.getName().equals("getRawFormFields")) {
-                    return sink.asFlux();
+                    return fields;
                 }
                 if (method.getName().equals("addDisposalResource")) {
                     disposal.add((Runnable) args[0]);

@@ -226,6 +226,11 @@ final class DefaultLocatedHttpBodyRouteSpec<T, B extends @Nullable Object> imple
     }
 
     @Override
+    public void sse(SseBodyHandler<B> handler) {
+        route.sse(handler);
+    }
+
+    @Override
     public void handle(LocatedBodyRequestHandler<T, B> handler) {
         LocatedBodyRequestHandler<T, B> checked = route.checked(handler);
         // a local: the handler keeps the reader of the target, not this spec and its builder

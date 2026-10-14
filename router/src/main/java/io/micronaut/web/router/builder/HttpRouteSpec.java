@@ -53,8 +53,8 @@ import org.jspecify.annotations.Nullable;
  *     <li><b>Body stages.</b> {@link #body(Argument)}, {@link #body()} and {@link #form()} declare
  *     the body the handler receives: the pending route becomes an {@link HttpBodyRouteSpec}, whose
  *     terminals take a handler of that body.</li>
- *     <li><b>Terminals.</b> {@link #handle(RequestHandler)}, {@link #handleAsync(AsyncRequestHandler)}
- *     and the {@code respond} methods add the route, with the settings given before. A route is
+ *     <li><b>Terminals.</b> {@link #handle(RequestHandler)}, {@link #handleAsync(AsyncRequestHandler)},
+ *     {@link #sse(SseHandler)} and the {@code respond} methods add the route, with the settings given before. A route is
  *     ended with exactly one terminal: a second one, or a setting after the terminal, fails with an
  *     {@link IllegalStateException}. A pending route with no terminal fails the startup, see
  *     {@link HttpRouteBuilder}.</li>
@@ -245,4 +245,28 @@ public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits D
      * @since 5.3.0
      */
     void respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response);
+
+    /**
+     * End the route with a server-sent events handler: the response is a
+     * {@code text/event-stream} of the events the handler pushes to its
+     * {@link io.micronaut.http.sse.SseEmitter}. The route produces {@code text/event-stream}, not
+     * the media types its group produces. A route whose handler may answer with another response,
+     * see {@link io.micronaut.http.sse.SseEmitter#respond}, declares the types of both, e.g.
+     * {@code produces(MediaType.TEXT_EVENT_STREAM_TYPE, MediaType.APPLICATION_JSON_TYPE)}. The handler does not read the body of the request, like
+     * a {@link RequestHandler}: a handler that does declares a body stage first, e.g.
+     * {@code body(Prompt.class).sse(...)}, see {@link HttpBodyRouteSpec#sse(SseBodyHandler)}.
+     *
+     * <pre>{@code
+     * routes.GET("/ticks").sse((request, pathVariables, events) -> {
+     *     Subscription subscription = ticker.onTick(tick -> events.send(Event.of(tick).id(String.valueOf(tick.sequence()))));
+     *     events.keepOpen().heartbeat(Duration.ofSeconds(15)).onClose(error -> subscription.cancel());
+     * });
+     * }</pre>
+     *
+     * @param handler The handler
+     * @throws IllegalStateException if the route was already ended, or declared media types without {@code text/event-stream} with {@code produces}
+     * @see SseHandler
+     * @since 5.3.0
+     */
+    void sse(SseHandler handler);
 }

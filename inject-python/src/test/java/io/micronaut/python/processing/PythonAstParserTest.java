@@ -2419,6 +2419,304 @@ class ProductMappers:
     }
 
     @Test
+    void testDataclassAnnotatedDataInfersMappedEntity() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from dataclasses import dataclass
+            from typing import Annotated
+            from micronaut.data.annotation import Id, GeneratedValue
+
+            @dataclass
+            class Fruit:
+                name: str
+                id: Annotated[int | None, Id, GeneratedValue] = None
+            """)) {
+            var fruit = environment.classes().get("Fruit");
+            var id = fruit.attributes().get(1);
+            assertTrue(id.decorators().stream().anyMatch(d -> d.annotationName().equals("jakarta.annotation.Nullable")));
+            assertEquals(List.of("io.micronaut.data.annotation.Id", "io.micronaut.data.annotation.GeneratedValue"),
+                id.decorators().stream().map(DecoratorDef::annotationName)
+                    .filter(name -> name.startsWith("io.micronaut.data.annotation.")).toList());
+            assertTrue(id.hasDefaultValue(), "explicit None remains a default");
+            assertNull(id.value());
+            assertTrue(fruit.decorators().stream().anyMatch(d -> d.annotationName().equals("io.micronaut.data.annotation.MappedEntity")));
+            assertFalse(fruit.decorators().stream().anyMatch(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")),
+                "MappedEntity supplies Data-specific introspection indexes");
+        }
+    }
+
+    @Test
+    void testDataclassAnnotatedDataIdentityDefaultsAndDtoControls() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            import dataclasses as dc
+            from dataclasses import dataclass as data, field as f
+            from typing import Annotated
+            from other_package import dataclass as foreign_data
+            from micronaut.data.annotation import Id, GeneratedValue, MappedEntity
+            from micronaut.core.annotation import Introspected
+            from jakarta.validation.constraints import Min
+
+            STRATEGY = "SEQUENCE"
+
+            @dc.dataclass
+            class Entity:
+                id: Annotated[int, Id, Min(0)] = dc.field(metadata={"help": object()})
+                label: str = f(default="ready")
+                tags: list[str] = f(default_factory=list)
+
+            @MappedEntity("configured")
+            @Introspected(excludes=["secret"])
+            @data
+            class Configured:
+                id: Annotated[int | None, Id, GeneratedValue(value=STRATEGY,
+                    definition="CREATE SEQUENCE fruit_seq", ref="fruit_seq")] = f(default=None)
+                secret: str = "hidden"
+
+            @data
+            class Plain:
+                id: int
+
+            @data
+            class Validated:
+                id: Annotated[int, Min(0)]
+
+            @data
+            class Metadata:
+                id: int = f(metadata={"data": {"id": True, "generated_value": True}, "third_party": object()})
+
+            @foreign_data
+            class ForeignClass:
+                id: Annotated[int, Id]
+
+            class NotDataclass:
+                id: Annotated[int, Id]
+
+            @data
+            class Outer:
+                id: int
+
+                @dc.dataclass
+                class Nested:
+                    id: Annotated[int, Id]
+            """)) {
+            var entity = environment.classes().get("Entity");
+            assertTrue(entity.decorators().stream().anyMatch(d -> d.annotationName().equals("io.micronaut.data.annotation.MappedEntity")));
+            var id = entity.attributes().getFirst();
+            assertFalse(id.hasDefaultValue());
+            assertTrue(id.decorators().stream().anyMatch(d -> d.annotationName().equals("jakarta.validation.constraints.Min")));
+            assertTrue(id.decorators().stream().anyMatch(d -> d.annotationName().equals("io.micronaut.data.annotation.Id")));
+            assertEquals("ready", entity.attributes().get(1).value());
+            assertEquals("list", entity.attributes().get(2).defaultFactoryName());
+            var configured = environment.classes().get("Configured");
+            assertEquals(1, configured.decorators().stream().filter(d -> d.annotationName().equals("io.micronaut.data.annotation.MappedEntity")).count());
+            assertEquals(List.of("secret"), configured.decorators().stream()
+                .filter(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")).findFirst().orElseThrow().members().get("excludes"));
+            var generation = configured.attributes().getFirst().decorators().stream()
+                .filter(d -> d.annotationName().equals("io.micronaut.data.annotation.GeneratedValue")).findFirst().orElseThrow();
+            assertEquals("SEQUENCE", generation.members().get("value"));
+            assertEquals("fruit_seq", generation.members().get("ref"));
+            assertEquals("CREATE SEQUENCE fruit_seq", generation.members().get("definition"));
+            for (String name : List.of("Plain", "Validated", "Metadata", "ForeignClass", "NotDataclass", "Outer")) {
+                assertFalse(environment.classes().get(name).decorators().stream()
+                    .anyMatch(d -> d.annotationName().equals("io.micronaut.data.annotation.MappedEntity")), name);
+            }
+            assertTrue(environment.classes().get("Metadata").attributes().getFirst().decorators().isEmpty(),
+                "dataclass field metadata does not declare Data annotations");
+            assertTrue(environment.classes().get("Outer").nestedClasses().getFirst().decorators().stream()
+                .anyMatch(d -> d.annotationName().equals("io.micronaut.data.annotation.MappedEntity")));
+        }
+    }
+
+    @Test
+    void testDataclassAnnotatedDataAliases() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from dataclasses import dataclass
+            from typing import Annotated
+            from micronaut.data.annotation import Id as Identity, GeneratedValue
+            import micronaut.data.annotation as data
+
+            @dataclass
+            class Called:
+                id: Annotated[int, Identity()]
+
+            @dataclass
+            class Module:
+                id: Annotated[int, data.Id]
+
+            @dataclass
+            class ModuleCalled:
+                id: Annotated[int, data.Id()]
+
+            @dataclass
+            class GeneratedOnly:
+                value: Annotated[int, GeneratedValue]
+
+            """)) {
+            for (String name : List.of("Called", "Module", "ModuleCalled", "GeneratedOnly")) {
+                assertTrue(environment.classes().get(name).decorators().stream()
+                    .anyMatch(d -> d.annotationName().equals("io.micronaut.data.annotation.MappedEntity")), name);
+            }
+            var generated = environment.classes().get("GeneratedOnly").attributes().getFirst();
+            assertFalse(generated.decorators().stream().anyMatch(d -> d.annotationName().equals("io.micronaut.data.annotation.Id")),
+                "GeneratedValue does not imply Id");
+        }
+    }
+
+    @Test
+    void testDataclassFieldMetadataIsNotAValidationDsl() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from dataclasses import dataclass, field
+
+            @dataclass
+            class Contact:
+                name: str = field(metadata={"validation": {"not_blank": True}})
+                label: str = field(default="ready", metadata={"validation": {"not_blanc": True}})
+            """)) {
+            var contact = environment.classes().get("Contact");
+            assertTrue(contact.attributes().stream().allMatch(a -> a.decorators().isEmpty()),
+                "field metadata is available to other Python libraries, not interpreted as constraints");
+            assertFalse(contact.attributes().getFirst().hasDefaultValue());
+            assertEquals("ready", contact.attributes().get(1).value());
+            assertTrue(contact.decorators().stream().anyMatch(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")));
+        }
+    }
+
+    @Test
+    void testDataclassAnnotatedValidation() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from dataclasses import dataclass, field
+            from typing import Annotated
+            from jakarta.validation.constraints import NotBlank
+
+            @dataclass
+            class Contact:
+                name: Annotated[str, NotBlank] = field(metadata={"help": "Contact name"})
+            """)) {
+            ClassDef contact = environment.classes().get("Contact");
+            var field = contact.attributes().getFirst();
+            assertEquals(List.of("jakarta.validation.constraints.NotBlank"),
+                field.decorators().stream().map(DecoratorDef::annotationName).toList());
+            assertFalse(field.hasDefaultValue(), "metadata-only field() is required");
+            assertFalse(contact.constructor().arguments().arguments().getFirst().hasDefaultValue());
+        }
+    }
+
+    @Test
+    void testDataclassFieldDefaultsAndImportIdentity() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            import dataclasses as dc
+            from dataclasses import dataclass as data, field as f
+            from other_package import field as other_field, dataclass as other_dataclass
+            from micronaut.core.annotation import Introspected as Inspect
+            from typing import Annotated
+            from jakarta.validation.constraints import NotBlank, Size, NotEmpty
+
+            SHARED_OPTIONS = {"default": "shared"}
+
+            @dc.dataclass
+            class Contact:
+                name: Annotated[str, NotBlank] = dc.field(metadata={"help": object()})
+                optional: str | None = f(default=None)
+                label: Annotated[str, Size(min=1)] = f(default="ready")
+                tags: Annotated[list[str], NotEmpty] = f(default_factory=list)
+                foreign: str = other_field(metadata={"help": "Other library"})
+
+            @data
+            class ThirdParty:
+                first: str = f(metadata=OTHER_LIBRARY_METADATA)
+                second: str = f(metadata={**OTHER_LIBRARY_METADATA})
+                third: str = f(**options)
+                fourth: str = f(**{"metadata": {"help": "Required"}})
+                fifth: str = f(**SHARED_OPTIONS)
+                sixth: str | None = f(**{"default": None})
+                seventh: str = f(**{**{"default": "nested"}})
+
+            @Inspect(excludes=["secret"])
+            @data(frozen=True)
+            class Configured:
+                secret: str
+
+            @other_dataclass
+            class Foreign:
+                name: str = f(metadata={"help": "Foreign dataclass"})
+
+            class Plain:
+                name: str = f(metadata={"help": "Plain class"})
+            """)) {
+            var contact = environment.classes().get("Contact");
+            var fields = contact.attributes();
+            assertEquals(List.of(false, true, true, true, true), fields.stream().map(a -> a.hasDefaultValue()).toList());
+            assertNull(fields.get(1).value());
+            assertEquals("ready", fields.get(2).value());
+            assertEquals("list", fields.get(3).defaultFactoryName());
+            assertTrue(fields.get(4).decorators().isEmpty(), "other libraries' field helpers do not carry Jakarta constraints");
+            assertEquals(List.of(false, true, true, true, true), contact.constructor().arguments().arguments().stream().map(a -> a.hasDefaultValue()).toList());
+            assertEquals(1, contact.decorators().stream().filter(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")).count());
+            var configured = environment.classes().get("Configured");
+            assertTrue(configured.frozenDataclass());
+            assertEquals("dataclass", configured.decorators().stream().filter(d -> d.annotationName().equals("dataclasses.dataclass")).findFirst().orElseThrow().name());
+            assertEquals(1, configured.decorators().stream().filter(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")).count());
+            assertEquals(List.of("secret"), configured.decorators().stream().filter(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")).findFirst().orElseThrow().members().get("excludes"));
+            var thirdPartyFields = environment.classes().get("ThirdParty").attributes();
+            assertTrue(thirdPartyFields.stream().noneMatch(a -> a.decorators().stream()
+                .anyMatch(d -> d.annotationName().startsWith("jakarta.validation."))));
+            assertEquals(List.of(false, false, true, false, true, true, true),
+                thirdPartyFields.stream().map(a -> a.hasDefaultValue()).toList());
+            assertFalse(thirdPartyFields.get(3).hasDefaultValue());
+            assertEquals("shared", thirdPartyFields.get(4).value());
+            assertNull(thirdPartyFields.get(5).value());
+            assertEquals("nested", thirdPartyFields.get(6).value());
+            for (String name : List.of("Foreign", "Plain")) {
+                var ordinary = environment.classes().get(name);
+                assertTrue(ordinary.decorators().stream().noneMatch(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")));
+                assertTrue(ordinary.attributes().getFirst().decorators().isEmpty());
+                assertNull(ordinary.constructor());
+            }
+        }
+    }
+
+    @Test
+    void testDataclassAnnotatedStandardConstraintCatalog() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from dataclasses import dataclass
+            from typing import Annotated
+            from jakarta.validation import Valid
+            from jakarta.validation.constraints import (
+                NotBlank, NotNull, Null, NotEmpty, Size, Min, Max, DecimalMin, DecimalMax,
+                Positive, PositiveOrZero, Negative, NegativeOrZero, Digits, Pattern, Email,
+                AssertTrue, AssertFalse, Past, PastOrPresent, Future, FutureOrPresent,
+            )
+
+            @dataclass
+            class AllConstraints:
+                value: Annotated[str,
+                    NotBlank(message="required"), NotNull, Null, NotEmpty,
+                    Size(min=1, max=20), Min(0), Max(9),
+                    DecimalMin("0.001"), DecimalMax("9.99", inclusive=False),
+                    Positive, PositiveOrZero, Negative, NegativeOrZero,
+                    Digits(integer=2, fraction=3),
+                    Pattern(regexp="[a-z]+", flags=[Pattern.Flag.CASE_INSENSITIVE]),
+                    Email(regexp=".*example.com"), AssertTrue, AssertFalse,
+                    Past, PastOrPresent, Future, FutureOrPresent, Valid]
+            """)) {
+            var decorators = environment.classes().get("AllConstraints").attributes().getFirst().decorators();
+            assertEquals(23, decorators.size());
+            assertEquals(23, decorators.stream().map(DecoratorDef::annotationName).distinct().count());
+            assertTrue(decorators.stream().allMatch(d -> d.annotationName().startsWith("jakarta.validation.")));
+            assertEquals(0, decorators.stream().filter(d -> d.name().equals("Min")).findFirst().orElseThrow().members().get("value"));
+            assertEquals("0.001", decorators.stream().filter(d -> d.name().equals("DecimalMin")).findFirst().orElseThrow().members().get("value"));
+            assertEquals(List.of("jakarta.validation.constraints.Pattern.Flag.CASE_INSENSITIVE"), decorators.stream().filter(d -> d.name().equals("Pattern")).findFirst().orElseThrow().members().get("flags"));
+            assertNull(decorators.stream().filter(d -> d.name().equals("Valid")).findFirst().orElseThrow().repeatedName());
+        }
+    }
+
+    @Test
     void testDataclassDefaultFactoryConstructorArgumentParsing() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         try (PythonEnvironment environment = pythonProcessor.parse("""

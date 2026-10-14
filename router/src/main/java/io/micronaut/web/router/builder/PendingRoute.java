@@ -25,6 +25,7 @@ import io.micronaut.web.router.RouteArguments;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -50,6 +51,10 @@ final class PendingRoute {
     private final Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes;
     private final String description;
     private final List<Consumer<HandlerRoutes>> settings = new ArrayList<>();
+    /**
+     * The media types of the last {@code produces}, or {@code null}.
+     */
+    private MediaType @Nullable [] produces;
     private boolean ended;
 
     /**
@@ -123,6 +128,40 @@ final class PendingRoute {
         return new NullPointerException(name);
     }
 
+    /**
+     * Check that the media types the route declared include the one its terminal writes, e.g. the
+     * {@code text/event-stream} of {@link HttpRouteSpec#sse}: a route that declared only others
+     * would negotiate types it does not write. It may declare others besides, for the other
+     * responses of its handler. Such a route is dropped and the terminal fails.
+     *
+     * @param mediaType The media type the terminal writes
+     * @param terminal  The name of the terminal, for the message
+     * @throws IllegalStateException if the route declared media types without this one
+     */
+    void producesIncluding(MediaType mediaType, String terminal) {
+        MediaType[] declared = produces;
+        if (declared == null) {
+            return;
+        }
+        for (MediaType type : declared) {
+            if (type.getName().equals(mediaType.getName())) {
+                return;
+            }
+        }
+        drop();
+        throw new IllegalStateException("The route " + description + " produces " + Arrays.toString(declared)
+            + ", but " + terminal + " writes " + mediaType + ": add it to produces(...), or remove produces(...)");
+    }
+
+    /**
+     * Drop the route: its terminal failed, so the startup does not fail again for a route with
+     * no terminal.
+     */
+    private void drop() {
+        ended = true;
+        builder.dropPending(this);
+    }
+
     private void addSetting(Consumer<HandlerRoutes> setting) {
         checkPending();
         settings.add(setting);
@@ -147,6 +186,7 @@ final class PendingRoute {
     void produces(MediaType[] mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
         addSetting(added -> added.produces(checked));
+        produces = checked;
     }
 
     void annotationMetadata(AnnotationMetadataProvider annotationMetadata) {

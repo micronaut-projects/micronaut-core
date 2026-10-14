@@ -28,7 +28,6 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
-import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import jakarta.inject.Singleton;
@@ -37,7 +36,6 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -59,8 +57,8 @@ public class HandlerRoutePortTest {
     @Test
     void theRoutesOfAGroupWithAPortAnswerOnThatPortOnlyLikeAControllerWithAPort() throws Exception {
         int port = SocketUtils.findAvailableTcpPort();
-        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider()
-            .getServer(SPEC_NAME, Map.of(PORT_PROPERTY, port))) {
+        try (ServerUnderTest server = PortRouteTestServer.start(SPEC_NAME, PORT_PROPERTY, port)) {
+            port = server.getApplicationContext().getProperty(PORT_PROPERTY, Integer.class).orElseThrow();
             for (String path : new String[]{"/port-routes/group", "/port-routes/group/nested", "/port-routes/route", "/port-controller"}) {
                 assertEquals(200, status(port, path), path);
                 assertEquals("ported", body(port, path), path);

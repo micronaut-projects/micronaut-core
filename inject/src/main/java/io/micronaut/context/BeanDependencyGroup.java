@@ -24,18 +24,16 @@ import io.micronaut.core.annotation.Experimental;
  * Use {@link BeanContext#createDependencyGroup()} for independent ownership or
  * {@link BeanDependencyResolver#createGroup()} to attach the group to a managed consumer.
  *
+ * <p>A group follows the lookup rules of {@link BeanDependencyResolver}: a group created before context shutdown
+ * remains usable by the {@link io.micronaut.context.event.ShutdownEvent} listeners and destruction callbacks that
+ * run on the thread performing the shutdown. What such a lookup creates is destroyed before the shutdown
+ * completes, even when the group is independent and never closed; what the group held before shutdown remains
+ * the caller's to release.</p>
+ *
  * @since 5.3.0
  */
 @Experimental
 public sealed interface BeanDependencyGroup extends BeanDependencyResolver, AutoCloseable permits DefaultBeanDependencyResolver {
-    /**
-     * Destroys and forgets a registration owned by this group. A shared registration is never destroyed.
-     * Registration identity, rather than equality of bean definitions or instances, identifies ownership.
-     * @param registration The registration
-     * @return Whether this group owned the registration
-     */
-    boolean destroy(BeanRegistration<?> registration);
-
     /**
      * Creates and owns a fresh instance of an exact definition, bypassing that bean's scope.
      * @param definition The definition

@@ -43,6 +43,11 @@ public interface DelegatingExecutableMethod<T, R> extends ExecutableMethod<T, R>
     }
 
     @Override
+    default boolean hasTargetMethod() {
+        return getTarget().hasTargetMethod();
+    }
+
+    @Override
     default ReturnType<R> getReturnType() {
         return getTarget().getReturnType();
     }

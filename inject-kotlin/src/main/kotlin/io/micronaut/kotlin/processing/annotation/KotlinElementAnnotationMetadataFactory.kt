@@ -125,9 +125,16 @@ internal class KotlinElementAnnotationMetadataFactory(
             return metadataBuilder.lookupOrBuild(
                 Key2(kotlinPlaceholderElement.genericNativeType, typeArgument),
                 KotlinAnnotations(
-                    kotlinPlaceholderElement.genericNativeType.declaration.annotations +
-                        typeArgument.annotations + (typeArgument.type?.resolve()?.annotations ?: emptySequence())
+                    typeArgument.annotations + (typeArgument.type?.resolve()?.annotations ?: emptySequence())
                 )
+            )
+        }
+        val useType = kotlinPlaceholderElement.useType
+        if (useType != null) {
+            // Only the type parameter declaration reports the type parameter's annotations
+            return metadataBuilder.lookupOrBuild(
+                Key2(kotlinPlaceholderElement.genericNativeType, useType),
+                KotlinAnnotations(useType.annotations)
             )
         }
         return metadataBuilder.lookupOrBuild(

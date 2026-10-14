@@ -39,6 +39,10 @@ class LoomCarrierGroupTest {
     }
 
     private static LoomCarrierGroup createGroup(int nThreads) {
+        return createGroup(nThreads, Integer.MAX_VALUE, Duration.ZERO); // no work spilling
+    }
+
+    private static LoomCarrierGroup createGroup(int nThreads, int workSpillThreshold, Duration workSpillMinQueueAge) {
         LoomCarrierConfiguration configuration = new LoomCarrierConfiguration(
             Duration.ofNanos(1), // one continuation per carrier loop iteration
             Duration.ofNanos(1),
@@ -46,7 +50,8 @@ class LoomCarrierGroupTest {
             Duration.ofMillis(5),
             Duration.ofSeconds(1),
             10,
-            Integer.MAX_VALUE, // no work spilling, there is only one runner anyway
+            workSpillThreshold,
+            workSpillMinQueueAge,
             0 // no warmup, every thread goes straight to the runner
         );
         LoomCarrierGroup.Factory factory = new LoomCarrierGroup.Factory(new EventLoopLoomFactory(), configuration);
@@ -169,6 +174,53 @@ class LoomCarrierGroupTest {
         release.countDown();
         thread.join(10_000);
         assertFalse(thread.isAlive());
+    }
+
+    @Test
+    void spillsWhenFallingBehind() throws Exception {
+        assertTrue(threadCreatedBehindBacklogIsSpilled(Duration.ofMillis(5)));
+    }
+
+    @Test
+    void doesNotSpillFreshBacklog() throws Exception {
+        assertFalse(threadCreatedBehindBacklogIsSpilled(Duration.ofHours(1)));
+    }
+
+    /**
+     * Queue CPU heavy virtual threads on the first of two runners, then create another thread
+     * from the IO thread of that runner once the backlog has waited for a while. The spill
+     * threshold of 1 would always spill, so only the queue age decides. The busy threads are
+     * scheduled by the first runner directly, so that they are never spilled themselves.
+     *
+     * @return whether the last thread ran on the second runner
+     */
+    private static boolean threadCreatedBehindBacklogIsSpilled(Duration minQueueAge) throws Exception {
+        assumeTrue(PrivateLoomSupport.isSupported());
+        LoomCarrierGroup twoRunners = createGroup(2, 1, minQueueAge);
+        try {
+            LoomCarrierGroup.Runner first = twoRunners.runners.get(0);
+            LoomCarrierGroup.Runner second = twoRunners.runners.get(1);
+            CompletableFuture<Boolean> onSecond = new CompletableFuture<>();
+            first.eventLoop().execute(() -> {
+                for (int i = 0; i < 4; i++) {
+                    Thread.Builder.OfVirtual builder = Thread.ofVirtual().name("busy-" + i);
+                    PrivateLoomSupport.setScheduler(builder, first);
+                    builder.start(() -> {
+                        long end = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(20);
+                        while (System.nanoTime() < end) {
+                            Thread.onSpinWait();
+                        }
+                    });
+                }
+                // runs on the IO thread once a busy thread has finished, while the others wait
+                first.eventLoop().schedule(() -> first.newThread(() -> onSecond.complete(second.isOnRunner(Thread.currentThread()))).start(),
+                    1, TimeUnit.MILLISECONDS);
+            });
+            return onSecond.get(10, TimeUnit.SECONDS);
+        } finally {
+            twoRunners.shutdownGracefully(0, 0, TimeUnit.MILLISECONDS);
+            assertTrue(twoRunners.awaitTermination(10, TimeUnit.SECONDS));
+        }
     }
 
     @Test

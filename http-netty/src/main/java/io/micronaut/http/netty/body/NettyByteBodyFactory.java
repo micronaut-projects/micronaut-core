@@ -27,6 +27,7 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
+import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -37,12 +38,13 @@ import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.util.internal.ThreadExecutorMap;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 /**
  * {@link ByteBodyFactory} implementation with netty-optimized bodies.
@@ -75,6 +77,18 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     }
 
     @Override
+    public Executor streamingBodyExecutor() {
+        // a StreamingNettyByteBody.SharedBuffer must be fed on its loop
+        return loop;
+    }
+
+    @Override
+    public boolean isEventLoopThread() {
+        // this loop, or the loop of another connection
+        return loop.inEventLoop() || ThreadExecutorMap.currentExecutor() != null;
+    }
+
+    @Override
     protected AbstractBodyAdapter createBodyAdapter(Publisher<ReadBuffer> publisher, @Nullable Runnable onDiscard) {
         return new NettyBodyAdapter(loop, publisher, onDiscard);
     }
@@ -93,7 +107,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
 
     public CloseableByteBody adapt(Publisher<ByteBuf> publisher, @Nullable HttpHeaders headersForLength, @Nullable Runnable onDiscard) {
         return adapt(
-            Flux.from(publisher).map(readBufferFactory()::adapt),
+            BodyPublishers.map(publisher, readBufferFactory()::adapt),
             BodySizeLimits.UNLIMITED, headersForLength == null ? null : new NettyHttpHeaders(headersForLength, ConversionService.SHARED),
             onDiscard);
     }
@@ -108,9 +122,8 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
         }
     }
 
-    public static Flux<ByteBuf> toByteBufs(ByteBody body) {
-        return Flux.from(body.toReadBufferPublisher())
-            .map(NettyReadBufferFactory::toByteBuf);
+    public static Publisher<ByteBuf> toByteBufs(ByteBody body) {
+        return BodyPublishers.map(body.toReadBufferPublisher(), NettyReadBufferFactory::toByteBuf);
     }
 
     public StreamingNettyByteBody.SharedBuffer createStreamingBuffer(BodySizeLimits limits, BufferConsumer.Upstream rootUpstream) {
@@ -124,6 +137,15 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
         }
         // the length first: for an available body it is a claiming operation, like the publisher
         OptionalLong expectedLength = body.expectedLength();
+        if (loop.inEventLoop() && body instanceof AvailableByteBody available) {
+            StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(BodySizeLimits.UNLIMITED, bytesConsumed -> {
+                // All bytes have arrived; there is no producer to notify about demand.
+            });
+            expectedLength.ifPresent(sb::setExpectedLength);
+            sb.add(available.toReadBuffer());
+            sb.complete(body.trailers());
+            return new StreamingNettyByteBody(sb);
+        }
         NettyBodyAdapter adapter = new NettyBodyAdapter(loop, body.toReadBufferPublisher(), null);
         StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb);

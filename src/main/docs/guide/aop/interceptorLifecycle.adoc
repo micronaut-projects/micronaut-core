@@ -161,8 +161,10 @@ target was created. During context shutdown, a singleton target or a singleton o
 before those shared interceptors. Failed selections clean up newly created dependents, and a selection racing target
 destruction cannot attach new interceptors to the destroyed target. Custom-scoped interceptors remain owned by their
 scope.
-New selections are rejected once context shutdown begins; selections already cached on a target remain available
-to destruction callbacks until that target is destroyed.
+Once context shutdown begins, new selections are only made on the thread running the shutdown, on behalf of a shutdown
+event listener or a destruction callback, including the destruction callbacks of the target itself; the interceptors
+they create are destroyed with the target. Selections already cached on a target remain available to destruction
+callbacks until that target is destroyed.
 
 An interceptor that resolves additional beans dynamically can inject api:context.BeanDependencyResolver[] to give
 those dependencies its lifetime. It uses the same ownership and failure-cleanup infrastructure as native interceptor
@@ -199,6 +201,44 @@ proxy, is intercepted with instances the context creates once for such targets. 
 --
 NOTE: An advised Python bean is proxied at run time, by a ann:aop.runtime.RuntimeProxy[], which keeps the
 interceptors it was created with, so a non-singleton interceptor is one instance per proxy.
+--
+
+[[interceptionTarget]]
+=== Knowing the Target
+
+A non-singleton interceptor created for one bean can inject api:context.InterceptionTarget[] to learn which bean
+that target is. Its `definition()` is the definition of the intercepted bean, carrying the bean's qualifier, so two
+targets of one class, such as two beans of one ann:context.annotation.EachBean[], are told apart:
+
+snippet::io.micronaut.docs.aop.lifecycle.pertarget.labelled.Channel[tags="channel", indent=0, title="Two targets of one class"]
+
+<1> One `Channel` for each configured channel, each with the name of its configuration as qualifier
+
+snippet::io.micronaut.docs.aop.lifecycle.pertarget.labelled.LabelInterceptor[tags="imports,interceptor", indent=0, title="An interceptor that knows its target"]
+
+<1> The bean this instance is created for, injected like any other dependency
+<2> The qualifier of that bean, `@Named("sms")` for the `sms` channel
+
+snippet::io.micronaut.docs.aop.lifecycle.pertarget.labelled.LabelInterceptorTest[tags="test", indent=0, title="Each target is labelled with its own qualifier"]
+
+The target is known only to the interceptor's own injection points, not to the beans the interceptor depends on. It
+is not known to a singleton or custom-scoped interceptor, which is shared, or to an interceptor obtained by a plain
+lookup; an injection point declared `@Nullable` receives `null` in those cases and any other fails with a
+`NoSuchBeanException`.
+
+[.lang-java.lang-groovy.lang-kotlin]
+--
+The target is known whenever the container creates the interceptor for a bean: while the bean itself is created, to
+intercept its construction or lifecycle, and when a proxy with `lazyInterceptorsPerTarget` resolves the interceptors of
+a target on its first call. It is not known to the interceptors a proxy creates for a target the context holds no
+registration for. Without `lazyInterceptorsPerTarget` the interceptors of a proxy are injected into the proxy as
+ordinary dependencies, and do not know the target either.
+--
+
+[.lang-python]
+--
+An advised Python bean is a runtime proxy, which creates its interceptors as the bean is created, so each one knows the
+bean without `lazyInterceptorsPerTarget`.
 --
 
 == Ordering
