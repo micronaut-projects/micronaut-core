@@ -175,6 +175,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
      * @param precalculatedInfo           The precalculated info
      * @since 5.3.0
      */
+    @UsedByGeneratedCode
     protected AbstractInitializableBeanDefinition(
             Class<T> beanType,
             @Nullable MethodOrFieldReference constructor,
