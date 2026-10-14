@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.python.annotation.processing.test.javabases.BoxedOverloadedBase
 import io.micronaut.python.annotation.processing.test.javabases.OverloadedBase
 import io.micronaut.python.annotation.processing.test.javabases.RoutingBase
 
@@ -107,7 +108,7 @@ class AmbiguousAcceptor(AssignableOverloadedBase):
         e.message.contains('Python method [accept] of class [AmbiguousAcceptor] matches several overloads of [io.micronaut.python.annotation.processing.test.javabases.AssignableOverloadedBase]')
         e.message.contains('accept(java.util.Collection)')
         e.message.contains('accept(java.lang.Iterable)')
-        e.message.contains('The type hints of the Python method are [accept(values: java.util.ArrayList)]')
+        e.message.contains('The type hints of the Python method are [accept(values: java.util.ArrayList[str])]')
         e.message.contains('narrow the type hint')
     }
 
@@ -131,7 +132,7 @@ class AnyRenderer(OverloadedBase):
         e.message.contains('render(java.lang.String)')
         e.message.contains('render(java.util.List)')
         e.message.contains('The type hints of the Python method are [render(values)]')
-        e.message.contains('type hint')
+        e.message.contains('Python has no overloading: add a type hint to name the parameter types')
     }
 
     void 'a base method named with $ is left out and a Python class selects the overload taking a Class'() {
@@ -190,6 +191,60 @@ class UnrelatedRenderer(OverloadedBase):
         then: 'the message names no match and the hint that was seen'
         def e = thrown(RuntimeException)
         e.message.contains('Python method [render] of class [UnrelatedRenderer] matches none of the overloads of [io.micronaut.python.annotation.processing.test.javabases.OverloadedBase]')
-        e.message.contains('The type hints of the Python method are [render(values: ')
+        e.message.contains('The type hints of the Python method are [render(values: int)]')
+        e.message.contains('Python has no overloading: change the type hints to name the parameter types')
+    }
+
+    void "a type hint selects the overload it names without boxing when the base declares both"() {
+        given:
+        def context = buildContext("""
+from jakarta.inject import Singleton
+${pythonImport}
+from io.micronaut.python.annotation.processing.test.javabases import BoxedOverloadedBase
+
+
+@Singleton
+class BoxedDescriber(BoxedOverloadedBase):
+
+    def describe(self, value: ${hint}) -> str:
+        return "python:" + str(value)
+""")
+        BoxedOverloadedBase bean = getBean(context, "python.BoxedDescriber") as BoxedOverloadedBase
+
+        expect: 'the stub declares only the overload the hint names'
+        bean.class.declaredMethods.findAll { it.name == "describe" && !it.bridge }*.parameterTypes == [[selected] as Class[]]
+
+        and: 'the named overload runs the Python method, the other keeps its inherited implementation'
+        BoxedOverloadedBase.getMethod("describe", selected).invoke(bean, 1) == "python:1"
+        BoxedOverloadedBase.getMethod("describe", other).invoke(bean, 1) == inherited
+
+        cleanup:
+        context?.close()
+
+        where:
+        hint      | pythonImport                    | selected  | other     | inherited
+        'int'     | ''                              | int.class | Integer   | 'integer:1'
+        'Integer' | 'from java.lang import Integer' | Integer   | int.class | 'int:1'
+    }
+
+    void "a Python method hinting only some parameters is told to add or change its hints"() {
+        when:
+        buildContext('''
+from jakarta.inject import Singleton
+from io.micronaut.python.annotation.processing.test.javabases import TwoParameterOverloadedBase
+
+
+@Singleton
+class PartlyHintedJoiner(TwoParameterOverloadedBase):
+
+    def join(self, prefix: str, values) -> str:
+        return "python"
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains('Python method [join] of class [PartlyHintedJoiner] matches none of the overloads of [io.micronaut.python.annotation.processing.test.javabases.TwoParameterOverloadedBase]')
+        e.message.contains('The type hints of the Python method are [join(prefix: str, values)]')
+        e.message.contains('Python has no overloading: add or change the type hints to name the parameter types')
     }
 }
