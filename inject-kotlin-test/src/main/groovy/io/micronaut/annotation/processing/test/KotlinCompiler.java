@@ -90,7 +90,7 @@ public class KotlinCompiler {
         KotlinCompilation compilation = new KotlinCompilation();
         compilation.setJvmDefault(jvmDefaultMode);
         Ksp2Kt.useKsp2(compilation);
-        compilation.setLanguageVersion("2.0");
+        compilation.setLanguageVersion("2.4");
         compilation.setKotlincArguments(Arrays.asList("-Xsuppress-version-warnings", "-Xannotation-default-target=first-only"));
         List<File> classpath = new ArrayList<>();
         classpath.add(new File(compilation.getWorkingDir(), "ksp/classes"));
