@@ -29,6 +29,7 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.codec.CodecException;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -55,13 +56,21 @@ class ResponseLifecycleWriteErrorTest {
     static final class Failing {
     }
 
+    static final class CodecFailing {
+    }
+
     static final RuntimeException WRITE_FAILURE = new IllegalStateException("write failed");
+
+    static final CodecException CODEC_FAILURE = new CodecException("encoding failed");
 
     static final MessageBodyWriter<Object> WRITER = new MessageBodyWriter<>() {
         @Override
         public void writeTo(Argument<Object> type, MediaType mediaType, Object object, MutableHeaders outgoingHeaders, OutputStream outputStream) {
             if (object instanceof Failing) {
                 throw WRITE_FAILURE;
+            }
+            if (object instanceof CodecFailing) {
+                throw CODEC_FAILURE;
             }
             try {
                 outputStream.write(object.toString().getBytes(StandardCharsets.UTF_8));
@@ -132,6 +141,19 @@ class ResponseLifecycleWriteErrorTest {
             assertEquals("handled", text(result));
         }
         assertEquals(List.of(WRITE_FAILURE), handled);
+    }
+
+    @Test
+    void handlerResponseReplacesTheOneWhoseWriterFailedWithACodecException() throws Exception {
+        List<Throwable> handled = new ArrayList<>();
+        try (ByteBodyHttpResponse<?> result = encode(HttpResponse.ok(new CodecFailing()).contentType(MediaType.TEXT_PLAIN_TYPE), e -> {
+            handled.add(e);
+            return ExecutionFlow.just(HttpResponse.status(HttpStatus.I_AM_A_TEAPOT).body("handled").contentType(MediaType.TEXT_PLAIN_TYPE));
+        })) {
+            assertEquals(418, result.code());
+            assertEquals("handled", text(result));
+        }
+        assertEquals(List.of(CODEC_FAILURE), handled);
     }
 
     @Test

@@ -15,6 +15,10 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.Experimental;
+
+import java.util.Optional;
+
 /**
  * Extends {@link BeanContext} interface and allows the bean context to be configured but not started.
  *
@@ -35,4 +39,17 @@ public interface ConfigurableBeanContext
      * @see #start()
      */
     void configure();
+
+    /**
+     * The graph of which bean received which, recorded when the context was configured to
+     * {@link BeanContextConfiguration#beanDependencyTrackingEnabled() track dependencies}. For a development
+     * launcher and the modules that rebuild state on a reload, not for application code.
+     *
+     * @return The graph, or empty when the context does not record it
+     * @since 5.3.0
+     */
+    @Experimental
+    default Optional<BeanDependencyGraph> findDependencyGraph() {
+        return Optional.empty();
+    }
 }
