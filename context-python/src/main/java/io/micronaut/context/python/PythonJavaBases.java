@@ -22,6 +22,7 @@ import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayDeque;
@@ -40,9 +41,10 @@ import java.util.Set;
  * (created by {@link #baseClass}) that records the arguments of {@code super().__init__(...)} and
  * defines a Python method for every accessible instance method of the Java base. Those methods
  * reach the base implementation through the Java instance bound to the Python object
- * ({@link #bind}), which the generated constructors create from the recorded arguments. A Python
- * object created in Python code gets its Java instance the first time an inherited method is
- * called.
+ * ({@link #bind}), which the generated constructors create from the recorded arguments; when the
+ * Java super constructor takes no argument, they create it before {@code __init__} runs, so the
+ * inherited methods {@code __init__} calls reach it. A Python object created in Python code gets
+ * its Java instance the first time an inherited method is called.
  *
  * @author Micronaut Team
  * @since 5.2.0
@@ -94,9 +96,11 @@ public final class PythonJavaBases {
      * @param name The method name
      * @param arguments The Python arguments
      * @return The result, converted for Python
+     * @throws Exception The checked exception the base method declares, raised in Python as a host exception
      */
+    @SuppressWarnings("java:S112") // the base method may declare any checked exception
     @UsedByGeneratedCode
-    public static @Nullable Object invoke(Value self, String name, Value arguments) {
+    public static @Nullable Object invoke(Value self, String name, Value arguments) throws Exception {
         ValueCoercible.JavaBaseMembers javaInstance = javaInstance(self);
         int count = (int) arguments.getArraySize();
         List<Value> values = new ArrayList<>(count);
@@ -201,6 +205,60 @@ public final class PythonJavaBases {
     }
 
     /**
+     * Whether the trailing Python arguments, from the given index, are accepted by the varargs
+     * parameter of a Java base method: each one is an element of the component type, or the single
+     * trailing argument is already an array of it.
+     *
+     * @param arguments The Python arguments
+     * @param from The index of the first argument of the varargs parameter
+     * @param componentType The component type of the varargs parameter
+     * @return Whether the arguments are accepted
+     */
+    @UsedByGeneratedCode
+    public static boolean matchesVarargs(List<Value> arguments, int from, Class<?> componentType) {
+        if (arrayArgument(arguments, from, componentType) != null) {
+            return true;
+        }
+        for (int i = from; i < arguments.size(); i++) {
+            if (!ValueCoercibles.matchesArgument(arguments.get(i), componentType)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The array a varargs parameter of a Java base method receives for the trailing Python
+     * arguments, from the given index: each one converted to the component type, or the single
+     * trailing argument when it is already an array of it, as in a Java call.
+     *
+     * @param arguments The Python arguments
+     * @param from The index of the first argument of the varargs parameter
+     * @param componentType The component type of the varargs parameter
+     * @return The array, typed with the component type
+     */
+    @UsedByGeneratedCode
+    public static Object varargs(List<Value> arguments, int from, Class<?> componentType) {
+        Object array = arrayArgument(arguments, from, componentType);
+        if (array != null) {
+            return array;
+        }
+        int length = Math.max(arguments.size() - from, 0);
+        array = Array.newInstance(componentType, length);
+        for (int i = 0; i < length; i++) {
+            Array.set(array, i, PythonConversion.convertValue(arguments.get(from + i), componentType));
+        }
+        return array;
+    }
+
+    private static @Nullable Object arrayArgument(List<Value> arguments, int from, Class<?> componentType) {
+        if (arguments.size() != from + 1) {
+            return null;
+        }
+        return ValueCoercibles.hostObject(arguments.get(from), componentType.arrayType());
+    }
+
+    /**
      * The error for a call of a Java base method that no accessible overload of the base accepts;
      * thrown by the generated {@code micronautInvokeJavaBaseMethod}.
      *
@@ -234,8 +292,7 @@ public final class PythonJavaBases {
             return members;
         }
         throw new IllegalStateException("Python object of class [" + className(self)
-            + "] has no Java instance of its Java base class: the Java instance is created after __init__ returns, "
-            + "so inherited Java methods cannot be called from __init__");
+            + "] has no Java instance of its Java base class");
     }
 
     private static @Nullable Object boundInstance(Value pythonObject) {
@@ -273,7 +330,8 @@ public final class PythonJavaBases {
                 // a generic method (toArray(T[])) is not reachable through the generated dispatcher either
                 continue;
             }
-            if (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)) {
+            // no Python name can call a method whose name contains $, which the dispatcher leaves out
+            if ((Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)) && method.getName().indexOf('$') < 0) {
                 names.add(method.getName());
             }
         }

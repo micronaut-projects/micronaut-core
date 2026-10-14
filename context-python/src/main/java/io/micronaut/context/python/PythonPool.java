@@ -16,8 +16,11 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.env.Environment;
+import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
+import io.micronaut.context.event.StartupEvent;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
@@ -50,6 +53,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
@@ -59,13 +63,44 @@ import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
  * <p>
  * The first context (primary) is created synchronously and is not part of the pool. It is exposed
  * via {@link PythonContextRuntime#getContext()} and used for non-pooled operations. Remaining pooled
- * contexts are created lazily by generated bridge calls that borrow from the pool.
+ * contexts are created lazily by generated bridge calls that borrow from the pool, except for the
+ * {@link PythonPoolConfiguration#prestart() pre-started} ones, which a background thread creates once
+ * the application has started.
  */
 @Singleton
 @io.micronaut.context.annotation.Context
 @Internal
-final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListener<Context>, GracefulShutdownCapable, Ordered {
+final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListener<Context>, GracefulShutdownCapable, Ordered,
+    ApplicationEventListener<StartupEvent> {
+    /**
+     * The name of the thread that pre-starts pooled contexts.
+     */
+    static final String PRESTART_THREAD_NAME = "python-pool-prestart";
+
     private static final Logger LOG = LoggerFactory.getLogger(PythonPool.class);
+
+    /**
+     * Contexts to pre-start when none is configured, outside the test environment: enough for the
+     * first request not to wait for a context to initialize, without making an idle application
+     * pay for a pool it may never fill.
+     */
+    private static final int DEFAULT_PRESTART = 1;
+
+    /**
+     * Processors per pooled context when no size is configured. See {@link #computeDefaultSize()}.
+     */
+    private static final int PROCESSORS_PER_CONTEXT = 2;
+
+    /**
+     * The fewest contexts to default to. One context serialises every Python call and is
+     * markedly slower than a few.
+     */
+    private static final int MIN_DEFAULT_SIZE = 2;
+
+    /**
+     * The most contexts to default to, however many processors there are.
+     */
+    private static final int MAX_DEFAULT_SIZE = 8;
     private final Engine engine;
     private final HostAccess hostAccess;
     private final ApplicationContext applicationContext;
@@ -96,7 +131,11 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     private final AtomicBoolean gracefulShutdownStarted = new AtomicBoolean();
     private final CompletableFuture<Void> gracefulShutdown = new CompletableFuture<>();
     private final int targetSize;
+    private final int prestart;
     private volatile boolean closed;
+    /** Set once the application stops: no context is pre-started after it; guarded by this. */
+    private boolean prestartStopped;
+    private final AtomicReference<@Nullable Thread> prestartThread = new AtomicReference<>();
 
     /**
      * Create the pool coordinator around the primary context and shared engine.
@@ -128,11 +167,102 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         int configuredPoolSize = configuration.size();
         this.warnThreshold = configuration.warnWait();
         this.targetSize = configuration.enabled() ? (configuredPoolSize > 0 ? configuredPoolSize : computeDefaultSize()) : 0;
+        this.prestart = prestartCount(configuration.prestart(), targetSize,
+            applicationContext.getEnvironment().getActiveNames().contains(Environment.TEST));
     }
 
+    /**
+     * The number of pooled contexts to create once the application has started.
+     * <p>
+     * Unless configured, one outside the test environment and none in it: a test suite starts and stops
+     * many applications, most of which never borrow a pooled context, and a context being built competes
+     * with the tests for processors.
+     *
+     * @param configured The configured number, or {@code null} for the default
+     * @param targetSize The pool size, {@code 0} when pooling is disabled
+     * @param testEnvironment Whether the test environment is active
+     * @return The number of contexts to pre-start, at most the pool size
+     */
+    static int prestartCount(@Nullable Integer configured, int targetSize, boolean testEnvironment) {
+        int requested;
+        if (configured != null) {
+            requested = configured;
+        } else {
+            requested = testEnvironment ? 0 : DEFAULT_PRESTART;
+        }
+        return Math.clamp(requested, 0, Math.max(targetSize, 0));
+    }
+
+    /**
+     * The pool size to use when none is configured.
+     *
+     * <p>Scaled down from the processor count and capped, rather than multiplied up. The
+     * previous default of {@code processors * 2} grew with core count, so a larger machine
+     * made it worse rather than better, and it sat past the point where more contexts stop
+     * paying for themselves on every workload measured.
+     *
+     * <p>How far down to scale depends on something this release changes. A Python bean
+     * that is not itself pooled is a single instance living in one context, so the more
+     * contexts there are, the smaller the share of requests served on the one that owns it
+     * -- and until a pooled type could take constructor arguments, a service with a
+     * dependency could not be pooled. Measured that way, on a 12-core machine and 32
+     * concurrent clients against a paged read of 20 rows, throughput peaked at 3 and fell
+     * away: 1,240 at 3, 899 at 6, 847 at 24.
+     *
+     * <p>With the services pooled the relationship inverts, because contexts now add
+     * concurrency instead of dividing the traffic reaching one of them. The same
+     * application and load, re-measured:
+     *
+     * <table>
+     *   <caption>Throughput by pool size, services pooled</caption>
+     *   <tr><th>size</th><td>3</td><td>4</td><td>6</td><td>8</td><td>12</td><td>16</td></tr>
+     *   <tr><th>paged read</th><td>1511</td><td>1948</td><td>2205</td><td>1609</td><td>1423</td><td>1407</td></tr>
+     *   <tr><th>keyed read</th><td>9191</td><td>10873</td><td>13336</td><td>15603</td><td>17581</td><td>16510</td></tr>
+     *   <tr><th>write</th><td>2854</td><td>3126</td><td>3668</td><td>3986</td><td>3611</td><td>3467</td></tr>
+     * </table>
+     *
+     * <p>Three peaks in three places -- 6, 12 and 8 -- and they order by how much Python
+     * work a request does: the paged read builds 20 objects per response and turns over
+     * soonest, the keyed read does almost nothing per request and keeps gaining. So there
+     * is no one right answer, and this picks the best compromise rather than any peak. Of
+     * the sizes measured, 6 is the only one within 25% of every scenario's own best, and it
+     * is what {@code processors / 2} yields on that machine.
+     *
+     * <p>Choosing 6 over 8 rests on the paged read falling away between them, so that pair was
+     * measured twice: 2,205 and 2,193 at 6 against 1,609 and 1,437 at 8. The fall is real and
+     * steeper than one run suggested.
+     *
+     * <p>Which is also the limit of what the cap can do. From sixteen processors up the default
+     * is 8, and 8 is where the paged read measured 1,609 and 1,437 against about 2,200 at 6 --
+     * so on a larger machine the heavier workload sits 27% to 35% below its own best. That is not
+     * a reason to lower the cap on this evidence: the same table has the keyed read still gaining
+     * at 12, so a lower cap would move the shortfall onto the lighter workload rather than remove
+     * it. Which way it should go depends on whether the peak travels with the core count or stays
+     * near an absolute number, and one machine cannot say. A workload of either shape on a large
+     * machine should set {@code micronaut.python.pool.size} and measure.
+     *
+     * <p>One machine, one application, and one run per point except that pair: the shape --
+     * small, capped, not linear in core count -- is better supported than the constant, and
+     * {@code processors / 2} is a curve fitted to twelve cores rather than a law. A workload
+     * doing more Python work per request wants fewer contexts and one doing less wants more;
+     * that is what {@code micronaut.python.pool.size} is for, and a workload sensitive to it
+     * should measure rather than trust this.
+     *
+     * @return The default pool size
+     */
     private static int computeDefaultSize() {
-        int processors = Runtime.getRuntime().availableProcessors();
-        return Math.max(1, processors * 2);
+        return defaultSizeForProcessors(Runtime.getRuntime().availableProcessors());
+    }
+
+    /**
+     * The default pool size for a processor count. Separated from {@link #computeDefaultSize()}
+     * so that the arithmetic can be exercised for machines other than the one running the test.
+     *
+     * @param processors The number of available processors
+     * @return The default pool size
+     */
+    static int defaultSizeForProcessors(int processors) {
+        return Math.min(MAX_DEFAULT_SIZE, Math.max(MIN_DEFAULT_SIZE, processors / PROCESSORS_PER_CONTEXT));
     }
 
     @Override
@@ -163,6 +293,133 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         }
         runtime.pool(this);
         cache.put(primaryContext, new ConcurrentHashMap<>());
+    }
+
+    /**
+     * Pre-start the configured number of pooled contexts on a background thread once the application
+     * has started, so the first requests find a context ready rather than paying for its initialization.
+     *
+     * @param event The startup event
+     */
+    @Override
+    public void onApplicationEvent(StartupEvent event) {
+        if (prestart <= 0 || runtime.pool() != this) {
+            // pre-starting is off, or there is no pool: pooling is disabled or the context is reused
+            return;
+        }
+        Thread thread = Thread.ofPlatform()
+            .name(PRESTART_THREAD_NAME)
+            .daemon(true)
+            .unstarted(this::prestartContexts);
+        thread.setContextClassLoader(applicationContext.getClassLoader());
+        prestartThread.set(thread);
+        thread.start();
+    }
+
+    /**
+     * The thread pre-starting contexts, while it runs or after it finished.
+     *
+     * @return The thread, or {@code null} when nothing was pre-started
+     */
+    @Nullable Thread prestartThread() {
+        return prestartThread.get();
+    }
+
+    private void prestartContexts() {
+        long start = System.nanoTime();
+        int created = 0;
+        try {
+            // bounded: an event loop that takes a pooled context lowers the count again
+            while (created < prestart && prestartContext()) {
+                created++;
+            }
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Pre-started {} pooled Python context(s) in {}ms", created, Duration.ofNanos(System.nanoTime() - start).toMillis());
+            }
+        } catch (RuntimeException e) {
+            if (isPrestartStopped()) {
+                LOG.debug("Pre-starting pooled Python contexts stopped by shutdown", e);
+            } else {
+                // not fatal: requests create the contexts they need on demand, as without pre-starting
+                LOG.warn("Failed to pre-start a pooled Python context; contexts are created on demand instead", e);
+            }
+        }
+    }
+
+    /**
+     * Create one pooled context and make it available, unless the pool already holds as many as are
+     * pre-started (a request may have created one first) or the application is stopping.
+     * <p>
+     * The context is created through the same single creation slot as a borrow, so a request that
+     * arrives while it is being created waits for it and then borrows it, rather than creating another.
+     *
+     * @return Whether a context was created
+     */
+    private boolean prestartContext() {
+        synchronized (this) {
+            while (true) {
+                if (prestartStopped || closed || gracefulShutdownStarted.get() || size.get() >= prestart) {
+                    return false;
+                }
+                if (creatingContext == null) {
+                    creatingContext = Thread.currentThread();
+                    break;
+                }
+                try {
+                    // a request is creating a context; it may be all the pool needs
+                    wait();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+        }
+        Context created = null;
+        try {
+            created = createBorrowedPooledContext(true);
+            if (created != null) {
+                warmUp(created);
+            }
+        } finally {
+            synchronized (this) {
+                creatingContext = null;
+                // a closing pool has the context in its snapshot and closes it
+                if (created != null && !closed) {
+                    pooledQueue.add(created);
+                }
+                notifyAll();
+            }
+        }
+        return created != null;
+    }
+
+    /**
+     * Do the work every context does on its first borrow, ahead of it: import the runtime module the
+     * bridge calls go through, which imports {@code asyncio} and other modules that are slow to load.
+     * Measured on a small application this was most of the first request, far more than building the
+     * context. A failure leaves the context as a borrow would find it, so the borrow imports it again.
+     *
+     * @param context The pre-started context, not yet available to borrowers
+     */
+    private void warmUp(Context context) {
+        long start = System.nanoTime();
+        try {
+            PythonContextRegistry.withExecutionFrame(context, () -> PythonContextRuntime.helper(context, "__micronaut_import_module"));
+        } catch (RuntimeException e) {
+            if (isPrestartStopped()) {
+                LOG.debug("Warming up a pre-started Python context stopped by shutdown", e);
+            } else {
+                LOG.warn("Failed to warm up a pre-started Python context; its first borrow does instead", e);
+            }
+            return;
+        }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Warmed up pre-started Python context in {}ms", Duration.ofNanos(System.nanoTime() - start).toMillis());
+        }
+    }
+
+    private synchronized boolean isPrestartStopped() {
+        return prestartStopped || closed;
     }
 
     /**
@@ -232,6 +489,85 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     }
 
     /**
+     * @return The application context the pool was built with
+     */
+    ApplicationContext applicationContext() {
+        return applicationContext;
+    }
+
+    /**
+     * Borrow a context, hand it to the callback, and release it after the callback completes.
+     *
+     * <p>For a caller that resolves its own value in the context rather than a class cached by
+     * the pool: a pooled bean with constructor arguments owns its per-context instances, because
+     * the pool's cache is keyed by class and two such beans of one class can hold different
+     * dependencies.
+     *
+     * @param fn The callback that receives the borrowed context
+     * @param <T> The callback result type
+     * @return The callback result
+     */
+    <T> T withLeasedContext(java.util.function.Function<Context, T> fn) {
+        return inContext(fn);
+    }
+
+    /**
+     * Runs a callback against a context, reusing the one this thread is already executing in
+     * rather than borrowing a second.
+     *
+     * <p>Borrowing while holding is a deadlock, not an inefficiency: every caller ends up holding
+     * one context and waiting for another, and the contexts they wait for are the ones they hold.
+     * It is also wrong before it is slow -- a value belongs to the context it was created in, so
+     * host code reached from guest code has to answer in the context that called it.
+     *
+     * <p>Every leasing path goes through here or {@link #inContextUntilComplete}, so a new caller
+     * cannot reintroduce the deadlock by forgetting the check.
+     *
+     * @param fn The callback that receives the context
+     * @param <T> The callback result type
+     * @return The callback result
+     */
+    private <T> T inContext(java.util.function.Function<Context, T> fn) {
+        Context entered = PythonContextRegistry.currentContext();
+        if (entered != null) {
+            return fn.apply(entered);
+        }
+        Context c = borrow();
+        try {
+            return PythonContextRegistry.withExecutionFrame(c, () -> fn.apply(c));
+        } finally {
+            release(c);
+        }
+    }
+
+    /**
+     * {@link #inContext} for a callback returning a stage, which keeps the lease until the stage
+     * completes. A reused context is not leased: it belongs to the caller's frame, as it does on
+     * the event-loop path.
+     *
+     * @param fn The callback that receives the context and returns the stage
+     * @return The stage
+     */
+    private CompletionStage<?> inContextUntilComplete(Function<Context, CompletionStage<?>> fn) {
+        Context entered = PythonContextRegistry.currentContext();
+        if (entered != null) {
+            return fn.apply(entered);
+        }
+        return leaseUntilComplete(fn);
+    }
+
+    /**
+     * Borrow a context and keep it leased until the stage the callback returns completes; see
+     * {@link #withLeasedContext} and {@link #withClassUntilComplete}.
+     *
+     * @param fn The callback that receives the borrowed context and returns the stage
+     * @return The stage
+     */
+    CompletionStage<?> withLeasedContextUntilComplete(Function<Context, CompletionStage<?>> fn) {
+        return inContextUntilComplete(fn);
+    }
+
+    /**
      * Borrow a context, resolve a cached class value in that context, and release the context after the callback completes.
      *
      * @param classReference The Python class reference
@@ -240,12 +576,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @return The callback result
      */
     <T> T withClass(PythonContextRuntime.PythonClassReference classReference, java.util.function.Function<Value, T> fn) {
-        Context c = borrow();
-        try {
-            return PythonContextRegistry.withExecutionFrame(c, () -> fn.apply(getOrCreateClass(c, classReference)));
-        } finally {
-            release(c);
-        }
+        return inContext(c -> fn.apply(getOrCreateClass(c, classReference)));
     }
 
     /**
@@ -259,12 +590,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @return The callback result
      */
     <T> T withScript(String packageName, String scriptName, java.util.function.Function<Value, T> fn) {
-        Context c = borrow();
-        try {
-            return PythonContextRegistry.withExecutionFrame(c, () -> fn.apply(getOrCreateScript(c, packageName, scriptName)));
-        } finally {
-            release(c);
-        }
+        return inContext(c -> fn.apply(getOrCreateScript(c, packageName, scriptName)));
     }
 
     /**
@@ -279,7 +605,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @return The stage
      */
     CompletionStage<?> withClassUntilComplete(PythonContextRuntime.PythonClassReference classReference, Function<Value, CompletionStage<?>> fn) {
-        return leaseUntilComplete(c -> fn.apply(getOrCreateClass(c, classReference)));
+        return inContextUntilComplete(c -> fn.apply(getOrCreateClass(c, classReference)));
     }
 
     /**
@@ -292,7 +618,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @return The stage
      */
     CompletionStage<?> withScriptUntilComplete(String packageName, String scriptName, Function<Value, CompletionStage<?>> fn) {
-        return leaseUntilComplete(c -> fn.apply(getOrCreateScript(c, packageName, scriptName)));
+        return inContextUntilComplete(c -> fn.apply(getOrCreateScript(c, packageName, scriptName)));
     }
 
     private CompletionStage<?> leaseUntilComplete(Function<Context, CompletionStage<?>> fn) {
@@ -325,12 +651,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @return The callback result
      */
     <T> T withValue(String expression, java.util.function.Function<Value, T> fn) {
-        Context c = borrow();
-        try {
-            return PythonContextRegistry.withExecutionFrame(c, () -> fn.apply(getOrCreateValue(c, expression)));
-        } finally {
-            release(c);
-        }
+        return inContext(c -> fn.apply(getOrCreateValue(c, expression)));
     }
 
     /**
@@ -752,6 +1073,11 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
 
     @Override
     public void onDestroyed(BeanDestroyedEvent<Context> event) {
+        synchronized (this) {
+            // none is pre-started from now on; one being built is closed by the pool once it is
+            prestartStopped = true;
+            notifyAll();
+        }
         if (PythonContextRuntime.isReuseContext()) {
             return;
         }

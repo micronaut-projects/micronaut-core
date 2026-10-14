@@ -1,0 +1,15 @@
+<configuration>
+
+    <!-- Not on the classpath: this module's tests run with the module directory as their working directory.
+         This should be ignored, as logback-test.xml and logback.xml are on the classpath -->
+    <appender name="WORKING_DIRECTORY" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>WORKING_DIRECTORY %d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="info">
+        <appender-ref ref="WORKING_DIRECTORY" />
+    </root>
+    <logger name="from.working.directory" level="TRACE" />
+</configuration>

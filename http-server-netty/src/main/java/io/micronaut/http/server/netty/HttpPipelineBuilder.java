@@ -22,6 +22,7 @@ import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.handler.Compressor;
 import io.micronaut.http.server.netty.handler.Http2ConnectionWindow;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
@@ -50,7 +51,6 @@ import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
-import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
 import io.netty.handler.codec.http2.Http2CodecUtil;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
@@ -77,7 +77,6 @@ import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
-import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AsciiString;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
@@ -141,6 +140,12 @@ final class HttpPipelineBuilder {
 
     private final boolean quic;
 
+    /**
+     * The response compressor shared by all connections of this server, released with it.
+     */
+    @Nullable
+    private final Compressor compressor;
+
     HttpPipelineBuilder(NettyHttpServer server, NettyEmbeddedServices embeddedServices, @Nullable ServerSslConfiguration sslConfiguration, RoutingInBoundHandler routingInBoundHandler, HttpHostResolver hostResolver, NettyServerCustomizer serverCustomizer, boolean quic) {
         this.server = server;
         this.embeddedServices = embeddedServices;
@@ -149,6 +154,7 @@ final class HttpPipelineBuilder {
         this.hostResolver = hostResolver;
         this.serverCustomizer = serverCustomizer;
         this.quic = quic;
+        this.compressor = Compressor.create(embeddedServices.getHttpCompressionStrategy());
 
         Optional<LogLevel> logLevel = server.getServerConfiguration().getLogLevel();
         loggingHandler = logLevel.map(level -> new LoggingHandler(NettyHttpServer.class, level)).orElse(null);
@@ -425,7 +431,7 @@ final class HttpPipelineBuilder {
             if (idleTime != null && !idleTime.isNegative()) {
                 // millisecond precision: truncating to whole seconds turns a sub-second timeout into 0,
                 // which IdleStateHandler treats as "disabled"
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new ServerIdleStateHandler(
                         server.getServerConfiguration().getReadIdleTimeout().toMillis(),
                         server.getServerConfiguration().getWriteIdleTimeout().toMillis(),
                         idleTime.toMillis(),
@@ -497,7 +503,7 @@ final class HttpPipelineBuilder {
             NettyHttpServerConfiguration.Http2Settings http2 = server.getServerConfiguration().getHttp2();
             Http2ServerHandler.ConnectionHandlerBuilder builder = new Http2ServerHandler.ConnectionHandlerBuilder(makeRequestHandler(embeddedServices.getWebSocketUpgradeHandler(server), ssl))
                 .decompress(server.getServerConfiguration().isRequestDecompressionEnabled())
-                .compressor(embeddedServices.getHttpCompressionStrategy())
+                .compressor(compressor)
                 .bodySizeLimits(bodySizeLimits())
                 .accessLogManagerFactory(accessLogManagerFactory)
                 .validateHeaders(server.getServerConfiguration().isValidateHeaders())
@@ -807,10 +813,9 @@ final class HttpPipelineBuilder {
                 channel.attr(SSL_SESSION_ATTRIBUTE.get()).set(sslHandler.findSslSession());
             }
 
+            // the websocket compression handler is only added to the pipeline when a connection is upgraded, see
+            // NettyServerWebSocketUpgradeHandler
             Optional<NettyServerWebSocketUpgradeHandler> webSocketUpgradeHandler = embeddedServices.getWebSocketUpgradeHandler(server);
-            if (webSocketUpgradeHandler.isPresent()) {
-                pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
-            }
             if (server.getServerConfiguration().getServerType() != NettyHttpServerConfiguration.HttpServerType.STREAMED) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR,
                     new HttpObjectAggregator(
@@ -822,9 +827,11 @@ final class HttpPipelineBuilder {
 
             RequestHandler requestHandler = makeRequestHandler(webSocketUpgradeHandler, sslHandler != null);
             PipeliningServerHandler pipeliningServerHandler = new PipeliningServerHandler(requestHandler, quic);
-            pipeliningServerHandler.setCompressionStrategy(embeddedServices.getHttpCompressionStrategy());
+            pipeliningServerHandler.setCompressor(compressor);
             pipeliningServerHandler.setBodySizeLimits(bodySizeLimits());
             pipeliningServerHandler.setRequestDecompressionEnabled(server.getServerConfiguration().isRequestDecompressionEnabled());
+            pipeliningServerHandler.setHttp10KeepAlive(server.getServerConfiguration().isHttp10KeepAlive());
+            pipeliningServerHandler.setRejectUnsupportedHttpVersions(server.getServerConfiguration().isRejectUnsupportedHttpVersions());
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, pipeliningServerHandler);
             return pipeliningServerHandler;
         }

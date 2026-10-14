@@ -49,4 +49,31 @@ public interface RawHttpClientFactory {
      * @return The client
      */
     RawHttpClient createRawClient(@Nullable URI url, HttpClientConfiguration configuration);
+
+    /**
+     * Create a new {@link AsyncRawHttpClient}. Note that this method should only be used outside
+     * the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a
+     * client instead
+     *
+     * @param url The base URL
+     * @return The client
+     * @since 5.3.0
+     */
+    default AsyncRawHttpClient createAsyncRawClient(@Nullable URI url) {
+        return createRawClient(url).toAsyncRaw();
+    }
+
+    /**
+     * Create a new {@link AsyncRawHttpClient} with the specified configuration. Note that this
+     * method should only be used outside the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url           The base URL
+     * @param configuration the client configuration
+     * @return The client
+     * @since 5.3.0
+     */
+    default AsyncRawHttpClient createAsyncRawClient(@Nullable URI url, HttpClientConfiguration configuration) {
+        return createRawClient(url, configuration).toAsyncRaw();
+    }
 }

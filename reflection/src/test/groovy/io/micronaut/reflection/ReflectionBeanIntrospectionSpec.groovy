@@ -13,6 +13,20 @@ import java.lang.reflect.Method
 
 class ReflectionBeanIntrospectionSpec extends Specification {
 
+    void "propertyIndexOf rejects a null name, while getProperty still answers empty"() {
+        given:
+        def introspection = ReflectionBeanIntrospection.of(Constructors.Annotated)
+
+        when:
+        introspection.propertyIndexOf(null)
+
+        then:
+        thrown(NullPointerException)
+
+        expect:
+        !introspection.getProperty((String) null).isPresent()
+    }
+
     void "the constructor is selected the way the processor selects it"() {
         expect:
         ReflectionBeanIntrospection.of(type).constructorArguments*.type == arguments

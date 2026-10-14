@@ -20,7 +20,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.concurrent.EventExecutor;
@@ -38,7 +38,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
-import java.util.function.IntUnaryOperator;
 
 /**
  * This class handles the sizing of a connection pool to conform to the configuration in
@@ -50,8 +49,15 @@ import java.util.function.IntUnaryOperator;
  * {@link #dirty()}. The state management logic ensures that {@link #doSomeWork()} is called in a
  * serialized fashion (no concurrency or reentrancy) at least once after each {@link #dirty()}
  * call.
+ *
+ * @deprecated This is the connection pool of micronaut-core 4.0, kept for compatibility. It is
+ * only used when {@link HttpClientConfiguration.ConnectionPoolConfiguration.PoolVersion#V4_0} is
+ * selected explicitly, and will be removed in a future release. Use the default
+ * {@link HttpClientConfiguration.ConnectionPoolConfiguration.PoolVersion#V4_9} implementation
+ * ({@link Pool49}) instead.
  */
 @Internal
+@Deprecated(since = "5.3.0")
 final class Pool40 implements Pool {
     private final Pool.Listener listener;
     private final Logger log;
@@ -71,6 +77,7 @@ final class Pool40 implements Pool {
         this.log = log;
         this.connectionPoolConfiguration = connectionPoolConfiguration;
         this.group = group;
+        log.warn("The connection pool version V4_0 is deprecated and will be removed in a future release. Switch to the default pool version V4_9.");
     }
 
     @Override
@@ -344,7 +351,7 @@ final class Pool40 implements Pool {
     void addPendingRequest(PendingRequest sink) {
         int maxPendingAcquires = connectionPoolConfiguration.getMaxPendingAcquires();
         if (maxPendingAcquires != Integer.MAX_VALUE && pendingRequests.size() >= maxPendingAcquires) {
-            sink.tryCompleteExceptionally(new HttpClientException("Cannot acquire connection, exceeded max pending acquires configuration"));
+            sink.tryCompleteExceptionally(new UnprocessedRequestException(UnprocessedRequestException.Reason.POOL_ACQUIRE, "Cannot acquire connection, exceeded max pending acquires configuration", null));
             return;
         }
         pendingRequests.addLast(sink);
@@ -553,7 +560,7 @@ final class Pool40 implements Pool {
 
     final class Http2 extends PoolEntry implements Http2PoolEntry {
         private final AtomicInteger earmarkedOrLiveRequests = new AtomicInteger(0);
-        private int maxStreamCount;
+        private volatile int maxStreamCount;
 
         public Http2(EventLoop eventLoop, ResizerConnection connection) {
             super(eventLoop, connection);
@@ -561,21 +568,21 @@ final class Pool40 implements Pool {
 
         @Override
         boolean tryEarmarkForRequest() {
-            IntUnaryOperator upd = old -> {
-                if (old >= Math.min(connectionPoolConfiguration.getMaxConcurrentRequestsPerHttp2Connection(), maxStreamCount)) {
-                    return old;
-                } else {
-                    return old + 1;
-                }
-            };
-            int old = earmarkedOrLiveRequests.updateAndGet(upd);
-            return upd.applyAsInt(old) != old;
+            int limit = Math.min(connectionPoolConfiguration.getMaxConcurrentRequestsPerHttp2Connection(), maxStreamCount);
+            int prev = earmarkedOrLiveRequests.getAndUpdate(old -> old >= limit ? old : old + 1);
+            return prev < limit;
         }
 
         @Override
         public void onConnectionEstablished(int maxStreamCount) {
             this.maxStreamCount = maxStreamCount;
             onNewConnectionEstablished2(this);
+        }
+
+        @Override
+        public void updateMaxStreamCount(int maxStreamCount) {
+            this.maxStreamCount = maxStreamCount;
+            markConnectionAvailable();
         }
 
         @Override

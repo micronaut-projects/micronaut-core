@@ -30,8 +30,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class DestinationTest {
 
     /**
-     * The destination values the specification lists, so that this enum drifting away from the
-     * specification fails here rather than silently dropping metadata at runtime.
+     * The destination values the Fetch Standard lists, plus those added by the specifications
+     * that extend it and those shipping browsers send, so that this enum drifting away from them
+     * fails here rather than silently dropping metadata at runtime.
      *
      * @see <a href="https://fetch.spec.whatwg.org/#concept-request-destination">Destination</a>
      */
@@ -39,6 +40,7 @@ class DestinationTest {
         "empty",
         "audio",
         "audioworklet",
+        "compression-dictionary",
         "document",
         "embed",
         "fencedframe",
@@ -59,7 +61,9 @@ class DestinationTest {
         "text",
         "track",
         "video",
+        "webbundle",
         "webidentity",
+        "webtransport",
         "worker",
         "xslt"
     );

@@ -394,10 +394,11 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         }
         ParameterElement[] pythonParameters = pythonMethod.getParameters();
         ParameterElement[] parameters = inheritedMethod.getParameters().clone();
-        // When the Python hints resolve to the Java method, it is among the overridden methods and the Python
-        // parameters already inherit its annotations (see PythonMethodElement#resolveParameters); inheriting
-        // them again here would only repeat the same metadata in the hierarchy.
-        boolean metadataInherited = pythonMethod.getOverriddenMethods().contains(inheritedMethod);
+        // When the Python hints resolve to the Java method, it is among the methods overridden in the hierarchy of
+        // the declaring type and the Python parameters already inherit its annotations (see
+        // PythonMethodElement#resolveParameters); inheriting them again here would only repeat the same metadata
+        // in the hierarchy.
+        boolean metadataInherited = pythonMethod.getDeclaringTypeOverriddenMethods().contains(inheritedMethod);
         if (pythonParameters.length == parameters.length) {
             for (int i = 0; i < parameters.length; i++) {
                 ParameterElement pythonParameter = pythonParameters[i];
@@ -640,6 +641,12 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
      * Whether the parameter types of a Python method match those of the inherited Java method by erasure. A
      * Python {@code int} hint is a primitive {@code int} while a Java {@code ID} argument resolves to the boxed
      * {@code Integer}: Python has no overloading, so the two are the same method.
+     *
+     * <p>A parameter declared as a type variable is compared against its resolved type as well as its erasure.
+     * {@code CrudRepository<Product, Integer>.findById(ID)} erases to {@code findById(Object)}, so comparing
+     * only the erasure never matches a Python {@code findById(self, id: int)} and the override is missed --
+     * leaving the Python signature on the generated interface next to the inherited one it was meant to
+     * implement.
      */
     private static boolean hasSameRawParameterTypes(MethodElement methodElement, MethodElement inheritedMethod) {
         ParameterElement[] parameters = methodElement.getParameters();
@@ -648,7 +655,9 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             return false;
         }
         for (int i = 0; i < parameters.length; i++) {
-            if (!PythonJavaTypes.isSameOrBoxedType(parameters[i].getType(), inheritedParameters[i].getType())) {
+            ClassElement parameterType = parameters[i].getType();
+            if (!PythonJavaTypes.isSameOrBoxedType(parameterType, inheritedParameters[i].getType())
+                && !PythonJavaTypes.isSameOrBoxedType(parameterType, inheritedParameters[i].getGenericType())) {
                 return false;
             }
         }

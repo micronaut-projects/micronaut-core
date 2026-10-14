@@ -5,11 +5,13 @@ import java
 from jakarta.inject import Inject
 from micronaut.context.annotation import Property
 from micronaut.http import HttpRequest
-from micronaut.http.client import HttpClient
+from micronaut.http.client import HttpClient, StreamingHttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from org.junit.jupiter.api import Test
 
+Duration = java.type("java.time.Duration")
+Flux = java.type("reactor.core.publisher.Flux")
 AsyncioConcurrentClientRunner = java.type("micronaut.docs.asyncio.AsyncioConcurrentClientRunner")
 NoteClass = java.type("micronaut.docs.asyncio.Note")
 
@@ -26,6 +28,7 @@ from .Note import Note
 @MicronautTest
 class PythonAsyncioSpec:
     client: Annotated[HttpClient, Inject, Client("/")]
+    streaming_client: Annotated[StreamingHttpClient, Inject, Client("/")]
 
     @Test
     def asyncBackendControllerCanSleep(self):
@@ -67,6 +70,41 @@ class PythonAsyncioSpec:
         assert "route:publisher-backend" == response, response
 
     @Test
+    def singletonModuleAsyncRouteCanAwaitClient(self):
+        response = self.client.toBlocking().retrieve("/singleton-async-routes/message")
+        assert "singleton:backend" == response, response
+
+    @Test
+    def singletonModuleAsyncGeneratorRouteStreams(self):
+        values = Flux.from_(
+            self.streaming_client.jsonStream(HttpRequest.GET("/singleton-async-routes/stream"), java.type("java.lang.String"))
+        ).collectList().block(Duration.ofSeconds(30))
+
+        assert list(values) == ["first", "backend"], values
+
+    @Test
+    def singletonModuleAsyncRouteSeesModuleStateChangedBySyncRoute(self):
+        self.client.toBlocking().retrieve("/singleton-async-routes/greeting/changed")
+        response = self.client.toBlocking().retrieve("/singleton-async-routes/greeting")
+        assert "changed" == response, response
+
+    @Test
+    def singletonModuleAsyncRouteSeesGlobalResetToNone(self):
+        self.client.toBlocking().retrieve("/singleton-async-routes/greeting/before-reset")
+        assert "before-reset" == self.client.toBlocking().retrieve("/singleton-async-routes/greeting")
+        self.client.toBlocking().retrieve("/singleton-async-routes/greeting-reset")
+        response = self.client.toBlocking().retrieve("/singleton-async-routes/greeting")
+        assert "None" == response, response
+
+    @Test
+    def singletonModuleStateIsSharedBySyncAndAsyncRoutes(self):
+        # the module is one object: a global an async route assigns is the one every later route reads
+        self.client.toBlocking().retrieve("/singleton-async-routes/greeting/from-sync")
+        assert "from-async" == self.client.toBlocking().retrieve("/singleton-async-routes/async-greeting/from-async")
+        response = self.client.toBlocking().retrieve("/singleton-async-routes/greeting")
+        assert "from-async" == response, response
+
+    @Test
     def asyncRequestsAreConcurrentOnSingleEventLoop(self):
         self.client.toBlocking().retrieve("/async-backend/reset-stats")
         elapsed_millis = AsyncioConcurrentClientRunner.retrieveConcurrently(
@@ -99,10 +137,12 @@ class PythonAsyncioSpec:
         assert 3 == response.priority
 
     @Test
-    def asyncControllerUsesEventLoopContext(self):
+    def asyncSingletonControllerRunsInItsOwnContext(self):
+        # a singleton is one object in one context: its coroutines are not run on a copy in the event-loop
+        # context, which would be a second controller (see PythonAsyncSingletonSpec)
         context_id = self.client.toBlocking().retrieve("/async-demo/context-id")
 
-        assert context_id != builtins.__MN_CTX_ID__
+        assert context_id == builtins.__MN_CTX_ID__
 
     @Test
     def constructorInjectedAsyncControllerRunsInEventLoopContext(self):

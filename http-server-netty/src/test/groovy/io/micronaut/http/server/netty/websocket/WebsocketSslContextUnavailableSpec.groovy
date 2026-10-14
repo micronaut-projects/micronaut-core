@@ -85,10 +85,12 @@ class WebsocketSslContextUnavailableSpec extends Specification {
     static class EchoClient implements AutoCloseable {
         @OnMessage
         void onMessage(String message) {
+            // the test only checks the connection fails
         }
 
         @Override
         void close() throws Exception {
+            // nothing to release
         }
     }
 }

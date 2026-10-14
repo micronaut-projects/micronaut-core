@@ -2,6 +2,7 @@ package io.micronaut.python.annotation.processing.test
 
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Min
+import io.micronaut.context.python.PythonAsyncioRuntime
 import io.micronaut.data.intercept.annotation.DataMethod
 import io.micronaut.data.intercept.reactive.FindAllReactiveInterceptor
 import io.micronaut.data.intercept.reactive.FindPageReactiveInterceptor
@@ -15,7 +16,69 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
 import spock.lang.PendingFeature
 
+import java.util.concurrent.TimeUnit
+
 class IntroductionGenericInterfaceSpec extends AbstractPythonTypeElementSpec {
+
+    void "repeated introduction proxies remain awaitable from Python"() {
+        given:
+        def context = buildContext('''
+from abc import ABC, abstractmethod
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Introduction
+from micronaut.context.annotation import Prototype
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+CompletableFuture = java.type("java.util.concurrent.CompletableFuture")
+
+@Introduction
+def AsyncIntroduction(cls):
+    return cls
+
+@InterceptorBean(AsyncIntroduction)
+@Singleton
+class AsyncIntroductionInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return CompletableFuture.completedFuture("introduced")
+
+@AsyncIntroduction
+@Prototype
+class AsyncService(ABC):
+    def __init__(self):
+        pass
+
+    @abstractmethod
+    async def value(self) -> str:
+        pass
+
+''')
+        def serviceType = context.classLoader.loadClass("python.AsyncService")
+
+        when:
+        def first = context.createBean(serviceType)
+        Value firstTarget = first.asPolyglotValue()
+        Value caller = firstTarget.context.eval("python", """
+async def call(service):
+    return await service.value()
+call
+""")
+
+        then:
+        first.value().toCompletableFuture().get(10, TimeUnit.SECONDS) == "introduced"
+        PythonAsyncioRuntime.toCompletionStage(caller.execute(firstTarget)).toCompletableFuture().get(10, TimeUnit.SECONDS) == "introduced"
+
+        when:
+        def second = context.createBean(serviceType)
+
+        then:
+        !first.is(second)
+        PythonAsyncioRuntime.toCompletionStage(caller.execute(second.asPolyglotValue())).toCompletableFuture().get(10, TimeUnit.SECONDS) == "introduced"
+        second.value().toCompletableFuture().get(10, TimeUnit.SECONDS) == "introduced"
+
+        cleanup:
+        context?.close()
+    }
 
     void "test introduction interfaces declared by annotation are implemented by python class"() {
         given:

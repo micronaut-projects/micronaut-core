@@ -67,6 +67,29 @@ class DefaultClassPathResourceLoaderJarTest {
     }
 
     @Test
+    void doesNotResolveADirectoryOfAJarUnderABasePath() throws IOException {
+        try (URLClassLoader classLoader = staticJarClassLoader()) {
+            DefaultClassPathResourceLoader loader = new DefaultClassPathResourceLoader(classLoader, "public");
+
+            assertFalse(loader.getResource("docs").isPresent());
+            assertFalse(loader.getResource("docs/").isPresent());
+            assertTrue(loader.getResource("docs/index.html").isPresent());
+            assertTrue(loader.getResource("site.css").isPresent());
+        }
+    }
+
+    @Test
+    void doesNotResolveADirectoryOfAJar() throws IOException {
+        try (URLClassLoader classLoader = staticJarClassLoader()) {
+            DefaultClassPathResourceLoader loader = new DefaultClassPathResourceLoader(classLoader);
+
+            assertFalse(loader.getResource("conf").isPresent());
+            assertFalse(loader.getResource("public/docs").isPresent());
+            assertTrue(loader.getResource("public/docs/index.html").isPresent());
+        }
+    }
+
+    @Test
     void answersEmptyForAMissingEntry() throws IOException {
         try (URLClassLoader classLoader = jarClassLoader()) {
             DefaultClassPathResourceLoader loader = new DefaultClassPathResourceLoader(classLoader);
@@ -85,6 +108,22 @@ class DefaultClassPathResourceLoaderJarTest {
             zip.putNextEntry(new ZipEntry("conf/app.properties"));
             zip.write("name=test".getBytes(StandardCharsets.UTF_8));
             zip.closeEntry();
+        }
+        return new URLClassLoader(new URL[]{jar.toUri().toURL()}, null);
+    }
+
+    private URLClassLoader staticJarClassLoader() throws IOException {
+        Path jar = tempDir.resolve("static.jar");
+        try (OutputStream out = Files.newOutputStream(jar); ZipOutputStream zip = new ZipOutputStream(out)) {
+            for (String directory : List.of("META-INF/", "conf/", "public/", "public/docs/")) {
+                zip.putNextEntry(new ZipEntry(directory));
+                zip.closeEntry();
+            }
+            for (String file : List.of("public/site.css", "public/docs/index.html")) {
+                zip.putNextEntry(new ZipEntry(file));
+                zip.write(file.getBytes(StandardCharsets.UTF_8));
+                zip.closeEntry();
+            }
         }
         return new URLClassLoader(new URL[]{jar.toUri().toURL()}, null);
     }

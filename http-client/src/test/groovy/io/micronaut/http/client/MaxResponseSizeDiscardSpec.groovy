@@ -89,8 +89,14 @@ class MaxResponseSizeDiscardSpec extends Specification {
             } else {
                 body = 'ok'.getBytes(StandardCharsets.US_ASCII)
             }
-            out.write("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${body.length}\r\n\r\n".getBytes(StandardCharsets.US_ASCII))
-            out.write(body)
+            // head and body in one write, so that the client reads the whole response at once. If
+            // the head arrived on its own, the client would go on to stream the body and reject
+            // it at the first read that overflows the buffer, reporting that read's length
+            // instead of the declared one.
+            ByteArrayOutputStream response = new ByteArrayOutputStream()
+            response.write("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${body.length}\r\n\r\n".getBytes(StandardCharsets.US_ASCII))
+            response.write(body)
+            out.write(response.toByteArray())
             out.flush()
         }
     }

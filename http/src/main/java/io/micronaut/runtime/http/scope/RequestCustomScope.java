@@ -62,6 +62,18 @@ class RequestCustomScope extends AbstractConcurrentCustomScope<RequestScope> imp
         return ServerRequestContext.currentRequest().isPresent();
     }
 
+    /**
+     * Only requests that hold request scoped beans need the event, the HTTP server uses this to
+     * skip publishing the event when nothing else listens for it.
+     *
+     * @param event The event
+     * @return Whether the request of the event holds request scoped beans
+     */
+    @Override
+    public boolean supports(HttpRequestTerminatedEvent event) {
+        return getRequestAttributeMap(event.getSource(), false) != null;
+    }
+
     @Override
     public void onApplicationEvent(HttpRequestTerminatedEvent event) {
         destroyBeans(event.getSource());
@@ -104,16 +116,18 @@ class RequestCustomScope extends AbstractConcurrentCustomScope<RequestScope> imp
     }
 
     private <T> @Nullable ConcurrentHashMap<BeanIdentifier, CreatedBean<?>> getRequestAttributeMap(HttpRequest<T> httpRequest, boolean create) {
+        if (!create) {
+            // a lookup only: a request without scoped beans need not create its attribute map
+            Object o = httpRequest.getAttribute(SCOPED_BEANS_ATTRIBUTE).orElse(null);
+            return o instanceof ConcurrentHashMap ? (ConcurrentHashMap<BeanIdentifier, CreatedBean<?>>) o : null;
+        }
         MutableConvertibleValues<Object> attrs = httpRequest.getAttributes();
         Object o = attrs.getValue(SCOPED_BEANS_ATTRIBUTE);
         if (o instanceof ConcurrentHashMap) {
             return (ConcurrentHashMap<BeanIdentifier, CreatedBean<?>>) o;
         }
-        if (create) {
-            ConcurrentHashMap<BeanIdentifier, CreatedBean<?>> scopedBeans = new ConcurrentHashMap<>(5);
-            attrs.put(SCOPED_BEANS_ATTRIBUTE, scopedBeans);
-            return scopedBeans;
-        }
-        return null;
+        ConcurrentHashMap<BeanIdentifier, CreatedBean<?>> scopedBeans = new ConcurrentHashMap<>(5);
+        attrs.put(SCOPED_BEANS_ATTRIBUTE, scopedBeans);
+        return scopedBeans;
     }
 }

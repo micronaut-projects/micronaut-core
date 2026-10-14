@@ -424,6 +424,89 @@ final class PyronautCompilerIncrementalTest {
     }
 
     @Test
+    void functionalInterfaceProviderKeepsPythonCompilationIncremental(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = python.resolve("alpha.py");
+        Files.writeString(alpha, """
+            from java.util.function import Function
+            from jakarta.inject import Singleton
+            @Singleton
+            class Alpha:
+                def apply(self, fn: Function) -> int:
+                    return 1
+            """);
+        Files.writeString(python.resolve("beta.py"), """
+            from jakarta.inject import Singleton
+            @Singleton
+            class Beta:
+                value: int = 2
+            """);
+
+        compilePython(python, java, output, cache);
+        Set<String> providerOutputs = functionalInterfaceProviderOutputs(output);
+        assertTrue(providerOutputs.stream().anyMatch(path -> path.endsWith("$Definition.class")));
+        assertTrue(providerOutputs.stream().anyMatch(path -> path.startsWith(
+            "META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/"
+        )));
+        Properties state = state(cache);
+        assertEquals("true", state.getProperty("processor.compatible"));
+        assertTrue(decodeStateList(state.getProperty("python.aggregating.outputs")).containsAll(providerOutputs));
+        assertTrue(decodeStateList(state.getProperty("shared.outputs")).stream()
+            .noneMatch(path -> path.contains("$PythonFunctionalInterfaces$")));
+
+        Path betaBean = findOutput(output, "Beta$Definition.class");
+        Files.setLastModifiedTime(betaBean, UNCHANGED_MARKER);
+        Files.writeString(alpha, Files.readString(alpha).replace("return 1", "return 2"));
+        compilePython(python, java, output, cache);
+
+        assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(betaBean));
+        assertEquals(providerOutputs, functionalInterfaceProviderOutputs(output));
+        assertEquals("true", state(cache).getProperty("processor.compatible"));
+    }
+
+    @Test
+    void replacesTheFunctionalInterfaceProviderWhenItsInterfacesChange(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = python.resolve("alpha.py");
+        Files.writeString(alpha, """
+            from java.util.function import Function
+            from jakarta.inject import Singleton
+            @Singleton
+            class Alpha:
+                def apply(self, fn: Function) -> int:
+                    return 1
+            """);
+
+        compilePython(python, java, output, cache);
+        Set<String> previousOutputs = functionalInterfaceProviderOutputs(output);
+        assertFalse(previousOutputs.isEmpty());
+
+        Files.writeString(alpha, """
+            from java.util.function import Supplier
+            from jakarta.inject import Singleton
+            @Singleton
+            class Alpha:
+                def apply(self, fn: Supplier) -> int:
+                    return 1
+            """);
+        compilePython(python, java, output, cache);
+
+        Set<String> currentOutputs = functionalInterfaceProviderOutputs(output);
+        assertFalse(currentOutputs.isEmpty());
+        assertTrue(currentOutputs.stream().noneMatch(previousOutputs::contains));
+        assertEquals(1, currentOutputs.stream().filter(path -> path.endsWith(".java")).count());
+        Properties state = state(cache);
+        assertEquals("true", state.getProperty("processor.compatible"));
+        assertTrue(decodeStateList(state.getProperty("python.aggregating.outputs")).containsAll(currentOutputs));
+    }
+
+    @Test
     void preservesUnchangedPythonSourceOutputs(@TempDir Path directory) throws Exception {
         Path python = Files.createDirectories(directory.resolve("python"));
         Path java = Files.createDirectories(directory.resolve("java"));
@@ -1919,6 +2002,15 @@ final class PyronautCompilerIncrementalTest {
                 .filter(path -> path.getFileName().toString().endsWith(suffix))
                 .findFirst()
                 .orElseThrow();
+        }
+    }
+
+    private static Set<String> functionalInterfaceProviderOutputs(Path output) throws Exception {
+        try (var paths = Files.walk(output)) {
+            return paths.filter(Files::isRegularFile)
+                .filter(path -> path.getFileName().toString().contains("$PythonFunctionalInterfaces$"))
+                .map(path -> output.relativize(path).toString().replace('\\', '/'))
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
         }
     }
 

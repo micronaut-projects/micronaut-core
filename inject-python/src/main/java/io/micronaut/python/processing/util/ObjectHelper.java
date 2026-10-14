@@ -62,11 +62,13 @@ public final class ObjectHelper {
      * @param selfType the type of the generated class
      * @param properties all bean properties of the source element
      * @param propertyFields map from property name to backing FieldDef in the generated class
+     * @param toString whether to add {@code toString} (a class bridging {@code __str__} declares its own)
      */
     public static void addObjectMethods(ClassDef.ClassDefBuilder classDefBuilder,
                                         ClassTypeDef selfType,
                                         List<PropertyElement> properties,
-                                        Map<String, FieldDef> propertyFields) {
+                                        Map<String, FieldDef> propertyFields,
+                                        boolean toString) {
         List<PropertyElement> readableProps = properties.stream()
             .filter(p -> !p.isWriteOnly())
             .toList();
@@ -80,7 +82,9 @@ public final class ObjectHelper {
         List<PropertyElement> hashCodeProps = readableProps.stream()
             .filter(p -> !referencesPythonClass(p.getGenericType()))
             .toList();
-        createToStringMethod(classDefBuilder, selfType, toStringProps, propertyFields);
+        if (toString) {
+            createToStringMethod(classDefBuilder, selfType, toStringProps, propertyFields);
+        }
         createEqualsMethod(classDefBuilder, selfType, readableProps, propertyFields);
         createHashCodeMethod(classDefBuilder, selfType, hashCodeProps, propertyFields);
     }

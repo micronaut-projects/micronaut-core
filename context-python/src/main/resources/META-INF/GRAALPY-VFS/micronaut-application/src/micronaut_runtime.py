@@ -19,6 +19,29 @@ def __micronaut_new_uninitialized_instance(cls):
     return object.__new__(cls)
 
 
+def __micronaut_allocate_instance(cls, *args):
+    """Allocates an instance as cls(*args) would, through the __new__ of the class, without __init__.
+
+    Returns the instance and whether it is initialized already: a metaclass customizing __call__
+    creates it, so the class is called as it is.
+    """
+    if type(cls).__call__ is not type.__call__:
+        return [cls(*args), True]
+    new = cls.__new__
+    if new is object.__new__:
+        return [object.__new__(cls), False]
+    return [new(cls, *args), False]
+
+
+def __micronaut_initialize_instance(instance, cls, *args):
+    """Runs __init__ on an instance __micronaut_allocate_instance returned, as cls(*args) would: only
+    when the instance is one of the class, and __init__ has to return None."""
+    if isinstance(instance, cls):
+        result = type(instance).__init__(instance, *args)
+        if result is not None:
+            raise TypeError(f"__init__() should return None, not '{type(result).__name__}'")
+
+
 def __micronaut_set_instance_property(instance, name, value):
     object.__setattr__(instance, name, value)
     return instance
@@ -52,11 +75,20 @@ __micronaut_inspect_isclass = inspect.isclass
 __micronaut_import_module = importlib.import_module
 
 
-def __micronaut_loaded_module(name):
-    """The imported and initialized module, or None: not imported, or another thread is executing it."""
+def __micronaut_import_package_of_member(name):
+    """The package a member is resolved from: imported, or None while its import runs on any thread.
+
+    A package that was never imported is imported here, before the module named after the member,
+    so the import holds the lock of the package alone: importing the module first would take its
+    lock and then wait for the package, which a second thread importing another module of the
+    package the same way waits for while holding the lock of its module (_DeadlockError, as the
+    initialiser of a generated package imports every module of the package). A package whose
+    import is running is not waited for: the caller imports the module named after the member,
+    which the import system executes without the lock of its package.
+    """
     module = sys.modules.get(name)
     if module is None:
-        return None
+        return importlib.import_module(name)
     spec = getattr(module, "__spec__", None)
     if spec is not None and getattr(spec, "_initializing", False):
         return None
@@ -75,13 +107,29 @@ def __micronaut_python_dict(keys, values):
     return dict(zip(keys, values))
 
 
-def __micronaut_to_python_standard_type(kind, value, nanos=0):
+def __micronaut_to_python_standard_type(kind, value, nanos=0, zone=None):
+    if kind == "decimal":
+        # imported on first use: importing decimal with this module made the imports of a nested
+        # application's context walk into the frames of the enclosing context (Truffle rejects the
+        # invalid sharing of AST nodes under -ea)
+        import decimal
+        return decimal.Decimal(value)
     if kind == "date":
         return datetime.date.fromisoformat(value)
     if kind == "time":
         return datetime.time.fromisoformat(value)
     if kind == "datetime":
         return datetime.datetime.fromisoformat(value)
+    if kind == "zoned_datetime":
+        result = datetime.datetime.fromisoformat(value)
+        if zone is not None:
+            try:
+                import zoneinfo
+                result = result.astimezone(zoneinfo.ZoneInfo(zone))
+            except Exception:
+                # no time zone data for the region here: the fixed offset still names the same instant
+                pass
+        return result
     if kind == "duration":
         return datetime.timedelta(seconds=value, microseconds=nanos // 1000)
     if kind == "zone_offset":
@@ -143,6 +191,26 @@ def __micronaut_has_coroutine_methods(cls):
     return False
 
 
+def __micronaut_async_function_kind(owner, name, member):
+    """'coroutine' or 'async_generator' for an async function or bound method, otherwise ''.
+
+    Prefixed with 'instance:' when the member is an attribute of the object itself rather than of its
+    class: another object of the class may hold something else under that name.
+    """
+    if inspect.iscoroutinefunction(member):
+        kind = "coroutine"
+    elif inspect.isasyncgenfunction(member):
+        kind = "async_generator"
+    else:
+        kind = ""
+    try:
+        if name in vars(owner):
+            return "instance:" + kind
+    except TypeError:
+        pass
+    return kind
+
+
 def __micronaut_is_plain_bean_instance(obj, qualname):
     """Whether obj is an instance of the bean class itself, not an introduction or a scoped proxy."""
     cls = type(obj)
@@ -194,15 +262,21 @@ def __micronaut_get_raw_class_member(cls, name):
 def __micronaut_prepare_introduction(cls):
     """Make an abstract class or Protocol instantiable for a Micronaut introduction.
 
-    Every abstract method gets a stub that the Java proxy replaces; the class is
-    marked so the work happens once per class and context.
+    Every abstract method gets a stub that the Java proxy replaces; coroutine
+    identity is preserved for later proxies of the same class. The class is marked
+    so the work happens once per class and context.
     """
     if cls.__dict__.get("__micronaut_introduction__", False):
         # the marker is not inherited: a subclass that adds abstract methods is prepared on its own
         return cls
     from abc import update_abstractmethods
+
+    async def async_stub(*args, **kwargs):
+        return None
+
     for name in list(getattr(cls, "__abstractmethods__", ())):
-        setattr(cls, name, lambda *args, **kwargs: None)
+        stub = async_stub if inspect.iscoroutinefunction(getattr(cls, name)) else lambda *args, **kwargs: None
+        setattr(cls, name, stub)
     update_abstractmethods(cls)
     if getattr(cls, "_is_protocol", False):
         cls._is_protocol = False
@@ -286,13 +360,16 @@ def __micronaut_create_raw_instance(cls):
     return cls.__new__(cls)
 
 
-class _MicronautSelfInvocation:
-    """Instance attribute that routes ``self.method(...)`` of a proxied bean through the interceptor chain.
+class _MicronautInterceptedCall:
+    """Calls the interceptor chain of a proxied method the way Python calls the method itself.
 
-    The override was created for the bean object that carries the attribute, so the chain runs on the
-    calling object; it binds the class function to that object, so the attribute is never re-entered.
-    Keyword and omitted defaulted arguments are laid out positionally the way the generated Java method
-    declares them.
+    The chain is a Java executable taking the arguments of the generated Java method positionally, one
+    per parameter after ``self``. Python callers pass keyword arguments and omit defaulted ones, so the
+    call is bound through the signature of the class function: keyword arguments take their place and
+    omitted ones are filled from the Python defaults, and the interceptors see the full argument list.
+
+    Used for the overrides of the scoped proxy and introduction targets (calls through the proxy) and
+    for the instance attributes that route ``self.method(...)`` of a proxied bean through the chain.
     """
 
     __slots__ = ("_function", "_override", "_parameters")
@@ -304,7 +381,19 @@ class _MicronautSelfInvocation:
 
     def __call__(self, *args, **kwargs):
         parameters = self._parameters
+        if len(args) > len(parameters):
+            # counted with self, as the plain Python call reports it
+            maximum = len(parameters) + 1
+            minimum = 1 + sum(1 for parameter in parameters if parameter.default is parameter.empty)
+            expected = str(maximum) if minimum == maximum else f"from {minimum} to {maximum}"
+            raise TypeError(f"{self._function.__qualname__}() takes {expected} positional arguments but {len(args) + 1} were given")
         if kwargs or len(args) < len(parameters):
+            positional_only = [parameter.name for parameter in parameters if parameter.kind == parameter.POSITIONAL_ONLY and parameter.name in kwargs]
+            if positional_only:
+                raise TypeError(f"{self._function.__qualname__}() got some positional-only arguments passed as keyword arguments: '{', '.join(positional_only)}'")
+            for parameter in parameters[:len(args)]:
+                if parameter.name in kwargs:
+                    raise TypeError(f"{self._function.__qualname__}() got multiple values for argument '{parameter.name}'")
             values = list(args)
             for parameter in parameters[len(args):]:
                 if parameter.name in kwargs:
@@ -319,7 +408,7 @@ class _MicronautSelfInvocation:
         return self._override(*args)
 
     def __getattr__(self, name):
-        if name in _MicronautSelfInvocation.__slots__:
+        if name in _MicronautInterceptedCall.__slots__:
             raise AttributeError(name)
         return getattr(self._function, name)
 
@@ -348,37 +437,65 @@ class _MicronautStageAwaitable:
 
 # the parameter layout of a class function, computed once per function: a bean of a prototype-like scope
 # is bound on every instantiation
-_micronaut_self_invocation_layouts = {}
+_micronaut_positional_layouts = {}
 
 
-def _micronaut_self_invocation_layout(function):
+def _micronaut_positional_layout(function):
     """The parameters after ``self``, or ``None`` when the layout cannot be mapped onto the Java method.
 
     A method taking ``*args`` or ``**kwargs`` has no positional layout, and the generated Java method
-    has no parameter for a keyword-only one; the self-invocations of such methods stay direct rather
-    than dropping or misplacing arguments.
+    has no parameter for a keyword-only one; such methods are called with the arguments as given rather
+    than dropping or misplacing arguments. A positional-only parameter is a parameter of the Java method
+    like any other, which a caller cannot pass by keyword.
     """
     try:
-        return _micronaut_self_invocation_layouts[function]
+        return _micronaut_positional_layouts[function]
     except KeyError:
         pass
     except TypeError:
         return None
     parameters = None
-    try:
-        parameters = tuple(inspect.signature(function).parameters.values())[1:]
-        for parameter in parameters:
-            if parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD, parameter.KEYWORD_ONLY):
-                parameters = None
-                break
-    except (TypeError, ValueError):
-        pass
-    _micronaut_self_invocation_layouts[function] = parameters
+    # a static or class method has no self to drop from its signature
+    if callable(function) and not isinstance(function, (staticmethod, classmethod)):
+        try:
+            parameters = tuple(inspect.signature(function).parameters.values())[1:]
+            for parameter in parameters:
+                if parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD, parameter.KEYWORD_ONLY):
+                    parameters = None
+                    break
+        except (TypeError, ValueError):
+            parameters = None
+    _micronaut_positional_layouts[function] = parameters
     return parameters
+
+
+def _micronaut_intercepted_call(function, override):
+    """The override of an intercepted method, callable with the keyword and defaulted arguments of the Python function.
+
+    The override itself when the function has no positional layout. The function is the one the class
+    declared: an introduction replaces its abstract methods with stubs, which have no layout.
+    """
+    parameters = _micronaut_positional_layout(function)
+    if parameters is None:
+        return override
+    return _MicronautInterceptedCall(function, override, parameters)
+
+
+def _micronaut_intercepted_member(cls, name, override):
+    return _micronaut_intercepted_call(__micronaut_get_raw_class_member(cls, name), override)
+
+
+# the Java proxy creator's name for it; the scoped proxy class calls the single underscore names, which
+# its body does not mangle
+__micronaut_intercepted_call = _micronaut_intercepted_call
 
 
 def __micronaut_is_coroutine_function(function):
     return inspect.iscoroutinefunction(function)
+
+
+def __micronaut_is_async_generator_function(function):
+    return inspect.isasyncgenfunction(function)
 
 
 def __micronaut_await_stage(stage, to_awaitable):
@@ -392,6 +509,11 @@ def __micronaut_bind_self_invocations(target, names, overrides):
     A Python bean is a plain object behind the scoped proxy; an instance attribute per intercepted method
     gives ``self.method()`` the same semantics while ``self`` stays the bean object. ``overrides`` are the
     chains created for this target, one per name.
+
+    A name the object already holds is left alone: an instance attribute shadows the method of its class
+    in plain Python, and it does here too, so a bean holding state under the name of one of its methods
+    (``self.books`` next to a ``def books``) reads and writes its own value. The method keeps its
+    interception for the callers that reach it as a method.
     """
     try:
         attributes = vars(target)
@@ -401,16 +523,15 @@ def __micronaut_bind_self_invocations(target, names, overrides):
     cls = type(target)
     for i in range(len(names)):
         name = names[i]
-        if isinstance(attributes.get(name), _MicronautSelfInvocation):
-            # already bound: the same target resolved again
+        if name in attributes:
+            # an attribute of the object itself: either a chain bound when the same target resolved
+            # again, or a value the bean wrote, which shadows the method as it does in plain Python
             continue
         function = __micronaut_get_raw_class_member(cls, name)
-        if function is None or not callable(function):
-            continue
-        parameters = _micronaut_self_invocation_layout(function)
+        parameters = _micronaut_positional_layout(function)
         if parameters is None:
             continue
-        object.__setattr__(target, name, _MicronautSelfInvocation(function, overrides[i], parameters))
+        object.__setattr__(target, name, _MicronautInterceptedCall(function, overrides[i], parameters))
 
 
 def __micronaut_create_scoped_proxy(cls, target_supplier, java_proxy_reference=None):
@@ -443,7 +564,7 @@ def __micronaut_create_scoped_proxy(cls, target_supplier, java_proxy_reference=N
             return target
 
         def _micronaut_put_override(self, name, value):
-            object.__getattribute__(self, "_micronaut_overrides")[name] = value
+            object.__getattribute__(self, "_micronaut_overrides")[name] = _micronaut_intercepted_member(cls, name, value)
 
         def _micronaut_put_setter_override(self, name, value):
             object.__getattribute__(self, "_micronaut_setter_overrides")[name] = value
@@ -470,6 +591,12 @@ def __micronaut_create_scoped_proxy(cls, target_supplier, java_proxy_reference=N
                 java_proxy = object.__getattribute__(self, "_micronaut_java_proxy")
                 if java_proxy is not None:
                     return java_proxy
+                # The host object of the proxy is the Java AOP proxy it stands in for, never the
+                # wrapper of the bean it currently resolves to. Until the Java side is bound the
+                # proxy has no host object: answering the lookup from the target would create the
+                # bean while the proxy is being created, which a bean of a custom scope that is not
+                # active at that point cannot be.
+                raise AttributeError(name)
             overrides = object.__getattribute__(self, "_micronaut_overrides")
             if name in overrides:
                 return overrides[name]

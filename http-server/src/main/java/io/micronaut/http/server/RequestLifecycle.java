@@ -19,6 +19,7 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.ReturnType;
@@ -31,6 +32,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.FilterRunner;
@@ -45,14 +47,17 @@ import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.http.server.websocket.WebSocketUpgradeCondition;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonSyntaxException;
+import io.micronaut.web.router.AnyMethodRoutes;
 import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.DefaultUriRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UriRouteMatch;
 import org.jspecify.annotations.Nullable;
@@ -67,6 +72,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
@@ -251,12 +257,15 @@ public class RequestLifecycle {
     protected final ExecutionFlow<HttpResponse<?>> onWriteError(HttpRequest<?> request, Throwable throwable) {
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         try {
+            // the route that answered, whose own filters filter the response: an error route
+            // replaces the route match of the request
+            RouteMatch<?> routeMatch = RouteAttributes.getRouteMatch(request).orElse(null);
             return onErrorNoFilter(request, throwable, propagatedContext)
                 .flatMap(response -> {
                     RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(response).orElse(null);
                     return handleStatusException(request, response, routeInfo, propagatedContext);
                 })
-                .flatMap(response -> runResponseFilters(request, response, propagatedContext))
+                .flatMap(response -> runResponseFilters(request, routeMatch, response, propagatedContext))
                 .onErrorResume(t -> createDefaultErrorResponseFlow(request, t, propagatedContext));
         } catch (Throwable e) {
             return createDefaultErrorResponseFlow(request, e, propagatedContext);
@@ -374,7 +383,10 @@ public class RequestLifecycle {
     protected final ExecutionFlow<HttpResponse<?>> runWithFilters(HttpRequest<?> request, BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
         try {
             List<GenericHttpFilter> httpFilters = routeExecutor.router.findFilters(request);
-            FilterRunner filterRunner = new FilterRunner(httpFilters, responseProvider) {
+            FilterRunner filterRunner = new LifecycleFilterRunner(null, httpFilters, (filteredRequest, propagatedContext) -> {
+                onFilteredRequest(filteredRequest);
+                return responseProvider.apply(filteredRequest, propagatedContext);
+            }) {
                 @Override
                 protected ExecutionFlow<HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {
                     RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(response).orElse(null);
@@ -393,12 +405,26 @@ public class RequestLifecycle {
         }
     }
 
+    /**
+     * Called with the request that the request filters pass downstream, before the route, the
+     * file or the error handler produces the response. Filters may replace the request, so this
+     * can be a different instance than the request that the lifecycle was started with.
+     *
+     * @param filteredRequest The request after the request filters
+     * @since 5.3.0
+     */
+    protected void onFilteredRequest(HttpRequest<?> filteredRequest) {
+        // no-op by default: only lifecycles that need the effective request record it
+    }
+
     private ExecutionFlow<HttpResponse<?>> runResponseFilters(HttpRequest<?> request,
+                                                              @Nullable RouteMatch<?> routeMatch,
                                                               HttpResponse<?> response,
                                                               PropagatedContext propagatedContext) {
-        FilterRunner filterRunner = new FilterRunner(
+        FilterRunner filterRunner = new LifecycleFilterRunner(
             routeExecutor.router.findPreMatchingFilters(request),
-            routeExecutor.router.findFilters(request),
+            // the filters of the route too, like the filters that ran for the request
+            routeExecutor.router.findFilters(request, routeMatch),
             (httpRequest, context) -> {
                 throw new IllegalStateException("Should not be called");
             }) {
@@ -421,7 +447,7 @@ public class RequestLifecycle {
         try {
             PropagatedContext propagatedContext = PropagatedContext.get();
             List<GenericHttpFilter> preMatchingFilters = routeExecutor.router.findPreMatchingFilters(request);
-            FilterRunner filterRunner = new FilterRunner(preMatchingFilters, null, new BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>>() {
+            FilterRunner filterRunner = new LifecycleFilterRunner(preMatchingFilters, null, new BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>>() {
                 @Override
                 public ExecutionFlow<HttpResponse<?>> apply(HttpRequest<?> httpRequest, PropagatedContext propagatedContext) {
                     throw new IllegalStateException("Should not be called");
@@ -433,35 +459,41 @@ public class RequestLifecycle {
 
                 @Override
                 protected List<GenericHttpFilter> findFiltersAfterRouteMatch(HttpRequest<?> request) {
-                    return routeExecutor.router.findFilters(request);
+                    // the matched route selects the filters that apply to it, and brings its own route filters
+                    return routeExecutor.router.findFilters(request, routeMatch);
                 }
 
                 @Override
                 protected ExecutionFlow<HttpResponse<?>> provideResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
-                    if (this.routeMatch == null) {
-                        //Check if there is a file for the route before returning route not found
-                        FileCustomizableResponseType fileCustomizableResponseType = findFile(request);
-                        if (fileCustomizableResponseType != null) {
-                            return ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType));
+                    onFilteredRequest(request);
+                    return provideRouteResponse(request, routeMatch, propagatedContext);
+                }
+
+                @Override
+                protected @Nullable ExecutionFlow<?> doRouteMatchAsync(HttpRequest<?> request) {
+                    try {
+                        doRouteMatch(request);
+                        return null;
+                    } catch (RuntimeException e) {
+                        CompletionStage<?> pending = RouteLocator.pendingLocation(e);
+                        if (pending == null) {
+                            throw e;
                         }
-                        return onRouteMiss(request, propagatedContext);
+                        // an asynchronous locator locates its target: match again when it has
+                        onPendingLocation(request, pending);
+                        PropagatedContext context = PropagatedContext.getOrEmpty();
+                        return CompletableFutureExecutionFlow.just(pending).flatMap(located -> context.propagate(() -> {
+                            ExecutionFlow<?> next = doRouteMatchAsync(request);
+                            return next == null ? ExecutionFlow.just(Boolean.TRUE) : next;
+                        }));
                     }
-                    // all ok proceed to try and execute the route
-                    if (routeMatch.getRouteInfo().isWebSocketRoute()) {
-                        return onStatusError(
-                            request,
-                            new NotWebSocketRequestException(),
-                            routeMatch.getDeclaringType(),
-                            propagatedContext);
-                    }
-                    return executeRoute(request, propagatedContext, routeMatch);
                 }
 
                 @Override
                 protected void doRouteMatch(HttpRequest<?> request) {
                     // Store it a field because RouteExecutor#findRouteMatch in some cases stores and sets something different
                     // This can be corrected after Cors / Options stuff migrated to pre-matching
-                    routeMatch = routeExecutor.findRouteMatch(request);
+                    routeMatch = matchRoute(request);
                     if (routeMatch == null) {
                         if (LOG.isTraceEnabled()) {
                             LOG.trace("Not matched route for request {} - {}", request.getMethodName(), request.getUri().getPath());
@@ -490,6 +522,54 @@ public class RequestLifecycle {
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
         }
+    }
+
+    /**
+     * Find the route of a request. Called after the pre-matching filters, with the request they
+     * pass on, and before the filters that apply to the matched route. A failure is answered
+     * like a failure of the route.
+     *
+     * @param request The request, after the pre-matching filters
+     * @return The match of the route, or {@code null} if no route matches
+     * @since 5.3.0
+     */
+    @Internal
+    protected @Nullable UriRouteMatch<Object, Object> matchRoute(HttpRequest<?> request) {
+        return routeExecutor.findRouteMatch(request);
+    }
+
+    /**
+     * Produce the response for the route that {@link #matchRoute(HttpRequest)} matched, after
+     * the request filters ran. By default this executes the route, or answers a request that no
+     * route matches with a file or a status error.
+     *
+     * @param request           The request, after the request filters
+     * @param routeMatch        The match of the route, or {@code null} if no route matches
+     * @param propagatedContext The propagated context
+     * @return The response flow
+     * @since 5.3.0
+     */
+    @Internal
+    protected ExecutionFlow<HttpResponse<?>> provideRouteResponse(HttpRequest<?> request,
+                                                                  @Nullable UriRouteMatch<Object, Object> routeMatch,
+                                                                  PropagatedContext propagatedContext) {
+        if (routeMatch == null) {
+            //Check if there is a file for the route before returning route not found
+            FileCustomizableResponseType fileCustomizableResponseType = findFile(request);
+            if (fileCustomizableResponseType != null) {
+                return ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType));
+            }
+            return onRouteMiss(request, propagatedContext);
+        }
+        // all ok proceed to try and execute the route
+        if (routeMatch.getRouteInfo().isWebSocketRoute()) {
+            return onStatusError(
+                request,
+                new NotWebSocketRequestException(),
+                routeMatch.getDeclaringType(),
+                propagatedContext);
+        }
+        return executeRoute(request, propagatedContext, routeMatch);
     }
 
     private ExecutionFlow<HttpResponse<?>> handleStatusException(HttpRequest<?> request,
@@ -536,8 +616,11 @@ public class RequestLifecycle {
             LOG.debug("No matching route: {} {}", httpMethod, httpRequest.getUri());
         }
 
-        // if there is no route present try to locate a route that matches a different HTTP method
-        final List<UriRouteMatch<Object, Object>> anyMatchingRoutes = routeExecutor.router.findAny(httpRequest);
+        // if there is no route present try to locate a route that matches a different HTTP method.
+        // The route of a WebSocket only matches an upgrade request, see ServerWebSocketProcessor:
+        // the request is taken as one during the lookup, so that it also finds the WebSocket at its path
+        final List<UriRouteMatch<Object, Object>> anyMatchingRoutes = WebSocketUpgradeCondition.assumingUpgrade(httpRequest,
+            () -> routeExecutor.router.findAny(httpRequest));
         final Collection<MediaType> acceptedTypes = httpRequest.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(acceptedTypes);
 
@@ -545,9 +628,19 @@ public class RequestLifecycle {
         Set<String> allowedMethods = new HashSet<>(5);
         Set<MediaType> produceableContentTypes = hasAcceptHeader ? new HashSet<>(5) : Set.of();
         Class<?> declaringType = null;
+        UriRouteMatch<?, ?> webSocketRoute = null;
         for (UriRouteMatch<?, ?> anyRoute : anyMatchingRoutes) {
+            if (anyRoute.getRouteInfo().isWebSocketRoute()) {
+                if (webSocketRoute == null) {
+                    webSocketRoute = anyRoute;
+                }
+                continue;
+            }
             final String routeMethod = anyRoute.getRouteInfo().getHttpMethodName();
-            if (!requestMethodName.equals(routeMethod)) {
+            // the route of any custom method is a route of the method of a custom request
+            boolean sameMethod = requestMethodName.equals(routeMethod)
+                || httpMethod == HttpMethod.CUSTOM && AnyMethodRoutes.CUSTOM_METHODS.equals(routeMethod);
+            if (!sameMethod) {
                 allowedMethods.add(routeMethod);
             } else {
                 if (contentType != null && !anyRoute.getRouteInfo().doesConsume(contentType)) {
@@ -583,6 +676,19 @@ public class RequestLifecycle {
                 declaringType,
                 propagatedContext);
         }
+        // the route of a WebSocket only matches an upgrade request, see ServerWebSocketProcessor:
+        // with no other route for the request, a plain request to its path is still answered for it
+        if (webSocketRoute != null) {
+            if (httpMethod == HttpMethod.GET || httpMethod == HttpMethod.HEAD) {
+                return onStatusError(
+                    httpRequest,
+                    new NotWebSocketRequestException(),
+                    webSocketRoute.getDeclaringType(),
+                    propagatedContext);
+            }
+            allowedMethods.add(HttpMethod.GET.name());
+            declaringType = webSocketRoute.getDeclaringType();
+        }
         if (!allowedMethods.isEmpty()) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Method not allowed for URI {} and method {}", httpRequest.getUri(), requestMethodName);
@@ -610,7 +716,7 @@ public class RequestLifecycle {
      */
     protected final ExecutionFlow<HttpResponse<?>> onStatusError(HttpRequest<?> request, MutableHttpResponse<?> defaultResponse, String message) {
 
-        ExecutionFlow<HttpResponse<?>> flow = executionFlowWithStatusRoute(request, defaultResponse.getStatus());
+        ExecutionFlow<HttpResponse<?>> flow = executionFlowWithStatusRoute(request, defaultResponse.getStatus(), PropagatedContext.getOrEmpty());
         if (flow != null) {
             return flow;
         }
@@ -623,6 +729,21 @@ public class RequestLifecycle {
             }
         }
         return ExecutionFlow.just(defaultResponse);
+    }
+
+    /**
+     * Called when matching the request waits for an asynchronous route locator to locate its
+     * target. A server that can tell when the client goes away, e.g. closes the connection,
+     * stops waiting for the locators of the request with {@link RouteLocator#abandonPendingLocations}
+     * then, so that the request fails instead of waiting for a target no one receives a response
+     * for, and the stages of the locators no longer reference the request.
+     *
+     * @param request The request
+     * @param located Completes when the target is located, or the request is abandoned
+     * @since 5.3.0
+     */
+    protected void onPendingLocation(HttpRequest<?> request, CompletionStage<?> located) {
+        // nothing to abandon by default: a server that knows when the client goes away overrides this
     }
 
     /**
@@ -684,7 +805,8 @@ public class RequestLifecycle {
                                                          HttpStatusException cause,
                                                          @Nullable Class<?> declaringType,
                                                          PropagatedContext propagatedContext) {
-        ExecutionFlow<HttpResponse<?>> flow  = executionFlowWithStatusRoute(request, cause.getStatus());
+        // the status route runs with the propagated context of the filters, like the error routes
+        ExecutionFlow<HttpResponse<?>> flow  = executionFlowWithStatusRoute(request, cause.getStatus(), propagatedContext);
         if (flow != null) {
             return flow;
         }
@@ -724,9 +846,28 @@ public class RequestLifecycle {
 
     @Nullable
     private ExecutionFlow<HttpResponse<?>> executionFlowWithStatusRoute(HttpRequest<?> request,
-                                                                        HttpStatus status) {
+                                                                        HttpStatus status,
+                                                                        PropagatedContext propagatedContext) {
         return routeExecutor.router.findStatusRoute(status, request)
-                .map(routeMatch -> executeRoute(request, PropagatedContext.getOrEmpty(), routeMatch))
+                .map(routeMatch -> executeRoute(request, propagatedContext, routeMatch))
                 .orElse(null);
+    }
+
+    /**
+     * The filter runner of the lifecycle: it closes the elements of a response body that a filter
+     * dropped off the event loop, since closing them may block.
+     */
+    private abstract class LifecycleFilterRunner extends FilterRunner {
+
+        LifecycleFilterRunner(@Nullable List<GenericHttpFilter> preMatchingFilters,
+                              @Nullable List<GenericHttpFilter> filters,
+                              BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
+            super(preMatchingFilters, filters, responseProvider);
+        }
+
+        @Override
+        protected void closeElements(HttpRequest<?> request, BodyElements<?> elements) {
+            routeExecutor.discardElements(request, elements);
+        }
     }
 }

@@ -69,8 +69,12 @@ class LambdaCaller:
         return self.overloads.callback(PythonInterop.fn(FunctionalOverloads.CustomBiCallback, lambda value, count: value * count))
 
     @Executable
-    def custom_ambiguous(self) -> str:
+    def custom_one_arg_plain(self) -> str:
         return self.overloads.callback(lambda value: value + "!")
+
+    @Executable
+    def custom_two_arg_plain(self) -> str:
+        return self.overloads.callback(lambda value, count: value * count)
 
     @Executable
     def explicit_consumer(self) -> str:
@@ -209,11 +213,9 @@ def join(prefix, value):
         caller.invokeMember('custom_two_arg').asString() == 'custombi:xx'
         caller.invokeMember('explicit_consumer').asString() == "True:Consumer:['explicit']"
 
-        when: "a custom overload is called with a plain lambda"
-        caller.invokeMember('custom_ambiguous')
-
-        then: "the host interop cannot choose between the custom overloads"
-        thrown(RuntimeException)
+        and: "the custom interfaces of an imported type are selected by arity as well"
+        caller.invokeMember('custom_one_arg_plain').asString() == 'custom:x!'
+        caller.invokeMember('custom_two_arg_plain').asString() == 'custombi:xx'
 
         cleanup:
         ctx?.close()

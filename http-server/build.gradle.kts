@@ -17,7 +17,8 @@ dependencies {
     testImplementation(libs.managed.netty.codec.http)
     testImplementation(libs.managed.kotlinx.coroutines.core)
     testImplementation(projects.micronautContextPropagation)
-    testRuntimeOnly(projects.micronautJsonCore)
+    testImplementation(projects.micronautJsonCore)
+    testImplementation(projects.micronautJacksonDatabind)
 
     testAnnotationProcessor(projects.micronautInjectJava)
     testAnnotationProcessor(platform(libs.test.boms.micronaut.validation))
@@ -33,6 +34,9 @@ dependencies {
     }
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
+    // the Reactive Streams TCK of the pieces of a streamed response, run by the TestNG engine
+    testImplementation(libs.reactive.streams.tck)
+    testRuntimeOnly(libs.junit.testng.engine)
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

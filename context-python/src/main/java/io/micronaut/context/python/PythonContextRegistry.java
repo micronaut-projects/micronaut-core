@@ -60,6 +60,10 @@ final class PythonContextRegistry {
     private static final AtomicInteger ACTIVE_EXECUTIONS = new AtomicInteger();
     private static final Object LOCK = new Object();
     private static final HashMap<Context, ContextState> CONTEXT_STATES = new HashMap<>();
+    /** The contexts of each engine that are being built and not registered yet; guarded by {@link #LOCK}. */
+    private static final HashMap<Engine, Integer> PENDING_BUILDS = new HashMap<>();
+    /** The {@link #onNoContexts} listeners waiting for the builds of an engine to end; guarded by {@link #LOCK}. */
+    private static final HashMap<Engine, List<Runnable>> AFTER_PENDING_BUILDS = new HashMap<>();
     private static final ScopedValue<ExecutionFrame> CURRENT_EXECUTION = ScopedValue.newInstance();
 
     private PythonContextRegistry() {
@@ -111,6 +115,47 @@ final class PythonContextRegistry {
     }
 
     /**
+     * Record that a context of the engine is being built.
+     * <p>
+     * A context exists for the engine before {@link #registerContext} can see it: an engine closed in
+     * between would close under the build. {@link #onNoContexts} therefore waits for the builds of the
+     * engine to end, which callers mark with {@link #endContextBuild} once the context is registered or
+     * the build failed.
+     *
+     * @param engine The engine the context is built on
+     */
+    static void beginContextBuild(Engine engine) {
+        synchronized (LOCK) {
+            PENDING_BUILDS.merge(engine, 1, Integer::sum);
+        }
+    }
+
+    /**
+     * Record that a build marked by {@link #beginContextBuild} ended, registered or failed.
+     *
+     * @param engine The engine the context was built on
+     */
+    static void endContextBuild(Engine engine) {
+        List<Runnable> deferred;
+        synchronized (LOCK) {
+            Integer pending = PENDING_BUILDS.get(engine);
+            if (pending == null) {
+                return;
+            }
+            if (pending > 1) {
+                PENDING_BUILDS.put(engine, pending - 1);
+                return;
+            }
+            PENDING_BUILDS.remove(engine);
+            deferred = AFTER_PENDING_BUILDS.remove(engine);
+        }
+        if (deferred != null) {
+            // gate again, now on the contexts the builds registered
+            deferred.forEach(listener -> onNoContexts(engine, listener));
+        }
+    }
+
+    /**
      * Remove a context from execution tracking and notify listeners waiting for its removal.
      * <p>
      * This is part of shutdown coordination; it clears cached helper/member state before the
@@ -126,7 +171,7 @@ final class PythonContextRegistry {
                 listeners = List.copyOf(contextState.noContextListeners);
                 // executions still in flight leave the aggregate now; their exit finds no state
                 ACTIVE_EXECUTIONS.addAndGet(-contextState.activeExecutions);
-                contextState.clear();
+                contextState.clear(context);
             } else {
                 listeners = List.of();
             }
@@ -168,7 +213,7 @@ final class PythonContextRegistry {
             ContextState state = CONTEXT_STATES.remove(context);
             if (state != null) {
                 ACTIVE_EXECUTIONS.addAndGet(-state.activeExecutions);
-                state.clear();
+                state.clear(context);
             }
         }
     }
@@ -291,6 +336,24 @@ final class PythonContextRegistry {
             return run.call();
         }
         return ScopedValue.where(CURRENT_EXECUTION, new ExecutionFrame()).call(run);
+    }
+
+    /**
+     * The context this thread is already executing in, innermost first, or {@code null}.
+     *
+     * <p>A value belongs to the context it was created in, so host code reached from guest code has
+     * to resolve a value in the context that called it rather than choose one. Choosing is not merely
+     * wasteful: taking a second context from the pool while holding one deadlocks, because the
+     * borrow waits for a context that the waiting threads are themselves holding.
+     *
+     * @return The innermost entered context, or {@code null} when this thread is not in one
+     */
+    static @Nullable Context currentContext() {
+        if (!CURRENT_EXECUTION.isBound()) {
+            return null;
+        }
+        List<Context> contexts = CURRENT_EXECUTION.get().contexts;
+        return contexts.isEmpty() ? null : contexts.get(contexts.size() - 1);
     }
 
     private static <T, X extends Throwable> T runEnteredExecutionFrame(Context ctx, ExecutionFrame frame, CallableOp<T, X> operation) throws X {
@@ -432,7 +495,7 @@ final class PythonContextRegistry {
                 if (state != null && state == snapshot.get(context)) {
                     CONTEXT_STATES.remove(context);
                     ACTIVE_EXECUTIONS.addAndGet(-state.activeExecutions);
-                    state.clear();
+                    state.clear(context);
                     dropped++;
                 }
             }
@@ -675,6 +738,8 @@ final class PythonContextRegistry {
      * <p>
      * The listener runs immediately when no registered context uses the engine. Registration and gate
      * installation happen under the registry lock so a concurrent unregister cannot miss the listener.
+     * While a context of the engine is being built (see {@link #beginContextBuild}) the gate is installed
+     * once the build ends, so it includes the context the build registers.
      *
      * @param engine The engine to observe
      * @param listener The listener to run when the engine no longer owns contexts
@@ -682,8 +747,14 @@ final class PythonContextRegistry {
     static void onNoContexts(Engine engine, Runnable listener) {
         boolean runNow;
         synchronized (LOCK) {
+            if (PENDING_BUILDS.containsKey(engine)) {
+                AFTER_PENDING_BUILDS.computeIfAbsent(engine, ignored -> new ArrayList<>()).add(listener);
+                return;
+            }
+            // registered contexts only: a state that a late lookup recreated for a context already
+            // closed and unregistered is never unregistered again, and must not hold the engine open
             List<ContextState> states = CONTEXT_STATES.entrySet().stream()
-                .filter(entry -> entry.getKey().getEngine().equals(engine))
+                .filter(entry -> entry.getValue().registered && entry.getKey().getEngine().equals(engine))
                 .map(Map.Entry::getValue)
                 .toList();
             runNow = states.isEmpty();
@@ -757,15 +828,6 @@ final class PythonContextRegistry {
     /**
      * The runtime state of one GraalPy context.
      */
-    /**
-     * The event-loop instance of a startup-context object.
-     *
-     * @param target The event-loop instance
-     * @param constructorMembers The members its own {@code __init__} set
-     */
-    record AsyncInstance(Value target, Set<String> constructorMembers) {
-    }
-
     static final class ContextState {
         final Object lock = new Object();
         /** The enterable creator instance of this context, when known. */
@@ -774,24 +836,28 @@ final class PythonContextRegistry {
         volatile boolean registered;
         /** Whether entering was probed on an instance that cannot be entered. */
         volatile boolean enterUnsupported;
-        /** Host members assigned to startup-context objects, mirrored into event-loop contexts. */
-        final IdentityHashMap<Value, Map<String, Object>> asyncMembers = new IdentityHashMap<>();
-        /**
-         * Host constructor arguments of startup-context objects, replayed into event-loop contexts. Weak: an object
-         * created per request is forgotten with its wrapper, which holds the key.
-         */
-        final WeakHashMap<Value, Object[]> asyncConstructorArguments = new WeakHashMap<>();
-        /**
-         * Event-loop instances of startup-context objects, in an event-loop context. Weak: the startup object's
-         * wrapper holds the key.
-         */
-        final Map<Value, AsyncInstance> asyncInstances = Collections.synchronizedMap(new WeakHashMap<>());
         /** Whether a Python class declares coroutine methods, keyed by its class cache key. */
         final Map<String, Boolean> coroutineClasses = new ConcurrentHashMap<>();
         /** Class-bound allocators, keyed by the precomputed class reference cache key. */
         final Map<String, Value> uninitializedInstanceFactories = new ConcurrentHashMap<>();
         /** Successfully prepared introduction classes, keyed by the precomputed class reference cache key. */
         final Set<String> preparedIntroductionClasses = ConcurrentHashMap.newKeySet();
+        /**
+         * Whether a member of a Python class is an async function, by class and member name: read for every call
+         * a caller in another context makes through a wrapper.
+         */
+        final Map<Value, Map<String, String>> asyncFunctionKinds = new ConcurrentHashMap<>();
+        /**
+         * The pooled beans that have an instance in this context, so that closing it can tell them to
+         * drop it. The instances themselves live on the bean, which is what makes a collected bean take
+         * its instances with it; this is the other half, and neither side can be weak on its own,
+         * because a stored instance reaches its bean (through the host-object back-reference) and a
+         * bean reaches the contexts it has served.
+         *
+         * <p>Weakly held, so a prototype bean collected while this context lives on is not kept
+         * reachable by having been served here.
+         */
+        final Set<PythonPooledInstance> pooledHolders = Collections.newSetFromMap(new WeakHashMap<>());
         /** Helper functions and cached pooled values, keyed by name or expression. */
         final Map<String, Value> helpers = new ConcurrentHashMap<>();
         /** The micronaut_runtime module imported into this context, once resolved. */
@@ -800,22 +866,38 @@ final class PythonContextRegistry {
         final Map<String, Value> classes = new ConcurrentHashMap<>();
         /** The Python scoped proxies standing in for generated AOP proxies of Python classes, by proxy instance. */
         final IdentityHashMap<Object, Value> scopedProxies = new IdentityHashMap<>();
+        /**
+         * The object a wrapper of another context is seen as in this one, by the object the wrapper
+         * holds. Keyed by identity, as {@link Value#equals(Object)} compares the guest objects, so one
+         * Python object of the other context is one object here however often the view asks for it and
+         * whichever wrapper asks: the view hashes, compares and prints the same object every time.
+         * Weakly keyed: the key is the value the wrapper itself holds, so the entry lives exactly as
+         * long as that wrapper and nothing here keeps it alive.
+         */
+        final Map<Value, Value> viewedValues = Collections.synchronizedMap(new WeakHashMap<>());
         private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
         private final List<Runnable> noContextListeners = new ArrayList<>();
         private int activeExecutions;
         /** Set once a close listener is registered: no new outermost execution may start. */
         private boolean closing;
 
-        private void clear() {
-            asyncMembers.clear();
-            asyncConstructorArguments.clear();
-            asyncInstances.clear();
+        private void clear(Context owner) {
+            // tell each pooled bean to forget this context before the state goes. A holder's map is a
+            // ConcurrentHashMap, so this takes no monitor: clear() runs under the registry lock, and
+            // taking a bean's lock here while a thread holding that bean's lock waits for the registry
+            // lock is the deadlock this ordering avoids.
+            for (PythonPooledInstance holder : List.copyOf(pooledHolders)) {
+                holder.forget(owner);
+            }
+            pooledHolders.clear();
             coroutineClasses.clear();
             uninitializedInstanceFactories.clear();
             preparedIntroductionClasses.clear();
+            asyncFunctionKinds.clear();
             helpers.clear();
             classes.clear();
             scopedProxies.clear();
+            viewedValues.clear();
             runtimeModule.set(null);
             registered = false;
             noActiveExecutionsListeners.clear();

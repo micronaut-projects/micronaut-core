@@ -14,6 +14,12 @@ final class EmbeddedConnectionManager extends ConnectionManager {
     final List<ChannelFuture> openFutures;
 
     private int i;
+    /**
+     * Shared between all pools, so that a pool that is created after an unused pool has been
+     * evicted continues with the next event loop (i.e. the next embedded channel). Tests may
+     * reset it to make the next new connection land on the event loop of the next channel.
+     */
+    final AtomicInteger preferredPoolCounter = new AtomicInteger();
 
     EmbeddedConnectionManager(ConnectionManager from, List<EmbeddedChannel> channels, List<ChannelFuture> openFutures) {
         super(from);
@@ -28,7 +34,12 @@ final class EmbeddedConnectionManager extends ConnectionManager {
             int index = i++;
             var connection = channels.get(index);
             return openFutures.get(index)
-                .addListener(future -> connection.pipeline().addLast(channelInitializer));
+                .addListener(future -> {
+                    // like a real failed connect, a failed open never initializes the channel
+                    if (future.isSuccess()) {
+                        connection.pipeline().addLast(channelInitializer);
+                    }
+                });
         } catch (Throwable t) {
             // print it immediately to make sure it's not swallowed
             t.printStackTrace();
@@ -39,8 +50,7 @@ final class EmbeddedConnectionManager extends ConnectionManager {
     @Override
     PoolHolder createPool(NettyHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
         PoolHolder pool = super.createPool(requestKey, channels.stream().map(EmbeddedChannel::eventLoop).toList());
-        AtomicInteger j = new AtomicInteger();
-        ((Pool49) pool.pool).pickPreferredPoolOverride = l -> l.get((j.getAndIncrement()) % l.size());
+        ((Pool49) pool.pool).pickPreferredPoolOverride = l -> l.get(preferredPoolCounter.getAndIncrement() % l.size());
         return pool;
     }
 }

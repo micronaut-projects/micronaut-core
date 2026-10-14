@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog;
 
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.server.netty.handler.accesslog.element.AccessLog;
 import io.micronaut.http.server.netty.handler.accesslog.element.AccessLogFormatParser;
@@ -55,6 +56,17 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
      * The default logger name.
      */
     public static final String HTTP_ACCESS_LOGGER = "HTTP_ACCESS_LOGGER";
+
+    /**
+     * Channel attribute that holds the request whose response headers are being written. The
+     * server handlers set it only for the duration of that write, so access log elements can read
+     * the attributes of the request that the response belongs to, also with pipelined HTTP/1
+     * requests and multiplexed HTTP/2 streams.
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    public static final AttributeKey<Object> RESPONSE_REQUEST = AttributeKey.valueOf("micronaut.access-log.response-request");
 
     static final String H2_PROTOCOL_NAME = "HTTP/2.0";
     private static final AttributeKey<AccessLogHolder> ACCESS_LOGGER = AttributeKey.valueOf("ACCESS_LOGGER");

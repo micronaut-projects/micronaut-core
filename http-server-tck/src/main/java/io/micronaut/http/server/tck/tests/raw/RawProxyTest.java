@@ -33,15 +33,22 @@ import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.client.RawHttpClient;
+import io.micronaut.http.client.RawRequestOptions;
+import io.micronaut.http.server.util.ForwardedHeaders;
+import io.micronaut.http.util.HttpHeadersUtil;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.runtime.server.EmbeddedServer;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -55,6 +62,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -79,6 +87,12 @@ import static org.junit.jupiter.api.Assertions.fail;
  * A route that relays a request through the {@link RawHttpClient} and returns the raw client
  * response. The response bytes must be streamed back unchanged, response filters must keep them,
  * and the upstream response must be closed whenever the server does not send it.
+ *
+ * <p>Tests tagged {@value #UPSTREAM_CANCELLATION} check that the upstream exchange is cancelled
+ * when the server drops it or the client disconnects, and tests tagged {@value #STREAMING_RELAY}
+ * check back-pressure, streamed uploads and truncation on an upstream failure. They need a
+ * server that observes disconnects and demand, which servlet containers do not expose, so a
+ * runner of such a server can exclude these tags.</p>
  */
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -87,6 +101,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 })
 public class RawProxyTest {
     public static final String SPEC_NAME = "RawProxyTest";
+    public static final String UPSTREAM_CANCELLATION = "upstream-cancellation";
+    public static final String STREAMING_RELAY = "streaming-relay";
 
     private static final int CHUNK_SIZE = 8192;
     private static final int LARGE_SIZE = 10 * 1024 * 1024;
@@ -129,26 +145,51 @@ public class RawProxyTest {
     }
 
     @Test
+    void responseFilterReplacingResponseIsSent() throws IOException {
+        try (ServerUnderTest server = server()) {
+            assertReplacedResponse(server, "replaced-sent");
+        }
+    }
+
+    @Test
+    @Tag(UPSTREAM_CANCELLATION)
     void responseFilterReplacingResponseClosesUpstream() throws Exception {
         try (ServerUnderTest server = server()) {
-            HttpResponse<String> response = server.exchange(HttpRequest.GET("/raw-proxy/replaced"), String.class);
-            assertEquals(HttpStatus.OK, response.getStatus());
-            assertEquals("replaced", response.body());
+            assertReplacedResponse(server, "replaced");
             assertUpstreamCancelled(server, "replaced");
         }
     }
 
+    private static void assertReplacedResponse(ServerUnderTest server, String key) {
+        HttpResponse<String> response = server.exchange(HttpRequest.GET("/raw-proxy/replaced?key=" + key), String.class);
+        assertEquals(HttpStatus.OK, response.getStatus());
+        assertEquals("replaced", response.body());
+    }
+
     @Test
-    void headRequestClosesUpstream() throws Exception {
+    void headRequestHasNoBody() throws IOException {
         try (ServerUnderTest server = server()) {
-            HttpResponse<byte[]> response = server.exchange(HttpRequest.HEAD("/raw-proxy/head"), byte[].class);
-            assertEquals(HttpStatus.OK, response.getStatus());
-            assertTrue(response.getBody().map(b -> b.length == 0).orElse(true));
-            assertUpstreamCancelled(server, "head");
+            assertHeadResponse(server, "head-sent");
         }
     }
 
     @Test
+    @Tag(UPSTREAM_CANCELLATION)
+    void headRequestClosesUpstream() throws Exception {
+        try (ServerUnderTest server = server()) {
+            assertHeadResponse(server, "head");
+            assertUpstreamCancelled(server, "head");
+        }
+    }
+
+    private static void assertHeadResponse(ServerUnderTest server, String key) {
+        HttpResponse<byte[]> response = server.exchange(HttpRequest.HEAD("/raw-proxy/head?key=" + key), byte[].class);
+        assertEquals(HttpStatus.OK, response.getStatus());
+        assertTrue(response.getBody().map(b -> b.length == 0).orElse(true));
+    }
+
+    @Test
+    @Tag(STREAMING_RELAY)
     void streamingUploadIsRelayed() throws IOException {
         try (ServerUnderTest server = server()) {
             byte[] upload = content(0, UPLOAD_SIZE);
@@ -162,27 +203,52 @@ public class RawProxyTest {
     }
 
     @Test
-    void bodyClearedAfterReplacingTheBytesIsEmpty() throws Exception {
+    void bodyClearedAfterReplacingTheBytesIsEmpty() throws IOException {
         try (ServerUnderTest server = server()) {
-            // a filter replaced the bytes with an object body, then cleared it: the bytes stay closed
-            HttpResponse<String> response = server.exchange(HttpRequest.GET("/raw-proxy/cleared"), String.class);
-            assertEquals(HttpStatus.OK, response.getStatus());
-            assertTrue(response.getBody().map(String::isEmpty).orElse(true), () -> "body: " + response.getBody());
+            assertClearedResponse(server, "cleared-sent");
+        }
+    }
+
+    @Test
+    @Tag(UPSTREAM_CANCELLATION)
+    void bodyClearedAfterReplacingTheBytesClosesUpstream() throws Exception {
+        try (ServerUnderTest server = server()) {
+            assertClearedResponse(server, "cleared");
             assertUpstreamCancelled(server, "cleared");
         }
     }
 
+    private static void assertClearedResponse(ServerUnderTest server, String key) {
+        // a filter replaced the bytes with an object body, then cleared it: the bytes stay closed
+        HttpResponse<String> response = server.exchange(HttpRequest.GET("/raw-proxy/cleared?key=" + key), String.class);
+        assertEquals(HttpStatus.OK, response.getStatus());
+        assertTrue(response.getBody().map(String::isEmpty).orElse(true), () -> "body: " + response.getBody());
+    }
+
     @Test
-    void wrapperBodyReplacesTheWrappedBytes() throws Exception {
+    void wrapperBodyReplacesTheWrappedBytes() throws IOException {
         try (ServerUnderTest server = server()) {
-            HttpResponse<String> response = server.exchange(HttpRequest.GET("/raw-proxy/wrapper-replaced"), String.class);
-            assertEquals(HttpStatus.OK, response.getStatus());
-            assertEquals("replacement", response.body());
-            assertUpstreamCancelled(server, "wrapper-replaced");
+            assertWrapperReplacedResponse(server, "wrapper-replaced-sent");
         }
     }
 
     @Test
+    @Tag(UPSTREAM_CANCELLATION)
+    void wrapperBodyReplacingTheWrappedBytesClosesUpstream() throws Exception {
+        try (ServerUnderTest server = server()) {
+            assertWrapperReplacedResponse(server, "wrapper-replaced");
+            assertUpstreamCancelled(server, "wrapper-replaced");
+        }
+    }
+
+    private static void assertWrapperReplacedResponse(ServerUnderTest server, String key) {
+        HttpResponse<String> response = server.exchange(HttpRequest.GET("/raw-proxy/wrapper-replaced?key=" + key), String.class);
+        assertEquals(HttpStatus.OK, response.getStatus());
+        assertEquals("replacement", response.body());
+    }
+
+    @Test
+    @Tag(STREAMING_RELAY)
     void slowUpstreamStallsUpload() throws Exception {
         try (ServerUnderTest server = server();
              Socket socket = connect(server)) {
@@ -233,6 +299,37 @@ public class RawProxyTest {
     }
 
     @Test
+    void proxyOptionsAndForwardedHeaders() throws IOException {
+        try (ServerUnderTest server = server()) {
+            HttpResponse<String> response = server.exchange(
+                HttpRequest.GET("/raw-proxy/gateway").header("X-Forwarded-For", "198.51.100.1").header("Keep-Alive", "timeout=5"),
+                String.class
+            );
+            assertEquals(HttpStatus.OK, response.getStatus());
+            Map<String, String> received = new java.util.TreeMap<>();
+            for (String line : response.body().split("\n")) {
+                int separator = line.indexOf('=');
+                received.put(line.substring(0, separator), line.substring(separator + 1));
+            }
+            // the untrusted X-Forwarded-For of the client is replaced, not appended to
+            assertFalse(received.get("x-forwarded-for").contains("198.51.100.1"), received.toString());
+            assertFalse(received.get("x-forwarded-for").isEmpty(), received.toString());
+            // the scheme the gateway was reached with, e.g. https for an HTTP/2 server with TLS
+            String scheme = server.getURL().orElseThrow().getProtocol();
+            assertEquals(scheme, received.get("x-forwarded-proto"));
+            assertTrue(received.get("forwarded").contains("proto=" + scheme + ";"), received.toString());
+            // the host header is computed from the upstream URI, the inbound one is in X-Forwarded-Host
+            assertEquals(received.get("x-forwarded-host") + ":" + received.get("x-forwarded-port"), response.getHeaders().get("X-Inbound-Host"));
+            assertEquals("", received.get("keep-alive"));
+            // hop-by-hop headers of the upstream response are removed. Keep-Alive is not checked
+            // here: some servers add their own to the response they send
+            assertFalse(response.getHeaders().contains(HttpHeaders.PROXY_AUTHENTICATE));
+            assertEquals("kept", response.getHeaders().get("X-End-To-End"));
+        }
+    }
+
+    @Test
+    @Tag(UPSTREAM_CANCELLATION)
     void clientDisconnectCancelsUpstream() throws Exception {
         try (ServerUnderTest server = server();
              Socket socket = connect(server)) {
@@ -255,6 +352,7 @@ public class RawProxyTest {
     }
 
     @Test
+    @Tag(STREAMING_RELAY)
     void upstreamFailureTruncatesResponse() throws Exception {
         try (ServerUnderTest server = server();
              Socket socket = connect(server)) {
@@ -315,7 +413,7 @@ public class RawProxyTest {
                 public X509Certificate[] getAcceptedIssuers() {
                     return new X509Certificate[0];
                 }
-            }}, null);
+            } }, null);
             return context;
         } catch (GeneralSecurityException e) {
             throw new IOException(e);
@@ -358,9 +456,20 @@ public class RawProxyTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class Upstream {
         private final UpstreamEvents events;
+        /**
+         * The scheduler of the delay, owned by this test: Reactor's shared parallel scheduler
+         * would start its threads here, and they would keep the leak detection resource scope
+         * of this test class for every later test that runs on them.
+         */
+        private final Scheduler delayScheduler = Schedulers.newSingle("raw-proxy-upstream", true);
 
         Upstream(UpstreamEvents events) {
             this.events = events;
+        }
+
+        @PreDestroy
+        void close() {
+            delayScheduler.dispose();
         }
 
         @Get(value = "/stream", produces = MediaType.APPLICATION_OCTET_STREAM)
@@ -386,7 +495,18 @@ public class RawProxyTest {
         Publisher<byte[]> broken() {
             return Flux.range(0, BrokenUpstream.CHUNKS_BEFORE_FAILURE)
                 .map(i -> content((long) i * CHUNK_SIZE, CHUNK_SIZE))
-                .concatWith(Mono.delay(Duration.ofMillis(200)).then(Mono.error(new IllegalStateException("Upstream failure"))));
+                .concatWith(Mono.delay(Duration.ofMillis(200), delayScheduler).then(Mono.error(new IllegalStateException("Upstream failure"))));
+        }
+
+        @Get(value = "/inspect", produces = MediaType.TEXT_PLAIN)
+        HttpResponse<String> inspect(HttpRequest<?> request) {
+            StringBuilder received = new StringBuilder();
+            for (String name : List.of("host", "x-forwarded-for", "x-forwarded-proto", "x-forwarded-host", "x-forwarded-port", "forwarded", "keep-alive")) {
+                received.append(name).append('=').append(String.join(", ", request.getHeaders().getAll(name))).append('\n');
+            }
+            return HttpResponse.ok(received.toString())
+                .header("X-End-To-End", "kept")
+                .header(HttpHeaders.PROXY_AUTHENTICATE, "Basic");
         }
 
         @Post(value = "/slow-upload", consumes = MediaType.APPLICATION_OCTET_STREAM, produces = MediaType.TEXT_PLAIN)
@@ -451,6 +571,21 @@ public class RawProxyTest {
             return relay(request, "/raw-upstream/slow-upload");
         }
 
+        @Get("/gateway")
+        Mono<HttpResponse<?>> gateway(ServerHttpRequest<?> request) {
+            MutableHttpRequest<Object> outbound = HttpRequest.create(request.getMethod(), upstream("/raw-upstream/inspect").toString());
+            request.getHeaders().forEach((name, values) -> values.forEach(value -> outbound.header(name, value)));
+            // a proxy removes the hop-by-hop headers in both directions
+            HttpHeadersUtil.stripHopByHopHeaders(outbound.getHeaders());
+            ForwardedHeaders.apply(request, outbound);
+            return Mono.<HttpResponse<?>>from(client.exchange(outbound, request.byteBody().move(), null, RawRequestOptions.proxy()))
+                .map(response -> {
+                    MutableHttpResponse<?> relayed = response.toMutableResponse();
+                    HttpHeadersUtil.stripHopByHopHeaders(relayed.getHeaders());
+                    return relayed.header("X-Inbound-Host", request.getHeaders().get(HttpHeaders.HOST));
+                });
+        }
+
         @Get("/stream")
         Mono<HttpResponse<?>> stream(ServerHttpRequest<?> request, @QueryValue long size) {
             return relay(request, "/raw-upstream/stream?size=" + size);
@@ -470,26 +605,26 @@ public class RawProxyTest {
         }
 
         @Get("/replaced")
-        Mono<HttpResponse<?>> replaced(ServerHttpRequest<?> request) {
-            return relay(request, "/raw-upstream/endless?key=replaced");
+        Mono<HttpResponse<?>> replaced(ServerHttpRequest<?> request, @QueryValue String key) {
+            return relay(request, "/raw-upstream/endless?key=" + key);
         }
 
         @Get("/head")
-        Mono<HttpResponse<?>> head(ServerHttpRequest<?> request) {
+        Mono<HttpResponse<?>> head(ServerHttpRequest<?> request, @QueryValue String key) {
             // always a GET upstream, so the upstream sends a body that the server must drop
-            return relay(request, HttpRequest.GET(upstream("/raw-upstream/endless?key=head")));
+            return relay(request, HttpRequest.GET(upstream("/raw-upstream/endless?key=" + key)));
         }
 
         @Get("/cleared")
-        Mono<HttpResponse<?>> cleared(ServerHttpRequest<?> request) {
-            return relay(request, "/raw-upstream/endless?key=cleared");
+        Mono<HttpResponse<?>> cleared(ServerHttpRequest<?> request, @QueryValue String key) {
+            return relay(request, "/raw-upstream/endless?key=" + key);
         }
 
         @Get("/wrapper-replaced")
         @SuppressWarnings("unchecked")
-        Mono<HttpResponse<?>> wrapperReplaced(ServerHttpRequest<?> request) {
+        Mono<HttpResponse<?>> wrapperReplaced(ServerHttpRequest<?> request, @QueryValue String key) {
             // a wrapper whose object body supersedes the bytes of the wrapped raw response
-            return relay(request, "/raw-upstream/endless?key=wrapper-replaced")
+            return relay(request, "/raw-upstream/endless?key=" + key)
                 .map(response -> new HttpResponseWrapper<>((HttpResponse<Object>) response) {
                     @Override
                     public Optional<Object> getBody() {

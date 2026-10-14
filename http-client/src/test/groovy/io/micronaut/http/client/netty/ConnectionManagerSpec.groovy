@@ -4,12 +4,19 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory
+import io.micronaut.core.io.buffer.ByteBuffer
+import io.micronaut.core.io.buffer.ReadBuffer
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.HttpVersion
 import io.micronaut.http.MediaType
+import io.micronaut.http.body.ByteBodyFactory
+import io.micronaut.http.body.CloseableByteBody
+import io.micronaut.http.body.stream.BodySizeLimits
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.RawHttpClient
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.client.exceptions.ReadTimeoutException
 import io.micronaut.http.client.multipart.MultipartBody
@@ -31,6 +38,7 @@ import io.netty.channel.ChannelInitializer
 import io.netty.channel.ChannelPromise
 import io.netty.channel.EventLoop
 import io.netty.channel.ServerChannel
+import io.netty.channel.WriteBufferWaterMark
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpContent
@@ -51,6 +59,7 @@ import io.netty.handler.codec.http2.DefaultHttp2GoAwayFrame
 import io.netty.handler.codec.http2.DefaultHttp2Headers
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame
 import io.netty.handler.codec.http2.DefaultHttp2PingFrame
+import io.netty.handler.codec.http2.DefaultHttp2SettingsFrame
 import io.netty.handler.codec.http2.Http2Error
 import io.netty.handler.codec.http2.Http2FrameCodec
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
@@ -61,6 +70,7 @@ import io.netty.handler.codec.http2.Http2HeadersFrame
 import io.netty.handler.codec.http2.Http2PingFrame
 import io.netty.handler.codec.http2.Http2ResetFrame
 import io.netty.handler.codec.http2.Http2ServerUpgradeCodec
+import io.netty.handler.codec.http2.Http2Settings
 import io.netty.handler.codec.http2.Http2SettingsAckFrame
 import io.netty.handler.codec.http2.Http2SettingsFrame
 import io.netty.handler.codec.http2.Http2Stream
@@ -74,6 +84,9 @@ import jakarta.inject.Singleton
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.function.Executable
 import org.spockframework.runtime.model.parallel.ExecutionMode
+import org.reactivestreams.Subscription
+import reactor.core.Disposable
+import reactor.core.publisher.BaseSubscriber
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Execution
@@ -161,6 +174,69 @@ class ConnectionManagerSpec extends Specification {
         conn.testStreamingResponse(r1)
 
         assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 streaming window update is flushed when consumption is signalled after the read'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        patch(client, conn)
+
+        long received = 0
+        boolean complete = false
+        BaseSubscriber<ByteBuffer<?>> subscriber = new BaseSubscriber<ByteBuffer<?>>() {
+            @Override
+            protected void hookOnSubscribe(Subscription subscription) {
+                // no demand yet: the consumer is slow
+            }
+
+            @Override
+            protected void hookOnNext(ByteBuffer<?> value) {
+                received += value.readableBytes()
+            }
+
+            @Override
+            protected void hookOnComplete() {
+                complete = true
+            }
+        }
+        Flux.from(client.dataStream(HttpRequest.GET('https://example.com/foo'))).subscribe(subscriber)
+        conn.exchangeSettings()
+        conn.advance()
+        Http2HeadersFrame request = conn.serverChannel.readInbound()
+
+        int frameSize = 16384
+        int frames = 16
+        def responseHeaders = new DefaultHttp2Headers()
+        responseHeaders.add(Http2Headers.PseudoHeaderName.STATUS.value(), "200")
+        conn.serverChannel.write(new DefaultHttp2HeadersFrame(responseHeaders, false).stream(request.stream()))
+        for (int i = 0; i < frames; i++) {
+            conn.serverChannel.write(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(new byte[frameSize]), i == frames - 1).stream(request.stream()))
+        }
+        // the server can only send as much as the flow control window of the client allows. All
+        // of it arrives in one read, so the client has a read pending when it has consumed it
+        conn.serverChannel.config().setWriteBufferWaterMark(new WriteBufferWaterMark(1 << 20, 1 << 21))
+        conn.serverChannel.flush()
+        conn.advance()
+
+        when:
+        // the consumer only now asks for the data, outside the read of the connection
+        subscriber.request(Long.MAX_VALUE)
+        conn.advance()
+
+        then:
+        // the window update reached the server, which sent the rest
+        received == (long) frameSize * frames
+        complete
 
         cleanup:
         client.close()
@@ -412,6 +488,249 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'http2 server max concurrent streams limits pool dispatch'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        // the server only allows a single concurrent stream
+        conn.setupHttp2Tls(new Http2Settings().maxConcurrentStreams(1))
+        patch(client, conn)
+
+        when:
+        // start three requests before the handshake completes
+        def f1 = Mono.from(client.exchange('https://example.com/r1')).toFuture()
+        f1.exceptionally(t -> t.printStackTrace())
+        def f2 = Mono.from(client.exchange('https://example.com/r2')).toFuture()
+        f2.exceptionally(t -> t.printStackTrace())
+        def f3 = Mono.from(client.exchange('https://example.com/r3')).toFuture()
+        f3.exceptionally(t -> t.printStackTrace())
+        conn.exchangeSettings()
+        then:
+        // only the first request is dispatched, the others stay pending in the pool
+        def req1 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req1.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r1'
+        conn.serverChannel.readInbound() == null
+        !f1.isDone()
+        !f2.isDone()
+        !f3.isDone()
+
+        when:
+        conn.respondOk(req1.stream())
+        conn.advance()
+        then:
+        f1.get().status() == HttpStatus.OK
+        // the completed stream frees up a slot for the second request
+        def req2 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req2.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r2'
+        req2.stream().id() != req1.stream().id()
+        conn.serverChannel.readInbound() == null
+        !f2.isDone()
+        !f3.isDone()
+
+        when:
+        conn.respondOk(req2.stream())
+        conn.advance()
+        then:
+        f2.get().status() == HttpStatus.OK
+        def req3 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req3.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r3'
+        conn.serverChannel.readInbound() == null
+        !f3.isDone()
+
+        when:
+        conn.respondOk(req3.stream())
+        conn.advance()
+        then:
+        f3.get().status() == HttpStatus.OK
+        conn.serverChannel.readInbound() == null
+
+        // the same connection is reused for all requests
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 server max concurrent streams of zero queues requests until raised'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        // the server initially does not allow any streams
+        conn.setupHttp2Tls(new Http2Settings().maxConcurrentStreams(0))
+        patch(client, conn)
+
+        when:
+        def f1 = Mono.from(client.exchange('https://example.com/r1')).toFuture()
+        f1.exceptionally(t -> t.printStackTrace())
+        conn.exchangeSettings()
+        then:
+        // the request stays pending in the pool
+        conn.serverChannel.readInbound() == null
+        !f1.isDone()
+
+        when:
+        // the server raises the limit, the pending request is dispatched
+        conn.sendMaxConcurrentStreams(1)
+        then:
+        def req1 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req1.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r1'
+
+        when:
+        conn.respondOk(req1.stream())
+        conn.advance()
+        then:
+        f1.get().status() == HttpStatus.OK
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 server lowers max concurrent streams while streams are in flight'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls(new Http2Settings().maxConcurrentStreams(3))
+        patch(client, conn)
+
+        when:
+        def f1 = Mono.from(client.exchange('https://example.com/r1')).toFuture()
+        f1.exceptionally(t -> t.printStackTrace())
+        def f2 = Mono.from(client.exchange('https://example.com/r2')).toFuture()
+        f2.exceptionally(t -> t.printStackTrace())
+        def f3 = Mono.from(client.exchange('https://example.com/r3')).toFuture()
+        f3.exceptionally(t -> t.printStackTrace())
+        conn.exchangeSettings()
+        then:
+        // all three requests are dispatched immediately
+        def req1 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req1.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r1'
+        def req2 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req2.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r2'
+        def req3 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req3.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r3'
+        conn.serverChannel.readInbound() == null
+
+        when:
+        // the server lowers the limit while the three streams are in flight
+        conn.sendMaxConcurrentStreams(1)
+        def f4 = Mono.from(client.exchange('https://example.com/r4')).toFuture()
+        f4.exceptionally(t -> t.printStackTrace())
+        conn.advance()
+        then:
+        // in-flight streams are unaffected, but no new stream is opened
+        conn.serverChannel.readInbound() == null
+        !f1.isDone()
+        !f4.isDone()
+
+        when:
+        conn.respondOk(req1.stream())
+        conn.advance()
+        then:
+        // two streams are still in flight, which is above the new limit
+        f1.get().status() == HttpStatus.OK
+        conn.serverChannel.readInbound() == null
+        !f4.isDone()
+
+        when:
+        conn.respondOk(req2.stream())
+        conn.advance()
+        then:
+        // one stream in flight, still at the limit
+        f2.get().status() == HttpStatus.OK
+        conn.serverChannel.readInbound() == null
+        !f4.isDone()
+
+        when:
+        conn.respondOk(req3.stream())
+        conn.advance()
+        then:
+        // now the fourth request can be dispatched
+        f3.get().status() == HttpStatus.OK
+        def req4 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req4.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r4'
+
+        when:
+        conn.respondOk(req4.stream())
+        conn.advance()
+        then:
+        f4.get().status() == HttpStatus.OK
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 server raises max concurrent streams dispatches pending requests'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls(new Http2Settings().maxConcurrentStreams(1))
+        patch(client, conn)
+
+        when:
+        def f1 = Mono.from(client.exchange('https://example.com/r1')).toFuture()
+        f1.exceptionally(t -> t.printStackTrace())
+        def f2 = Mono.from(client.exchange('https://example.com/r2')).toFuture()
+        f2.exceptionally(t -> t.printStackTrace())
+        def f3 = Mono.from(client.exchange('https://example.com/r3')).toFuture()
+        f3.exceptionally(t -> t.printStackTrace())
+        conn.exchangeSettings()
+        then:
+        // only the first request is dispatched
+        def req1 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req1.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r1'
+        conn.serverChannel.readInbound() == null
+
+        when:
+        // the server raises the limit, the pending requests are dispatched
+        conn.sendMaxConcurrentStreams(3)
+        then:
+        def req2 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req2.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r2'
+        def req3 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req3.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r3'
+        conn.serverChannel.readInbound() == null
+
+        when:
+        conn.respondOk(req1.stream())
+        conn.respondOk(req2.stream())
+        conn.respondOk(req3.stream())
+        conn.advance()
+        then:
+        f1.get().status() == HttpStatus.OK
+        f2.get().status() == HttpStatus.OK
+        f3.get().status() == HttpStatus.OK
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     def 'http1 reuse'() {
         def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
         def client = ctx.getBean(DefaultHttpClient)
@@ -480,6 +799,45 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'customizer handlers see the response on #protocol'(String protocol) {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+                'spec.recorder': true,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+        def recorder = ctx.getBean(ResponseRecorder)
+
+        when:
+        if (protocol == 'http2') {
+            def conn = new EmbeddedTestConnectionHttp2()
+            conn.setupHttp2Tls()
+            patch(client, conn)
+            def future = conn.testExchangeRequest(client)
+            conn.exchangeSettings()
+            conn.testExchangeResponse(future)
+        } else {
+            def conn = new EmbeddedTestConnectionHttp1()
+            conn.setupHttp1()
+            patch(client, conn)
+            conn.testExchangeResponse(conn.testExchangeRequest(client))
+        }
+
+        then:
+        // a handler appended by the customizer comes before the response handler, so it observes
+        // the response head and the last content
+        recorder.messages.any { it instanceof io.netty.handler.codec.http.HttpResponse }
+        recorder.messages.any { it instanceof LastHttpContent }
+
+        cleanup:
+        client.close()
+        ctx.close()
+
+        where:
+        protocol << ['http1', 'http2']
+    }
+
     def 'http1 plain text customization'() {
         given:
         def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
@@ -525,6 +883,43 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+
+    def 'http1 request handlers added by a customizer do not collide on a reused connection'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'spec.name': ConnectionManagerSpec.simpleName,
+                'spec.request-handler': true,
+                'micronaut.http.client.pool.max-concurrent-http1-connections': 1,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+        def customizer = ctx.getBean(RequestHandlerCustomizer)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn)
+
+        when:
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+        def namesBetweenRequests = conn.clientChannel.pipeline().names()
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+
+        then:
+        // no duplicate name error when adding the handler for the second request
+        customizer.errors.isEmpty()
+        // the handler was added exactly once for each request, and saw that request's response
+        customizer.handlerCounts == [1, 1]
+        customizer.handlers.size() == 2
+        customizer.handlers.every { it.responses == 1 }
+        // it is removed when the request completes, and the connection is kept
+        !namesBetweenRequests.contains(RequestHandlerCustomizer.NAME)
+        !conn.clientChannel.pipeline().names().contains(RequestHandlerCustomizer.NAME)
+        conn.clientChannel.pipeline().get(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE) != null
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
 
     def 'http2 customization'(boolean secure) {
         given:
@@ -889,6 +1284,223 @@ class ConnectionManagerSpec extends Specification {
         }
         assert futures.get(5).isDone()
         assert futures.get(5).completedExceptionally
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'cancelled pending acquire does not count towards max pending acquires'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.pool.max-pending-acquires': 1,
+                'micronaut.http.client.pool.max-pending-connections': 1,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+
+        conn.openFuture = new CompletableFuture<>() // delay open
+
+        patch(client, conn)
+
+        def subscription = Mono.from(client.exchange(conn.scheme + '://example.com/foo')).subscribe()
+        conn.advance()
+        subscription.dispose()
+        conn.advance()
+
+        // the cancelled acquire must not block this one
+        def future = conn.testExchangeRequest(client)
+        conn.advance()
+        assert !future.isDone()
+
+        conn.openFuture.complete(null)
+        conn.advance()
+
+        // the new request gets the connection, not the cancelled one
+        conn.testExchangeResponse(future)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'unused pools are evicted once their connections close'() {
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        List<EmbeddedTestConnectionHttp1> conns = (0..<3).collect {
+            def conn = new EmbeddedTestConnectionHttp1()
+            conn.setupHttp1()
+            conn
+        }
+        patch(client, *conns)
+
+        conns.eachWithIndex { conn, i ->
+            def host = "host${i}.example".toString()
+            conn.testExchangeResponse(conn.testExchangeRequest(client, host), "keep-alive", host)
+        }
+        // idle connections keep their pools alive
+        assert client.connectionManager.poolCount() == 3
+        assertPoolConnections(client, 3)
+
+        when:
+        conns.each {
+            it.clientChannel.close()
+            it.advance()
+        }
+
+        then:
+        client.connectionManager.poolCount() == 0
+        assertPoolConnections(client, 0)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'pool with an idle connection is kept and a new pool is created after eviction'() {
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp1()
+        conn1.setupHttp1()
+        def conn2 = new EmbeddedTestConnectionHttp1()
+        conn2.setupHttp1()
+        patch(client, conn1, conn2)
+
+        conn1.testExchangeResponse(conn1.testExchangeRequest(client))
+        def pool = client.connectionManager.pools().values().first()
+
+        // the idle connection is reused, and the pool stays
+        conn1.testExchangeResponse(conn1.testExchangeRequest(client))
+        assert client.connectionManager.poolCount() == 1
+        assert client.connectionManager.pools().values().first() == pool
+        assertPoolConnections(client, 1)
+
+        conn1.clientChannel.close()
+        conn1.advance()
+        assert client.connectionManager.poolCount() == 0
+        assert ((Pool49) pool.pool).isRetired()
+        // a retired pool refuses new requests, so that callers look up a fresh one
+        assert pool.acquire(null, null) == null
+
+        when:
+        // the next connection is conn2, make sure the request prefers its event loop
+        ((EmbeddedConnectionManager) client.connectionManager).preferredPoolCounter.set(1)
+        conn2.testExchangeResponse(conn2.testExchangeRequest(client))
+
+        then:
+        client.connectionManager.poolCount() == 1
+        client.connectionManager.pools().values().first() != pool
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'request does not get stuck on a retired pool that is still in the pool map'() {
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp1()
+        conn1.setupHttp1()
+        def conn2 = new EmbeddedTestConnectionHttp1()
+        conn2.setupHttp1()
+        patch(client, conn1, conn2)
+
+        conn1.testExchangeResponse(conn1.testExchangeRequest(client))
+        def key = client.connectionManager.pools().keySet().first()
+        def pool = client.connectionManager.pools().get(key)
+        conn1.clientChannel.close()
+        conn1.advance()
+        assert ((Pool49) pool.pool).isRetired()
+
+        // simulate a request that looked up the pool just before it retired
+        client.connectionManager.pools().put(key, pool)
+
+        when:
+        conn2.testExchangeResponse(conn2.testExchangeRequest(client))
+
+        then:
+        client.connectionManager.poolCount() == 1
+        client.connectionManager.pools().get(key) != pool
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    @Timeout(30)
+    def 'failed connect evicts the pool'() {
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        conn.openFuture = new CompletableFuture<>() // delay open
+        patch(client, conn)
+
+        def future = Mono.from(client.exchange('http://example.com/foo')).toFuture()
+        conn.advance()
+        assert !future.isDone()
+        assert client.connectionManager.poolCount() == 1
+
+        when:
+        conn.openFuture.completeExceptionally(new IOException('connect failed'))
+        conn.advance()
+
+        then:
+        future.isCompletedExceptionally()
+        client.connectionManager.poolCount() == 0
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    @Timeout(30)
+    def 'pending acquire still completes when another connect fails'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.pool.max-pending-connections': 1,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp1()
+        conn1.setupHttp1()
+        conn1.openFuture = new CompletableFuture<>() // delay open
+        def conn2 = new EmbeddedTestConnectionHttp1()
+        conn2.setupHttp1()
+        patch(client, conn1, conn2)
+
+        def future1 = Mono.from(client.exchange('http://example.com/foo')).toFuture()
+        conn1.advance()
+        // can't open a second connection, so this request waits in the pool
+        def future2 = Mono.from(client.exchange('http://example.com/foo')).toFuture()
+        conn2.advance()
+        assert !future1.isDone()
+        assert !future2.isDone()
+
+        when:
+        conn1.openFuture.completeExceptionally(new IOException('connect failed'))
+        conn1.advance()
+        conn2.advance()
+
+        then:
+        future1.isCompletedExceptionally()
+        // the pool must not retire while future2 is still waiting
+        client.connectionManager.poolCount() == 1
+
+        when:
+        conn2.testExchangeResponse(future2)
+
+        then:
+        client.connectionManager.poolCount() == 1
+        assertPoolConnections(client, 1)
 
         cleanup:
         client.close()
@@ -1324,6 +1936,317 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'http1 response handler is installed once per connection'() {
+        given:
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn)
+        conn.serverChannel.pipeline().addLast(new HttpObjectAggregator(1024))
+
+        when:
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+        def pipeline = conn.clientChannel.pipeline()
+        def handlerNames = pipeline.names()
+        def handler = pipeline.get(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
+
+        then:
+        handler instanceof Http1ResponseHandler
+        handler.idle
+        pipeline.toMap().values().count { it instanceof Http1ResponseHandler } == 1
+
+        when:
+        for (int i = 0; i < 5; i++) {
+            conn.testExchangeResponse(conn.testExchangeRequest(client))
+            conn.testStreamingResponse(conn.testStreamingRequest(client))
+            conn.testPublisherRequest(client)
+        }
+
+        then:
+        // the same handler served every request, and no request left anything behind
+        pipeline.names() == handlerNames
+        pipeline.get(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE).is(handler)
+        pipeline.toMap().values().count { it instanceof Http1ResponseHandler } == 1
+        handler.idle
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http1 connection serves the next request after a cancelled streaming response'() {
+        given:
+        def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn)
+
+        when:
+        def received = new ArrayDeque<String>()
+        Disposable subscription = Flux.from(client.dataStream(HttpRequest.GET(conn.scheme + '://example.com/foo')))
+                .subscribe(b -> received.add(b.toString(StandardCharsets.UTF_8)))
+        conn.advance()
+        io.netty.handler.codec.http.HttpRequest request = conn.serverChannel.readInbound()
+        def tail = conn.serverChannel.readInbound()
+        def handler = conn.clientChannel.pipeline().get(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
+
+        then:
+        request.uri() == '/foo'
+        tail == null || tail instanceof LastHttpContent
+        handler instanceof Http1ResponseHandler
+        !handler.idle
+
+        when:
+        def response = new DefaultHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        response.headers().add('content-length', 6)
+        conn.serverChannel.writeOutbound(response)
+        conn.serverChannel.writeOutbound(new DefaultHttpContent(Unpooled.wrappedBuffer('foo'.bytes)))
+        conn.advance()
+
+        then:
+        received.poll() == 'foo'
+
+        when:
+        // the consumer goes away while the body is still on the wire
+        subscription.dispose()
+        conn.advance()
+        conn.serverChannel.writeOutbound(new DefaultLastHttpContent(Unpooled.wrappedBuffer('bar'.bytes)))
+        conn.advance()
+
+        then:
+        // the rest of the body is drained, nothing is delivered, and the connection is kept
+        received.isEmpty()
+        handler.idle
+        conn.clientChannel.isOpen()
+        assertPoolConnections(client, 1)
+
+        when:
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+
+        then:
+        conn.clientChannel.pipeline().get(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE).is(handler)
+        handler.idle
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'raw exchange cancelled before the response closes the http1 connection'() {
+        def ctx = ApplicationContext.run('spec.name': ConnectionManagerSpec.simpleName)
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn)
+
+        def body = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).copyOf('foo', StandardCharsets.UTF_8)
+        def exchange = new RawExchange(client, HttpRequest.POST(conn.scheme + '://example.com/foo', null), body)
+        conn.advance()
+
+        io.netty.handler.codec.http.HttpRequest request = conn.serverChannel.readInbound()
+        assert request.uri() == '/foo'
+        assert request.method() == HttpMethod.POST
+        LastHttpContent content = conn.serverChannel.readInbound()
+        assert content.content().toString(StandardCharsets.UTF_8) == 'foo'
+        content.release()
+
+        when:
+        exchange.cancel()
+        conn.advance()
+
+        then:
+        // the connection is closed, and nothing is delivered, not even the error of the closed connection
+        !conn.clientChannel.isOpen()
+        !exchange.done
+        assertPoolConnections(client, 0)
+
+        when:
+        // a response that arrives anyway is dropped
+        conn.respondOk()
+        conn.advance()
+
+        then:
+        !exchange.done
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'raw exchange cancelled while its response is on the wire discards the response'() {
+        def ctx = ApplicationContext.run('spec.name': ConnectionManagerSpec.simpleName)
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn)
+
+        def exchange = new RawExchange(client, HttpRequest.GET(conn.scheme + '://example.com/foo'), null)
+        conn.advance()
+
+        io.netty.handler.codec.http.HttpRequest request = conn.serverChannel.readInbound()
+        assert request.uri() == '/foo'
+        def tail = conn.serverChannel.readInbound()
+        assert tail == null || tail instanceof LastHttpContent
+
+        def response = new DefaultFullHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.wrappedBuffer('foo'.bytes))
+        response.headers().add('content-length', 3)
+        conn.serverChannel.writeOutbound(response)
+
+        when:
+        // the response is sent, but the client has not read it yet
+        exchange.cancel()
+        conn.advance()
+
+        then:
+        // the response is not delivered, but it was read completely, so the connection is kept
+        !exchange.done
+        conn.clientChannel.isOpen()
+        assertPoolConnections(client, 1)
+
+        and:
+        // and it is reused
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'raw exchange cancelled before the response resets only the http2 stream'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        patch(client, conn)
+
+        def exchange = new RawExchange(client, HttpRequest.GET(conn.scheme + '://example.com/foo'), null)
+        conn.exchangeSettings()
+
+        Http2HeadersFrame request = conn.serverChannel.readInbound()
+        assert request.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/foo'
+
+        when:
+        exchange.cancel()
+        conn.advance()
+
+        then:
+        // the stream is reset, nothing is delivered
+        Http2ResetFrame reset = conn.serverChannel.readInbound()
+        reset.stream().id() == request.stream().id()
+        !exchange.done
+
+        and:
+        // the connection is kept and reused
+        conn.clientChannel.isOpen()
+        assertPoolConnections(client, 1)
+
+        when:
+        def future = conn.testExchangeRequest(client)
+        conn.advance()
+        conn.testExchangeResponse(future)
+
+        then:
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'raw exchange cancelled while it waits for a connection closes its body'() {
+        def ctx = ApplicationContext.run('spec.name': ConnectionManagerSpec.simpleName)
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        conn.openFuture = new CompletableFuture<>() // delay open
+        patch(client, conn)
+
+        boolean discarded = false
+        def body = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE)
+                .adapt(Flux.<ReadBuffer> never(), BodySizeLimits.UNLIMITED, null, { discarded = true })
+        def exchange = new RawExchange(client, HttpRequest.POST(conn.scheme + '://example.com/foo', null), body)
+        conn.advance()
+        assert !discarded
+
+        when:
+        exchange.cancel()
+        conn.advance()
+
+        then:
+        discarded
+        !exchange.done
+
+        when:
+        // the connection that opens later serves the next exchange
+        conn.openFuture.complete(null)
+        conn.advance()
+
+        then:
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'raw exchange that cannot be sent closes its body'() {
+        def ctx = ApplicationContext.run('spec.name': ConnectionManagerSpec.simpleName)
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def request = Stub(HttpRequest) {
+            toMutableRequest() >> { throw new IllegalStateException('not mutable') }
+        }
+        def body = Mock(CloseableByteBody)
+
+        when:
+        client.exchange(request, body, (Thread) null)
+
+        then:
+        def e = thrown IllegalStateException
+        e.message == 'not mutable'
+        1 * body.close()
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    /**
+     * An exchange of the raw client, subscribed to until {@link #cancel}.
+     */
+    static class RawExchange {
+        final Disposable subscription
+        volatile HttpResponse<?> response
+        volatile Throwable error
+
+        RawExchange(RawHttpClient client, HttpRequest<?> request, CloseableByteBody body) {
+            subscription = Mono.from(client.exchange(request, body, (Thread) null))
+                    .subscribe(r -> response = r, e -> error = e)
+        }
+
+        boolean isDone() {
+            return response != null || error != null
+        }
+
+        void cancel() {
+            subscription.dispose()
+        }
+    }
+
     void assertPoolConnections(DefaultHttpClient client, int count) {
         assert client.connectionManager.getChannels().size() == count
         client.connectionManager.getChannels().forEach { assert it.isActive() }
@@ -1387,18 +2310,18 @@ class ConnectionManagerSpec extends Specification {
             serverChannel.writeOutbound(response)
         }
 
-        CompletableFuture<HttpResponse<?>> testExchangeRequest(HttpClient client) {
-            def future = Mono.from(client.exchange(scheme + '://example.com/foo')).toFuture()
+        CompletableFuture<HttpResponse<?>> testExchangeRequest(HttpClient client, String host = 'example.com') {
+            def future = Mono.from(client.exchange(scheme + '://' + host + '/foo')).toFuture()
             future.exceptionally(t -> t.printStackTrace())
             advance()
             return future
         }
 
-        void testExchangeResponse(CompletableFuture<HttpResponse<?>> future, String connectionHeader = "keep-alive") {
+        void testExchangeResponse(CompletableFuture<HttpResponse<?>> future, String connectionHeader = "keep-alive", String host = 'example.com') {
             io.netty.handler.codec.http.HttpRequest request = serverChannel.readInbound()
             assert request.uri() == '/foo'
             assert request.method() == HttpMethod.GET
-            assert request.headers().get('host') == 'example.com'
+            assert request.headers().get('host') == host
             assert request.headers().get("connection") == connectionHeader
 
             def tail = serverChannel.readInbound()
@@ -1408,6 +2331,31 @@ class ConnectionManagerSpec extends Specification {
             advance()
 
             assert future.get().status() == HttpStatus.OK
+        }
+
+        /**
+         * A request with a streaming (publisher) body, which is written by a StreamWriter. The
+         * server needs a HttpObjectAggregator.
+         */
+        void testPublisherRequest(HttpClient client) {
+            def future = Mono.from(client.exchange(HttpRequest.POST(scheme + '://example.com/foo', Flux.fromIterable([1, 2, 3]))
+                    .contentType(MediaType.APPLICATION_JSON_TYPE), String)).toFuture()
+            future.exceptionally(t -> t.printStackTrace())
+            advance()
+
+            FullHttpRequest request = serverChannel.readInbound()
+            assert request.uri() == '/foo'
+            assert request.method() == HttpMethod.POST
+            assert request.headers().get('host') == 'example.com'
+            assert request.headers().get("connection") == "keep-alive"
+            assert request.content().toString(StandardCharsets.UTF_8) == '[1,2,3]'
+            request.release()
+
+            def response = new DefaultFullHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.wrappedBuffer('foo'.bytes))
+            response.headers().add("Content-Length", 3)
+            serverChannel.writeOutbound(response)
+            advance()
+            assert future.get().body() == 'foo'
         }
 
         private Queue<String> testStreamingRequest(StreamingHttpClient client) {
@@ -1452,7 +2400,7 @@ class ConnectionManagerSpec extends Specification {
         private String scheme
         Http2FrameStream h2cResponseStream
 
-        void setupHttp2Tls() {
+        void setupHttp2Tls(Http2Settings serverSettings = Http2Settings.defaultSettings()) {
             scheme = 'https'
 
             def certificate = new SelfSignedCertificate()
@@ -1466,7 +2414,7 @@ class ConnectionManagerSpec extends Specification {
                         @Override
                         protected void configurePipeline(ChannelHandlerContext chtx, String protocol) throws Exception {
                             chtx.pipeline()
-                                    .addLast(Http2FrameCodecBuilder.forServer().build())
+                                    .addLast(Http2FrameCodecBuilder.forServer().initialSettings(serverSettings).build())
                         }
                     })
         }
@@ -1521,6 +2469,12 @@ class ConnectionManagerSpec extends Specification {
 
             assert serverChannel.readInbound() instanceof Http2SettingsFrame
             assert serverChannel.readInbound() instanceof Http2ResetFrame
+            assert serverChannel.readInbound() instanceof Http2SettingsAckFrame
+        }
+
+        void sendMaxConcurrentStreams(int maxConcurrentStreams) {
+            serverChannel.writeOutbound(new DefaultHttp2SettingsFrame(new Http2Settings().maxConcurrentStreams(maxConcurrentStreams)))
+            advance()
             assert serverChannel.readInbound() instanceof Http2SettingsAckFrame
         }
 
@@ -1582,6 +2536,89 @@ class ConnectionManagerSpec extends Specification {
 
             assert responseData.poll() == 'bar'
             assert responseData.poll() == 'END'
+        }
+    }
+
+    /**
+     * Customizer that appends a recording inbound handler to every channel it specializes for,
+     * like a logging customizer would.
+     */
+    @Requires(property = "spec.recorder", value = "true")
+    @Singleton
+    static class ResponseRecorder implements NettyClientCustomizer, BeanCreatedEventListener<Registry> {
+        final List<Object> messages = new ArrayList<>()
+
+        @Override
+        NettyClientCustomizer specializeForChannel(Channel channel, ChannelRole role) {
+            channel.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                @Override
+                void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                    messages.add(msg)
+                    super.channelRead(ctx, msg)
+                }
+            })
+            return this
+        }
+
+        @Override
+        Registry onCreated(BeanCreatedEvent<Registry> event) {
+            event.getBean().register(this)
+            return event.getBean()
+        }
+    }
+
+    /**
+     * Customizer that adds a named handler for each request, like the documented logbook
+     * customizer.
+     */
+    @Requires(property = "spec.request-handler", value = "true")
+    @Singleton
+    static class RequestHandlerCustomizer implements NettyClientCustomizer, BeanCreatedEventListener<Registry> {
+        static final String NAME = "request-handler"
+
+        final List<Throwable> errors = new ArrayList<>()
+        final List<Integer> handlerCounts = new ArrayList<>()
+        final List<CountingHandler> handlers = new ArrayList<>()
+
+        @Override
+        NettyClientCustomizer specializeForChannel(Channel channel, ChannelRole role) {
+            return new NettyClientCustomizer() {
+                @Override
+                NettyClientCustomizer specializeForChannel(Channel channel_, ChannelRole role_) {
+                    return RequestHandlerCustomizer.this.specializeForChannel(channel_, role_)
+                }
+
+                @Override
+                void onRequestPipelineBuilt() {
+                    def handler = new CountingHandler()
+                    try {
+                        channel.pipeline().addBefore(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, NAME, handler)
+                    } catch (Throwable t) {
+                        errors.add(t)
+                        throw t
+                    }
+                    handlers.add(handler)
+                    handlerCounts.add(channel.pipeline().names().count { it == NAME } as Integer)
+                }
+            }
+        }
+
+        @Override
+        Registry onCreated(BeanCreatedEvent<Registry> event) {
+            event.getBean().register(this)
+            return event.getBean()
+        }
+
+        static class CountingHandler extends ChannelInboundHandlerAdapter {
+            int responses
+
+            @Override
+            void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                if (msg instanceof io.netty.handler.codec.http.HttpResponse) {
+                    responses++
+                }
+                super.channelRead(ctx, msg)
+            }
         }
     }
 

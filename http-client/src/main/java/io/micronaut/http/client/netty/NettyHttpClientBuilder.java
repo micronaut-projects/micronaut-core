@@ -103,6 +103,7 @@ final class NettyHttpClientBuilder {
     AddressResolverGroup<?> resolverGroup = null;
     @Nullable
     ExecutorService blockingExecutor = null;
+    NettyHttpClient.@Nullable LifecycleListener lifecycleListener = null;
 
     NettyHttpClientBuilder() {
     }
@@ -271,6 +272,11 @@ final class NettyHttpClientBuilder {
 
     NettyHttpClientBuilder blockingExecutor(@Nullable ExecutorService blockingExecutor) {
         this.blockingExecutor = blockingExecutor;
+        return this;
+    }
+
+    NettyHttpClientBuilder lifecycleListener(NettyHttpClient.@Nullable LifecycleListener lifecycleListener) {
+        this.lifecycleListener = lifecycleListener;
         return this;
     }
 

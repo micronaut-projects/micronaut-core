@@ -101,6 +101,61 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
         this.supportedInterceptorTypes = Collections.emptySet();
     }
 
+    /**
+     * Interceptor binding qualifiers of several interception points, which qualify an interceptor bound to any of them.
+     *
+     * <p>The occurrences of a binding annotation are resolved for each point in its own metadata, so that points
+     * binding different members of the same annotation each keep theirs, and a point binding an annotation by name
+     * qualifies every interceptor of it.</p>
+     *
+     * @param interceptionPoints The metadata of the interception points
+     */
+    private InterceptorBindingQualifier(AnnotationMetadata[] interceptionPoints) {
+        final Map<String, List<AnnotationValue<?>>> annotationNames = new LinkedHashMap<>();
+        final Set<String> interceptorTypes = new LinkedHashSet<>();
+        for (AnnotationMetadata interceptionPoint : interceptionPoints) {
+            final Collection<AnnotationValue<Annotation>> annotationValues = interceptionPoint.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
+            findSupportedAnnotations(annotationValues, interceptionPoint).forEach((name, occurrences) -> {
+                if (!annotationNames.containsKey(name)) {
+                    annotationNames.put(name, occurrences == null ? null : new ArrayList<>(occurrences));
+                    return;
+                }
+                final List<AnnotationValue<?>> merged = annotationNames.get(name);
+                if (merged == null) {
+                    return;
+                }
+                if (occurrences == null) {
+                    annotationNames.put(name, null);
+                } else {
+                    for (AnnotationValue<?> occurrence : occurrences) {
+                        if (!merged.contains(occurrence)) {
+                            merged.add(occurrence);
+                        }
+                    }
+                }
+            });
+            for (AnnotationValue<?> annotationValue : annotationValues) {
+                annotationValue.annotationClassValue(META_MEMBER_INTERCEPTOR_TYPE).map(AnnotationClassValue::getName).ifPresent(interceptorTypes::add);
+            }
+        }
+        this.supportedAnnotationNames = annotationNames;
+        this.supportedInterceptorTypes = interceptorTypes;
+    }
+
+    /**
+     * Qualifies the interceptors bound to any of the given interception points, such as the methods of a proxy.
+     * Merging the points into one metadata would keep a single occurrence of an annotation that does not repeat.
+     *
+     * @param interceptionPoints The metadata of the interception points
+     * @param <T>                The bean type
+     * @return The qualifier
+     * @since 5.3.0
+     */
+    @Internal
+    public static <T> InterceptorBindingQualifier<T> ofInterceptionPoints(AnnotationMetadata... interceptionPoints) {
+        return new InterceptorBindingQualifier<>(interceptionPoints);
+    }
+
     private static Map<String, List<AnnotationValue<?>>> findSupportedAnnotations(Collection<AnnotationValue<Annotation>> annotationValues,
                                                                                   @Nullable AnnotationMetadata annotationMetadata) {
         final Map<String, List<AnnotationValue<?>>> supportedAnnotationNames = CollectionUtils.newHashMap(annotationValues.size());

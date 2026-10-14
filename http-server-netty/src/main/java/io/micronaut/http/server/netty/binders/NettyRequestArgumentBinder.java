@@ -28,14 +28,17 @@ import java.util.Optional;
  * @param <T> A type
  * @author Denis Stepanov
  * @since 4.0.0
+ * @deprecated Form binders use transport-independent request capabilities instead.
  */
 @Experimental
-public sealed interface NettyRequestArgumentBinder<T> extends RequestArgumentBinder<T>
-    permits NettyCompletedFileUploadBinder, NettyPublisherPartUploadBinder, NettyStreamingFileUploadBinder {
+@Deprecated(since = "5.3.0", forRemoval = true)
+public interface NettyRequestArgumentBinder<T> extends RequestArgumentBinder<T> {
 
     @Override
     default BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
-        if (source instanceof NettyHttpRequest<?> nettyHttpRequest) {
+        // the request itself, or e.g. the mutable view of the request that a filter continued with
+        NettyHttpRequest<?> nettyHttpRequest = NettyHttpRequest.findBodyRequest(source);
+        if (nettyHttpRequest != null) {
             return bindForNettyRequest(context, nettyHttpRequest);
         }
         return BindingResult.EMPTY;

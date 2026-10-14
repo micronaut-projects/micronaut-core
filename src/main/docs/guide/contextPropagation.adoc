@@ -158,6 +158,42 @@ Integer status = context.propagateCall(() -> client.status()); // Callable<T>
 
 For cases where you need to hand off work—for example to an executor—you can also pre-wrap a `Runnable`, `Callable`, or `Supplier` via `PropagatedContext.wrap(…)`.
 
+=== Executor beans
+
+`ExecutorService` beans propagate the context automatically. This covers the built-in `io`, `blocking`, `virtual` and `scheduled` executors, executors configured under `micronaut.executors.*`, and other beans exposed as `ExecutorService`. A task submitted to one of them captures the context of the submitting thread and runs with it. The worker thread doesn't keep the context once the task completes. This works in both the `thread-local` and `scoped-value` modes. When no context is in scope, the task is submitted as-is.
+
+So code that hands work to an executor bean, for example a messaging listener configured with a named executor or a method annotated with `@ExecuteOn`, sees the caller's trace and MDC state without wrapping the task itself.
+
+To turn this off for one executor configured under `micronaut.executors.*`, set `propagate-context` to `false` (default: `true`):
+
+[configuration]
+----
+micronaut:
+  executors:
+    my-pool:
+      type: fixed
+      number-of-threads: 4
+      propagate-context: false
+----
+
+The context is captured when a task is submitted or scheduled, so it stays referenced until the task has run. This matters for the `ScheduledExecutorService` methods:
+
+* A periodic task (`scheduleAtFixedRate` or `scheduleWithFixedDelay`) doesn't capture the context, because it would keep that context alive until it is cancelled. It runs without the context of the code that scheduled it. To run it with that context, wrap it yourself, for example `scheduler.scheduleAtFixedRate(PropagatedContext.wrapCurrent(this::poll), 0, 30, TimeUnit.SECONDS)`.
+* A one-shot task (`schedule`) captures the context. A task that schedules itself again with `schedule`, for example a polling loop or a retry with backoff, therefore passes its context to the next run, and a request's context can outlive the request.
+
+`@Scheduled` methods are scheduled at startup, without a context. When code that runs with a request's context schedules long-lived work that reschedules itself, schedule it from an empty context so that the request's MDC or tracing state isn't kept:
+
+[source,java]
+----
+PropagatedContext.empty().propagate(() ->
+    scheduler.schedule(this::pollAndReschedule, 30, TimeUnit.SECONDS)
+);
+----
+
+Alternatively, set `propagate-context: false` on an executor that runs such work.
+
+NOTE: Only tasks passed to the executor's own methods (`execute`, `submit`, `invokeAll`, `invokeAny` and `schedule`) are wrapped. Work that a task forks directly onto a `ForkJoinPool`, for example with `ForkJoinTask.fork()`, doesn't go through the wrapper.
+
 === Default thread-local propagation with optional Scoped Values
 
 Micronaut Framework 5 targets Java 25 by default. Since Java 21 the JDK ships *Scoped Values* (`java.lang.ScopedValue`) as a structured alternative to classic thread locals. Even though Scoped Values are available on Java 25, Micronaut keeps `thread-local` as the default propagation mode so existing integrations that require thread-local state continue to work without extra configuration.
@@ -178,9 +214,22 @@ context.propagate(() -> {
 
 The try-with-resources pattern exists primarily for legacy integrations that require `ThreadLocal` propagation. Whenever you can, call one of the lambda-based `propagate(…)` helpers shown earlier instead—they work in both propagation modes. Only fall back to the scope API when the surrounding code expects a `ThreadLocal` to be present. Because the scope relies on thread-local state, invoking `propagate()` while the mode is `scoped-value` throws an `IllegalStateException` instructing you to switch back to thread-local support.
 
+==== Integrations that must keep a context open across calls
+
+A scoped value is only bound for the duration of a single callback invocation: it cannot be bound by one method and unbound by a later one. As a result there is no equivalent of an open/close scope in `scoped-value` mode. Some integrations nonetheless cannot use a callback because the context must stay in scope across separate calls into user code, for example an `Iterator` that brings the context of a record into scope when `next()` is called and takes it out of scope on the following `next()` or `close()`.
+
+Such integrations can call `PropagatedContext.supportsScopes()` to check whether the current mode supports scopes, or use `propagateIfSupported()`, which behaves like `propagate()` in `thread-local` mode and returns a no-op scope (without propagating anything) in `scoped-value` mode instead of throwing:
+
+[source,java]
+----
+PropagatedContext.Scope scope = context.propagateIfSupported(); // no-op in scoped-value mode
+// ... later, for example on the next call to Iterator.next()
+scope.close();
+----
+
 To opt into scoped-value mode globally (default: `thread-local`), set `micronaut.propagation`:
 
-[source,yaml]
+[configuration]
 ----
 micronaut:
   propagation: scoped-value

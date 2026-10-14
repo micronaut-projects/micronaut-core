@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.subscriber.LazySendingSubscriber;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.ByteBodyHttpResponse;
@@ -26,6 +25,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ConcatenatingSubscriber;
+import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
@@ -34,11 +34,11 @@ import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.ResponseLifecycle;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.util.LeakPresenceDetector;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.util.concurrent.Executor;
 
@@ -73,8 +73,8 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
         if (response instanceof NettyHttpResponseBuilder builder) {
             io.netty.handler.codec.http.HttpResponse nettyResponse = builder.toHttpResponse();
             if (nettyResponse instanceof StreamedHttpResponse streamed) {
-                return LazySendingSubscriber.create(streamed).map(contents -> {
-                    CloseableByteBody body = byteBodyFactory().adapt(Flux.from(contents).map(HttpContent::content), null, null);
+                return BodyPublishers.awaitFirst(streamed, HttpContent::release).map(contents -> {
+                    CloseableByteBody body = byteBodyFactory().adapt(BodyPublishers.map(contents, HttpContent::content), null, null);
                     return ByteBodyHttpResponseWrapper.wrap(response, body);
                 }).onErrorResume(e -> (ExecutionFlow) handleStreamingError(request, e));
             }
@@ -93,12 +93,23 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
     }
 
     @Override
+    protected boolean isJsonFormattable(io.micronaut.core.type.Argument<?> type) {
+        return !ByteBuf.class.isAssignableFrom(type.getType()) && super.isJsonFormattable(type);
+    }
+
+    @Override
+    protected ConcatenatingSubscriber.Separators jsonSeparators() {
+        return NettyConcatenatingSubscriber.JSON_NETTY;
+    }
+
+    @Override
     protected CloseableByteBody concatenateJson(Publisher<ByteBody> items) {
-        return NettyConcatenatingSubscriber.concatenate(byteBodyFactory(), NettyConcatenatingSubscriber.JSON_NETTY, items);
+        return NettyConcatenatingSubscriber.concatenate(byteBodyFactory(), NettyConcatenatingSubscriber.JSON_NETTY_TRAILING, items);
     }
 
     private static class NettyConcatenatingSubscriber extends ConcatenatingSubscriber implements BufferConsumer {
         static final Separators JSON_NETTY = LeakPresenceDetector.staticInitializer(() -> Separators.jsonSeparators(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT)));
+        static final Separators JSON_NETTY_TRAILING = JSON_NETTY.trailingOnly();
 
         private final EventLoopFlow flow;
 

@@ -104,10 +104,7 @@ class _MicronautJavaAnnotation:
                     f"@{self.__name__} was applied bare to {args[0]!r} through a name the compiler did not recognise "
                     f"as the annotation; write @{self.__name__}() or apply it under the name it is imported as")
 
-        def decorator(target):
-            return target
-
-        return decorator
+        return _MicronautAnnotationMarker((self.__name__,))
 
     def _value_member_holds_class(self):
         if self._value_holds_class is None:
@@ -137,6 +134,32 @@ class _MicronautJavaAnnotation:
 
     def __repr__(self):
         return f"<Java annotation {self.java_class_name}>"
+
+
+class _MicronautAnnotationMarker:
+    """
+    What a call of an annotation decorator returns: applied as a decorator it returns its target unchanged, the
+    annotation metadata having been compiled into the generated Java class; used as a parameter default or a module
+    attribute value (``content_type: str = Header()``) it marks the parameter or attribute, and only the compiler
+    reads it. Markers join with ``&`` (``NotBlank() & Size(max=50)``). A direct Python caller that omits a marked
+    argument receives the marker, as with FastAPI's ``Query()``; it prints as ``<Header marker>`` to show it.
+    """
+
+    __slots__ = ('_names',)
+
+    def __init__(self, names):
+        self._names = names
+
+    def __call__(self, target):
+        return target
+
+    def __and__(self, other):
+        if isinstance(other, _MicronautAnnotationMarker):
+            return _MicronautAnnotationMarker(self._names + other._names)
+        return NotImplemented
+
+    def __repr__(self):
+        return '<' + ' & '.join(self._names) + ' marker>'
 
 
 _micronaut_java_annotations = {}
@@ -418,12 +441,22 @@ def _micronaut_java_package_member(module_name, name):
     return member
 
 
+def _micronaut_module_file(path_without_suffix):
+    """Whether a Python module file of the path exists, under any suffix the import system loads."""
+    for suffix in _micronaut_importlib_machinery.all_suffixes():
+        if _micronaut_os.path.isfile(path_without_suffix + suffix):
+            return True
+    return False
+
+
 class _MicronautJavaImportFinder:
     """
-    Serves the Java packages and types the manifests record as modules. An application package of the
-    same name (a directory with an initialiser on the path) is left to the path finder: its generated
-    initialiser falls back to the Java members. A directory without an initialiser becomes part of the
-    Java package's path, so the Python modules in it import as usual.
+    Serves the Java packages and types the manifests record as modules. An application module or
+    package of the same name is left to the path finder: a directory with an initialiser on the path
+    is the application package, whose generated initialiser falls back to the Java members, and a
+    module file on the path is the application module, which is what its own name imports even when a
+    generated Java type shares it. A directory without an initialiser becomes part of the Java
+    package's path, so the Python modules in it import as usual.
     """
 
     # identifies the finder across reloads of this module, which define the class anew
@@ -446,6 +479,10 @@ class _MicronautJavaImportFinder:
                 if _micronaut_os.path.isfile(_micronaut_os.path.join(directory, '__init__.py')):
                     return None
                 directories.append(directory)
+            elif _micronaut_module_file(directory):
+                # a Python module of the name: the class the compiler generated for one of its own
+                # classes is not what `import <module>` means, so the path finder serves the module
+                return None
         spec = _micronaut_importlib_machinery.ModuleSpec(fullname, self, origin='java:' + java_name, is_package=True)
         spec.submodule_search_locations = directories
         return spec

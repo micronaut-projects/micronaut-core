@@ -1,0 +1,64 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.http.filter;
+
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.propagation.PropagatedContextElement;
+
+/**
+ * Marks the propagated context handed to the response provider when a filter subscribes to the
+ * publisher of its continuation. Such a filter can add values to the Reactor context of that
+ * publisher with {@code contextWrite}, so the route result must stay a lazy publisher until the
+ * filter subscribes to it: subscribing eagerly would run the route publisher before those values
+ * exist.
+ * <p>This is the {@link FilterContext#reactive()} marker carried over to the response provider,
+ * which only sees the propagated context.
+ *
+ * @author Denis Stepanov
+ * @since 5.3.0
+ */
+@Internal
+public final class ReactiveFilterChainElement implements PropagatedContextElement {
+
+    private static final ReactiveFilterChainElement INSTANCE = new ReactiveFilterChainElement();
+
+    private ReactiveFilterChainElement() {
+    }
+
+    /**
+     * Mark the context.
+     *
+     * @param propagatedContext The context
+     * @return The marked context
+     */
+    public static PropagatedContext mark(PropagatedContext propagatedContext) {
+        if (isPresent(propagatedContext)) {
+            return propagatedContext;
+        }
+        return propagatedContext.plus(INSTANCE);
+    }
+
+    /**
+     * Check whether the context is marked.
+     *
+     * @param propagatedContext The context
+     * @return {@code true} if a filter subscribes to the response publisher
+     */
+    public static boolean isPresent(PropagatedContext propagatedContext) {
+        return propagatedContext.find(ReactiveFilterChainElement.class).isPresent();
+    }
+}

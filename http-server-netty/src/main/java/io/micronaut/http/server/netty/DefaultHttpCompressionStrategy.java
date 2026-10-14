@@ -78,12 +78,12 @@ public final class DefaultHttpCompressionStrategy implements HttpCompressionStra
             return false;
         }
 
+        if (contentLength != -1 && contentLength < compressionThreshold) {
+            return false;
+        }
         HttpHeaders headers = response.headers();
         String contentType = headers.get(HttpHeaderNames.CONTENT_TYPE);
-
-        return contentType != null &&
-            (contentLength == -1 || contentLength >= compressionThreshold) &&
-            MediaType.isTextBased(contentType);
+        return contentType != null && MediaType.isTextBased(contentType);
     }
 
     @Override

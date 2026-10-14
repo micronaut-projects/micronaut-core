@@ -59,6 +59,9 @@ class FormLimitSpec extends Specification {
             assert response.body() == "attributes: " + toSend
         }
 
+        cleanup:
+        ctx.close()
+
         where:
         multipart | toSend | limitToConfigure
         false     | 100    | 128
@@ -90,6 +93,9 @@ class FormLimitSpec extends Specification {
         } else {
             assert response.body() == "attributes: 1" // even spaces only are a valid attribute!
         }
+
+        cleanup:
+        ctx.close()
 
         where:
         multipart | toSend | limitToConfigure

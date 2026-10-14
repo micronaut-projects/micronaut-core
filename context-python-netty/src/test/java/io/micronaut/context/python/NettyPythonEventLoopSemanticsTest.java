@@ -612,6 +612,43 @@ final class NettyPythonEventLoopSemanticsTest {
     }
 
     @Test
+    void awaitedJavaValuesKeepTheirJavaExceptionTypeOnTheNettyLoop() throws Exception {
+        assertEquals("_MicronautAsyncioEventLoop,direct:late failure,gather:late failure,value:late value", runPython("""
+            import asyncio
+            import java
+            IllegalStateException = java.type("java.lang.IllegalStateException")
+            async def run(client):
+                outcomes = [type(asyncio.get_running_loop()).__name__]
+                # a CompletableFuture any Java call returned is awaitable; its failure is the Java exception
+                try:
+                    await client.failLater()
+                except IllegalStateException as e:
+                    outcomes.append("direct:" + e.getMessage())
+                async def uncaught():
+                    return await client.failLater()
+                try:
+                    await asyncio.gather(uncaught(), asyncio.sleep(0.01))
+                except IllegalStateException as e:
+                    outcomes.append("gather:" + e.getMessage())
+                outcomes.append("value:" + await client.later("late value"))
+                return ",".join(outcomes)
+            run
+            """, new LateClient(), true));
+    }
+
+    public static final class LateClient {
+        public CompletableFuture<String> failLater() {
+            return CompletableFuture.supplyAsync(() -> {
+                throw new IllegalStateException("late failure");
+            }, CompletableFuture.delayedExecutor(20, TimeUnit.MILLISECONDS));
+        }
+
+        public CompletableFuture<String> later(String value) {
+            return CompletableFuture.supplyAsync(() -> value, CompletableFuture.delayedExecutor(20, TimeUnit.MILLISECONDS));
+        }
+    }
+
+    @Test
     void aProtocolWhoseConnectionLostThrowsStillReleasesItsChannel() throws Exception {
         assertEquals("closed", runPython("""
             import asyncio
@@ -944,6 +981,11 @@ final class NettyPythonEventLoopSemanticsTest {
         return runPython(python, argument, new NettyPythonEventLoopProvider());
     }
 
+    /** Runs the coroutine in a context bootstrapped like an application context: Java stages are awaitable. */
+    private static String runPython(String python, Object argument, boolean javaObjectMembers) throws Exception {
+        return runPython(python, argument, new NettyPythonEventLoopProvider(), () -> { }, javaObjectMembers);
+    }
+
     private static String runPython(String python, Object argument, NettyPythonEventLoopProvider provider) throws Exception {
         return runPython(python, argument, provider, () -> { });
     }
@@ -954,10 +996,17 @@ final class NettyPythonEventLoopSemanticsTest {
 
     /** Runs the coroutine, then {@code afterRun} while the context is still open, then closes everything. */
     private static String runPython(String python, Object argument, NettyPythonEventLoopProvider provider, AfterRun afterRun) throws Exception {
+        return runPython(python, argument, provider, afterRun, false);
+    }
+
+    private static String runPython(String python, Object argument, NettyPythonEventLoopProvider provider, AfterRun afterRun, boolean javaObjectMembers) throws Exception {
         MultiThreadIoEventLoopGroup group = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = group.next();
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        if (javaObjectMembers) {
+            GraalPyContextFactory.registerJavaObjectMembers(context);
+        }
         PythonAsyncioRuntime.setEventLoopProviders(List.of(provider));
         PythonAsyncioRuntime.setExecutorService(executorService);
         try {

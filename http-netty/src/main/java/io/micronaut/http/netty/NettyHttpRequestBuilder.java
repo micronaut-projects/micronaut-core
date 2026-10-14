@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.DirectByteBodyAccess;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -35,7 +36,7 @@ import java.util.Optional;
  * @since 2.0.0
  */
 @Internal
-public interface NettyHttpRequestBuilder {
+public interface NettyHttpRequestBuilder extends DirectByteBodyAccess {
     /**
      * Converts this object to a full http request.
      *
@@ -85,6 +86,7 @@ public interface NettyHttpRequestBuilder {
      *
      * @return The body
      */
+    @Override
     @Nullable
     default ByteBody byteBodyDirect() {
         return null;
@@ -97,6 +99,21 @@ public interface NettyHttpRequestBuilder {
      * @return The request excluding the body
      */
     HttpRequest toHttpRequestWithoutBody();
+
+    /**
+     * Convert this request to a netty request without the body, with the given request target
+     * (path and query) instead of the URI of this request. The caller will handle adding the
+     * body.
+     *
+     * @param requestTarget The request target to use as the netty request URI
+     * @return The request excluding the body
+     * @since 5.3.0
+     */
+    default HttpRequest toHttpRequestWithoutBody(String requestTarget) {
+        // do not change the URI of the returned request, it may be the backing request of this one
+        HttpRequest request = toHttpRequestWithoutBody();
+        return new DefaultHttpRequest(request.protocolVersion(), request.method(), requestTarget, request.headers());
+    }
 
     /**
      * @return Is the request a stream.
@@ -145,14 +162,18 @@ public interface NettyHttpRequestBuilder {
             request = wrapper.getDelegate();
         }
 
-        // manual conversion
-        HttpRequest nettyRequest = new DefaultHttpRequest(
-            HttpVersion.HTTP_1_1,
-            HttpMethod.valueOf(request.getMethodName()),
-            request.getUri().toString()
-        );
-        request.getHeaders()
-            .forEach((s, strings) -> nettyRequest.headers().add(s, strings));
-        return () -> nettyRequest;
+        // manual conversion. This is done lazily, so that the builder reflects header changes
+        // made after asBuilder was called
+        io.micronaut.http.HttpRequest<?> finalRequest = request;
+        return () -> {
+            HttpRequest nettyRequest = new DefaultHttpRequest(
+                HttpVersion.HTTP_1_1,
+                HttpMethod.valueOf(finalRequest.getMethodName()),
+                finalRequest.getUri().toString()
+            );
+            finalRequest.getHeaders()
+                .forEach((s, strings) -> nettyRequest.headers().add(s, strings));
+            return nettyRequest;
+        };
     }
 }

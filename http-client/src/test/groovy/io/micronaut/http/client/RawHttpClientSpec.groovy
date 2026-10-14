@@ -7,7 +7,9 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory
 import io.micronaut.http.body.ByteBody
+import io.micronaut.http.body.ByteBodyFactory
 import io.micronaut.http.netty.body.NettyByteBodyFactory
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.buffer.Unpooled
@@ -45,6 +47,38 @@ class RawHttpClientSpec extends Specification {
 
         cleanup:
         resp.close()
+        server.close()
+        ctx.close()
+    }
+
+    def 'relative request URI is resolved against the client URL'() {
+        given:
+        def ctx = ApplicationContext.run(['spec.name': 'RawHttpClientSpec'])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+        def client = ctx.createBean(RawHttpClient, server.URI)
+
+        when:
+        def resp = Mono.from(client.exchange(
+                HttpRequest.POST("/raw/echo", null),
+                ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt("foo".getBytes(StandardCharsets.UTF_8)),
+                null
+        )).block()
+        def withOptions = Mono.from(client.exchange(
+                HttpRequest.POST("/raw/echo", null),
+                ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt("bar".getBytes(StandardCharsets.UTF_8)),
+                null,
+                RawRequestOptions.proxy()
+        )).block()
+
+        then:
+        resp.byteBody().buffer().get().toString(StandardCharsets.UTF_8) == "foo"
+        withOptions.byteBody().buffer().get().toString(StandardCharsets.UTF_8) == "bar"
+
+        cleanup:
+        resp?.close()
+        withOptions?.close()
+        client.close()
         server.close()
         ctx.close()
     }

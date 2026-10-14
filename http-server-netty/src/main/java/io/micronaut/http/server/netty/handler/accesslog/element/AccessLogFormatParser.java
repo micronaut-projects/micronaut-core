@@ -53,6 +53,7 @@ import java.util.stream.Collectors;
  * <li><b>%p</b> - Local port</li>
  * <li><b>%q</b> - Query string (excluding the '?' character)</li>
  * <li><b>%r</b> - First line of the request</li>
+ * <li><b>%{&lt;attribute&gt;}r</b> - Value of the Micronaut request attribute (see {@link io.micronaut.http.HttpRequest#getAttribute(CharSequence)}) when the response is written, or '-' if it is not set</li>
  * <li><b>%s</b> - HTTP status code of the response</li>
  * <li><b>%{&lt;format&gt;}t</b> - Date and time. If the argument is omitted the Common Log Format format is used ("'['dd/MMM/yyyy:HH:mm:ss Z']'").
  * If the format starts with begin: (default) the time is taken at the beginning of the request processing. If it starts with end: it is the time when the log entry gets written, close to the end of the request processing.

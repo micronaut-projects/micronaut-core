@@ -28,8 +28,6 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.writer.OriginatingElements;
 
-import java.io.IOException;
-import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -248,75 +246,6 @@ public class ConfigurationMetadataBuilder {
             return ConfigurationUtils.getRequiredTypePath(propertyType);
         }
         return NameUtils.hyphenate(buildPropertyPath(owningType, declaringType, name), true);
-    }
-
-    /**
-     * Quote a string.
-     *
-     * @param string The string to quote
-     * @return The quoted string
-     */
-    @SuppressWarnings("MagicNumber")
-    static String quote(String string) {
-        if (string == null || string.isEmpty()) {
-            return "\"\"";
-        }
-
-        char c = 0;
-        int i;
-        int len = string.length();
-        StringBuilder sb = new StringBuilder(len + 4);
-        String t;
-
-        sb.append('"');
-        for (i = 0; i < len; i += 1) {
-            c = string.charAt(i);
-            switch (c) {
-                case '\\', '"', '/':
-                    sb.append('\\');
-                    sb.append(c);
-                    break;
-                case '\b':
-                    sb.append("\\b");
-                    break;
-                case '\t':
-                    sb.append("\\t");
-                    break;
-                case '\n':
-                    sb.append("\\n");
-                    break;
-                case '\f':
-                    sb.append("\\f");
-                    break;
-                case '\r':
-                    sb.append("\\r");
-                    break;
-                default:
-                    if (c < ' ') {
-                        t = "000" + Integer.toHexString(c);
-                        sb.append("\\u").append(t.substring(t.length() - 4));
-                    } else {
-                        sb.append(c);
-                    }
-            }
-        }
-        sb.append('"');
-        return sb.toString();
-    }
-
-    /**
-     * Write a quoted attribute with a value to a writer.
-     *
-     * @param out   The out writer
-     * @param name  The name of the attribute
-     * @param value The value
-     * @throws IOException If an error occurred writing output
-     */
-    static void writeAttribute(Writer out, String name, String value) throws IOException {
-        out.write('"');
-        out.write(name);
-        out.write("\":");
-        out.write(quote(value));
     }
 
     /**

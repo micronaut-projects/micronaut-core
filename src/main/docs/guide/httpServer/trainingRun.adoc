@@ -1,0 +1,168 @@
+A JDK AOT cache (`-XX:AOTCacheOutput`), a dynamic CDS archive (`-XX:ArchiveClassesAtExit`), a GraalVM profile for profile-guided optimization (`.iprof`) and the `native-image-agent` configuration are all written when the JVM exits after a representative run of the application. A Micronaut application does not exit on its own, so the build would have to start it, wait until it is ready, send it some requests and stop it.
+
+A _training run_ does this from inside the application. It has two modes, which `micronaut.application.training.mode` selects:
+
+* `start`, the default, starts the application as usual, HTTP server included. Once the server has started, it can send warm-up GET requests to it. Then it stops the application and exits.
+* `load` starts neither the application nor the server: it reads the configuration, loads the bean definitions without creating any bean and exits. It sends no request. It is described in <<trainingRunLoad, Training without starting the application>>.
+
+Set `micronaut.application.training.enabled` to `true`, for example with `-Dmicronaut.application.training.enabled=true` or the `MICRONAUT_APPLICATION_TRAINING_ENABLED=true` environment variable. In the `start` mode, `Micronaut.run` then:
+
+. logs a warning that this JVM is a training run and does not serve traffic, before the application starts,
+. starts the application as usual and waits until startup has completed and every startup event listener has run,
+. logs a second warning, stops the application and closes the application context,
+. exits the JVM with status 0.
+
+Only `true` turns the switch on, in any case (`TRUE` works too). Any other text, `yes` and `on` included, leaves it off when the value is a string: a system property, an environment variable, a `.properties` file or a quoted YAML value. An unquoted `yes` or `on` in a YAML file is different: YAML reads it as the boolean `true`, so `enabled: yes` in `application.yml` turns the training run on.
+
+A failure during startup, the warm-up included, still exits with a non-zero status, so a failed training run fails the build. This applies to every embedded application, including messaging applications without an HTTP server. In the `test` environment the application is stopped, but `System.exit` is not called.
+
+This is the `start` mode of a training run, the default. It creates the beans of the application, so it needs the services they use. If the application cannot start where the training runs, for example because it needs a database and the training is a step of a container image build, use the `load` mode described in <<trainingRunLoad, Training without starting the application>>.
+
+WARNING: Never set `micronaut.application.training.enabled` or `MICRONAUT_APPLICATION_TRAINING_ENABLED` on a deployment target, whether in the configuration of the deployed application or in an environment variable shared by a platform or a cluster. The application would start, stop right away and exit with status 0, which most orchestrators read as a clean shutdown: the service restarts in a loop and nothing reports an error. The exit status has to stay 0 for the tools that write their output at exit, so the two warnings in the log are the only signal. Set the switch only in the build step that runs the training.
+
+The switch acts on the api:runtime.EmbeddedApplication[] of the application, such as the HTTP server or a messaging application. An application without one is not stopped: `Micronaut.run` logs a warning that says so and returns as usual. The beans that require the switch are still created, so a startup listener written for the training run still runs. If such an application starts non-daemon threads of its own, the training run does not end until they do, so the application has to stop them itself.
+
+To warm up the application before it stops, list the paths the HTTP server should send GET requests to itself, next to the switch. The requests are only sent in the `start` mode, which starts the server; the `load` mode starts no server and ignores these settings:
+
+[configuration]
+----
+micronaut:
+  application:
+    training:
+      warmup:
+        paths:
+          - /hello
+          - /books?page=1
+        repeat: 3
+----
+
+.Configuration Properties for the training warm-up
+|===
+|Property |Type |Description |Default value
+
+| `+micronaut.application.training.warmup.paths+`
+|java.util.List<java.lang.String>
+|The paths the warm-up sends a GET request to, in order, including the context path if the server has one. A path may carry a query string.
+|none, so no warm-up requests are sent
+
+| `+micronaut.application.training.warmup.repeat+`
+|int
+|How many times the warm-up requests the paths. It must be at least 1.
+|1
+|===
+
+The <<configurationreference#io.micronaut.http.server.TrainingWarmupConfiguration,configuration reference>> lists these properties too.
+
+The warm-up runs once the server has started and listens on its port, after the other api:runtime.server.event.ServerStartupEvent[] listeners, for the server the application runs (not for other servers built with a server factory). It sends each path in order, `repeat` times, with `java.net.HttpURLConnection`, so no HTTP client is needed. `repeat` must be at least 1: a lower value fails the training run, even when no paths are set. The requests go to the configured `micronaut.server.host`, or to the loopback address when no host or a wildcard address such as `0.0.0.0` is set. The paths are sent as they are, so they include the context path if the server has one.
+
+An I/O error or a response status of 500 or above fails the startup. A status from 400 to 499 does not: the warm-up logs a warning with the URL and the status, and the training run continues.
+
+The warm-up runs while the server starts, so the `Startup completed in` time that a training run logs includes the warm-up requests. Do not compare it with the startup time of a normal run. The warm-up logs its own duration: `Training warm-up sent 3 GET requests to http://127.0.0.1:8080 in 45ms`.
+
+For example, the following command trains a JDK AOT cache with a warm-up and exits once the cache is written:
+
+[source,bash]
+----
+$ java -XX:AOTCacheOutput=app.aot \
+    -Dmicronaut.application.training.enabled=true \
+    -Dmicronaut.application.training.warmup.paths=/hello \
+    -jar app.jar
+----
+
+The built-in warm-up only sends plain HTTP GET requests, without credentials:
+
+* If warm-up paths are set and the server has SSL enabled, the training run fails.
+* If the application rejects a request, for example with 401 or 403 because the path is secured, or with 429 from a rate limiter, the warm-up logs the warning described above and continues. A rejected request still exercises the server, the routing and the filters that rejected it, but not the code behind them. A path that does not exist (404) is reported the same way, so check the log of a training run for these warnings.
+
+For other requests (a POST, authenticated requests, a server with SSL enabled, or a messaging application), write a startup listener that only exists during a training run:
+
+[source,java]
+----
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.runtime.server.event.ServerStartupEvent;
+import jakarta.inject.Singleton;
+
+@Singleton
+@Requires(property = "micronaut.application.training.enabled", pattern = "(?i)true")
+public class CustomWarmup implements ApplicationEventListener<ServerStartupEvent> {
+
+    @Override
+    public void onApplicationEvent(ServerStartupEvent event) {
+        // send the requests to event.getSource(), throw to fail the training run
+    }
+}
+----
+
+The `pattern` matches `true` in any case, as the switch does: with `value = "true"` a training run started with `TRUE` would stop the application without running the listener. For a messaging application, listen for api:runtime.event.ApplicationStartupEvent[] instead.
+
+WARNING: A training run in `start` mode executes application code, including the warm-up requests. If the application needs external services such as a database, run the training with an environment that configures them, or in `load` mode. Micronaut Test Resources cannot replace them: a training run disables it, as described in <<trainingRunTestResources, Test Resources>>.
+
+[[trainingRunLoad]]
+=== Training without starting the application
+
+Set `micronaut.application.training.mode` to `load`, next to the switch, for a training run that does not start the application. The environment variable is `MICRONAUT_APPLICATION_TRAINING_MODE=load`:
+
+[source,bash]
+----
+$ java -XX:AOTCacheOutput=app.aot \
+    -Dmicronaut.application.training.enabled=true \
+    -Dmicronaut.application.training.mode=load \
+    -jar app.jar
+----
+
+`Micronaut.run` then:
+
+. reads the configuration of the application as usual,
+. logs a warning that this JVM is a training run and does not serve traffic,
+. reads the bean definitions and evaluates their conditions without starting the application context, as `configure()` of api:context.ConfigurableBeanContext[] does,
+. loads every enabled bean definition and the classes it names: the bean class, the classes generated for AOP advice, and the types of its constructor, of its injected fields and methods and of its executable methods,
+. logs how many bean definitions it loaded, logs a second warning and closes the application context,
+. exits the JVM with status 0.
+
+No bean is created and no bean class is initialized. No constructor, `@PostConstruct` method or startup event listener runs, no `@Context` or other eager bean is created, no method is scheduled, the api:runtime.EmbeddedApplication[] is not started and no port is bound. A bean that opens a connection when it is created therefore does not fail the run. A bean definition that cannot be loaded, for example because it names a class of an optional dependency that is absent, is skipped, and so is one with a condition that cannot be evaluated (see below). The run logs each skipped bean definition with the cause, and counts it in the line that ends the loading:
+
+----
+Training run (micronaut.application.training.mode=load): loaded 359 of 411 bean definitions and the 655 types they name in 43ms, skipped 0 that could not be evaluated or loaded
+----
+
+The mode is read only when `micronaut.application.training.enabled` is `true`. Its values are `start`, the default, and `load`, in any case; any other value fails the training run. The `load` mode works for every application, including one without an `EmbeddedApplication`, which a `start` run cannot stop. In the `test` environment `System.exit` is not called and `Micronaut.run` returns the application context, closed and never started.
+
+The warm-up does not apply to the `load` mode, because no server is started. If `micronaut.application.training.warmup` settings are present, a warning says that they are ignored.
+
+What still runs in `load` mode is the code that runs whenever an application context is configured:
+
+* the property source loaders. The one of Micronaut Test Resources supplies nothing, because a training run disables it (see <<trainingRunTestResources, Test Resources>>). If the application reads distributed configuration at startup through the bootstrap context, it still does, and the beans of the bootstrap context that read it are created.
+* the api:context.ApplicationContextConfigurer[] classes of the application.
+* the conditions of the bean definitions, custom api:context.condition.Condition[] classes included. A condition cannot look up a bean: the application context is not running, so the lookup throws an `IllegalStateException` and no bean is created. The bean definition with that condition is skipped and logged with that cause, although a normal start evaluates the condition.
+
+==== Choosing a mode
+
+The tools that a training run feeds record what the JVM loads and what it executes. A `load` run loads the classes of the beans and executes the framework code that builds the application context, but none of the code that creates the beans, starts the server and handles requests. A JDK AOT cache or a CDS archive trained in `load` mode therefore holds fewer classes, and none of the linked lambdas and method profiles of that code: the application starts faster than without a cache, but slower than with a cache trained in `start` mode.
+
+|===
+|Training run |When to use it
+
+|`start` with warm-up paths
+|The application can start where the training runs: the services it needs are available, or a training environment replaces them. This gives the most complete cache.
+
+|`start` without warm-up paths
+|As above, when the application has no request that is safe to send.
+
+|`load`
+|The application cannot start where the training runs. The cache is smaller and keeps only part of the gain.
+|===
+
+For a GraalVM profile for profile-guided optimization or for the `native-image-agent`, use the `start` mode: both record what the application executes, and a `load` run executes almost none of it.
+
+[[trainingRunTestResources]]
+=== Test Resources
+
+https://micronaut-projects.github.io/micronaut-test-resources/latest/guide/[Micronaut Test Resources] supplies the properties that the configuration of an application lacks, such as `datasources.default.url`, and starts a container for each one that is read. Left enabled in a training run, it would change what the run trains: a `load` run would ask the Test Resources server which properties it can supply while it reads the configuration, and a condition that compares the value of such a property would make the server start a container; a `start` run would train against the containers. A training run therefore disables Test Resources, in both modes:
+
+* Before it reads the configuration, the training run sets the system property `micronaut.test.resources.enabled` to `false`, the switch of the Test Resources client. The client then contacts no server, supplies no property and starts no container. The system property gets its previous value back once the configuration has been read; the configuration of the training run keeps `false`.
+* This needs the training run switch before the configuration is read: set `micronaut.application.training.enabled` as a system property, as the `MICRONAUT_APPLICATION_TRAINING_ENABLED` environment variable or as an argument of the application. If Test Resources is on the class path and the switch is only set in the configuration of the application, for example in a configuration file, the training run fails with a message that says so.
+* A Test Resources module that does not read that switch, such as `micronaut-test-resources-embedded`, cannot be disabled: if one is on the class path, the training run fails.
+* Test Resources reuses a client that the same JVM has already created from system properties, whatever the switch says, and the training run cannot tell. In practice this is a test that starts an application context with Test Resources and then runs a training run in the same JVM: run such a training run in a JVM of its own.
+
+The Micronaut Gradle plugin adds the Test Resources client to the `developmentOnly` and `testRuntimeOnly` configurations, and a Maven project generated by Micronaut Launch declares it with the `provided` scope. Neither is part of the runtime class path that a JAR or a container image is built from, so a training run in an image build only sees Test Resources if the build adds it to that class path.

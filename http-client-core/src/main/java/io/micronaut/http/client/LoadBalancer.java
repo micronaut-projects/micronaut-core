@@ -19,11 +19,14 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
+import io.micronaut.http.client.loadbalance.OutlierEjectionState;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;
 import java.net.URL;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -40,6 +43,71 @@ public interface LoadBalancer {
      * @return The selected {@link ServiceInstance}
      */
     Publisher<ServiceInstance> select(@Nullable Object discriminator);
+
+    /**
+     * Report the outcome of an exchange with an instance this load balancer selected, so that
+     * it can stop selecting an instance that keeps failing, see
+     * {@link io.micronaut.http.client.loadbalance.OutlierDetectionConfiguration}. The clients
+     * report every selection exactly once, when its exchange ends: an exchange that the caller
+     * cancelled, or that ended without saying anything about the instance, is reported as
+     * {@link Outcome#CANCELLED}. Ignored by default.
+     *
+     * @param serviceInstance The instance the request was sent to
+     * @param outcome         The outcome of the exchange
+     * @since 5.3.0
+     */
+    default void report(ServiceInstance serviceInstance, Outcome outcome) {
+    }
+
+    /**
+     * A snapshot of the outlier detection state of the instances of this load balancer: which
+     * ones are ejected, and until when. Read only, and safe to call concurrently; the snapshot is
+     * built on each call. Empty for a load balancer without outlier detection.
+     *
+     * @return The state of each known instance, sorted by URI
+     * @since 5.3.0
+     */
+    @Experimental
+    default List<OutlierEjectionState> getOutlierEjectionStates() {
+        return List.of();
+    }
+
+    /**
+     * The outcome of an exchange with a selected instance, see {@link #report}.
+     *
+     * @since 5.3.0
+     */
+    enum Outcome {
+        /**
+         * A response arrived, with a status below 500.
+         */
+        SUCCESS,
+        /**
+         * The connection to the instance could not be opened, or not in time.
+         */
+        CONNECT_FAILURE,
+        /**
+         * The response did not arrive in time.
+         */
+        TIMEOUT,
+        /**
+         * The connection or the stream was closed or reset by the instance before the response
+         * was complete.
+         */
+        RESET,
+        /**
+         * A response with a status of 500 or above.
+         */
+        SERVER_ERROR,
+        /**
+         * The exchange ended without saying anything about the instance: the caller cancelled
+         * it before its response, or it failed before it reached the instance, e.g. because
+         * the connection pool was full or the client was closed. It only ends the exchange,
+         * e.g. for the count of exchanges in flight of a strategy: it is neither a failure nor
+         * a success for the outlier detection.
+         */
+        CANCELLED
+    }
 
     /**
      * @return The context path to use for requests.
