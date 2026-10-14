@@ -1,9 +1,6 @@
 package io.micronaut.inject.lazy
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.exceptions.NoSuchBeanException
-import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.type.Argument
 import io.micronaut.fixtures.context.ApplicationUnderTest
 import io.micronaut.inject.BeanDefinition
@@ -393,21 +390,23 @@ class LazyBeanDefinitionsSpec extends Specification {
         stereotypedByName(lazy, 'demo.Tag') == stereotypedByName(eager, 'demo.Tag')
     }
 
-    void "a qualifier compared by its values matches a bean that leaves a member at its default, as eager mode, without loading it first"() {
-        given:
-        FixtureLoader eagerLoader = loader(classes)
-        ApplicationContext eager = start(eagerLoader, EAGER)
-        FixtureLoader lazyLoader = loader(classes)
-        ApplicationContext lazy = start(lazyLoader, LAZY_ONLY)
-        def large = AnnotationValue.builder('demo.Flavor').value('vanilla').member('size', 'large').build()
-        def small = AnnotationValue.builder('demo.Flavor').value('vanilla').member('size', 'small').build()
+    void "a qualifier compared by its values matches a bean that leaves a member at its default, as eager mode, as the first lookup of a JVM (#mode)"() {
+        given: "a JVM of its own, as the defaults of annotations are registered JVM-wide"
+        String java = Path.of(System.getProperty('java.home'), 'bin', 'java').toString()
+        String classPath = System.getProperty('java.class.path') + File.pathSeparator + classes
+        List<String> command = [java, '--enable-preview'] + switches + ['-cp', classPath, LazyQualifierDefaultsMain.name]
+        def process = new ProcessBuilder(command).redirectErrorStream(true).start()
+        String output = process.inputStream.text
 
-        expect: "as the first lookup"
-        byAnnotation(lazy, large) == byAnnotation(eager, large)
-        byAnnotation(lazy, large).contains('demo.VanillaLarge')
-        byAnnotation(lazy, small) == byAnnotation(eager, small)
-        byAnnotation(lazy, small).contains('demo.VanillaSmall')
-        !byAnnotation(lazy, small).contains('demo.VanillaLarge')
+        expect:
+        process.waitFor() == 0
+        output.contains('ANSWER large=[demo.VanillaLarge] small=[demo.VanillaSmall]')
+
+        where:
+        mode                  | switches
+        'eager'               | []
+        'lazy'                | ['-D' + LAZY + '=true', '-D' + WARM_UP + '=false']
+        'lazy, one processor' | ['-D' + LAZY + '=true', '-XX:ActiveProcessorCount=1']
     }
 
     void "a disabled bean of a type it is not exposed as is reported when that type is looked up, as in eager mode"() {
@@ -710,11 +709,6 @@ public final class Boom implements BeanDefinitionReference<Boom> {
     @groovy.transform.CompileStatic
     private static List<String> stereotypedByName(ApplicationContext context, String stereotype) {
         names(context.getBeanDefinitions(Qualifiers.byStereotype(stereotype))).findAll { String name -> name.startsWith('demo.') }.sort()
-    }
-
-    @groovy.transform.CompileStatic
-    private static List<String> byAnnotation(ApplicationContext context, AnnotationValue<?> value) {
-        names(context.getBeanDefinitions(Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA, (AnnotationValue) value))).findAll { String name -> name.startsWith('demo.') }.sort()
     }
 
     /**
