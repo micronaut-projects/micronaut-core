@@ -148,6 +148,9 @@ class SubMutC(SubMutBase):
             baseParameterAnnotations = annotationsOfParameter(base)
             subFieldAnnotations = annotationsOfField(sub)
             subParameterAnnotations = annotationsOfParameter(sub)
+            // The visitor is registered for every compilation of the module: the elements belong to this one
+            base = null
+            sub = null
         }
 
         private static List<String> annotationsOfField(ClassElement element) {
