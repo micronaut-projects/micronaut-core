@@ -1066,18 +1066,19 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     /**
      * Resolves the placeholders of the value that a lookup has found for a name.
      *
-     * <p>A text made of random expressions alone, such as <code>${random.port}</code>, resolves to
-     * something else every time, and the cache that keeps what it has resolved to is cleared
-     * after each property source. A property source that reads such a value while the property
-     * sources are being processed would be left with one that no later lookup returns. So what
-     * the text has resolved to is remembered with the text, and returned again for as long as a
-     * lookup by the name finds the same text.</p>
+     * <p>A text whose placeholders are all random expressions, such as <code>${random.port}</code>
+     * or <code>http://localhost:${random.port}/</code>, resolves to something else every time, and
+     * the cache that keeps what it has resolved to is cleared after each property source. A
+     * property source that reads such a value while the property sources are being processed
+     * would be left with one that no later lookup returns. So what the text has resolved to is
+     * remembered with the text, and returned again for as long as a lookup by the name finds the
+     * same text.</p>
      *
-     * <p>Only a text whose every placeholder is a random expression is remembered: resolving it
-     * reads no property, so nothing a property source adds can make what it has resolved to out
-     * of date. A text that names a property next to a random expression is resolved again by
-     * every lookup that does not find it cached, and so are the random expressions in a list or
-     * a map.</p>
+     * <p>Only a text whose every placeholder is a random expression is remembered, whatever else
+     * the text holds: resolving it reads no property, so nothing a property source adds can make
+     * what it has resolved to out of date. A text that names a property next to a random
+     * expression is resolved again by every lookup that does not find it cached, and so are the
+     * random expressions in a list or a map.</p>
      *
      * @param resolverState The state the value was read from
      * @param name          The name the value was looked up by
@@ -1242,8 +1243,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
          */
         private final Map<String, Object> placeholderResolutionCache = new ConcurrentHashMap<>(20);
         /**
-         * What the texts made of random expressions alone have resolved to, by the name they were
-         * looked up by. Unlike the caches it is kept when a property source is processed.
+         * What the texts whose placeholders are all random expressions have resolved to, by the
+         * name they were looked up by. Unlike the caches it is kept when a property source is
+         * processed.
          */
         private final Map<String, RandomText> randomTexts = new ConcurrentHashMap<>(4);
         /**
@@ -1253,7 +1255,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
-     * What a text made of random expressions alone has resolved to.
+     * What a text whose placeholders are all random expressions has resolved to.
      *
      * @param text     The text
      * @param resolved What it has resolved to
