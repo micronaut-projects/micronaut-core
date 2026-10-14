@@ -160,40 +160,47 @@ internal class KotlinElementAnnotationMetadataFactory(
 
     override fun lookupForParameter(parameterElement: ParameterElement): CachedAnnotationMetadata {
         val kotlinParameterElement = parameterElement as KotlinParameterElement
-        // Keyed by the declaring type, not the owning type: a parameter of an inherited method is the same
-        // parameter whichever class it is read through, so a mutation must be visible through all of them
-        val declaringType = kotlinParameterElement.methodElement.declaringType as KotlinClassElement
-        return metadataBuilder.lookupOrBuild(
+        // A mutation made through the declaring type is shared: a parameter of an inherited method is the same
+        // parameter whichever class it is read through. A mutation made through a subclass belongs to that subclass
+        val declaringType = getClassDefinitionCacheKey(kotlinParameterElement.methodElement.declaringType as KotlinClassElement)
+        val owningType = getClassDefinitionCacheKey(kotlinParameterElement.methodElement.owningType as KotlinClassElement)
+        return metadataBuilder.lookupOrBuildForOwner(
             Key3(
-                getClassDefinitionCacheKey(declaringType),
+                declaringType,
                 kotlinParameterElement.methodElement.nativeType,
                 kotlinParameterElement.nativeType
             ),
-            kotlinParameterElement.nativeType.element
+            OwnerKey3(
+                owningType,
+                kotlinParameterElement.methodElement.nativeType,
+                kotlinParameterElement.nativeType
+            ),
+            kotlinParameterElement.nativeType.element,
+            owningType != declaringType
         )
     }
 
     override fun lookupForField(fieldElement: FieldElement, propertyComponent: Boolean): CachedAnnotationMetadata {
         val kotlinFieldElement = fieldElement as AbstractKotlinElement<*>
-        // A mutation of the field is keyed by the declaring type, not the owning type: an inherited field is the
-        // same field whichever class it is read through, so a mutation must be visible through all of them.
-        // A mutation made through a bean property belongs to the owning type the property is resolved for
+        // A mutation made through the declaring type is shared: an inherited field is the same field whichever
+        // class it is read through. A mutation made through a subclass, or through a bean property, belongs to
+        // the owning type the member is resolved for
         if (kotlinFieldElement !is KotlinFieldElement && kotlinFieldElement !is KotlinEnumConstantElement) {
             throw RuntimeException("Unknown field element type ${fieldElement.javaClass}")
         }
-        val declaringType = fieldElement.declaringType as KotlinClassElement
-        val owningType = fieldElement.owningType as KotlinClassElement
+        val declaringType = getClassDefinitionCacheKey(fieldElement.declaringType as KotlinClassElement)
+        val owningType = getClassDefinitionCacheKey(fieldElement.owningType as KotlinClassElement)
         return metadataBuilder.lookupOrBuildForOwner(
             Key2(
-                getClassDefinitionCacheKey(declaringType),
+                declaringType,
                 kotlinFieldElement.nativeType,
             ),
             OwnerKey2(
-                getClassDefinitionCacheKey(owningType),
+                owningType,
                 kotlinFieldElement.nativeType,
             ),
             kotlinFieldElement.nativeType.element,
-            propertyComponent
+            propertyComponent || owningType != declaringType
         )
     }
 
@@ -220,5 +227,7 @@ internal class KotlinElementAnnotationMetadataFactory(
     data class OwnerKey2(private val v1: Any, private val v2: Any)
 
     data class Key3(private val v1: Any, private val v2: Any, private val v3: Any)
+
+    data class OwnerKey3(private val v1: Any, private val v2: Any, private val v3: Any)
 
 }

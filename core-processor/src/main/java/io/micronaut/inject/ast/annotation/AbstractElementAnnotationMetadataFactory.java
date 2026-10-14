@@ -169,16 +169,18 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
     }
 
     /**
-     * Lookup annotation metadata for the parameter. The entry is keyed by the declaring type of the method, not
-     * by the owning type, so that a parameter of an inherited method shares one entry whichever class it is read
-     * through.
+     * Lookup annotation metadata for the parameter read through its owning type. A mutation made through the type
+     * declaring the method is visible through every type the method is read through, a mutation made through a
+     * subclass is visible through that subclass only.
      *
      * @param parameterElement The element
      * @return The annotation metadata
+     * @see AbstractAnnotationMetadataBuilder#lookupOrBuildForParameter(Object, Object, Object, Object)
      */
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForParameter(ParameterElement parameterElement) {
         MethodElement methodElement = parameterElement.getMethodElement();
         return metadataBuilder.lookupOrBuildForParameter(
+            getNativeElement(methodElement.getOwningType()),
             getNativeElement(methodElement.getDeclaringType()),
             getNativeElement(methodElement),
             getNativeElement(parameterElement)
@@ -186,8 +188,9 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
     }
 
     /**
-     * Lookup annotation metadata for the field. The entry is keyed by the declaring type of the field, not by the
-     * owning type, so that an inherited field shares one entry whichever class it is read through.
+     * Lookup annotation metadata for the field read through its owning type. A mutation made through the type
+     * declaring the field is visible through every type the field is read through, a mutation made through a
+     * subclass is visible through that subclass only.
      *
      * @param fieldElement The element
      * @return The annotation metadata
@@ -197,9 +200,8 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
     }
 
     /**
-     * Lookup annotation metadata for the field read through its owning type. A mutation made on the field is keyed
-     * by the declaring type, a mutation made on the field as a component of a bean property belongs to the owning
-     * type.
+     * Lookup annotation metadata for the field read through its owning type. A mutation made on the field through
+     * a subclass, or on the field as a component of a bean property, belongs to the owning type.
      *
      * @param fieldElement      The element
      * @param propertyComponent Whether a mutation is made on the field as a component of a bean property

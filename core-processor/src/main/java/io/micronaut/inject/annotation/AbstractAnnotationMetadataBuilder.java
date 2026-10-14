@@ -309,19 +309,44 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Build the metadata for the given parameter element. The metadata is keyed by the type that <em>declares</em>
-     * the method, not by the type the method is reached through: a parameter of an inherited method is the same
+     * Build the metadata for the given parameter element read through the type that declares its method. The
+     * metadata is shared by every type the method is read through: a parameter of an inherited method is the same
      * parameter whether it is read through the declaring class or through a subclass, so a mutation made through
-     * one must be visible through the other. Unlike a method, a parameter's metadata never includes the owning
-     * type's annotations, so nothing distinguishes it per owner.
+     * the declaring class is visible through every subclass.
      *
      * @param declaringType    The type declaring the method
      * @param methodElement    The method element
      * @param parameterElement The parameter element
      * @return The {@link AnnotationMetadata}
+     * @see #lookupOrBuildForParameter(Object, Object, Object, Object)
      */
     public CachedAnnotationMetadata lookupOrBuildForParameter(T declaringType, T methodElement, T parameterElement) {
         return lookupOrBuild(new Key3<>(declaringType, methodElement, parameterElement), parameterElement);
+    }
+
+    /**
+     * Build the metadata for the given parameter element read through the given owning type. A mutation made
+     * through the type declaring the method is shared, as with
+     * {@link #lookupOrBuildForParameter(Object, Object, Object)}, and is visible through every type the method is
+     * read through. A mutation made through a subclass belongs to that subclass only: a visitor annotating the
+     * parameters of one bean must not annotate the same inherited parameter read through another subclass, nor
+     * through the declaring type. Once the owning type holds such a mutation, the parameter read or mutated
+     * through the owning type uses it.
+     *
+     * @param owningType       The type the method is read through
+     * @param declaringType    The type declaring the method
+     * @param methodElement    The method element
+     * @param parameterElement The parameter element
+     * @return The {@link AnnotationMetadata}
+     * @since 5.3.0
+     */
+    public CachedAnnotationMetadata lookupOrBuildForParameter(T owningType, T declaringType, T methodElement, T parameterElement) {
+        return lookupOrBuildForOwner(
+            new Key3<>(declaringType, methodElement, parameterElement),
+            new OwnerKey3<>(owningType, methodElement, parameterElement),
+            parameterElement,
+            !owningType.equals(declaringType)
+        );
     }
 
     /**
@@ -361,12 +386,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     /**
      * Build the metadata for the given field element read through the given owning type, excluding any class
-     * metadata. A mutation made on the field itself is keyed by the declaring type, as with
+     * metadata. A mutation made through the type declaring the field is shared, as with
      * {@link #lookupOrBuildForField(Object, Object)}, and is visible through every type the field is read through.
-     * A mutation made on the field as a component of a bean property belongs to the owning type: a bean property is
-     * resolved for the type it is read through, as its accessor methods are, so annotating the property of a super
-     * type must not annotate the same property read through a subclass. Once the owning type holds such a mutation,
-     * the field read or mutated through the owning type uses it.
+     * A mutation made through a subclass belongs to that subclass only: a visitor annotating the fields of one bean
+     * must not annotate the same inherited field read through another subclass, nor through the declaring type.
+     * A mutation made on the field as a component of a bean property belongs to the owning type whichever type it
+     * is made through: a bean property is resolved for the type it is read through, as its accessor methods are, so
+     * annotating the property of a super type must not annotate the same property read through a subclass. Once
+     * the owning type holds such a mutation, the field read or mutated through the owning type uses it.
      *
      * @param owningType        The type the field is read through
      * @param declaringType     The type declaring the field
@@ -376,7 +403,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @since 5.2.1
      */
     public CachedAnnotationMetadata lookupOrBuildForField(T owningType, T declaringType, T element, boolean propertyComponent) {
-        return lookupOrBuildForOwner(new Key2<>(declaringType, element), new OwnerKey2<>(owningType, element), element, propertyComponent);
+        return lookupOrBuildForOwner(
+            new Key2<>(declaringType, element),
+            new OwnerKey2<>(owningType, element),
+            element,
+            propertyComponent || !owningType.equals(declaringType)
+        );
     }
 
     /**
@@ -2486,6 +2518,23 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         @Override
         public Iterator<T> iterator() {
             return List.of(owningType, e2).iterator();
+        }
+    }
+
+    /**
+     * Key used to reference the metadata a parameter is mutated with for one owning type. The first element is the
+     * owning type so that {@link #clearMutated(Object)} can drop the entry when that type is cleared.
+     *
+     * @param owningType The owning type
+     * @param e2         The element 2
+     * @param e3         The element 3
+     * @param <T>        the element type
+     */
+    @Internal
+    private record OwnerKey3<T>(T owningType, T e2, T e3) implements Iterable<T> {
+        @Override
+        public Iterator<T> iterator() {
+            return List.of(owningType, e2, e3).iterator();
         }
     }
 
