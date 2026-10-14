@@ -80,7 +80,9 @@ public final class DevAccessLinks {
                 .filter(host -> !host.isEmpty())
                 .orElse(null);
             String named = bound == null || bound.equals("0.0.0.0") || bound.equals("::") || bound.equals("[::]") ? null : bracketed(bound);
-            boolean allInterfaces = named == null;
+            String name = named == null ? null : DevAccess.hostName(named);
+            // every interface, or an address other machines route to
+            boolean reachable = name == null || !DevAccess.isLoopback(name);
             String host = named == null ? "localhost" : named;
             String contextPath = normalizedPath(environment.getProperty(CONTEXT_PATH, String.class).orElse(""));
             String controlPanel = contextPath + controlPanelPath(environment);
@@ -102,7 +104,7 @@ public final class DevAccessLinks {
             String url = scheme + "://" + host + ":" + linkPort + path
                 + (access.tokenEnabled() ? "?" + DevAccess.TOKEN_PARAMETER + "=" + access.token() : "");
             String bindAddress = named == null ? "all interfaces (*:" + port + ")" : named + ":" + port;
-            return new Link(url, bindAddress, allInterfaces, access.tokenEnabled());
+            return new Link(url, bindAddress, reachable);
         } catch (RuntimeException | LinkageError e) {
             // a generation that stopped meanwhile, or a server without HTTP: the note goes without the link
             LOG.debug("Cannot build the development link of a generation", e);
@@ -199,9 +201,9 @@ public final class DevAccessLinks {
      *
      * @param url The URL to open, with the token when it is needed
      * @param bindAddress The address the server listens on, for the note
-     * @param allInterfaces Whether the server listens on every interface, so other machines reach it
-     * @param tokenEnabled Whether the development pages need the token
+     * @param reachable Whether the server listens on every interface or on an address that is not a loopback one, so
+     *                  other machines reach it
      */
-    public record Link(String url, String bindAddress, boolean allInterfaces, boolean tokenEnabled) {
+    public record Link(String url, String bindAddress, boolean reachable) {
     }
 }

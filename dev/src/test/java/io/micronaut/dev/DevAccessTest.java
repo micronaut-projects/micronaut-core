@@ -116,7 +116,9 @@ class DevAccessTest {
             // the note links to the configured Control Panel path with the token
             String notice = logged.list.stream().map(ILoggingEvent::getFormattedMessage).filter(message -> message.contains(DevModeNotice.HEADLINE))
                 .findFirst().orElseThrow();
-            assertTrue(notice.contains("      http://localhost:" + port + "/admin?token=" + token + System.lineSeparator()), notice);
+            // on exactly one line of its own, the only place the token is shown
+            assertEquals(List.of("Development pages: http://localhost:" + port + "/admin?token=" + token),
+                notice.lines().filter(line -> line.contains(token)).toList(), notice);
 
             // the application's own routes are left alone
             assertEquals("200 hello", status(get("/hello", "rebind.attacker.example:" + port, "")));
