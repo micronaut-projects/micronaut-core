@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.context.ClientContextPathProvider;
@@ -395,7 +396,8 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
 
     /** @param configuration JDK-specific settings for this client */
     @Inject
-    void configureJdk(@Nullable ServiceJdkConfiguration configuration) {
+    @Internal
+    public void configureJdk(@Nullable ServiceJdkConfiguration configuration) {
         if (configuration != null) {
             setJdk(configuration);
         }
