@@ -203,6 +203,10 @@ class Outer {
     }
 }
 
+@interface Marker {
+}
+
+@Marker
 @interface MyAnn {
     String name()
     @NonBinding String description() default ""
@@ -211,13 +215,14 @@ class Outer {
     ElementType target() default ElementType.METHOD
     String[] tags() default ["a", "b"]
     Outer.Nested nested() default @Outer.Nested(value = "n")
+    Outer.Nested[] list() default []
 }
 """)
         def members = element.getMembers()
 
         expect: "the members in declaration order, each a member of the annotation"
         element.getName() == 'test.MyAnn'
-        members*.getName() == ['name', 'description', 'priority', 'type', 'target', 'tags', 'nested']
+        members*.getName() == ['name', 'description', 'priority', 'type', 'target', 'tags', 'nested', 'list']
         members.every { it instanceof AnnotationMemberElement && it.getDeclaringType().getName() == 'test.MyAnn' }
 
         and: "the declared types"
@@ -241,9 +246,16 @@ class Outer {
         ((AnnotationValue) members[6].getDefaultValue().get()).getAnnotationName() == 'test.Outer$Nested'
         ((AnnotationValue) members[6].getDefaultValue().get()).stringValue().get() == 'n'
 
-        and: "the annotations of a member"
+        and: "the annotations of a member are its own, not those of the annotation interface"
         members[1].hasAnnotation('test.NonBinding')
         members.count { it.hasAnnotation('test.NonBinding') } == 1
+        element.hasAnnotation('test.Marker')
+        members.every { !it.hasAnnotation('test.Marker') }
+
+        and: "a member can be annotated"
+        members[0].annotate('test.Marker')
+        members[0].hasAnnotation('test.Marker')
+        !members[1].hasAnnotation('test.Marker')
 
         and: "the type of a nested annotation member is an annotation element with members of its own"
         members[6].getType() instanceof AnnotationElement
@@ -252,9 +264,23 @@ class Outer {
         nested[0].getDefaultValue() == Optional.empty()
         nested[1].getDefaultValue() == Optional.of(true)
 
-        and: "a copy of the element keeps the members"
+        and: "an array of a nested annotation keeps the annotation element through its component"
+        members[7].getType().isArray()
+        members[7].getType() instanceof AnnotationElement
+        members[7].getType().fromArray() instanceof AnnotationElement
+        ((AnnotationElement) members[7].getType().fromArray()).getMembers()*.getName() == ['value', 'flag']
+        members[6].getType().toArray() instanceof AnnotationElement
+        members[6].getType().toArray().isArray()
+        members[7].getDefaultValue().get() instanceof Object[]
+        ((Object[]) members[7].getDefaultValue().get()).length == 0
+
+        and: "a copy of the element keeps the members, and a copy of a member is a member"
         def copy = (AnnotationElement) element.withAnnotationMetadata(element.getAnnotationMetadata())
         copy.getMembers()*.getName() == members*.getName()
+        AnnotationMemberElement memberCopy = members[1].withAnnotationMetadata(members[1].getAnnotationMetadata())
+        memberCopy.getName() == 'description'
+        memberCopy.getDefaultValue() == Optional.of('')
+        memberCopy.hasAnnotation('test.NonBinding')
     }
 
     void "test getMembers for annotations on the classpath"() {

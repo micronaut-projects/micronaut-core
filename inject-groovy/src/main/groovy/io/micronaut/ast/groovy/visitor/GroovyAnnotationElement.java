@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.ast.AnnotationElement;
 import io.micronaut.inject.ast.AnnotationMemberElement;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
@@ -57,13 +58,31 @@ final class GroovyAnnotationElement extends GroovyClassElement implements Annota
     public GroovyAnnotationElement(GroovyVisitorContext visitorContext,
                                    GroovyNativeElement nativeElement,
                                    ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        super(visitorContext, nativeElement, annotationMetadataFactory);
+        this(visitorContext, nativeElement, annotationMetadataFactory, 0);
+    }
+
+    /**
+     * @param visitorContext The visitor context
+     * @param nativeElement The native element
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param arrayDimensions The number of array dimensions
+     */
+    GroovyAnnotationElement(GroovyVisitorContext visitorContext,
+                            GroovyNativeElement nativeElement,
+                            ElementAnnotationMetadataFactory annotationMetadataFactory,
+                            int arrayDimensions) {
+        // an annotation type cannot be generic, so the type arguments can be ignored
+        super(visitorContext, nativeElement, annotationMetadataFactory, null, arrayDimensions);
     }
 
     @Override
     protected @NonNull GroovyClassElement copyConstructor() {
-        // an annotation type cannot be generic, so the type arguments can be ignored
-        return new GroovyAnnotationElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory);
+        return new GroovyAnnotationElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, getArrayDimensions());
+    }
+
+    @Override
+    public ClassElement withArrayDimensions(int arrayDimensions) {
+        return copyArrayTypeAnnotations(new GroovyAnnotationElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, arrayDimensions));
     }
 
     @Override

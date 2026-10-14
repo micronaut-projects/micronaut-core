@@ -128,6 +128,9 @@ class Outer {
     annotation class Nested(val value: String, val flag: Boolean = true)
 }
 
+annotation class Marker
+
+@Marker
 annotation class MyAnn(
     val name: String,
     @NonBinding val description: String = "",
@@ -135,7 +138,8 @@ annotation class MyAnn(
     val type: KClass<*> = Any::class,
     val target: ElementType = ElementType.METHOD,
     val tags: Array<String> = ["a", "b"],
-    val nested: Outer.Nested = Outer.Nested("n")
+    val nested: Outer.Nested = Outer.Nested("n"),
+    val list: Array<Outer.Nested> = []
 )
 
 annotation class UnusedAnn(val value: String = "unused")
@@ -149,15 +153,15 @@ class MyBean
         def members = MembersVisitor.MEMBERS['test.MyAnn']
 
         expect: "the members in declaration order, each a member of the annotation"
-        MembersVisitor.NAMES['test.MyAnn'] == ['name', 'description', 'priority', 'type', 'target', 'tags', 'nested']
+        MembersVisitor.NAMES['test.MyAnn'] == ['name', 'description', 'priority', 'type', 'target', 'tags', 'nested', 'list']
         MembersVisitor.DECLARING['test.MyAnn'] == ['test.MyAnn'] as Set
 
         and: "the declared types, an array by its component"
         MembersVisitor.TYPES['test.MyAnn'] == [
             name: 'java.lang.String', description: 'java.lang.String', priority: 'int', type: 'kotlin.reflect.KClass',
-            target: ElementType.name, tags: 'java.lang.String', nested: 'test.Outer$Nested'
+            target: ElementType.name, tags: 'java.lang.String', nested: 'test.Outer$Nested', list: 'test.Outer$Nested'
         ]
-        MembersVisitor.ARRAYS['test.MyAnn'] == ['tags']
+        MembersVisitor.ARRAYS['test.MyAnn'] == ['tags', 'list']
 
         and: "the defaults, as the metadata records them"
         members['name'] == Optional.empty()
@@ -171,11 +175,15 @@ class MyBean
         ((AnnotationValue) members['nested'].get()).getAnnotationName() == 'test.Outer$Nested'
         ((AnnotationValue) members['nested'].get()).stringValue().get() == 'n'
 
-        and: "the annotations of a member"
+        and: "the annotations of a member are its own, not those of the annotation class"
         MembersVisitor.NON_BINDING['test.MyAnn'] == ['description']
+        MembersVisitor.MARKED['test.MyAnn'] == ['name']
 
-        and: "the type of a nested annotation member is an annotation element, and the nested annotation has members of its own"
-        MembersVisitor.ANNOTATION_TYPED['test.MyAnn'] == ['nested']
+        and: "the type of a nested annotation member is an annotation element, through an array too, and the nested annotation has members of its own"
+        MembersVisitor.ANNOTATION_TYPED['test.MyAnn'] == ['nested', 'list']
+        MembersVisitor.ARRAY_COMPONENT_MEMBERS['test.MyAnn'] == [list: ['value', 'flag']]
+        members['list'].get() instanceof Object[]
+        ((Object[]) members['list'].get()).length == 0
         MembersVisitor.NAMES['test.Outer$Nested'] == ['value', 'flag']
         MembersVisitor.MEMBERS['test.Outer$Nested'] == [value: Optional.empty(), flag: Optional.of(true)]
 
@@ -204,9 +212,11 @@ class MyBean
         static final Map<String, List<String>> NON_BINDING = [:]
         static final Map<String, List<String>> ANNOTATION_TYPED = [:]
         static final Map<String, List<String>> ARRAYS = [:]
+        static final Map<String, List<String>> MARKED = [:]
+        static final Map<String, Map<String, List<String>>> ARRAY_COMPONENT_MEMBERS = [:]
 
         static void clear() {
-            [NAMES, MEMBERS, TYPES, DECLARING, NON_BINDING, ANNOTATION_TYPED, ARRAYS]*.clear()
+            [NAMES, MEMBERS, TYPES, DECLARING, NON_BINDING, ANNOTATION_TYPED, ARRAYS, MARKED, ARRAY_COMPONENT_MEMBERS]*.clear()
         }
 
         @Override
@@ -229,6 +239,14 @@ class MyBean
             NON_BINDING.put(name, members.findAll { it.hasAnnotation('test.NonBinding') }*.getName())
             ANNOTATION_TYPED.put(name, members.findAll { it.getType() instanceof AnnotationElement }*.getName())
             ARRAYS.put(name, members.findAll { it.getType().isArray() }*.getName())
+            // the annotation class carries the marker; the first member is given it, which the others must not see
+            if (!members.isEmpty() && element.hasAnnotation('test.Marker')) {
+                members[0].annotate('test.Marker')
+            }
+            MARKED.put(name, members.findAll { it.hasAnnotation('test.Marker') }*.getName())
+            ARRAY_COMPONENT_MEMBERS.put(name, members
+                .findAll { it.getType().isArray() && it.getType().fromArray() instanceof AnnotationElement }
+                .collectEntries { [(it.getName()): ((AnnotationElement) it.getType().fromArray()).getMembers()*.getName()] })
         }
     }
 

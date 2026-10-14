@@ -40,20 +40,29 @@ import java.util.Optional
 internal class KotlinAnnotationElement(
     private val annotationNativeType: KotlinClassNativeElement,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-    visitorContext: KotlinVisitorContext
+    visitorContext: KotlinVisitorContext,
+    arrayDimensions: Int = 0
 ) : KotlinClassElement(
     annotationNativeType,
     elementAnnotationMetadataFactory,
-    null,
-    visitorContext
+    null, // an annotation type cannot be generic, so the type arguments can be ignored
+    visitorContext,
+    arrayDimensions
 ), AnnotationElement {
 
-    // an annotation type cannot be generic, so the type arguments can be ignored
-    override fun copyThis() = KotlinAnnotationElement(
+    override fun copyThis() = copyArrayTypeAnnotations(KotlinAnnotationElement(
         annotationNativeType,
         elementAnnotationMetadataFactory,
-        visitorContext
-    )
+        visitorContext,
+        arrayDimensions
+    ))
+
+    override fun withArrayDimensions(arrayDimensions: Int) = copyArrayTypeAnnotations(KotlinAnnotationElement(
+        annotationNativeType,
+        elementAnnotationMetadataFactory,
+        visitorContext,
+        arrayDimensions
+    ))
 
     override fun isInherited() = declaration.annotations.any { annotation ->
         annotation.annotationType.resolve().declaration.qualifiedName?.asString() == AnnotationUtil.ANN_INHERITED
