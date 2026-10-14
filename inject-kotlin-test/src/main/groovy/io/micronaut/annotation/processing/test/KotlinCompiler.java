@@ -86,9 +86,14 @@ public class KotlinCompiler {
 
     private static String jvmDefaultMode = "enable";
 
+    private static String jvmTarget = null;
+
     private static KotlinCompilation newKspCompilation() {
         KotlinCompilation compilation = new KotlinCompilation();
         compilation.setJvmDefault(jvmDefaultMode);
+        if (jvmTarget != null) {
+            compilation.setJvmTarget(jvmTarget);
+        }
         Ksp2Kt.useKsp2(compilation);
         compilation.setLanguageVersion("2.4");
         compilation.setKotlincArguments(Arrays.asList("-Xsuppress-version-warnings", "-Xannotation-default-target=first-only"));
@@ -112,6 +117,16 @@ public class KotlinCompiler {
      */
     public static void setJvmDefaultMode(String mode) {
         jvmDefaultMode = mode;
+    }
+
+    /**
+     * Sets the {@code -jvm-target} the compilations run with, {@code null} for the default. A
+     * {@code @JvmRecord} class needs a target of 16 or later.
+     *
+     * @param target The target, such as {@code 17}, or {@code null}
+     */
+    public static void setJvmTarget(String target) {
+        jvmTarget = target;
     }
 
     public static URLClassLoader buildClassLoader(String name, @Language("kotlin") String clazz) {
