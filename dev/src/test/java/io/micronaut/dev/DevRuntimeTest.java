@@ -3,6 +3,7 @@ package io.micronaut.dev;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.dev.compile.SourceKind;
@@ -23,6 +24,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BooleanSupplier;
@@ -459,6 +461,52 @@ class DevRuntimeTest {
         // a file micronaut.config.files names relative to the working directory
         Path relative = Path.of("").toAbsolutePath().relativize(project.resolve("relative.yml").toAbsolutePath());
         assertTrue(ResourceNotifier.isPropertySource(project.resolve("relative.yml"), roots, Set.of("file:" + relative)));
+    }
+
+    @Test
+    void theConfigurationFilesIncludeThoseOfOverriddenLocationsAndOfImportsNotLoadedYet() {
+        List<Path> roots = List.of(project);
+        Set<String> names = ResourceNotifier.names();
+        Set<String> extensions = Set.of("properties", "yml", "yaml");
+        // overrideConfigLocations("classpath:config/"): the environment records only application.yml as the origin
+        List<String> locations = List.of("classpath:config/", "file:" + project.resolve("external"));
+        assertTrue(ResourceNotifier.isConfigurationFile(project.resolve("config/application.yml"), roots, locations, names, extensions));
+        assertTrue(ResourceNotifier.isConfigurationFile(project.resolve("external/application-dev.yml"), roots, locations, names, extensions));
+        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("application.yml"), roots, locations, names, extensions));
+        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("config/schema.graphqls"), roots, locations, names, extensions));
+        assertFalse(ResourceNotifier.isConfigurationFile(project.resolve("config/application.yml"), roots, names, extensions));
+
+        // imports declared whether or not their files existed when the context started
+        Set<String> imports = ResourceNotifier.imports(List.of(
+            PropertySource.of("application", Map.of(
+                "micronaut.config.import", List.of("optional:classpath://feature", "optional:classpath://late.yml", "optional:file://" + project.resolve("abs.yml").toAbsolutePath()))),
+            PropertySource.of("indexed", Map.of("micronaut.config.import[0]", "optional:classpath://indexed/one.yml")),
+            PropertySource.of("structured", Map.of(
+                "micronaut.config.import[0].provider", "classpath",
+                "micronaut.config.import[0].resource-path", "nested/structured.yml",
+                "micronaut.config.import[0].optional", true)),
+            PropertySource.of("nested", Map.of("micronaut.config.import", "optional:classpath://sibling.yml"), PropertySource.Origin.of("classpath:config/app.yml")),
+            PropertySource.of("structured-nested", Map.of(
+                "micronaut.config.import[0].provider", "classpath",
+                "micronaut.config.import[0].resource-path", "shared.yml"), PropertySource.Origin.of("classpath:config/other.yml")),
+            PropertySource.of("other", Map.of("micronaut.config.importance", "classpath://unrelated.yml", "app.name", "test"))));
+        assertTrue(ResourceNotifier.isImport(project.resolve("late.yml"), roots, imports, extensions));
+        assertTrue(ResourceNotifier.isImport(project.resolve("abs.yml"), roots, imports, extensions));
+        assertTrue(ResourceNotifier.isImport(project.resolve("indexed/one.yml"), roots, imports, extensions));
+        assertTrue(ResourceNotifier.isImport(project.resolve("nested/structured.yml"), roots, imports, extensions));
+        // an import resolves against the location of the property source that declares it, and names that file only
+        assertTrue(ResourceNotifier.isImport(project.resolve("config/sibling.yml"), roots, imports, extensions));
+        assertFalse(ResourceNotifier.isImport(project.resolve("sibling.yml"), roots, imports, extensions));
+        assertFalse(ResourceNotifier.isImport(project.resolve("config/late.yml"), roots, imports, extensions));
+        // a structured import resolves from the class path root, wherever it is declared
+        assertTrue(ResourceNotifier.isImport(project.resolve("shared.yml"), roots, imports, extensions));
+        assertFalse(ResourceNotifier.isImport(project.resolve("config/shared.yml"), roots, imports, extensions));
+        assertFalse(ResourceNotifier.isImport(project.resolve("unrelated.yml"), roots, imports, extensions));
+        assertFalse(ResourceNotifier.isImport(project.resolve("schema.graphqls"), roots, imports, extensions));
+        assertFalse(ResourceNotifier.isImport(project.resolve("notlate.yml"), roots, imports, extensions));
+        // an import without an extension, of a file in any format a loader reads
+        assertTrue(ResourceNotifier.isImport(project.resolve("feature.yml"), roots, imports, extensions));
+        assertFalse(ResourceNotifier.isImport(project.resolve("feature.graphqls"), roots, imports, extensions));
     }
 
     /**
