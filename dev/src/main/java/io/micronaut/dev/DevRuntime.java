@@ -316,7 +316,7 @@ public final class DevRuntime implements Closeable {
             notRunning = notRunning(launched, launching, failure, definesServer, "first start");
             if (notRunning == null) {
                 // of the generation that ran; when it did not, the first reload that runs one logs the note
-                notice.logOnce(LOG, strategy(), liveReload, definesServer, definesServer && manifest.liveReload().injectScript(), launched, access());
+                notice.logOnce(LOG, liveReload, definesServer, launched, access());
             }
             if (notRunning != null && !markStartFailed(launched, notRunning)) {
                 // a change launched the next generation meanwhile: it is the one that runs, or not
@@ -1536,7 +1536,7 @@ public final class DevRuntime implements Closeable {
         fresh.publishEvent(new ReloadCompletedEvent(this, new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));
         LOG.info("Reloaded: generation {} started in {} ms ({} class(es) changed, {} bean(s) retained)", classLoader.generation(), elapsed.toMillis(), changeSet.classes().size(), retainedCount);
         // when the first generation did not run, the first that does logs the note
-        notice.logOnce(LOG, strategy(), liveReload, definesServer, definesServer && manifest.liveReload().injectScript(), fresh, access());
+        notice.logOnce(LOG, liveReload, definesServer, fresh, access());
         LiveReloadServer server = liveReload;
         if (server != null) {
             // the new generation serves: the browsers see the new code

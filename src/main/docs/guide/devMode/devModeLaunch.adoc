@@ -53,7 +53,13 @@ The application does what it always does, `Micronaut.run(Application.class, args
 * `micronaut.dev.enabled=true`;
 * the beans retained from the previous generation.
 
-Once a generation of the application first runs, the launcher logs a framed note at INFO saying that it runs with development settings, not production ones, and lists them: the `dev` environment, the reload strategy, the compilation failures answered to requests and the LiveReload server, where they apply. A reload does not repeat the note. The launcher is not for production: run the packaged application there.
+Once a generation of the application first runs, the launcher logs a short note at INFO, followed by the link to the development pages with the launch's access token when the application has an HTTP server (see <<devModeSecurity, Security>>), and by the port of the LiveReload server when it runs. A reload does not repeat the note. The launcher is not for production: run the packaged application there.
+
+----
+Development Mode Active: Not for production usage.
+Development pages: http://localhost:8080/dev?token=8RkV...
+LiveReload server listening on port 35729
+----
 
 TIP: Everything under the manifest's `micronaut.dev.` keys can be set as a system property. api:context.env.DevelopmentMode[] answers whether the application runs this way, so a bean can be conditioned on it with `@DevelopmentActive` (or `@DevelopmentInactive` for the opposite).
 
@@ -89,12 +95,12 @@ The development runtime reveals the machine: the `dev` endpoint reports absolute
 
 === The access token
 
-Each start of the launcher generates a random token of 256 bits, which reloads keep and a relaunch replaces. Once the application first runs, the startup note prints a link with it, to the Control Panel when the application has one (at `micronaut.control-panel.path`, `/control-panel` by default) and to the `dev` endpoint otherwise, along with the address the HTTP server listens on:
+Each start of the launcher generates a random token of 256 bits, which reloads keep and a relaunch replaces. Once the application first runs, the startup note prints a link with it on a line of its own, to the Control Panel when the application has one (at `micronaut.control-panel.path`, `/control-panel` by default) and to the `dev` endpoint otherwise. It is the only place the token is shown:
 
 ----
-    - the HTTP server listens on localhost:8080
-    - the development pages need this launch's access token; open:
-      http://localhost:8080/control-panel?token=8RkV...
+Development Mode Active: Not for production usage.
+Development pages: http://localhost:8080/control-panel?token=8RkV...
+LiveReload server listening on port 35729
 ----
 
 Opening the link sets a cookie, `HttpOnly`, `SameSite=Strict` and of path `/`, and redirects to the same page without the token, so that it leaves the address bar and the history. From then on the browser reaches the development pages: everything under the `dev` endpoint, wherever `endpoints.dev.path` puts it, and under `/dev` and the Control Panel's path. A client that is not a browser, such as curl or an IDE, sends the token in the `X-Micronaut-Dev-Token` header. A request with neither is answered 401 with a hint to open the link. The token is compared in constant time.
@@ -114,7 +120,7 @@ To open the application through another name, such as a LAN host or a developmen
 
 === Binding to the loopback address
 
-In run mode, the launcher binds the HTTP server to `localhost`, so that other machines on the network cannot reach the development server at all. It sets `micronaut.server.host=localhost` at the lowest precedence: a `micronaut.server.host` in the application's configuration, an environment variable or a system property wins. The manifest entry `micronaut.dev.bind-loopback`, which the build plugins write, turns this off when false, as does `-Dmicronaut.dev.bind-loopback=false`. Test mode leaves the host alone. The startup note prints the address the server listens on, and warns when it listens on every interface.
+In run mode, the launcher binds the HTTP server to `localhost`, so that other machines on the network cannot reach the development server at all. It sets `micronaut.server.host=localhost` at the lowest precedence: a `micronaut.server.host` in the application's configuration, an environment variable or a system property wins. The manifest entry `micronaut.dev.bind-loopback`, which the build plugins write, turns this off when false, as does `-Dmicronaut.dev.bind-loopback=false`. Test mode leaves the host alone. The startup note warns, on a line of its own, when the server listens on every interface or on an address other than a loopback one.
 
 === Opting out
 

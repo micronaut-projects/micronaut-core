@@ -16,32 +16,27 @@
 package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.env.DevelopmentMode;
-import io.micronaut.context.env.Environment;
-import io.micronaut.dev.manifest.DevReloadStrategy;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.http.DevAccessLinks;
 import io.micronaut.dev.livereload.LiveReloadServer;
-import io.micronaut.dev.manifest.DevManifest;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
-import java.util.Locale;
 import java.util.OptionalInt;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * The note the launcher logs once, when a generation of the application first runs: the process runs with development
- * settings, not production ones. It lists only what is true of this launch, and, for an HTTP server, the link that
- * opens the development pages with the launch's access token and the address the server listens on.
+ * The note the launcher logs once, when a generation of the application first runs: the process runs in development
+ * mode, not for production. For an HTTP server it adds the link that opens the development pages with the launch's
+ * access token, and a warning when other machines can reach the server; it adds the LiveReload server's port when it
+ * runs.
  *
  * @since 5.3.0
  */
 @Internal
 final class DevModeNotice {
 
-    static final String HEADLINE = "DEVELOPMENT MODE: not for production use";
-    private static final String RULE = "=".repeat(80);
+    static final String HEADLINE = "Development Mode Active: Not for production usage.";
 
     private final AtomicBoolean logged = new AtomicBoolean();
 
@@ -51,66 +46,43 @@ final class DevModeNotice {
      * note again.
      *
      * @param log        The launcher's logger
-     * @param strategy   The reload strategy in force
      * @param liveReload The LiveReload server, when it runs
-     * @param http       Whether the application defines an HTTP server, whose requests the gate filter answers
-     * @param script     Whether the LiveReload script is added to the server's HTML pages
+     * @param http       Whether the application defines an HTTP server
      * @param generation The generation that runs
      * @param access     The access of the launch, whose token the link carries
      */
-    void logOnce(Logger log, DevReloadStrategy strategy, @Nullable LiveReloadServer liveReload, boolean http, boolean script,
-                 ApplicationContext generation, DevAccess access) {
+    void logOnce(Logger log, @Nullable LiveReloadServer liveReload, boolean http, ApplicationContext generation, DevAccess access) {
         if (logged.compareAndSet(false, true) && log.isInfoEnabled()) {
             OptionalInt port = liveReload == null ? OptionalInt.empty() : OptionalInt.of(liveReload.port());
             DevAccessLinks.Link link = http ? DevAccessLinks.of(generation, access) : null;
-            log.info("{}", text(strategy, port, http, script, link));
+            log.info("{}", text(port, link));
         }
     }
 
     /**
      * The note for a launch.
      *
-     * @param strategy   The reload strategy
      * @param liveReload The port the LiveReload server listens on, when it runs
-     * @param http       Whether the application defines an HTTP server, whose requests the gate filter answers
-     * @param script     Whether the LiveReload script is added to the server's HTML pages
      * @param link       The link to the development pages and the server's address, when a server runs
-     * @return The note: a framed block of lines that starts on a line of its own
+     * @return The note: the headline, then a line each for the link, the warning and the LiveReload server
      */
-    static String text(DevReloadStrategy strategy, OptionalInt liveReload, boolean http, boolean script, DevAccessLinks.@Nullable Link link) {
-        StringBuilder text = new StringBuilder(System.lineSeparator());
-        line(text, RULE);
-        line(text, "  " + HEADLINE);
-        line(text, "  The application runs under the micronaut-dev launcher, with development");
-        line(text, "  settings rather than production ones:");
-        line(text, "    - the '" + Environment.DEVELOPMENT + "' environment is active, with " + DevelopmentMode.PROPERTY + "=true");
-        line(text, "    - classes and resources reload as they change (strategy: " + strategy.name().toLowerCase(Locale.ROOT) + ")");
-        if (http) {
-            line(text, "    - while a compilation fails, requests are answered with the compiler's");
-            line(text, "      diagnostics, their source paths only with the access token");
+    static String text(OptionalInt liveReload, DevAccessLinks.@Nullable Link link) {
+        StringBuilder text = new StringBuilder(HEADLINE);
+        if (link != null) {
+            // the only place the token is shown: without it the development pages cannot be opened
+            line(text, "Development pages: " + link.url());
+            if (link.reachable()) {
+                line(text, "HTTP server listening on " + link.bindAddress()
+                    + ", reachable from other machines: set micronaut.server.host=localhost to restrict it");
+            }
         }
         if (liveReload.isPresent()) {
-            line(text, "    - a LiveReload server listens on port " + liveReload.getAsInt() + (script ? ", and HTML pages load its script" : ""));
+            line(text, "LiveReload server listening on port " + liveReload.getAsInt());
         }
-        if (link != null) {
-            if (link.allInterfaces()) {
-                line(text, "    - the HTTP server listens on " + link.bindAddress() + ": other machines can reach it;");
-                line(text, "      set micronaut.server.host=localhost to keep it to this one");
-            } else {
-                line(text, "    - the HTTP server listens on " + link.bindAddress());
-            }
-            if (link.tokenEnabled()) {
-                line(text, "    - the development pages need this launch's access token; open:");
-            } else {
-                line(text, "    - the development pages need no access token (" + DevManifest.ACCESS_TOKEN_ENABLED + "=false); open:");
-            }
-            line(text, "      " + link.url());
-        }
-        line(text, "  Run the packaged application, without the launcher, in production.");
-        return text.append(RULE).toString();
+        return text.toString();
     }
 
     private static void line(StringBuilder text, String line) {
-        text.append(line).append(System.lineSeparator());
+        text.append(System.lineSeparator()).append(line);
     }
 }
