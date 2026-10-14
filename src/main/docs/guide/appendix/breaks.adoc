@@ -102,6 +102,12 @@ If an earlier filter continued with a request that cannot be copied this way, fo
 
 When writing a response fails before it is committed, the error is handled by the error routes and the error response is filtered again by the response filters. Since Micronaut 5.3 those filters are selected with the route that answered the request, as for the response of that route, and include the filters of that route, rather than with the error route that handled the failure. A filter bound to a route with a ann:http.annotation.FilterMatcher[] annotation, or by its route attributes, filters the error response of its route when the write fails.
 
+=== A `CodecException` thrown while writing the response body is handled by the error routes (5.3)
+
+When a api:http.body.MessageBodyWriter[] failed with a api:http.codec.CodecException[] while writing the body of a response, for example because the body could not be serialized to JSON, the server previously answered the default error response (`500 Internal Server Error`, with the message of the exception when `micronaut.server.error-response-include-message` allows it) directly. The exception handlers, the error and status routes and the response filters did not see the failure.
+
+Since Micronaut 5.3 a `CodecException` thrown before anything was sent is handled like any other exception of the writer: it goes to the exception handlers and the error and status routes, and the response filters run on the error response. An application with an exception handler or an error route for `CodecException`, or for a supertype such as `Exception`, or with a status route for `500`, now gets its response instead of the default error response, which therefore no longer carries the message of the codec failure. The default error response is still answered when no handler or route applies, and when the writer of the error response fails as well.
+
 === The name condition of `SoftServiceLoader.load` is tested on every service entry (5.3)
 
 The `Predicate<String>` given to the three-argument `load(Class, ClassLoader, Predicate)` of api:core.io.service.SoftServiceLoader[] is documented to be passed the class name of each service. Previously it was only tested on the lines of `META-INF/services` files, comment included. Since Micronaut 5.3 it is tested on the name of every entry, so a caller that passes a condition can get different results:
