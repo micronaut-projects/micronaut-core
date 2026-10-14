@@ -44,6 +44,30 @@ tasks.withType(Test).configureEach {
     }
 }
 
+// -PlazyBeanDefinitions=on runs the tests with lazy bean definition references, and =verify also compares every
+// descriptor with its definition: a difference fails the test task, which lists them, even when a test caught it
+def lazyBeanDefinitions = providers.gradleProperty("lazyBeanDefinitions")
+if (lazyBeanDefinitions.isPresent()) {
+    tasks.withType(Test).configureEach { Test test ->
+        systemProperty "micronaut.bean-definitions.lazy", "true"
+        if (lazyBeanDefinitions.get() == "verify") {
+            File report = project.layout.buildDirectory.file("lazy-bean-definitions/${test.name}.txt").get().asFile
+            systemProperty "micronaut.bean-definitions.lazy.verify", "true"
+            systemProperty "micronaut.bean-definitions.lazy.verify.report", report.absolutePath
+            outputs.upToDateWhen { false }
+            doFirst {
+                report.delete()
+                report.parentFile.mkdirs()
+            }
+            doLast {
+                if (report.exists() && report.length() > 0) {
+                    throw new GradleException("Descriptors disagree with their bean definitions, see ${report}:\n${report.text.take(4000)}")
+                }
+            }
+        }
+    }
+}
+
 pluginManager.withPlugin("jacoco") {
     tasks.withType(Test).configureEach {
         // The agent instruments every class a test loads by default, including the Java, Groovy and
