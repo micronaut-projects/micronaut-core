@@ -53,6 +53,7 @@ ioc:
     introspectedProperty: Explicit Bean Properties
     propertyMembers: Bean Property Members
     introspectionHierarchy: Type Hierarchy
+    typeHierarchyRecords: Type Hierarchy Records
     atCreator: Constructor Methods
     staticAtCreator: Static Creator Methods
     introspectionConstructors: Describing Constructors
