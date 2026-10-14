@@ -159,6 +159,31 @@ class Top implements A14, B14 {}
         types.last().name == 'java.lang.Object'
     }
 
+    void "a precompiled generic super type written raw is raw, and so are its super types"() {
+        given:
+        ClassElement raw = buildClassElement('test.Raw', '''
+package test
+
+abstract class Raw extends java.util.ArrayList implements Comparable {}
+''')
+
+        when:
+        def types = raw.getAllSuperTypes()
+
+        then:
+        types.collect { render(it) } == ['test.Raw', 'java.util.ArrayList', 'java.util.AbstractList', 'java.util.AbstractCollection', 'java.util.Collection', 'java.lang.Iterable', 'java.util.List', 'java.util.SequencedCollection', 'java.util.RandomAccess', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Comparable', 'java.lang.Object']
+        types[1].rawType
+        types[2].rawType
+        types[2].typeArguments.isEmpty()
+        types[11].rawType
+        types[1].typeArguments.values().every { it instanceof GenericPlaceholderElement && it.rawType }
+        !buildClassElement('test.Typed', '''
+package test
+
+abstract class Typed extends java.util.ArrayList<String> implements Comparable<String> {}
+''').getAllSuperTypes()[1].rawType
+    }
+
     private static ClassElement field(ClassElement holder, String name) {
         holder.getEnclosedElements(ElementQuery.ALL_FIELDS).find { it.name == name }.genericType
     }
