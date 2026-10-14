@@ -77,6 +77,10 @@ final class FsEventStreams implements Closeable {
     private final Thread thread;
     private final LinkedBlockingQueue<Runnable> tasks = new LinkedBlockingQueue<>();
     private final CompletableFuture<FsEventsApi.RunLoop> runLoop = new CompletableFuture<>();
+    // the run loop belongs to the thread and goes with it: once the thread is leaving, stopping it would touch freed
+    // memory, which CoreFoundation answers by trapping
+    private final Object stopLock = new Object();
+    private boolean leaving; // guarded by stopLock
     /**
      * The streams, touched on the run loop thread only.
      */
@@ -204,8 +208,12 @@ final class FsEventStreams implements Closeable {
         // none when the run loop could not start
         FsEventsApi.RunLoop loop = runLoop.isDone() && !runLoop.isCompletedExceptionally() ? runLoop.join() : null;
         if (loop != null) {
-            // stops the current or the next run of the loop: the thread then runs the tasks
-            loop.stop();
+            synchronized (stopLock) {
+                if (!leaving) {
+                    // stops the current or the next run of the loop: the thread then runs the tasks
+                    loop.stop();
+                }
+            }
         }
     }
 
@@ -229,6 +237,10 @@ final class FsEventStreams implements Closeable {
             runLoop.completeExceptionally(e);
             LOG.warn("The FSEvents run loop failed: {}", e.getMessage(), e);
         } finally {
+            synchronized (stopLock) {
+                // no stop from now on: the loop is freed with the thread
+                leaving = true;
+            }
             ended = true;
             // outside the run loop: no callback runs while the streams stop and are released
             for (FsEventsApi.NativeStream stream : streams) {

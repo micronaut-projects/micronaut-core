@@ -126,6 +126,11 @@ final class FakeFsEvents implements FsEventsApi {
 
         @Override
         public void stop() {
+            Thread owner = runLoopThread;
+            if (owner != null && !owner.isAlive()) {
+                // CoreFoundation frees a thread's run loop with the thread: stopping it then traps
+                violations.add("stop of the run loop after its thread ended");
+            }
             stops.add(Boolean.TRUE);
         }
     }
