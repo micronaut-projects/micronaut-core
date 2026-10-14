@@ -492,6 +492,36 @@ class AnnotationValueSpec extends Specification {
         emptyDefaults.matches(noDefaults)
         !noDefaults.matches(new AnnotationValue("test.Foo", [:] as Map<CharSequence, Object>, (Map<CharSequence, Object>) null))
     }
+
+    void "mutate().defaultValues() works on a value built without defaults"() {
+        when:
+        AnnotationValue<?> av = AnnotationValue.builder("x.Y").member("a", 1).build()
+                .mutate().defaultValues(Map.of("a", 0, "b", "z")).build()
+
+        then:
+        av.intValue("a").getAsInt() == 1
+        av.getDefaultValues() == [a: 0, b: "z"]
+        av.get("b", String).get() == "z"
+
+        when: "the source was created with the two-argument constructor"
+        av = new AnnotationValue<>("x.Y", [a: 1]).mutate().defaultValues([a: 0]).build()
+
+        then:
+        av.getDefaultValues() == [a: 0]
+    }
+
+    void "mutate().defaultValues() does not write into the source value's defaults"() {
+        given:
+        Map<CharSequence, Object> defaults = Collections.unmodifiableMap([a: 0] as Map<CharSequence, Object>)
+        AnnotationValue<?> source = new AnnotationValue<>("x.Y", [a: 1] as Map<CharSequence, Object>, defaults)
+
+        when:
+        AnnotationValue<?> mutated = source.mutate().defaultValues([b: 2]).build()
+
+        then:
+        mutated.getDefaultValues() == [a: 0, b: 2]
+        source.getDefaultValues() == [a: 0]
+    }
 }
 
 @interface Bar {}
