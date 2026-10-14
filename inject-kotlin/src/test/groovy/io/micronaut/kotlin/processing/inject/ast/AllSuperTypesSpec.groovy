@@ -112,6 +112,22 @@ class Holder {
         return result
     }
 
+    void "the Object listed last is assignable as Object"() {
+        given:
+        List<Boolean> answers = []
+        buildClassElement('test.Leaf', TYPES) { leaf ->
+            def object = leaf.getAllSuperTypes().last()
+            answers << (object.name == 'java.lang.Object')
+            answers << object.isAssignable('java.lang.Object')
+            answers << object.isAssignable(Object)
+            answers << object.isAssignable(ClassElement.of(Object))
+            answers << !object.isAssignable(Runnable)
+        }
+
+        expect:
+        answers == [true, true, true, true, true]
+    }
+
     private static ClassElement field(ClassElement holder, String name) {
         holder.getEnclosedElements(ElementQuery.ALL_FIELDS).find { it.name == name }.genericType
     }

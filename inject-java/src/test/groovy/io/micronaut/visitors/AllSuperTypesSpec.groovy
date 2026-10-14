@@ -198,6 +198,26 @@ abstract class Box<T> implements View<T>, Named {}
         closure(box) == ['test.Box<java.util.List>', 'test.View<java.util.List>', 'test.Named', 'java.lang.Object']
     }
 
+    void "the Object listed last is assignable as Object"() {
+        given:
+        ClassElement leaf = buildClassElement('''
+package test;
+
+class Leaf implements Named {}
+interface Named {}
+''')
+
+        when:
+        def object = leaf.getAllSuperTypes().last()
+
+        then:
+        object.name == 'java.lang.Object'
+        object.isAssignable('java.lang.Object')
+        object.isAssignable(Object)
+        object.isAssignable(ClassElement.of(Object))
+        !object.isAssignable(Runnable)
+    }
+
     private static ClassElement field(ClassElement holder, String name) {
         holder.getEnclosedElements(ElementQuery.ALL_FIELDS).find { it.name == name }.genericType
     }
