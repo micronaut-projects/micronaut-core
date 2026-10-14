@@ -180,7 +180,7 @@ final class PythonCompilation implements AutoCloseable {
                 transaction.put(stagedLedger, ledger);
                 transaction.commit();
             } catch (IOException | UncheckedIOException e) {
-                transaction.rollback();
+                transaction.rollback(e);
                 throw e;
             }
             Set<Path> removedOutputs = new LinkedHashSet<>(transaction.removed());
