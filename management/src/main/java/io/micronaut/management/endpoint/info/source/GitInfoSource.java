@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
@@ -41,7 +42,6 @@ import java.util.function.Supplier;
 public class GitInfoSource implements PropertiesInfoSource {
 
     private static final String EXTENSION = ".properties";
-    private static final String PREFIX = "classpath:";
 
     private final String gitPropertiesPath;
     private final ResourceResolver resourceResolver;
@@ -67,7 +67,7 @@ public class GitInfoSource implements PropertiesInfoSource {
     }
 
     private Optional<PropertySource> retrieveGitInfo() {
-        return retrievePropertiesPropertySource(gitPropertiesPath, PREFIX, EXTENSION, resourceResolver);
+        return retrievePropertiesPropertySource(gitPropertiesPath, ClassPathResourceLoader.PREFIX, EXTENSION, resourceResolver);
     }
 }
 

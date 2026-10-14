@@ -41,6 +41,13 @@ import java.util.stream.Stream;
 public interface ClassPathResourceLoader extends ResourceLoader {
 
     /**
+     * The resource name prefix.
+     *
+     * @since 5.3.0
+     */
+    String PREFIX = "classpath:";
+
+    /**
      * Hook to handle duplicate resources for {@link ResourceLoadStrategyType#FIRST_MATCH}.
      * Default implementation is a no-op.
      *
@@ -66,7 +73,7 @@ public interface ClassPathResourceLoader extends ResourceLoader {
      */
     @Override
     default boolean supportsPrefix(String path) {
-        return path.startsWith("classpath:");
+        return path.startsWith(PREFIX);
     }
 
     /**
