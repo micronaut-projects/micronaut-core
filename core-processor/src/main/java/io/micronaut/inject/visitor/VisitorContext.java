@@ -29,6 +29,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
+import io.micronaut.inject.writer.TypeHierarchyWriter;
 
 import java.lang.annotation.RetentionPolicy;
 import java.net.URI;
@@ -424,6 +425,33 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @Experimental
     default BeanElementBuilder registerBean(ClassElement beanType, Element... originatingElements) {
         throw new UnsupportedOperationException("Registering beans is not supported by the " + getLanguage() + " processor");
+    }
+
+    /**
+     * Records the generic hierarchy of a type, which {@link io.micronaut.core.type.TypeHierarchies#find(Class)} finds
+     * at run time as a {@link io.micronaut.core.type.TypeHierarchy}: its type variables with their bounds, its generic
+     * superclass and its generic interfaces, as declared. The type can be any class the compilation sees, a class of
+     * a library or of the JDK included. The record is a small generated class, one per type, written once per
+     * compilation however many times the type is recorded.
+     *
+     * <p>The record is named after the type and written into the package of the first originating element, or into
+     * the package of the type when the type, a bound or a supertype of it is not public. Every originating element is
+     * reported to the compiler, as for {@link #registerBean(ClassElement, Element...)}, and the same rule applies: the
+     * record is written with the round, and recording from {@link TypeElementVisitor#finish(VisitorContext)} is not
+     * portable.</p>
+     *
+     * @param type                The type
+     * @param originatingElements The originating elements, at least one; the first must be a class, a member or a
+     *                            package of the compilation
+     * @return The name of the record
+     * @throws IllegalArgumentException if no originating element is given, or the first one is of another kind
+     * @since 5.3.0
+     */
+    @Experimental
+    default String recordTypeHierarchy(ClassElement type, Element... originatingElements) {
+        String recordName = TypeHierarchyWriter.recordClassName(type, originatingElements);
+        TypeHierarchyWriter.write(type, recordName, this, originatingElements);
+        return recordName;
     }
 
     /**
