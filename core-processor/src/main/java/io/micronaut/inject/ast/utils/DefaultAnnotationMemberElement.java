@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.MemberElement;
+import io.micronaut.inject.ast.MethodElement;
 
 import java.lang.annotation.Annotation;
 import java.util.Map;
@@ -90,8 +91,15 @@ public final class DefaultAnnotationMemberElement implements AnnotationMemberEle
         return member.getNativeType();
     }
 
+    /*
+     * A method element answers its metadata combined with that of its declaring type, a property element its own:
+     * the member answers its own under every compiler.
+     */
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
+        if (member instanceof MethodElement method) {
+            return method.getMethodAnnotationMetadata();
+        }
         return member.getAnnotationMetadata();
     }
 
