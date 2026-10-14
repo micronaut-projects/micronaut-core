@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
-import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.AnnotationMetadata;
 
 import java.util.Optional;
 
@@ -31,14 +31,15 @@ import java.util.Optional;
  * @see AnnotationElement#getMembers()
  * @since 5.3.0
  */
-public interface AnnotationMemberElement extends MemberElement {
+public interface AnnotationMemberElement extends MemberElement, TypedElement {
 
     /**
      * The type the member is declared with: the return type of the method, the type of the property.
      *
      * @return The declared type of the member; never {@code null}
+     * @since 5.3.0
      */
-    @NonNull
+    @Override
     ClassElement getType();
 
     /**
@@ -53,7 +54,22 @@ public interface AnnotationMemberElement extends MemberElement {
      * compilation is annotated with reports no default.</p>
      *
      * @return The default value, or empty when the member declares none or it cannot be resolved
+     * @since 5.3.0
      */
-    @NonNull
     Optional<Object> getDefaultValue();
+
+    /**
+     * The annotation metadata of the member itself: what is written on the method or property, not what is
+     * written on the annotation interface that declares it.
+     *
+     * @return The annotation metadata of the member
+     * @since 5.3.0
+     */
+    @Override
+    AnnotationMetadata getAnnotationMetadata();
+
+    @Override
+    default AnnotationMemberElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (AnnotationMemberElement) MemberElement.super.withAnnotationMetadata(annotationMetadata);
+    }
 }

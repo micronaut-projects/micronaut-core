@@ -161,7 +161,7 @@ public final class DefaultAnnotationMemberElement implements AnnotationMemberEle
     }
 
     @Override
-    public MemberElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+    public AnnotationMemberElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return new DefaultAnnotationMemberElement(member.withAnnotationMetadata(annotationMetadata), type, defaultValues);
     }
 
