@@ -29,6 +29,8 @@ tasks {
     test {
         useJUnitPlatform()
         systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
+        // forwards the switches of the fuzz suite: -Dfuzz.seed, -Dfuzz.only, -Dfuzz.runKnown, -Dfuzz.full and -Dfuzz.knownFailures
+        System.getProperties().stringPropertyNames().filter { it.startsWith("fuzz.") }.forEach { systemProperty(it, System.getProperty(it)!!) }
     }
 }
 

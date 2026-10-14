@@ -1,0 +1,7 @@
+# Known failures of the server TCK fuzz suite (io.micronaut.http.server.tck.tests.fuzz.HttpServerFuzzTest) on Netty.
+# One entry per line: [engine[,engine]:]regex matched against the start of the case name => reason.
+# Run them anyway with -Dfuzz.runKnown=true.
+netty:form args a/b/c => Netty bug: a repeated form field bound to a List<String> argument keeps only the first value
+netty:resp HEAD with Content-Length keeps connection usable => Netty bug: an explicit @Head route returning a body is answered without Content-Length and with Connection: close
+netty:filter-mutate-only wrap => Netty bug: a filter @Body argument cannot be bound once an earlier filter replaced the request with an HttpRequestWrapper (Unbindable argument -> 500)
+netty:limit 17MB chunked > max-request-size -> 413 \(/f/is\) => Netty bug: a blocking InputStream body past max-request-size fails with ContentLengthExceededException wrapped in an IOException by PublisherAsStream, answered 500 instead of 413
