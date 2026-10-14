@@ -288,7 +288,12 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
      */
     @Override
     public List<Argument<?>> getTypeClosure() {
-        List<Argument<?>> closure = new ArrayList<>(ReflectionArguments.typeClosureOf(Argument.of(getBeanType())));
+        Class<T> type = getBeanType();
+        // the bean type with the variables it declares, as a compiled definition records them
+        Argument<?>[] variables = Arrays.stream(type.getTypeParameters())
+            .map(variable -> ReflectionArguments.ofExact(variable.getName(), variable))
+            .toArray(Argument[]::new);
+        List<Argument<?>> closure = new ArrayList<>(ReflectionArguments.typeClosureOf(Argument.of(type, variables)));
         // the reflective walk reaches Object through the super class chain; the definition answers it last
         if (closure.removeIf(superType -> superType.getType() == Object.class)) {
             closure.add(Argument.OBJECT_ARGUMENT);
