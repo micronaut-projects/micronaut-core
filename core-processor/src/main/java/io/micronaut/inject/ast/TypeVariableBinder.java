@@ -17,8 +17,11 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.function.UnaryOperator;
 
@@ -67,8 +70,14 @@ public final class TypeVariableBinder {
 
     private static ClassElement bind(ClassElement type, Map<String, ClassElement> bindings) {
         if (type instanceof GenericPlaceholderElement placeholder) {
+            if (placeholder.isRawType()) {
+                // the variable of a type written raw stands for its erasure, whatever a variable of the same name is bound to
+                return type;
+            }
             ClassElement binding = bindings.get(placeholder.getVariableName());
-            if (binding == null) {
+            if (binding == null || isSameVariable(binding, placeholder)) {
+                // unbound, or an unresolved use bound to the variable itself: the use is kept, so that nothing above it
+                // is copied for no change
                 return type;
             }
             // A variable resolved through a binding already counts the dimensions of the binding
@@ -82,13 +91,56 @@ public final class TypeVariableBinder {
             }
             return readThroughUse(bound, placeholder);
         }
-        if (type instanceof WildcardElement) {
+        if (type instanceof WildcardElement wildcard) {
+            // The wildcard is kept as it is when none of its bounds changes: the language element knows its variance,
+            // and a copy of the type holding it would resolve the variables inside it by name again, against the
+            // arguments of that type, where a variable of the first type can share its name with a parameter of the
+            // copied one
+            if (bind(wildcard.getUpperBounds(), bindings) == null && bind(wildcard.getLowerBounds(), bindings) == null) {
+                return type;
+            }
             ClassElement folded = type.foldBoundGenericTypes(bound -> bound instanceof GenericPlaceholderElement ? bind(bound, bindings) : bound);
             return folded == null ? type : folded;
         }
         Map<String, ClassElement> typeArguments = type.getTypeArguments();
         Map<String, ClassElement> boundTypeArguments = bind(typeArguments, bindings);
         return boundTypeArguments == typeArguments ? type : copy(type, bound -> bound.withTypeArguments(boundTypeArguments));
+    }
+
+    /**
+     * Whether a binding is the variable it binds, a use of a variable bound to itself.
+     */
+    private static boolean isSameVariable(ClassElement binding, GenericPlaceholderElement use) {
+        // a use that is resolved, as the Kotlin element resolves a use to its bound, is replaced by the declaration
+        return use.getResolved().isEmpty()
+            && binding instanceof GenericPlaceholderElement bound
+            && bound.getResolved().isEmpty()
+            && bound.getVariableName().equals(use.getVariableName())
+            && bound.getArrayDimensions() == 0
+            && bound.getGenericTypeAnnotationMetadata().getAnnotationMetadata().getAnnotationNames().isEmpty();
+    }
+
+    /**
+     * Binds each of the bounds of a wildcard.
+     *
+     * @param bounds   The bounds
+     * @param bindings The bindings
+     * @return The bound bounds, or {@code null} when none changed
+     */
+    @Nullable
+    private static List<ClassElement> bind(List<? extends ClassElement> bounds, Map<String, ClassElement> bindings) {
+        List<ClassElement> bound = null;
+        for (int i = 0; i < bounds.size(); i++) {
+            ClassElement each = bounds.get(i);
+            ClassElement boundEach = bind(each, bindings);
+            if (boundEach != each && bound == null) {
+                bound = new ArrayList<>(bounds.subList(0, i));
+            }
+            if (bound != null) {
+                bound.add(boundEach);
+            }
+        }
+        return bound;
     }
 
     /**
