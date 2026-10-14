@@ -22,9 +22,11 @@ import io.micronaut.core.annotation.Generated
 import java.lang.annotation.ElementType
 import java.lang.annotation.RetentionPolicy
 import io.micronaut.inject.ast.AnnotationElement
+import io.micronaut.inject.ast.AnnotationMemberElement
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
+import jakarta.inject.Named
 import jakarta.inject.Singleton
 
 class PythonAnnotationElementSpec extends AbstractPythonTypeElementSpec {
@@ -137,6 +139,105 @@ class Test:
             assert property.getRepeatableContainer() == Optional.of(PropertySource.name)
             assert generated.getRetentionPolicy() == RetentionPolicy.CLASS
             assert singleton.getRetentionPolicy() == RetentionPolicy.RUNTIME
+            return element
+        }
+    }
+
+    void "test getMembers reports the members in declaration order with their types, defaults and annotations"() {
+        expect:
+        buildClassElement('''
+from enum import Enum
+from typing import Annotated
+from jakarta.inject import Singleton
+from micronaut.context.annotation import NonBinding
+
+def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
+    def decorator(func):
+        return func
+    return decorator
+
+class Colour(Enum):
+    RED = "RED"
+    GREEN = "GREEN"
+
+class Target:
+    pass
+
+@micronaut_annotation("test.MyAnn")
+def my_ann(
+    name: str,
+    description: Annotated[str, NonBinding] = "",
+    priority: int = 5,
+    classValue: type = Target,
+    enumValue: Colour = Colour.GREEN,
+    tags: list[str] = ["a", "b"],
+):
+    def decorator(target):
+        return target
+    return decorator
+
+@micronaut_annotation("test.MyBareAnn")
+def my_bare_ann(func):
+    return func
+
+@Singleton
+@my_ann(name="bean")
+class Test:
+    pass
+''') { ClassElement element ->
+            def context = element.environment.visitorContext()
+            def ann = (AnnotationElement) context.getClassElement('test.MyAnn').get()
+            List<? extends AnnotationMemberElement> members = ann.getMembers()
+
+            // the members in declaration order, each a member of the annotation
+            assert members*.getName() == ['name', 'description', 'priority', 'classValue', 'enumValue', 'tags']
+            assert members.every { it.getDeclaringType().getName() == 'test.MyAnn' }
+
+            // the declared types
+            assert members[0].getType().getName() == 'java.lang.String'
+            assert members[2].getType().getName() == 'int'
+            assert members[3].getType().getName() == 'java.lang.Class'
+            assert members[4].getType().getName() == 'python.Colour'
+            assert members[5].getType().isArray()
+            assert members[5].getType().fromArray().getName() == 'java.lang.String'
+
+            // the defaults, as the metadata records them: the Python class is visited before its generated
+            // annotation type exists, so a class value is the class name and a list value a List, the shapes
+            // AnnotationMemberDefaultsSpec documents for the written metadata
+            assert members[0].getDefaultValue() == Optional.empty()
+            assert members[1].getDefaultValue() == Optional.of('')
+            assert members[2].getDefaultValue() == Optional.of(5)
+            assert members[3].getDefaultValue() == Optional.of('python.Target')
+            assert members[4].getDefaultValue() == Optional.of('GREEN')
+            assert members[5].getDefaultValue() == Optional.of(['a', 'b'])
+
+            // the annotations of a member are its own
+            assert members[1].hasAnnotation('io.micronaut.context.annotation.NonBinding')
+            assert members.count { it.hasAnnotation('io.micronaut.context.annotation.NonBinding') } == 1
+
+            // the decorated target a bare decorator takes is no member
+            def bare = (AnnotationElement) context.getClassElement('test.MyBareAnn').get()
+            assert bare.getMembers().isEmpty()
+
+            // a copy of the element keeps the members, and a copy of a member is a member
+            def copy = (AnnotationElement) ann.withAnnotationMetadata(ann.getAnnotationMetadata())
+            assert copy.getMembers()*.getName() == members*.getName()
+            AnnotationMemberElement memberCopy = members[1].withAnnotationMetadata(members[1].getAnnotationMetadata())
+            assert memberCopy.getDefaultValue() == Optional.of('')
+
+            // a Java annotation on the classpath answers with its own declaration, a nested annotation type included
+            def named = (AnnotationElement) context.getClassElement(Named.name).get()
+            assert named.getMembers()*.getName() == ['value']
+            assert named.getMembers()[0].getDefaultValue() == Optional.of('')
+            assert ((AnnotationElement) context.getClassElement(Singleton.name).get()).getMembers().isEmpty()
+            def property = (AnnotationElement) context.getClassElement(Property.name).get()
+            assert property.getMembers()*.getName() == ['name', 'value', 'defaultValue']
+            assert property.getMembers()*.getDefaultValue() == [Optional.empty(), Optional.of(''), Optional.of('')]
+            def introspected = (AnnotationElement) context.getClassElement(Introspected.name).get()
+            def indexed = introspected.getMembers().find { it.getName() == 'indexed' }
+            assert indexed.getType().isArray()
+            assert indexed.getType().fromArray() instanceof AnnotationElement
+            assert ((AnnotationElement) indexed.getType().fromArray()).getMembers()*.getName() == ['annotation', 'member']
             return element
         }
     }
