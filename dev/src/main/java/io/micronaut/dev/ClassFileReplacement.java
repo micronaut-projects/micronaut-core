@@ -29,11 +29,12 @@ import java.util.Map;
  * versions they replace, so that a redefinition the JVM refuses leaves the snapshot as it was before the restart
  * that follows.
  *
- * <p>The rollback restores files, not classes: a changed class that another thread loaded for the first time between
- * the replacement and the refusal is already the new version. That generation only runs until the restart, which
- * retires it and starts a new one on the whole change, so nothing holds class loading for the attempt.</p>
+ * <p>The replacement holds the generation's {@link GenerationClassLoader#classFileLock() class file lock} from its
+ * construction until it is {@link #close() closed}, so that the files written, the redefinition and the rollback form
+ * one change: no thread loads a class through the generation in between, which could otherwise define a changed class
+ * from a file the rollback then restores, leaving the generation with that class new and the others old.</p>
  */
-final class ClassFileReplacement {
+final class ClassFileReplacement implements AutoCloseable {
 
     // the runtime's logger: this is part of the runtime's reloads
     private static final Logger LOG = LoggerFactory.getLogger(DevRuntime.class);
@@ -42,10 +43,13 @@ final class ClassFileReplacement {
     private final Deque<Map.Entry<String, byte[]>> replaced = new ArrayDeque<>();
 
     /**
+     * Takes the generation's class file lock, which {@link #close()} releases.
+     *
      * @param generation The generation whose snapshot is changed
      */
     ClassFileReplacement(GenerationClassLoader generation) {
         this.generation = generation;
+        generation.classFileLock().lock();
     }
 
     /**
@@ -76,5 +80,14 @@ final class ClassFileReplacement {
                 LOG.debug("Cannot restore the class file of {} in generation {}", entry.getKey(), generation.generation(), e);
             }
         }
+    }
+
+    /**
+     * Releases the generation's class file lock: a class loaded from now on is defined from the files as the
+     * replacement, or its rollback, left them.
+     */
+    @Override
+    public void close() {
+        generation.classFileLock().unlock();
     }
 }
