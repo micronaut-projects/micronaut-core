@@ -4,6 +4,7 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextBuilder
 import io.micronaut.context.BeanContext
+import io.micronaut.context.BeanDefinitionRegistry
 import io.micronaut.context.BeanResolutionCustomizer
 import io.micronaut.context.Qualifier
 import io.micronaut.context.exceptions.NonUniqueBeanException
@@ -18,6 +19,7 @@ package test;
 
 import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Secondary;
@@ -45,6 +47,18 @@ interface WithDefault {}
 interface Custom {}
 @Singleton class CustomOne implements Custom {}
 @Singleton class CustomTwo implements Custom {}
+
+interface Mutated {}
+@Singleton class MutatedKept implements Mutated {}
+@Singleton class MutatedDropped implements Mutated {}
+
+class Twice {}
+@Singleton class TwiceAsClass extends Twice {}
+@Factory
+class TwiceFactory {
+    @Singleton Twice twice() { return new Twice(); }
+    @Singleton @Named("other") Twice other() { return new Twice(); }
+}
 
 interface Ambiguous {}
 @Singleton class AmbiguousOne implements Ambiguous {}
@@ -237,6 +251,59 @@ class Consumer {
         context.selectAmong(argument('test.Several'), ordered).beanType.name == ['test.OrderedFirst']
     }
 
+    void "the customizer is handed the lookup's own collection and may still remove from it"() {
+        when:
+        def picked = select('test.Mutated')
+
+        then:
+        picked.beanType.name == 'test.MutatedKept'
+        context.getBean(type('test.Mutated')).class.name == 'test.MutatedKept'
+        context.findBeanDefinition(argument('test.Mutated'), Qualifiers.any()).get().beanType.name == 'test.MutatedKept'
+    }
+
+    void "a lookup still decides what the rules leave: any takes the first, otherwise it is non-unique"() {
+        given:
+        def ambiguous = candidates('test.Ambiguous')
+
+        expect:
+        context.findBeanDefinition(argument('test.Ambiguous'), Qualifiers.any()).get().is(ambiguous[0])
+
+        when: 'injecting an instance whose class has several definitions'
+        def constructor = type('test.Twice').getDeclaredConstructor()
+        constructor.accessible = true
+        context.inject(constructor.newInstance())
+
+        then:
+        thrown(NonUniqueBeanException)
+
+        when: 'a lookup that does not throw on ambiguity'
+        context.registerSingleton(type('test.Ambiguous'), newAmbiguousOne(), null, true)
+
+        then:
+        noExceptionThrown()
+    }
+
+    void "the registry default applies the rules with the default customizer"() {
+        given:
+        BeanDefinitionRegistry registry = java.lang.reflect.Proxy.newProxyInstance(
+            BeanDefinitionRegistry.classLoader, [BeanDefinitionRegistry] as Class[],
+            { proxy, method, args -> java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, args) } as java.lang.reflect.InvocationHandler
+        ) as BeanDefinitionRegistry
+        def custom = candidates('test.Custom')
+
+        expect:
+        registry.selectAmong(argument('test.Several'), candidates('test.Several')).beanType.name == ['test.SeveralPrimaryFirst']
+        registry.selectAmong(argument('test.Ordered'), candidates('test.Ordered')).beanType.name == ['test.OrderedFirst']
+        registry.selectAmong(argument('test.Exact'), candidates('test.Exact')).beanType.name == ['test.Exact']
+        registry.selectAmong(argument('test.Custom'), custom) as Set == custom as Set
+    }
+
+    private Object newAmbiguousOne() {
+        def constructor = type('test.AmbiguousOne').getDeclaredConstructor()
+        constructor.accessible = true
+        constructor.newInstance()
+    }
+
     private BeanDefinition<?> select(String name) {
         def selected = context.selectAmong(argument(name), candidates(name))
         assert selected.size() == 1
@@ -282,6 +349,10 @@ class Consumer {
         @Override
         <T> Optional<BeanDefinition<T>> resolveNonUniqueBean(Argument<T> beanType, Qualifier<T> qualifier, Collection<BeanDefinition<T>> candidates) {
             consulted.add(beanType.type.name)
+            if (beanType.type.name == 'test.Mutated') {
+                candidates.removeIf { it.beanType.name == 'test.MutatedDropped' }
+                return Optional.of(candidates.iterator().next())
+            }
             if (beanType.type.name == 'test.Custom') {
                 return Optional.of(candidates.find { it.beanType.name == 'test.CustomTwo' })
             }
