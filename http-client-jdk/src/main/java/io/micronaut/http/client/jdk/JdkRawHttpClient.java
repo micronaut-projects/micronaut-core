@@ -18,14 +18,17 @@ package io.micronaut.http.client.jdk;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.client.AbstractHttpClient;
+import io.micronaut.http.client.AsyncProxyHttpClient;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
 import io.micronaut.http.client.RawHttpClientSupport;
 import io.micronaut.http.client.RawRequestOptions;
+import io.micronaut.http.client.RawResponseFuture;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequest;
@@ -43,6 +46,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
 /**
@@ -53,6 +57,7 @@ import java.util.stream.Collectors;
  */
 @Internal
 final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpClient, ProxyHttpClient {
+    private static final String OPTIONS_PARAMETER = "options";
     private static final String ALLOW_RESTRICTED_HEADERS_PROPERTY = "jdk.httpclient.allowRestrictedHeaders";
     /**
      * Request attribute with the {@link UploadListener} of the request body.
@@ -102,7 +107,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     @Override
     @SuppressWarnings("java:S2095") // the request wrapper only holds the body, which the exchange releases
     public Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread, RawRequestOptions options) {
-        Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(options, OPTIONS_PARAMETER);
         MutableHttpRequest<?> rawRequest;
         try {
             MutableHttpRequest<Object> copy = RawHttpClientSupport.copyRequest(request, options);
@@ -127,44 +132,107 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
 
     @Override
     public Publisher<MutableHttpResponse<?>> proxy(HttpRequest<?> request, ProxyRequestOptions options) {
-        Objects.requireNonNull(options, "options");
-        // same behavior as the Netty client: redirects are followed as configured, and the host
-        // header is computed from the URI unless it is retained
-        RawRequestOptions rawOptions = RawRequestOptions.builder()
-            .retainHostHeader(options.isRetainHostHeader())
-            .build();
+        Objects.requireNonNull(options, OPTIONS_PARAMETER);
         // the body bytes of a server request are claimed when the exchange starts
         return Mono.defer(() -> {
-            MutableHttpRequest<Object> copy = RawHttpClientSupport.copyRequest(request, rawOptions);
-            CloseableByteBody serverBody = RawHttpClientSupport.claimServerRequestBody(request);
-            MutableHttpRequest<?> proxyRequest;
-            if (serverBody != null) {
-                proxyRequest = new RawHttpRequestWrapper<>(conversionService, copy, serverBody);
-            } else {
-                request.getBody().ifPresent(copy::body);
-                proxyRequest = copy;
-            }
-            return exchangeWithOptions(proxyRequest, serverBody, rawOptions);
+            ProxyExchange exchange = proxyExchange(request, options);
+            return exchangeWithOptions(exchange.request(), exchange.serverBody(), exchange.options());
         }).map(HttpResponse::toMutableResponse);
     }
 
+    @Override
+    public AsyncProxyHttpClient toAsyncProxy() {
+        return new JdkAsyncProxyHttpClient(this);
+    }
+
+    /**
+     * The proxied exchange of {@link JdkAsyncProxyHttpClient}: {@link #proxy} without Reactor.
+     * The claimed body of a server request is released once the exchange completes or is
+     * cancelled.
+     *
+     * @param request The request to proxy
+     * @param options The options
+     * @return The future of the response
+     */
+    CompletionStage<MutableHttpResponse<?>> proxyAsync(HttpRequest<?> request, ProxyRequestOptions options) {
+        Objects.requireNonNull(options, OPTIONS_PARAMETER);
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        ProxyExchange exchange;
+        try {
+            exchange = proxyExchange(request, options);
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+        CloseableByteBody serverBody = exchange.serverBody();
+        HttpClientException refused = prepare(exchange.request(), exchange.options());
+        if (refused != null) {
+            if (serverBody != null) {
+                serverBody.close();
+            }
+            return CompletableFuture.failedFuture(refused);
+        }
+        ExecutionFlow<MutableHttpResponse<?>> flow;
+        try {
+            flow = send(exchange.request(), exchange.options());
+        } catch (RuntimeException e) {
+            flow = ExecutionFlow.error(e);
+        }
+        return RawResponseFuture.ofMutable(flow, serverBody == null ? null : serverBody::close, propagatedContext);
+    }
+
+    /**
+     * The request of a proxied exchange: the same behavior as the Netty client, redirects are
+     * followed as configured, and the host header is computed from the URI unless it is retained.
+     * The body bytes of a server request are claimed.
+     */
+    private ProxyExchange proxyExchange(HttpRequest<?> request, ProxyRequestOptions options) {
+        RawRequestOptions rawOptions = RawRequestOptions.builder()
+            .retainHostHeader(options.isRetainHostHeader())
+            .build();
+        MutableHttpRequest<Object> copy = RawHttpClientSupport.copyRequest(request, rawOptions);
+        CloseableByteBody serverBody = RawHttpClientSupport.claimServerRequestBody(request);
+        if (serverBody != null) {
+            return new ProxyExchange(new RawHttpRequestWrapper<>(conversionService, copy, serverBody), serverBody, rawOptions);
+        }
+        request.getBody().ifPresent(copy::body);
+        return new ProxyExchange(copy, null, rawOptions);
+    }
+
     private Mono<MutableHttpResponse<?>> exchangeWithOptions(MutableHttpRequest<?> request, @Nullable CloseableByteBody requestBody, RawRequestOptions options) {
-        if (options.isAllowUpgrade() && request.getHeaders().contains(HttpHeaders.UPGRADE)) {
-            // the JDK client gives no access to a connection that switched protocols
+        HttpClientException refused = prepare(request, options);
+        if (refused != null) {
             if (requestBody != null) {
                 requestBody.close();
             }
-            return Mono.error(new HttpClientException("The JDK HTTP client cannot switch a connection to another protocol: the request asks to upgrade to '" +
-                request.getHeaders().get(HttpHeaders.UPGRADE) + "'"));
+            return Mono.error(refused);
+        }
+        Mono<MutableHttpResponse<?>> response = Mono.defer(() -> Mono.from(ReactiveExecutionFlow.toPublisher(send(request, options))));
+        if (requestBody != null) {
+            // released unless they were sent, e.g. when the connection is refused, also when the
+            // exchange is cancelled
+            response = response.doFinally(signal -> requestBody.close());
+        }
+        return response;
+    }
+
+    /**
+     * Prepare a request for the JDK client, or refuse it.
+     *
+     * @param request The request, whose headers and attributes are adjusted
+     * @param options The options
+     * @return Why the JDK client cannot send the request, or {@code null}
+     */
+    private static @Nullable HttpClientException prepare(MutableHttpRequest<?> request, RawRequestOptions options) {
+        if (options.isAllowUpgrade() && request.getHeaders().contains(HttpHeaders.UPGRADE)) {
+            // the JDK client gives no access to a connection that switched protocols
+            return new HttpClientException("The JDK HTTP client cannot switch a connection to another protocol: the request asks to upgrade to '" +
+                request.getHeaders().get(HttpHeaders.UPGRADE) + "'");
         }
         Set<String> allowedRestrictedHeaders = allowedRestrictedHeaders();
         if (request.getHeaders().contains(HttpHeaders.HOST) && !allowedRestrictedHeaders.contains("host")) {
-            if (requestBody != null) {
-                requestBody.close();
-            }
-            return Mono.error(new HttpClientException("The JDK HTTP client can only send the Host header of the request if the '" +
+            return new HttpClientException("The JDK HTTP client can only send the Host header of the request if the '" +
                 ALLOW_RESTRICTED_HEADERS_PROPERTY + "' system property includes 'host'. Set the property, e.g. -D" +
-                ALLOW_RESTRICTED_HEADERS_PROPERTY + "=host, or do not retain the Host header"));
+                ALLOW_RESTRICTED_HEADERS_PROPERTY + "=host, or do not retain the Host header");
         }
         for (String header : RESTRICTED_HEADERS) {
             // content-length is always computed from the body
@@ -175,26 +243,28 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         if (!options.isFollowRedirects()) {
             request.setAttribute(AbstractHttpClient.NO_FOLLOW_REDIRECTS, Boolean.TRUE);
         }
-        UploadListener listener = null;
+        return null;
+    }
+
+    /**
+     * Send a prepared request.
+     *
+     * @param request The request
+     * @param options The options
+     * @return The flow of the response
+     */
+    private ExecutionFlow<MutableHttpResponse<?>> send(MutableHttpRequest<?> request, RawRequestOptions options) {
+        UploadListener uploads = null;
         if (options.getResponseTimeout() != null) {
             // the response timeout does not count the upload of the body, see toJdkRequest
-            listener = new UploadListener(new CompletableFuture<>(), new CompletableFuture<>());
-            request.setAttribute(UPLOAD_LISTENER_ATTRIBUTE, listener);
+            uploads = new UploadListener(new CompletableFuture<>(), new CompletableFuture<>());
+            request.setAttribute(UPLOAD_LISTENER_ATTRIBUTE, uploads);
         }
-        UploadListener uploads = listener;
-        Mono<MutableHttpResponse<?>> response = Mono.defer(() -> {
-            ExecutionFlow<HttpResponse<?>> flow = pipelineClient().rawExchangeFlow(request, null);
-            if (uploads != null) {
-                flow = RawHttpClientSupport.withResponseTimeout(flow, options.getResponseTimeout(), uploads.started(), uploads.uploaded());
-            }
-            return Mono.from(ReactiveExecutionFlow.toPublisher(flow.map(RawHttpClientSupport::toMutableResponse)));
-        });
-        if (requestBody != null) {
-            // released unless they were sent, e.g. when the connection is refused, also when the
-            // exchange is cancelled
-            response = response.doFinally(signal -> requestBody.close());
+        ExecutionFlow<HttpResponse<?>> flow = pipelineClient().rawExchangeFlow(request, null);
+        if (uploads != null) {
+            flow = RawHttpClientSupport.withResponseTimeout(flow, options.getResponseTimeout(), uploads.started(), uploads.uploaded());
         }
-        return response;
+        return flow.map(RawHttpClientSupport::toMutableResponse);
     }
 
     private static Set<String> allowedRestrictedHeaders() {
@@ -212,4 +282,13 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         // Nothing to do here, we do not need to close clients
     }
 
+    /**
+     * A proxied exchange.
+     *
+     * @param request    The request
+     * @param serverBody The claimed body of a server request, or {@code null}
+     * @param options    The options
+     */
+    private record ProxyExchange(MutableHttpRequest<?> request, @Nullable CloseableByteBody serverBody, RawRequestOptions options) {
+    }
 }

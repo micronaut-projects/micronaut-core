@@ -45,6 +45,7 @@ import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.ProxyHttpClient;
+import io.micronaut.http.client.AsyncProxyHttpClient;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.DefaultAsyncOverRawHttpClient;
@@ -251,6 +252,31 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         BeanContext beanContext
     ) {
         return new JdkRawHttpClient(resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext));
+    }
+
+    /**
+     * Creates an {@link AsyncProxyHttpClient} for the given injection point: the async view of
+     * the {@link ProxyHttpClient} the same injection point gets.
+     *
+     * @param injectionPoint The injection point
+     * @param loadBalancer   The load balancer to use (Optional)
+     * @param configuration  The configuration (Optional)
+     * @param beanContext    The bean context to use
+     * @return The client
+     * @since 5.3.0
+     */
+    @Bean
+    @BootstrapContextCompatible
+    @Primary
+    @Order(2) // If both this and the netty client are present, netty is the default.
+    @SuppressWarnings("java:S2095") // the async proxy wraps the raw client, which shares the pipeline of the client bean
+    AsyncProxyHttpClient asyncProxyHttpClient(
+        @Nullable InjectionPoint<?> injectionPoint,
+        @Parameter @Nullable LoadBalancer loadBalancer,
+        @Parameter @Nullable HttpClientConfiguration configuration,
+        BeanContext beanContext
+    ) {
+        return new JdkRawHttpClient(resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext)).toAsyncProxy();
     }
 
     private DefaultJdkHttpClient resolveDefaultHttpClient(
