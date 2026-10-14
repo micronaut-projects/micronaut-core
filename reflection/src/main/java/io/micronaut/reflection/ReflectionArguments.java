@@ -528,7 +528,7 @@ public final class ReflectionArguments {
         collected.add(type);
         Map<TypeVariable<?>, AnnotatedType> substitutions = new HashMap<>();
         collectTypeSubstitutions(toExactType(argument), substitutions);
-        collectSupertypes(type, substitutions, closure, collected);
+        collectSupertypes(type, substitutions, closure, collected, argument.isRawType());
         if (collected.add(Object.class)) {
             // an interface has no superclass to reach it through
             closure.add(Argument.OBJECT_ARGUMENT);
@@ -539,17 +539,26 @@ public final class ReflectionArguments {
     private static void collectSupertypes(Class<?> type,
                                           Map<TypeVariable<?>, AnnotatedType> substitutions,
                                           List<Argument<?>> closure,
-                                          Set<Class<?>> collected) {
+                                          Set<Class<?>> collected,
+                                          boolean erased) {
         for (AnnotatedType supertype : getSupertypes(type).toList()) {
             Class<?> raw = getRawType(supertype.getType());
             if (!collected.add(raw)) {
                 continue;
             }
+            if (erased) {
+                // the super types of a raw type are their erasures (JLS 4.8): the raw type, with the variables
+                // it declares, as a compiled definition records them
+                closure.add(ofExact(raw));
+                collectSupertypes(raw, Map.of(), closure, collected, true);
+                continue;
+            }
             AnnotatedType resolved = substitutions.isEmpty() ? supertype : new LazySubstitutingType(supertype, substitutions);
-            closure.add(toArgument(null, resolved, Map.of(), Set.of(), true));
+            Argument<?> argument = toArgument(null, resolved, Map.of(), Set.of(), true);
+            closure.add(argument);
             Map<TypeVariable<?>, AnnotatedType> own = new HashMap<>();
             collectTypeSubstitutions(resolved, own);
-            collectSupertypes(raw, own, closure, collected);
+            collectSupertypes(raw, own, closure, collected, argument.isRawType());
         }
     }
 
