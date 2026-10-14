@@ -51,6 +51,10 @@ interface Named_ {}
 @Singleton @Named("left") class NamedLeft implements Named_ {}
 @Singleton @Named("right") class NamedRight implements Named_ {}
 
+interface AllLowered {}
+@Singleton @Secondary class AllLoweredOne implements AllLowered {}
+@Singleton @Secondary class AllLoweredTwo implements AllLowered {}
+
 interface Lowered {}
 @Singleton @Secondary class LoweredSecondary implements Lowered {}
 @Singleton class LoweredPlain implements Lowered {}
@@ -153,11 +157,34 @@ class Consumer {
     }
 
     void "the any qualifier takes the first of candidates nothing decides among"() {
+        given:
+        def candidates = candidates('test.Ambiguous')
+
         when:
-        def picked = resolve('test.Ambiguous', Qualifiers.any())
+        def picked = context.findBeanDefinition(argument('test.Ambiguous'), candidates, Qualifiers.any()).get()
 
         then:
-        picked.beanType.name in ['test.AmbiguousOne', 'test.AmbiguousTwo']
+        picked.is(candidates[0])
+
+        when:
+        picked = context.findBeanDefinition(argument('test.Ambiguous'), candidates.reverse(), Qualifiers.any()).get()
+
+        then:
+        picked.is(candidates[1])
+    }
+
+    void "candidates that are all secondary stay non-unique under the any qualifier, as a lookup does"() {
+        when:
+        resolve('test.AllLowered', Qualifiers.any())
+
+        then:
+        thrown(NonUniqueBeanException)
+
+        when:
+        context.getBean(type('test.AllLowered'), Qualifiers.any())
+
+        then:
+        thrown(NonUniqueBeanException)
     }
 
     void "the qualifier narrows the candidates first"() {
