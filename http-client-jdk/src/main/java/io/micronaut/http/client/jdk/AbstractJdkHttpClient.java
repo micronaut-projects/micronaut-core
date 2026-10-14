@@ -116,9 +116,13 @@ abstract class AbstractJdkHttpClient {
     final BodySizeLimits sizeLimits;
     /**
      * Whether the redirects are followed by the client pipeline, see
-     * {@link HttpClientConfiguration.JdkConfiguration#isUseMicronautRedirects()}, else by the JDK client.
+     * {@link JdkHttpClientConfiguration.JdkConfiguration#isUseMicronautRedirects()}, else by the JDK client.
      */
     final boolean micronautRedirects;
+    /**
+     * The settings only the JDK client uses, see {@link JdkHttpClientConfiguration}.
+     */
+    final JdkHttpClientConfiguration.JdkConfiguration jdkConfiguration;
     /**
      * The client for raw exchanges and for proxying: it follows redirects as configured, and
      * keeps no cookies, because the exchanges a raw client relays belong to different users.
@@ -142,6 +146,7 @@ abstract class AbstractJdkHttpClient {
         this.client = prototype.client;
         this.sizeLimits = prototype.sizeLimits;
         this.micronautRedirects = prototype.micronautRedirects;
+        this.jdkConfiguration = prototype.jdkConfiguration;
         this.rawClient = prototype.rawClient;
         this.rawNoRedirectClient = prototype.rawNoRedirectClient;
         this.cookieManager = prototype.cookieManager;
@@ -178,6 +183,35 @@ abstract class AbstractJdkHttpClient {
         JdkClientSslBuilder sslBuilder,
         CookieDecoder cookieDecoder
     ) {
+        this(log, configuration, mediaTypeCodecRegistry, messageBodyHandlerRegistry, clientId, conversionService, sslBuilder, cookieDecoder, null);
+    }
+
+    /**
+     * @param log                        the logger to use
+     * @param configuration              The {@link HttpClientConfiguration} to use
+     * @param mediaTypeCodecRegistry     The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param messageBodyHandlerRegistry The {@link MessageBodyHandlerRegistry} to use for encoding and decoding objects
+     * @param clientId                   The client id
+     * @param conversionService          The {@link ConversionService}
+     * @param sslBuilder                 The {@link JdkClientSslBuilder} for creating an {@link javax.net.ssl.SSLContext}
+     * @param cookieDecoder              The cookie decoder
+     * @param defaultJdkConfiguration    The JDK settings used when the configuration is not a {@link JdkHttpClientConfiguration}, or {@code null} for the defaults
+     */
+    @SuppressWarnings("java:S107") // too many parameters
+    AbstractJdkHttpClient(
+        Logger log,
+        HttpClientConfiguration configuration,
+        @Nullable
+        MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        @Nullable
+        MessageBodyHandlerRegistry messageBodyHandlerRegistry,
+        @Nullable
+        String clientId,
+        ConversionService conversionService,
+        JdkClientSslBuilder sslBuilder,
+        CookieDecoder cookieDecoder,
+        JdkHttpClientConfiguration.@Nullable JdkConfiguration defaultJdkConfiguration
+    ) {
         this.cookieDecoder = cookieDecoder;
         this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(log);
         this.configuration = configuration;
@@ -196,7 +230,10 @@ abstract class AbstractJdkHttpClient {
         // the redirects are followed by the JDK client, as they always were, unless the client
         // pipeline follows them, see AbstractHttpClient, with the configuration and the options
         // of an exchange
-        this.micronautRedirects = configuration.getJdk().isUseMicronautRedirects();
+        this.jdkConfiguration = configuration instanceof JdkHttpClientConfiguration jdkClientConfiguration
+            ? jdkClientConfiguration.getJdk()
+            : Objects.requireNonNullElseGet(defaultJdkConfiguration, JdkHttpClientConfiguration.JdkConfiguration::new);
+        this.micronautRedirects = jdkConfiguration.isUseMicronautRedirects();
         HttpClient.Redirect redirect = configuration.isFollowRedirects() && !micronautRedirects ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER;
         this.client = buildClient(redirect, true);
         Supplier<HttpClient> rawNoRedirect = SupplierUtil.memoized(() -> buildClient(HttpClient.Redirect.NEVER, false));

@@ -94,7 +94,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     private final Map<ClientKey, DefaultJdkHttpClient> clients = new ConcurrentHashMap<>(10);
     private final BeanContext beanContext;
     private final LoadBalancerResolver loadBalancerResolver;
-    private final HttpClientConfiguration defaultHttpClientConfiguration;
+    private final DefaultJdkHttpClientConfiguration defaultHttpClientConfiguration;
     private final JsonMapper jsonMapper;
     @Nullable
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
@@ -107,7 +107,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     public DefaultJdkHttpClientRegistry(
         BeanContext beanContext,
         LoadBalancerResolver loadBalancerResolver,
-        HttpClientConfiguration defaultHttpClientConfiguration,
+        DefaultJdkHttpClientConfiguration defaultHttpClientConfiguration,
         HttpClientFilterResolver<ClientFilterResolutionContext> httpClientFilterResolver,
         JsonMapper jsonMapper,
         @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
@@ -436,7 +436,8 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
             clientId,
             conversionService,
             jdkClientSslBuilder,
-            cookieDecoder
+            cookieDecoder,
+            defaultHttpClientConfiguration.getJdk()
         );
     }
 
