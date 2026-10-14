@@ -117,7 +117,6 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
 import io.netty.handler.codec.http.multipart.FileUpload;
@@ -504,14 +503,14 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         }
 
         try {
-            boolean convertBodyWithBodyType = shouldConvertWithBodyType(fullHttpResponse, this.configuration, bodyType, errorType);
+            boolean convertBodyWithBodyType = convertsWithBodyType(fullHttpResponse.status().code(), bodyType, errorType);
             FullNettyClientHttpResponse<O> response = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, bodyType, convertBodyWithBodyType || streamingError, conversionService);
 
             if (convertBodyWithBodyType) {
                 return ExecutionFlow.just(response);
             } else { // error flow
                 try {
-                    return ExecutionFlow.error(makeErrorFromRequestBody(errorType, fullHttpResponse.status(), response));
+                    return ExecutionFlow.error(errorStatusException(errorType, response));
                 } catch (HttpClientResponseException t) {
                     return ExecutionFlow.error(t);
                 } catch (Exception t) {
@@ -729,7 +728,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             WebSocketClientHandshakerFactory.newHandshaker(
                 webSocketURL, protocolVersion, subprotocol, true, customHeaders, maxFramePayloadLength),
             requestBinderRegistry,
-            mediaTypeCodecRegistry,
+            Objects.requireNonNull(mediaTypeCodecRegistry),
             handlerRegistry,
             conversionService,
             // by default the handshake response is awaited without a limit, as before
@@ -1647,16 +1646,6 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         return failure;
     }
 
-    private static <O, E> boolean shouldConvertWithBodyType(io.netty.handler.codec.http.HttpResponse msg,
-                                                            HttpClientConfiguration configuration,
-                                                            @Nullable Argument<O> bodyType,
-                                                            Argument<E> errorType) {
-        if (msg.status().code() < 400) {
-            return true;
-        }
-        return !configuration.isExceptionOnErrorStatus() && bodyType != null && bodyType.equalsType(errorType);
-    }
-
     /**
      * Create a {@link HttpClientResponseException} if parsing of the HTTP error body failed.
      */
@@ -1674,27 +1663,6 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             errorResponse,
             null
         ));
-    }
-
-    /**
-     * Create a {@link HttpClientResponseException} from a response with a failed HTTP status.
-     */
-    private HttpClientResponseException makeErrorFromRequestBody(@Nullable Argument<?> errorType, HttpResponseStatus status, FullNettyClientHttpResponse<?> response) {
-        if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
-            return decorate(new HttpClientResponseException(
-                status.reasonPhrase(),
-                null,
-                response,
-                new HttpClientErrorDecoder() {
-                    @Override
-                    public Argument<?> getErrorType(MediaType mediaType) {
-                        return errorType;
-                    }
-                }
-            ));
-        } else {
-            return decorate(new HttpClientResponseException(status.reasonPhrase(), response));
-        }
     }
 
     /**
@@ -1833,4 +1801,5 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             super("Client request execution failed on a background thread; stack trace of the failure follows", null, false, true);
         }
     }
+
 }

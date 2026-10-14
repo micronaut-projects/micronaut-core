@@ -56,6 +56,14 @@ public final class BodyPieces implements PieceReader<ByteBuffer<?>> {
     }
 
     /**
+     * @return The reader of the pieces of a body: every piece that is not empty is an element, a
+     * byte array buffer
+     */
+    static PieceReader<ByteBuffer<?>> reader() {
+        return new BodyPieces();
+    }
+
+    /**
      * The lines of a response body, without their line ending: a line feed, a carriage return, or
      * a carriage return and a line feed. Every line is an element, an empty one too, and the bytes after the last
      * line ending are not, as the lines of an event stream were split before.
