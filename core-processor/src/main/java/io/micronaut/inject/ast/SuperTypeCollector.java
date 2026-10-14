@@ -35,7 +35,7 @@ import java.util.stream.Stream;
  *
  * <p>The walk asks a function for the direct super types of each type it reaches, so a language whose types can
  * have several concrete bases, as Python's can, walks all of them where {@link #declared(ClassElement)} walks the
- * interfaces and the one super class a {@link ClassElement} declares.</p>
+ * one super class and then the interfaces a {@link ClassElement} declares.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -47,14 +47,14 @@ public final class SuperTypeCollector {
     }
 
     /**
-     * The direct super types a class element declares: its interfaces, then its super class.
+     * The direct super types a class element declares: its super class, then its interfaces.
      *
      * @param type The type
      * @return The direct super types
      */
     @NonNull
     public static Stream<ClassElement> declared(@NonNull ClassElement type) {
-        return Stream.concat(type.getInterfaces().stream(), type.getSuperType().stream());
+        return Stream.concat(type.getSuperType().stream(), type.getInterfaces().stream());
     }
 
     /**
@@ -71,6 +71,24 @@ public final class SuperTypeCollector {
         List<ClassElement> result = new ArrayList<>();
         result.add(type);
         if (type.isArray()) {
+            // An array of S is an array of every super type of S (JLS 4.10.3), then Object, Cloneable and Serializable
+            // as the language gives every array (JLS 10.8); a primitive array has only those
+            ClassElement component = type;
+            int dimensions = 0;
+            while (component.isArray()) {
+                component = component.fromArray();
+                dimensions++;
+            }
+            if (!component.isPrimitive()) {
+                List<ClassElement> componentSuperTypes = collect(component, directSuperTypes);
+                for (int i = 1; i < componentSuperTypes.size(); i++) {
+                    ClassElement array = componentSuperTypes.get(i);
+                    for (int j = 0; j < dimensions; j++) {
+                        array = array.toArray();
+                    }
+                    result.add(array);
+                }
+            }
             result.add(ClassElement.of(Cloneable.class));
             result.add(ClassElement.of(Serializable.class));
         } else if (type.isPrimitive()) {

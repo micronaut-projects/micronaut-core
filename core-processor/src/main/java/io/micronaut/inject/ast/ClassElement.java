@@ -759,11 +759,11 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * All the super types of this type: the type itself first, then every interface it implements and class it
-     * extends, transitively, each with its type arguments written in the type arguments of this type, and
-     * {@code Object} last. The super types are listed as they are declared, the interfaces of a type before its
-     * super class, and a type reached more than once, as the two sides of a diamond reach it, is listed once,
-     * where it is reached first.
+     * All the super types of this type: the type itself first, then every class it extends and interface it
+     * implements, transitively, each with its type arguments written in the type arguments of this type, and
+     * {@code Object} last. The super class of a type comes before its interfaces, each followed by its own super
+     * types, in declaration order, and a type reached more than once, as the two sides of a diamond reach it, is
+     * listed once, where it is reached first.
      *
      * <p>The arguments of a super type are resolved against the path that reaches it, as
      * {@link #getAllTypeArguments()} resolves them: a {@code Child} that extends {@code Base} with {@code String}
@@ -773,9 +773,10 @@ public interface ClassElement extends TypedElement {
      *
      * <p>The super types of a {@link #isRawType() raw type} are raw, as the language has them (JLS 4.8): a raw
      * {@code Box}, where {@code Box} implements {@code View} of its variable, lists a {@code View} without type
-     * arguments, and answers {@code true} to {@link #isRawType()}. An array has the super types the language gives
-     * it (JLS 10.8), {@code Cloneable}, {@code Serializable} and {@code Object}, and its element type is not
-     * walked; a primitive has none.</p>
+     * arguments, and answers {@code true} to {@link #isRawType()}. An array of a type is an array of each super type of
+     * that type (JLS 4.10.3), {@code List<String>[]} listing {@code Collection<String>[]} and {@code Object[]},
+     * and then {@code Cloneable}, {@code Serializable} and {@code Object}, which every array has (JLS 10.8); a
+     * primitive has none.</p>
      *
      * <p>No language reports {@code Object}, {@code Cloneable} or {@code Serializable} as a super type element, so
      * they are listed as {@link #of(Class)} answers them: by name and assignability, without their members.</p>

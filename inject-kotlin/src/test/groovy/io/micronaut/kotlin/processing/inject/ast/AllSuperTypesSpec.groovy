@@ -35,14 +35,14 @@ class Holder {
 
     void "the closure of a class binds the variables of its super types along the path"() {
         expect:
-        closures('test.Leaf') == [['test.Leaf', 'test.Mid<java.lang.String>', 'test.Titled', 'test.Named', 'test.Box<java.lang.String>', 'test.View<java.lang.String>', 'java.lang.Object']]
+        closures('test.Leaf') == [['test.Leaf', 'test.Mid<java.lang.String>', 'test.Box<java.lang.String>', 'test.View<java.lang.String>', 'test.Named', 'test.Titled', 'java.lang.Object']]
     }
 
     void "the closure of a parameterized use binds the variables of the super types to its arguments"() {
         expect:
         closures('test.Holder', 'box', 'swapped', 'list', 'star') == [
             ['test.Box<java.lang.String>', 'test.View<java.lang.String>', 'test.Named', 'java.lang.Object'],
-            ['test.Swapped<java.lang.String, java.lang.Integer>', 'java.util.HashMap<java.lang.Integer, java.lang.String>', 'java.lang.Cloneable', 'java.io.Serializable', 'java.util.Map<java.lang.Integer, java.lang.String>', 'java.util.AbstractMap<java.lang.Integer, java.lang.String>', 'java.lang.Object'],
+            ['test.Swapped<java.lang.String, java.lang.Integer>', 'java.util.HashMap<java.lang.Integer, java.lang.String>', 'java.util.AbstractMap<java.lang.Integer, java.lang.String>', 'java.util.Map<java.lang.Integer, java.lang.String>', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object'],
             ['java.util.List<java.lang.String>', 'java.util.SequencedCollection<java.lang.String>', 'java.util.Collection<java.lang.String>', 'java.lang.Iterable<java.lang.String>', 'java.lang.Object'],
             ['test.Box<?>', 'test.View<?>', 'test.Named', 'java.lang.Object'],
         ]
@@ -50,7 +50,7 @@ class Holder {
 
     void "an interface reached by both sides of a diamond is listed once, where it is reached first"() {
         expect:
-        closures('test.Diamond') == [['test.Diamond', 'test.Titled', 'test.Named', 'test.Box<java.lang.String>', 'test.View<java.lang.String>', 'java.lang.Object']]
+        closures('test.Diamond') == [['test.Diamond', 'test.Box<java.lang.String>', 'test.View<java.lang.String>', 'test.Named', 'test.Titled', 'java.lang.Object']]
     }
 
     void "the super types of a type copied without arguments are raw"() {
@@ -68,11 +68,11 @@ class Holder {
         raw == [true, true, false, false]
     }
 
-    void "an array has Cloneable, Serializable and Object as its super types, and a primitive none"() {
+    void "an array is an array of each super type of its component, then Cloneable, Serializable and Object, and a primitive has none"() {
         expect:
         closures('test.Holder', 'strings', 'boxes', 'ints', 'primitive') == [
-            ['java.lang.String[]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object'],
-            ['test.Box<java.lang.String>[]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object'],
+            ['java.lang.String[]', 'java.lang.Comparable<java.lang.String>[]', 'java.lang.CharSequence[]', 'java.io.Serializable[]', 'java.lang.Object[]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object'],
+            ['test.Box<java.lang.String>[]', 'test.View<java.lang.String>[]', 'test.Named[]', 'java.lang.Object[]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object'],
             ['int[][]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object'],
             ['int'],
         ]
