@@ -16,9 +16,11 @@
 package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.BeanDependencyGraph;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.ConfigurableBeanContext;
 import io.micronaut.context.DefaultBeanDefinitionsProvider;
+import io.micronaut.context.DisabledBean;
 import io.micronaut.context.RequiresCondition;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachBean;
@@ -32,10 +34,14 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.FieldInjectionPoint;
+import io.micronaut.inject.MethodInjectionPoint;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -114,8 +120,8 @@ final class ConfigurationStaleness {
         // the singletons, and through the graph what they hold: a prototype a singleton received and keeps
         // is as stale as the singleton would be
         Set<BeanDefinition<?>> definitions = new LinkedHashSet<>();
-        Optional<io.micronaut.context.BeanDependencyGraph> graph = current instanceof ConfigurableBeanContext configurable ? configurable.findDependencyGraph() : Optional.empty();
-        for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(io.micronaut.inject.qualifiers.Qualifiers.any())) {
+        Optional<BeanDependencyGraph> graph = current instanceof ConfigurableBeanContext configurable ? configurable.findDependencyGraph() : Optional.empty();
+        for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(Qualifiers.any())) {
             BeanDefinition<?> definition = registration.getBeanDefinition();
             definitions.add(definition);
             graph.ifPresent(g -> definitions.addAll(g.transitiveDependenciesOf(definition)));
@@ -271,7 +277,7 @@ final class ConfigurationStaleness {
         }
         // a bean whose definition failed its conditions keeps its reference, and is tracked by type instead
         Set<String> disabledTypes = new HashSet<>();
-        for (io.micronaut.context.DisabledBean<?> disabled : current.getDisabledBeans()) {
+        for (DisabledBean<?> disabled : current.getDisabledBeans()) {
             disabledTypes.add(disabled.getBeanType().getName());
         }
         Set<String> resolved = new HashSet<>();
@@ -284,8 +290,8 @@ final class ConfigurationStaleness {
                 // a reference whose type cannot load is never resolved
             }
         }
-        Optional<io.micronaut.context.BeanDependencyGraph> graph = current instanceof ConfigurableBeanContext configurable ? configurable.findDependencyGraph() : Optional.empty();
-        for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(io.micronaut.inject.qualifiers.Qualifiers.any())) {
+        Optional<BeanDependencyGraph> graph = current instanceof ConfigurableBeanContext configurable ? configurable.findDependencyGraph() : Optional.empty();
+        for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(Qualifiers.any())) {
             BeanDefinition<?> definition = registration.getBeanDefinition();
             resolved.add(definition.getClass().getName());
             graph.ifPresent(g -> g.transitiveDependenciesOf(definition).forEach(d -> resolved.add(d.getClass().getName())));
@@ -382,58 +388,22 @@ final class ConfigurationStaleness {
     }
 
     private static boolean injectsChangedProperty(BeanDefinition<?> definition, ConfigurationChange change) {
-        for (io.micronaut.core.type.Argument<?> argument : definition.getConstructor().getArguments()) {
-            if (mentionsChangedProperty(argument.getAnnotationMetadata(), change)) {
+        for (Argument<?> argument : definition.getConstructor().getArguments()) {
+            if (change.mentions(argument.getAnnotationMetadata())) {
                 return true;
             }
         }
-        for (io.micronaut.inject.FieldInjectionPoint<?, ?> field : definition.getInjectedFields()) {
-            if (mentionsChangedProperty(field.getAnnotationMetadata(), change)) {
+        for (FieldInjectionPoint<?, ?> field : definition.getInjectedFields()) {
+            if (change.mentions(field.getAnnotationMetadata())) {
                 return true;
             }
         }
-        for (io.micronaut.inject.MethodInjectionPoint<?, ?> method : definition.getInjectedMethods()) {
-            for (io.micronaut.core.type.Argument<?> argument : method.getArguments()) {
-                if (mentionsChangedProperty(argument.getAnnotationMetadata(), change)) {
+        for (MethodInjectionPoint<?, ?> method : definition.getInjectedMethods()) {
+            for (Argument<?> argument : method.getArguments()) {
+                if (change.mentions(argument.getAnnotationMetadata())) {
                     return true;
                 }
             }
-        }
-        return false;
-    }
-
-    /**
-     * Whether an injection point names a changed property: {@code @Property(name = "key")}, or a
-     * {@code @Value} expression with a {@code ${key}} or {@code ${key:default}} placeholder.
-     */
-    static boolean mentionsChangedProperty(AnnotationMetadata metadata, ConfigurationChange change) {
-        // the raw values: a string value read through the metadata has its placeholders resolved already
-        Object property = metadata.getValues(io.micronaut.context.annotation.Property.class.getName()).get("name");
-        if (property != null && change.touches(property.toString())) {
-            return true;
-        }
-        Object raw = metadata.getValues(io.micronaut.context.annotation.Value.class.getName()).get("value");
-        if (raw == null) {
-            return false;
-        }
-        String expression = raw.toString();
-        if (expression.contains("#{") && expression.contains("env")) {
-            // an evaluated expression reading the environment: which keys it reads is not known, so any change counts
-            return true;
-        }
-        int start = expression.indexOf("${");
-        while (start >= 0) {
-            int end = expression.indexOf('}', start);
-            if (end < 0) {
-                break;
-            }
-            String placeholder = expression.substring(start + 2, end);
-            int colon = placeholder.indexOf(':');
-            String key = (colon >= 0 ? placeholder.substring(0, colon) : placeholder).trim();
-            if (!key.isEmpty() && change.touches(key)) {
-                return true;
-            }
-            start = expression.indexOf("${", end);
         }
         return false;
     }
