@@ -431,6 +431,11 @@ internal open class KotlinClassElement(
                     // written as a bean property, so leave it to the field handling below, which
                     // applies the configured access kinds and visibility.
                     false
+                } else if (nativeEl is KSPropertyDeclaration && visitorContext.hasContextParameters(nativeEl)) {
+                    // The getter of a property with context parameters takes them as arguments, so like
+                    // any other getter with arguments it is not a bean property. KSP does not report them,
+                    // so the property would otherwise be read without them.
+                    false
                 } else {
                     !propertyElementQuery.excludes.contains(el.name)
                             && (propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(el.name))

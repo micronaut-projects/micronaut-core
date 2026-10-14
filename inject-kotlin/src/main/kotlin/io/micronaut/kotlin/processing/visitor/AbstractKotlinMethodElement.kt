@@ -30,6 +30,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
+import io.micronaut.inject.processing.ProcessingException
 
 internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
     private val nativeType: T,
@@ -90,7 +91,21 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
         }
     }
 
+    private val hasContextParameters: Boolean by lazy {
+        declaration?.let { visitorContext.hasContextParameters(it) } ?: false
+    }
+
     override fun getSuspendParameters(): Array<ParameterElement> {
+        // The JVM method takes the context parameters first, but KSP does not report them, so the
+        // parameters are wrong for any code generated to invoke, override or inject the method
+        if (hasContextParameters) {
+            throw ProcessingException(
+                this,
+                "Kotlin context parameters are not supported by Micronaut yet: ${declaringType.name}.${declaration!!.simpleName.asString()}. " +
+                    "Micronaut cannot generate code that invokes, overrides or injects a function or property with context parameters " +
+                    "until KSP exposes them. Remove the context parameters, or the annotations that make Micronaut process the member."
+            )
+        }
         return if (isSuspend) {
             val continuationParameter =
                 visitorContext.getClassElement("kotlin.coroutines.Continuation")
