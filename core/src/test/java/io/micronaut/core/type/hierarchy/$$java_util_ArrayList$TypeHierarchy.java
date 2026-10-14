@@ -1,0 +1,30 @@
+package io.micronaut.core.type.hierarchy;
+
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.GeneratedTypeHierarchy;
+
+import java.io.Serializable;
+import java.util.AbstractList;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.RandomAccess;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
+
+import static io.micronaut.core.type.hierarchy.Records.of;
+import static io.micronaut.core.type.hierarchy.Records.variable;
+
+/**
+ * The record of {@link ArrayList}, written into this package as a record of a class of the JDK is.
+ */
+@SuppressWarnings({"checkstyle:TypeName", "unused"})
+public final class $$java_util_ArrayList$TypeHierarchy extends GeneratedTypeHierarchy {
+    public static final AtomicInteger LOADED = new AtomicInteger();
+
+    public $$java_util_ArrayList$TypeHierarchy() {
+        super(ArrayList.class, new Argument[]{variable("E")},
+            of(AbstractList.class, variable("E")),
+            new Argument[]{of(List.class, variable("E")), Argument.of(RandomAccess.class), Argument.of(Cloneable.class), Argument.of(Serializable.class)});
+        LOADED.incrementAndGet();
+    }
+}
