@@ -280,6 +280,22 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
         return exposedTypes;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Read reflectively, as {@link ReflectionArguments#typeClosureOf(Argument)} reads it, since nothing was
+     * compiled for the type.</p>
+     */
+    @Override
+    public List<Argument<?>> getTypeClosure() {
+        List<Argument<?>> closure = new ArrayList<>(ReflectionArguments.typeClosureOf(Argument.of(getBeanType())));
+        // the reflective walk reaches Object through the super class chain; the definition answers it last
+        if (closure.removeIf(superType -> superType.getType() == Object.class)) {
+            closure.add(Argument.OBJECT_ARGUMENT);
+        }
+        return closure;
+    }
+
     @Override
     public List<Argument<?>> getTypeArguments(@Nullable Class<?> type) {
         return type == null ? Collections.emptyList() : getTypeArguments(type.getName());
