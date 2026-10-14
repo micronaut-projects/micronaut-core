@@ -22,6 +22,8 @@ import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.core.type.WildcardArgument
 import io.micronaut.inject.BeanDefinition
 
+import java.util.function.Supplier
+
 /**
  * {@code BeanDefinition#getTypeClosure()} records every type a bean is assignable to, as the compiler resolved
  * it, so that a consumer needing the hierarchy reads the classes and their arguments from the definition
@@ -286,5 +288,105 @@ class Plain implements Marker {}
         definition.typeClosure*.type*.name == ['closure.Plain', 'closure.Marker', Object.name]
         definition.typeArgumentKeys.isEmpty()
         definition.typeArguments.isEmpty()
+    }
+
+    void "test an array bean is assignable to the arrays of its component's closure and answers the lookups for the component"() {
+        given:
+        def context = buildContext('''
+package closure;
+
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+import jakarta.inject.Singleton;
+import java.util.List;
+
+@Factory
+class ArrayFactory {
+    @Bean
+    @Singleton
+    List<String>[] lists() { return new List[0]; }
+}
+''')
+        def definition = context.getBeanDefinition(List[])
+        def closure = definition.typeClosure
+
+        expect: 'each array carries the arguments of its component'
+        closure*.type == [List[], SequencedCollection[], Collection[], Iterable[], Object[], Object]
+        closure[0].typeParameters*.type == [String]
+        closure[2].typeParameters*.type == [String]
+
+        and: 'the type argument lookups answer for the component, as the recorded type arguments did'
+        definition.getTypeArguments(List)*.type == [String]
+        definition.getTypeArguments('java.util.List')*.type == [String]
+        definition.getTypeArguments(List[]).isEmpty()
+        definition.typeArgumentKeys.toSet() == [List.name, SequencedCollection.name, Collection.name, Iterable.name].toSet()
+
+        cleanup:
+        context.close()
+    }
+
+    void "test a super type the definition cannot name is left out while the types above it are kept"() {
+        given:
+        def context = buildContext(new JavaFiles()
+            .add('closure.lib.PublicBase', '''
+package closure.lib;
+
+interface Hidden<T> extends java.util.function.Supplier<T> {
+}
+
+abstract class HiddenBase<T> implements Hidden<T> {
+}
+
+public abstract class PublicBase<T> extends HiddenBase<T> {
+}
+''')
+            .add('closure.app.Child', '''
+package closure.app;
+
+import closure.lib.PublicBase;
+import jakarta.inject.Singleton;
+
+@Singleton
+public class Child extends PublicBase<String> {
+    public String get() { return "child"; }
+}
+'''))
+        def child = context.classLoader.loadClass('closure.app.Child')
+        def closure = context.getBeanDefinition(child).typeClosure
+
+        expect: 'the bean loads; the package-private class and interface are left out, Supplier<String> above them is kept'
+        context.getBean(child).get() == 'child'
+        closure*.type*.name == ['closure.app.Child', 'closure.lib.PublicBase', Supplier.name, Object.name]
+        closure[2].typeParameters*.type == [String]
+
+        cleanup:
+        context.close()
+    }
+
+    void "test a configuration bean delegate answers the recorded closure"() {
+        given:
+        def context = buildContext('closure.Item', '''
+package closure;
+
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
+
+interface Named {}
+
+@EachProperty("items")
+class Item implements Named {
+    final String name;
+    Item(@Parameter String name) { this.name = name; }
+}
+''', false, ['items.one.enabled': 'true', 'items.two.enabled': 'true'])
+        def item = context.classLoader.loadClass('closure.Item')
+        def definitions = context.getBeanDefinitions(item)
+
+        expect: 'each entry is wrapped in a delegate that forwards the closure of the compiled definition'
+        definitions.size() == 2
+        definitions.every { it.typeClosure*.type*.name == ['closure.Item', 'closure.Named', Object.name] }
+
+        cleanup:
+        context.close()
     }
 }

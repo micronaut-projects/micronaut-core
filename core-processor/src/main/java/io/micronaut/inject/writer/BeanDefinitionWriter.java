@@ -2599,9 +2599,13 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             classDefBuilder.addField(typeClosureField);
 
             // The elements give the hierarchy, the recorded type arguments what the bean binds each type's
-            // variables to the whole way up, the same for every language; an array bean answers for its component
+            // variables to the whole way up, the same for every language; an array bean answers for its component.
+            // A super type the definition cannot name - package-private in another package - is left out, as the
+            // exposed types leave it out, since loading its class constant would fail the definition
+            ClassElement beanClosureType = typeClosure.getFirst();
             initStatements.add(beanDefinitionTypeDef.getStaticField(typeClosureField)
                 .put(ArgumentExpUtils.TYPE_ARGUMENT_ARRAY.instantiate(typeClosure.stream()
+                    .filter(superType -> superType == beanClosureType || isAccessibleFromBeanDefinition(superType))
                     .map(superType -> ArgumentExpUtils.pushCreateArgument(
                         annotationMetadataDefaults,
                         ClassElement.of(beanDefinitionName),
