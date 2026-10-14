@@ -225,7 +225,87 @@ class MyBean {
         around     | kinds
         '@Around'  | '@InterceptorBinding(kind = InterceptorKind.AROUND)'
         '@Around'  | '@InterceptorBinding(kind = InterceptorKind.AROUND)\n@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)'
-        '@Around'  | '@InterceptorBinding(kind = InterceptorKind.AROUND)\n@InterceptorBinding(kind = InterceptorKind.AROUND_CONSTRUCT)'
+    }
+
+    void 'test one per target interceptor of a subclass proxy intercepts its construction and its methods, told the bean once'() {
+        given:
+        ApplicationContext context = buildContext('constructed.MyBean', '''
+package constructed;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.InterceptionTarget;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.inject.BeanDefinition;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@InterceptorBinding(kind = InterceptorKind.AROUND_CONSTRUCT)
+@interface Probed {
+}
+
+class Seen {
+    // the interceptor instance, by what it intercepted: "construct" or the name of the method
+    static final Map<String, Object> INTERCEPTORS = Collections.synchronizedMap(new LinkedHashMap<>());
+    static final List<BeanDefinition<?>> DEFINITIONS = Collections.synchronizedList(new ArrayList<>());
+}
+
+@Prototype
+@InterceptorBinding(value = Probed.class, kind = InterceptorKind.AROUND)
+@InterceptorBinding(value = Probed.class, kind = InterceptorKind.AROUND_CONSTRUCT)
+class ProbingInterceptor implements MethodInterceptor<Object, Object>, ConstructorInterceptor<Object> {
+    final BeanDefinition<?> definition;
+
+    ProbingInterceptor(InterceptionTarget target) {
+        this.definition = target.definition();
+        Seen.DEFINITIONS.add(definition);
+    }
+
+    @Override
+    public Object intercept(InvocationContext<Object, Object> context) {
+        return context instanceof ConstructorInvocationContext<Object> constructor
+            ? intercept(constructor) : intercept((MethodInvocationContext<Object, Object>) context);
+    }
+
+    @Override
+    public Object intercept(ConstructorInvocationContext<Object> context) {
+        Seen.INTERCEPTORS.put("construct", this);
+        return context.proceed();
+    }
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        Seen.INTERCEPTORS.put(context.getMethodName(), this);
+        return context.proceed();
+    }
+}
+
+@Singleton
+@Around
+@Probed
+class MyBean {
+    String work() { return "worked"; }
+}
+''')
+        Class<?> beanType = context.classLoader.loadClass('constructed.MyBean')
+        Class<?> seen = context.classLoader.loadClass('constructed.Seen')
+
+        when:
+        def bean = context.getBean(beanType)
+
+        then: 'the interceptor is created once, for the bean, and intercepts its construction and its methods'
+        bean.work() == 'worked'
+        seen.INTERCEPTORS.keySet() == ['construct', 'work'] as Set
+        seen.INTERCEPTORS['construct'].is(seen.INTERCEPTORS['work'])
+        seen.DEFINITIONS.size() == 1
+        seen.DEFINITIONS[0] == context.getBeanDefinition(beanType)
+        beanType.isAssignableFrom(seen.DEFINITIONS[0].beanType)
+
+        cleanup:
+        context.close()
     }
 
     void 'test a per target interceptor of an introduction learns the bean it is created for'() {
