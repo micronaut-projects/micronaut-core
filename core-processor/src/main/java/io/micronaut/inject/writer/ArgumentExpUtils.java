@@ -46,6 +46,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -330,7 +331,7 @@ public final class ArgumentExpUtils {
         } else if (isGenericPlaceholder) {
             variableName = ((GenericPlaceholderElement) argumentType).getVariableName();
         }
-        boolean hasVariableName = !variableName.equals(argumentName);
+        boolean hasVariableName = !Objects.equals(variableName, argumentName);
         // A type that took the place of a variable, which is still written as a placeholder of the variable
         boolean isResolvedTypeVariable = isTypeVariable && variable == null;
 
@@ -339,7 +340,7 @@ public final class ArgumentExpUtils {
         // 1st argument: The type
         values.add(argumentTypeConstant);
         // 2nd argument: The argument name
-        values.add(ExpressionDef.constant(argumentName));
+        values.add(nullableConstant(argumentName));
 
         if (!hasAnnotations && !hasTypeArguments && !isTypeVariable && !isRawType) {
             return TYPE_ARGUMENT.invokeStatic(
@@ -393,7 +394,7 @@ public final class ArgumentExpUtils {
                 return TYPE_ARGUMENT.invokeStatic(
                     isResolvedTypeVariable ? METHOD_CREATE_RESOLVED_TYPE_VAR : METHOD_CREATE_TYPE_VAR_WITH_BOUNDS,
                     argumentTypeConstant,
-                    ExpressionDef.constant(argumentName),
+                    nullableConstant(argumentName),
                     hasVariableName ? ExpressionDef.constant(variableName) : ExpressionDef.nullValue(),
                     values.get(values.size() - 2),
                     values.get(values.size() - 1),

@@ -150,6 +150,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.TypeClosure;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.beans.BeanElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
@@ -565,6 +566,23 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         Throwable.class // failed initialization
     );
 
+    private static final Optional<Constructor<AbstractInitializableBeanDefinitionAndReference>> BEAN_DEFINITION_CLASS_CONSTRUCTOR3 = ReflectionUtils.findConstructor(
+        AbstractInitializableBeanDefinitionAndReference.class,
+        Class.class, // beanType
+        AbstractInitializableBeanDefinition.MethodOrFieldReference.class, // constructor
+        AnnotationMetadata.class, // annotationMetadata
+        AbstractInitializableBeanDefinition.MethodReference[].class, // methodInjection
+        AbstractInitializableBeanDefinition.FieldReference[].class, // fieldInjection
+        AbstractInitializableBeanDefinition.AnnotationReference[].class, // annotationInjection
+        ExecutableMethodsDefinition.class, // executableMethodsDefinition
+        Map.class, // typeArgumentsMap
+        Argument[].class, // typeClosure
+        AbstractInitializableBeanDefinition.PrecalculatedInfo.class, // precalculated info
+        Condition[].class, // pre conditions
+        Condition[].class, // post conditions
+        Throwable.class // failed initialization
+    );
+
     private static final Constructor<?> PRECALCULATED_INFO_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(AbstractInitializableBeanDefinition.PrecalculatedInfo.class,
         Optional.class, // scope
         boolean.class, // isAbstract
@@ -596,6 +614,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final String FIELD_INJECTION_FIELDS = "$INJECTION_FIELDS";
     private static final String FIELD_ANNOTATION_INJECTIONS = "$ANNOTATION_INJECTIONS";
     private static final String FIELD_TYPE_ARGUMENTS = "$TYPE_ARGUMENTS";
+    private static final String FIELD_TYPE_CLOSURE = "$TYPE_CLOSURE";
     private static final String FIELD_INNER_CLASSES = "$INNER_CONFIGURATION_CLASSES";
     private static final String FIELD_EXPOSED_TYPES = "$EXPOSED_TYPES";
     private static final String FIELD_REPLACES = "$REPLACES";
@@ -760,6 +779,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     // Sometimes the original annotations are hierarchy etc and there we cannot contribute defaults easily
     private final AnnotationMetadata annotationMetadataDefaults = new MutableAnnotationMetadata();
     private Map<String, Map<String, ClassElement>> typeArguments;
+    private List<ClassElement> typeClosure;
     @Nullable
     private String interceptedType;
     @Nullable
@@ -958,6 +978,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(beanDefinitionTypeDef, loadTypeMethods);
 
         typeArguments = beanType.getAllTypeArguments();
+        typeClosure = TypeClosure.of(beanType);
 
         visitAnnotationMetadata(this.annotationMetadata);
     }
@@ -975,6 +996,22 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             this.typeArguments = typeArguments;
         } else {
             this.typeArguments.putAll(typeArguments);
+        }
+    }
+
+    /**
+     * Records a further type the bean is assignable to, which is not a super type of the bean type: an interface a
+     * proxy implements besides the type it proxies. Its closure joins {@link BeanDefinition#getTypeClosure()} and
+     * its type arguments the type argument lookups.
+     *
+     * @param type The type
+     * @since 5.3.0
+     */
+    public void addAssignableType(ClassElement type) {
+        typeClosure = TypeClosure.add(typeClosure, type);
+        Map<String, ClassElement> typeArguments = type.getTypeArguments();
+        if (!typeArguments.isEmpty()) {
+            addTypeArguments(Map.of(type.getName(), typeArguments));
         }
     }
 
@@ -2495,6 +2532,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         FieldDef injectionFieldsField = null;
         FieldDef annotationInjectionsFieldType = null;
         FieldDef typeArgumentsField = null;
+        FieldDef typeClosureField = null;
         FieldDef executableMethodsField = null;
 
         boolean hasMethodInjection = !superBeanDefinition && !allMethods.isEmpty();
@@ -2553,7 +2591,31 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             failStatements.add(beanDefinitionTypeDef.getStaticField(annotationInjectionsFieldType).put(ExpressionDef.nullValue()));
         }
 
-        boolean hasTypeArguments = !superBeanDefinition && hasTypeArguments();
+        if (!superBeanDefinition && BEAN_DEFINITION_CLASS_CONSTRUCTOR3.isPresent()) {
+            // The closure answers the type argument lookups as well, so the map is left out
+            typeClosureField = FieldDef.builder(FIELD_TYPE_CLOSURE, Argument[].class)
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+                .build();
+            classDefBuilder.addField(typeClosureField);
+
+            // The elements give the hierarchy, the recorded type arguments what the bean binds each type's
+            // variables to the whole way up, the same for every language; an array bean answers for its component
+            initStatements.add(beanDefinitionTypeDef.getStaticField(typeClosureField)
+                .put(ArgumentExpUtils.TYPE_ARGUMENT_ARRAY.instantiate(typeClosure.stream()
+                    .map(superType -> ArgumentExpUtils.pushCreateArgument(
+                        annotationMetadataDefaults,
+                        ClassElement.of(beanDefinitionName),
+                        beanDefinitionTypeDef,
+                        null,
+                        superType,
+                        AnnotationMetadata.EMPTY_METADATA,
+                        typeArguments == null ? superType.getTypeArguments() : typeArguments.getOrDefault(superType.getName(), superType.getTypeArguments()),
+                        loadClassValueExpressionFn
+                    )).toList())));
+            failStatements.add(beanDefinitionTypeDef.getStaticField(typeClosureField).put(ExpressionDef.nullValue()));
+        }
+
+        boolean hasTypeArguments = !superBeanDefinition && typeClosureField == null && hasTypeArguments();
         if (hasTypeArguments) {
             typeArgumentsField = FieldDef.builder(FIELD_TYPE_ARGUMENTS, Map.class)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
@@ -2719,6 +2781,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             injectionFieldsField,
             annotationInjectionsFieldType,
             typeArgumentsField,
+            typeClosureField,
             executableMethodsField,
             precalculatedInfoField,
             preStartConditionsField,
@@ -4891,10 +4954,18 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                     } else {
                         values.add(beanDefinitionTypeDef.getStaticField(staticBlock.typeArgumentsField));
                     }
+                    if (BEAN_DEFINITION_CLASS_CONSTRUCTOR3.isPresent()) {
+                        // `Argument<?>[]` typeClosure
+                        if (staticBlock.typeClosureField == null) {
+                            values.add(ExpressionDef.nullValue());
+                        } else {
+                            values.add(beanDefinitionTypeDef.getStaticField(staticBlock.typeClosureField));
+                        }
+                    }
                     // 9: `PrecalculatedInfo`
                     values.add(beanDefinitionTypeDef.getStaticField(staticBlock.precalculatedInfoField));
 
-                    if (BEAN_DEFINITION_CLASS_CONSTRUCTOR2.isPresent()) {
+                    if (BEAN_DEFINITION_CLASS_CONSTRUCTOR3.isPresent() || BEAN_DEFINITION_CLASS_CONSTRUCTOR2.isPresent()) {
                         if (staticBlock.preStartConditionsField == null) {
                             // 10: Pre conditions
                             values.add(ClassTypeDef.of(Condition.class).array().instantiate());
@@ -4909,7 +4980,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                         // 12: Exception
                         values.add(beanDefinitionTypeDef.getStaticField(staticBlock.failedInitializationField));
 
-                        return aThis.superRef(TYPE_ABSTRACT_BEAN_DEFINITION_AND_REFERENCE).invokeConstructor(BEAN_DEFINITION_CLASS_CONSTRUCTOR2.get(), values);
+                        return aThis.superRef(TYPE_ABSTRACT_BEAN_DEFINITION_AND_REFERENCE).invokeConstructor(
+                            BEAN_DEFINITION_CLASS_CONSTRUCTOR3.isPresent() ? BEAN_DEFINITION_CLASS_CONSTRUCTOR3.get() : BEAN_DEFINITION_CLASS_CONSTRUCTOR2.get(), values);
 
                     } else if (BEAN_DEFINITION_CLASS_CONSTRUCTOR1.isPresent()) {
                         return aThis.superRef(TYPE_ABSTRACT_BEAN_DEFINITION_AND_REFERENCE).invokeConstructor(BEAN_DEFINITION_CLASS_CONSTRUCTOR1.get(), values);
@@ -5364,6 +5436,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         FieldDef annotationInjectionsFieldType,
         @Nullable
         FieldDef typeArgumentsField,
+        @Nullable
+        FieldDef typeClosureField,
         @Nullable
         FieldDef executableMethodsField,
         FieldDef precalculatedInfoField,

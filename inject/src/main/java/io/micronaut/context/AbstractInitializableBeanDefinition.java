@@ -274,7 +274,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         }
         if (typeClosure != null) {
             for (Argument<?> superType : typeClosure) {
-                if (superType.getType() == type) {
+                if (keyType(superType) == type) {
                     return typeParametersOf(superType);
                 }
             }
@@ -290,7 +290,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         }
         if (typeClosure != null) {
             for (Argument<?> superType : typeClosure) {
-                if (superType.getType().getName().equals(type)) {
+                if (keyType(superType).getName().equals(type)) {
                     return typeParametersOf(superType);
                 }
             }
@@ -304,6 +304,18 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             return Arrays.asList(arguments);
         }
         return Collections.emptyList();
+    }
+
+    /**
+     * The type a closure entry answers the type argument lookups for: an array answers for its component, which
+     * carries the arguments - {@code List<String>[]} answers {@code [String]} for {@code List}.
+     */
+    private static Class<?> keyType(Argument<?> superType) {
+        Class<?> type = superType.getType();
+        while (type.isArray()) {
+            type = type.getComponentType();
+        }
+        return type;
     }
 
     private static List<Argument<?>> typeParametersOf(Argument<?> superType) {
@@ -333,8 +345,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             }
             Set<String> keys = CollectionUtils.newLinkedHashSet(typeClosure.length);
             for (Argument<?> superType : typeClosure) {
-                if (superType.getType() != Object.class) {
-                    keys.add(superType.getType().getName());
+                Class<?> keyType = keyType(superType);
+                if (keyType != Object.class) {
+                    keys.add(keyType.getName());
                 }
             }
             return Collections.unmodifiableSet(keys);

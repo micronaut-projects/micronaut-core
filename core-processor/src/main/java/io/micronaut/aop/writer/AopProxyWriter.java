@@ -339,9 +339,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                           VisitorContext visitorContext,
                           AnnotationValue<?>... interceptorBinding) {
         super(
-            createProxyConstructor(targetType, createProxyType(targetType), visitorContext),
+            createProxyConstructor(targetType, createProxyType(targetType, implementInterface), visitorContext),
 //            null,
-            createProxyType(targetType),
+            createProxyType(targetType, implementInterface),
             targetType,
             implementInterface,
             visitorContext,
@@ -359,8 +359,14 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         return createProxyType(target, parent.getBeanDefinitionName() + PROXY_SUFFIX, parent.getAnnotationMetadata());
     }
 
-    private static ClassElement createProxyType(ClassElement target) {
+    private static ClassElement createProxyType(ClassElement target, boolean implementInterface) {
         String proxyName = target.getName() + PROXY_SUFFIX;
+        if (target.isInterface() && !implementInterface) {
+            // The target names the proxy without being implemented by it: the adapter of an @Adapter method is
+            // generated under a synthetic name and implements the adapted interface alone, so the proxy type
+            // carries no super type it is not assignable to
+            return ClassElement.of(proxyName, false, target.getAnnotationMetadata(), Map.of(), null, List.of());
+        }
         return createProxyType(target, proxyName, target.getAnnotationMetadata());
     }
 
