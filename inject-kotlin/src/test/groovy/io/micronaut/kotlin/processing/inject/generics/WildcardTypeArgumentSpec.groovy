@@ -164,7 +164,6 @@ class Bean<B : Book>(
         upper(foo) == [foo.type.name] && lower(foo) == []
     }
 
-    @PendingFeature(reason = "the Kotlin processor drops the type arguments of a projection's bound")
     void "a projection keeps the type arguments of its bound"() {
         given:
         Argument<?> comparable = constructorArguments().parameterizedBound.typeParameters[0]
