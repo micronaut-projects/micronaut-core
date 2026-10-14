@@ -165,6 +165,8 @@ class LiveRegionTest {
         assertEquals(2, LiveRegion.columns(0x231A));
         // a symbol shown as text by default stays narrow
         assertEquals(1, LiveRegion.columns(0x2764));
+        // a flag is a pair of regional indicators, two columns in all
+        assertEquals(2, LiveRegion.width("🇺🇸"));
         assertEquals(10, LiveRegion.width("加算テスト"));
         assertEquals(4, LiveRegion.width("cafe\u0301"));
         assertEquals(3, LiveRegion.width("a😀"));

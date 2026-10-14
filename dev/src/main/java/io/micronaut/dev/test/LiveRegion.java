@@ -349,6 +349,10 @@ final class LiveRegion {
             || type == Character.CONTROL) {
             return 0;
         }
+        if (codePoint >= 0x1F1E6 && codePoint <= 0x1F1FF) {
+            // a regional indicator: a pair of them is a flag, shown in two columns
+            return 1;
+        }
         // an emoji shown as one by default is wide wherever it is, as the East Asian width of Unicode 9 on tells
         return isWide(codePoint) || Character.isEmojiPresentation(codePoint) ? 2 : 1;
     }
