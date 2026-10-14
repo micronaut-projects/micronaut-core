@@ -543,8 +543,18 @@ internal open class KotlinClassElement(
             value.setter,
             elementAnnotationMetadataFactory,
             visitorContext,
-            value.isExcluded
+            value.isExcluded,
+            // a public Java field is read and written directly
+            toPropertyAccessKind(value.readAccessKind),
+            toPropertyAccessKind(value.writeAccessKind)
         )
+
+    private fun toPropertyAccessKind(accessKind: BeanProperties.AccessKind?) =
+        if (accessKind == BeanProperties.AccessKind.FIELD) {
+            PropertyElement.AccessKind.FIELD
+        } else {
+            PropertyElement.AccessKind.METHOD
+        }
 
     @OptIn(KspExperimental::class)
     override fun getSimpleName(): String {
