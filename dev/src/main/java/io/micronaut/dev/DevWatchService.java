@@ -15,6 +15,7 @@
  */
 package io.micronaut.dev;
 
+import com.sun.nio.file.SensitivityWatchEventModifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.NativeImageUtils;
@@ -25,7 +26,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
 import java.nio.file.WatchService;
+import java.time.Duration;
+import java.util.Locale;
 
 /**
  * The watch service the launcher watches with. On macOS the JDK's service polls, every ten seconds by default and
@@ -65,7 +69,7 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      * @throws IOException if no service can be created
      */
     static DevWatchService create() throws IOException {
-        boolean mac = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac");
+        boolean mac = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
         return create(mac, NativeImageUtils.inImageRuntimeCode(), ClassUtils.isPresent(JNA, DevWatchService.class.getClassLoader()));
     }
 
@@ -110,10 +114,10 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      */
     java.time.Duration detectionDelay() {
         if (service instanceof PollingWatchService) {
-            return java.time.Duration.ofMillis(POLL_MILLIS);
+            return Duration.ofMillis(POLL_MILLIS);
         }
         if (service instanceof FsEventsWatchService fsEvents) {
-            return fsEvents.detectionDelay(java.time.Duration.ofMillis(Math.round(MAC_LATENCY_SECONDS * 1000)));
+            return fsEvents.detectionDelay(Duration.ofMillis(Math.round(MAC_LATENCY_SECONDS * 1000)));
         }
         return java.time.Duration.ZERO;
     }
@@ -122,7 +126,7 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      * @return A service comparing the watched directories every {@value #POLL_MILLIS} milliseconds
      */
     static DevWatchService polling() {
-        PollingWatchService polling = new PollingWatchService(java.time.Duration.ofMillis(POLL_MILLIS));
+        PollingWatchService polling = new PollingWatchService(Duration.ofMillis(POLL_MILLIS));
         return new DevWatchService(polling, (directory, service) -> polling.register(directory), true);
     }
 
@@ -131,7 +135,7 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      */
     private static final class MacOs {
         static DevWatchService create() throws IOException {
-            FsEventsWatchService service = new FsEventsWatchService(MAC_LATENCY_SECONDS, java.time.Duration.ofMillis(POLL_MILLIS));
+            FsEventsWatchService service = new FsEventsWatchService(MAC_LATENCY_SECONDS, Duration.ofMillis(POLL_MILLIS));
             return new DevWatchService(service, (directory, watchService) -> service.register(directory), true);
         }
     }
@@ -142,10 +146,10 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
     private static final class HighSensitivity {
         static DirectoryWatcher.WatchKeyRegistrar registrar() {
             // resolved now, so that a JDK without the modifier fails here rather than at the first registration
-            java.nio.file.WatchEvent.Modifier high = com.sun.nio.file.SensitivityWatchEventModifier.HIGH;
+            WatchEvent.Modifier high = SensitivityWatchEventModifier.HIGH;
             return (directory, service) -> directory.register(
                 service,
-                new java.nio.file.WatchEvent.Kind<?>[] {StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY},
+                new WatchEvent.Kind<?>[] {StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY},
                 high
             );
         }
