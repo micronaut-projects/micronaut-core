@@ -75,7 +75,24 @@ public final class MethodGenUtils {
      * @since 4.6.2
      */
     public static int calculateNumberOfKotlinDefaultsMasks(List<ParameterElement> parameters) {
-        return (int) Math.ceil(parameters.size() / 32.0);
+        return (int) Math.ceil(countKotlinDefaultsMaskParameters(parameters) / 32.0);
+    }
+
+    /**
+     * Counts the parameters that have a bit in the Kotlin defaults masks.
+     *
+     * <p>Only the Kotlin value parameters do: an extension receiver, prepended to the
+     * parameters of an extension function, and a suspend function's continuation are passed to
+     * the {@code $default} method without a mask bit.</p>
+     */
+    private static int countKotlinDefaultsMaskParameters(List<ParameterElement> parameters) {
+        int count = 0;
+        for (ParameterElement parameter : parameters) {
+            if (parameter instanceof KotlinParameterElement) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /**
@@ -447,23 +464,26 @@ public final class MethodGenUtils {
                                                             @Nullable
                                                             List<? extends ExpressionDef> hasValuesExpressions) {
         ExpressionDef[] masksLocal = new ExpressionDef[numberOfMasks];
-        for (int i = 0; i < numberOfMasks; i++) {
-            int fromIndex = i * 32;
-            List<ParameterElement> params = parameters.subList(fromIndex, Math.min(fromIndex + 32, parameters.size()));
-            if (hasValuesExpressions == null) {
-                masksLocal[i] = TypeDef.Primitive.INT.constant((int) ((long) Math.pow(2, params.size() + 1) - 1));
-            } else {
-                ExpressionDef maskValue = TypeDef.Primitive.INT.constant(0);
-                int maskIndex = 1;
-                int paramIndex = fromIndex;
-                for (ParameterElement parameter : params) {
-                    if (parameter instanceof KotlinParameterElement kp && kp.hasDefault()) {
-                        maskValue = writeMask(hasValuesExpressions, kp, paramIndex, maskIndex, maskValue);
-                    }
-                    maskIndex *= 2;
-                    paramIndex++;
+        if (hasValuesExpressions == null) {
+            int maskParameters = countKotlinDefaultsMaskParameters(parameters);
+            for (int i = 0; i < numberOfMasks; i++) {
+                int size = Math.min(32, maskParameters - i * 32);
+                masksLocal[i] = TypeDef.Primitive.INT.constant((int) ((1L << (size + 1)) - 1));
+            }
+            return masksLocal;
+        }
+        Arrays.fill(masksLocal, TypeDef.Primitive.INT.constant(0));
+        // The mask bits are numbered by the Kotlin value parameters only, while the values are
+        // indexed by all the parameters, including an extension receiver given no mask bit
+        int maskParameterIndex = 0;
+        for (int paramIndex = 0; paramIndex < parameters.size(); paramIndex++) {
+            if (parameters.get(paramIndex) instanceof KotlinParameterElement kp) {
+                int mask = maskParameterIndex / 32;
+                if (kp.hasDefault()) {
+                    int maskIndex = 1 << (maskParameterIndex % 32);
+                    masksLocal[mask] = writeMask(hasValuesExpressions, kp, paramIndex, maskIndex, masksLocal[mask]);
                 }
-                masksLocal[i] = maskValue;
+                maskParameterIndex++;
             }
         }
         return masksLocal;
