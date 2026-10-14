@@ -38,7 +38,7 @@ internal class KotlinNativeElementsHelper(resolver: Resolver) : NativeElementsHe
             // A new resolver is a new round and a new Analysis API session, so nothing memoized
             // against the old one may be reused.
             field = value
-            overridesCache.clear()
+            clearCaches()
         }
 
     /*
@@ -54,6 +54,11 @@ internal class KotlinNativeElementsHelper(resolver: Resolver) : NativeElementsHe
      * which the Analysis API interns.
      */
     private val overridesCache = HashMap<Pair<KSFunctionDeclaration, KSFunctionDeclaration>, Boolean>()
+
+    override fun clearCaches() {
+        super.clearCaches()
+        overridesCache.clear()
+    }
 
     override fun getClassCacheKey(classElement: KSClassDeclaration): Any {
         return KotlinClassNativeElement(classElement, null, null)

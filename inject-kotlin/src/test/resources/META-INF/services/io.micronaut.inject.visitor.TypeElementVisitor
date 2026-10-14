@@ -25,3 +25,4 @@ io.micronaut.inject.visitor.rounds.RoundsVisitor
 io.micronaut.kotlin.processing.beans.builder.AssociatedBeanSpec$ProducingVisitor
 io.micronaut.kotlin.processing.beans.builder.AssociatedBeanSpec$AggregatingVisitor
 io.micronaut.kotlin.processing.beans.builder.AssociatedBeanSpec$FailingRoundVisitor
+io.micronaut.kotlin.processing.visitor.rounds.RoundOverriddenMethodsSpec$OverridesRecordingVisitor
