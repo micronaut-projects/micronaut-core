@@ -18,9 +18,9 @@ package io.micronaut.http.server.binding;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.InputStreamByteBody;
+import io.micronaut.http.body.stream.ReactorInterop;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import org.jspecify.annotations.Nullable;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -174,7 +174,7 @@ final class StoredUploadContent extends UploadContent {
      * @return Completes when the upload was closed
      */
     private CompletableFuture<Void> closeRejected() {
-        if (upload.isInMemory() || !Schedulers.isInNonBlockingThread()) {
+        if (upload.isInMemory() || !ReactorInterop.isInNonBlockingThread()) {
             try {
                 upload.close();
                 return CompletableFuture.completedFuture(null);
