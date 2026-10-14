@@ -66,6 +66,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.instrument.Instrumentation;
@@ -79,6 +80,7 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
@@ -351,7 +353,7 @@ public final class DevRuntime implements Closeable {
         Path absolute = file.toAbsolutePath().normalize();
         Path root = mostSpecificRoot(absolute);
         String relative = root != null ? root.relativize(absolute).toString() : absolute.getFileName().toString();
-        return "/" + relative.replace(java.io.File.separatorChar, '/');
+        return "/" + relative.replace(File.separatorChar, '/');
     }
 
     /**
@@ -1573,7 +1575,7 @@ public final class DevRuntime implements Closeable {
             return;
         }
         boolean onlyCss = !changes.changed().isEmpty() && changes.deleted().isEmpty()
-            && changes.changed().stream().allMatch(path -> path.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".css"));
+            && changes.changed().stream().allMatch(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".css"));
         if (onlyCss) {
             for (Path stylesheet : changes.changed()) {
                 server.reload(publicPathOf(stylesheet), true);
