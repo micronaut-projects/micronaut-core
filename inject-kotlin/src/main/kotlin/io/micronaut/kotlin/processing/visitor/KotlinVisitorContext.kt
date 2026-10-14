@@ -37,6 +37,7 @@ import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.Origin
+import com.google.devtools.ksp.symbol.Variance
 import io.micronaut.core.annotation.Internal
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.value.MutableConvertibleValues
@@ -289,6 +290,57 @@ internal class KotlinVisitorContext(
                 return resolver.getJavaClassByName(Object::class.java.name)!!
             }
         }
+    }
+
+    /**
+     * Expands the use of a type alias to the type the alias stands for. KSP reports the use of an alias as a type
+     * declared by the alias, carrying the arguments and the nullability written at the use, so the arguments of an
+     * alias of `Array<String>`, the `?` of an alias of `String?` and the order of the arguments of an alias that
+     * renames or reorders them are only found in the type the alias expands to. Aliases of aliases are expanded
+     * until a type that is not an alias is reached.
+     *
+     * @param type The type
+     * @return The type, or the type its alias expands to
+     */
+    internal fun expandTypeAlias(type: KSType): KSType {
+        var expanded = type
+        while (true) {
+            val alias = expanded.declaration as? KSTypeAlias ?: return expanded
+            var target = alias.type.resolve()
+            if (alias.typeParameters.isNotEmpty() && alias.typeParameters.size == expanded.arguments.size) {
+                val substitutions = alias.typeParameters.map { it.name.asString() }.zip(expanded.arguments).toMap()
+                target = substituteTypeArguments(target, substitutions)
+            }
+            expanded = if (expanded.isMarkedNullable) target.makeNullable() else target
+        }
+    }
+
+    private fun substituteTypeArguments(type: KSType, substitutions: Map<String, KSTypeArgument>): KSType {
+        val declaration = type.declaration
+        if (declaration is KSTypeParameter) {
+            val substitution = substitutions[declaration.name.asString()]?.type?.resolve() ?: return type
+            return if (type.isMarkedNullable) substitution.makeNullable() else substitution
+        }
+        if (type.arguments.isEmpty()) {
+            return type
+        }
+        val arguments = type.arguments.map { argument ->
+            val argumentType = argument.type?.resolve() ?: return@map argument
+            val argumentDeclaration = argumentType.declaration
+            val substitution = if (argumentDeclaration is KSTypeParameter) substitutions[argumentDeclaration.name.asString()] else null
+            if (substitution != null && (substitution.variance == Variance.STAR || substitution.type == null)) {
+                // The alias is used with a star projection: List<*> for an alias of List<T>
+                return@map substitution
+            }
+            val variance = if (substitution != null && argument.variance == Variance.INVARIANT) substitution.variance else argument.variance
+            val substituted = substituteTypeArguments(argumentType, substitutions)
+            if (substituted === argumentType && variance == argument.variance) {
+                argument
+            } else {
+                resolver.getTypeArgument(resolver.createKSTypeReferenceFromKSType(substituted), variance)
+            }
+        }
+        return type.replace(arguments)
     }
 
     @OptIn(KspExperimental::class)

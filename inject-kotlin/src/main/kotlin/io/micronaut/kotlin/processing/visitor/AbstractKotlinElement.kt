@@ -26,7 +26,6 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSModifierListOwner
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSType
-import com.google.devtools.ksp.symbol.KSTypeAlias
 import com.google.devtools.ksp.symbol.KSTypeArgument
 import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.Modifier
@@ -310,14 +309,8 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         parentTypeArguments: Map<String, ClassElement>,
         visitedTypes: MutableSet<Any> = HashSet()
     ): Map<String, ClassElement> {
-        // A non-generic typealias (e.g. typealias BarList = List<Bar>) has no typeParameters
-        // on the alias itself, so KSType.arguments is empty and the concrete type arguments
-        // (Bar) would be lost. Expand to the underlying type to recover them.
-        val effectiveType = if (type.declaration is KSTypeAlias && type.declaration.typeParameters.isEmpty()) {
-            (type.declaration as KSTypeAlias).type.resolve()
-        } else {
-            type
-        }
+        // The arguments of an alias (e.g. typealias BarList = List<Bar>) are those of the type it expands to
+        val effectiveType = visitorContext.expandTypeAlias(type)
         val typeArguments = mutableMapOf<String, ClassElement>()
         val typeParameters = effectiveType.declaration.typeParameters
         if (effectiveType.arguments.isEmpty() || effectiveType.arguments.size != typeParameters.size) {
@@ -620,13 +613,16 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
 
     private fun newClassElement(
         owner: KotlinNativeElement?,
-        type: KSType?,
+        useType: KSType?,
         declaration: KSClassDeclaration,
         parentTypeArguments: Map<String, ClassElement>,
         visitedTypes: MutableSet<Any>,
         allowPrimitive: Boolean = true,
         stripTypeArguments: Boolean = false
     ): ClassElement {
+        // The declaration is the class an alias stands for, so the arguments and the nullability are read from the
+        // type the alias expands to. The annotations are those written at the use, which only the use type reports.
+        val type = useType?.let { visitorContext.expandTypeAlias(it) }
         if (type != null) {
             val typeDeclaration = type.declaration
             if (typeDeclaration is KSTypeParameter) {
@@ -638,7 +634,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                 )
                 if (placeholder is KotlinGenericPlaceholderElement) {
                     // A use of the type parameter reports its own annotations, not the declaration's
-                    placeholder.useType = type
+                    placeholder.useType = useType
                 }
                 return placeholder
             }
@@ -648,10 +644,10 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
             val qualifiedNameString = qualifiedName.asString()
             val primitiveArray = primitiveArrays[qualifiedNameString]
             if (primitiveArray != null) {
-                return if (type == null) primitiveArray else withDimensionAnnotations(primitiveArray, primitiveArray.fromArray(), type)
+                return if (type == null) primitiveArray else withDimensionAnnotations(primitiveArray, primitiveArray.fromArray(), useType!!)
             }
             val canBePrimitive =
-                type == null || type.annotations.toList().isEmpty() && !type.isMarkedNullable
+                type == null || useType!!.annotations.toList().isEmpty() && !type.isMarkedNullable
             if (allowPrimitive && canBePrimitive && type?.nullability != Nullability.PLATFORM) {
                 val element = primitives[qualifiedNameString]
                 if (element != null) {
@@ -674,7 +670,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                     // Keep the occurrence, and its annotations, apart from the declaration of the variable
                     component.typeArgument = type.arguments[0]
                 }
-                return withDimensionAnnotations(component.toArray(), component, type)
+                return withDimensionAnnotations(component.toArray(), component, useType!!)
             }
         }
         val typeArguments = if (stripTypeArguments) {
@@ -696,14 +692,14 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         }
         return if (declaration.classKind == ClassKind.ENUM_CLASS) {
             KotlinEnumElement(
-                KotlinClassNativeElement(declaration, type, owner),
+                KotlinClassNativeElement(declaration, useType, owner),
                 elementAnnotationMetadataFactory,
                 visitorContext,
                 typeArguments
             )
         } else {
             KotlinClassElement(
-                KotlinClassNativeElement(declaration, type, owner),
+                KotlinClassNativeElement(declaration, useType, owner),
                 elementAnnotationMetadataFactory,
                 typeArguments,
                 visitorContext
