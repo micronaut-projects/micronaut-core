@@ -113,7 +113,8 @@ class HandlerRouteWebSocketTest {
     @AfterAll
     @Timeout(value = 60, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     static void stop() {
-        http.close();
+        // close() waits for the WebSockets that are still open, e.g. of a test that failed
+        http.shutdownNow();
         context.close();
     }
 
@@ -213,6 +214,18 @@ class HandlerRouteWebSocketTest {
         Closed closed = client.closed();
         assertEquals(4000, closed.code);
         assertEquals("done now", closed.reason);
+    }
+
+    @Test
+    void theCloseOfTheClientIsAnsweredWithACloseFrameOnceTheCloseHandlerIsDone() throws Exception {
+        Client client = connect("/ws/chat/answered");
+        assertEquals("open answered /ws/chat/answered true", client.next());
+        client.ws.sendClose(1000, "bye").get(TIMEOUT, TimeUnit.SECONDS);
+        // the close handshake completes: a client may not notice the end of the connection alone
+        Closed closed = client.closed();
+        assertEquals(1000, closed.code);
+        assertEquals("bye", closed.reason);
+        assertEquals("close answered 1000 bye", event());
     }
 
     @Test

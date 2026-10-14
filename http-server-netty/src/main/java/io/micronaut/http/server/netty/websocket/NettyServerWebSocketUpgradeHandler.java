@@ -401,7 +401,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
      * @return The WebSocket route, if any
      */
     private static Optional<UriRouteMatch<Object, Object>> findWebSocketRoute(Router router, HttpRequest<?> request) {
-        List<UriRouteMatch<Object, Object>> functionalRoutes = router.<Object, Object>findAny(request.getPath(), request)
+        // the conditions of the routes of the path are only evaluated when a WebSocket route of
+        // the route builder has the path: a @ServerWebSocket upgrade only evaluates its own
+        boolean anyFunctionalRoute = router.<Object, Object>findAny(request.getPath(), null)
+            .anyMatch(rm -> rm.getHttpMethod() == HttpMethod.GET && isFunctionalWebSocketRoute(rm));
+        List<UriRouteMatch<Object, Object>> functionalRoutes = !anyFunctionalRoute ? List.of() : router.<Object, Object>findAny(request.getPath(), request)
             .filter(rm -> rm.getHttpMethod() == HttpMethod.GET && isFunctionalWebSocketRoute(rm))
             .toList();
         if (!functionalRoutes.isEmpty()) {

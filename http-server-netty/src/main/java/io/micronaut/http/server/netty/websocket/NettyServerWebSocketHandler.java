@@ -858,6 +858,13 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     @Override
+    protected boolean answersCloseFrame() {
+        // a WebSocket route completes the close handshake: a client, e.g. the JDK one, may not
+        // notice the end of a connection whose close it waits for
+        return routeEndpoint != null;
+    }
+
+    @Override
     protected void messageHandled(ChannelHandlerContext ctx, Object message) {
         ctx.executor().execute(() -> {
             try {

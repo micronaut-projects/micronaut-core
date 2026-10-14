@@ -496,7 +496,10 @@ public class RequestLifecycle {
                 @Override
                 protected ExecutionFlow<HttpResponse<?>> provideResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
                     onFilteredRequest(request);
-                    return provideRouteResponse(request, routeMatch, propagatedContext);
+                    // a failed response is answered by the error handling here: without a filter
+                    // that applies to the request, no filter would hand the failure to processFailure
+                    return provideRouteResponse(request, routeMatch, propagatedContext)
+                        .onErrorResume(throwable -> onErrorNoFilter(request, throwable, propagatedContext));
                 }
 
                 @Override
