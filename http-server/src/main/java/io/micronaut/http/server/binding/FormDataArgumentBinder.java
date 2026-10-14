@@ -153,7 +153,9 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
         request.addDisposalResource(() -> {
             owned.close();
             // disposing of the reading completes neither callback of the subscription
-            result.completeExceptionally(new CancellationException("The request ended before its form was read completely"));
+            if (!result.isDone()) {
+                result.completeExceptionally(new CancellationException("The request ended before its form was read completely"));
+            }
         });
         // the parts of a form arrive in order: each one is read or stored before the next
         FormFieldFlows.Concat<RawFormField, Boolean> subscription = new FormFieldFlows.Concat<>(
