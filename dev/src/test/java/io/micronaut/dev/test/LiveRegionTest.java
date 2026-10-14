@@ -153,6 +153,43 @@ class LiveRegionTest {
         assertEquals("Calc…rTest", LiveRegion.Glyphs.UNICODE.truncate("CalculatorTest", 10));
     }
 
+    @Test
+    void rowsAreFittedToTheColumnsTheirCharactersTake() {
+        // wide East Asian characters take two columns, combining marks none, a surrogate pair is one character
+        assertEquals(2, LiveRegion.columns('加'));
+        assertEquals(1, LiveRegion.columns('a'));
+        assertEquals(0, LiveRegion.columns('\u0301'));
+        assertEquals(2, LiveRegion.columns("😀".codePointAt(0)));
+        assertEquals(10, LiveRegion.width("加算テスト"));
+        assertEquals(4, LiveRegion.width("cafe\u0301"));
+        assertEquals(3, LiveRegion.width("a😀"));
+
+        assertEquals("加算テ", LiveRegion.fit("加算テスト", 7));
+        // a wide character that does not fit ends the line, and the escapes after it are kept
+        assertEquals("\033[1m加算テ\033[0m", LiveRegion.fit("\033[1m加算テスト x\033[0m", 7));
+        assertEquals("cafe\u0301", LiveRegion.fit("cafe\u0301s", 4));
+        assertEquals("a😀", LiveRegion.fit("a😀b", 3));
+        assertEquals("a", LiveRegion.fit("a😀b", 2));
+
+        assertEquals("加算…スト", LiveRegion.Glyphs.UNICODE.truncate("加算のテスト", 9));
+        assertEquals("加…ト", LiveRegion.Glyphs.UNICODE.truncate("加算のテスト", 6));
+        // three columns each side of the ellipsis: one emoji, never half of one
+        assertEquals("😀…😀", LiveRegion.Glyphs.UNICODE.truncate("😀😀😀😀😀", 7));
+        assertEquals("e\u0301…e\u0301", LiveRegion.Glyphs.UNICODE.truncate("e\u0301e\u0301e\u0301e\u0301", 3));
+
+        AtomicReference<List<String>> rows = new AtomicReference<>(List.of("加算のテストです", "second"));
+        LiveRegion region = region(12);
+        region.start((frame, columns) -> rows.get(), false);
+        region.refresh();
+        // 11 columns drawn: five wide characters, the sixth would overflow
+        assertEquals("加算のテス\nsecond", screen());
+        // repainted in place, over the two rows drawn
+        rows.set(List.of("引き算のテストです"));
+        region.refresh();
+        assertEquals("引き算のテ", screen());
+        region.stop();
+    }
+
     private LiveRegion region(int width) {
         return new LiveRegion(new PrintStream(buffer, true, StandardCharsets.UTF_8), true, width, System::nanoTime, lock);
     }

@@ -93,7 +93,7 @@ class TestProgressConsoleTest {
               – CalculatorTest.later() (skipped: not yet)
               ✗ BrokenTest (error)
                   IllegalStateException: no context
-            """ + row("⠋ Running tests · 3/5 done, 2 failed", "0.1s") + "\n" + row("  └ CalculatorTest.slow()", "0.1s"), screen());
+            """ + row("⠋ Running tests · 3/5 done, 1 failed, 1 error", "0.1s") + "\n" + row("  └ CalculatorTest.slow()", "0.1s"), screen());
 
         console.testFinished(test(CALCULATOR, "slow"), passed(100));
         console.runFinished(summary(2, 1, 1, 1, 900, false));
@@ -192,8 +192,13 @@ class TestProgressConsoleTest {
         assertEquals("[1.0s] ! No tests ran (0.0s)", summaryOf(List.of(), summary(0, 0, 0, 0, 0, false)));
         assertEquals("[1.0s] ! No tests ran, 2 skipped (0.0s)",
             summaryOf(List.of(skippedOutcome(), skippedOutcome()), summary(0, 0, 0, 2, 0, false)));
-        assertEquals("[1.0s] ✗ 2 of 2 tests failed (0.0s)",
+        // a test that threw something other than an assertion failure is an error, as the reports count it
+        assertEquals("[1.0s] ✗ 1 of 2 tests failed, 1 error (0.0s)",
             summaryOf(List.of(failedOutcome(TestStatus.FAILED), failedOutcome(TestStatus.ERRORED)), summary(0, 1, 1, 0, 0, false)));
+        assertEquals("[1.0s] ✗ 1 of 2 tests passed, 1 error (0.0s)",
+            summaryOf(List.of(passed(0), failedOutcome(TestStatus.ERRORED)), summary(1, 0, 1, 0, 0, false)));
+        assertEquals("[1.0s] ✗ No tests passed, 2 errors (0.0s)",
+            summaryOf(List.of(failedOutcome(TestStatus.ERRORED), failedOutcome(TestStatus.ERRORED)), summary(0, 0, 2, 0, 0, false)));
         assertEquals("[1.0s] ! Cancelled after 2 tests: 1 failed (0.0s)",
             summaryOf(List.of(passed(0), failedOutcome(TestStatus.FAILED)), summary(1, 1, 0, 0, 0, true)));
     }
@@ -367,6 +372,51 @@ class TestProgressConsoleTest {
         assertEquals(132, TestProgressConsole.Terminal.sttyWidth("/bin/sh", "-c", "echo 24 132; sleep 5 &"));
         elapsed = System.nanoTime() - start;
         assertTrue(elapsed < Duration.ofSeconds(4).toNanos(), "blocked for " + Duration.ofNanos(elapsed));
+    }
+
+    @Test
+    void aTestThatErrorsIsShownAsAnError() {
+        TestProgressConsole console = console(true, true, null);
+        start(console, 2);
+        TestId breaks = test(CALCULATOR, "breaks");
+        console.testStarted(breaks);
+        console.testFinished(breaks, new TestOutcome(TestStatus.ERRORED, Duration.ofMillis(40),
+            new TestFailure(IllegalStateException.class.getName(), "no connection", ""), null));
+        console.testStarted(test(CALCULATOR, "slow"));
+        console.repaint();
+        assertEquals("""
+              ✗ CalculatorTest.breaks() (error, 0.0s)
+                  IllegalStateException: no connection
+            """ + row("⠋ Running tests · 1/2 done, 1 error", "0.0s") + "\n" + row("  └ CalculatorTest.slow()", "0.0s"), screen());
+
+        buffer.reset();
+        TestProgressConsole plain = console(false, true, null);
+        start(plain, 1);
+        plain.testFinished(breaks, new TestOutcome(TestStatus.ERRORED, Duration.ofMillis(40),
+            new TestFailure(IllegalStateException.class.getName(), "no connection", ""), null));
+        plain.runFinished(summary(0, 0, 1, 0, 100, false));
+        assertTrue(raw().contains("ERROR CalculatorTest.breaks() (0.0s)\n"), raw());
+        assertTrue(raw().contains("No tests passed, 1 error in 0.1s\n"), raw());
+        assertFalse(raw().contains("FAILED"), raw());
+    }
+
+    @Test
+    void wideTestNamesFitTheRowsWithoutWrapping() {
+        TestProgressConsole console = console(true, true, null);
+        start(console, 2);
+        TestId wide = test(CALCULATOR, "加算のテスト".repeat(10));
+        console.testStarted(wide);
+        console.testStarted(test(CALCULATOR, "slow"));
+        console.repaint();
+        advance(100);
+        console.repaint();
+        List<String> lines = screen().lines().toList();
+        assertEquals(3, lines.size(), screen());
+        for (String line : lines) {
+            assertEquals(79, LiveRegion.width(line), line);
+        }
+        assertTrue(lines.get(1).contains("…"), lines.get(1));
+        assertTrue(lines.get(1).endsWith("0.1s"), lines.get(1));
     }
 
     private static Function<String, String> environment(Map<String, String> variables) {

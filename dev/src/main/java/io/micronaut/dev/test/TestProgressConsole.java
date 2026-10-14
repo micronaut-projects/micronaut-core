@@ -41,7 +41,7 @@ import java.util.function.Supplier;
 /**
  * Shows test runs on the console as Pyronaut's {@code pyronaut test} does, so that test mode looks alike from every
  * build tool and from Pyronaut. On a terminal, a spinner row counts the tests done and failed with the tests running
- * under it; every test that ends becomes a permanent line, {@code ✓} passed, {@code ✗} failed with its message and
+ * under it; every test that ends becomes a permanent line, {@code ✓} passed, {@code ✗} failed or errored with its message and
  * the first frames of the project beneath, {@code –} skipped; a run ends with a summary line, the report to open and,
  * in continuous testing, the keys. Without a terminal, with {@code TERM=dumb}, or with {@code NO_COLOR} set, it prints
  * the same as plain lines with no escape sequence: {@code PASSED}, {@code FAILED}, {@code SKIPPED} and {@code ERROR}.
@@ -82,7 +82,10 @@ public final class TestProgressConsole implements TestReportListener {
     private long runStarted;
     private int passed;
     private int failed;
+    // the class errors and the tests that errored, as the reports count errors
     private int errors;
+    // the tests that threw something other than an assertion failure
+    private int erroredTests;
     private int skipped;
 
     /**
@@ -181,6 +184,7 @@ public final class TestProgressConsole implements TestReportListener {
             passed = 0;
             failed = 0;
             errors = 0;
+            erroredTests = 0;
             skipped = 0;
             runStarted = clock.getAsLong();
             if (interactive) {
@@ -244,6 +248,14 @@ public final class TestProgressConsole implements TestReportListener {
                     String detail = reason == null || reason.isBlank() ? "skipped" : "skipped: " + reason.lines().findFirst().orElse("").strip();
                     line("  " + paint(LiveRegion.DIM, glyphs().skipped() + " " + name + " (" + detail + ")"), "SKIPPED " + name + " (" + detail + ")");
                 }
+                case ERRORED -> {
+                    // something other than an assertion failure: an error, as the reports count it
+                    erroredTests++;
+                    errors++;
+                    line("  " + paint(LiveRegion.RED, glyphs().cross()) + " " + paint(LiveRegion.BOLD, name) + " " + paint(LiveRegion.DIM, "(error, " + took + ")"),
+                        "ERROR " + name + " (" + took + ")");
+                    failure(outcome.failure());
+                }
                 default -> {
                     failed++;
                     line("  " + paint(LiveRegion.RED, glyphs().cross()) + " " + paint(LiveRegion.BOLD, name) + " " + paint(LiveRegion.DIM, "(" + took + ")"),
@@ -264,7 +276,7 @@ public final class TestProgressConsole implements TestReportListener {
             String message;
             String tone;
             String symbol;
-            int ran = passed + failed;
+            int ran = passed + failed + erroredTests;
             String skippedText = skipped == 0 ? "" : ", " + skipped + " skipped";
             String errorText = errors == 0 ? "" : ", " + errors + (errors == 1 ? " error" : " errors");
             if (summary.cancelled()) {
@@ -280,6 +292,10 @@ public final class TestProgressConsole implements TestReportListener {
                 message = "No tests ran" + errorText + skippedText;
                 tone = errors > 0 ? LiveRegion.RED : LiveRegion.YELLOW;
                 symbol = errors > 0 ? glyphs().cross() : glyphs().warning();
+            } else if (erroredTests > 0) {
+                message = (passed == 0 ? "No tests passed" : passed + " of " + ran + " tests passed") + errorText + skippedText;
+                tone = LiveRegion.RED;
+                symbol = glyphs().cross();
             } else {
                 message = ran + (ran == 1 ? " test passed" : " tests passed") + errorText + skippedText;
                 tone = errors > 0 ? LiveRegion.RED : LiveRegion.GREEN;
@@ -463,7 +479,7 @@ public final class TestProgressConsole implements TestReportListener {
         // the region calls it under the lock
         List<String> lines = new ArrayList<>();
         long now = clock.getAsLong();
-        long done = (long) passed + failed + skipped;
+        long done = (long) passed + failed + erroredTests + skipped;
         StringBuilder detail = new StringBuilder();
         detail.append(done);
         // the platform counts the tests it discovered: dynamic tests come on top
@@ -471,8 +487,11 @@ public final class TestProgressConsole implements TestReportListener {
             detail.append('/').append(planned);
         }
         detail.append(" done");
-        if (failed + errors > 0) {
-            detail.append(", ").append(failed + errors).append(" failed");
+        if (failed > 0) {
+            detail.append(", ").append(failed).append(" failed");
+        }
+        if (errors > 0) {
+            detail.append(", ").append(errors).append(errors == 1 ? " error" : " errors");
         }
         lines.add(region.headerRow(spinnerFrame, "Running tests", detail.toString(), now - runStarted, columns));
         int shown = 0;
@@ -483,7 +502,7 @@ public final class TestProgressConsole implements TestReportListener {
             }
             String elapsed = LiveRegion.duration(now - test.since());
             String name = glyphs().truncate(test.name(), Math.max(12, columns - 12));
-            int padding = Math.max(1, columns - (4 + name.length()) - elapsed.length());
+            int padding = Math.max(1, columns - (4 + LiveRegion.width(name)) - LiveRegion.width(elapsed));
             lines.add(LiveRegion.paint(LiveRegion.DIM, "  " + glyphs().branch() + " ") + name + " ".repeat(padding) + LiveRegion.paint(LiveRegion.DIM, elapsed));
             shown++;
         }

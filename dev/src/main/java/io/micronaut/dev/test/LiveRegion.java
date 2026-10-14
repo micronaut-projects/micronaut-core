@@ -278,7 +278,7 @@ final class LiveRegion {
         String spinner = glyphs.spinner().get(Math.floorMod(spinnerFrame, glyphs.spinner().size()));
         String elapsed = duration(elapsedNanos);
         String detailText = detail == null || detail.isEmpty() ? "" : " " + glyphs.separator() + " " + detail;
-        int padding = Math.max(1, columns - (2 + label.length() + detailText.length()) - elapsed.length());
+        int padding = Math.max(1, columns - (2 + width(label) + width(detailText)) - width(elapsed));
         return paint(CYAN, spinner) + " " + paint(BOLD, label) + paint(DIM, detailText) + " ".repeat(padding) + paint(DIM, elapsed);
     }
 
@@ -292,6 +292,7 @@ final class LiveRegion {
     static String fit(String line, int columns) {
         StringBuilder result = new StringBuilder();
         int visible = 0;
+        boolean full = false;
         int index = 0;
         while (index < line.length()) {
             char ch = line.charAt(index);
@@ -304,13 +305,69 @@ final class LiveRegion {
                 index = end + 1;
                 continue;
             }
-            if (visible < columns) {
-                result.append(ch);
-                visible++;
+            int codePoint = line.codePointAt(index);
+            int columnsTaken = columns(codePoint);
+            // a wide character that does not fit ends the line, rather than a narrower one after it filling the gap
+            if (!full && visible + columnsTaken <= columns) {
+                result.appendCodePoint(codePoint);
+                visible += columnsTaken;
+            } else {
+                full = true;
             }
-            index++;
+            index += Character.charCount(codePoint);
         }
         return result.toString();
+    }
+
+    /**
+     * The columns text takes on a terminal, without escape sequences.
+     *
+     * @param text The text
+     * @return The sum of the columns of its code points
+     */
+    static int width(String text) {
+        int total = 0;
+        for (int index = 0; index < text.length(); ) {
+            int codePoint = text.codePointAt(index);
+            total += columns(codePoint);
+            index += Character.charCount(codePoint);
+        }
+        return total;
+    }
+
+    /**
+     * The columns a code point takes on a terminal, as {@code wcwidth} tells: none for a combining mark, a format or
+     * control character, two for a wide or fullwidth East Asian character or an emoji, one otherwise.
+     *
+     * @param codePoint The code point
+     * @return 0, 1 or 2
+     */
+    static int columns(int codePoint) {
+        int type = Character.getType(codePoint);
+        if (type == Character.NON_SPACING_MARK || type == Character.ENCLOSING_MARK || type == Character.FORMAT
+            || type == Character.CONTROL) {
+            return 0;
+        }
+        return isWide(codePoint) ? 2 : 1;
+    }
+
+    private static boolean isWide(int codePoint) {
+        return codePoint >= 0x1100 && (codePoint <= 0x115F // Hangul Jamo initial consonants
+            || codePoint >= 0x2E80 && codePoint <= 0x303E // CJK radicals, Kangxi, ideographic punctuation
+            || codePoint >= 0x3041 && codePoint <= 0x33FF // Hiragana, Katakana, Bopomofo, CJK compatibility
+            || codePoint >= 0x3400 && codePoint <= 0x4DBF // CJK extension A
+            || codePoint >= 0x4E00 && codePoint <= 0x9FFF // CJK unified ideographs
+            || codePoint >= 0xA000 && codePoint <= 0xA4CF // Yi
+            || codePoint >= 0xAC00 && codePoint <= 0xD7A3 // Hangul syllables
+            || codePoint >= 0xF900 && codePoint <= 0xFAFF // CJK compatibility ideographs
+            || codePoint >= 0xFE30 && codePoint <= 0xFE4F // CJK compatibility forms
+            || codePoint >= 0xFF00 && codePoint <= 0xFF60 // fullwidth forms
+            || codePoint >= 0xFFE0 && codePoint <= 0xFFE6 // fullwidth signs
+            || codePoint >= 0x1F300 && codePoint <= 0x1F64F // pictographs and emoticons
+            || codePoint >= 0x1F680 && codePoint <= 0x1F6FF // transport and map symbols
+            || codePoint >= 0x1F900 && codePoint <= 0x1F9FF // supplemental symbols and pictographs
+            || codePoint >= 0x20000 && codePoint <= 0x2FFFD // CJK extensions B to F
+            || codePoint >= 0x30000 && codePoint <= 0x3FFFD); // CJK extension G and beyond
     }
 
     /**
@@ -425,15 +482,56 @@ final class LiveRegion {
             if (maxWidth <= 0) {
                 return "";
             }
-            if (value.length() <= maxWidth) {
+            if (width(value) <= maxWidth) {
                 return value;
             }
-            if (maxWidth <= ellipsis.length()) {
-                return value.substring(0, maxWidth);
+            int ellipsisWidth = width(ellipsis);
+            if (maxWidth <= ellipsisWidth) {
+                return head(value, maxWidth);
             }
-            int head = (maxWidth - ellipsis.length()) / 2;
-            int tail = maxWidth - ellipsis.length() - head;
-            return value.substring(0, head) + ellipsis + value.substring(value.length() - tail);
+            int headWidth = (maxWidth - ellipsisWidth) / 2;
+            int tailWidth = maxWidth - ellipsisWidth - headWidth;
+            return head(value, headWidth) + ellipsis + tail(value, tailWidth);
+        }
+
+        /**
+         * The longest start of a text that fits a width, by code point.
+         */
+        private static String head(String value, int maxWidth) {
+            int used = 0;
+            int index = 0;
+            while (index < value.length()) {
+                int codePoint = value.codePointAt(index);
+                int taken = columns(codePoint);
+                if (used + taken > maxWidth) {
+                    break;
+                }
+                used += taken;
+                index += Character.charCount(codePoint);
+            }
+            return value.substring(0, index);
+        }
+
+        /**
+         * The longest end of a text that fits a width, by code point, its combining marks with the character they mark.
+         */
+        private static String tail(String value, int maxWidth) {
+            int used = 0;
+            int index = value.length();
+            while (index > 0) {
+                int codePoint = value.codePointBefore(index);
+                int taken = columns(codePoint);
+                if (used + taken > maxWidth) {
+                    break;
+                }
+                used += taken;
+                index -= Character.charCount(codePoint);
+            }
+            // a mark left at the start of the tail would combine with the ellipsis
+            while (index < value.length() && columns(value.codePointAt(index)) == 0) {
+                index += Character.charCount(value.codePointAt(index));
+            }
+            return value.substring(index);
         }
     }
 }
