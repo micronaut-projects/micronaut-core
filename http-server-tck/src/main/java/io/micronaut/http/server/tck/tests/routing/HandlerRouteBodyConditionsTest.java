@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.tck.tests.routing;
 
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
@@ -28,15 +30,21 @@ import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.micronaut.web.router.builder.RouteCondition.body;
+import static io.micronaut.web.router.builder.RouteCondition.bodyAsync;
 import static io.micronaut.web.router.builder.RouteCondition.bodyBytes;
 import static io.micronaut.web.router.builder.RouteCondition.bodyText;
 import static io.micronaut.web.router.builder.RouteCondition.header;
@@ -55,6 +63,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class HandlerRouteBodyConditionsTest {
     public static final String SPEC_NAME = "HandlerRouteBodyConditionsTest";
     private static final AtomicInteger EVALUATED = new AtomicInteger();
+    private static final Set<String> KNOWN = Set.of("alice", "bob");
     /**
      * Bytes in a charset: a type the clients send as they are, with the charset of the text.
      */
@@ -118,6 +127,25 @@ public class HandlerRouteBodyConditionsTest {
                 .contentType(LATIN_1_TEXT), HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("latin-1")
+                .build());
+        }
+    }
+
+    @Test
+    void anAsynchronousConditionDecidesWhenItsStageCompletes() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/bc/users", "alice").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("known alice")
+                .build());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/bc/users", "carol").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("unknown carol")
+                .build());
+            // a stage that fails does not meet the condition
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/bc/users", "fail").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("unknown fail")
                 .build());
         }
     }
@@ -264,9 +292,29 @@ public class HandlerRouteBodyConditionsTest {
     record Order(String kind, int id) {
     }
 
+    @Factory
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class Lookups {
+        /**
+         * The executor the asynchronous condition completes on, like a database call would: the
+         * route is chosen and executed on its thread.
+         */
+        @Singleton
+        @Named("body-condition-lookups")
+        @Bean(preDestroy = "shutdown")
+        ExecutorService lookups() {
+            return Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, "body-condition-lookup"));
+        }
+    }
+
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class BodyConditionRoutes implements HttpRoutes {
+        private final ExecutorService lookups;
+
+        BodyConditionRoutes(@Named("body-condition-lookups") ExecutorService lookups) {
+            this.lookups = lookups;
+        }
 
         @Override
         public void routes(HttpRouteBuilder routes) {
@@ -292,6 +340,18 @@ public class HandlerRouteBodyConditionsTest {
                 .handle((request, pathVariables) -> text("bytes"));
             routes.POST("/bc/charset").where(bodyText("héllo"::equals)).consumesAll()
                 .handle((request, pathVariables) -> text("latin-1"));
+
+            routes.POST("/bc/users")
+                .where(bodyAsync(String.class, name -> "fail".equals(name)
+                    ? CompletableFuture.failedFuture(new IllegalStateException("lookup failed"))
+                    : CompletableFuture.supplyAsync(() -> KNOWN.contains(name), lookups)))
+                .order(-1)
+                .consumesAll()
+                .body(String.class)
+                .handle((request, pathVariables, name) -> text("known " + name));
+            routes.POST("/bc/users").consumesAll()
+                .body(String.class)
+                .handle((request, pathVariables, name) -> text("unknown " + name));
 
             routes.POST("/bc/limited").where(bodyText(text -> true).maxBytes(8)).order(-1).consumesAll()
                 .body(String.class).handle((request, pathVariables, body) -> text("small " + body));

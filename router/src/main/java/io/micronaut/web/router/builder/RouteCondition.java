@@ -27,6 +27,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -359,7 +362,36 @@ public sealed interface RouteCondition {
      * @return The condition
      */
     static <T> Body<T> body(Argument<T> type, Predicate<? super T> predicate) {
-        return new Body<>(type, predicate, Body.SERVER_LIMIT);
+        Objects.requireNonNull(predicate);
+        return new Body<>(type, value -> CompletableFuture.completedStage(predicate.test(value)), Body.SERVER_LIMIT);
+    }
+
+    /**
+     * A request whose body, decoded to the type, meets a condition decided later, e.g. after a
+     * lookup in a database: {@code bodyAsync(Order.class, order -> customers.isPremiumAsync(order.customer()))}.
+     * The route is chosen once the stage completes, without blocking, and a stage that fails
+     * does not meet the condition, which is logged as a warning.
+     *
+     * @param type      The type
+     * @param condition The condition, which must not block: it returns a stage of whether the body meets it
+     * @param <T>       The type
+     * @return The condition
+     */
+    static <T> Body<T> bodyAsync(Class<T> type, Function<? super T, ? extends CompletionStage<Boolean>> condition) {
+        return bodyAsync(Argument.of(Objects.requireNonNull(type, "type")), condition);
+    }
+
+    /**
+     * A request whose body, decoded to the type, meets a condition decided later, see
+     * {@link #bodyAsync(Class, Function)}.
+     *
+     * @param type      The type
+     * @param condition The condition, which must not block: it returns a stage of whether the body meets it
+     * @param <T>       The type
+     * @return The condition
+     */
+    static <T> Body<T> bodyAsync(Argument<T> type, Function<? super T, ? extends CompletionStage<Boolean>> condition) {
+        return new Body<>(type, condition, Body.SERVER_LIMIT);
     }
 
     /**
@@ -609,7 +641,7 @@ public sealed interface RouteCondition {
     }
 
     /**
-     * A request whose body, read as the type, meets the predicate: the body as text for
+     * A request whose body, read as the type, meets the condition: the body as text for
      * {@code String}, as bytes for {@code byte[]}, and otherwise decoded by the message body
      * readers of its content type, like a {@code @Body} argument.
      *
@@ -626,11 +658,12 @@ public sealed interface RouteCondition {
      * limit is above it fails the startup of the server.</p>
      *
      * @param type      The type the body is read as
-     * @param predicate The predicate, which must be fast and must not block
+     * @param condition Whether the body meets the condition, as a stage, which must not block: a
+     *                  synchronous predicate, see {@link #body(Class, Predicate)}, is a completed stage
      * @param maxBytes  The limit of the body, or {@link #SERVER_LIMIT} for the limit of the server
      * @param <T>       The type
      */
-    record Body<T>(Argument<T> type, Predicate<? super T> predicate, int maxBytes) implements RouteCondition {
+    record Body<T>(Argument<T> type, Function<? super T, ? extends CompletionStage<Boolean>> condition, int maxBytes) implements RouteCondition {
 
         /**
          * The limit of the server for buffered request content, {@code micronaut.server.max-request-buffer-size}.
@@ -639,7 +672,7 @@ public sealed interface RouteCondition {
 
         public Body {
             Objects.requireNonNull(type, "type");
-            Objects.requireNonNull(predicate, "predicate");
+            Objects.requireNonNull(condition, "condition");
             if (maxBytes < 0 && maxBytes != SERVER_LIMIT) {
                 throw new IllegalArgumentException("The limit of a body condition must not be negative: " + maxBytes);
             }
@@ -657,7 +690,7 @@ public sealed interface RouteCondition {
             if (maxBytes < 0) {
                 throw new IllegalArgumentException("The limit of a body condition must not be negative: " + maxBytes);
             }
-            return new Body<>(type, predicate, maxBytes);
+            return new Body<>(type, condition, maxBytes);
         }
 
         /**

@@ -49,6 +49,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Supplier;
 
 /**
  * The asynchronous step of the request lifecycle that chooses a route by the body of the request,
@@ -138,49 +139,115 @@ final class BodyRouteSelector {
                                                                PropagatedContext propagatedContext) {
         int serverLimit = serverLimit();
         return read(request, pending.getMaxBytes(serverLimit))
-            .flatMap(body -> propagatedContext.propagate(() -> ExecutionFlow.just(choose(request, pending, body, serverLimit))));
+            .flatMap(body -> propagatedContext.propagate(() -> choose(new Selection<>(request, pending, body, serverLimit, propagatedContext), 0)));
     }
 
     private int serverLimit() {
         return (int) Math.min(configuration.getMaxRequestBufferSize(), MAX_ARRAY);
     }
 
-    private <T, R> Optional<UriRouteMatch<T, R>> choose(HttpRequest<?> request,
-                                                        PendingRouteMatch<T, R> pending,
-                                                        RequestBody body,
-                                                        int serverLimit) {
-        for (List<UriRouteMatch<T, R>> rank : pending.getRanks()) {
-            List<UriRouteMatch<T, R>> matched = new ArrayList<>(rank.size());
-            for (UriRouteMatch<T, R> match : rank) {
-                if (meets(match.getRouteInfo().getBodyConditions(), body, serverLimit)) {
-                    matched.add(match);
-                }
+    /**
+     * Choose the route among the ranks from one on: the first rank with a route whose body
+     * conditions the body meets. The conditions are evaluated one after the other, and an
+     * asynchronous condition continues the choice when its stage completes.
+     */
+    private <T, R> ExecutionFlow<Optional<UriRouteMatch<T, R>>> choose(Selection<T, R> selection, int from) {
+        List<List<UriRouteMatch<T, R>>> ranks = selection.pending.getRanks();
+        for (int i = from; i < ranks.size(); i++) {
+            List<UriRouteMatch<T, R>> rank = ranks.get(i);
+            ExecutionFlow<List<UriRouteMatch<T, R>>> matchedFlow = matched(selection, rank, 0, new ArrayList<>(rank.size()));
+            List<UriRouteMatch<T, R>> matched = matchedFlow.tryCompleteValue();
+            if (matched == null) {
+                int next = i + 1;
+                return matchedFlow.flatMap(m -> selection.propagate(() -> m.isEmpty()
+                    ? choose(selection, next)
+                    : ExecutionFlow.just(Optional.ofNullable(selection.pending.choose(selection.request, m)))));
             }
             if (!matched.isEmpty()) {
-                return Optional.ofNullable(pending.choose(request, matched));
+                return ExecutionFlow.just(Optional.ofNullable(selection.pending.choose(selection.request, matched)));
             }
         }
         if (LOG.isDebugEnabled()) {
-            LOG.debug("The body of the request {} {} meets the body conditions of no route", request.getMethodName(), request.getPath());
+            LOG.debug("The body of the request {} {} meets the body conditions of no route", selection.request.getMethodName(), selection.request.getPath());
         }
-        return Optional.empty();
+        return ExecutionFlow.just(Optional.empty());
     }
 
-    private static boolean meets(List<RouteCondition.Body<?>> conditions, RequestBody body, int serverLimit) {
-        for (RouteCondition.Body<?> condition : conditions) {
-            if (!meets(condition, body, serverLimit)) {
-                return false;
+    /**
+     * The matches of a rank, from one on, whose body conditions the body meets.
+     */
+    private <T, R> ExecutionFlow<List<UriRouteMatch<T, R>>> matched(Selection<T, R> selection,
+                                                                   List<UriRouteMatch<T, R>> rank,
+                                                                   int from,
+                                                                   List<UriRouteMatch<T, R>> matched) {
+        for (int i = from; i < rank.size(); i++) {
+            UriRouteMatch<T, R> match = rank.get(i);
+            ExecutionFlow<Boolean> flow = meets(selection, match.getRouteInfo().getBodyConditions(), 0);
+            Boolean meets = flow.tryCompleteValue();
+            if (meets == null) {
+                int next = i + 1;
+                return flow.flatMap(m -> selection.propagate(() -> {
+                    if (m) {
+                        matched.add(match);
+                    }
+                    return matched(selection, rank, next, matched);
+                }));
+            }
+            if (meets) {
+                matched.add(match);
             }
         }
-        return true;
+        return ExecutionFlow.just(matched);
     }
 
-    private static <V> boolean meets(RouteCondition.Body<V> condition, RequestBody body, int serverLimit) {
-        if (body.length() > condition.effectiveMaxBytes(serverLimit)) {
-            return false;
+    /**
+     * Whether the body meets the conditions of a route, from one on: all of them, in order.
+     */
+    private ExecutionFlow<Boolean> meets(Selection<?, ?> selection, List<RouteCondition.Body<?>> conditions, int from) {
+        for (int i = from; i < conditions.size(); i++) {
+            ExecutionFlow<Boolean> flow = meets(selection, conditions.get(i));
+            Boolean meets = flow.tryCompleteValue();
+            if (meets == null) {
+                int next = i + 1;
+                return flow.flatMap(m -> selection.propagate(() -> m ? meets(selection, conditions, next) : ExecutionFlow.just(false)));
+            }
+            if (!meets) {
+                return ExecutionFlow.just(false);
+            }
+        }
+        return ExecutionFlow.just(true);
+    }
+
+    private <V> ExecutionFlow<Boolean> meets(Selection<?, ?> selection, RouteCondition.Body<V> condition) {
+        RequestBody body = selection.body;
+        if (body.length() > condition.effectiveMaxBytes(selection.serverLimit)) {
+            return ExecutionFlow.just(false);
         }
         Optional<V> value = body.decode(condition.type());
-        return value.isPresent() && condition.predicate().test(value.get());
+        if (value.isEmpty()) {
+            return ExecutionFlow.just(false);
+        }
+        CompletionStage<Boolean> stage;
+        try {
+            stage = condition.condition().apply(value.get());
+        } catch (RuntimeException e) {
+            return failed(selection.request, e);
+        }
+        if (stage == null) {
+            return ExecutionFlow.just(false);
+        }
+        return CompletableFutureExecutionFlow.just(stage)
+            .map(Boolean.TRUE::equals)
+            .onErrorResume(error -> failed(selection.request, error));
+    }
+
+    /**
+     * A condition that failed, or whose stage failed, is not met.
+     */
+    private static ExecutionFlow<Boolean> failed(HttpRequest<?> request, Throwable error) {
+        Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+        LOG.warn("A body condition of the request {} {} failed, it is not met: {}", request.getMethodName(), request.getPath(), cause.getMessage(), cause);
+        return ExecutionFlow.just(false);
     }
 
     /**
@@ -353,5 +420,26 @@ final class BodyRouteSelector {
      * @param value The value, empty if the body does not decode to the type
      */
     private record Decoded(Argument<?> type, Optional<?> value) {
+    }
+
+    /**
+     * The state of the choice of a route by the body of a request.
+     *
+     * @param request     The request
+     * @param pending     The matches that depend on the body
+     * @param body        The body, as the conditions read it
+     * @param serverLimit The limit of the server for buffered request content
+     * @param context     The context the conditions are evaluated in
+     * @param <T>         The target type
+     * @param <R>         The result type
+     */
+    private record Selection<T, R>(HttpRequest<?> request,
+                                   PendingRouteMatch<T, R> pending,
+                                   RequestBody body,
+                                   int serverLimit,
+                                   PropagatedContext context) {
+        <U> ExecutionFlow<U> propagate(Supplier<ExecutionFlow<U>> next) {
+            return context.propagate(next);
+        }
     }
 }
