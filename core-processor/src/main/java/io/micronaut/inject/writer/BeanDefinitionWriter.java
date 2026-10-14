@@ -150,7 +150,6 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
-import io.micronaut.inject.ast.TypeClosure;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.beans.BeanElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
@@ -978,8 +977,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(beanDefinitionTypeDef, loadTypeMethods);
 
         typeArguments = beanType.getAllTypeArguments();
-        typeClosure = TypeClosure.of(beanType);
-        completeTypeClosure();
+        typeClosure = beanType.getAllSuperTypes();
 
         visitAnnotationMetadata(this.annotationMetadata);
     }
@@ -1001,26 +999,6 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     /**
-     * Adds to the closure the types the recorded type arguments name that the walk of the super type and the
-     * interfaces did not reach: a language with several concrete bases, Python, reports them all there while a
-     * {@link ClassElement} has one super type.
-     */
-    private void completeTypeClosure() {
-        if (typeArguments == null) {
-            return;
-        }
-        Set<String> names = new HashSet<>();
-        for (ClassElement element : typeClosure) {
-            names.add(element.getName());
-        }
-        for (String name : typeArguments.keySet()) {
-            if (!names.contains(name)) {
-                visitorContext.getClassElement(name).ifPresent(element -> typeClosure = TypeClosure.add(typeClosure, element));
-            }
-        }
-    }
-
-    /**
      * Records a further type the bean is assignable to, which is not a super type of the bean type: an interface a
      * proxy implements besides the type it proxies. Its closure joins {@link BeanDefinition#getTypeClosure()} and
      * its type arguments the type argument lookups.
@@ -1029,11 +1007,34 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
      * @since 5.3.0
      */
     public void addAssignableType(ClassElement type) {
-        typeClosure = TypeClosure.add(typeClosure, type);
+        // the closure of the added type joins the bean's, each type once and Object last
+        Set<String> keys = new HashSet<>();
+        List<ClassElement> merged = new ArrayList<>(typeClosure.size() + 4);
+        for (ClassElement element : typeClosure) {
+            if (!isObjectType(element)) {
+                keys.add(typeClosureKey(element));
+                merged.add(element);
+            }
+        }
+        for (ClassElement element : type.getAllSuperTypes()) {
+            if (!isObjectType(element) && keys.add(typeClosureKey(element))) {
+                merged.add(element);
+            }
+        }
+        merged.add(ClassElement.of(Object.class));
+        typeClosure = merged;
         Map<String, ClassElement> typeArguments = type.getTypeArguments();
         if (!typeArguments.isEmpty()) {
             addTypeArguments(Map.of(type.getName(), typeArguments));
         }
+    }
+
+    private static boolean isObjectType(ClassElement element) {
+        return !element.isArray() && Object.class.getName().equals(element.getName());
+    }
+
+    private static String typeClosureKey(ClassElement element) {
+        return element.getName() + "[]".repeat(element.getArrayDimensions());
     }
 
     private void visitAnnotationMetadata(AnnotationMetadata annotationMetadata) {
@@ -2619,10 +2620,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 .build();
             classDefBuilder.addField(typeClosureField);
 
-            // The elements give the hierarchy, the recorded type arguments what the bean binds each type's
-            // variables to the whole way up, the same for every language; an array bean answers for its component.
-            // A super type the definition cannot name - package-private in another package - is left out, as the
-            // exposed types leave it out, since loading its class constant would fail the definition
+            // Each super type carries the arguments the bean binds its variables to, the whole way up, as
+            // ClassElement.getAllSuperTypes() lists them; an array bean answers for its component. A super type
+            // the definition cannot name - package-private in another package - is left out, as the exposed types
+            // leave it out, since loading its class constant would fail the definition
             ClassElement beanClosureType = typeClosure.getFirst();
             List<ClassElement> recorded = typeClosure.stream()
                 .filter(superType -> superType == beanClosureType || isAccessibleFromBeanDefinition(superType))
@@ -2636,7 +2637,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                         null,
                         superType,
                         AnnotationMetadata.EMPTY_METADATA,
-                        typeArguments == null ? superType.getTypeArguments() : typeArguments.getOrDefault(superType.getName(), superType.getTypeArguments()),
+                        superType.getTypeArguments(),
                         loadClassValueExpressionFn
                     )).toList())));
             failStatements.add(beanDefinitionTypeDef.getStaticField(typeClosureField).put(ExpressionDef.nullValue()));
