@@ -255,6 +255,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * with the {@link #beanDefinitionsEpoch} it was computed at.
      */
     private final Map<Argument<?>, IndexExhaustiveness> indexExhaustiveCache = new ConcurrentHashMap<>(5);
+    // the providers @ResolveWith injection points name, by provider type: a singleton is held once resolved,
+    // any other scope is remembered as not held, so that neither is looked up again
+    private final Map<Class<? extends BeanInjectionProvider>, HeldInjectionProvider> injectionProviders = new ConcurrentHashMap<>(5);
 
     /**
      * Advanced after bean definitions are added, so that an index exhaustiveness computed before is not used.
@@ -633,6 +636,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             beanProxyTargetCache.clear();
             containsBeanCache.clear();
             indexExhaustiveCache.clear();
+            injectionProviders.clear();
             beanConfigurations.clear();
             disabledConfigurations.clear();
             singletonScope.clear();
@@ -1195,6 +1199,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         beanConcreteCandidateCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
         singletonBeanRegistrations.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
         containsBeanCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
+        injectionProviders.keySet().removeIf(providerType -> providerType.isInstance(singleton));
     }
 
     final BeanResolutionContext newResolutionContext(BeanDefinition<?> beanDefinition, @Nullable BeanResolutionContext currentContext) {
@@ -2547,7 +2552,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     private void purgeCacheForBeanDefinition(RuntimeBeanDefinition<?> definition) {
         if (beanCandidateCache.isEmpty() && beanConcreteCandidateCache.isEmpty() &&
-            singletonBeanRegistrations.isEmpty() && containsBeanCache.isEmpty()) {
+            singletonBeanRegistrations.isEmpty() && containsBeanCache.isEmpty() && injectionProviders.isEmpty()) {
             return;
         }
         Class<?> beanType = definition.getBeanType();
@@ -2558,6 +2563,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         beanConcreteCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
         singletonBeanRegistrations.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
         containsBeanCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
+        injectionProviders.keySet().removeIf(providerType -> isAffected.test(Argument.of(providerType)));
     }
 
     private static boolean isAffectedByRegistration(Argument<?> cachedType,
@@ -2749,6 +2755,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         indexExhaustiveCache.clear();
         containsBeanCache.clear();
         beanProxyTargetCache.clear();
+        injectionProviders.clear();
     }
 
     /**
@@ -5250,6 +5257,49 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                                                        Argument<T> beanType,
                                                        @Nullable Qualifier<T> qualifier) {
         return java.util.Objects.requireNonNull(resolveBeanRegistration(resolutionContext, beanType, qualifier, true));
+    }
+
+    /**
+     * Resolves the {@link BeanInjectionProvider} a {@link io.micronaut.context.annotation.ResolveWith} injection point
+     * names. A singleton provider is resolved once per context and then held by its type, so the injection points of
+     * every bean share that one lookup; it is still recorded as a dependency of each bean injected. A provider of any
+     * other scope is never held: it is resolved on every injection, as a dependent of the bean injected.
+     *
+     * @param resolutionContext The resolution context of the bean injected
+     * @param providerType      The provider type
+     * @param <P>               The provider type
+     * @return The provider
+     * @since 5.3.0
+     */
+    @Internal
+    @SuppressWarnings("unchecked")
+    final <P extends BeanInjectionProvider> P getInjectionProvider(BeanResolutionContext resolutionContext, Class<P> providerType) {
+        HeldInjectionProvider held = injectionProviders.get(providerType);
+        if (held != null && held.registration != null) {
+            recordDependency(resolutionContext, held.registration.beanDefinition, null);
+            return (P) held.registration.bean;
+        }
+        Argument<P> argument = Argument.of(providerType);
+        P provider = resolutionContext.getBean(argument, null);
+        if (held == null) {
+            // held only as the instance the singleton scope keeps for the definition the type resolves to; the
+            // resolution above may itself have put the type here, which is kept
+            BeanRegistration<P> singleton = findBeanDefinition(resolutionContext, argument, null)
+                .map(singletonScope::findBeanRegistration)
+                .filter(registration -> registration.bean == provider)
+                .orElse(null);
+            injectionProviders.putIfAbsent(providerType, new HeldInjectionProvider(singleton));
+        }
+        return provider;
+    }
+
+    /**
+     * A provider type resolved for a @ResolveWith injection point: the registration the singleton scope holds for
+     * it, or none for a provider of any other scope.
+     *
+     * @param registration The singleton registration, or null when the provider is not a singleton
+     */
+    private record HeldInjectionProvider(@Nullable BeanRegistration<? extends BeanInjectionProvider> registration) {
     }
 
     /**

@@ -2551,7 +2551,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             boolean isNotInnerConfiguration = !precalculatedInfo.isConfigurationProperties || !isInnerConfiguration(argument);
             ConfigurationPath previousPath = isNotInnerConfiguration ? resolutionContext.setConfigurationPath(null) : null;
             try {
-                BeanInjectionProvider provider = resolutionContext.getBean(Argument.of(providerType), null);
+                BeanContext context = resolutionContext.getContext();
+                // a singleton provider is held by the context, so a bean with many marked points resolves it once
+                BeanInjectionProvider provider = context instanceof DefaultBeanContext defaultBeanContext
+                    ? defaultBeanContext.getInjectionProvider(resolutionContext, providerType)
+                    : resolutionContext.getBean(Argument.of(providerType), null);
                 boolean nullable = argument.isDeclaredNullable() || isOptional;
                 K value = provider.get(resolutionContext, argument, qualifier, nullable);
                 if (value == null && !nullable) {
