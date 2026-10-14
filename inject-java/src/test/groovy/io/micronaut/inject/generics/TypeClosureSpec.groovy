@@ -352,12 +352,18 @@ public class Child extends PublicBase<String> {
 }
 '''))
         def child = context.classLoader.loadClass('closure.app.Child')
-        def closure = context.getBeanDefinition(child).typeClosure
+        def definition = context.getBeanDefinition(child)
+        def closure = definition.typeClosure
 
         expect: 'the bean loads; the package-private class and interface are left out, Supplier<String> above them is kept'
         context.getBean(child).get() == 'child'
         closure*.type*.name == ['closure.app.Child', 'closure.lib.PublicBase', Supplier.name, Object.name]
         closure[2].typeParameters*.type == [String]
+
+        and: 'their names are still recorded, with their arguments, for a consumer that can load them'
+        definition.typeArgumentKeys.containsAll(['closure.lib.HiddenBase', 'closure.lib.Hidden'])
+        definition.getTypeArguments('closure.lib.HiddenBase')*.type == [String]
+        definition.getTypeArguments('closure.lib.Hidden')*.type == [String]
 
         cleanup:
         context.close()
