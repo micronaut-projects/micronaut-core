@@ -18,6 +18,7 @@ package io.micronaut.inject.ast;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,9 +37,11 @@ import java.util.Map;
  * wildcard stays a wildcard.</p>
  *
  * <p>The order is the super class before the interfaces, each followed by its own super types, in declaration
- * order; a type reached twice (a diamond) is kept where it was first reached. A primitive has no super type, and
- * an array is assignable to the arrays of its component's closure: {@code List<String>[]} to
- * {@code Collection<String>[]}, {@code Iterable<String>[]}, {@code Object[]} and {@code Object}.</p>
+ * order; a type reached twice (a diamond) is kept where it was first reached. A primitive has no super type. An
+ * array is assignable to the arrays of its component's closure, then to the arrays of fewer dimensions of
+ * {@code Object}, {@code Cloneable} and {@code Serializable}, and to those three types themselves:
+ * {@code List<String>[]} to {@code Collection<String>[]}, {@code Iterable<String>[]}, {@code Object[]},
+ * {@code Cloneable}, {@code Serializable} and {@code Object}.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -47,6 +50,7 @@ import java.util.Map;
 public final class TypeClosure {
 
     private static final String OBJECT = Object.class.getName();
+    private static final Class<?>[] ARRAY_TYPES = {Object.class, Cloneable.class, Serializable.class};
 
     private TypeClosure() {
     }
@@ -75,7 +79,7 @@ public final class TypeClosure {
         Map<String, ClassElement> extended = new LinkedHashMap<>();
         for (ClassElement element : closure) {
             if (!isObject(element)) {
-                extended.put(element.getName(), element);
+                extended.put(key(element), element);
             }
         }
         return withObject(collect(type, extended));
@@ -100,15 +104,23 @@ public final class TypeClosure {
                 componentClosure.put(OBJECT, ClassElement.of(Object.class));
             }
             for (ClassElement element : componentClosure.values()) {
-                ClassElement array = element;
-                for (int i = 0; i < dimensions; i++) {
-                    array = array.toArray();
+                ClassElement array = arrayOf(element, dimensions);
+                closure.putIfAbsent(key(array), array);
+            }
+            // an array of fewer dimensions is an Object, a Cloneable and a Serializable, so an array of more is
+            // assignable to their arrays of that many dimensions, and every array to the three types themselves
+            for (int fewer = dimensions - 1; fewer >= 0; fewer--) {
+                for (Class<?> arrayType : ARRAY_TYPES) {
+                    if (fewer == 0 && arrayType == Object.class) {
+                        continue;
+                    }
+                    ClassElement array = arrayOf(ClassElement.of(arrayType), fewer);
+                    closure.putIfAbsent(key(array), array);
                 }
-                closure.putIfAbsent(element.getName(), array);
             }
             return closure;
         }
-        if (isObject(type) || closure.putIfAbsent(type.getName(), type) != null || type.isPrimitive()) {
+        if (isObject(type) || closure.putIfAbsent(key(type), type) != null || type.isPrimitive()) {
             return closure;
         }
         type.getSuperType().ifPresent(superType -> collect(superType, closure));
@@ -120,5 +132,20 @@ public final class TypeClosure {
 
     private static boolean isObject(ClassElement type) {
         return !type.isArray() && OBJECT.equals(type.getName());
+    }
+
+    private static ClassElement arrayOf(ClassElement element, int dimensions) {
+        ClassElement array = element;
+        for (int i = 0; i < dimensions; i++) {
+            array = array.toArray();
+        }
+        return array;
+    }
+
+    /**
+     * What tells two entries apart: the name, and the dimensions since the name of an array is its component's.
+     */
+    private static String key(ClassElement type) {
+        return type.getName() + "[]".repeat(type.getArrayDimensions());
     }
 }

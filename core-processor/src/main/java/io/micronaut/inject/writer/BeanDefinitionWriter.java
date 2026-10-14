@@ -979,6 +979,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
         typeArguments = beanType.getAllTypeArguments();
         typeClosure = TypeClosure.of(beanType);
+        completeTypeClosure();
 
         visitAnnotationMetadata(this.annotationMetadata);
     }
@@ -996,6 +997,26 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             this.typeArguments = typeArguments;
         } else {
             this.typeArguments.putAll(typeArguments);
+        }
+    }
+
+    /**
+     * Adds to the closure the types the recorded type arguments name that the walk of the super type and the
+     * interfaces did not reach: a language with several concrete bases, Python, reports them all there while a
+     * {@link ClassElement} has one super type.
+     */
+    private void completeTypeClosure() {
+        if (typeArguments == null) {
+            return;
+        }
+        Set<String> names = new HashSet<>();
+        for (ClassElement element : typeClosure) {
+            names.add(element.getName());
+        }
+        for (String name : typeArguments.keySet()) {
+            if (!names.contains(name)) {
+                visitorContext.getClassElement(name).ifPresent(element -> typeClosure = TypeClosure.add(typeClosure, element));
+            }
         }
     }
 
@@ -2603,9 +2624,11 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             // A super type the definition cannot name - package-private in another package - is left out, as the
             // exposed types leave it out, since loading its class constant would fail the definition
             ClassElement beanClosureType = typeClosure.getFirst();
+            List<ClassElement> recorded = typeClosure.stream()
+                .filter(superType -> superType == beanClosureType || isAccessibleFromBeanDefinition(superType))
+                .toList();
             initStatements.add(beanDefinitionTypeDef.getStaticField(typeClosureField)
-                .put(ArgumentExpUtils.TYPE_ARGUMENT_ARRAY.instantiate(typeClosure.stream()
-                    .filter(superType -> superType == beanClosureType || isAccessibleFromBeanDefinition(superType))
+                .put(ArgumentExpUtils.TYPE_ARGUMENT_ARRAY.instantiate(recorded.stream()
                     .map(superType -> ArgumentExpUtils.pushCreateArgument(
                         annotationMetadataDefaults,
                         ClassElement.of(beanDefinitionName),
@@ -2619,7 +2642,25 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             failStatements.add(beanDefinitionTypeDef.getStaticField(typeClosureField).put(ExpressionDef.nullValue()));
         }
 
-        boolean hasTypeArguments = !superBeanDefinition && typeClosureField == null && hasTypeArguments();
+        // The type arguments by name, in full when the closure is not written, and for the types the closure left
+        // out otherwise, so that a name lookup of a type the definition cannot name still answers
+        Map<String, Map<String, ClassElement>> typeArgumentsToRecord = typeArguments;
+        if (typeClosureField != null && typeArguments != null) {
+            Set<String> recordedNames = new HashSet<>();
+            for (ClassElement element : typeClosure) {
+                if (element == typeClosure.getFirst() || isAccessibleFromBeanDefinition(element)) {
+                    recordedNames.add(element.getName());
+                }
+            }
+            typeArgumentsToRecord = new LinkedHashMap<>();
+            for (Map.Entry<String, Map<String, ClassElement>> entry : typeArguments.entrySet()) {
+                if (!recordedNames.contains(entry.getKey()) && !entry.getValue().isEmpty()) {
+                    typeArgumentsToRecord.put(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+        boolean hasTypeArguments = !superBeanDefinition && typeArgumentsToRecord != null && !typeArgumentsToRecord.isEmpty()
+            && typeArgumentsToRecord.values().stream().anyMatch(e -> !e.isEmpty());
         if (hasTypeArguments) {
             typeArgumentsField = FieldDef.builder(FIELD_TYPE_ARGUMENTS, Map.class)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
@@ -2628,7 +2669,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
             initStatements.add(beanDefinitionTypeDef.getStaticField(typeArgumentsField)
                 .put(GenUtils.stringMapOf(
-                    typeArguments, true, null, el -> ArgumentExpUtils.pushTypeArgumentElements(
+                    typeArgumentsToRecord, true, null, el -> ArgumentExpUtils.pushTypeArgumentElements(
                         annotationMetadataDefaults,
                         beanDefinitionTypeDef,
                         ClassElement.of(beanDefinitionName),

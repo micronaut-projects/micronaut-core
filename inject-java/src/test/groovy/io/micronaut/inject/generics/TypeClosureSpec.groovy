@@ -310,8 +310,8 @@ class ArrayFactory {
         def definition = context.getBeanDefinition(List[])
         def closure = definition.typeClosure
 
-        expect: 'each array carries the arguments of its component'
-        closure*.type == [List[], SequencedCollection[], Collection[], Iterable[], Object[], Object]
+        expect: 'each array carries the arguments of its component, and every array is a Cloneable and a Serializable'
+        closure*.type == [List[], SequencedCollection[], Collection[], Iterable[], Object[], Cloneable, Serializable, Object]
         closure[0].typeParameters*.type == [String]
         closure[2].typeParameters*.type == [String]
 

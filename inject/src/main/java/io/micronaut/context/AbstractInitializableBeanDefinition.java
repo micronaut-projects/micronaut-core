@@ -279,7 +279,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                     return typeParametersOf(superType);
                 }
             }
-            return Collections.emptyList();
         }
         return getTypeArguments(type.getName());
     }
@@ -295,7 +294,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                     return typeParametersOf(superType);
                 }
             }
-            return Collections.emptyList();
+            // a type the closure could not name, package-private in another package, is recorded by name alone
         }
         if (typeArgumentsMap == null) {
             return Collections.emptyList();
@@ -328,35 +327,36 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
      * {@inheritDoc}
      *
      * <p>Derived from the recorded {@link #getTypeClosure() type closure} where the definition carries one: the
-     * name of every type in it other than {@code Object}, or nothing at all when none of them carries a type
-     * argument, which is what a definition recording the type arguments alone answers.</p>
+     * name of every type in it other than {@code Object}, plus the types recorded by name alone, or nothing at all
+     * when none of them carries a type argument, which is what a definition recording the type arguments alone
+     * answers.</p>
      */
     @Override
     public final Collection<String> getTypeArgumentKeys() {
-        if (typeClosure != null) {
-            boolean anyArguments = false;
-            for (Argument<?> superType : typeClosure) {
-                if (superType.getTypeParameters().length > 0) {
-                    anyArguments = true;
-                    break;
-                }
-            }
-            if (!anyArguments) {
-                return Collections.emptySet();
-            }
-            Set<String> keys = CollectionUtils.newLinkedHashSet(typeClosure.length);
-            for (Argument<?> superType : typeClosure) {
-                Class<?> keyType = keyType(superType);
-                if (keyType != Object.class) {
-                    keys.add(keyType.getName());
-                }
-            }
-            return Collections.unmodifiableSet(keys);
+        if (typeClosure == null) {
+            return typeArgumentsMap == null ? Collections.emptySet() : Collections.unmodifiableSet(typeArgumentsMap.keySet());
         }
-        if (typeArgumentsMap == null) {
+        boolean anyArguments = typeArgumentsMap != null && !typeArgumentsMap.isEmpty();
+        for (Argument<?> superType : typeClosure) {
+            if (superType.getTypeParameters().length > 0) {
+                anyArguments = true;
+                break;
+            }
+        }
+        if (!anyArguments) {
             return Collections.emptySet();
         }
-        return Collections.unmodifiableSet(typeArgumentsMap.keySet());
+        Set<String> keys = CollectionUtils.newLinkedHashSet(typeClosure.length);
+        for (Argument<?> superType : typeClosure) {
+            Class<?> keyType = keyType(superType);
+            if (keyType != Object.class) {
+                keys.add(keyType.getName());
+            }
+        }
+        if (typeArgumentsMap != null) {
+            keys.addAll(typeArgumentsMap.keySet());
+        }
+        return Collections.unmodifiableSet(keys);
     }
 
     @Override
