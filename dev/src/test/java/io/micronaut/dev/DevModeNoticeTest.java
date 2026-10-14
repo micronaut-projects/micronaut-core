@@ -4,7 +4,6 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import io.micronaut.dev.manifest.DevReloadStrategy;
 import io.micronaut.dev.manifest.DevManifest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,7 +19,6 @@ import java.util.List;
 import java.util.OptionalInt;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -80,11 +78,8 @@ class DevModeNoticeTest {
             assertEquals(Level.INFO, notice.getLevel());
             assertEquals(DevRuntime.class.getName(), notice.getLoggerName());
             String text = notice.getFormattedMessage();
-            assertTrue(text.contains("'dev' environment is active, with micronaut.dev.enabled=true"), text);
-            assertTrue(text.contains("strategy: restart"), text);
-            // the application has an HTTP server, whose requests a failed compilation answers
-            assertTrue(text.contains("answered with the compiler's"), text);
-            assertTrue(text.contains("in production"), text);
+            // no LiveReload server runs in this launch: the headline alone
+            assertEquals("Development Mode Active: Not for production usage.", text);
 
             // a reload starts generation two without logging the note again
             Files.writeString(greeter, greeter("two"));
@@ -98,18 +93,10 @@ class DevModeNoticeTest {
     }
 
     @Test
-    void theNoticeListsOnlyWhatTheLaunchHas() {
-        String text = DevModeNotice.text(DevReloadStrategy.RELOAD, OptionalInt.empty(), false, false);
-        assertTrue(text.contains(DevModeNotice.HEADLINE), text);
-        assertTrue(text.contains("strategy: reload"), text);
-        assertFalse(text.contains("compiler's"), text);
-        assertFalse(text.contains("LiveReload"), text);
-        String withServer = DevModeNotice.text(DevReloadStrategy.RESTART, OptionalInt.of(35729), true, true);
-        assertTrue(withServer.contains("a LiveReload server listens on port 35729, and HTML pages load its script"), withServer);
-        // micronaut.dev.livereload.inject-script=false: the server runs, the pages are left alone
-        String noScript = DevModeNotice.text(DevReloadStrategy.RESTART, OptionalInt.of(35729), true, false);
-        assertTrue(noScript.contains("a LiveReload server listens on port 35729" + System.lineSeparator()), noScript);
-        assertFalse(noScript.contains("load its script"), noScript);
+    void theNoticeIsTheHeadlineAndTheLiveReloadServerWhenItRuns() {
+        assertEquals(DevModeNotice.HEADLINE, DevModeNotice.text(OptionalInt.empty()));
+        assertEquals(DevModeNotice.HEADLINE + System.lineSeparator() + "LiveReload server listening on port 35729",
+            DevModeNotice.text(OptionalInt.of(35729)));
     }
 
     private List<ILoggingEvent> notices() {

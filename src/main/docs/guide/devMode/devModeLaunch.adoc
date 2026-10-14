@@ -53,7 +53,12 @@ The application does what it always does, `Micronaut.run(Application.class, args
 * `micronaut.dev.enabled=true`;
 * the beans retained from the previous generation.
 
-Once a generation of the application first runs, the launcher logs a framed note at INFO saying that it runs with development settings, not production ones, and lists them: the `dev` environment, the reload strategy, the compilation failures answered to requests and the LiveReload server, where they apply. A reload does not repeat the note. The launcher is not for production: run the packaged application there.
+Once a generation of the application first runs, the launcher logs a short note at INFO, followed by the port of the LiveReload server when it runs. A reload does not repeat the note. The launcher is not for production: run the packaged application there.
+
+----
+Development Mode Active: Not for production usage.
+LiveReload server listening on port 35729
+----
 
 TIP: Everything under the manifest's `micronaut.dev.` keys can be set as a system property. api:context.env.DevelopmentMode[] answers whether the application runs this way, so a bean can be conditioned on it with `@DevelopmentActive` (or `@DevelopmentInactive` for the opposite).
 

@@ -15,29 +15,24 @@
  */
 package io.micronaut.dev;
 
-import io.micronaut.context.env.DevelopmentMode;
-import io.micronaut.context.env.Environment;
-import io.micronaut.dev.manifest.DevReloadStrategy;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.livereload.LiveReloadServer;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
-import java.util.Locale;
 import java.util.OptionalInt;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * The note the launcher logs once, when a generation of the application first runs: the process runs with development
- * settings, not production ones. It lists only what is true of this launch.
+ * The note the launcher logs once, when a generation of the application first runs: the process runs in development
+ * mode, not for production, and where the LiveReload server listens when it runs.
  *
  * @since 5.3.0
  */
 @Internal
 final class DevModeNotice {
 
-    static final String HEADLINE = "DEVELOPMENT MODE: not for production use";
-    private static final String RULE = "=".repeat(80);
+    static final String HEADLINE = "Development Mode Active: Not for production usage.";
 
     private final AtomicBoolean logged = new AtomicBoolean();
 
@@ -47,47 +42,25 @@ final class DevModeNotice {
      * note again.
      *
      * @param log        The launcher's logger
-     * @param strategy   The reload strategy in force
      * @param liveReload The LiveReload server, when it runs
-     * @param http       Whether the application defines an HTTP server, whose requests the gate filter answers
-     * @param script     Whether the LiveReload script is added to the server's HTML pages
      */
-    void logOnce(Logger log, DevReloadStrategy strategy, @Nullable LiveReloadServer liveReload, boolean http, boolean script) {
+    void logOnce(Logger log, @Nullable LiveReloadServer liveReload) {
         if (logged.compareAndSet(false, true) && log.isInfoEnabled()) {
-            OptionalInt port = liveReload == null ? OptionalInt.empty() : OptionalInt.of(liveReload.port());
-            log.info("{}", text(strategy, port, http, script));
+            log.info("{}", text(liveReload == null ? OptionalInt.empty() : OptionalInt.of(liveReload.port())));
         }
     }
 
     /**
      * The note for a launch.
      *
-     * @param strategy   The reload strategy
      * @param liveReload The port the LiveReload server listens on, when it runs
-     * @param http       Whether the application defines an HTTP server, whose requests the gate filter answers
-     * @param script     Whether the LiveReload script is added to the server's HTML pages
-     * @return The note: a framed block of lines that starts on a line of its own
+     * @return The note: the headline, and the LiveReload server's port on a line of its own when it runs
      */
-    static String text(DevReloadStrategy strategy, OptionalInt liveReload, boolean http, boolean script) {
-        StringBuilder text = new StringBuilder(System.lineSeparator());
-        line(text, RULE);
-        line(text, "  " + HEADLINE);
-        line(text, "  The application runs under the micronaut-dev launcher, with development");
-        line(text, "  settings rather than production ones:");
-        line(text, "    - the '" + Environment.DEVELOPMENT + "' environment is active, with " + DevelopmentMode.PROPERTY + "=true");
-        line(text, "    - classes and resources reload as they change (strategy: " + strategy.name().toLowerCase(Locale.ROOT) + ")");
-        if (http) {
-            line(text, "    - while a compilation fails, requests are answered with the compiler's");
-            line(text, "      diagnostics, source paths included");
-        }
+    static String text(OptionalInt liveReload) {
+        StringBuilder text = new StringBuilder(HEADLINE);
         if (liveReload.isPresent()) {
-            line(text, "    - a LiveReload server listens on port " + liveReload.getAsInt() + (script ? ", and HTML pages load its script" : ""));
+            text.append(System.lineSeparator()).append("LiveReload server listening on port ").append(liveReload.getAsInt());
         }
-        line(text, "  Run the packaged application, without the launcher, in production.");
-        return text.append(RULE).toString();
-    }
-
-    private static void line(StringBuilder text, String line) {
-        text.append(line).append(System.lineSeparator());
+        return text.toString();
     }
 }
