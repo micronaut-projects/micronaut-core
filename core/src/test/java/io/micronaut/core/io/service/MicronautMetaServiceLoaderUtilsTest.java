@@ -107,6 +107,33 @@ class MicronautMetaServiceLoaderUtilsTest {
         }
     }
 
+    @Test
+    void aFactoryCreatesTheEntriesItKnowsAndTheOthersAreInstantiated() throws IOException {
+        String service = SERVICES + Runnable.class.getName() + "/";
+        Path root = Files.createDirectories(tempDir.resolve("factory").resolve(service));
+        Files.createFile(root.resolve("made"));
+        Files.createFile(root.resolve(Instantiated.class.getName()));
+        Runnable made = () -> { };
+        List<String> asked = Collections.synchronizedList(new ArrayList<>());
+        try (URLClassLoader loader = new URLClassLoader(new URL[]{tempDir.resolve("factory").toUri().toURL()}, getClass().getClassLoader())) {
+            List<Runnable> found = MicronautMetaServiceLoaderUtils.findMetaMicronautServiceEntries(loader, Runnable.class, null, (classLoader, name) -> {
+                asked.add(name);
+                return name.equals("made") ? made : null;
+            });
+
+            assertEquals(2, found.size(), found.toString());
+            assertTrue(found.contains(made), found.toString());
+            assertTrue(found.stream().anyMatch(Instantiated.class::isInstance), found.toString());
+            assertEquals(Set.of("made", Instantiated.class.getName()), Set.copyOf(asked));
+        }
+    }
+
+    public static final class Instantiated implements Runnable {
+        @Override
+        public void run() {
+        }
+    }
+
     private static CachedServices cacheDisposableLoader(Path jar) throws IOException {
         try (URLClassLoader loader = new URLClassLoader(new URL[]{jar.toUri().toURL()}, null)) {
             Set<String> services = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(loader, "io.micronaut.inject.BeanDefinitionReference");

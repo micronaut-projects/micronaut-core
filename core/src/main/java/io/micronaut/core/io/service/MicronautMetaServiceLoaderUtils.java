@@ -44,11 +44,13 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.ServiceConfigurationError;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.RecursiveAction;
+import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -113,8 +115,50 @@ public final class MicronautMetaServiceLoaderUtils {
         if (staticServiceLoader != null) {
             return staticServiceLoader.load(predicate);
         }
-        return new MicronautServiceCollector<>(classLoader, serviceClass.getName(), predicate)
+        return new MicronautServiceCollector<>(classLoader, serviceClass.getName(), predicate, null)
             .collect(true);
+    }
+
+    /**
+     * Find all instantiated Micronaut service entries, letting a factory create the instance of an entry. The entries
+     * are found and collected as {@link #findMetaMicronautServiceEntries(ClassLoader, Class, Predicate)} finds and
+     * collects them, in the same order and on the same threads. For each entry the factory is called first, with the
+     * class loader and the name of the entry; when it returns {@code null}, the class the entry names is instantiated,
+     * as that method does.
+     *
+     * <p>A static service loader registered for the service answers instead, without the factory.</p>
+     *
+     * @param classLoader  The classloader
+     * @param serviceClass The service class
+     * @param predicate    The predicate
+     * @param factory      Creates the instance of an entry, or returns {@code null} to have its class instantiated
+     * @param <S>          The service type
+     * @return the result
+     * @since 5.3.0
+     */
+    @Internal
+    public static <S> List<S> findMetaMicronautServiceEntries(ClassLoader classLoader,
+                                                              Class<S> serviceClass,
+                                                              @Nullable Predicate<S> predicate,
+                                                              BiFunction<ClassLoader, String, @Nullable S> factory) {
+        SoftServiceLoader.StaticServiceLoader<S> staticServiceLoader = (SoftServiceLoader.StaticServiceLoader<S>) SoftServiceLoader.STATIC_SERVICES.get(serviceClass.getName());
+        if (staticServiceLoader != null) {
+            return staticServiceLoader.load(predicate);
+        }
+        return new MicronautServiceCollector<>(classLoader, serviceClass.getName(), predicate, Objects.requireNonNull(factory, "factory"))
+            .collect(true);
+    }
+
+    /**
+     * The generation of the cached service entries, which {@link #invalidate()} increases. A cache of what is read
+     * from the entries of a class loader is valid as long as the generation it was filled in is.
+     *
+     * @return The generation
+     * @since 5.3.0
+     */
+    @Internal
+    public static long generation() {
+        return CACHE_GENERATION.get();
     }
 
     /**
@@ -735,13 +779,21 @@ public final class MicronautMetaServiceLoaderUtils {
         private final Predicate<S> predicate;
         @Nullable
         private final ServiceIndex index;
+        @Nullable
+        private final BiFunction<ClassLoader, String, @Nullable S> factory;
         private final List<RecursiveActionValuesCollector<S>> tasks = new ArrayList<>();
         private int size;
 
         MicronautServiceCollector(ClassLoader classLoader, String serviceName, @Nullable Predicate<S> predicate) {
+            this(classLoader, serviceName, predicate, null);
+        }
+
+        MicronautServiceCollector(ClassLoader classLoader, String serviceName, @Nullable Predicate<S> predicate,
+                                  @Nullable BiFunction<ClassLoader, String, @Nullable S> factory) {
             this.classLoader = classLoader;
             this.serviceName = serviceName;
             this.predicate = predicate;
+            this.factory = factory;
             // asked for here, on the thread that starts the lookup, and not in compute(), which a pool thread can run
             this.index = ServiceScanner.findServiceIndex(classLoader);
         }
@@ -752,7 +804,13 @@ public final class MicronautMetaServiceLoaderUtils {
                 Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName, index);
                 size = serviceEntries.size();
                 for (String serviceEntry : serviceEntries) {
-                    final ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(classLoader, serviceEntry, predicate);
+                    // the factory's task is typed as its superclass here, so that verifying this class does not load it
+                    final RecursiveActionValuesCollector<S> task;
+                    if (factory == null) {
+                        task = new ServiceInstanceLoader<>(classLoader, serviceEntry, predicate);
+                    } else {
+                        task = DescribedEntryLoader.task(classLoader, serviceEntry, predicate, factory);
+                    }
                     tasks.add(task);
                     task.fork();
                 }
@@ -781,7 +839,7 @@ public final class MicronautMetaServiceLoaderUtils {
                 Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName, index);
                 List<S> collection = new ArrayList<>(serviceEntries.size());
                 for (String serviceEntry : serviceEntries) {
-                    S val = instantiate(serviceEntry, classLoader);
+                    S val = factory == null ? instantiate(serviceEntry, classLoader) : DescribedEntryLoader.create(factory, serviceEntry, classLoader);
                     if (val != null && (predicate == null || predicate.test(val))) {
                         collection.add(val);
                     }
@@ -824,6 +882,64 @@ public final class MicronautMetaServiceLoaderUtils {
         protected void compute() {
             try {
                 result = instantiate(className, classLoader);
+                if (result != null && predicate != null && !predicate.test(result)) {
+                    result = null;
+                }
+            } catch (Throwable e) {
+                throwable = e;
+            }
+        }
+
+        @Override
+        public void collect(Collection<S> values) {
+            if (throwable != null) {
+                throw new SoftServiceLoader.ServiceLoadingException("Failed to load a service: " + throwable.getMessage(), throwable);
+            }
+            if (result != null) {
+                values.add(result);
+            }
+        }
+    }
+
+    /**
+     * Creates the instance of an entry with a factory, or, when the factory gives none, instantiates the class the
+     * entry names, as {@link ServiceInstanceLoader} does.
+     *
+     * @param <S> The service type
+     */
+    private static final class DescribedEntryLoader<S> extends RecursiveActionValuesCollector<S> {
+
+        private final ClassLoader classLoader;
+        private final String className;
+        @Nullable
+        private final Predicate<S> predicate;
+        private final BiFunction<ClassLoader, String, @Nullable S> factory;
+        @Nullable
+        private S result;
+        @Nullable
+        private Throwable throwable;
+
+        DescribedEntryLoader(ClassLoader classLoader, String className, @Nullable Predicate<S> predicate, BiFunction<ClassLoader, String, @Nullable S> factory) {
+            this.classLoader = classLoader;
+            this.className = className;
+            this.predicate = predicate;
+            this.factory = factory;
+        }
+
+        static <S> RecursiveActionValuesCollector<S> task(ClassLoader classLoader, String className, @Nullable Predicate<S> predicate, BiFunction<ClassLoader, String, @Nullable S> factory) {
+            return new DescribedEntryLoader<>(classLoader, className, predicate, factory);
+        }
+
+        @Nullable
+        static <S> S create(BiFunction<ClassLoader, String, @Nullable S> factory, String className, ClassLoader classLoader) {
+            S created = factory.apply(classLoader, className);
+            return created != null ? created : instantiate(className, classLoader);
+        }
+
+        @Override
+        protected void compute() {
+            try {
+                result = create(factory, className, classLoader);
                 if (result != null && predicate != null && !predicate.test(result)) {
                     result = null;
                 }
