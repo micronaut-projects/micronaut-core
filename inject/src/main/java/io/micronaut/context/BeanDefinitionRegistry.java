@@ -207,9 +207,14 @@ public interface BeanDefinitionRegistry {
      * <p>The result is one definition when a rule decides, and otherwise the candidates the rules left,
      * so that the caller can tell ambiguity from a choice without an exception. One candidate or none is
      * returned as it is. When the requested type is not known the customizer and the exact type are not
-     * consulted. A lookup by type applies the same rules and then throws
-     * {@link io.micronaut.context.exceptions.NonUniqueBeanException} for what is left, or takes the first
-     * under {@link io.micronaut.context.annotation.Any}.</p>
+     * consulted, and the customizer is told of no qualifier.</p>
+     *
+     * <p>A lookup by type applies these rules to the candidates its qualifier left and then decides what is
+     * still left in ways this method does not: candidates that are all secondary are a
+     * {@link io.micronaut.context.exceptions.NonUniqueBeanException} whatever the qualifier, otherwise
+     * {@link io.micronaut.context.annotation.Any} takes the first, a {@link io.micronaut.context.annotation.EachProperty}
+     * bean is matched by its name, and anything else is a {@code NonUniqueBeanException}. A caller of this
+     * method decides those for itself.</p>
      *
      * @param beanType   The requested bean type, or {@code null} when it is not known
      * @param candidates The candidate definitions to choose among
