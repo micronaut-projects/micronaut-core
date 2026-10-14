@@ -432,7 +432,8 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * at run time as a {@link io.micronaut.core.type.TypeHierarchy}: its type variables with their bounds, its generic
      * superclass and its generic interfaces, as declared. The type can be any class the compilation sees, a class of
      * a library or of the JDK included. The record is a small generated class, one per type, written once per
-     * compilation however many times the type is recorded.
+     * compilation however many times the type is recorded. A parameterized usage of the type, the
+     * {@code Box<String>} of a field, records the declaration {@code Box<T>}.
      *
      * <p>The record is named after the type and written into the package of the first originating element, or into
      * the package of the type when the type, a bound or a supertype of it is not public. Every originating element is
@@ -449,8 +450,10 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      */
     @Experimental
     default String recordTypeHierarchy(ClassElement type, Element... originatingElements) {
-        String recordName = TypeHierarchyWriter.recordClassName(type, originatingElements);
-        TypeHierarchyWriter.write(type, recordName, this, originatingElements);
+        // the declaration, not the usage that was passed: Box<String> records Box<T> and its supertypes in terms of T
+        ClassElement declaration = type.getTypeArguments().isEmpty() ? type : getClassElement(type.getName()).orElse(type);
+        String recordName = TypeHierarchyWriter.recordClassName(declaration, originatingElements);
+        TypeHierarchyWriter.write(declaration, recordName, this, originatingElements);
         return recordName;
     }
 
