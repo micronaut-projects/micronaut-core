@@ -331,7 +331,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * read through. A mutation made through a subclass belongs to that subclass only: a visitor annotating the
      * parameters of one bean must not annotate the same inherited parameter read through another subclass, nor
      * through the declaring type. Once the owning type holds such a mutation, the parameter read or mutated
-     * through the owning type uses it.
+     * through the owning type uses it, and a later mutation made through the declaring type is no longer seen
+     * through that owning type.
      *
      * @param owningType       The type the method is read through
      * @param declaringType    The type declaring the method
@@ -393,7 +394,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * A mutation made on the field as a component of a bean property belongs to the owning type whichever type it
      * is made through: a bean property is resolved for the type it is read through, as its accessor methods are, so
      * annotating the property of a super type must not annotate the same property read through a subclass. Once
-     * the owning type holds such a mutation, the field read or mutated through the owning type uses it.
+     * the owning type holds such a mutation, the field read or mutated through the owning type uses it, and a
+     * later mutation made through the declaring type is no longer seen through that owning type.
      *
      * @param owningType        The type the field is read through
      * @param declaringType     The type declaring the field
