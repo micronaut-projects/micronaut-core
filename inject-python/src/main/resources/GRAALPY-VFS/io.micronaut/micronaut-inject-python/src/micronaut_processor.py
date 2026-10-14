@@ -2031,8 +2031,11 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     type_var = TypeVar(name, bound, constraints)
                     type_params.append(type_var)
         else:
-            # Check for Generic[T] syntax in bases (Python < 3.12)
-            for base in node.bases:
+            # Check for Generic[T] syntax in bases (Python < 3.12). A Generic[...] base fixes the order of the type
+            # parameters, whatever the other bases name before it: class C(Base[B, A], Generic[A, B]) is C<A, B>
+            generic_bases = [base for base in node.bases if isinstance(base, ast.Subscript)
+                             and isinstance(base.value, ast.Name) and base.value.id == 'Generic']
+            for base in (generic_bases or node.bases):
                 if isinstance(base, ast.Subscript):
                     # Check if it's Generic[...]
                     if isinstance(base.value, ast.Name) and base.value.id == 'Generic':
