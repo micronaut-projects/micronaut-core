@@ -7,6 +7,7 @@ import io.micronaut.core.propagation.PropagatedContextElement
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpResponse
+import io.micronaut.http.client.internal.RawResponseFuture
 import org.jspecify.annotations.Nullable
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
