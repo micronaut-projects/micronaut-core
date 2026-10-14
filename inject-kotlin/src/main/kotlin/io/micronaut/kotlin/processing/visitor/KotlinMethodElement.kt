@@ -105,6 +105,9 @@ internal open class KotlinMethodElement(
 
     override fun isSuspend() = declaration.modifiers.contains(Modifier.SUSPEND)
 
+    // Only a vararg parameter that comes last compiles to a JVM varargs method
+    override fun isVarArgs() = declaration.parameters.lastOrNull()?.isVararg == true
+
     /**
      * The methods this method overrides as a member of its owning type, as javac reports them: the methods it
      * overrides in the hierarchy of its declaring type and, for an inherited method, the methods it implements of
