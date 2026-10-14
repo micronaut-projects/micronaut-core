@@ -284,7 +284,9 @@ class FsEventStreamsTest {
             assertFalse(FsEventStreams.isLive(stream));
             IOException e = assertThrows(IOException.class, () -> streams.watch(base));
             assertTrue(e.getMessage().contains("ended"), e.getMessage());
+            assertFalse(fake.runLoopThread.isAlive());
         }
+        // closing after the thread ended does not stop the run loop that went with it
         assertEquals(List.of(), fake.violations);
     }
 
