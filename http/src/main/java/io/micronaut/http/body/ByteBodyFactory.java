@@ -28,6 +28,7 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
+import io.micronaut.http.body.stream.BodyElementsPublisher;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.body.stream.TrailingByteBody;
@@ -288,6 +289,36 @@ public class ByteBodyFactory {
     }
 
     /**
+     * Create a new streaming body from {@link ReadBuffer}s pulled one at a time, without Reactive
+     * Streams: an element is asked for when the consumer of the body wants more bytes. The body
+     * takes over the elements, and closes each buffer once its bytes are consumed. Discarding
+     * the body closes the elements.
+     *
+     * @param elements The pieces of the body
+     * @return The body
+     * @since 5.3.0
+     */
+    @Experimental
+    public CloseableByteBody adapt(BodyElements<ReadBuffer> elements) {
+        // an element read while the body is discarded is closed
+        return adapt(new BodyElementsPublisher<>(elements, ReadBuffer::close));
+    }
+
+    /**
+     * Create a new streaming body from {@link ReadBuffer}s pulled one at a time, see
+     * {@link #adapt(BodyElements)}.
+     *
+     * @param elements      The pieces of the body
+     * @param contentLength The length of the body, if known
+     * @return The body
+     * @since 5.3.0
+     */
+    @Experimental
+    public CloseableByteBody adapt(BodyElements<ReadBuffer> elements, OptionalLong contentLength) {
+        return adapt(new BodyElementsPublisher<>(elements, ReadBuffer::close), contentLength);
+    }
+
+    /**
      * Create a new {@link ByteBody} that streams the given input buffers.
      *
      * @param publisher The input buffer publisher
@@ -438,11 +469,23 @@ public class ByteBodyFactory {
         if (body instanceof BaseStreamingByteBody<?> bsbb) {
             return bsbb;
         }
+        // Available bodies cannot report their length after the publisher claims their bytes.
+        OptionalLong expectedLength = body.expectedLength();
+        if (body instanceof AvailableByteBody available) {
+            StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, bytesConsumed -> {
+                // All bytes have arrived; there is no producer to notify about demand.
+            });
+            expectedLength.ifPresent(sb.sharedBuffer::setExpectedLength);
+            // Transfer the owned buffer directly, avoiding a publisher/subscription round trip.
+            sb.sharedBuffer.add(available.toReadBuffer());
+            sb.sharedBuffer.complete(body.trailers());
+            return sb.rootBody;
+        }
         AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
         StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb.sharedBuffer);
         adapter.setTrailers(body.trailers());
-        body.expectedLength().ifPresent(sb.sharedBuffer::setExpectedLength);
+        expectedLength.ifPresent(sb.sharedBuffer::setExpectedLength);
         return sb.rootBody;
     }
 
