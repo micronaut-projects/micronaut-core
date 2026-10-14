@@ -30,6 +30,7 @@ import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
@@ -146,6 +147,23 @@ public class HandlerRouteBodyConditionsTest {
             AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/bc/users", "fail").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("unknown fail")
+                .build());
+        }
+    }
+
+    @Test
+    void theRoutesOfALocatedTargetAreChosenByTheBody() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/bc/shops/7/orders", "express lamp").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("shop 7 express express lamp")
+                .build());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/bc/shops/7/orders", "lamp").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("shop 7 standard lamp")
+                .build());
+            AssertionUtils.assertThrows(server, HttpRequest.POST("/bc/shops/7/only", "lamp").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.NOT_FOUND)
                 .build());
         }
     }
@@ -340,6 +358,16 @@ public class HandlerRouteBodyConditionsTest {
                 .handle((request, pathVariables) -> text("bytes"));
             routes.POST("/bc/charset").where(bodyText("héllo"::equals)).consumesAll()
                 .handle((request, pathVariables) -> text("latin-1"));
+
+            LocatedRoutes<String> shops = TckLocatedRoutes.of(String.class, shop -> {
+                shop.POST("/orders").where(bodyText(text -> text.startsWith("express"))).order(-1).consumesAll()
+                    .body(String.class).handle((request, pathVariables, id, body) -> text("shop " + id + " express " + body));
+                shop.POST("/orders").consumesAll()
+                    .body(String.class).handle((request, pathVariables, id, body) -> text("shop " + id + " standard " + body));
+                shop.POST("/only").where(bodyText(text -> text.startsWith("express"))).consumesAll()
+                    .handle((request, pathVariables, id) -> text("only"));
+            });
+            routes.locate("/bc/shops/{id}", (request, pathVariables) -> pathVariables.getString("id"), shop -> shops);
 
             routes.POST("/bc/users")
                 .where(bodyAsync(String.class, name -> "fail".equals(name)

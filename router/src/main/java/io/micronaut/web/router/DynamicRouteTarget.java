@@ -24,6 +24,7 @@ import io.micronaut.web.router.builder.HandlerMethod;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -70,6 +71,23 @@ interface DynamicRouteTarget {
      * @return The match, or {@code null} if none
      */
     <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request, UriRouteMatch<T, R> match);
+
+    /**
+     * The closest match to use instead of the closest match of the route, or the matches that
+     * depend on the body of the request, given to {@code pending}, see
+     * {@link Router#findClosest(HttpRequest, Consumer)}.
+     *
+     * @param request The request
+     * @param match   The match of the route
+     * @param pending Given the matches that depend on the body of the request
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The match, or {@code null} if none or it depends on the body
+     */
+    default <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                                             Consumer<? super PendingRouteMatch<T, R>> pending) {
+        return findClosest(request, match);
+    }
 
     /**
      * The closest matches to use instead of a closest match of the route, see

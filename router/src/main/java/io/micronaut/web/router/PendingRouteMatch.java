@@ -22,6 +22,7 @@ import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 /**
  * The match of a request that depends on its body: the routes the request matched without its
@@ -42,9 +43,8 @@ import java.util.List;
 @Internal
 public final class PendingRouteMatch<T, R> {
 
-    private final String path;
     private final List<List<UriRouteMatch<T, R>>> ranks;
-    private final @Nullable Resolver resolver;
+    private final Chooser<T, R> chooser;
 
     /**
      * @param path     The path of the request
@@ -54,9 +54,35 @@ public final class PendingRouteMatch<T, R> {
     PendingRouteMatch(String path, List<List<UriRouteMatch<T, R>>> ranks, @Nullable Resolver resolver) {
         // the ranks are built by a BodyFallThrough, the only place that decides where a request
         // whose body conditions fail goes
-        this.path = path;
+        this(ranks, (request, matched) -> {
+            UriRouteMatch<T, R> match = UriRouteSet.closest(path, matched);
+            if (match == null || resolver == null) {
+                return match;
+            }
+            //noinspection unchecked
+            return (UriRouteMatch<T, R>) resolver.resolve(request, match);
+        });
+    }
+
+    private PendingRouteMatch(List<List<UriRouteMatch<T, R>>> ranks, Chooser<T, R> chooser) {
         this.ranks = ranks;
-        this.resolver = resolver;
+        this.chooser = chooser;
+    }
+
+    /**
+     * The pending match of the routes of a located target, see {@link RouteLocator}: the same
+     * ranks, whose chosen match is chosen with the request of the target and wrapped as a match
+     * of the request.
+     *
+     * @param targetRequest The request the routes of the target were matched with
+     * @param wrap          Wraps the chosen match of the target
+     * @return The pending match of the request
+     */
+    PendingRouteMatch<T, R> located(HttpRequest<?> targetRequest, UnaryOperator<UriRouteMatch<T, R>> wrap) {
+        return new PendingRouteMatch<>(ranks, (request, matched) -> {
+            UriRouteMatch<T, R> match = choose(targetRequest, matched);
+            return match == null ? null : wrap.apply(match);
+        });
     }
 
     /**
@@ -95,13 +121,7 @@ public final class PendingRouteMatch<T, R> {
      * @throws DuplicateRouteException if several routes match
      */
     public @Nullable UriRouteMatch<T, R> choose(HttpRequest<?> request, List<UriRouteMatch<T, R>> matched) throws DuplicateRouteException {
-        UriRouteMatch<T, R> match = UriRouteSet.closest(path, matched);
-        Resolver dynamic = resolver;
-        if (match == null || dynamic == null) {
-            return match;
-        }
-        //noinspection unchecked
-        return (UriRouteMatch<T, R>) dynamic.resolve(request, match);
+        return chooser.choose(request, matched);
     }
 
     /**
@@ -115,6 +135,17 @@ public final class PendingRouteMatch<T, R> {
             }
         }
         return false;
+    }
+
+    /**
+     * Chooses the match among the matches of a rank the body matches.
+     *
+     * @param <T> The target type
+     * @param <R> The result type
+     */
+    @FunctionalInterface
+    private interface Chooser<T, R> {
+        @Nullable UriRouteMatch<T, R> choose(HttpRequest<?> request, List<UriRouteMatch<T, R>> matched);
     }
 
     /**

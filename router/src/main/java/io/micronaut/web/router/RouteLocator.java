@@ -46,6 +46,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -261,6 +262,24 @@ public final class RouteLocator implements DynamicRouteTarget {
         UriRouteMatch<T, R> target;
         try {
             target = located.routes().findClosest(located.request(), null);
+        } catch (RuntimeException e) {
+            throw located.failed(e);
+        }
+        return target == null ? null : located.wrap(target);
+    }
+
+    @Override
+    public <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                                            Consumer<? super PendingRouteMatch<T, R>> pending) {
+        Located located = locate(request, match);
+        if (located == null) {
+            return null;
+        }
+        UriRouteMatch<T, R> target;
+        try {
+            // the routes of the target are pending on the body like the routes of the router
+            target = located.routes().findClosest(located.request(), null,
+                (PendingRouteMatch<T, R> targetPending) -> pending.accept(targetPending.located(located.request(), located::wrap)));
         } catch (RuntimeException e) {
             throw located.failed(e);
         }

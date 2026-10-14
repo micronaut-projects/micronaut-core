@@ -230,10 +230,12 @@ final class UriRouteSet {
     }
 
     /**
-     * @return Whether a route of the set has conditions on the body
+     * @return Whether a route of the set has conditions on the body, or may resolve to routes
+     * with them: a route with a dynamic target, e.g. of a route locator, whose routes are known
+     * when it is resolved
      */
     boolean hasBodyConditions() {
-        return bodyConditioned;
+        return bodyConditioned || hasDynamicTargets;
     }
 
     /**
@@ -251,18 +253,18 @@ final class UriRouteSet {
     @Nullable <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request,
                                                      @Nullable Set<Integer> ports,
                                                      Consumer<? super PendingRouteMatch<T, R>> pending) throws DuplicateRouteException {
-        if (!bodyConditioned) {
+        if (!bodyConditioned && !hasDynamicTargets) {
             return findClosest(request, ports);
         }
         String path = request.getPath();
         List<UriRouteMatch<T, R>> matches = findMatches(request, path, ports);
         if (!PendingRouteMatch.anyHasBodyConditions(matches)) {
-            return resolveDynamic(request, closestRoute(path, request, matches));
+            return resolveDynamic(request, closestRoute(path, request, matches), pending);
         }
         List<List<UriRouteMatch<T, R>>> ranks = BodyFallThrough.DEFAULT.rank(request, matches);
         if (!PendingRouteMatch.anyHasBodyConditions(ranks.get(0))) {
             // the body does not decide: as without body conditions
-            return resolveDynamic(request, closest(path, ranks.get(0)));
+            return resolveDynamic(request, closest(path, ranks.get(0)), pending);
         }
         pending.accept(new PendingRouteMatch<>(path, ranks, hasDynamicTargets ? this::resolveDynamicMatch : null));
         return null;
@@ -271,6 +273,20 @@ final class UriRouteSet {
     @SuppressWarnings("unchecked")
     private @Nullable UriRouteMatch<?, ?> resolveDynamicMatch(HttpRequest<?> request, UriRouteMatch<?, ?> match) {
         return resolveDynamic(request, (UriRouteMatch<Object, Object>) match);
+    }
+
+    /**
+     * Resolve the match of a route with a dynamic target, whose routes may depend on the body.
+     */
+    private @Nullable <T, R> UriRouteMatch<T, R> resolveDynamic(HttpRequest<?> request, @Nullable UriRouteMatch<T, R> match,
+                                                                Consumer<? super PendingRouteMatch<T, R>> pending) {
+        if (hasDynamicTargets && match != null) {
+            DynamicRouteTarget target = DynamicRouteTarget.of(match.getRouteInfo());
+            if (target != null) {
+                return target.findClosest(request, match, pending);
+            }
+        }
+        return match;
     }
 
     private @Nullable <T, R> UriRouteMatch<T, R> resolveDynamic(HttpRequest<?> request, @Nullable UriRouteMatch<T, R> match) {

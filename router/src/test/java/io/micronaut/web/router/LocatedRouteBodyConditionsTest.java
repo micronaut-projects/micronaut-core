@@ -18,36 +18,63 @@ package io.micronaut.web.router;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.web.router.builder.RouteCondition;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The router resolves the route of a located target without the body of the request: a located
- * route cannot have a body condition.
+ * The routes of a located target with body conditions are pending on the body like the routes
+ * of the router: the chosen route is a match of the target, under the prefix of its locator.
  */
 class LocatedRouteBodyConditionsTest {
 
+    private static final RouteCondition.Body<String> EXPRESS = RouteCondition.bodyText(text -> text.contains("express"));
+
     @Test
-    void aLocatedRouteCannotHaveABodyCondition() {
-        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/items")
-            .where(RouteCondition.bodyText(text -> true))
-            .handle((request, pathVariables) -> HttpResponse.ok()));
+    void theRoutesOfALocatedTargetArePendingOnTheBody() {
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> {
+            located.POST("/items").where(EXPRESS).order(-1).handle((request, pathVariables) -> HttpResponse.ok("express"));
+            located.POST("/items", (request, pathVariables) -> HttpResponse.ok("standard"));
+        });
         Router router = router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> "order", target -> items));
 
-        assertFalse(router.hasBodyConditions(), "the routes of the router have none");
-        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-            () -> router.findClosest(HttpRequest.POST("/orders/1/items", "x")));
-        assertTrue(error.getMessage().startsWith("Located routes cannot have body conditions"), error.getMessage());
+        assertTrue(router.hasBodyConditions(), "a located target may have routes with body conditions");
+        MutableHttpRequest<?> request = HttpRequest.POST("/orders/1/items", "express");
+        List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
+        assertNull(router.findClosest(request, pending::add));
+        assertEquals(1, pending.size());
+        List<List<UriRouteMatch<Object, Object>>> ranks = pending.get(0).getRanks();
+        assertEquals(2, ranks.size(), "the conditioned route, then the fallback");
+        assertEquals(List.of(EXPRESS), ranks.get(0).get(0).getRouteInfo().getBodyConditions());
+
+        UriRouteMatch<Object, Object> chosen = pending.get(0).choose(request, ranks.get(0));
+        assertNotNull(chosen);
+        // a match of the request: the target is bound to it
+        assertInstanceOf(RouteLocator.LocatedUriMatchInfo.class, ((DefaultUriRouteMatch<?, ?>) chosen).matchInfo());
+        assertEquals("order", ((RouteLocator.LocatedUriMatchInfo) ((DefaultUriRouteMatch<?, ?>) chosen).matchInfo()).target());
+    }
+
+    @Test
+    void aLocatedTargetWithoutBodyConditionsIsMatchedWithoutTheBody() {
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/items", (request, pathVariables) -> HttpResponse.ok()));
+        Router router = router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> "order", target -> items));
+
+        List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
+        assertNotNull(router.findClosest(HttpRequest.POST("/orders/1/items", "x"), pending::add));
+        assertTrue(pending.isEmpty());
     }
 
     private static Router router(Consumer<HttpRouteBuilder> routes) {
