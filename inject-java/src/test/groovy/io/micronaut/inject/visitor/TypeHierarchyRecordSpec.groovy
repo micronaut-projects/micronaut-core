@@ -8,8 +8,8 @@ import io.micronaut.core.type.TypeHierarchy
 import io.micronaut.inject.ast.ClassElement
 
 
-import static io.micronaut.inject.visitor.TypeStrings.string
-import static io.micronaut.inject.visitor.TypeStrings.strings
+import static io.micronaut.inject.test.hierarchy.TypeStrings.string
+import static io.micronaut.inject.test.hierarchy.TypeStrings.strings
 
 class TypeHierarchyRecordSpec extends AbstractTypeElementSpec {
 
@@ -209,6 +209,145 @@ class Two {
 
         expect:
         record(classLoader, 'java.util.ArrayList', 'test').type == ArrayList
+    }
+
+    void "type-use annotations on the super types and their arguments are kept and follow a substituted variable"() {
+        given:
+        def classLoader = buildClassLoader('test.Annotated', '''
+package test;
+
+import io.micronaut.core.annotation.RecordTypeHierarchy;
+import java.lang.annotation.*;
+import java.util.*;
+import java.util.function.Supplier;
+
+@Target(ElementType.TYPE_USE) @Retention(RetentionPolicy.RUNTIME) @interface Marker {}
+@Target(ElementType.TYPE_USE) @Retention(RetentionPolicy.RUNTIME) @interface Other {}
+
+class Base<T> {
+}
+
+@RecordTypeHierarchy
+public class Annotated<T> extends @Marker Base<@Marker T> implements Supplier<List<@Other String>> {
+    public List<@Other String> get() { return null; }
+}
+''')
+        def hierarchy = record(classLoader, 'test.Annotated')
+        def superclass = hierarchy.genericSuperclass.get()
+        def supplier = hierarchy.genericInterfaces[0]
+
+        expect: "the annotations of the type uses are those of the entries"
+        superclass.annotationMetadata.hasAnnotation('test.Marker')
+        superclass.typeParameters[0].annotationMetadata.hasAnnotation('test.Marker')
+        !supplier.annotationMetadata.hasAnnotation('test.Marker')
+        supplier.typeParameters[0].typeParameters[0].annotationMetadata.hasAnnotation('test.Other')
+        hierarchy.superTypes[0].annotationMetadata.hasAnnotation('test.Marker')
+        strings(hierarchy.superTypes) == ['Base<T>', 'Supplier<List<String>>', 'Object']
+
+        when:
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, Integer))
+
+        then: "a substituted variable keeps the annotations of its use"
+        strings(closure) == ['Annotated<Integer>', 'Base<Integer>', 'Supplier<List<String>>', 'Object']
+        closure[1].annotationMetadata.hasAnnotation('test.Marker')
+        closure[1].typeParameters[0].annotationMetadata.hasAnnotation('test.Marker')
+        closure[2].typeParameters[0].typeParameters[0].annotationMetadata.hasAnnotation('test.Other')
+    }
+
+    void "wildcards of every kind are kept through the substitution and erased for a raw parameterization"() {
+        given:
+        def classLoader = buildClassLoader('test.Wild', '''
+package test;
+
+import io.micronaut.core.annotation.RecordTypeHierarchy;
+import java.util.*;
+import java.util.function.*;
+
+@RecordTypeHierarchy
+public class Wild<T> implements Supplier<List<? extends T>>, Consumer<List<? super T>>, Function<List<?>, Map<? extends Number, ? super T>> {
+    public List<? extends T> get() { return null; }
+    public void accept(List<? super T> list) { }
+    public Map<? extends Number, ? super T> apply(List<?> list) { return null; }
+}
+''')
+        def hierarchy = record(classLoader, 'test.Wild')
+
+        expect:
+        strings(hierarchy.superTypes) == ['Supplier<List<? extends T>>', 'Consumer<List<? super T>>', 'Function<List<?>, Map<? extends Number, ? super T>>', 'Object']
+        hierarchy.superTypes[0].typeParameters[0].typeParameters[0].isWildcard()
+        hierarchy.superTypes[2].typeParameters[0].typeParameters[0].isWildcard()
+
+        when:
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, Integer))
+
+        then:
+        strings(closure) == ['Wild<Integer>', 'Supplier<List<? extends Integer>>', 'Consumer<List<? super Integer>>', 'Function<List<?>, Map<? extends Number, ? super Integer>>', 'Object']
+        closure[1].typeParameters[0].typeParameters[0].isWildcard()
+        closure[2].typeParameters[0].typeParameters[0].upperBounds*.type == [Object]
+        closure[2].typeParameters[0].typeParameters[0].lowerBounds*.type == [Integer]
+
+        when:
+        closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type))
+
+        then:
+        strings(closure) == ['Wild', 'Supplier', 'Consumer', 'Function', 'Object']
+        closure[1].isRawType() && closure[3].isRawType()
+    }
+
+    void "variables are swapped, nested and made arrays along the path"() {
+        given:
+        def classLoader = buildClassLoader('test.Swapped', '''
+package test;
+
+import io.micronaut.core.annotation.RecordTypeHierarchy;
+import java.util.*;
+
+@RecordTypeHierarchy(classes = {Swapped.class, Nested.class})
+public class Swapped<K, V> extends HashMap<V, K> {
+}
+
+// no Comparable<Nested<T>> here: the javac element resolves the arguments of a type naming its declaring class to
+// Object (a recursion guard in AbstractJavaElement), so a self reference loses its variable under javac only
+class Nested<T> extends ArrayList<List<T[]>> implements Comparable<String> {
+    public int compareTo(String other) { return 0; }
+}
+''')
+        def swapped = record(classLoader, 'test.Swapped')
+        def nested = record(classLoader, 'test.Nested')
+
+        expect:
+        strings(swapped.superTypes) == ['HashMap<V, K>', 'AbstractMap<V, K>', 'Map<V, K>', 'Cloneable', 'Serializable', 'Object']
+        strings(swapped.getTypeClosure(Argument.of(swapped.type, String, Integer))) == ['Swapped<String, Integer>', 'HashMap<Integer, String>', 'AbstractMap<Integer, String>', 'Map<Integer, String>', 'Cloneable', 'Serializable', 'Object']
+        strings(nested.getTypeClosure(Argument.of(nested.type, String))) - ['SequencedCollection<List<String[]>>'] == ['Nested<String>', 'ArrayList<List<String[]>>', 'AbstractList<List<String[]>>', 'AbstractCollection<List<String[]>>',
+                                                                                                                       'Collection<List<String[]>>', 'Iterable<List<String[]>>', 'List<List<String[]>>', 'RandomAccess', 'Cloneable', 'Serializable', 'Comparable<String>', 'Object']
+        nested.getTypeClosure(Argument.of(nested.type, String))[1].typeParameters[0].typeParameters[0].type == String[]
+    }
+
+    void "recursive and intersection bounds are recorded on the variables"() {
+        given:
+        def classLoader = buildClassLoader('test.Ordered', '''
+package test;
+
+import io.micronaut.core.annotation.RecordTypeHierarchy;
+import java.io.Serializable;
+import java.util.*;
+import java.util.function.Supplier;
+
+@RecordTypeHierarchy
+public class Ordered<T extends Comparable<T> & Serializable, U extends List<T>> implements Supplier<U> {
+    public U get() { return null; }
+}
+''')
+        def hierarchy = record(classLoader, 'test.Ordered')
+
+        expect:
+        string(hierarchy.declaration) == 'Ordered<T, U>'
+        hierarchy.typeVariables*.variableName == ['T', 'U']
+        strings(hierarchy.typeVariables[0].bounds) == ['Comparable<T>', 'Serializable']
+        hierarchy.typeVariables[0].type == Comparable
+        strings(hierarchy.typeVariables[1].bounds) == ['List<T>']
+        hierarchy.typeVariables[1].type == List
+        strings(hierarchy.getTypeClosure(Argument.of(hierarchy.type, Argument.of(String), Argument.of(ArrayList, String)))) == ['Ordered<String, ArrayList<String>>', 'Supplier<ArrayList<String>>', 'Object']
     }
 
     void "a parameterized usage records the declaration"() {

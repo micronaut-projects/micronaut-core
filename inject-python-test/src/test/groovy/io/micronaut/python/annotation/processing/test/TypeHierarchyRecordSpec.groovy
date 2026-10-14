@@ -22,8 +22,8 @@ import io.micronaut.core.type.TypeHierarchy
 import io.micronaut.python.compiler.PyronautCompiler
 
 
-import static io.micronaut.python.annotation.processing.test.TypeStrings.string
-import static io.micronaut.python.annotation.processing.test.TypeStrings.strings
+import static io.micronaut.inject.test.hierarchy.TypeStrings.string
+import static io.micronaut.inject.test.hierarchy.TypeStrings.strings
 
 class TypeHierarchyRecordSpec extends AbstractPythonTypeElementSpec {
 

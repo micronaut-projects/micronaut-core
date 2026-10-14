@@ -7,8 +7,8 @@ import io.micronaut.core.type.TypeHierarchies
 import io.micronaut.core.type.TypeHierarchy
 
 
-import static io.micronaut.kotlin.processing.visitor.TypeStrings.string
-import static io.micronaut.kotlin.processing.visitor.TypeStrings.strings
+import static io.micronaut.inject.test.hierarchy.TypeStrings.string
+import static io.micronaut.inject.test.hierarchy.TypeStrings.strings
 
 class TypeHierarchyRecordSpec extends AbstractKotlinCompilerSpec {
 
@@ -126,6 +126,124 @@ class Payload<T> : Supplier<Array<T>> {
         then:
         strings(closure) == ['Payload<String>', 'Supplier<String[]>', 'Object']
         closure[1].typeParameters[0].type == String[]
+    }
+
+    void "type-use annotations on the arguments of the super types are kept and follow a substituted variable"() {
+        given:
+        def classLoader = buildClassLoader('test.Annotated', '''
+package test
+
+import io.micronaut.core.annotation.RecordTypeHierarchy
+import java.util.function.Supplier
+
+@Target(AnnotationTarget.TYPE) @Retention(AnnotationRetention.RUNTIME) annotation class Marker
+@Target(AnnotationTarget.TYPE) @Retention(AnnotationRetention.RUNTIME) annotation class Other
+
+open class Base<T>
+
+@RecordTypeHierarchy
+class Annotated<T> : Base<@Marker T>(), Supplier<List<@Other String>> {
+    override fun get(): List<@Other String> = throw UnsupportedOperationException()
+}
+''')
+        def hierarchy = record(classLoader, 'test.Annotated')
+
+        expect:
+        hierarchy.genericSuperclass.get().typeParameters[0].annotationMetadata.hasAnnotation('test.Marker')
+        hierarchy.genericInterfaces[0].typeParameters[0].typeParameters[0].annotationMetadata.hasAnnotation('test.Other')
+        strings(hierarchy.superTypes) == ['Base<T>', 'Supplier<List<String>>', 'Object']
+
+        when:
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, Integer))
+
+        then:
+        strings(closure) == ['Annotated<Integer>', 'Base<Integer>', 'Supplier<List<String>>', 'Object']
+        closure[1].typeParameters[0].annotationMetadata.hasAnnotation('test.Marker')
+        closure[2].typeParameters[0].typeParameters[0].annotationMetadata.hasAnnotation('test.Other')
+    }
+
+    void "wildcards of every kind are kept through the substitution and erased for a raw parameterization"() {
+        given:
+        def classLoader = buildClassLoader('test.Wild', '''
+package test
+
+import io.micronaut.core.annotation.RecordTypeHierarchy
+import java.util.function.Consumer
+import java.util.function.Supplier
+
+@RecordTypeHierarchy
+class Wild<T> : Supplier<List<out T>>, Consumer<MutableList<in T>>, java.util.function.Function<MutableList<*>, MutableMap<out Number, in T>> {
+    override fun get(): List<out T> = throw UnsupportedOperationException()
+    override fun accept(list: MutableList<in T>) { }
+    override fun apply(list: MutableList<*>): MutableMap<out Number, in T> = throw UnsupportedOperationException()
+}
+''')
+        def hierarchy = record(classLoader, 'test.Wild')
+
+        expect:
+        strings(hierarchy.superTypes) == ['Supplier<List<? extends T>>', 'Consumer<List<? super T>>', 'Function<List<?>, Map<? extends Number, ? super T>>', 'Object']
+
+        when:
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, Integer))
+
+        then:
+        strings(closure) == ['Wild<Integer>', 'Supplier<List<? extends Integer>>', 'Consumer<List<? super Integer>>', 'Function<List<?>, Map<? extends Number, ? super Integer>>', 'Object']
+        closure[2].typeParameters[0].typeParameters[0].lowerBounds*.type == [Integer]
+
+        when:
+        closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type))
+
+        then:
+        strings(closure) == ['Wild', 'Supplier', 'Consumer', 'Function', 'Object']
+        closure[1].isRawType()
+    }
+
+    void "variables are swapped, nested and made arrays along the path"() {
+        given:
+        def classLoader = buildClassLoader('test.Swapped', '''
+package test
+
+import io.micronaut.core.annotation.RecordTypeHierarchy
+
+@RecordTypeHierarchy(classes = [Swapped::class, Nested::class])
+open class Swapped<K, V> : java.util.HashMap<V, K>()
+
+class Nested<T> : java.util.ArrayList<List<Array<T>>>(), Comparable<Nested<T>> {
+    override fun compareTo(other: Nested<T>): Int = 0
+}
+''')
+        def swapped = record(classLoader, 'test.Swapped')
+        def nested = record(classLoader, 'test.Nested')
+
+        expect:
+        strings(swapped.superTypes) as Set == ['HashMap<V, K>', 'AbstractMap<V, K>', 'Map<V, K>', 'Cloneable', 'Serializable', 'Object'] as Set
+        strings(swapped.getTypeClosure(Argument.of(swapped.type, String, Integer))) as Set == ['Swapped<String, Integer>', 'HashMap<Integer, String>', 'AbstractMap<Integer, String>', 'Map<Integer, String>', 'Cloneable', 'Serializable', 'Object'] as Set
+        strings(nested.getTypeClosure(Argument.of(nested.type, String))) - ['SequencedCollection<List<String[]>>'] as Set == ['Nested<String>', 'ArrayList<List<String[]>>', 'AbstractList<List<String[]>>', 'AbstractCollection<List<String[]>>',
+                                                                                                                                'Collection<List<String[]>>', 'Iterable<List<String[]>>', 'List<List<String[]>>', 'RandomAccess', 'Cloneable', 'Serializable', 'Comparable<Nested<String>>', 'Object'] as Set
+        nested.getTypeClosure(Argument.of(nested.type, String))[1].typeParameters[0].typeParameters[0].type == String[]
+    }
+
+    void "recursive and intersection bounds are recorded on the variables"() {
+        given:
+        def classLoader = buildClassLoader('test.Ordered', '''
+package test
+
+import io.micronaut.core.annotation.RecordTypeHierarchy
+import java.util.function.Supplier
+
+@RecordTypeHierarchy
+class Ordered<T, U> : Supplier<U> where T : Comparable<T>, T : java.io.Serializable, U : List<T> {
+    override fun get(): U = throw UnsupportedOperationException()
+}
+''')
+        def hierarchy = record(classLoader, 'test.Ordered')
+
+        expect:
+        string(hierarchy.declaration) == 'Ordered<T, U>'
+        hierarchy.typeVariables*.variableName == ['T', 'U']
+        strings(hierarchy.typeVariables[0].bounds) == ['Comparable<T>', 'Serializable']
+        strings(hierarchy.typeVariables[1].bounds) == ['List<T>']
+        strings(hierarchy.getTypeClosure(Argument.of(hierarchy.type, Argument.of(String), Argument.of(ArrayList, String)))) == ['Ordered<String, ArrayList<String>>', 'Supplier<ArrayList<String>>', 'Object']
     }
 
     void "a private class is recorded"() {
