@@ -520,6 +520,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                     LOG.debug("BeanContext Started.");
                 }
                 publishEvent(new StartupEvent(this));
+                beanDefinitionProvider.started(this);
             }
             running.set(true);
             initializing.set(false);
@@ -3897,7 +3898,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             resolutionContext,
             beanType,
             false,
-            beanDefinitionProvider.getDisabledBeans(this).stream().<BeanDefinition<T>>mapMulti((disabledBean, consumer) -> {
+            beanDefinitionProvider.getDisabledBeans(this, beanType).stream().<BeanDefinition<T>>mapMulti((disabledBean, consumer) -> {
                 if (beanResolutionCustomizer.isCandidateBean(beanType, disabledBean)) {
                     consumer.accept((BeanDefinition<T>) disabledBean);
                 }
@@ -4515,7 +4516,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                                                                    @Nullable Qualifier<T> qualifier) {
 
         // TODO: Improve
-        List<BeanDefinition<Object>> targetProxyBeans = CollectionUtils.iterableToList(beanDefinitionProvider.getTargetProxyBeans(this));
+        List<BeanDefinition<Object>> targetProxyBeans = CollectionUtils.iterableToList(beanDefinitionProvider.getTargetProxyBeans(this, beanType));
         Collection<BeanDefinition<T>> candidates = collectBeanCandidates(
             resolutionContext,
             beanType,

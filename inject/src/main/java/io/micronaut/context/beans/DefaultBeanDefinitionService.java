@@ -20,7 +20,9 @@ import io.micronaut.context.BeanContextConfiguration;
 import io.micronaut.context.BeanDefinitionsProvider;
 import io.micronaut.context.BeanResolutionCustomizer;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.context.DisabledBean;
+import io.micronaut.context.LazyBeanDefinitionReference;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.event.ApplicationEventListener;
@@ -38,6 +40,7 @@ import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
@@ -57,6 +60,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -83,9 +87,38 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         ConversionService.class
     );
 
+    /**
+     * The system property that switches lazy bean definition references on, read when the service is created.
+     */
+    private static final String LAZY_PROPERTY = "micronaut.bean-definitions.lazy";
+    private static final String LAZY_VERIFY_PROPERTY = LAZY_PROPERTY + ".verify";
+    private static final String LAZY_WARM_UP_PROPERTY = LAZY_PROPERTY + ".warm-up";
+
     private final String[] eagerInitStereotypes;
     private final boolean eagerInitStereotypesPresent;
     private final boolean eagerInitSingletons;
+
+    /**
+     * Whether the context reads its definitions lazily: a definition whose entry carries a descriptor is loaded only
+     * when a lookup needs it. Every lazy step is in {@link LazyBeans} and {@link LazyBeanDefinitionProducer}, which
+     * are never loaded otherwise.
+     */
+    private final boolean lazy;
+    private final boolean warmUp;
+    /**
+     * In lazy mode, the references as the provider gave them, which carry what it counted.
+     */
+    @Nullable
+    private List<BeanDefinitionReference<?>> providedReferences;
+    /**
+     * In lazy mode, the warm-up of the current definitions, or {@code null}.
+     */
+    @Nullable
+    private volatile Object runningWarmUp;
+    /**
+     * In lazy mode, the disabled beans of lazy references, built when they are read.
+     */
+    private final CopyOnWriteArrayList<Object> deferredDisabledBeans = new CopyOnWriteArrayList<>();
 
     // The collection should be modified only when new bean definition is added
     // That shouldn't happen that often, so we can use CopyOnWriteArrayList
@@ -96,6 +129,14 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         // Keep an anonymous class for performance
         @Override
         public List<BeanDefinitionProducer> apply(Class<?> indexedType) {
+            return new ArrayList<>(20);
+        }
+    };
+
+    private static final Function<String, List<BeanDefinitionProducer>> COMPUTE_NAME_INDEXES_FN = new Function<String, List<BeanDefinitionProducer>>() {
+        // Keep an anonymous class for performance
+        @Override
+        public List<BeanDefinitionProducer> apply(String indexedType) {
             return new ArrayList<>(20);
         }
     };
@@ -146,9 +187,25 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         this.beanDefinitionReferencesProvider = contextConfiguration.getBeanDefinitionsProvider();
         this.beanResolutionCustomizer = Objects.requireNonNull(beanResolutionCustomizer, "Bean resolution customizer cannot be null");
         this.classLoader = contextConfiguration.getClassLoader();
+        this.lazy = (Boolean.getBoolean(LAZY_PROPERTY) || Boolean.getBoolean(LAZY_VERIFY_PROPERTY)) && !NativeImageUtils.inImageCode();
+        this.warmUp = lazy && ForkJoinPool.getCommonPoolParallelism() > 1 && !StringUtils.FALSE.equals(System.getProperty(LAZY_WARM_UP_PROPERTY));
         if (beans == null) {
             beans = createBeans(resolveBeanDefinitionReferences(), List.of());
         }
+    }
+
+    /**
+     * Creates the producers of the references, and in lazy mode starts their warm-up.
+     */
+    private Beans createBeans(List<BeanDefinitionReference<?>> beanDefinitionReferences, List<BeanConfiguration> beanConfigurations) {
+        if (!lazy) {
+            return createEagerBeans(beanDefinitionReferences, beanConfigurations);
+        }
+        Beans created = LazyBeans.createBeans(beanDefinitionReferences, beanConfigurations);
+        if (warmUp) {
+            runningWarmUp = LazyBeans.warmUp(created);
+        }
+        return created;
     }
 
     /**
@@ -392,7 +449,8 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         if (type == Object.class) {
             return beansNotNull.all;
         }
-        List<BeanDefinitionProducer> producers = beansNotNull.beanIndex.get(type);
+        Map<String, List<BeanDefinitionProducer>> nameIndex = beansNotNull.nameIndex;
+        List<BeanDefinitionProducer> producers = nameIndex != null ? nameIndex.get(type.getName()) : beansNotNull.beanIndex.get(type);
         if (producers == null) {
             return List.of();
         }
@@ -401,8 +459,14 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
     @Override
     public void reset() {
+        if (lazy) {
+            Object warmingUp = runningWarmUp;
+            runningWarmUp = null;
+            LazyBeans.stop(warmingUp, getBeanReferences());
+        }
         beans = null;
         disabledBeans.clear();
+        deferredDisabledBeans.clear();
         additionalBeanDefinitions.clear();
         additionalBeanConfigurations.clear();
     }
@@ -427,6 +491,9 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
     @Override
     public void trackDisabled(QualifiedBeanType<?> beanType, List<String> reasons) {
+        if (lazy && LazyBeans.deferDisabled(deferredDisabledBeans, beanType, reasons)) {
+            return;
+        }
         try {
             @SuppressWarnings("unchecked")
             Argument<Object> argument = (Argument<Object>) beanType.getGenericBeanType();
@@ -464,19 +531,64 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     @Override
+    public Iterable<BeanDefinition<Object>> getTargetProxyBeans(BeanContext beanContext, Argument<?> beanType) {
+        if (!lazy) {
+            return getTargetProxyBeans(beanContext);
+        }
+        // only the targets a lookup of the type finds by name are loaded
+        return getBeanDefinitions(LazyBeans.foundBy(Objects.requireNonNull(beans).proxyTargetBeans, beanType.getType().getName()), beanContext, Argument.OBJECT_ARGUMENT, null, null);
+    }
+
+    @Override
     public List<DisabledBean<?>> getDisabledBeans(BeanContext beanContext) {
-        return disabledBeans.stream()
+        List<DisabledBean<?>> disabled = disabledBeans.stream()
             .map(producer -> (DisabledBean<?>) producer.reference)
             .filter(Objects::nonNull)
             .collect(Collectors.toList());
+        if (lazy) {
+            disabled.addAll(LazyBeans.disabledBeans(deferredDisabledBeans, null));
+        }
+        return disabled;
+    }
+
+    @Override
+    public List<DisabledBean<?>> getDisabledBeans(BeanContext beanContext, Argument<?> beanType) {
+        if (!lazy) {
+            return getDisabledBeans(beanContext);
+        }
+        List<DisabledBean<?>> disabled = disabledBeans.stream()
+            .map(producer -> (DisabledBean<?>) producer.reference)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+        // only the ones a lookup of the type finds by name are built
+        disabled.addAll(LazyBeans.disabledBeans(deferredDisabledBeans, beanType.getType().getName()));
+        return disabled;
+    }
+
+    @Override
+    public void started(BeanContext beanContext) {
+        if (lazy) {
+            LazyBeans.started(providedReferences, getBeanReferences());
+        }
     }
 
     private Collection<BeanDefinitionProducer> resolveTypeIndex(Class<?> indexedType) {
-        return Objects.requireNonNull(beans).beanIndex.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN);
+        Beans current = Objects.requireNonNull(beans);
+        Map<String, List<BeanDefinitionProducer>> nameIndex = current.nameIndex;
+        if (nameIndex != null) {
+            return nameIndex.computeIfAbsent(indexedType.getName(), COMPUTE_NAME_INDEXES_FN);
+        }
+        return current.beanIndex.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN);
     }
 
     @Override
     public boolean exists(Class<?> beanType) {
+        if (lazy) {
+            Beans current = beans;
+            return current == null
+                ? LazyBeans.exists(resolveBeanDefinitionReferences(), beanType)
+                : LazyBeans.exists(Objects.requireNonNull(current.nameIndex).get(beanType.getName()));
+        }
         if (beans == null) {
             for (BeanDefinitionReference<?> beanDefinitionReference : resolveBeanDefinitionReferences()) {
                 if (beanType.isAssignableFrom(beanDefinitionReference.getBeanType())) {
@@ -503,12 +615,12 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                 addBeanDefinition(additionalBeanDefinition);
                 for (Map.Entry<BeanConfiguration, List<BeanDefinitionProducer>> e : beans.byConfiguration) {
                     BeanConfiguration configuration = e.getKey();
-                    if (!configuration.isEnabled(beanContext) && configuration.isWithin(reference)) {
+                    if (!configuration.isEnabled(beanContext) && isWithin(configuration, additionalBeanDefinition)) {
                         additionalBeanDefinition.disable();
                     }
                 }
                 for (BeanConfiguration additionalBeanConfiguration : additionalBeanConfigurations) {
-                    if (!additionalBeanConfiguration.isEnabled(beanContext) && additionalBeanConfiguration.isWithin(reference)) {
+                    if (!additionalBeanConfiguration.isEnabled(beanContext) && isWithin(additionalBeanConfiguration, additionalBeanDefinition)) {
                         additionalBeanDefinition.disable();
                     }
                 }
@@ -529,8 +641,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         for (BeanConfiguration additionalBeanConfiguration : additionalBeanConfigurations) {
             if (!additionalBeanConfiguration.isEnabled(beanContext)) {
                 for (BeanDefinitionProducer producer : beans.all) {
-                    BeanDefinitionReference<?> reference = producer.reference;
-                    if (reference != null && additionalBeanConfiguration.isWithin(reference)) {
+                    if (isWithin(additionalBeanConfiguration, producer)) {
                         producer.disable();
                     }
                 }
@@ -547,12 +658,25 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
 
+    /**
+     * Whether the reference of a producer is within a configuration. In lazy mode, the default
+     * {@link BeanConfiguration#isWithin(io.micronaut.inject.BeanDefinitionReference)} loads the bean type of a lazy
+     * reference, and a reference whose bean type does not load is not present.
+     */
+    private boolean isWithin(BeanConfiguration configuration, BeanDefinitionProducer producer) {
+        BeanDefinitionReference<?> reference = producer.reference;
+        if (reference == null) {
+            return false;
+        }
+        return lazy ? LazyBeans.isWithin(configuration, producer, reference) : configuration.isWithin(reference);
+    }
+
     private boolean isEagerInit(BeanDefinitionReference<?> beanDefinitionReference) {
         return eagerInitSingletons && beanDefinitionReference.isSingleton() ||
             eagerInitStereotypesPresent && beanDefinitionReference.getAnnotationMetadata().hasDeclaredStereotype(eagerInitStereotypes);
     }
 
-    private static Beans createBeans(List<BeanDefinitionReference<?>> beanDefinitionReferences, List<BeanConfiguration> beanConfigurations) {
+    private static Beans createEagerBeans(List<BeanDefinitionReference<?>> beanDefinitionReferences, List<BeanConfiguration> beanConfigurations) {
         List<BeanDefinitionProducer> eagerInitBeans = new ArrayList<>(20);
         List<BeanDefinitionProducer> processedBeans = new ArrayList<>(10);
         List<BeanDefinitionProducer> parallelBeans = new ArrayList<>(10);
@@ -609,6 +733,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             new CopyOnWriteArrayList<>(all),
             proxyTargetBeans,
             new ConcurrentHashMap<>(indexByType),
+            null,
             byConfiguration
         );
     }
@@ -645,7 +770,16 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     private List<BeanDefinitionReference<?>> resolveBeanDefinitionReferences() {
-        List<BeanDefinitionReference<?>> refs = beanDefinitionReferencesProvider.provide(classLoader);
+        List<BeanDefinitionReference<?>> refs;
+        if (lazy) {
+            // the context's own provider gives lazy references when asked; a provider of the application decides itself
+            refs = beanDefinitionReferencesProvider instanceof DefaultBeanDefinitionsProvider defaultProvider
+                ? defaultProvider.provide(classLoader, true)
+                : beanDefinitionReferencesProvider.provide(classLoader);
+            providedReferences = refs;
+        } else {
+            refs = beanDefinitionReferencesProvider.provide(classLoader);
+        }
         if (beansPredicate != null) {
             List<BeanDefinitionReference<?>> list = new ArrayList<>(refs.size());
             for (BeanDefinitionReference<?> ref : refs) {
@@ -661,6 +795,12 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     private record ProducersByDefinitionName(Beans beans, Map<String, List<BeanDefinitionProducer>> index) {
     }
 
+    /**
+     * The producers of the definitions.
+     *
+     * @param beanIndex The producers by the types they are found by, in eager mode
+     * @param nameIndex The producers by the names of the types they are found by, in lazy mode, else {@code null}
+     */
     private record Beans(
         List<BeanDefinitionProducer> eagerInitBeans,
         List<BeanDefinitionProducer> processedBeans,
@@ -668,6 +808,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         List<BeanDefinitionProducer> all,
         List<BeanDefinitionProducer> proxyTargetBeans,
         Map<Class<?>, List<BeanDefinitionProducer>> beanIndex,
+        @Nullable Map<String, List<BeanDefinitionProducer>> nameIndex,
         List<Map.Entry<BeanConfiguration, List<BeanDefinitionProducer>>> byConfiguration
     ) {
     }
@@ -679,10 +820,10 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
      * @since 4.0.0
      */
     @Internal
-    private static final class BeanDefinitionProducer {
-        private static final AtomicReferenceFieldUpdater<BeanDefinitionProducer, Object> DEFINITION_UPDATER =
+    private static class BeanDefinitionProducer {
+        static final AtomicReferenceFieldUpdater<BeanDefinitionProducer, Object> DEFINITION_UPDATER =
             AtomicReferenceFieldUpdater.newUpdater(BeanDefinitionProducer.class, Object.class, "definition");
-        private static final Object DEFINITION_DISABLED_SENTINEL = "";
+        static final Object DEFINITION_DISABLED_SENTINEL = "";
 
         /**
          * Initially the reference, may be set to {@code null} by {@link #disable()} or if
@@ -690,7 +831,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
          */
         @Nullable
         @SuppressWarnings("java:S3077")
-        private volatile BeanDefinitionReference<?> reference;
+        volatile BeanDefinitionReference<?> reference;
         /**
          * Initially {@code null}. If the {@link #reference} is enabled, and the definition from it
          * is also enabled, this is set to the {@link BeanDefinition}. If the definition is
@@ -699,7 +840,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
          */
         @Nullable
         @SuppressWarnings("java:S3077")
-        private volatile Object definition;
+        volatile Object definition;
 
         BeanDefinitionProducer(BeanDefinitionReference<?> reference) {
             this.reference = reference;
@@ -819,7 +960,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
          * @param beanType The requested bean type
          * @return True if the bean declares an index for exactly the requested type and does not implement it
          */
-        private boolean isIndexedBy(Argument<?> beanType) {
+        boolean isIndexedBy(Argument<?> beanType) {
             BeanDefinitionReference<?> ref = reference;
             if (ref == null) {
                 return false;
@@ -855,6 +996,452 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                 return "BeanDefinitionProducer{disabled}";
             }
             return ref.toString();
+        }
+    }
+    /**
+     * A producer of a {@link LazyBeanDefinitionReference}. The steps with side effects keep the order eager mode
+     * gives them: the conditions checked before loading, then, for a lookup of a type, the class of the definition is
+     * instantiated without a context and the candidate check runs on it, then the reference predicate, then the
+     * definition is loaded for the context, then the definition predicate and the conditions checked after loading.
+     * The reference predicate is asked of the lazy reference first, which answers a lookup by a qualifier alone
+     * without loading anything, and then, for the references it selects, of the instance, as eager mode asks it. A
+     * reference whose definition cannot be linked disables the producer for good, as the eager read would have
+     * dropped it.
+     */
+    private static final class LazyBeanDefinitionProducer extends BeanDefinitionProducer {
+
+        private final LazyBeanDefinitionReference<?> lazy;
+
+        LazyBeanDefinitionProducer(LazyBeanDefinitionReference<?> lazy) {
+            super(lazy);
+            this.lazy = lazy;
+        }
+
+        @Override
+        @Nullable
+        <T> BeanDefinitionReference<T> getReferenceIfEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
+            BeanDefinitionReference ref = reference;
+            if (ref == null) {
+                return null;
+            }
+            if (lazy.isPreLoadEnabled(context, resolutionContext)) {
+                return ref;
+            }
+            // Only permanently disable if the context is running, as eager mode does
+            if (context.isRunning()) {
+                this.reference = null;
+            }
+            return null;
+        }
+
+        @Override
+        @Nullable
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        <T> BeanDefinition<T> getDefinitionIfEnabled(BeanContext context,
+                                                     @Nullable BeanResolutionContext resolutionContext,
+                                                     BeanResolutionCustomizer beanResolutionCustomizer,
+                                                     @Nullable Argument<T> beanType,
+                                                     @Nullable Predicate<BeanDefinitionReference<T>> refPredicate,
+                                                     @Nullable Predicate<BeanDefinition<T>> defPredicate) {
+            Object defObject = this.definition;
+            if (defObject != DEFINITION_DISABLED_SENTINEL && defObject != null) {
+                return super.getDefinitionIfEnabled(context, resolutionContext, beanResolutionCustomizer, beanType, refPredicate, defPredicate);
+            }
+            BeanDefinitionReference<T> ref = getReferenceIfEnabled(context, resolutionContext);
+            if (ref == null) {
+                if (context.isRunning()) {
+                    // shortcut for future calls
+                    this.definition = DEFINITION_DISABLED_SENTINEL;
+                }
+                return null;
+            }
+            try {
+                if (beanType != null && !beanType.getType().equals(Object.class)) {
+                    // the instance eager mode checks, without the configuration load(context) gives it
+                    BeanDefinitionReference instance = lazy.instantiate();
+                    if (instance == null) {
+                        disable();
+                        return null;
+                    }
+                    if (!(beanResolutionCustomizer.isCandidateBean(beanType, instance) || isIndexedBy(beanType))) {
+                        return null;
+                    }
+                }
+                if (refPredicate != null) {
+                    if (!refPredicate.test(ref)) {
+                        return null;
+                    }
+                    // the descriptor selected it: ask the instance, as eager mode does, which a definition whose
+                    // static initializer failed answers differently
+                    BeanDefinitionReference instance = lazy.instantiate();
+                    if (instance == null) {
+                        disable();
+                        return null;
+                    }
+                    if (!refPredicate.test(instance)) {
+                        return null;
+                    }
+                }
+            } catch (NoClassDefFoundError e) {
+                if (!lazy.isPresent()) {
+                    // the bean type or the definition does not link, so the bean is not present
+                    disable();
+                    return null;
+                }
+                throw e;
+            }
+            BeanDefinition<T> def = ref.load(context);
+            if (def == null) {
+                disable();
+                return null;
+            }
+            if (defPredicate != null && !defPredicate.test(def)) {
+                return null;
+            }
+            if (isDefinitionEnabled(context, resolutionContext, def)) {
+                if (DEFINITION_UPDATER.compareAndSet(this, null, def)) {
+                    return def;
+                } else {
+                    defObject = this.definition;
+                    return defObject != DEFINITION_DISABLED_SENTINEL && defObject != null ? (BeanDefinition<T>) defObject : null;
+                }
+            } else {
+                this.definition = DEFINITION_DISABLED_SENTINEL;
+                return null;
+            }
+        }
+    }
+
+    /**
+     * The steps of lazy mode, which the service calls only in lazy mode, so that this class and
+     * {@link LazyBeanDefinitionReference} are never loaded otherwise.
+     */
+    private static final class LazyBeans {
+
+        private LazyBeans() {
+        }
+
+        static BeanDefinitionProducer producer(BeanDefinitionReference<?> reference) {
+            return reference instanceof LazyBeanDefinitionReference<?> lazy ? new LazyBeanDefinitionProducer(lazy) : new BeanDefinitionProducer(reference);
+        }
+
+        /**
+         * The producers of lazy mode: as in eager mode, but indexed by the names of the types, which a lazy
+         * reference answers without loading a class.
+         */
+        static Beans createBeans(List<BeanDefinitionReference<?>> beanDefinitionReferences, List<BeanConfiguration> beanConfigurations) {
+            List<BeanDefinitionProducer> eagerInitBeans = new ArrayList<>(20);
+            List<BeanDefinitionProducer> processedBeans = new ArrayList<>(10);
+            List<BeanDefinitionProducer> parallelBeans = new ArrayList<>(10);
+
+            Map<String, List<BeanDefinitionProducer>> indexByName = CollectionUtils.newHashMap(beanDefinitionReferences.size());
+            List<BeanDefinitionProducer> all = new ArrayList<>(beanDefinitionReferences.size());
+            List<BeanDefinitionProducer> proxyTargetBeans = new ArrayList<>(beanDefinitionReferences.size());
+            for (BeanDefinitionReference<?> beanDefinitionReference : beanDefinitionReferences) {
+                all.add(producer(beanDefinitionReference));
+            }
+
+            List<Map.Entry<BeanConfiguration, List<BeanDefinitionProducer>>> byConfiguration = new ArrayList<>(beanConfigurations.size());
+            for (BeanConfiguration beanConfiguration : beanConfigurations) {
+                byConfiguration.add(Map.entry(beanConfiguration, new ArrayList<>()));
+            }
+
+            for (BeanDefinitionProducer beanDefinitionProducer : all) {
+                BeanDefinitionReference<?> beanDefinitionReference = beanDefinitionProducer.reference;
+                if (beanDefinitionReference == null) {
+                    continue;
+                }
+                for (Map.Entry<BeanConfiguration, List<BeanDefinitionProducer>> e : byConfiguration) {
+                    if (isWithin(e.getKey(), beanDefinitionProducer, beanDefinitionReference)) {
+                        e.getValue().add(beanDefinitionProducer);
+                    }
+                }
+                if (beanDefinitionReference.isProxiedBean()) {
+                    beanDefinitionProducer.disable();
+                    indexNames(indexByName, beanDefinitionReference, null);
+                    // retain only if proxy target otherwise the target is never used
+                    if (beanDefinitionReference.isProxyTarget()) {
+                        proxyTargetBeans.add(producer(beanDefinitionReference));
+                    }
+                    continue;
+                }
+
+                if (beanDefinitionReference.isContextScope()) {
+                    eagerInitBeans.add(beanDefinitionProducer);
+                } else if (beanDefinitionReference.isParallel()) {
+                    parallelBeans.add(beanDefinitionProducer);
+                }
+                if (beanDefinitionReference.requiresMethodProcessing()) {
+                    processedBeans.add(beanDefinitionProducer);
+                }
+                indexNames(indexByName, beanDefinitionReference, beanDefinitionProducer);
+            }
+
+            return new Beans(
+                eagerInitBeans,
+                processedBeans,
+                parallelBeans,
+                new CopyOnWriteArrayList<>(all),
+                proxyTargetBeans,
+                new ConcurrentHashMap<>(),
+                new ConcurrentHashMap<>(indexByName),
+                byConfiguration
+            );
+        }
+
+        /**
+         * Indexes a producer under the names of the types a lookup finds it by: for a lazy reference, the exposed
+         * types and the indexes the descriptor names; for an eager one, the names of the types eager mode indexes it
+         * by. Without a producer, only creates the keys, as eager mode does for a disabled bean.
+         */
+        private static void indexNames(Map<String, List<BeanDefinitionProducer>> indexByName,
+                                       BeanDefinitionReference<?> reference,
+                                       @Nullable BeanDefinitionProducer producer) {
+            if (reference instanceof LazyBeanDefinitionReference<?> lazy) {
+                String[] exposed = lazy.exposedTypeNames();
+                for (String type : exposed) {
+                    index(indexByName, type, producer);
+                }
+                for (String type : lazy.indexNames()) {
+                    if (!lazy.isExposedAs(type)) {
+                        index(indexByName, type, producer);
+                    }
+                }
+                return;
+            }
+            Set<Class<?>> exposedTypes = reference.getExposedTypes();
+            if (exposedTypes.isEmpty() && producer != null) {
+                // The reference must be compiled prior to v5, use reflection to find exposed types till it's recompiled
+                exposedTypes = ReflectionUtils.getAllClassesInHierarchy(reference.getBeanType());
+            }
+            for (Class<?> type : exposedTypes) {
+                index(indexByName, type.getName(), producer);
+            }
+            for (Class<?> type : reference.getIndexes()) {
+                if (!exposedTypes.contains(type)) {
+                    index(indexByName, type.getName(), producer);
+                }
+            }
+        }
+
+        private static void index(Map<String, List<BeanDefinitionProducer>> indexByName, String type, @Nullable BeanDefinitionProducer producer) {
+            List<BeanDefinitionProducer> producers = indexByName.computeIfAbsent(type, COMPUTE_NAME_INDEXES_FN);
+            if (producer != null) {
+                producers.add(producer);
+            }
+        }
+
+        static boolean isWithin(BeanConfiguration configuration, BeanDefinitionProducer producer, BeanDefinitionReference<?> reference) {
+            try {
+                return configuration.isWithin(reference);
+            } catch (NoClassDefFoundError e) {
+                if (reference instanceof LazyBeanDefinitionReference<?> lazy && !lazy.isPresent()) {
+                    // the default reads the bean type, which does not load: the bean is not present
+                    producer.disable();
+                    return false;
+                }
+                throw e;
+            }
+        }
+
+        /**
+         * Whether one of the producers a lookup by name found holds a reference that links, as eager mode, which
+         * only has references that do, answers.
+         */
+        static boolean exists(@Nullable List<BeanDefinitionProducer> producers) {
+            if (producers == null) {
+                return false;
+            }
+            for (BeanDefinitionProducer producer : producers) {
+                BeanDefinitionReference<?> reference = producer.reference;
+                if (reference != null && (!(reference instanceof LazyBeanDefinitionReference<?> lazy) || lazy.links())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        static boolean exists(List<BeanDefinitionReference<?>> references, Class<?> beanType) {
+            for (BeanDefinitionReference<?> reference : references) {
+                if (reference instanceof LazyBeanDefinitionReference<?> lazy) {
+                    if (lazy.isFoundBy(beanType.getName()) && lazy.links()) {
+                        return true;
+                    }
+                } else if (beanType.isAssignableFrom(reference.getBeanType())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * The producers of a list that a lookup of the type finds by name, and every eager one.
+         */
+        static List<BeanDefinitionProducer> foundBy(List<BeanDefinitionProducer> producers, String typeName) {
+            List<BeanDefinitionProducer> found = new ArrayList<>(producers.size());
+            for (BeanDefinitionProducer producer : producers) {
+                if (!(producer.reference instanceof LazyBeanDefinitionReference<?> lazy) || lazy.isFoundBy(typeName)) {
+                    found.add(producer);
+                }
+            }
+            return found;
+        }
+
+        /**
+         * Keeps a bean of a lazy reference that its conditions disable, to be built when the disabled beans are read:
+         * building it loads its bean type at least.
+         */
+        static boolean deferDisabled(List<Object> deferred, QualifiedBeanType<?> beanType, List<String> reasons) {
+            if (beanType instanceof LazyBeanDefinitionReference<?> lazy) {
+                deferred.add(new DeferredDisabledBean(lazy, reasons));
+                return true;
+            }
+            return false;
+        }
+
+        /**
+         * Builds the disabled beans of lazy references.
+         *
+         * @param deferred The beans kept by {@link #deferDisabled(List, QualifiedBeanType, List)}
+         * @param typeName The name of the type a lookup asked for, to build only the ones it finds, or {@code null}
+         * @return The disabled beans that could be built
+         */
+        static List<DisabledBean<?>> disabledBeans(List<Object> deferred, @Nullable String typeName) {
+            List<DisabledBean<?>> disabled = new ArrayList<>(deferred.size());
+            for (Object entry : deferred) {
+                DeferredDisabledBean bean = (DeferredDisabledBean) entry;
+                if (typeName == null || bean.reference.isFoundBy(typeName)) {
+                    DisabledBean<?> built = bean.build();
+                    if (built != null) {
+                        disabled.add(built);
+                    }
+                }
+            }
+            return disabled;
+        }
+
+        /**
+         * Starts the warm-up, when the common pool has more than one thread.
+         */
+        static Object warmUp(Beans beans) {
+            Map<BeanDefinitionReference<?>, Boolean> ordered = new java.util.IdentityHashMap<>();
+            List<LazyBeanDefinitionReference<?>> first = new ArrayList<>();
+            // the beans the context creates or processes as it starts, and the infrastructure it looks up first
+            addLazy(first, ordered, beans.eagerInitBeans);
+            addLazy(first, ordered, beans.parallelBeans);
+            addLazy(first, ordered, beans.processedBeans);
+            Map<String, List<BeanDefinitionProducer>> nameIndex = Objects.requireNonNull(beans.nameIndex);
+            for (Class<?> type : KNOWN_INDEX_TYPES) {
+                List<BeanDefinitionProducer> producers = nameIndex.get(type.getName());
+                if (producers != null) {
+                    addLazy(first, ordered, producers);
+                }
+            }
+            // then every other one whose conditions are of classes that load
+            List<LazyBeanDefinitionReference<?>> rest = new ArrayList<>();
+            addLazy(rest, ordered, beans.all);
+            WarmUp warmUp = new WarmUp(first, rest);
+            for (int i = 0; i < ForkJoinPool.getCommonPoolParallelism(); i++) {
+                ForkJoinPool.commonPool().execute(warmUp);
+            }
+            return warmUp;
+        }
+
+        private static void addLazy(List<LazyBeanDefinitionReference<?>> list, Map<BeanDefinitionReference<?>, Boolean> added, List<BeanDefinitionProducer> producers) {
+            for (BeanDefinitionProducer producer : producers) {
+                if (producer.reference instanceof LazyBeanDefinitionReference<?> lazy && added.put(lazy, Boolean.TRUE) == null) {
+                    list.add(lazy);
+                }
+            }
+        }
+
+        /**
+         * Logs, once the context has started, how many definitions were loaded.
+         */
+        static void started(@Nullable List<BeanDefinitionReference<?>> provided, List<BeanDefinitionReference<Object>> references) {
+            LazyBeanDefinitionReference.started(provided, references);
+        }
+
+        /**
+         * Stops the warm-up, and with the verification on, loads and compares every definition no lookup needed.
+         */
+        static void stop(@Nullable Object warmUp, List<BeanDefinitionReference<Object>> references) {
+            if (warmUp instanceof WarmUp running) {
+                running.cancelled = true;
+            }
+            LazyBeanDefinitionReference.stopped(references);
+        }
+    }
+
+    /**
+     * A bean of a lazy reference that its conditions disabled, built once when it is read.
+     */
+    private static final class DeferredDisabledBean {
+
+        final LazyBeanDefinitionReference<?> reference;
+        final List<String> reasons;
+        @Nullable
+        private volatile Object built;
+
+        DeferredDisabledBean(LazyBeanDefinitionReference<?> reference, List<String> reasons) {
+            this.reference = reference;
+            this.reasons = reasons;
+        }
+
+        @Nullable
+        @SuppressWarnings({"unchecked", "rawtypes", "java:S1181"})
+        DisabledBean<?> build() {
+            Object current = built;
+            if (current == null) {
+                try {
+                    current = new DisabledBean(reference.disabledBeanType(), reference.getDeclaredQualifier(), reasons);
+                } catch (LinkageError | RuntimeException e) {
+                    // the maps built here are purely to aid error diagnosis, as in eager mode
+                    current = Boolean.FALSE;
+                }
+                built = current;
+            }
+            return current instanceof DisabledBean<?> bean ? bean : null;
+        }
+    }
+
+    /**
+     * Instantiates lazy references on the common pool, without a context, in the order given: the definitions the
+     * context needs first, then every other one whose conditions are only of classes, which hold. The workers share a
+     * cursor, so the order holds across them. A reference a lookup instantiated meanwhile is skipped.
+     */
+    private static final class WarmUp implements Runnable {
+
+        private final LazyBeanDefinitionReference<?>[] references;
+        private final int first;
+        private final java.util.concurrent.atomic.AtomicInteger cursor = new java.util.concurrent.atomic.AtomicInteger();
+        volatile boolean cancelled;
+
+        WarmUp(List<LazyBeanDefinitionReference<?>> first, List<LazyBeanDefinitionReference<?>> rest) {
+            this.references = new LazyBeanDefinitionReference<?>[first.size() + rest.size()];
+            for (int i = 0; i < first.size(); i++) {
+                references[i] = first.get(i);
+            }
+            for (int i = 0; i < rest.size(); i++) {
+                references[first.size() + i] = rest.get(i);
+            }
+            this.first = first.size();
+        }
+
+        @Override
+        @SuppressWarnings("java:S1181") // a failure is kept by the reference and met again by the lookup that needs it
+        public void run() {
+            int index;
+            while (!cancelled && (index = cursor.getAndIncrement()) < references.length) {
+                LazyBeanDefinitionReference<?> reference = references[index];
+                try {
+                    if (index < first || reference.isEnabledByClasses()) {
+                        reference.instantiate();
+                    }
+                } catch (Throwable e) {
+                    // kept by the reference
+                }
+            }
         }
     }
 }

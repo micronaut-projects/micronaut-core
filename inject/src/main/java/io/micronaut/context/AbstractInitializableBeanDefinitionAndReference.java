@@ -117,6 +117,28 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
     }
 
     /**
+     * @return Whether the static initializer of the definition failed, for the verification of lazy references: such
+     * a definition answers with empty metadata, which is no fault of its descriptor
+     */
+    final boolean isFailedInitializationForVerification() {
+        return failedInitialization != null;
+    }
+
+    /**
+     * @return The conditions checked before the definition is loaded, for the verification of lazy references
+     */
+    final Condition @Nullable [] preLoadConditionsForVerification() {
+        return preLoadConditions;
+    }
+
+    /**
+     * @return The conditions checked once the definition is loaded, for the verification of lazy references
+     */
+    final Condition @Nullable [] postLoadConditionsForVerification() {
+        return postLoadConditions;
+    }
+
+    /**
      * Represents {@link BeanDefinitionReference#getBeanDefinitionName()} when the class implements {@link BeanDefinitionReference}.
      *
      * @return The name of this bean definition

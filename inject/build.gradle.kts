@@ -60,6 +60,8 @@ noReflection {
     allowIn("io.micronaut.context.DefaultFieldInjectionPoint", "ANNOTATION_SYNTHESIS", "CLASS_NAMES", "REFLECTION_UTILS")
     allowIn("io.micronaut.context.DefaultMethodInjectionPoint", "CLASS_NAMES")
     allowIn("io.micronaut.context.DefaultRuntimeBeanDefinition", "CLASS_NAMES")
+    allowIn("io.micronaut.context.LazyBeanDefinitionReference", "CLASS_LOADING", "GENERIC_SIGNATURES", "HANDLES")
+    allowIn("io.micronaut.context.LazyBeanDefinitionVerifier", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.context.RuntimeBeanDefinition", "GENERIC_SIGNATURES", "INTERFACES")
     allowIn("io.micronaut.context.beans.DefaultBeanDefinitionService", "FIELD_UPDATERS", "REFLECTION_UTILS")
     allowIn("io.micronaut.context.conditions.MatchesAbsenceOfClassNamesCondition", "CLASS_LOADING")

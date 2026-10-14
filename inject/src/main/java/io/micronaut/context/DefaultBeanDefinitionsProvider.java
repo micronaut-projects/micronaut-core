@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.inject.BeanDefinitionReference;
 
 import java.util.List;
@@ -38,6 +39,26 @@ public final class DefaultBeanDefinitionsProvider implements BeanDefinitionsProv
             BeanDefinitionReference::isPresent
         );
         return (List) result;
+    }
+
+    /**
+     * Provides the references, lazily when asked to: a definition whose {@code META-INF/micronaut} entry carries a
+     * descriptor gets a reference that answers from the descriptor and loads the definition only when it needs to.
+     * The other definitions get the references {@link #provide(ClassLoader)} gives, and so do all of them in a native
+     * image. Only the context's own read and the bean definition prefetch ask for lazy references, when lazy bean
+     * definitions are switched on ({@code micronaut.bean-definitions.lazy=true}).
+     *
+     * @param classLoader The class loader to use for loading bean definitions
+     * @param lazy        Whether to give lazy references
+     * @return A list of bean definition references
+     * @since 5.3.0
+     */
+    @Internal
+    public List<BeanDefinitionReference<?>> provide(ClassLoader classLoader, boolean lazy) {
+        if (!lazy || NativeImageUtils.inImageCode()) {
+            return provide(classLoader);
+        }
+        return LazyBeanDefinitions.provide(classLoader);
     }
 
 }

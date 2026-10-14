@@ -103,6 +103,41 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
     List<DisabledBean<?>> getDisabledBeans(BeanContext beanContext);
 
     /**
+     * The disabled beans a lookup of a type reports: every one, unless lazy references let the service leave out the
+     * ones whose types the lookup does not find, without loading them.
+     *
+     * @param beanContext The bean context
+     * @param beanType    The type looked up
+     * @return The disabled beans
+     * @since 5.3.0
+     */
+    default List<DisabledBean<?>> getDisabledBeans(BeanContext beanContext, Argument<?> beanType) {
+        return getDisabledBeans(beanContext);
+    }
+
+    /**
+     * The targets of proxies a lookup of a type reports: every one, unless lazy references let the service leave out
+     * the ones whose types the lookup does not find, without loading them.
+     *
+     * @param beanContext The bean context
+     * @param beanType    The type looked up
+     * @return The targets
+     * @since 5.3.0
+     */
+    default Iterable<BeanDefinition<Object>> getTargetProxyBeans(BeanContext beanContext, Argument<?> beanType) {
+        return getTargetProxyBeans(beanContext);
+    }
+
+    /**
+     * Called once the context has started.
+     *
+     * @param beanContext The bean context
+     * @since 5.3.0
+     */
+    default void started(BeanContext beanContext) {
+    }
+
+    /**
      * Returns whether at least one bean definition exists for the given raw type.
      * This is a lightweight existence check and does not consider qualifiers.
      *

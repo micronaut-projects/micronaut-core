@@ -23,6 +23,12 @@ import java.util.List;
 /**
  * The provider of bean definitions.
  *
+ * <p>With the experimental system property {@code micronaut.bean-definitions.lazy=true}, the references a context
+ * reads with its default provider may be lazy: such a reference is not a
+ * {@link io.micronaut.inject.BeanDefinition} and loads its definition only when it needs to. A provider of the
+ * application gets what {@link #provide(ClassLoader)} of {@link DefaultBeanDefinitionsProvider} gives, which is
+ * never lazy.</p>
+ *
  * @author Denis Stepanov
  * @since 5.0
  */
