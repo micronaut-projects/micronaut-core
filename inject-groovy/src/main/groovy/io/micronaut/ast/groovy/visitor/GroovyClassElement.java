@@ -368,6 +368,18 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
+    public boolean isRawType() {
+        GenericsType[] redirectTypes = classNode.redirect().getGenericsTypes();
+        if (redirectTypes == null || redirectTypes.length == 0) {
+            return false;
+        }
+        // Written without arguments, or copied without any by withTypeArguments
+        Map<String, ClassElement> typeArguments = getTypeArguments();
+        return typeArguments.isEmpty() || typeArguments.values().stream()
+            .allMatch(argument -> argument instanceof GenericPlaceholderElement placeholder && placeholder.isRawType());
+    }
+
+    @Override
     public Collection<ClassElement> getInterfaces() {
         final ClassNode[] interfaces = classNode.getInterfaces();
         if (ArrayUtils.isNotEmpty(interfaces)) {

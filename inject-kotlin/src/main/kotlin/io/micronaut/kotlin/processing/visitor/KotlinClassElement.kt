@@ -740,6 +740,9 @@ internal open class KotlinClassElement(
 
     override fun isInner() = outerType != null
 
+    // Copied without any arguments by withTypeArguments
+    override fun isRawType() = resolvedTypeArguments?.isEmpty() == true && declaration.typeParameters.isNotEmpty()
+
     override fun getPrimaryConstructor() = resolvedPrimaryConstructor
 
     override fun getDefaultConstructor() = resolvedDefaultConstructor

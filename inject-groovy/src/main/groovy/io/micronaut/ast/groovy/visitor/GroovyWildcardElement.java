@@ -74,6 +74,12 @@ final class GroovyWildcardElement extends GroovyClassElement implements Wildcard
         return Optional.of(upperType);
     }
 
+    @Override
+    public boolean isRawType() {
+        // A wildcard is never raw, whatever its bound is
+        return false;
+    }
+
     @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
