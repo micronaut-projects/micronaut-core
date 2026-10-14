@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.PropertySource
 import io.micronaut.core.annotation.Generated
 import java.lang.annotation.ElementType
 import java.lang.annotation.RetentionPolicy
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.AnnotationElement
 import io.micronaut.inject.ast.AnnotationMemberElement
 import io.micronaut.inject.ast.ClassElement
@@ -200,9 +201,9 @@ class Test:
             assert members[4].getType().getName() == 'python.Colour'
             assert members[5].getType().isArray()
             assert members[5].getType().fromArray().getName() == 'java.lang.String'
-
             assert members[5].isArray() && members[5].getArrayDimensions() == 1
             assert members[2].isPrimitive() && !members[0].isPrimitive()
+
             // the defaults, as the metadata records them: the Python class is visited before its generated
             // annotation type exists, so a class value is the class name and a list value a List, the shapes
             // AnnotationMemberDefaultsSpec documents for the written metadata
@@ -226,6 +227,8 @@ class Test:
             assert copy.getMembers()*.getName() == members*.getName()
             AnnotationMemberElement memberCopy = members[1].withAnnotationMetadata(members[1].getAnnotationMetadata())
             assert memberCopy.getDefaultValue() == Optional.of('')
+            assert !members[1].withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA).hasAnnotation('io.micronaut.context.annotation.NonBinding')
+            assert members[1].hasAnnotation('io.micronaut.context.annotation.NonBinding')
 
             // a Java annotation on the classpath answers with its own declaration, a nested annotation type included
             def named = (AnnotationElement) context.getClassElement(Named.name).get()

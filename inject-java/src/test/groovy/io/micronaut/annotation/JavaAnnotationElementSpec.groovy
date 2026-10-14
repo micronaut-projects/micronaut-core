@@ -6,6 +6,7 @@ import io.micronaut.context.annotation.PropertySource
 import io.micronaut.core.annotation.Generated
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.ast.AnnotationElement
 import io.micronaut.inject.ast.AnnotationMemberElement
@@ -252,15 +253,15 @@ class Outer {
         members*.getName() == ['name', 'description', 'priority', 'type', 'target', 'tags', 'nested', 'list']
         members.every { it instanceof AnnotationMemberElement && it.getDeclaringType().getName() == 'test.MyAnn' }
 
-        and: "the declared types"
+        and: "the declared types, answered by the member itself as well"
         members[0].getType().getName() == 'java.lang.String'
         members[2].getType().getName() == 'int'
-        members[3].getType().getName() == 'java.lang.Class'
         members[2].isPrimitive()
         !members[0].isPrimitive()
         members[5].isArray()
         members[5].getArrayDimensions() == 1
         !members[0].isArray()
+        members[3].getType().getName() == 'java.lang.Class'
         members[4].getType().getName() == ElementType.name
         members[5].getType().isArray()
         members[5].getType().fromArray().getName() == 'java.lang.String'
@@ -314,6 +315,10 @@ class Outer {
         memberCopy.getName() == 'description'
         memberCopy.getDefaultValue() == Optional.of('')
         memberCopy.hasAnnotation('test.NonBinding')
+
+        and: "a copy of a member answers the metadata it was given"
+        !members[1].withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA).hasAnnotation('test.NonBinding')
+        members[1].hasAnnotation('test.NonBinding')
     }
 
     void "test getMembers for annotations on the classpath"() {

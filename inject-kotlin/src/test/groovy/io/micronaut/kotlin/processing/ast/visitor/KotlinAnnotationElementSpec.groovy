@@ -6,6 +6,7 @@ import io.micronaut.context.annotation.PropertySource
 import io.micronaut.core.annotation.Generated
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.ast.AnnotationElement
 import io.micronaut.inject.ast.AnnotationMemberElement
@@ -162,8 +163,8 @@ class MyBean
             target: ElementType.name, tags: 'java.lang.String', nested: 'test.Outer$Nested', list: 'test.Outer$Nested'
         ]
         MembersVisitor.ARRAYS['test.MyAnn'] == ['tags', 'list']
-
         MembersVisitor.PRIMITIVES['test.MyAnn'] == ['priority']
+
         and: "the defaults, as the metadata records them"
         members['name'] == Optional.empty()
         members['description'] == Optional.of('')
@@ -202,6 +203,10 @@ class MyBean
 
         and: "a copy of the element keeps the members"
         MembersVisitor.NAMES['test.MyAnn:copy'] == MembersVisitor.NAMES['test.MyAnn']
+
+        and: "a copy of a member answers the metadata it was given, and the original keeps its own"
+        MembersVisitor.EMPTIED_COPY_NON_BINDING['test.MyAnn'] == []
+        MembersVisitor.NON_BINDING['test.MyAnn'] == ['description']
     }
 
     static class MembersVisitor implements TypeElementVisitor<Object, Object> {
@@ -215,14 +220,14 @@ class MyBean
         static final Map<String, List<String>> ARRAYS = [:]
         static final Map<String, List<String>> MARKED = [:]
         static final Map<String, Map<String, List<String>>> ARRAY_COMPONENT_MEMBERS = [:]
+        static final Map<String, List<String>> PRIMITIVES = [:]
+        static final Map<String, List<String>> EMPTIED_COPY_NON_BINDING = [:]
 
         static void clear() {
             [NAMES, MEMBERS, TYPES, DECLARING, NON_BINDING, ANNOTATION_TYPED, ARRAYS, MARKED, ARRAY_COMPONENT_MEMBERS,
              PRIMITIVES, EMPTIED_COPY_NON_BINDING]*.clear()
         }
 
-        static final Map<String, List<String>> PRIMITIVES = [:]
-        static final Map<String, List<String>> EMPTIED_COPY_NON_BINDING = [:]
         @Override
         void start(VisitorContext visitorContext) {
             def names = ['test.MyAnn', 'test.Outer$Nested', 'test.UnusedAnn', Named.name, Singleton.name, Property.name]
@@ -242,7 +247,10 @@ class MyBean
             DECLARING.put(name, members*.getDeclaringType()*.getName() as Set)
             NON_BINDING.put(name, members.findAll { it.hasAnnotation('test.NonBinding') }*.getName())
             ANNOTATION_TYPED.put(name, members.findAll { it.getType() instanceof AnnotationElement }*.getName())
-            ARRAYS.put(name, members.findAll { it.getType().isArray() }*.getName())
+            ARRAYS.put(name, members.findAll { it.isArray() }*.getName())
+            PRIMITIVES.put(name, members.findAll { it.isPrimitive() }*.getName())
+            EMPTIED_COPY_NON_BINDING.put(name, members
+                .findAll { it.withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA).hasAnnotation('test.NonBinding') }*.getName())
             // the annotation class carries the marker; the first member is given it, which the others must not see
             if (!members.isEmpty() && element.hasAnnotation('test.Marker')) {
                 members[0].annotate('test.Marker')
