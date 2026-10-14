@@ -29,6 +29,8 @@ import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -36,6 +38,63 @@ import java.util.concurrent.atomic.AtomicBoolean
  * @since 1.0
  */
 class PropertySourcePropertyResolverSpec extends Specification {
+
+    void "placeholder lookup does not retain a missing value observed during catalog reinitialization"() {
+        given: "a key that is looked up in a spelling only the generated catalog holds, as a reset keeps the raw catalog"
+        PropertySource source = PropertySource.of("test", ["testValue": "resolved"])
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(source)
+        DefaultPropertyPlaceholderResolver placeholders = new DefaultPropertyPlaceholderResolver(resolver, ConversionService.SHARED)
+        CountDownLatch catalogCleared = new CountDownLatch(1)
+        CountDownLatch lookupCompleted = new CountDownLatch(1)
+        Thread refreshThread = Thread.start {
+            resolver.reset()
+            catalogCleared.countDown()
+            assert lookupCompleted.await(10, TimeUnit.SECONDS)
+            resolver.addPropertySource(source)
+        }
+
+        when: "a request observes the empty catalog between reset and its reinitialization"
+        ConfigurationException missingDuringRefresh
+        try {
+            assert catalogCleared.await(10, TimeUnit.SECONDS)
+            try {
+                placeholders.resolveRequiredPlaceholders('${test-value}')
+                throw new AssertionError("Expected placeholder resolution to fail while the catalog is empty")
+            } catch (ConfigurationException e) {
+                missingDuringRefresh = e
+            }
+        } finally {
+            lookupCompleted.countDown()
+            refreshThread.join(10_000)
+        }
+        then: "the negative lookup must not survive once the catalog has been rebuilt"
+        !refreshThread.alive
+        missingDuringRefresh.message == 'Could not resolve placeholder ${test-value}'
+        placeholders.resolveRequiredPlaceholders('${test-value}') == "resolved"
+    }
+
+    void "building a resolver from property sources does not invoke the resetCaches hook of a subclass"() {
+        when: "the hook would fail, as the fields of the subclass are not initialized yet"
+        def resolver = new CachingResolver(PropertySource.of("test", ["test.value": "resolved"]))
+
+        then:
+        noExceptionThrown()
+        resolver.getProperty("test.value", String).get() == "resolved"
+    }
+
+    static class CachingResolver extends PropertySourcePropertyResolver {
+        private final Map<String, Object> derived = new HashMap<>()
+
+        CachingResolver(PropertySource... propertySources) {
+            super(propertySources)
+        }
+
+        @Override
+        protected void resetCaches() {
+            super.resetCaches()
+            derived.clear()
+        }
+    }
 
     @Unroll
     void "test resolve property #property matches for pattern #pattern"() {

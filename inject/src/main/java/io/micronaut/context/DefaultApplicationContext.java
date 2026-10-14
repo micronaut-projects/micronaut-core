@@ -963,20 +963,26 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
 
         @Override
         public Environment stop() {
-            if (bootstrapEnvironment != null) {
-                bootstrapEnvironment.stop();
-                bootstrapEnvironment = null;
+            // The lock of the property catalogs, which a refresh holds while it stops and starts this
+            // environment: the bootstrap environment is only ever replaced under that lock.
+            synchronized (catalog) {
+                if (bootstrapEnvironment != null) {
+                    bootstrapEnvironment.stop();
+                    bootstrapEnvironment = null;
+                }
+                return super.stop();
             }
-            return super.stop();
         }
 
         @Override
         public Environment start() {
-            if (bootstrapEnvironment == null && isRuntimeConfigured()) {
-                bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
-                startBootstrapEnvironment();
+            synchronized (catalog) {
+                if (bootstrapEnvironment == null && isRuntimeConfigured()) {
+                    bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
+                    startBootstrapEnvironment();
+                }
+                return super.start();
             }
-            return super.start();
         }
 
         @Override
