@@ -1,0 +1,30 @@
+A bean introspection describes a bean, and its <<introspectionHierarchy, type hierarchy>> is raw. Some code needs the generic hierarchy of classes that are not beans: the class of an event payload whose generic supertypes decide which observers hear it, a class that appears as a type argument or a bound, or a class of a library or of the JDK. The ann:core.annotation.RecordTypeHierarchy[] annotation records that hierarchy at compile time, as it is declared, so that it is read without reflection through api:core.type.TypeHierarchies[]:
+
+[source,java]
+----
+@RecordTypeHierarchy // <1>
+public class Payload<T extends Number> extends ArrayList<T> implements Supplier<List<T>> {
+    ...
+}
+
+@RecordTypeHierarchy(classes = {ArrayList.class, HashMap.class}) // <2>
+class Hierarchies {
+}
+----
+<1> Records the hierarchy of the annotated class
+<2> Records the hierarchies of the given classes instead, which can be classes of a library or of the JDK
+
+[source,java]
+----
+TypeHierarchy hierarchy = TypeHierarchies.find(Payload.class).orElseThrow();
+
+hierarchy.getTypeVariables();      // [T extends Number]
+hierarchy.getGenericSuperclass();  // Optional[ArrayList<T>]
+hierarchy.getGenericInterfaces();  // [Supplier<List<T>>]
+hierarchy.getTypeClosure(Argument.of(Payload.class, Integer.class));
+// [Payload<Integer>, ArrayList<Integer>, AbstractList<Integer>, ..., Supplier<List<Integer>>, Object]
+----
+
+The hierarchy is made of api:core.type.Argument[] instances: a type variable is a api:core.type.GenericPlaceholder[] with its bounds, a wildcard a api:core.type.WildcardArgument[], a type written without its type arguments a raw type. `getTypeClosure(parameterization)` walks the hierarchies of the supertypes, substituting the actual type arguments along the way and erasing the supertypes of a raw parameterization as the Java Language Specification does, with each distinct type once and `Object` last. A supertype that has no record of its own ends its branch of the walk; the overload taking a function lets a caller add hierarchies from a source of its own.
+
+A record is a small generated class, one per type, found through the `META-INF/micronaut` service entries like a bean definition is, and loaded only when its type is asked for. A compile-time visitor records a type with `recordTypeHierarchy` of api:inject.visitor.VisitorContext[].
