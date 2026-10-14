@@ -25,13 +25,17 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
@@ -58,6 +62,8 @@ public final class TestProgressConsole implements TestReportListener {
     private static final int MAX_STACK_FRAMES = 6;
     private static final int DEFAULT_WIDTH = 80;
     private static final long STTY_TIMEOUT_SECONDS = 2;
+    private static final String ERROR = " error";
+    private static final String ERRORS = " errors";
     private static final int MIN_WIDTH = 40;
     // the indent of the lines under a test or a summary line
     private static final String DETAIL_INDENT = "      ";
@@ -278,7 +284,7 @@ public final class TestProgressConsole implements TestReportListener {
             String symbol;
             int ran = passed + failed + erroredTests;
             String skippedText = skipped == 0 ? "" : ", " + skipped + " skipped";
-            String errorText = errors == 0 ? "" : ", " + errors + (errors == 1 ? " error" : " errors");
+            String errorText = errors == 0 ? "" : ", " + errorCount(errors);
             if (summary.cancelled()) {
                 int done = ran + skipped;
                 message = "Cancelled after " + done + (done == 1 ? " test" : " tests") + ": " + failed + " failed" + errorText + skippedText;
@@ -325,7 +331,7 @@ public final class TestProgressConsole implements TestReportListener {
             int count = failure.errors().size();
             String kind = failure.kind().name().toLowerCase(Locale.ROOT);
             String message = Character.toUpperCase(kind.charAt(0)) + kind.substring(1) + " compilation failed"
-                + (count == 0 ? "" : ": " + count + (count == 1 ? " error" : " errors"));
+                + (count == 0 ? "" : ": " + errorCount(count));
             line(LiveRegion.stamp(clock.getAsLong() - epoch, LiveRegion.RED, glyphs().cross(), message, null), "COMPILATION FAILED " + message);
             List<String> lines = new ArrayList<>();
             for (CompileDiagnostic diagnostic : problems) {
@@ -468,6 +474,14 @@ public final class TestProgressConsole implements TestReportListener {
         return interactive ? LiveRegion.paint(tone, text) : text;
     }
 
+    /**
+     * @param count A number of errors
+     * @return {@code 1 error} or {@code 2 errors}
+     */
+    private static String errorCount(int count) {
+        return count + (count == 1 ? ERROR : ERRORS);
+    }
+
     private LiveRegion.Glyphs glyphs() {
         return region.glyphs();
     }
@@ -491,7 +505,7 @@ public final class TestProgressConsole implements TestReportListener {
             detail.append(", ").append(failed).append(" failed");
         }
         if (errors > 0) {
-            detail.append(", ").append(errors).append(errors == 1 ? " error" : " errors");
+            detail.append(", ").append(errorCount(errors));
         }
         lines.add(region.headerRow(spinnerFrame, "Running tests", detail.toString(), now - runStarted, columns));
         int shown = 0;
@@ -593,7 +607,7 @@ public final class TestProgressConsole implements TestReportListener {
             try {
                 // to a file rather than a pipe: the output is read once the command ended, and a command that hangs, or
                 // leaves a process holding its output open, cannot block test mode's start past the timeout
-                output = Files.createTempFile("micronaut-dev-stty", ".txt");
+                output = ownerOnlyTempFile();
                 Process process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(output.toFile()).start();
                 if (!process.waitFor(STTY_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                     process.destroyForcibly();
@@ -618,6 +632,22 @@ public final class TestProgressConsole implements TestReportListener {
                 }
             }
             return DEFAULT_WIDTH;
+        }
+
+        /**
+         * A temporary file only its owner reads and writes: in the user's own temporary directory where the system
+         * has one, and with owner-only permissions set explicitly where the file system has POSIX permissions.
+         *
+         * @return The file
+         * @throws IOException if it cannot be created
+         */
+        static Path ownerOnlyTempFile() throws IOException {
+            if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+                return Files.createTempFile("micronaut-dev-stty", ".txt",
+                    PosixFilePermissions.asFileAttribute(Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)));
+            }
+            // Windows: Files.createTempFile restricts the file to its owner through the ACL of the user's temporary directory
+            return Files.createTempFile("micronaut-dev-stty", ".txt"); // NOSONAR java:S5443 no POSIX permissions on this file system; the default ACL is the owner's
         }
     }
 }

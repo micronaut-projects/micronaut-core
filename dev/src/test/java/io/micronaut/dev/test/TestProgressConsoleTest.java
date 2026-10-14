@@ -362,6 +362,17 @@ class TestProgressConsoleTest {
 
     @Test
     @DisabledOnOs(OS.WINDOWS)
+    void theFileSttyWritesToIsTheOwnersAlone() throws Exception {
+        Path file = TestProgressConsole.Terminal.ownerOnlyTempFile();
+        try {
+            assertEquals("rw-------", java.nio.file.attribute.PosixFilePermissions.toString(java.nio.file.Files.getPosixFilePermissions(file)));
+        } finally {
+            java.nio.file.Files.delete(file);
+        }
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
     void anSttyThatHangsCannotBlockTheStartPastItsTimeout() {
         long start = System.nanoTime();
         assertEquals(80, TestProgressConsole.Terminal.sttyWidth("/bin/sh", "-c", "sleep 30"));
