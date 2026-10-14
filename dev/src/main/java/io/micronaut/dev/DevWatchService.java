@@ -15,6 +15,7 @@
  */
 package io.micronaut.dev;
 
+import com.sun.nio.file.SensitivityWatchEventModifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.NativeImageUtils;
@@ -25,7 +26,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
 import java.nio.file.WatchService;
+import java.time.Duration;
+import java.util.Locale;
 
 /**
  * The watch service the launcher watches with. On macOS the JDK's service polls, every ten seconds
@@ -58,9 +62,9 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      */
     static DevWatchService create() throws IOException {
         ClassLoader loader = DevWatchService.class.getClassLoader();
-        boolean mac = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac");
+        boolean mac = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
         if (mac && NativeImageUtils.inImageRuntimeCode()) {
-            PollingWatchService polling = new PollingWatchService(java.time.Duration.ofMillis(NATIVE_POLL_MILLIS));
+            PollingWatchService polling = new PollingWatchService(Duration.ofMillis(NATIVE_POLL_MILLIS));
             return new DevWatchService(polling, (directory, service) -> polling.register(directory), true);
         }
         if (mac && ClassUtils.isPresent(MAC_SERVICE, loader)) {
@@ -100,10 +104,10 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
     private static final class HighSensitivity {
         static DirectoryWatcher.WatchKeyRegistrar registrar() {
             // resolved now, so that a JDK without the modifier fails here rather than at the first registration
-            java.nio.file.WatchEvent.Modifier high = com.sun.nio.file.SensitivityWatchEventModifier.HIGH;
+            WatchEvent.Modifier high = SensitivityWatchEventModifier.HIGH;
             return (directory, service) -> directory.register(
                 service,
-                new java.nio.file.WatchEvent.Kind<?>[] {StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY},
+                new WatchEvent.Kind<?>[] {StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY},
                 high
             );
         }

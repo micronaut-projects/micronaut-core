@@ -761,6 +761,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         private final ApplicationContextConfiguration bootstrapConfiguration;
         private final ApplicationContext parentContext;
         private final List<ApplicationContext> bootstrapContexts = new ArrayList<>();
+        private volatile Set<String> configurationLocations = Set.of();
 
         private BootstrapPropertySourcesLocator(ApplicationContextConfiguration bootstrapConfiguration, ApplicationContext parentContext) {
             this.bootstrapConfiguration = bootstrapConfiguration;
@@ -797,7 +798,13 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
                 // Lower priority than bootstrap property sources
                 bootstrapPropertySources.add(new BootstrapPropertySource(propertySource));
             }
+            configurationLocations = bootstrapContext.getEnvironment().getConfigurationLocations();
             return bootstrapPropertySources;
+        }
+
+        @Override
+        public Set<String> getConfigurationLocations() {
+            return configurationLocations;
         }
 
         @Override
