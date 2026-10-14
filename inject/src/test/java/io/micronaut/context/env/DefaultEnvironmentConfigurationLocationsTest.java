@@ -28,6 +28,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -133,6 +135,18 @@ class DefaultEnvironmentConfigurationLocationsTest {
             assertTrue(environment.isConfigurationLocation("classpath:bootstrap.yml"));
             assertTrue(environment.isConfigurationLocation("classpath:bootstrap-dev.properties"));
             assertTrue(environment.isConfigurationLocation("classpath:application.yml"));
+        }
+    }
+
+    @Test
+    void theFilesOfTheSourcesALocatorReads() throws IOException {
+        Path custom = root.resolve("custom.properties").toAbsolutePath();
+        PropertySourcesLocator locator = environment -> List.of(
+            PropertySource.of("custom", Map.of("app.custom", true), PropertySource.Origin.of("file:" + custom)));
+        try (ApplicationContext context = builder().propertySourcesLocator(locator).start()) {
+            Environment environment = context.getEnvironment();
+            assertTrue(environment.getProperty("app.custom", Boolean.class).orElse(false));
+            assertTrue(environment.isConfigurationLocation(custom.toString()));
         }
     }
 

@@ -50,6 +50,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -392,6 +393,14 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
                 Collection<PropertySource> sources = propertySourcesLocator.load(this);
                 propertySources.addAll(sources);
+                for (PropertySource source : sources) {
+                    // a located source read from a file, such as one a locator of the application reads, or an import
+                    String location = source.getOrigin().location();
+                    if (location.startsWith(ClassPathResourceLoader.PREFIX) || location.startsWith(CLASSPATH_ALL_PREFIX)
+                        || location.startsWith(FileSystemResourceLoader.PREFIX)) {
+                        recordConfigurationLocation(location);
+                    }
+                }
                 if (propertySourcesLocator instanceof BootstrapLocatorMarker bootstrapLocator) {
                     for (String location : bootstrapLocator.getConfigurationLocations()) {
                         recordConfigurationLocation(location);
@@ -747,8 +756,19 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                                                                 PropertySource.Origin origin,
                                                                 PropertySourceLoader propertySourceLoader) {
         if (resourceLoader instanceof FileSystemResourceLoader) {
-            recordConfigurationLocation(FileSystemResourceLoader.PREFIX + resourcePath);
-        } else if (resourceLoader == this || resourceLoader instanceof ClassPathResourceLoader) {
+            // a file the loader finds is where it is, below the base of the loader if it has one; a file not created
+            // yet is where the default loader looks for it
+            Optional<URL> resource = resourceLoader.getResource(resourcePath);
+            String location = FileSystemResourceLoader.PREFIX + resourcePath;
+            if (resource.isPresent()) {
+                try {
+                    location = FileSystemResourceLoader.PREFIX + Paths.get(resource.get().toURI());
+                } catch (URISyntaxException | IllegalArgumentException e) {
+                    // the path as given
+                }
+            }
+            recordConfigurationLocation(location);
+        } else if (resourceLoader == this) {
             recordConfigurationLocation(ClassPathResourceLoader.PREFIX + resourcePath);
         }
         try {
