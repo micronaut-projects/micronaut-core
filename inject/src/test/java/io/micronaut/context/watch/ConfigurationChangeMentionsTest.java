@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.dev;
+package io.micronaut.context.watch;
 
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import org.junit.jupiter.api.Test;
 
@@ -25,35 +24,29 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class ChangedPropertyMentionTest {
+class ConfigurationChangeMentionsTest {
 
     private static final ConfigurationChange CHANGE = ConfigurationChange.ofKeys(Set.of("app.greeting"));
 
     @Test
     void aPropertyInjectionPointNamesItsKey() {
-        assertTrue(ConfigurationStaleness.mentionsChangedProperty(metadata(Property.class, "name", "app.greeting"), CHANGE));
-        assertFalse(ConfigurationStaleness.mentionsChangedProperty(metadata(Property.class, "name", "app.other"), CHANGE));
-        assertFalse(ConfigurationStaleness.mentionsChangedProperty(new MutableAnnotationMetadata(), CHANGE));
+        assertTrue(CHANGE.mentions(metadata(Property.class, "name", "app.greeting")));
+        assertFalse(CHANGE.mentions(metadata(Property.class, "name", "app.other")));
+        assertFalse(CHANGE.mentions(new MutableAnnotationMetadata()));
     }
 
     @Test
     void aValueNamesTheKeysOfItsPlaceholders() {
-        assertTrue(ConfigurationStaleness.mentionsChangedProperty(value("${app.greeting}"), CHANGE));
-        assertTrue(ConfigurationStaleness.mentionsChangedProperty(value("Hello ${app.name:you}, ${ app.greeting : hi }"), CHANGE));
-        assertFalse(ConfigurationStaleness.mentionsChangedProperty(value("${app.name:you} and ${app.other}"), CHANGE));
-        assertFalse(ConfigurationStaleness.mentionsChangedProperty(value("${} ${app.greeting"), CHANGE));
-        assertFalse(ConfigurationStaleness.mentionsChangedProperty(value("plain"), CHANGE));
+        assertTrue(CHANGE.mentions(value("${app.greeting}")));
+        assertTrue(CHANGE.mentions(value("Hello ${app.name:you}, ${ app.greeting : hi }")));
+        assertFalse(CHANGE.mentions(value("${app.name:you} and ${app.other}")));
+        assertFalse(CHANGE.mentions(value("${} ${app.greeting")));
+        assertFalse(CHANGE.mentions(value("plain")));
         // an expression reading the environment may read any key
-        assertTrue(ConfigurationStaleness.mentionsChangedProperty(value("#{ env['other'] }"), CHANGE));
-        assertFalse(ConfigurationStaleness.mentionsChangedProperty(value("#{ 1 + 1 }"), CHANGE));
-    }
-
-    @Test
-    void noRunningContextHasNoRefresh() {
-        assertNull(ConfigurationStaleness.refreshConfiguration(null));
+        assertTrue(CHANGE.mentions(value("#{ env['other'] }")));
+        assertFalse(CHANGE.mentions(value("#{ 1 + 1 }")));
     }
 
     private static MutableAnnotationMetadata value(String expression) {
