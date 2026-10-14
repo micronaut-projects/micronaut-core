@@ -77,7 +77,7 @@ class RejectedBodyDrainSpec extends Specification {
         // meanwhile read whatever the server answers
         CompletableFuture<String> response = CompletableFuture.supplyAsync {
             try {
-                return new String(socket.inputStream.readNBytes(12), StandardCharsets.US_ASCII)
+                return new String(readUpTo(socket.inputStream, 12), StandardCharsets.US_ASCII)
             } catch (IOException e) {
                 return "closed: " + e.message
             }
@@ -134,5 +134,22 @@ class RejectedBodyDrainSpec extends Specification {
         String multipart(CompletedFileUpload file) {
             return "got ${file.size}"
         }
+    }
+
+    /**
+     * Read up to {@code n} bytes, fewer if the stream ends first. Like
+     * {@code InputStream.readNBytes(int)}, which is not available on Java 8.
+     */
+    private static byte[] readUpTo(InputStream input, int n) {
+        byte[] buf = new byte[n]
+        int off = 0
+        while (off < n) {
+            int read = input.read(buf, off, n - off)
+            if (read < 0) {
+                break
+            }
+            off += read
+        }
+        return Arrays.copyOf(buf, off)
     }
 }
