@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -175,9 +174,9 @@ public final class TypeHierarchyWriter {
                                           String name,
                                           ClassElement argument,
                                           Function<String, ExpressionDef> loadClassValueExpressionFn) {
-        // the annotations of the declaration are not part of the hierarchy
+        // the annotations written on the type use (extends @A Base<@B T>) are kept; those of the declaration of the type are not
         return ArgumentExpUtils.pushCreateArgument(defaults, type, recordType, name, argument,
-            AnnotationMetadata.EMPTY_METADATA, argument.getTypeArguments(), loadClassValueExpressionFn);
+            argument.getTypeAnnotationMetadata(), argument.getTypeArguments(), loadClassValueExpressionFn);
     }
 
     private static ExpressionDef arrayOrNull(List<ExpressionDef> arguments) {

@@ -93,13 +93,24 @@ final class TypeClosure {
             }
             // the dimensions the super type adds to the variable: T[] for a T erased to Object is one
             int dimensions = dimensions(argument.getType()) - dimensions(variable.getType());
-            return arrayOf(actual, dimensions);
+            return annotated(arrayOf(actual, dimensions), argument);
         }
         Argument<?>[] typeParameters = argument.getTypeParameters();
         if (typeParameters.length == 0 || argument.isRawType()) {
             return argument;
         }
         return argument.withTypeParameters(substitute(List.of(typeParameters), declared, substitutions));
+    }
+
+    /**
+     * Gives a substituted argument the annotations written on the use of the variable, {@code @A T} read with
+     * {@code T := String} being {@code @A String}, unless the actual argument carries annotations of its own.
+     */
+    private static Argument<?> annotated(Argument<?> actual, Argument<?> use) {
+        if (use.getAnnotationMetadata().isEmpty() || !actual.getAnnotationMetadata().isEmpty()) {
+            return actual;
+        }
+        return actual.withAnnotationMetadata(use.getAnnotationMetadata());
     }
 
     private static Argument<?>[] substitute(List<Argument<?>> arguments, Map<String, Argument<?>> declared, Map<String, Argument<?>> substitutions) {

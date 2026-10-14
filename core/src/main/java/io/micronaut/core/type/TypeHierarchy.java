@@ -108,7 +108,9 @@ public interface TypeHierarchy {
      * argument at its position, an array of a variable by an array of that argument, and a wildcard argument is kept
      * as a wildcard. A raw parameterization of a generic type, one with no type arguments or
      * {@link Argument#isRawType() marked raw}, erases every super type (JLS 4.8). A variable the record does not
-     * declare is kept as it is.</p>
+     * declare is kept as it is. The annotations written on a type use in the declaration, {@code extends @A Base<@B T>},
+     * are those of the entries, and a substituted variable carries the annotations of its use unless the actual argument
+     * has annotations of its own.</p>
      *
      * @param parameterization The type with its type arguments, or raw
      * @return The closure
