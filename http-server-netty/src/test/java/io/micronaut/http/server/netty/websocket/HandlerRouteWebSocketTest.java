@@ -41,6 +41,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -87,6 +88,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * WebSocket routes of handler functions, declared with the route builder, driven by the JDK
  * WebSocket client, which is {@link CompletionStage} based like the handlers.
  */
+@Timeout(value = 60, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class HandlerRouteWebSocketTest {
 
     private static final String SPEC = "HandlerRouteWebSocketTest";
@@ -109,6 +111,7 @@ class HandlerRouteWebSocketTest {
     }
 
     @AfterAll
+    @Timeout(value = 60, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     static void stop() {
         http.close();
         context.close();
