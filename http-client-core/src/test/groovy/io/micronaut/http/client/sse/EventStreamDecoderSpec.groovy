@@ -78,6 +78,24 @@ class EventStreamDecoderSpec extends Specification {
         decode("event: empty\nid: 1\n\ndata: a\n\n").size() == 1
     }
 
+    void "a data field without a value dispatches an event with empty data"() {
+        when:
+        List<Event<byte[]>> events = decode("event: empty\n\ndata\n\n")
+
+        then:
+        data(events) == [""]
+        events*.name == [null]
+    }
+
+    void "an id without data carries over, a retry too large for a number is ignored"() {
+        when:
+        List<Event<byte[]>> events = decode("id: 1\n\ndata: a\n\nretry: 99999999999999999999\ndata: b\n\n")
+
+        then:
+        events*.id == ["1", "1"]
+        events*.retry == [null, null]
+    }
+
     void "an event that is not terminated by a blank line is not dispatched"() {
         expect:
         decode("data: a\n\ndata: unterminated\n").size() == 1

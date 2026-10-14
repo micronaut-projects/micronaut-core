@@ -663,6 +663,19 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     @Override
+    public BeanElementBuilder registerBean(ClassElement beanType, io.micronaut.inject.ast.Element... originatingElements) {
+        AbstractBeanDefinitionBuilder.requireOriginatingElements(beanType, originatingElements);
+        JavaBeanDefinitionBuilder builder = new JavaBeanDefinitionBuilder(
+            originatingElements[0],
+            beanType,
+            beanType instanceof AbstractAnnotationElement aae ? aae.getElementAnnotationMetadataFactory() : elementAnnotationMetadataFactory,
+            this
+        );
+        builder.addOriginatingElements(originatingElements);
+        return builder;
+    }
+
+    @Override
     public BeanElementBuilder addAssociatedBean(io.micronaut.inject.ast.Element originatingElement, ClassElement type) {
         return new JavaBeanDefinitionBuilder(
             originatingElement,
