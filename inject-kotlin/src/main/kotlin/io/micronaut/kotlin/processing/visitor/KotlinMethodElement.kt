@@ -91,6 +91,9 @@ internal open class KotlinMethodElement(
 
     override fun isAbstract(): Boolean = declaration.isAbstract
 
+    @OptIn(KspExperimental::class)
+    override fun resolveThrownTypes() = visitorContext.resolver.getJvmCheckedException(declaration)
+
     override fun isPublic(): Boolean = declaration.isPublic()
 
     override fun isProtected(): Boolean = declaration.isProtected()
