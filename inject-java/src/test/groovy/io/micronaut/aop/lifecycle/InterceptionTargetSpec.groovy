@@ -117,6 +117,164 @@ class MyBean {
         '@Around(proxyTarget = true, lazy = true, lazyInterceptorsPerTarget = true)'  | '@InterceptorBinding(kind = InterceptorKind.AROUND)\n@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)'
     }
 
+    void 'test a per target interceptor of a plain around advised singleton learns the bean it is created for'() {
+        given:
+        ApplicationContext context = buildContext('plain.MyBean', '''
+package plain;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.InterceptionTarget;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.inject.BeanDefinition;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@interface Probed {
+}
+
+class Seen {
+    static final List<BeanDefinition<?>> DEFINITIONS = Collections.synchronizedList(new ArrayList<>());
+    static final List<Object> INTERCEPTORS = Collections.synchronizedList(new ArrayList<>());
+    static final List<Object> DESTROYED = Collections.synchronizedList(new ArrayList<>());
+}
+
+@Prototype
+@InterceptorBinding(value = Probed.class, kind = InterceptorKind.AROUND)
+class ProbingInterceptor implements MethodInterceptor<Object, Object> {
+    final BeanDefinition<?> definition;
+
+    ProbingInterceptor(InterceptionTarget target) {
+        this.definition = target.definition();
+        Seen.DEFINITIONS.add(definition);
+    }
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        Seen.INTERCEPTORS.add(this);
+        return context.proceed();
+    }
+
+    @PreDestroy
+    void destroy() {
+        Seen.DESTROYED.add(this);
+    }
+}
+
+@Singleton
+@Around
+@Probed
+class MyBean {
+    String work() { return "worked"; }
+}
+''')
+        Class<?> beanType = context.classLoader.loadClass('plain.MyBean')
+        Class<?> seen = context.classLoader.loadClass('plain.Seen')
+
+        when:
+        def bean = context.getBean(beanType)
+        BeanDefinition<?> definition = context.getBeanDefinition(beanType)
+
+        then: 'the interceptor is created once, for the bean, and told its definition'
+        bean.work() == 'worked'
+        bean.work() == 'worked'
+        seen.DEFINITIONS.size() == 1
+        seen.DEFINITIONS[0] == definition
+        beanType.isAssignableFrom(seen.DEFINITIONS[0].beanType)
+        seen.INTERCEPTORS.size() == 2
+        seen.INTERCEPTORS[0].is(seen.INTERCEPTORS[1])
+        seen.INTERCEPTORS[0].definition == definition
+
+        when: 'the bean is destroyed'
+        context.destroyBean(bean)
+
+        then: 'the interceptor created for it is destroyed with it'
+        seen.DESTROYED.size() == 1
+        seen.DESTROYED[0].is(seen.INTERCEPTORS[0])
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test a per target interceptor learns the definition of each of two subclass proxied targets of one class - #kinds'() {
+        given:
+        ApplicationContext context = buildContext('intercepted.MyBean', source(around, kinds), true, PROPERTIES)
+        Class<?> beanType = context.classLoader.loadClass('intercepted.MyBean')
+        Map<String, BeanDefinition<?>> seen = context.classLoader.loadClass('intercepted.Seen').DEFINITIONS
+
+        when:
+        def one = context.getBean(beanType, Qualifiers.byName('one'))
+        def two = context.getBean(beanType, Qualifiers.byName('two'))
+
+        then:
+        one.work() == 'one'
+        two.work() == 'two'
+        seen.keySet() == ['one', 'two'] as Set
+        seen.every { name, definition -> beanType.isAssignableFrom(definition.beanType) }
+        seen['one'].declaredQualifier == Qualifiers.byName('one')
+        seen['two'].declaredQualifier == Qualifiers.byName('two')
+
+        cleanup:
+        context.close()
+
+        where:
+        around     | kinds
+        '@Around'  | '@InterceptorBinding(kind = InterceptorKind.AROUND)'
+        '@Around'  | '@InterceptorBinding(kind = InterceptorKind.AROUND)\n@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)'
+        '@Around'  | '@InterceptorBinding(kind = InterceptorKind.AROUND)\n@InterceptorBinding(kind = InterceptorKind.AROUND_CONSTRUCT)'
+    }
+
+    void 'test a per target interceptor of an introduction learns the bean it is created for'() {
+        given:
+        ApplicationContext context = buildContext('introduced.MyBean', '''
+package introduced;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.InterceptionTarget;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.inject.BeanDefinition;
+import java.lang.annotation.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Introduction
+@InterceptorBinding(kind = InterceptorKind.INTRODUCTION)
+@interface Stubbed {
+}
+
+@Prototype
+@InterceptorBinding(value = Stubbed.class, kind = InterceptorKind.INTRODUCTION)
+class StubbingInterceptor implements MethodInterceptor<Object, Object> {
+    final BeanDefinition<?> definition;
+
+    StubbingInterceptor(InterceptionTarget target) {
+        this.definition = target.definition();
+    }
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        return definition;
+    }
+}
+
+@Stubbed
+interface MyBean {
+    Object work();
+}
+''')
+        Class<?> beanType = context.classLoader.loadClass('introduced.MyBean')
+
+        expect:
+        context.getBean(beanType).work() == context.getBeanDefinition(beanType)
+
+        cleanup:
+        context.close()
+    }
+
     void 'test without lazyInterceptorsPerTarget the interceptors injected into a proxy have no target'() {
         given:
         ApplicationContext context = buildContext('intercepted.MyBean',
