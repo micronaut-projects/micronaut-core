@@ -115,9 +115,12 @@ public final class TypeHierarchies {
     }
 
     /**
-     * Forgets the records found so far, for a class path that changed.
+     * Forgets the records found so far, for a class path that changed. A lookup that overlaps the call can still
+     * publish what it read before the change; a caller that reloads classes invalidates after the change is complete.
      */
     public static void invalidate() {
+        // the names of the service entries are cached as well, by the loader utilities
+        MicronautMetaServiceLoaderUtils.invalidate();
         INDEXES.clear();
     }
 
