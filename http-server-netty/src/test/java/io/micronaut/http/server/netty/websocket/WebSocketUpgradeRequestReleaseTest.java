@@ -26,6 +26,7 @@ import io.micronaut.http.LifecycleHttpRequest;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
+import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.runtime.http.scope.RequestScope;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.TaskExecutors;
@@ -45,10 +46,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.net.http.WebSocketHandshakeException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -241,6 +247,75 @@ class WebSocketUpgradeRequestReleaseTest {
     }
 
     @Test
+    void upgradeRequestFilteredOffTheEventLoopIsReleasedWhenTheSessionEnds() throws Exception {
+        Recorder recorder = ctx.getBean(Recorder.class);
+        WebSocket webSocket = client.newWebSocketBuilder().buildAsync(uri("/ws-release/offloop"), new WebSocket.Listener() {
+        }).get(10, TimeUnit.SECONDS);
+        await(() -> !recorder.opened.isEmpty());
+
+        // the filter completed the upgrade off the event loop, which then wrote the response
+        assertEquals(List.of(Boolean.FALSE), recorder.filteredOnEventLoop);
+        assertTrue(recorder.disposed.isEmpty());
+
+        webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "bye").get(10, TimeUnit.SECONDS);
+
+        await(() -> !recorder.disposed.isEmpty() && !recorder.terminated.isEmpty());
+        assertEquals(List.of("/ws-release/offloop"), recorder.disposed);
+        assertEquals(List.of("/ws-release/offloop"), recorder.terminated);
+    }
+
+    @Test
+    void upgradeRequestOfAnUnsupportedVersionIsReleased() throws Exception {
+        Recorder recorder = ctx.getBean(Recorder.class);
+        try (Socket socket = new Socket("localhost", server.getPort())) {
+            // no session opens: the handshake answers the versions it supports
+            String statusLine = sendUpgradeRequest(socket, "/ws-release/unsupported",
+                "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
+                "Sec-WebSocket-Version: 99\r\n");
+            assertTrue(statusLine.startsWith("HTTP/1.1 426"), statusLine);
+
+            await(() -> !recorder.disposed.isEmpty() && !recorder.terminated.isEmpty());
+        }
+        assertEquals(List.of("/ws-release/unsupported"), recorder.disposed);
+        assertEquals(List.of("/ws-release/unsupported"), recorder.terminated);
+        assertTrue(recorder.opened.isEmpty());
+    }
+
+    @Test
+    void upgradeRequestWhoseHandshakeFailsIsReleased() throws Exception {
+        Recorder recorder = ctx.getBean(Recorder.class);
+        try (Socket socket = new Socket("localhost", server.getPort())) {
+            // the handshake fails on the missing key
+            OutputStream out = socket.getOutputStream();
+            out.write(upgradeRequest("/ws-release/nokey", "Sec-WebSocket-Version: 13\r\n"));
+            out.flush();
+
+            await(() -> !recorder.disposed.isEmpty() && !recorder.terminated.isEmpty());
+        }
+        assertEquals(List.of("/ws-release/nokey"), recorder.disposed);
+        assertEquals(List.of("/ws-release/nokey"), recorder.terminated);
+        assertTrue(recorder.opened.isEmpty());
+    }
+
+    private static byte[] upgradeRequest(String path, String headers) {
+        return ("GET " + path + " HTTP/1.1\r\n" +
+            "Host: localhost:" + server.getPort() + "\r\n" +
+            "Connection: Upgrade\r\n" +
+            "Upgrade: websocket\r\n" +
+            headers +
+            "\r\n").getBytes(StandardCharsets.US_ASCII);
+    }
+
+    private static String sendUpgradeRequest(Socket socket, String path, String headers) throws Exception {
+        socket.setSoTimeout(10_000);
+        OutputStream out = socket.getOutputStream();
+        out.write(upgradeRequest(path, headers));
+        out.flush();
+        BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
+        return in.readLine();
+    }
+
+    @Test
     void notFoundUpgradeRequestIsReleased() throws Exception {
         Recorder recorder = ctx.getBean(Recorder.class);
         ExecutionException e = assertThrows(ExecutionException.class, () -> client.newWebSocketBuilder()
@@ -266,6 +341,7 @@ class WebSocketUpgradeRequestReleaseTest {
         final List<String> sessionsClosed = new CopyOnWriteArrayList<>();
         final List<Integer> beanAtOpen = new CopyOnWriteArrayList<>();
         final List<Integer> beanAtMessage = new CopyOnWriteArrayList<>();
+        final List<Boolean> filteredOnEventLoop = new CopyOnWriteArrayList<>();
         final AtomicInteger createdBeans = new AtomicInteger();
         volatile CountDownLatch handlerEntered = new CountDownLatch(1);
         volatile CountDownLatch releaseHandler = new CountDownLatch(1);
@@ -280,6 +356,7 @@ class WebSocketUpgradeRequestReleaseTest {
             sessionsClosed.clear();
             beanAtOpen.clear();
             beanAtMessage.clear();
+            filteredOnEventLoop.clear();
             createdBeans.set(0);
             handlerEntered = new CountDownLatch(1);
             releaseHandler = new CountDownLatch(1);
@@ -308,6 +385,26 @@ class WebSocketUpgradeRequestReleaseTest {
                 return HttpResponse.status(HttpStatus.FORBIDDEN);
             }
             return null;
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC)
+    @ServerFilter("/ws-release/offloop")
+    static class OffEventLoopFilter {
+        private final Recorder recorder;
+
+        OffEventLoopFilter(Recorder recorder) {
+            this.recorder = recorder;
+        }
+
+        @RequestFilter
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        void filter(HttpRequest<?> request) {
+            HttpRequest<?> current = request;
+            while (current instanceof HttpRequestWrapper<?> wrapper && !(current instanceof NettyHttpRequest<?>)) {
+                current = wrapper.getDelegate();
+            }
+            recorder.filteredOnEventLoop.add(((NettyHttpRequest<?>) current).getChannelHandlerContext().executor().inEventLoop());
         }
     }
 
@@ -411,6 +508,7 @@ class WebSocketUpgradeRequestReleaseTest {
 
         @OnMessage
         void onMessage(String message) {
+            // the messages are not used: the socket only tests the release once @OnClose completed
         }
 
         @OnClose

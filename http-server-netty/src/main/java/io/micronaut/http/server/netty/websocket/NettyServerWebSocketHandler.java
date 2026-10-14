@@ -349,18 +349,30 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             } finally {
                 // counted on the event loop, after any @OnError handler the completion triggered
                 // was invoked
-                if (eventLoop.inEventLoop()) {
-                    handlerCompleted();
-                } else {
-                    try {
-                        eventLoop.execute(this::handlerCompleted);
-                    } catch (RejectedExecutionException e) {
-                        handlerCompleted();
-                    }
-                }
+                runOnEventLoop(eventLoop, this::handlerCompleted);
             }
         });
         return completion;
+    }
+
+    /**
+     * Runs the given task on the given event loop: inline when called on it, otherwise once the
+     * event loop gets to it. A task the event loop rejects, as it shut down, runs inline.
+     *
+     * @param eventLoop The event loop
+     * @param task      The task, which runs exactly once
+     */
+    static void runOnEventLoop(EventLoop eventLoop, Runnable task) {
+        if (eventLoop.inEventLoop()) {
+            task.run();
+        } else {
+            try {
+                eventLoop.execute(task);
+            } catch (RejectedExecutionException e) {
+                // the event loop shut down, no other task of the channel runs anymore
+                task.run();
+            }
+        }
     }
 
     /**
