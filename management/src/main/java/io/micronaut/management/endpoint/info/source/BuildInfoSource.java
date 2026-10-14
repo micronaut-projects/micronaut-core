@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
@@ -41,7 +42,6 @@ import java.util.function.Supplier;
 public class BuildInfoSource implements PropertiesInfoSource {
 
     private static final String EXTENSION = ".properties";
-    private static final String PREFIX = "classpath:";
 
     private final String buildPropertiesPath;
     private final ResourceResolver resourceResolver;
@@ -67,6 +67,6 @@ public class BuildInfoSource implements PropertiesInfoSource {
     }
 
     private Optional<PropertySource> retrieveBuildInfo() {
-        return retrievePropertiesPropertySource(buildPropertiesPath, PREFIX, EXTENSION, resourceResolver);
+        return retrievePropertiesPropertySource(buildPropertiesPath, ClassPathResourceLoader.PREFIX, EXTENSION, resourceResolver);
     }
 }
