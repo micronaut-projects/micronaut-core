@@ -17,8 +17,10 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.Origin
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
@@ -47,14 +49,27 @@ internal class KotlinFieldElement(
         newClassElement(nativeType, internalKSType, declaringType.typeArguments)
     }
 
-    override fun isFinal() = declaration.setter == null
+    /**
+     * A Java field is a property without accessors, it keeps the modifiers it is declared with.
+     */
+    private val isJavaField =
+        declaration.origin == Origin.JAVA || declaration.origin == Origin.JAVA_LIB
 
-    override fun isReflectionRequired() = true // all Kotlin fields are private
+    override fun isFinal() = if (isJavaField) {
+        !declaration.isMutable
+    } else {
+        declaration.setter == null
+    }
 
-    override fun isReflectionRequired(callingType: ClassElement) =
+    override fun isReflectionRequired() = isReflectionRequired(owningType)
+
+    override fun isReflectionRequired(callingType: ClassElement) = if (isJavaField) {
+        super<FieldElement>.isReflectionRequired(callingType)
+    } else {
         true // all Kotlin fields are private
+    }
 
-    override fun isPublic() = if (hasDeclaredAnnotation(JvmField::class.java)) {
+    override fun isPublic() = if (isJavaField || hasDeclaredAnnotation(JvmField::class.java)) {
         super.isPublic()
     } else {
         false // all Kotlin fields are private
@@ -80,7 +95,11 @@ internal class KotlinFieldElement(
             visitorContext
         )
 
-    override fun isPrivate() = true
+    override fun isPrivate() = if (isJavaField) {
+        super<AbstractKotlinElement>.isPrivate()
+    } else {
+        true
+    }
 
     override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata) =
         super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as FieldElement
@@ -89,5 +108,12 @@ internal class KotlinFieldElement(
 
     override fun getDeclaringType() = internalDeclaringType
 
-    override fun getModifiers() = super<AbstractKotlinElement>.getModifiers()
+    override fun getModifiers(): MutableSet<ElementModifier> {
+        val modifiers = super<AbstractKotlinElement>.getModifiers()
+        if (isJavaField && declaration.isMutable) {
+            // KSP reports a field of a compiled Java class as final
+            modifiers.remove(ElementModifier.FINAL)
+        }
+        return modifiers
+    }
 }
