@@ -18,7 +18,7 @@ class SubclassMemberAnnotationMutationSpec extends AbstractBeanDefinitionSpec {
 
         when:
         def context = buildContext('''
-package test
+package submut
 
 import java.lang.annotation.Retention
 import java.lang.annotation.RetentionPolicy
@@ -55,28 +55,28 @@ class B extends Base {
 class C extends Base {
 }
 ''')
-        BeanDefinition<?> b = context.getBeanDefinition(context.classLoader.loadClass('test.B'))
-        BeanDefinition<?> c = context.getBeanDefinition(context.classLoader.loadClass('test.C'))
+        BeanDefinition<?> b = context.getBeanDefinition(context.classLoader.loadClass('submut.B'))
+        BeanDefinition<?> c = context.getBeanDefinition(context.classLoader.loadClass('submut.C'))
 
         then: 'the members were annotated through B'
-        MarkingVisitor.fieldOwner == 'test.B'
-        MarkingVisitor.parameterOwner == 'test.B'
+        MarkingVisitor.fieldOwner == 'submut.B'
+        MarkingVisitor.parameterOwner == 'submut.B'
 
         and: 'the definition of B carries the mutation'
         b.injectedFields.size() == 1
-        b.injectedFields[0].annotationMetadata.hasAnnotation('test.Marked')
+        b.injectedFields[0].annotationMetadata.hasAnnotation('submut.Marked')
         b.injectedMethods.size() == 1
-        b.injectedMethods[0].arguments[0].annotationMetadata.hasAnnotation('test.Marked')
+        b.injectedMethods[0].arguments[0].annotationMetadata.hasAnnotation('submut.Marked')
 
         and: 'the definition of C keeps the source annotations'
         c.injectedFields.size() == 1
-        !c.injectedFields[0].annotationMetadata.hasAnnotation('test.Marked')
+        !c.injectedFields[0].annotationMetadata.hasAnnotation('submut.Marked')
         c.injectedMethods.size() == 1
-        !c.injectedMethods[0].arguments[0].annotationMetadata.hasAnnotation('test.Marked')
+        !c.injectedMethods[0].arguments[0].annotationMetadata.hasAnnotation('submut.Marked')
 
         and: 'the members read through Base keep the source annotations'
-        !MarkingVisitor.baseFieldAnnotations.contains('test.Marked')
-        !MarkingVisitor.baseParameterAnnotations.contains('test.Marked')
+        !MarkingVisitor.baseFieldAnnotations.contains('submut.Marked')
+        !MarkingVisitor.baseParameterAnnotations.contains('submut.Marked')
 
         cleanup:
         context.close()
@@ -104,19 +104,19 @@ class C extends Base {
 
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
-            if (element.name == 'test.Base') {
+            if (element.name == 'submut.Base') {
                 base = element
             }
-            if (element.name != 'test.B') {
+            if (element.name != 'submut.B') {
                 return
             }
             def field = element.getEnclosedElement(ElementQuery.ALL_FIELDS.named('foo')).get()
             fieldOwner = field.owningType.name
-            field.annotate('test.Marked')
+            field.annotate('submut.Marked')
 
             def method = element.getEnclosedElement(ElementQuery.ALL_METHODS.named('setBars')).get()
             parameterOwner = method.owningType.name
-            method.parameters[0].annotate('test.Marked')
+            method.parameters[0].annotate('submut.Marked')
         }
 
         @Override
