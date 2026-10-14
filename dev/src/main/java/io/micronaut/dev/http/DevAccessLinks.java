@@ -30,6 +30,8 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
 /**
  * The link the launcher logs at startup to open the development pages with the launch's access token: the Control
  * Panel when the application has one, the {@code /dev} endpoint otherwise; and the address the server is bound to.
@@ -46,6 +48,10 @@ public final class DevAccessLinks {
      */
     static final String CONTROL_PANEL_PATH = "micronaut.control-panel.path";
     static final String DEFAULT_CONTROL_PANEL_PATH = "/control-panel";
+    /**
+     * The package of the Control Panel's classes, which tells its routes from the application's own.
+     */
+    static final String CONTROL_PANEL_PACKAGE = "io.micronaut.controlpanel.";
 
     private static final Logger LOG = LoggerFactory.getLogger(DevAccessLinks.class);
     private static final String SERVER_HOST = "micronaut.server.host";
@@ -86,7 +92,7 @@ public final class DevAccessLinks {
             String host = named == null ? "localhost" : named;
             String contextPath = normalizedPath(environment.getProperty(CONTEXT_PATH, String.class).orElse(""));
             String controlPanel = contextPath + controlPanelPath(environment);
-            boolean hasControlPanel = hasRoute(generation, controlPanel);
+            boolean hasControlPanel = hasControlPanel(generation, controlPanel);
             String path = controlPanel;
             int linkPort = port;
             String scheme = server.getScheme();
@@ -113,16 +119,47 @@ public final class DevAccessLinks {
     }
 
     /**
-     * Whether a generation routes a GET of a path; false for a server that does not route HTTP requests.
+     * Whether a generation routes the Control Panel at a path; false for a server that does not route HTTP requests.
      */
-    private static boolean hasRoute(ApplicationContext generation, String path) {
+    private static boolean hasControlPanel(ApplicationContext generation, String path) {
         try {
-            return generation.findBean(Router.class)
-                .map(router -> router.find(HttpMethod.GET, path, null).findAny().isPresent())
-                .orElse(false);
+            return generation.findBean(Router.class).map(router -> hasControlPanel(router, path)).orElse(false);
         } catch (NoClassDefFoundError e) {
             // a server of another protocol, without the router: it has no development pages of its own
             return false;
+        }
+    }
+
+    /**
+     * Whether a router routes the Control Panel at a path: a route of a Control Panel class, told by its package so
+     * that any Control Panel version is recognized without depending on it, at the path or under it. A route of the
+     * application's own at the path is not the Control Panel.
+     *
+     * @param router The router
+     * @param path The Control Panel's path
+     * @return True when the Control Panel is there
+     */
+    static boolean hasControlPanel(Router router, String path) {
+        return router.uriRoutes().anyMatch(route -> route.getDeclaringType().getName().startsWith(CONTROL_PANEL_PACKAGE)
+            && DevAccessFilter.isUnder(endpointPath(route), path));
+    }
+
+    /**
+     * The paths of the development endpoint's routes, up to their first variable; none when the endpoint is not
+     * routed, being disabled or the management module absent.
+     *
+     * @param router The router
+     * @return The paths
+     */
+    static List<String> devEndpointPaths(Router router) {
+        try {
+            return router.uriRoutes()
+                .filter(route -> route.getDeclaringType() == DevEndpoint.class)
+                .map(DevAccessLinks::endpointPath)
+                .distinct()
+                .toList();
+        } catch (NoClassDefFoundError e) {
+            return List.of();
         }
     }
 
