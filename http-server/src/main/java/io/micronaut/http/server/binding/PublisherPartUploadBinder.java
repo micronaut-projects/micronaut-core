@@ -108,15 +108,15 @@ public final class PublisherPartUploadBinder implements TypedRequestArgumentBind
             publisher = Flux.from(Publishers.bufferNow(Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC_NO_BACKPRESSURE, argument)))
                 // completeFileUpload rejects a part without a file name with the same 400 a single
                 // @Part CompletedFileUpload gets, instead of treating the malformed request as a server error
-                .flatMap(f -> ReactiveExecutionFlow.toPublisher(formFactory.get().completeFileUpload(request, f)))));
+                .flatMapSequential(f -> ReactiveExecutionFlow.toPublisher(formFactory.get().completeFileUpload(request, f)))));
         } else if (contentTypeClass == CompletedAttribute.class) {
             // Publisher<CompletedAttribute>
             publisher = Flux.from(Publishers.bufferNow(Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC_NO_BACKPRESSURE, argument)))
-                .flatMap(f -> ReactiveExecutionFlow.toPublisher(formFactory.get().completeAttribute(request, f)))));
+                .flatMapSequential(f -> ReactiveExecutionFlow.toPublisher(formFactory.get().completeAttribute(request, f)))));
         } else {
             // Publisher<CompletedPart> or anything else
             Flux<CompletedPart> cpublisher = Flux.from(Publishers.bufferNow(Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC_NO_BACKPRESSURE, argument)))
-                .flatMap(f -> ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(request, f)))));
+                .flatMapSequential(f -> ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(request, f)))));
             if (contentTypeClass == CompletedPart.class) {
                 publisher = cpublisher;
             } else {
