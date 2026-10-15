@@ -21,7 +21,12 @@ import io.micronaut.web.router.direct.DirectRouteSupport;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.util.ReferenceCounted;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
+
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Declares that the Netty server answers direct routes: {@link RoutingInBoundHandler} looks them
@@ -35,6 +40,11 @@ import jakarta.inject.Singleton;
 @Internal
 @Singleton
 final class NettyDirectRouteSupport implements DirectRouteSupport {
+
+    /**
+     * The responses this prepared, whose buffers are released on shutdown.
+     */
+    private final List<PreparedDirectResponse> prepared = new CopyOnWriteArrayList<>();
 
     /**
      * A {@link ByteBuf}, or a buffer over one, is released once written: the route keeps a copy
@@ -55,6 +65,30 @@ final class NettyDirectRouteSupport implements DirectRouteSupport {
         } finally {
             buf.release();
         }
+    }
+
+    /**
+     * A response with no body, or bytes, is prepared once: its headers validated, and its body in
+     * a buffer every request writes a duplicate of, see {@link PreparedDirectResponse}.
+     */
+    @Override
+    public @Nullable HttpResponse<?> prepare(HttpResponse<?> response) {
+        PreparedDirectResponse prepared = PreparedDirectResponse.of(response);
+        if (prepared != null) {
+            this.prepared.add(prepared);
+        }
+        return prepared;
+    }
+
+    /**
+     * Release the buffers of the prepared responses, when the server is shut down.
+     */
+    @PreDestroy
+    void close() {
+        for (PreparedDirectResponse response : prepared) {
+            response.release();
+        }
+        prepared.clear();
     }
 
     /**

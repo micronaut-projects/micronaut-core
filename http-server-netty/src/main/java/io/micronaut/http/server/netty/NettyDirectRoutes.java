@@ -211,6 +211,11 @@ final class NettyDirectRoutes {
         }
         // the route never reads it
         body.close();
+        if (direct instanceof PreparedDirectResponse prepared) {
+            // the value of the route, validated and buffered once
+            write(request, prepared.head(), prepared.content(), outboundAccess);
+            return true;
+        }
         ByteBuf content;
         HttpResponse head;
         try {

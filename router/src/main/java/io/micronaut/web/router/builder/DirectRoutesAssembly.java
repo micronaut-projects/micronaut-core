@@ -97,7 +97,8 @@ final class DirectRoutesAssembly implements DirectRouteLookup {
             .orElse(RouteConditionContext.fallback()));
         DirectRouteTable table = DirectRouteTable.build(declarations, conversionService, conditionContext,
             (executorName, route) -> executor(beanLocator, executorName, route),
-            response -> discard(directRouteSupport, response));
+            response -> discard(directRouteSupport, response),
+            response -> prepare(directRouteSupport, response));
         if (!table.isEmpty() && directRouteSupport.isEmpty()) {
             // never served as ordinary routes, which the filters they skip would see
             throw new ConfigurationException("The application declares direct routes, see HttpDirectRoutes, "
@@ -123,6 +124,14 @@ final class DirectRoutesAssembly implements DirectRouteLookup {
     /**
      * Release a response no runtime writes: each runtime releases the bodies of its own types.
      */
+    /**
+     * The response of a route that answers with a value, as the runtime prepared it, or
+     * {@code null}: only a single runtime prepares it, as every runtime writes the response.
+     */
+    private static @Nullable HttpResponse<?> prepare(List<DirectRouteSupport> runtimes, HttpResponse<?> response) {
+        return runtimes.size() == 1 ? runtimes.get(0).prepare(response) : null;
+    }
+
     private static void discard(List<DirectRouteSupport> runtimes, HttpResponse<?> response) {
         for (DirectRouteSupport runtime : runtimes) {
             try {

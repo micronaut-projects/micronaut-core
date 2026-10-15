@@ -17,6 +17,7 @@ package io.micronaut.web.router.direct;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpResponse;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The capability of a server runtime to answer direct routes: a runtime that looks up the
@@ -52,6 +53,25 @@ public interface DirectRouteSupport {
      */
     default Object shareableBody(Object body) {
         return body;
+    }
+
+    /**
+     * Prepare the response given as a value to a direct route, see
+     * {@link io.micronaut.web.router.builder.DirectRouteSpec#respond(io.micronaut.http.HttpResponse)},
+     * once, when the routes are built: the route then answers every request with the response
+     * this returns, the same instance, which the runtime writes without creating a response for
+     * the request, e.g. with its headers validated, and its body in a buffer, once. The response
+     * is never changed: neither by the route, nor by the runtime when it writes it.
+     *
+     * <p>It is called only when the application has a single runtime that answers direct routes.</p>
+     *
+     * @param response The response, whose body is the body {@link #shareableBody(Object)} prepared,
+     *                 the bytes of a text, or a copy of a {@code byte[]}
+     * @return The prepared response, or {@code null}, by default, to create a copy of the response for
+     *         each request
+     */
+    default @Nullable HttpResponse<?> prepare(HttpResponse<?> response) {
+        return null;
     }
 
     /**

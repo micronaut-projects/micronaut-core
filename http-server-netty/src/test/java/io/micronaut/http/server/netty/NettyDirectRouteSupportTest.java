@@ -17,7 +17,9 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MediaType;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.junit.jupiter.api.Test;
@@ -26,6 +28,8 @@ import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
@@ -59,5 +63,36 @@ class NettyDirectRouteSupportTest {
 
         // a body that holds nothing is left alone
         support.discard(HttpResponse.ok("text"));
+    }
+
+    @Test
+    void aResponseWithBytesIsPreparedOnce() {
+        byte[] bytes = "prepared".getBytes(StandardCharsets.UTF_8);
+        PreparedDirectResponse prepared = (PreparedDirectResponse) support.prepare(HttpResponse.ok(bytes)
+            .contentType(MediaType.TEXT_PLAIN_TYPE)
+            .header("X-Version", "1"));
+        assertNotNull(prepared);
+        assertEquals(200, prepared.code());
+        assertEquals("1", prepared.getHeaders().get("X-Version"));
+        assertEquals(MediaType.TEXT_PLAIN, prepared.getHeaders().get(HttpHeaders.CONTENT_TYPE));
+
+        // each request writes a duplicate of the shared buffer, and releases it
+        ByteBuf first = prepared.content();
+        assertEquals("prepared", first.toString(StandardCharsets.UTF_8));
+        first.release();
+        ByteBuf second = prepared.content();
+        assertEquals("prepared", second.toString(StandardCharsets.UTF_8));
+        second.release();
+
+        // each request gets its own headers
+        io.netty.handler.codec.http.HttpResponse head = prepared.head();
+        head.headers().set("X-Request", "1");
+        assertNull(prepared.head().headers().get("X-Request"));
+
+        // a response without a body is prepared too
+        assertNotNull(support.prepare(HttpResponse.noContent()));
+        // a body a message body writer writes is written for each request
+        assertNull(support.prepare(HttpResponse.ok(new Object())));
+        support.close();
     }
 }
