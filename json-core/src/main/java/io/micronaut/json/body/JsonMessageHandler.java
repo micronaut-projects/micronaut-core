@@ -15,10 +15,12 @@
  */
 package io.micronaut.json.body;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
@@ -33,16 +35,22 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
+import io.micronaut.http.body.stream.ForeignBufferReleaser;
+import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -57,7 +65,8 @@ import java.nio.charset.StandardCharsets;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Body handler for JSON.
+ * Body handler for JSON. It also reads the elements of a JSON array, or the values of a JSON
+ * stream, piecewise as the bytes of the body arrive, see {@link ChunkedMessageBodyReader}.
  *
  * @param <T> The type to read/write
  * @author Jonas Konrad
@@ -69,7 +78,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @JsonMessageHandler.ProducesJson
 @JsonMessageHandler.ConsumesJson
 @BootstrapContextCompatible
-public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, CustomizableJsonHandler, ResponseBodyWriter<T> {
+public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableJsonHandler, ResponseBodyWriter<T> {
 
     /**
      * The JSON handler should be preferred if for any type.
@@ -95,15 +104,58 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
      */
     private final @Nullable Argument<?> specificType;
     private final JsonMapper specificMapper;
+    /**
+     * Releases the buffers of the runtime that a Reactor input of {@link #readChunked} discards,
+     * or {@code null} if the runtime has none that need it.
+     */
+    private final @Nullable ForeignBufferReleaser bufferReleaser;
 
     public JsonMessageHandler(JsonMapper jsonMapper) {
-        this(jsonMapper, null, jsonMapper);
+        this(jsonMapper, (ForeignBufferReleaser) null);
     }
 
-    private JsonMessageHandler(JsonMapper jsonMapper, @Nullable Argument<?> specificType, JsonMapper specificMapper) {
+    /**
+     * @param jsonMapper     The mapper
+     * @param bufferReleaser Releases the buffers of the runtime that a Reactor input of
+     *                       {@link #readChunked} discards, e.g. Netty buffers, or {@code null}
+     * @since 5.3.0
+     */
+    @Inject
+    @Internal
+    public JsonMessageHandler(JsonMapper jsonMapper, @Nullable ForeignBufferReleaser bufferReleaser) {
+        this(jsonMapper, null, jsonMapper, bufferReleaser);
+    }
+
+    private JsonMessageHandler(JsonMapper jsonMapper, @Nullable Argument<?> specificType, JsonMapper specificMapper, @Nullable ForeignBufferReleaser bufferReleaser) {
         this.jsonMapper = jsonMapper;
         this.specificType = specificType;
         this.specificMapper = specificMapper;
+        this.bufferReleaser = bufferReleaser;
+    }
+
+    /**
+     * @return The releaser of the buffers of the runtime, or {@code null}
+     */
+    @Nullable ForeignBufferReleaser bufferReleaser() {
+        return bufferReleaser;
+    }
+
+    /**
+     * The elements a piece reader reads from the buffers of a body, which are shared with the
+     * values, not copied.
+     *
+     * @param input          The buffers of the body
+     * @param reader         The reader
+     * @param bufferReleaser Releases a buffer of the runtime that the input discards, or
+     *                       {@code null}
+     * @param <E>            The type of an element
+     * @return The publisher of the elements
+     */
+    static <E> Publisher<E> publisherOfBuffers(Publisher<ByteBuffer<?>> input, PieceReader<E> reader, @Nullable ForeignBufferReleaser bufferReleaser) {
+        if (bufferReleaser == null) {
+            return PieceReaders.publisherOfBuffers(input, reader, SharedReadBuffer::adapt);
+        }
+        return PieceReaders.publisherOfBuffers(input, reader, SharedReadBuffer::adapt, bufferReleaser::release);
     }
 
     /**
@@ -126,7 +178,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
 
     @Override
     public JsonMessageHandler<T> createSpecific(Argument<T> type) {
-        return new JsonMessageHandler<>(jsonMapper, type, jsonMapper.createSpecific(type));
+        return new JsonMessageHandler<>(jsonMapper, type, jsonMapper.createSpecific(type), bufferReleaser);
     }
 
     @Override
@@ -151,6 +203,70 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
             rc.release();
         }
         return decoded;
+    }
+
+    /**
+     * Read one value from the bytes of a value of a JSON array or stream, see
+     * {@link JsonPieceReader}.
+     *
+     * @param type  The type
+     * @param value The bytes of the value, which are consumed
+     * @return The value
+     * @throws CodecException If the value cannot be decoded
+     */
+    @Nullable
+    T readValue(Argument<T> type, ReadBuffer value) throws CodecException {
+        try {
+            return mapper(type).readValue(value, type);
+        } catch (IOException e) {
+            throw decorateRead(type, e);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A top-level JSON array is unwrapped: each of its elements is read as the given type,
+     * unless the type is a collection, e.g. {@code Publisher<List<T>>}, in which case the whole
+     * input is read as one value.</p>
+     */
+    @Override
+    public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+        JsonChunkedProcessor processor = new JsonChunkedProcessor();
+        if (Iterable.class.isAssignableFrom(type.getType())) {
+            // Publisher<List<T>> is parsed as a single item of type List
+            processor.counter.noTokenization();
+        } else {
+            // Publisher<T> is unwrapped
+            processor.counter.unwrapTopLevelArray();
+        }
+        return publisherOfBuffers(input, new JsonPieceReader<>(processor, value -> readValue(type, value)), bufferReleaser);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A top-level JSON array is always unwrapped: each of its elements is read as the given
+     * type, a collection too, e.g. {@code [[1,2],[3,4]]} as two lists.</p>
+     */
+    @Override
+    public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input, long maxElementSize) {
+        // the buffers of the input are shared with the values, not copied
+        return publisherOfBuffers(input, openPieceReader(type, mediaType, httpHeaders, maxElementSize), bufferReleaser);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A top-level JSON array is always unwrapped: each of its elements is read as the given
+     * type, a collection too, e.g. {@code [[1,2],[3,4]]} as two lists. Any other JSON is read as
+     * a stream of values.</p>
+     */
+    @Override
+    public PieceReader<T> openPieceReader(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
+        JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
+        processor.counter.unwrapTopLevelArray();
+        return new JsonPieceReader<>(processor, value -> readValue(type, value));
     }
 
     @Override
@@ -236,7 +352,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
 
     @Override
     public CustomizableJsonHandler customize(JsonFeatures jsonFeatures) {
-        return new JsonMessageHandler<>(jsonMapper.cloneWithFeatures(jsonFeatures));
+        return new JsonMessageHandler<>(jsonMapper.cloneWithFeatures(jsonFeatures), bufferReleaser);
     }
 
     /**

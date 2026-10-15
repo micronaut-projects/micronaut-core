@@ -20,9 +20,9 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.body.stream.BodyPublishers;
 import org.jetbrains.annotations.Contract;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -73,9 +73,7 @@ public abstract non-sealed class InternalByteBody implements ByteBody {
 
     @Override
     public Publisher<byte[]> toByteArrayPublisher() {
-        return Flux.from(toReadBufferPublisher())
-            .doOnDiscard(ReadBuffer.class, ReadBuffer::close)
-            .map(ReadBuffer::toArray);
+        return BodyPublishers.map(toReadBufferPublisher(), ReadBuffer::toArray, BodyPublishers::closeReadBuffer);
     }
 
     @Override
