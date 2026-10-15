@@ -49,6 +49,8 @@ import io.micronaut.http.form.FormPart;
 import io.micronaut.http.form.FormParts;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.server.exceptions.UnsupportedMediaException;
+import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -835,7 +837,17 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
         @Override
         public Optional<MediaType> getContentType() {
-            return getDelegate().getContentType();
+            Optional<MediaType> contentType = getDelegate().getContentType();
+            if (contentType.isPresent()) {
+                return contentType;
+            }
+            // A request without a content type is read as the route consumes, like the body of a
+            // controller route, whose reader the route has resolved for the type of its body: the
+            // type of the body of this route is not known before the handler reads it
+            return RouteAttributes.getRouteInfo(getDelegate())
+                .map(RouteInfo::getConsumes)
+                .filter(consumes -> consumes.size() == 1 && !MediaType.ALL_TYPE.equals(consumes.get(0)))
+                .map(consumes -> consumes.get(0));
         }
 
         @Override
