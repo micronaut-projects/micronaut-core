@@ -29,11 +29,13 @@ import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.form.FormCapableHttpRequest;
+import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -122,7 +124,9 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
         if (skipClaimed && completer.isClaimed(inputName)) {
             return BindingResult.unsatisfied();
         }
-        CompletableFuture<@Nullable Optional<T>> completableFuture = FormFieldFlows.firstFlatMap(completer.subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, context.getArgument())),
+        CompletableFuture<@Nullable Optional<T>> completableFuture = FormBinding.isMany(context.getArgument())
+            ? collectAll(conversionService, context, formFactory, formRequest, completer, inputName)
+            : FormFieldFlows.firstFlatMap(completer.subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, context.getArgument())),
             rff -> formFactory.completePart(formRequest, rff),
             d -> {
                 boolean skipClose = false;
@@ -164,6 +168,48 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
                 return res;
             }
         };
+    }
+
+    /**
+     * A collection, an array or an {@link Iterable} gets every field of the name, in order,
+     * like the fields of a form read whole.
+     */
+    private static <T> CompletableFuture<@Nullable Optional<T>> collectAll(ConversionService conversionService,
+                                                                         ArgumentConversionContext<T> context,
+                                                                         FormFactory formFactory,
+                                                                         FormCapableHttpRequest<?> formRequest,
+                                                                         FormRouteCompleter completer,
+                                                                         String inputName) {
+        CompletableFuture<@Nullable Optional<T>> result = new CompletableFuture<>();
+        List<String> values = new ArrayList<>();
+        FormFieldFlows.Concat<RawFormField, String> reading = new FormFieldFlows.Concat<>(
+            field -> formFactory.completePart(formRequest, field).map(part -> {
+                try {
+                    return conversionService.convert(part, String.class).orElse("");
+                } finally {
+                    part.closeAsync(formFactory.getDiskWriteExecutor());
+                }
+            }),
+            RawFormField::close,
+            values::add,
+            error -> {
+                if (error != null) {
+                    result.completeExceptionally(error);
+                } else if (values.isEmpty()) {
+                    // no field of the name: the argument is missing
+                    result.complete(null);
+                } else {
+                    result.complete(FormBinding.convert(conversionService, context, values));
+                }
+            });
+        result.whenComplete((ignored, error) -> {
+            if (result.isCancelled()) {
+                reading.cancel();
+            }
+        });
+        completer.subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, context.getArgument()))
+            .subscribe(reading);
+        return result;
     }
 
     @Override
