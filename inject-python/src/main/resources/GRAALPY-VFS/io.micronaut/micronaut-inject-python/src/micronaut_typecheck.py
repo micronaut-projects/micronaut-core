@@ -388,12 +388,6 @@ class DecoratorRules:
         # a method-targeted around or introduction binding on a class advises all of its methods
         return self.kind == "class" and description.interceptorBinding() and "METHOD" in targets
 
-    def _targets_allow(self, targets, description):
-        if any(target in self.targets for target in targets):
-            return True
-        # a method-targeted around or introduction binding on a class advises all of its methods
-        return self.kind == "class" and description.interceptorBinding() and "METHOD" in targets
-
     def _annotation_name(self, decorator):
         """
         The qualified name a decorator resolves to. A bare name the module bound with java.type()
@@ -451,7 +445,9 @@ BUILTIN_HINTS = {
 BUILTIN_JAVA_TYPES = {"java.lang.String": "str", "java.lang.CharSequence": "str", "boolean": "bool", "java.lang.Boolean": "bool",
                       "int": "int", "long": "int", "short": "int", "byte": "int", "java.lang.Integer": "int", "java.lang.Long": "int",
                       "java.lang.Short": "int", "java.lang.Byte": "int", "double": "float", "float": "float",
-                      "java.lang.Double": "float", "java.lang.Float": "float", "void": "none"}
+                      "java.lang.Double": "float", "java.lang.Float": "float", "void": "none",
+                      # GraalPy hands a Java char to Python as a one-character str
+                      "char": "str", "java.lang.Character": "str"}
 # every Java object has these, whether or not the element model lists them
 OBJECT_METHODS = {"equals", "hashCode", "toString", "getClass", "notify", "notifyAll", "wait"}
 # the members GraalPy adds to host objects and classes
@@ -542,7 +538,9 @@ class Bindings:
         function_def = self.unit.function_def
         if self.unit.class_def is not None:
             if function_def.isStatic():
-                self.locals["cls"] = Typed(PY_REF, self.unit.class_def)
+                # a class method takes the class as its first parameter; a static method takes nothing implicit
+                if _is_class_method(self.unit.node):
+                    self.locals["cls"] = Typed(PY_REF, self.unit.class_def)
             else:
                 self.locals["self"] = Typed(PY, self.unit.class_def)
         for argument in function_def.arguments().arguments():
@@ -648,6 +646,39 @@ def _bound_names(target):
     return []
 
 
+def _is_class_method(function_node):
+    """Whether a function is decorated with @classmethod, which hands it the class as its first parameter."""
+    return any(isinstance(decorator, ast.Name) and decorator.id == "classmethod"
+               for decorator in getattr(function_node, "decorator_list", ()))
+
+
+def _assigned_names(statements):
+    """The names the statements bind, nested blocks included and nested scopes excluded."""
+    names = set()
+    pending = list(statements)
+    while pending:
+        node = pending.pop()
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+            continue
+        if isinstance(node, (ast.Assign,)):
+            for target in node.targets:
+                names.update(_bound_names(target))
+        elif isinstance(node, (ast.AnnAssign, ast.AugAssign)):
+            names.update(_bound_names(node.target))
+        elif isinstance(node, (ast.For, ast.AsyncFor)):
+            names.update(_bound_names(node.target))
+        elif isinstance(node, (ast.With, ast.AsyncWith)):
+            for item in node.items:
+                if item.optional_vars is not None:
+                    names.update(_bound_names(item.optional_vars))
+        elif isinstance(node, ast.NamedExpr):
+            names.update(_bound_names(node.target))
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            names.add(node.name)
+        pending.extend(ast.iter_child_nodes(node))
+    return names
+
+
 class JavaReceiverRules:
     """
     The checks of calls, attribute reads and constructions whose receiver is a Java type: the member
@@ -678,8 +709,10 @@ class JavaReceiverRules:
             for name in _bound_names(node.target):
                 self.bindings.forget(name)
             self.expression(node.iter)
-            for child in getattr(node, "body", []) + getattr(node, "orelse", []):
-                self.statement(child)
+            self._loop_body(getattr(node, "body", []), getattr(node, "orelse", []))
+            return
+        if isinstance(node, ast.While):
+            self._loop_body(node.body, node.orelse, node.test)
             return
         if isinstance(node, (ast.With, ast.AsyncWith)):
             for item in node.items:
@@ -710,6 +743,22 @@ class JavaReceiverRules:
                             self.statement(child)
                         elif isinstance(child, ast.expr):
                             self.expression(child)
+
+    def _loop_body(self, body, orelse, test=None):
+        """
+        A loop body is walked once, in order, but runs any number of times: a name it assigns may hold, at the
+        top of an iteration, what a later statement of the previous one assigned, and after the loop either that
+        or what it held before. Such a name is unknown at the top of the body and after the loop.
+        """
+        assigned = _assigned_names(body + orelse)
+        for name in assigned:
+            self.bindings.forget(name)
+        if test is not None:
+            self.expression(test)
+        for child in body + orelse:
+            self.statement(child)
+        for name in assigned:
+            self.bindings.forget(name)
 
     def assignment(self, node):
         if isinstance(node, ast.AugAssign):

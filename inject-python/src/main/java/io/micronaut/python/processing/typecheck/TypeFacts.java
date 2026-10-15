@@ -138,7 +138,8 @@ public final class TypeFacts {
     public boolean isAssignable(String from, String to) {
         return assignable.computeIfAbsent(from + "->" + to, key -> {
             Boolean result = complete(() -> computeAssignable(from, to));
-            return result != null && result;  // an incomplete type fits nothing, and is never reported on
+            // a type javac completes in a later round is unknown, and unknown is never reported: it fits
+            return result == null || result;
         });
     }
 
@@ -363,12 +364,8 @@ public final class TypeFacts {
     }
 
     /**
-     * Looks a class up by its qualified name, trying the nested-class spellings
-     * ({@code a.b.Outer$Nested}) when the dotted name is not a class.
-     */
-    /**
-     * The element of a qualified name, trying the binary name of a nested type when the dotted name
-     * resolves to nothing.
+     * Looks a class up by its qualified name, trying the binary name of a nested type
+     * ({@code a.b.Outer$Nested}) when the dotted name resolves to nothing.
      */
     private @Nullable ClassElement resolveClass(String qualifiedName) {
         String candidate = qualifiedName;
