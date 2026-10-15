@@ -125,7 +125,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     /**
      * The configuration files the last read of the property sources looked for, published when the read ends.
      */
-    private volatile Set<String> configurationLocations = Set.of();
+    private volatile Set<String> configurationLocations = Set.of(); // NOSONAR java:S3077 published whole; the set is immutable
     /**
      * The configuration files the read in progress has looked for so far.
      */
@@ -422,7 +422,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         for (PropertySource propertySource : propertySources) {
             internalProcessPropertySource(propertySource);
         }
-        configurationLocations = Collections.unmodifiableSet(locations);
+        configurationLocations = Set.copyOf(locations);
         readingLocations = new LinkedHashSet<>();
     }
 
