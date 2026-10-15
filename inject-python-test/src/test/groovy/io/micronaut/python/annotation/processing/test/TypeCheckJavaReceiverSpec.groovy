@@ -213,4 +213,81 @@ class Service:
         return "x"
 ''').isEmpty()
     }
+
+    void "a Java char is a one-character str"() {
+        expect:
+        check('''
+from jakarta.inject import Singleton
+from java.lang import Character, Integer
+
+@Singleton
+class Service:
+    def run(self) -> int:
+        digit = Character.forDigit(1, 10)
+        digit.upper()
+        return Integer.parseInt(Character.forDigit(2, 10))
+''').isEmpty()
+    }
+
+    void "a name a loop rebinds later is unknown at the top of the loop and after it"() {
+        expect:
+        check('''
+from jakarta.inject import Singleton
+from java.util import ArrayList, HashMap
+
+@Singleton
+class Service:
+    def run(self) -> None:
+        items = HashMap()
+        for i in range(3):
+            if i > 0:
+                items.add("x")
+            items = ArrayList()
+        items.add("y")
+        count = 0
+        while count < 2:
+            if count > 0:
+                items.add("z")
+            items = ArrayList()
+            count += 1
+''').isEmpty()
+    }
+
+    void "a name a loop rebinds to the same type keeps it"() {
+        when:
+        def diagnostics = check('''
+from jakarta.inject import Singleton
+from java.util import ArrayList
+
+@Singleton
+class Service:
+    def run(self) -> None:
+        values = ArrayList()
+        for i in range(3):
+            values.ensureCapacity(i)
+            values = ArrayList(values)
+        values.no_such_method()
+''')
+
+        then:
+        diagnostics*.rule() == ['unknown-method']
+        diagnostics[0].span().line() == 12
+    }
+
+    void "a static method takes no implicit class parameter"() {
+        expect:
+        check('''
+from jakarta.inject import Singleton
+
+@Singleton
+class Service:
+    @staticmethod
+    def fill(cls, value):
+        cls.append(value)
+
+    @classmethod
+    def build(cls) -> "Service":
+        return cls()
+''').isEmpty()
+    }
 }
