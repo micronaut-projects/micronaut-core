@@ -16,6 +16,7 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.ApplicationContextConfigurer;
 import io.micronaut.context.BootstrapContextAccess;
 import io.micronaut.context.annotation.ContextConfigurer;
@@ -36,6 +37,14 @@ import io.micronaut.core.annotation.Internal;
  * too but is never recorded: it only holds {@code BootstrapContextCompatible} beans, so it cannot
  * provide the GraalPy context bean, and it publishes no {@code ShutdownEvent} that would clear the
  * record again, which matters when a refresh recreates it while the application is running.
+ * <p>
+ * The builder is configured before the application context exists at all, which is where the
+ * platform entry points of the application run ({@code TestPropertyProvider.getProperties()} is
+ * called while the builder is being filled in). Generated Python code reached from one of them finds
+ * neither a runtime nor a recorded application context, so {@link #configure(ApplicationContextBuilder)}
+ * records that an application is on its way and a default context may be bootstrapped for it. A call
+ * that arrives when no application is on its way and none is recorded either is a leftover reference
+ * of an application that shut down, and keeps failing.
  *
  * @author Micronaut Team
  * @since 5.3.0
@@ -43,6 +52,11 @@ import io.micronaut.core.annotation.Internal;
 @Internal
 @ContextConfigurer
 public final class PythonRuntimeBootstrapConfigurer implements ApplicationContextConfigurer {
+
+    @Override
+    public void configure(ApplicationContextBuilder builder) {
+        PythonApplicationRuntime.expectApplication();
+    }
 
     @Override
     public void configure(ApplicationContext applicationContext) {
