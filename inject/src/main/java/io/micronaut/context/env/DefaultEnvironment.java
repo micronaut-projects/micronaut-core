@@ -273,8 +273,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     private void readProperties() {
         if (reading.compareAndSet(false, true)) {
-            loadProperties();
-            reading.set(false);
+            try {
+                loadProperties();
+            } finally {
+                reading.set(false);
+            }
         }
     }
 
@@ -289,8 +292,27 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         // Rebuild into a replacement catalog and publish it in one step, so a concurrent lookup
         // sees the properties either as they were before the refresh or as they are after it.
         propertyPlaceholderResolver.refresh(() -> {
-            dropProperties();
-            readProperties();
+            Map<String, PropertySource> previousSources;
+            synchronized (propertySources) {
+                previousSources = new LinkedHashMap<>(propertySources);
+            }
+            List<PropertySource> previousRefreshable = new ArrayList<>(refreshablePropertySources);
+            boolean completed = false;
+            try {
+                dropProperties();
+                readProperties();
+                completed = true;
+            } finally {
+                if (!completed) {
+                    // Restore the inputs as well as the catalog retained by the resolver on failure.
+                    synchronized (propertySources) {
+                        propertySources.clear();
+                        propertySources.putAll(previousSources);
+                    }
+                    refreshablePropertySources.clear();
+                    refreshablePropertySources.addAll(previousRefreshable);
+                }
+            }
         });
     }
 
