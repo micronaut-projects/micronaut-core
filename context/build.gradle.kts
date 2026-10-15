@@ -28,6 +28,7 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.params)
 
 }
 
