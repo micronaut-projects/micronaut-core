@@ -32,6 +32,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Function
 
 /**
@@ -816,6 +817,83 @@ micronaut:
 
         cleanup:
         env.close()
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13895")
+    void "property source loading can be retried after a failed refresh"() {
+        given:
+        def loadCount = new AtomicInteger()
+        ApplicationContext context = ApplicationContext.builder()
+                .bootstrapEnvironment(false)
+                .propertySourcesLocator(new PropertySourcesLocator() {
+                    @Override
+                    Collection<PropertySource> load(Environment environment) {
+                        int attempt = loadCount.incrementAndGet()
+                        if (attempt == 2) {
+                            throw new IllegalStateException("Expected refresh failure")
+                        }
+                        String secret = attempt == 1 ? "old-secret" : "new-secret"
+                        return [PropertySource.of("secrets", ["api.secret": secret])]
+                    }
+                })
+                .start()
+
+        expect:
+        context.getRequiredProperty("api.secret", String.class) == "old-secret"
+
+        when:
+        context.getEnvironment().refresh()
+
+        then:
+        thrown(IllegalStateException)
+        context.getRequiredProperty("api.secret", String.class) == "old-secret"
+
+        when:
+        context.getEnvironment().refresh()
+
+        then:
+        context.getRequiredProperty("api.secret", String.class) == "new-secret"
+        loadCount.get() == 3
+
+        cleanup:
+        context?.close()
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13895")
+    void "corrected config imports can be reloaded after a failed refresh"() {
+        given:
+        File directory = Files.createTempDirectory("config-import-recovery").toFile()
+        File main = new File(directory, "application.properties")
+        File missing = new File(directory, "missing.properties")
+        main.text = "app.secret=old"
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        ApplicationContext context = ApplicationContext.builder("test")
+                .bootstrapEnvironment(false)
+                .start()
+
+        expect:
+        context.getRequiredProperty("app.secret", String) == "old"
+
+        when:
+        main.text = "app.secret=bad\nmicronaut.config.import=file://${missing.absolutePath}"
+        context.getEnvironment().refresh()
+
+        then:
+        thrown(ConfigurationException)
+        context.getRequiredProperty("app.secret", String) == "old"
+
+        when:
+        main.text = "app.secret=new"
+        def changes = context.getEnvironment().refreshAndDiff()
+
+        then:
+        context.getRequiredProperty("app.secret", String) == "new"
+        changes.get("app.secret") == "old"
+
+        cleanup:
+        context?.close()
+        System.clearProperty("micronaut.config.files")
+        directory?.deleteDir()
     }
 
     void "test imported file property source is re-read on refresh"() {
