@@ -36,7 +36,7 @@ import java.util.List;
  * @since 5.3.0
  */
 @Internal
-interface BodyFallThrough {
+sealed interface BodyFallThrough permits BodyFallThrough.AcrossSpecificity {
 
     /**
      * The routes of every specificity: a request whose body the routes of a URI template do not
