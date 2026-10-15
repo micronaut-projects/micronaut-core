@@ -101,6 +101,7 @@ public class MaxRequestSizeTest {
     }
 
     @Test
+    @Tag("publisher-request-body")
     void aChunkedBodyOverTheLimitReadFromAnInputStreamIsRefusedWith413() throws IOException {
         byte[] chunk = new byte[512];
         TestScenario.builder()
