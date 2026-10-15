@@ -19,6 +19,29 @@ def __micronaut_new_uninitialized_instance(cls):
     return object.__new__(cls)
 
 
+def __micronaut_allocate_instance(cls, *args):
+    """Allocates an instance as cls(*args) would, through the __new__ of the class, without __init__.
+
+    Returns the instance and whether it is initialized already: a metaclass customizing __call__
+    creates it, so the class is called as it is.
+    """
+    if type(cls).__call__ is not type.__call__:
+        return [cls(*args), True]
+    new = cls.__new__
+    if new is object.__new__:
+        return [object.__new__(cls), False]
+    return [new(cls, *args), False]
+
+
+def __micronaut_initialize_instance(instance, cls, *args):
+    """Runs __init__ on an instance __micronaut_allocate_instance returned, as cls(*args) would: only
+    when the instance is one of the class, and __init__ has to return None."""
+    if isinstance(instance, cls):
+        result = type(instance).__init__(instance, *args)
+        if result is not None:
+            raise TypeError(f"__init__() should return None, not '{type(result).__name__}'")
+
+
 def __micronaut_set_instance_property(instance, name, value):
     object.__setattr__(instance, name, value)
     return instance
@@ -84,7 +107,7 @@ def __micronaut_python_dict(keys, values):
     return dict(zip(keys, values))
 
 
-def __micronaut_to_python_standard_type(kind, value, nanos=0):
+def __micronaut_to_python_standard_type(kind, value, nanos=0, zone=None):
     if kind == "decimal":
         # imported on first use: importing decimal with this module made the imports of a nested
         # application's context walk into the frames of the enclosing context (Truffle rejects the
@@ -97,6 +120,16 @@ def __micronaut_to_python_standard_type(kind, value, nanos=0):
         return datetime.time.fromisoformat(value)
     if kind == "datetime":
         return datetime.datetime.fromisoformat(value)
+    if kind == "zoned_datetime":
+        result = datetime.datetime.fromisoformat(value)
+        if zone is not None:
+            try:
+                import zoneinfo
+                result = result.astimezone(zoneinfo.ZoneInfo(zone))
+            except Exception:
+                # no time zone data for the region here: the fixed offset still names the same instant
+                pass
+        return result
     if kind == "duration":
         return datetime.timedelta(seconds=value, microseconds=nanos // 1000)
     if kind == "zone_offset":
