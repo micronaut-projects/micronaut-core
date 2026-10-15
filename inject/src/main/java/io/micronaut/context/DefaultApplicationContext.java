@@ -761,7 +761,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         private final ApplicationContextConfiguration bootstrapConfiguration;
         private final ApplicationContext parentContext;
         private final List<ApplicationContext> bootstrapContexts = new ArrayList<>();
-        private volatile Set<String> configurationLocations = Set.of(); // NOSONAR java:S3077 published whole; the set is immutable
+        private volatile Set<String> configurationFiles = Set.of(); // NOSONAR java:S3077 published whole; the set is immutable
 
         private BootstrapPropertySourcesLocator(ApplicationContextConfiguration bootstrapConfiguration, ApplicationContext parentContext) {
             this.bootstrapConfiguration = bootstrapConfiguration;
@@ -798,13 +798,13 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
                 // Lower priority than bootstrap property sources
                 bootstrapPropertySources.add(new BootstrapPropertySource(propertySource));
             }
-            configurationLocations = bootstrapContext.getEnvironment().getConfigurationLocations();
+            configurationFiles = bootstrapContext.getEnvironment().getConfigurationFiles();
             return bootstrapPropertySources;
         }
 
         @Override
-        public Set<String> getConfigurationLocations() {
-            return configurationLocations;
+        public Set<String> getConfigurationFiles() {
+            return configurationFiles;
         }
 
         @Override
