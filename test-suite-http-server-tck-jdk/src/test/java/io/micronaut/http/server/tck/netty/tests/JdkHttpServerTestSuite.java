@@ -1,5 +1,6 @@
 package io.micronaut.http.server.tck.netty.tests;
 
+import io.micronaut.http.server.tck.WebSocketTckTags;
 import org.junit.platform.suite.api.ConfigurationParameter;
 import org.junit.platform.suite.api.ExcludeClassNamePatterns;
 import org.junit.platform.suite.api.ExcludeTags;
@@ -18,7 +19,7 @@ import org.junit.platform.suite.api.SuiteDisplayName;
     "io.micronaut.http.server.tck.tests.forms.FormsJacksonAnnotationsTest", // it seems application/x-www-form-urlencoded is not yet supported by the JDK client
     "io.micronaut.http.server.tck.tests.forms.UploadTest" // multipart
 })
-@ExcludeTags("multipart") // Multipart not supported by HttpClient
+@ExcludeTags({"multipart", WebSocketTckTags.WEBSOCKET}) // Multipart not supported by HttpClient; the JDK server cannot upgrade to WebSocket
 @ConfigurationParameter(key = "junit.jupiter.extensions.autodetection.enabled", value = "true")
 public class JdkHttpServerTestSuite {
 }
