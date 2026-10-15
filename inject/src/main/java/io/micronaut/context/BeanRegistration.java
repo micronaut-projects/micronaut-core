@@ -202,6 +202,14 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
         return bean;
     }
 
+    /**
+     * @return The bean instance, or null when a {@code @Nullable} factory method produced none
+     */
+    @Nullable
+    T beanOrNull() {
+        return bean;
+    }
+
     @Override
     public String toString() {
         return "BeanRegistration: " + bean;

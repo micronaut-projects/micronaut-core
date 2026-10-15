@@ -1740,7 +1740,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 return;
             }
         }
-        @Nullable T beanToDestroy = registration.getBean(); // a @Nullable factory method may have produced no bean
+        T beanToDestroy = registration.beanOrNull();
         BeanDefinition<T> definition = registration.getBeanDefinition();
         if (beanToDestroy != null) {
             purgeCacheForBeanInstance(beanToDestroy);
