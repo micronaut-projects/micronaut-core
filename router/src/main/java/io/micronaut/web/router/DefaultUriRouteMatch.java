@@ -15,12 +15,15 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
+import io.micronaut.inject.DelegatingExecutableMethod;
+import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URLDecoder;
@@ -44,6 +47,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     private final Charset defaultCharset;
     @Nullable
     private Map<String, Object> variables;
+    private @Nullable ExecutableMethod<T, R> inheritingMethod;
 
     /**
      * @param matchInfo The URI match info
@@ -59,6 +63,51 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
         this.matchInfo = matchInfo;
         this.uriRouteInfo = routeInfo;
         this.defaultCharset = defaultCharset;
+    }
+
+    /**
+     * @return The URI match info, with the raw values of the variables
+     */
+    UriMatchInfo matchInfo() {
+        return matchInfo;
+    }
+
+    @Override
+    @Nullable Object resolvedTarget() {
+        return matchInfo instanceof DynamicRouteTarget.ResolvedMatchInfo resolved ? resolved.target() : null;
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        ExecutableMethod<T, R> inheriting = inheritingMethod();
+        return inheriting == null ? super.getAnnotationMetadata() : inheriting.getAnnotationMetadata();
+    }
+
+    @Override
+    public ExecutableMethod<T, R> getExecutableMethod() {
+        ExecutableMethod<T, R> inheriting = inheritingMethod();
+        return inheriting == null ? super.getExecutableMethod() : inheriting;
+    }
+
+    /**
+     * The method of a route resolved by a {@link DynamicRouteTarget} that inherits annotations
+     * from the resolution, e.g. a route reached through a route locator, which has the annotations
+     * of the groups of the locator routes: the readers of the annotations of the match and of its
+     * method, such as the route match filters, see them, overridden by the ones of the route.
+     *
+     * @return The method with the inherited annotations, or {@code null} if the route inherits none
+     */
+    private @Nullable ExecutableMethod<T, R> inheritingMethod() {
+        ExecutableMethod<T, R> inheriting = inheritingMethod;
+        if (inheriting == null) {
+            if (!(matchInfo instanceof DynamicRouteTarget.ResolvedMatchInfo resolved) || resolved.annotationMetadata().isEmpty()) {
+                return null;
+            }
+            AnnotationMetadata metadata = RouteLocator.layered(resolved.annotationMetadata(), executableMethod.getAnnotationMetadata());
+            inheriting = new InheritingExecutableMethod<>(executableMethod, metadata);
+            inheritingMethod = inheriting;
+        }
+        return inheriting;
     }
 
     @Override
@@ -108,5 +157,27 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     @Override
     public String toString() {
         return uriRouteInfo.getHttpMethod() + " - " + matchInfo.getUri();
+    }
+
+    /**
+     * The method of a route with the annotations it inherits.
+     *
+     * @param target             The method of the route
+     * @param annotationMetadata The inherited annotations, overridden by the ones of the method
+     * @param <T>                The target type
+     * @param <R>                The return type
+     */
+    private record InheritingExecutableMethod<T, R>(ExecutableMethod<T, R> target,
+                                                    AnnotationMetadata annotationMetadata) implements DelegatingExecutableMethod<T, R> {
+
+        @Override
+        public ExecutableMethod<T, R> getTarget() {
+            return target;
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return annotationMetadata;
+        }
     }
 }

@@ -85,7 +85,7 @@ public final class PipelineTimings {
     }
 
     /**
-     * @return The start of a stage, to give to {@link #record(String, long)}; zero when off
+     * @return The start of a stage, to give to {@link #stop(String, long)}; zero when off
      */
     public static long start() {
         return ENABLED ? System.nanoTime() : 0L;
@@ -97,7 +97,7 @@ public final class PipelineTimings {
      * @param stage The stage
      * @param start The start, from {@link #start()}
      */
-    public static void record(String stage, long start) {
+    public static void stop(String stage, long start) {
         if (ENABLED) {
             NANOS.computeIfAbsent(stage, ignored -> new LongAdder()).add(System.nanoTime() - start);
             COUNTS.computeIfAbsent(stage, ignored -> new LongAdder()).increment();

@@ -436,6 +436,12 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     @Override
+    public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement, byte @Nullable [] content) {
+        checkForPostponedOriginalElement(originatingElement);
+        outputVisitor.visitServiceDescriptor(type, classname, originatingElement, content);
+    }
+
+    @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path, io.micronaut.inject.ast.Element... originatingElements) {
         checkForPostponedOriginalElements(originatingElements);
         return outputVisitor.visitMetaInfFile(path, originatingElements);
@@ -654,6 +660,19 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     @Internal
     void addBeanDefinitionBuilder(JavaBeanDefinitionBuilder javaBeanDefinitionBuilder) {
         this.beanDefinitionBuilders.add(javaBeanDefinitionBuilder);
+    }
+
+    @Override
+    public BeanElementBuilder registerBean(ClassElement beanType, io.micronaut.inject.ast.Element... originatingElements) {
+        AbstractBeanDefinitionBuilder.requireOriginatingElements(beanType, originatingElements);
+        JavaBeanDefinitionBuilder builder = new JavaBeanDefinitionBuilder(
+            originatingElements[0],
+            beanType,
+            beanType instanceof AbstractAnnotationElement aae ? aae.getElementAnnotationMetadataFactory() : elementAnnotationMetadataFactory,
+            this
+        );
+        builder.addOriginatingElements(originatingElements);
+        return builder;
     }
 
     @Override

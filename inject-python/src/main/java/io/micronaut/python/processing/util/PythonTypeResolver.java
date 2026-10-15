@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
@@ -36,6 +37,7 @@ import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.python.processing.model.AttributeDef;
 import io.micronaut.python.processing.model.DecoratorDef;
+import io.micronaut.python.processing.element.PythonGenericPlaceholderElement;
 import io.micronaut.python.processing.element.TypeAnnotatedClassElement;
 import io.micronaut.python.processing.model.TypeRef;
 
@@ -96,6 +98,10 @@ public final class PythonTypeResolver {
     private static ClassElement resolvePythonTypeToJava(TypeRef typeRef, PythonVisitorContext visitorContext, Map<String, ClassElement> boundGenerics) {
         if (typeRef == null) {
             return ClassElement.of(Object.class);
+        }
+        if (typeRef.nativeException()) {
+            // Keep the native Python ancestry at runtime, exposing a Throwable wrapper to Java.
+            return visitorContext.getClassElement(RuntimeException.class).orElse(ClassElement.of(RuntimeException.class));
         }
 
         String name = typeRef.name();
@@ -181,6 +187,9 @@ public final class PythonTypeResolver {
         if (baseType instanceof PrimitiveElement primitiveElement) {
             // A type annotation on a primitive, such as Annotated[int, ...]: an annotated copy of the shared constant
             return primitiveElement.withTypeAnnotationMetadata(metadata);
+        } else if (baseType instanceof PythonGenericPlaceholderElement placeholder) {
+            // A type annotation on a type variable, such as Annotated[E, ...]: the annotated copy is still the type variable
+            return placeholder.withTypeUseAnnotationMetadata(metadata);
         }
         return TypeAnnotatedClassElement.of(baseType, metadata);
     }
@@ -286,6 +295,8 @@ public final class PythonTypeResolver {
             case "bytes", "bytearray" -> PrimitiveElement.BYTE.toArray();
             case "str" ->
                 visitorContext.getClassElement(String.class).orElse(ClassElement.of(String.class));
+            case "decimal.Decimal" ->
+                visitorContext.getClassElement(BigDecimal.class).orElse(ClassElement.of(BigDecimal.class));
             case "date", "datetime.date" ->
                 visitorContext.getClassElement(LocalDate.class).orElse(ClassElement.of(LocalDate.class));
             case "time", "datetime.time" ->

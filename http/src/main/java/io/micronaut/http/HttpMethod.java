@@ -28,65 +28,67 @@ import org.jspecify.annotations.Nullable;
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.2.
      */
-    OPTIONS(false, true),
+    OPTIONS(false, true, true),
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.3.
      */
-    GET(false, false),
+    GET(false, false, true),
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.4.
      */
-    HEAD(false, false),
+    HEAD(false, false, true),
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.5.
      */
-    POST(true, true),
+    POST(true, true, false),
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.6.
      */
-    PUT(true, true),
+    PUT(true, true, true),
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.7.
      */
-    DELETE(false, true),
+    DELETE(false, true, true),
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.8.
      */
-    TRACE(false, false),
+    TRACE(false, false, true),
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.9.
      */
-    CONNECT(false, false),
+    CONNECT(false, false, false),
 
     /**
      * See https://tools.ietf.org/html/rfc5789.
      */
-    PATCH(true, true),
+    PATCH(true, true, false),
 
     /**
      * See https://www.rfc-editor.org/rfc/rfc10008.txt.
      * @since 5.2.0
      */
-    QUERY(true, true),
+    QUERY(true, true, true),
 
     /**
      * A custom non-standard HTTP method.
      */
-    CUSTOM(false, true);
+    CUSTOM(false, true, false);
 
     private final boolean requiresRequestBody;
     private final boolean permitsRequestBody;
+    private final boolean idempotent;
 
-    HttpMethod(boolean requiresRequestBody, boolean permitsRequestBody) {
+    HttpMethod(boolean requiresRequestBody, boolean permitsRequestBody, boolean idempotent) {
         this.requiresRequestBody = requiresRequestBody;
         this.permitsRequestBody = permitsRequestBody;
+        this.idempotent = idempotent;
     }
 
     @Override
@@ -132,6 +134,19 @@ import org.jspecify.annotations.Nullable;
      */
     public boolean permitsResponseBody() {
         return permitsRequestBody;
+    }
+
+    /**
+     * Whether the method is idempotent, i.e. whether sending the same request several times has
+     * the same intended effect on the server as sending it once. See
+     * <a href="https://www.rfc-editor.org/rfc/rfc9110#section-9.2.2">RFC 9110, section 9.2.2</a>.
+     * {@link #CUSTOM} methods are not considered idempotent.
+     *
+     * @return Whether the method is idempotent
+     * @since 5.3.0
+     */
+    public boolean isIdempotent() {
+        return idempotent;
     }
 
     /**

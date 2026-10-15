@@ -18,7 +18,7 @@ class PyronautCompilerTypeCheckTest {
     void theTypeCheckModeIsPassedAsAProcessorOptionAndDiagnosticsReachTheCallback() {
         List<PythonDiagnostic> diagnostics = new ArrayList<>();
 
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> PyronautCompiler.builder()
+        PyronautCompiler compiler = PyronautCompiler.builder()
             .pythonCode("""
                 from jakarta.inject import Singleton
                 from java.util import NoSuchList
@@ -30,8 +30,8 @@ class PyronautCompilerTypeCheckTest {
                 """)
             .typeCheck(TypeCheckMode.ERROR)
             .pythonDiagnosticCallback(diagnostics::add)
-            .build()
-            .buildClassLoader());
+            .build();
+        RuntimeException exception = assertThrows(RuntimeException.class, compiler::buildClassLoader);
 
         assertTrue(exception.getMessage().contains("[python:unresolved-import]"), exception.getMessage());
         assertEquals(1, diagnostics.size());
@@ -69,11 +69,11 @@ class PyronautCompilerTypeCheckTest {
 
     @Test
     void anUnknownModeIsRejectedWithAClearMessage() {
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> PyronautCompiler.builder()
+        PyronautCompiler compiler = PyronautCompiler.builder()
             .pythonCode("answer = 42")
             .options(List.of("-A" + TypeCheckMode.OPTION + "=strict"))
-            .build()
-            .buildClassLoader());
+            .build();
+        RuntimeException exception = assertThrows(RuntimeException.class, compiler::buildClassLoader);
 
         assertTrue(exception.getMessage().contains("Unknown value [strict] of the option micronaut.python.typecheck"), exception.getMessage());
     }

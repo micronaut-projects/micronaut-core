@@ -82,6 +82,34 @@ public interface ResponseBodyWriter<T> extends MessageBodyWriter<T> {
         T object) throws CodecException;
 
     /**
+     * Open a writer for the pieces of one streamed response, such as the elements of a
+     * {@link org.reactivestreams.Publisher} body. The returned writer may keep state across the
+     * pieces, where {@link #writePiece} sets that state up for every piece, and it puts the
+     * separators of the framing of the pieces (e.g. the brackets and commas of a JSON array) into
+     * the same bodies as the pieces. The writer is closed once the response is complete, failed
+     * or discarded.
+     *
+     * <p>The default implementation writes each piece with {@link #writePiece}.
+     *
+     * @param bodyFactory The buffer factory
+     * @param request     The request
+     * @param response    The response the pieces are part of
+     * @param type        The type of the pieces
+     * @param mediaType   The media type of the pieces
+     * @return The piece writer
+     * @throws CodecException If the writer cannot be created
+     * @since 5.3.0
+     */
+    default PieceWriter<T> openPieceWriter(
+        ByteBodyFactory bodyFactory,
+        HttpRequest<?> request,
+        HttpResponse<?> response,
+        Argument<T> type,
+        MediaType mediaType) throws CodecException {
+        return new DefaultPieceWriter<>(this, bodyFactory, request, response, type, mediaType);
+    }
+
+    /**
      * Wrap the given writer, if necessary, to get a {@link ResponseBodyWriter}.
      *
      * @param writer The generic message writer

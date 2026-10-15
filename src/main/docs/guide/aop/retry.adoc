@@ -78,6 +78,126 @@ Programmatic circuit breakers are created in the same way, using a typed `Circui
 
 snippet::io.micronaut.docs.aop.retry.ProgrammaticBookService[tags="programmatic-circuit", indent=0, title="Programmatic Circuit Breaker"]
 
+== Named Retry Policies
+
+NOTE: Named retry policies are experimental.
+
+Retry settings shared by several methods can be configured once as a named policy under `micronaut.retry.policies.<name>`, and referenced with the `name` member of ann:retry.annotation.Retryable[]:
+
+[configuration]
+----
+micronaut:
+  retry:
+    policies:
+      books:
+        attempts: 5
+        delay: 200ms
+        multiplier: 2
+        max-delay: 10s
+        jitter: 0.1
+        includes:
+          - java.io.IOException
+        excludes:
+          - java.io.FileNotFoundException
+----
+
+snippet::io.micronaut.docs.aop.retry.NamedRetryBookService[tags="named", indent=0, title="Applying a Named Retry Policy"]
+
+<1> The method takes the attempts, delay, multiplier, maximum delay, jitter, includes and excludes of the `books` policy
+
+As with the annotation, `attempts` is the maximum number of retries after the first call: `attempts: 5` calls the method at most six times. The `includes` and `excludes` are fully qualified class names of exception types.
+
+A member set explicitly on the annotation overrides that setting of the policy alone, e.g. `includes` on the annotation replaces the includes of the policy and keeps its excludes:
+
+snippet::io.micronaut.docs.aop.retry.NamedRetryBookService[tags="override", indent=0, title="Overriding a Named Retry Policy"]
+
+<1> One retry, so at most two calls, with the other settings of the `books` policy
+
+A policy member that is not configured takes the default of ann:retry.annotation.Retryable[]. A name that is not configured fails each call of the method with an `IllegalStateException` naming the missing policy; a method returning a `CompletionStage` or a `Publisher` returns it failed. A policy that is invalid, e.g. with an include that is not the name of an exception class, fails the startup of the application. Without a `name`, the annotation behaves as before.
+
+A ann:retry.annotation.CircuitBreaker[] method that has a `name` of ann:retry.annotation.Retryable[], e.g. on its class, retries with the named policy in the same way.
+
+The policies are also available programmatically through the api:retry.RetryRegistry[] bean, whose `retry(name)` returns the `RetryOperations` of a policy.
+
+== Named Circuit Breakers
+
+A circuit breaker with a name is shared by everything that uses the name: the api:retry.CircuitBreakerRegistry[] gives its circuit to programmatic users, to every method annotated `@CircuitBreaker(name = "...")` and to other modules. They open, half-open and close one circuit together, while each user keeps its own retries. A `@CircuitBreaker` without a name keeps a circuit of its own, as before.
+
+[configuration]
+----
+micronaut:
+  retry:
+    circuit-breakers:
+      inventory:
+        reset: 30s # the time the circuit stays open before it half-opens
+        attempts: 1 # the retries of registry.circuitBreaker("inventory")
+----
+
+snippet::io.micronaut.docs.aop.retry.InventoryService[tags="named", indent=0, title="Methods Sharing a Named Circuit Breaker"]
+
+<1> The method retries twice, and a failure that survives its retries opens the `inventory` circuit
+<2> The method fails fast once `stock` opened the circuit
+
+snippet::io.micronaut.docs.aop.retry.InventoryClient[tags="registry", indent=0, title="Named Circuit Breakers from the Registry"]
+
+<1> The operations of the `inventory` circuit, with the retries of its configuration
+<2> The guard of the `shipping` circuit, see below
+<3> The operation fails fast while the `inventory` circuit is open, whichever user opened it
+
+The reset timeout and the rolling window of a named circuit are those of its configuration, and a user that declares others fails. A name that is not configured takes them from its users, which must all agree, the defaults included: `registry.circuitBreaker(name)` and `registry.guard(name)` have the defaults, and a user that disagrees with the one that created the circuit fails with an `IllegalStateException` naming both. Configure a name that users share once, rather than repeating its settings.
+
+A caller that runs each operation itself and only reports its outcome uses the api:retry.CircuitBreakerGuard[] of the name: `acquire()` fails fast with a `CircuitOpenException` while the circuit is open, `onSuccess()` and `onFailure(e)` report the outcome, and `release()` returns a permit whose operation ended without one, for example when it was cancelled. A guard never retries, so a caller can report an outcome as soon as it knows it, for example once the headers of a response arrive, without waiting for its body.
+
+snippet::io.micronaut.docs.aop.retry.InventoryClient[tags="guard", indent=0, title="Reporting Outcomes with a CircuitBreakerGuard"]
+
+<1> Fails fast with a `CircuitOpenException` while the circuit is open
+<2> Reports a success
+<3> Reports a failure, which may open the circuit
+
+Without further settings, as for any circuit breaker of Micronaut, the first failure that survives the retries opens the circuit, and a half-open circuit closes on the first success and opens again on the first failure.
+
+=== Rolling Window
+
+A circuit breaker may instead decide by a rolling window of outcomes, as in MicroProfile Fault Tolerance. Setting any of these, on `@CircuitBreaker` or under `micronaut.retry.circuit-breakers.<name>`, gives the circuit a window, with the defaults of the others. Programmatically, a api:retry.CircuitBreakerWindow[] built with `CircuitBreakerWindow.builder()` is passed with the policy to `registry.circuitBreaker(name, policy, window)`:
+
+|===
+|Setting |Default |Meaning
+
+|`requestVolumeThreshold` (`request-volume-threshold`) |20 |the number of the last calls of a closed circuit in the window
+|`failureRatio` (`failure-ratio`) |0.5 |the ratio of failures of a full window that opens the circuit; never before the window is full
+|`successThreshold` (`success-threshold`) |1 |the trial calls of a half-open circuit: all succeed to close it, any failure opens it again, and the other calls are rejected without counting
+|`failOn` (`fail-on`) |every exception |the exceptions that count as a failure
+|`skipOn` (`skip-on`) |none |the exceptions that count as a success, whatever `failOn` says
+|===
+
+The reset timeout (`reset`) is the time an open circuit waits before it half-opens; a half-open circuit whose trial calls have not all reported within it, for example because they were abandoned, permits new ones. The outcome of a call of an annotated method is its outcome after its retries, and an exception its `excludes` or `predicate` do not retry counts as a success. A call that started before the circuit last changed state counts for nothing, and a reactive call counts once it is subscribed: cancelled before it produced a value, it counts for nothing. `CircuitBreakerRegistry.findSnapshot(name)` gives the state and counters of a circuit.
+
+For example, the `shipping` circuit of the guard above opens when two of its last four calls failed, and a `NoSuchElementException` counts as a success:
+
+[configuration]
+----
+micronaut:
+  retry:
+    circuit-breakers:
+      shipping:
+        reset: 30s
+        request-volume-threshold: 4
+        failure-ratio: 0.5
+        success-threshold: 2
+        skip-on:
+          - java.util.NoSuchElementException
+----
+
+The same window on the annotation:
+
+snippet::io.micronaut.docs.aop.retry.PricingService[tags="window", indent=0, title="A Rolling Window on @CircuitBreaker"]
+
+<1> One retry: a call counts once in the window, with its outcome after the retry
+<2> The window holds the last four calls, and the circuit never opens before it is full
+<3> Two failures of four calls open the circuit
+<4> Two trial calls of the half-open circuit must succeed to close it
+<5> A `NoSuchElementException` counts as a success
+
 == Factory Bean Retry
 
 When ann:retry.annotation.Retryable[] is applied to bean factory methods, it behaves as if the annotation was placed on the type being returned. The retry behavior applies when the methods on the returned object are invoked. Note that the bean factory method itself is *not* retried. If you want the functionality of creating the bean to be retried, it should be delegated to another singleton that has the ann:retry.annotation.Retryable[] annotation applied.

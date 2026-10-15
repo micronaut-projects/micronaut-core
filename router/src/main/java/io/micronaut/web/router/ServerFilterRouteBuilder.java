@@ -66,17 +66,7 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Bea
                 String contextPath = contextPathProvider != null ? contextPathProvider.getContextPath() : null;
                 if (contextPath != null) {
                     patterns = patterns.stream()
-                        .map(pattern -> {
-                            if (!pattern.startsWith(contextPath)) {
-                                String newValue = StringUtils.prependUri(contextPath, pattern);
-                                if (newValue.charAt(0) != '/') {
-                                    newValue = "/" + newValue;
-                                }
-                                return newValue;
-                            } else {
-                                return pattern;
-                            }
-                        })
+                        .map(pattern -> ServerFilterRouteBuilder.prependContextPath(contextPath, pattern))
                         .toList();
                 }
                 return patterns;
@@ -105,5 +95,23 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Bea
     @Override
     public void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
         delegate.process(beanDefinition, beanContext);
+    }
+
+    /**
+     * The pattern of a server filter under the context path, unless it starts with it.
+     *
+     * @param contextPath The context path
+     * @param pattern     The pattern
+     * @return The pattern under the context path
+     */
+    static String prependContextPath(String contextPath, String pattern) {
+        if (pattern.startsWith(contextPath)) {
+            return pattern;
+        }
+        String newValue = StringUtils.prependUri(contextPath, pattern);
+        if (newValue.charAt(0) != '/') {
+            newValue = "/" + newValue;
+        }
+        return newValue;
     }
 }

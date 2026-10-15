@@ -1,0 +1,14 @@
+<configuration>
+
+    <!-- This should be ignored, as logback-test.xml is on the test classpath -->
+    <appender name="MAIN" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>MAIN %d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="info">
+        <appender-ref ref="MAIN" />
+    </root>
+    <logger name="from.main" level="TRACE" />
+</configuration>

@@ -407,7 +407,7 @@ public final class PythonStatic {
             return number.longValue();
         }
         if (value instanceof Boolean bool) {
-            return bool ? 1 : 0;
+            return bool.booleanValue() ? 1 : 0;
         }
         throw new ClassCastException("not an int: " + str(value));
     }
@@ -878,7 +878,7 @@ public final class PythonStatic {
      */
     public static long toInt(@Nullable Object value) {
         if (value instanceof Boolean bool) {
-            return bool ? 1 : 0;
+            return bool.booleanValue() ? 1 : 0;
         }
         if (value instanceof Double || value instanceof Float) {
             double d = ((Number) value).doubleValue();
@@ -907,7 +907,7 @@ public final class PythonStatic {
      */
     public static double toFloat(@Nullable Object value) {
         if (value instanceof Boolean bool) {
-            return bool ? 1.0 : 0.0;
+            return bool.booleanValue() ? 1.0 : 0.0;
         }
         if (value instanceof Number number) {
             return number.doubleValue();

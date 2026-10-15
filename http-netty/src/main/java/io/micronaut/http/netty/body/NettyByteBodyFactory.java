@@ -27,6 +27,7 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
+import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -34,10 +35,16 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoop;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.util.internal.ThreadExecutorMap;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
+
+import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 /**
  * {@link ByteBodyFactory} implementation with netty-optimized bodies.
@@ -70,6 +77,18 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     }
 
     @Override
+    public Executor streamingBodyExecutor() {
+        // a StreamingNettyByteBody.SharedBuffer must be fed on its loop
+        return loop;
+    }
+
+    @Override
+    public boolean isEventLoopThread() {
+        // this loop, or the loop of another connection
+        return loop.inEventLoop() || ThreadExecutorMap.currentExecutor() != null;
+    }
+
+    @Override
     protected AbstractBodyAdapter createBodyAdapter(Publisher<ReadBuffer> publisher, @Nullable Runnable onDiscard) {
         return new NettyBodyAdapter(loop, publisher, onDiscard);
     }
@@ -88,7 +107,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
 
     public CloseableByteBody adapt(Publisher<ByteBuf> publisher, @Nullable HttpHeaders headersForLength, @Nullable Runnable onDiscard) {
         return adapt(
-            Flux.from(publisher).map(readBufferFactory()::adapt),
+            BodyPublishers.map(publisher, readBufferFactory()::adapt),
             BodySizeLimits.UNLIMITED, headersForLength == null ? null : new NettyHttpHeaders(headersForLength, ConversionService.SHARED),
             onDiscard);
     }
@@ -103,9 +122,8 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
         }
     }
 
-    public static Flux<ByteBuf> toByteBufs(ByteBody body) {
-        return Flux.from(body.toReadBufferPublisher())
-            .map(NettyReadBufferFactory::toByteBuf);
+    public static Publisher<ByteBuf> toByteBufs(ByteBody body) {
+        return BodyPublishers.map(body.toReadBufferPublisher(), NettyReadBufferFactory::toByteBuf);
     }
 
     public StreamingNettyByteBody.SharedBuffer createStreamingBuffer(BodySizeLimits limits, BufferConsumer.Upstream rootUpstream) {
@@ -117,10 +135,102 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
         if (body instanceof StreamingNettyByteBody snbb && snbb.isCompatible(loop)) {
             return snbb;
         }
+        // the length first: for an available body it is a claiming operation, like the publisher
+        OptionalLong expectedLength = body.expectedLength();
+        if (loop.inEventLoop() && body instanceof AvailableByteBody available) {
+            StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(BodySizeLimits.UNLIMITED, bytesConsumed -> {
+                // All bytes have arrived; there is no producer to notify about demand.
+            });
+            expectedLength.ifPresent(sb::setExpectedLength);
+            sb.add(available.toReadBuffer());
+            sb.complete(body.trailers());
+            return new StreamingNettyByteBody(sb);
+        }
         NettyBodyAdapter adapter = new NettyBodyAdapter(loop, body.toReadBufferPublisher(), null);
         StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb);
-        body.expectedLength().ifPresent(sb::setExpectedLength);
+        adapter.setTrailers(body.trailers());
+        expectedLength.ifPresent(sb::setExpectedLength);
         return new StreamingNettyByteBody(sb);
+    }
+
+    /**
+     * Attach the trailing headers of a {@link io.netty.handler.codec.http.LastHttpContent} to a
+     * body, see {@link ByteBody#trailers()}.
+     *
+     * @param body            The body
+     * @param trailingHeaders The trailing headers
+     * @return The given body if the trailing headers are empty, else a body with the trailers
+     * @since 5.3.0
+     */
+    public CloseableByteBody withTrailers(CloseableByteBody body, HttpHeaders trailingHeaders) {
+        if (trailingHeaders.isEmpty()) {
+            return body;
+        }
+        return withTrailers(body, CompletableFuture.completedFuture(new NettyHttpHeaders(trailingHeaders, ConversionService.SHARED)));
+    }
+
+    /**
+     * Get the trailers of a body that has ended, as netty headers, to send them after its last
+     * bytes. A body completes its trailers before it completes its consumers, so they are known
+     * when the consumer is completed.
+     *
+     * @param body The body
+     * @return The trailers, or {@code null} if the body carries none, or if they are not known
+     * @since 5.3.0
+     */
+    @Nullable
+    public static HttpHeaders trailersToSend(ByteBody body) {
+        io.micronaut.http.HttpHeaders headers = knownTrailers(body);
+        return headers == null ? null : toNettyHeaders(headers);
+    }
+
+    /**
+     * Whether a body carries trailers that are already known, e.g. because it was received fully
+     * before it is sent on. On HTTP/1 the message of such a body must use the chunked transfer
+     * coding even when the length of the body is known: a {@code Content-Length} message cannot
+     * carry trailers, and they would be dropped. The trailers of a body created with
+     * {@link ByteBodyFactory#withTrailers} may complete later, which is why that body has no
+     * expected length at all.
+     *
+     * @param body The body
+     * @return {@code true} if the trailers of the body are known and not empty
+     * @since 5.3.0
+     */
+    public static boolean hasTrailers(ByteBody body) {
+        return knownTrailers(body) != null;
+    }
+
+    private static io.micronaut.http.@Nullable HttpHeaders knownTrailers(ByteBody body) {
+        CompletableFuture<io.micronaut.http.HttpHeaders> trailers = body.trailers().toCompletableFuture();
+        if (!trailers.isDone() || trailers.isCompletedExceptionally()) {
+            return null;
+        }
+        io.micronaut.http.HttpHeaders headers = trailers.join();
+        if (headers == null || headers.isEmpty()) {
+            return null;
+        }
+        return headers;
+    }
+
+    /**
+     * Convert headers to netty headers, e.g. the trailers of a body.
+     *
+     * @param headers The headers
+     * @return The netty headers, {@link EmptyHttpHeaders#INSTANCE} if the headers are empty
+     * @since 5.3.0
+     */
+    public static HttpHeaders toNettyHeaders(io.micronaut.http.HttpHeaders headers) {
+        if (headers instanceof NettyHttpHeaders nettyHttpHeaders) {
+            return nettyHttpHeaders.getNettyHeaders();
+        }
+        if (headers.isEmpty()) {
+            return EmptyHttpHeaders.INSTANCE;
+        }
+        HttpHeaders nettyHeaders = new DefaultHttpHeaders(false);
+        for (String name : headers.names()) {
+            nettyHeaders.add(name, headers.getAll(name));
+        }
+        return nettyHeaders;
     }
 }

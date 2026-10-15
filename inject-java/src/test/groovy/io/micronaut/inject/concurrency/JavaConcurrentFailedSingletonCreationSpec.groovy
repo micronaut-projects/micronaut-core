@@ -117,6 +117,11 @@ class JavaConcurrentFailedSingletonCreationSpec extends Specification {
         context.close()
     }
 
+    void cleanup() {
+        // Specs running later in the same JVM construct the singleton through eager initialization
+        SteppedSingleton.started = null
+    }
+
     private static Thread getBeanOn(String name, ApplicationContext context, Map<String, Object> results) {
         Thread thread = new Thread({
             try {

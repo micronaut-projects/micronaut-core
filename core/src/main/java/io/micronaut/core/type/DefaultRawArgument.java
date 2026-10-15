@@ -52,6 +52,11 @@ final class DefaultRawArgument<T> extends DefaultArgument<T> {
         this.argumentName = name;
     }
 
+    private DefaultRawArgument(DefaultRawArgument<T> argument, @Nullable Argument<?> componentType) {
+        super(argument, componentType);
+        this.argumentName = argument.argumentName;
+    }
+
     @Override
     public boolean isRawType() {
         return true;
@@ -59,11 +64,16 @@ final class DefaultRawArgument<T> extends DefaultArgument<T> {
 
     @Override
     public Argument<T> withName(@Nullable String name) {
-        return new DefaultRawArgument<>(getType(), name, getAnnotationMetadata(), getTypeParameters());
+        return keepComponentType(new DefaultRawArgument<>(getType(), name, getAnnotationMetadata(), getTypeParameters()));
     }
 
     @Override
     public Argument<T> withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        return new DefaultRawArgument<>(getType(), argumentName, annotationMetadata, getTypeParameters());
+        return keepComponentType(new DefaultRawArgument<>(getType(), argumentName, annotationMetadata, getTypeParameters()));
+    }
+
+    @Override
+    protected DefaultArgument<T> copyWithComponentType(@Nullable Argument<?> componentType) {
+        return new DefaultRawArgument<>(this, componentType);
     }
 }

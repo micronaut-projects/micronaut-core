@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.env.ConfigurationPath;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -32,9 +33,11 @@ import io.micronaut.inject.MethodInjectionPoint;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Represents the resolution context for a current resolve of a given bean.
@@ -66,7 +69,10 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * creation and must be treated as an implementation detail.</p>
      *
      * @since 5.2.0
+     * @deprecated Interceptor candidates are retained by the dependency owner of the bean, see
+     * {@link #setBeanInterceptors(BeanDefinition, List)}. Read only for code compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     String INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.interceptorRegistrations";
 
     /**
@@ -77,17 +83,23 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * implementation detail.</p>
      *
      * @since 5.2.1
+     * @deprecated Interceptor candidates are retained by the dependency owner of the bean, see
+     * {@link #setBeanInterceptors(BeanDefinition, List)}. Read only for code compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     String SHARED_INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.sharedInterceptorRegistrations";
 
     /**
      * Attribute that exposes the interceptor registrations selected while creating the bean being disposed.
      *
      * <p>The value is a read-only {@code List<BeanRegistration<?>>}. It is set only while a bean is being disposed and
-     * is intended for lifecycle interception.</p>
+     * is read only for compatibility. Current callers use {@link #setBeanInterceptors(BeanDefinition, List)}.</p>
      *
      * @since 5.2.0
+     * @deprecated Interceptor candidates are retained by the dependency owner of the bean, see
+     * {@link #setBeanInterceptors(BeanDefinition, List)}. Read only for code compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0")
     String EXISTING_INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.existingInterceptorRegistrations";
 
     @Override
@@ -96,10 +108,70 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
+     * Resolves dependencies for a synchronous invocation and closes the temporary group afterwards.
+     * A context supplied by the container for destruction permits temporary lookups during shutdown,
+     * only on the destruction thread and until that invocation returns. Other contexts follow the ordinary
+     * shutdown restrictions of {@link BeanContext#withDependencies(Function)}.
+     * Cleanup failures are suppressed on an invocation failure. Do not retain an owned dependency in the result.
+     * @param action The invocation
+     * @param <R> The result type
+     * @return The result
+     * @since 5.3.0
+     */
+    @Experimental
+    default <R> R withDependencies(Function<BeanDependencyGroup, R> action) {
+        return getContext().withDependencies(action);
+    }
+
+    /**
      * @return The property resolver
      */
     @Nullable
     PropertyResolver getPropertyResolver();
+
+    /**
+     * Resolves the bean of the given definition as the given bean type, on behalf of the bean this context resolves
+     * for.
+     *
+     * <p>The bean is the one {@link #getBean(Argument, Qualifier)} returns for the bean type when its lookup picks this
+     * definition, without the lookup: the caller has already chosen the definition, so no other candidate is
+     * considered and no candidate lookup or cache is involved. The bean is resolved in the scope of the definition and
+     * with its declared qualifier, as {@link BeanDefinitionRegistry#getBeanRegistration(BeanDefinition, Argument)}
+     * resolves it, and a bean that has no scope of its own is a dependent of the bean this context resolves for and
+     * is destroyed with it, as one {@link #getBean(Argument, Qualifier)} creates is.</p>
+     *
+     * <p>The definition may be of a subtype of the bean type: a definition of an implementation is resolved as an
+     * interface it implements.</p>
+     *
+     * @param definition The bean definition
+     * @param beanType   The potentially parameterized bean type to resolve the definition as
+     * @param <T>        The bean type
+     * @return The bean
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the bean
+     *                                                             type
+     * @since 5.3.0
+     */
+    <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType);
+
+    /**
+     * Resolves the registration of the bean of the given definition as the given bean type, on behalf of the bean
+     * this context resolves for.
+     *
+     * <p>This is {@link #getBean(BeanDefinition, Argument)} with the registration kept: the bean is resolved within
+     * this context, so what is created for it sees this context's path, and a bean that has no scope of its own is a
+     * dependent of the bean this context resolves for and is destroyed with it. The registration is
+     * the one {@link BeanDefinitionRegistry#getBeanRegistration(BeanDefinition, Argument)} returns when the
+     * resolution starts no context of its own, with that ownership.</p>
+     *
+     * @param definition The bean definition
+     * @param beanType   The potentially parameterized bean type to resolve the definition as
+     * @param <T>        The bean type
+     * @return The bean registration
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the bean
+     *                                                             type
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType);
 
     /**
      * Obtains the bean registrations for the given type and qualifier.
@@ -111,6 +183,112 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 3.5.0
      */
     <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Obtains the registrations of the interceptors bound to the bean this context resolves for, as the bean's own.
+     *
+     * <p>A singleton, or an interceptor of a custom scope, comes from its scope. An interceptor no scope holds, a
+     * prototype or one with no scope, is the instance created for the bean earlier, for another of its interception
+     * points or for a proxy that fronts it, and is otherwise created now as a dependent of the bean, so that it is
+     * destroyed with the bean. That is what gives every interception point of a bean the same instance. A context the
+     * container did not create resolves as {@link #getBeanRegistrations(Argument, Qualifier)} does.</p>
+     *
+     * @param interceptorType The interceptor type
+     * @param binding         The interceptor binding qualifier
+     * @param <I>             The interceptor type
+     * @return The registrations
+     * @since 5.3.0
+     */
+    default <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
+        return getBeanRegistrations(interceptorType, binding);
+    }
+
+    /**
+     * Returns a view of the current bean's ownership, for generated proxies to retain even when no scope
+     * holds their registration. The view shares the lifecycle of the registration created for this bean.
+     * @return The dependency group, or {@code null} for a legacy creation path
+     * @since 5.3.0
+     */
+    default @Nullable BeanDependencyGroup getBeanDependencyGroup() {
+        return null;
+    }
+
+    /**
+     * Returns a resolver owned by the bean the current segment of the path belongs to: the bean a field, constructor
+     * argument or method argument is being injected into, or the bean itself when it is resolved by a lookup rather
+     * than injected.
+     *
+     * <p>A bean built for the injection point it is injected into, such as one of an
+     * {@link io.micronaut.inject.provider.AbstractInjectionPointBeanDefinition}, uses it to resolve dependencies on
+     * behalf of the bean it is injected into: a dependent the resolver creates is destroyed with that bean, under the
+     * rules of an injected {@link BeanDependencyResolver}, and can be destroyed earlier with
+     * {@link BeanDependencyResolver#destroy(BeanRegistration)}. The resolver can be retained after the injection.</p>
+     *
+     * <p>The resolver does not share the path of this context: it must not be used to resolve the bean it is owned by
+     * while that bean is being created.</p>
+     *
+     * @return The resolver, or {@code null} if there is no current segment, the bean of the segment is not being
+     * created through this context, or the context does not track bean ownership
+     * @since 5.3.0
+     */
+    @Experimental
+    default @Nullable BeanDependencyResolver getDependencyResolver() {
+        return null;
+    }
+
+    /**
+     * Associates a proxy's selected advice with the next creation of its unscoped target. Target construction
+     * keeps its own interceptor semantics; the proxy's advice takes precedence for target destruction.
+     * @param definition The target definition
+     * @param registrations The proxy's selected interceptor registrations
+     * @since 5.3.0
+     */
+    default void prepareProxyTarget(BeanDefinition<?> definition, List<?> registrations) {
+    }
+
+    /**
+     * Records the interceptor candidates for one bean's construction and lifecycle.
+     * @param definition The bean being created
+     * @param registrations Its interceptor registrations
+     * @since 5.3.0
+     */
+    @SuppressWarnings("unchecked")
+    default void setBeanInterceptors(BeanDefinition<?> definition, List<?> registrations) {
+        Map<BeanDefinition<?>, List<?>> stored =
+            (Map<BeanDefinition<?>, List<?>>) getAttribute(INTERCEPTOR_REGISTRATIONS);
+        if (stored == null) {
+            stored = new IdentityHashMap<>();
+            setAttribute(INTERCEPTOR_REGISTRATIONS, stored);
+        }
+        stored.put(definition, registrations);
+    }
+
+    /**
+     * Returns the candidates retained for one bean's lifecycle, without resolving any new beans.
+     * @param definition The bean being created
+     * @return Its interceptor registrations, or {@code null}
+     * @since 5.3.0
+     */
+    default @Nullable List<?> getBeanInterceptors(BeanDefinition<?> definition) {
+        return getAttribute(INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> stored
+            && stored.get(definition) instanceof List<?> registrations ? registrations : null;
+    }
+
+    /**
+     * Returns retained destruction candidates, including advice borrowed from an owning proxy.
+     * This does not resolve new beans and does not change the candidates used for initialization.
+     * @param definition The bean being created
+     * @return Its destruction candidates, or {@code null} if none have been recorded
+     * @since 5.3.0
+     */
+    default @Nullable List<?> getBeanDestructionInterceptors(BeanDefinition<?> definition) {
+        List<?> retained = getBeanInterceptors(definition);
+        if (retained != null) {
+            return retained;
+        }
+        // Compatibility with callers that supplied destruction candidates through the old context attribute.
+        return getAttribute(EXISTING_INTERCEPTOR_REGISTRATIONS) instanceof List<?> legacy ? legacy : null;
+    }
 
     /**
      * Call back to destroy any {@link io.micronaut.context.annotation.InjectScope} beans.
@@ -315,6 +493,35 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
+     * Resolves the factory bean a produced bean is instantiated from, and marks it as the dependent
+     * factory, as {@link #markDependentAsFactory()} does. Generated definitions call this rather than
+     * {@code getBean} followed by {@link #markDependentAsFactory()}.
+     *
+     * <p>When the context records a {@link BeanDependencyGraph}, the lookup is attributed to the produced
+     * definition: the factory is a dependency of the bean it produces, not of whatever bean happened to be
+     * resolving the produced one, which is what a lookup with no segment of its own would record. A context
+     * that records no graph does nothing more than the {@code getBean} and {@link #markDependentAsFactory()}
+     * it replaces.</p>
+     *
+     * <p>Definitions compiled against an earlier version keep calling {@code getBean} and
+     * {@link #markDependentAsFactory()}: in development mode, their factory is recorded as a dependency of the
+     * bean resolving the product rather than of the product, until they are compiled again.</p>
+     *
+     * @param producedDefinition The definition of the bean the factory produces
+     * @param factoryType The factory type
+     * @param qualifier The factory's qualifier, if any
+     * @param <F> The factory type
+     * @return The factory bean
+     * @since 5.3.0
+     */
+    @UsedByGeneratedCode
+    default <F> F getFactoryBean(BeanDefinition<?> producedDefinition, Class<F> factoryType, @Nullable Qualifier<F> qualifier) {
+        F factory = getBean(factoryType, qualifier);
+        markDependentAsFactory();
+        return factory;
+    }
+
+    /**
      * @return The dependent factory beans that was used to create the bean in context
      * @since 3.5.0
      */
@@ -363,6 +570,31 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     <T> T getProxyTargetBean(BeanDefinition<T> definition,
                              Argument<T> beanType,
                              @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Resolves the proxy target for a given proxy bean definition together with its registration.
+     *
+     * <p>Where {@link #getProxyTargetBean(BeanDefinition, Argument, Qualifier)} returns the target alone, this returns
+     * the registration the context holds for it, which carries the non-singleton interceptors created for the target.
+     * A proxy that fronts the target selects the interceptors of the target from it.</p>
+     *
+     * @param definition The proxy target bean definition
+     * @param beanType   The bean type
+     * @param qualifier  The bean qualifier
+     * @param <T>        The generic type
+     * @return The registration of the proxy target
+     * @since 5.3.0
+     */
+    @UsedByGeneratedCode
+    default <T> BeanRegistration<T> getProxyTargetBeanRegistration(BeanDefinition<T> definition,
+                                                                  Argument<T> beanType,
+                                                                  @Nullable Qualifier<T> qualifier) {
+        return new BeanRegistration<>(
+            new DefaultBeanContext.BeanKey<>(beanType, qualifier),
+            definition,
+            getProxyTargetBean(definition, beanType, qualifier)
+        );
+    }
 
     /**
      * Represents a path taken to resolve a bean definitions dependencies.

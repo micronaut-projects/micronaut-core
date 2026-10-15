@@ -61,7 +61,7 @@ public final class ServerRequestContext {
                 propagatedContext = propagatedContext.minus(serverHttpRequestContext.get());
             }
         } else {
-            propagatedContext = propagatedContext.plus(new ServerHttpRequestContext(request));
+            propagatedContext = ServerHttpRequestContext.withRequest(propagatedContext, request);
         }
         return propagatedContext;
     }

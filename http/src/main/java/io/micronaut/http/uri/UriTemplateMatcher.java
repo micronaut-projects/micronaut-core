@@ -40,6 +40,11 @@ import java.util.regex.Pattern;
 @Internal
 public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTemplateMatcher> {
 
+    /**
+     * Marker returned by {@link #matchSegments(String)} for a successful match of a template without a regexp segment.
+     */
+    private static final Matcher NO_REGEXP_MATCH = Pattern.compile("").matcher("");
+
     private final String templateString;
     private final List<UriTemplateParser.Part> parts;
     private final List<UriMatchVariable> variables;
@@ -49,6 +54,10 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
     // Matches cache
     private UriMatchInfo rootMatchInfo;
     private UriMatchInfo exactMatchInfo;
+    /**
+     * The number of variables with a regular expression, computed once, or -1.
+     */
+    private int patternVariableCount = -1;
 
     /**
      * Construct a new URI template for the given template.
@@ -284,59 +293,85 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
             }
             return null;
         }
-        Map<String, Object> variableMap = CollectionUtils.newLinkedHashMap(variables.size());
-        if (match(uri, variableMap)) {
-            return new DefaultUriMatchInfo(uri, variableMap, variables);
+        // Match first without allocating; only a successful match builds the variable map
+        Matcher regexpMatcher = matchSegments(uri);
+        if (regexpMatcher == null) {
+            return null;
         }
-        return null;
+        Map<String, Object> variableMap = CollectionUtils.newLinkedHashMap(variables.size());
+        collectVariables(uri, regexpMatcher, variableMap);
+        return new DefaultUriMatchInfo(uri, variableMap, variables);
     }
 
-    private boolean match(String uri, Map<String, Object> variableMap) {
+    /**
+     * Matches the URI against the segments without extracting the variable values.
+     *
+     * @param uri The URI
+     * @return {@code null} if the URI doesn't match, the matched regexp matcher if the template ends with a regexp segment,
+     * otherwise {@link #NO_REGEXP_MATCH}
+     */
+    @Nullable
+    private Matcher matchSegments(String uri) {
+        int length = uri.length();
+        int pos = 0;
         for (int i = 0; i < segments.length; i++) {
             Segment segment = segments[i];
             switch (segment.type) {
                 case LITERAL -> {
-                    if (uri.startsWith(segment.value)) {
-                        uri = uri.substring(segment.value.length());
+                    if (uri.startsWith(segment.value, pos)) {
+                        pos += segment.value.length();
                     } else {
-                        return false;
+                        return null;
                     }
                 }
                 case PATH -> {
                     boolean requiresSlash = i + 1 != segments.length;
-                    int index = readText(uri, requiresSlash);
-                    if (index > 0) { // Deny empty path
-                        String path = uri.substring(0, index);
-                        variableMap.put(segment.value, path);
-                        uri = uri.substring(index);
+                    int end = readText(uri, pos, requiresSlash);
+                    if (end > pos) { // Deny empty path
+                        pos = end;
                     } else {
-                        return false;
+                        return null;
                     }
                 }
                 case REGEXP -> {
                     Matcher matcher = segment.pattern.matcher(uri);
-                    if (matcher.matches()) {
-                        int groupInx = 2;
-                        for (String matchingVariable : segment.regexpVariables) {
-                            String group = matcher.group(groupInx);
-                            variableMap.put(matchingVariable, group);
-                            groupInx += 2;
-                        }
-                        return true;
-                    } else {
-                        return false;
-                    }
+                    matcher.region(pos, length);
+                    return matcher.matches() ? matcher : null;
                 }
                 default -> throw new IllegalStateException("Unsupported segment type: " + segment.type);
             }
         }
-        return uri.isEmpty();
+        return pos == length ? NO_REGEXP_MATCH : null;
     }
 
-    private static int readText(String input, boolean requiresSlash) {
+    private void collectVariables(String uri, Matcher regexpMatcher, Map<String, Object> variableMap) {
+        int pos = 0;
+        for (int i = 0; i < segments.length; i++) {
+            Segment segment = segments[i];
+            switch (segment.type) {
+                case LITERAL -> pos += segment.value.length();
+                case PATH -> {
+                    int end = readText(uri, pos, i + 1 != segments.length);
+                    variableMap.put(segment.value, uri.substring(pos, end));
+                    pos = end;
+                }
+                case REGEXP -> {
+                    int groupInx = 2;
+                    for (String matchingVariable : segment.regexpVariables) {
+                        variableMap.put(matchingVariable, regexpMatcher.group(groupInx));
+                        groupInx += 2;
+                    }
+                    return;
+                }
+                default -> throw new IllegalStateException("Unsupported segment type: " + segment.type);
+            }
+        }
+    }
+
+    private static int readText(String input, int from, boolean requiresSlash) {
         // NOTE: Micronaut doesn't allow some of the character in the path value
         int length = input.length();
-        for (int i = 0; i < length; i++) {
+        for (int i = from; i < length; i++) {
             char c = input.charAt(i);
             if (requiresSlash && c == '/') {
                 return i;
@@ -448,7 +483,12 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         // using that.compareTo because more raw length should have higher precedence
         int rawCompare = Integer.compare(thatEvaluator.rawLength, thisEvaluator.rawLength);
         if (rawCompare == 0) {
-            return Integer.compare(thisEvaluator.variableCount, thatEvaluator.variableCount);
+            int variableCompare = Integer.compare(thisEvaluator.variableCount, thatEvaluator.variableCount);
+            if (variableCompare == 0) {
+                // fewer variables constrained by a regular expression is more specific
+                return Integer.compare(thisEvaluator.patternVariableCount, thatEvaluator.patternVariableCount);
+            }
+            return variableCompare;
         }
         return rawCompare;
     }
@@ -462,6 +502,113 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         for (UriTemplateParser.Part part : parts) {
             part.visit(visitor);
         }
+    }
+
+    /**
+     * A literal that every URI this template matches starts with, once the URI is normalised with
+     * {@link #normalizeForMatching(String)}. Routers use it to skip templates that cannot match.
+     *
+     * @return The prefix, or an empty string if there is none
+     * @since 5.3.0
+     */
+    public String getRequiredPrefix() {
+        if (isRoot) {
+            return "";
+        }
+        if (variables.isEmpty()) {
+            // matched by equality
+            return templateString;
+        }
+        if (segments.length > 0 && segments[0].type == SegmentType.LITERAL) {
+            return segments[0].value;
+        }
+        return "";
+    }
+
+    /**
+     * @return The length of the literal parts, the first key of the order of templates, see
+     * {@link #compareTo(UriTemplateMatcher)}
+     * @since 5.3.0
+     */
+    public int getRawLength() {
+        PathEvaluator evaluator = new PathEvaluator();
+        visitParts(parts, evaluator);
+        return evaluator.rawLength;
+    }
+
+    /**
+     * @return The number of path variables, the second key of the order of templates, see
+     * {@link #compareTo(UriTemplateMatcher)}
+     * @since 5.3.0
+     */
+    public int getPathVariableCount() {
+        PathEvaluator evaluator = new PathEvaluator();
+        visitParts(parts, evaluator);
+        return evaluator.variableCount;
+    }
+
+    /**
+     * The number of path variables constrained by a regular expression, e.g. {@code {id:.+}}: the
+     * third key of the order of templates, see {@link #compareTo(UriTemplateMatcher)}. Among
+     * templates with the same literal length and number of variables, the one with fewer such
+     * variables sorts first, so {@code /t/{id}} is ordered before {@code /t/{id:.+}}. It only
+     * orders templates: a request that both match stays ambiguous. A
+     * numeric modifier, e.g. {@code {id:3}}, limits the length of the value and is not a
+     * regular expression: it is not counted.
+     *
+     * @return The number of path variables with a regular expression
+     * @since 5.3.0
+     */
+    public int getPatternVariableCount() {
+        int count = patternVariableCount;
+        if (count < 0) {
+            // computed once: the router reads it to order its routes
+            PathEvaluator evaluator = new PathEvaluator();
+            visitParts(parts, evaluator);
+            count = evaluator.patternVariableCount;
+            patternVariableCount = count;
+        }
+        return count;
+    }
+
+    /**
+     * Whether the modifier of a variable is a regular expression, rather than a numeric length
+     * limit, see {@link #getPatternVariableCount()}.
+     *
+     * @param modifier The modifier
+     * @return Whether it is a regular expression
+     */
+    private static boolean isPatternModifier(@Nullable String modifier) {
+        if (StringUtils.isEmpty(modifier)) {
+            return false;
+        }
+        // the same interpretation as the matcher: a modifier that parses as a number is a limit
+        try {
+            Integer.parseInt(modifier);
+            return false;
+        } catch (NumberFormatException e) {
+            return true;
+        }
+    }
+
+    /**
+     * Normalise a URI the way {@link #tryMatch(String)} does before it matches the segments: the
+     * query and a trailing slash are removed.
+     *
+     * @param uri The URI
+     * @return The normalised URI
+     * @since 5.3.0
+     */
+    public static String normalizeForMatching(String uri) {
+        int parameterIndex = uri.indexOf('?');
+        if (parameterIndex > -1) {
+            uri = uri.substring(0, parameterIndex);
+        }
+        int length = uri.length();
+        if (length > 1 && uri.charAt(length - 1) == '/') {
+            uri = uri.substring(0, length - 1);
+        }
+        return uri;
     }
 
     private boolean isRoot(String uri) {
@@ -483,6 +630,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
     private static final class PathEvaluator implements UriTemplateParser.PartVisitor {
 
         int variableCount = 0;
+        int patternVariableCount = 0;
         int rawLength = 0;
 
         @Override
@@ -494,6 +642,11 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         public void visitExpression(UriTemplateParser.ExpressionType type, List<UriTemplateParser.Variable> variables) {
             if (!type.isQueryPart()) {
                 variableCount += variables.size();
+                for (UriTemplateParser.Variable variable : variables) {
+                    if (isPatternModifier(variable.modifier())) {
+                        patternVariableCount++;
+                    }
+                }
             }
         }
     }

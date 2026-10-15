@@ -16,6 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.env.CachedEnvironment;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.http.HttpHeaders;
@@ -63,6 +64,13 @@ public abstract class HttpClientConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_READ_TIMEOUT_SECONDS = 10;
+
+    /**
+     * The default time to wait for {@code 100 Continue} before sending the body anyway, in seconds.
+     *
+     * @since 5.3.0
+     */
+    public static final long DEFAULT_EXPECT_CONTINUE_TIMEOUT_SECONDS = 1;
 
     /**
      * The default read idle timeout in minutes.
@@ -141,6 +149,14 @@ public abstract class HttpClientConfiguration {
     public static final boolean DEFAULT_ALLOW_BLOCK_EVENT_LOOP = false;
 
     /**
+     * The default value for {@link #isBlockingCallerStackTrace()}.
+     *
+     * @since 5.3.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_BLOCKING_CALLER_STACK_TRACE = false;
+
+    /**
      * The default value.
      */
     @SuppressWarnings("WeakerAccess")
@@ -165,6 +181,12 @@ public abstract class HttpClientConfiguration {
 
     @Nullable
     private Duration readTimeout = Duration.ofSeconds(DEFAULT_READ_TIMEOUT_SECONDS);
+
+    @Nullable
+    private Duration expectContinueTimeout = Duration.ofSeconds(DEFAULT_EXPECT_CONTINUE_TIMEOUT_SECONDS);
+
+    @Nullable
+    private Duration handshakeTimeout;
 
     @Nullable
     private Duration requestTimeout = null;
@@ -253,6 +275,8 @@ public abstract class HttpClientConfiguration {
 
     private boolean allowBlockEventLoop = DEFAULT_ALLOW_BLOCK_EVENT_LOOP;
 
+    private boolean blockingCallerStackTrace = DEFAULT_BLOCKING_CALLER_STACK_TRACE;
+
     private DnsResolutionMode dnsResolutionMode = DEFAULT_DNS_RESOLUTION_MODE;
 
     @Nullable
@@ -312,6 +336,8 @@ public abstract class HttpClientConfiguration {
             this.readIdleTimeout = copy.readIdleTimeout;
             this.connectionPoolIdleTimeout = copy.connectionPoolIdleTimeout;
             this.readTimeout = copy.readTimeout;
+            this.expectContinueTimeout = copy.expectContinueTimeout;
+            this.handshakeTimeout = copy.handshakeTimeout;
             this.shutdownTimeout = copy.shutdownTimeout;
             this.shutdownQuietPeriod = copy.shutdownQuietPeriod;
             this.sslConfiguration = copy.sslConfiguration;
@@ -326,6 +352,7 @@ public abstract class HttpClientConfiguration {
                 this.alpnModes = new ArrayList<>(copy.alpnModes);
             }
             this.allowBlockEventLoop = copy.allowBlockEventLoop;
+            this.blockingCallerStackTrace = copy.blockingCallerStackTrace;
             if (copy.dnsResolutionMode != null) {
                 this.dnsResolutionMode = copy.dnsResolutionMode;
             }
@@ -639,6 +666,18 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * How long a request with {@code Expect: 100-continue} waits for the {@code 100 Continue}
+     * response before it sends the body anyway, as RFC 9110 allows: a server that ignores the
+     * expectation waits for the body. Empty to wait until the read timeout.
+     *
+     * @return The time to wait for {@code 100 Continue}. Defaults to 1 second
+     * @since 5.3.0
+     */
+    public Optional<Duration> getExpectContinueTimeout() {
+        return Optional.ofNullable(expectContinueTimeout);
+    }
+
+    /**
      * The request timeout for non-streaming requests. This is the maximum time until the response
      * must be completely received. Defaults to one second more than read-timeout.
      *
@@ -745,6 +784,46 @@ public abstract class HttpClientConfiguration {
      */
     public void setReadTimeout(@Nullable Duration readTimeout) {
         this.readTimeout = readTimeout;
+    }
+
+    /**
+     * Sets how long a request with {@code Expect: 100-continue} waits for {@code 100 Continue}
+     * before it sends the body anyway. Default value
+     * ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_EXPECT_CONTINUE_TIMEOUT_SECONDS} second).
+     * {@code null} waits until the read timeout.
+     *
+     * @param expectContinueTimeout The time to wait for {@code 100 Continue}
+     * @since 5.3.0
+     */
+    public void setExpectContinueTimeout(@Nullable Duration expectContinueTimeout) {
+        this.expectContinueTimeout = expectContinueTimeout;
+    }
+
+    /**
+     * How long a WebSocket connect waits for the response to its upgrade request once connected:
+     * a server that does not answer in time fails the connect with a
+     * {@link io.micronaut.http.client.exceptions.ReadTimeoutException}, and the connection is
+     * closed. Empty, the default, to wait without a limit.
+     * [available in the Netty HTTP client]
+     *
+     * @return The WebSocket handshake timeout
+     * @since 5.3.0
+     */
+    @Experimental
+    public Optional<Duration> getHandshakeTimeout() {
+        return Optional.ofNullable(handshakeTimeout);
+    }
+
+    /**
+     * Sets how long a WebSocket connect waits for the response to its upgrade request once
+     * connected. {@code null}, the default, waits without a limit.
+     *
+     * @param handshakeTimeout The WebSocket handshake timeout
+     * @since 5.3.0
+     */
+    @Experimental
+    public void setHandshakeTimeout(@Nullable Duration handshakeTimeout) {
+        this.handshakeTimeout = handshakeTimeout;
     }
 
     /**
@@ -1096,6 +1175,36 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * Whether exceptions thrown from a {@link BlockingHttpClient} call (including declarative
+     * clients with a synchronous return type) should have their stack trace replaced with the
+     * stack trace of the calling thread. Such exceptions are usually constructed on an event
+     * loop, so by default their stack trace does not mention the code that made the call. When
+     * enabled, the original stack trace is kept as a suppressed exception.
+     *
+     * @return {@code true} if the stack trace of the caller should be used
+     * @since 5.3.0
+     */
+    public boolean isBlockingCallerStackTrace() {
+        return blockingCallerStackTrace;
+    }
+
+    /**
+     * Whether exceptions thrown from a {@link BlockingHttpClient} call (including declarative
+     * clients with a synchronous return type) should have their stack trace replaced with the
+     * stack trace of the calling thread. Such exceptions are usually constructed on an event
+     * loop, so by default their stack trace does not mention the code that made the call. When
+     * enabled, the original stack trace is kept as a suppressed exception.
+     * <br>
+     * Default value: {@value DEFAULT_BLOCKING_CALLER_STACK_TRACE}
+     *
+     * @param blockingCallerStackTrace {@code true} if the stack trace of the caller should be used
+     * @since 5.3.0
+     */
+    public void setBlockingCallerStackTrace(boolean blockingCallerStackTrace) {
+        this.blockingCallerStackTrace = blockingCallerStackTrace;
+    }
+
+    /**
      * Configure how DNS records are resolved. Ignored if {@link #getAddressResolverGroupName()} is
      * non-null. This option is specific to the netty client.
      *
@@ -1367,7 +1476,7 @@ public abstract class HttpClientConfiguration {
 
         /**
          * The version of the connection pool implementation. Defaults to {@code V4_9}, can be set
-         * to {@code V4_0} for compatibility.
+         * to the deprecated {@code V4_0} for compatibility.
          *
          * @return The pool version
          */
@@ -1377,7 +1486,7 @@ public abstract class HttpClientConfiguration {
 
         /**
          * The version of the connection pool implementation. Defaults to {@code V4_9}, can be set
-         * to {@code V4_0} for compatibility.
+         * to the deprecated {@code V4_0} for compatibility.
          *
          * @param version The pool version
          */
@@ -1426,7 +1535,11 @@ public abstract class HttpClientConfiguration {
         public enum PoolVersion {
             /**
              * The connection pool introduced in micronaut-core 4.0.0.
+             *
+             * @deprecated Kept for compatibility only, will be removed in a future release. Use
+             * the default {@link #V4_9} instead. Selecting this version logs a warning.
              */
+            @Deprecated(since = "5.3.0")
             V4_0,
             /**
              * The connection pool introduced in micronaut-core 4.9.0.

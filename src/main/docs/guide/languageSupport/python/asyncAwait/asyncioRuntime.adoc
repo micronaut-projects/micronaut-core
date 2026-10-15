@@ -2,6 +2,8 @@ The `micronaut-context-python-netty` module integrates Python `asyncio` executio
 
 dependency:io.micronaut:micronaut-context-python-netty[scope="runtimeOnly"]
 
+Without the module, a coroutine has no Micronaut event loop: a standard Python loop drives it to completion on the calling thread, and `run_in_executor(None, ...)` still uses Micronaut's blocking executor. A coroutine started on a Netty event-loop thread in this situation runs on the blocking executor instead, with a warning, since driving it on that thread would block the event loop and every client call that needs it.
+
 The module provides the Python-visible event-loop behavior. Its Java runtime classes are framework internals and should not be used directly by applications.
 
 Active Python bridge executions participate in Micronaut graceful shutdown. When `micronaut.lifecycle.graceful-shutdown.enabled=true`, shutdown waits for active Python coroutine bridges and pooled Python executions using the same `GracefulShutdownCapable` lifecycle and `micronaut.lifecycle.graceful-shutdown.grace-period` timeout that other Micronaut runtime components use.

@@ -111,6 +111,17 @@ def stub_type_name(typed):
     return None
 
 
+CREATOR_ANNOTATIONS = ("io.micronaut.core.annotation.Creator", "com.fasterxml.jackson.annotation.JsonCreator")
+
+
+def _static_creator(class_def):
+    """The name of the static @Creator function of a class, which becomes the primary constructor of its generated class, or None."""
+    for function_def in class_def.functions():
+        if function_def.isStatic() and any(decorator.annotationName() in CREATOR_ANNOTATIONS for decorator in function_def.decorators()):
+            return function_def.name()
+    return None
+
+
 def _abstract_class(class_def):
     """Whether the class is a protocol or declares an abstract method: its generated type is an interface or abstract."""
     return (any(base.name() in ("Protocol", "typing.Protocol") for base in class_def.bases())
@@ -1899,6 +1910,10 @@ class Lowering:
         self.impure = True
         if _abstract_class(class_def):
             self._refuse("unsupported-expression", f"[{model.name}] is a protocol or an abstract class; the generated type cannot be constructed", node)
+        creator = _static_creator(class_def)
+        if creator is not None:
+            # the generated class's constructor then takes the creator's parameters, not those of __init__
+            self._refuse("unsupported-expression", f"[{model.name}] is created through its static creator [{creator}]; its generated constructor mirrors the creator, not __init__", node)
         constructor = model.constructor_of()
         if constructor is UNKNOWN:
             self._refuse("unsupported-expression", f"the constructor of [{model.name}] is not the compilation's own", node)

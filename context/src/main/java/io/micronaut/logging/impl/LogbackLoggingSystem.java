@@ -37,9 +37,8 @@ import org.slf4j.LoggerFactory;
 @Internal
 public final class LogbackLoggingSystem implements LoggingSystem {
 
-    private static final String DEFAULT_LOGBACK_LOCATION = "logback.xml";
-
-    private final String logbackXmlLocation;
+    private final @Nullable String logbackExternalConfigLocation;
+    private final @Nullable String logbackXmlLocation;
 
     /**
      * @param logbackExternalConfigLocation The location of the logback configuration file set via logback properties
@@ -50,13 +49,8 @@ public final class LogbackLoggingSystem implements LoggingSystem {
         @Nullable @Property(name = "logback.configurationFile") String logbackExternalConfigLocation,
         @Nullable @Property(name = "logger.config") String logbackXmlLocation
     ) {
-        if (logbackExternalConfigLocation != null) {
-            this.logbackXmlLocation = logbackExternalConfigLocation;
-        } else if (logbackXmlLocation != null) {
-            this.logbackXmlLocation = logbackXmlLocation;
-        } else {
-            this.logbackXmlLocation = DEFAULT_LOGBACK_LOCATION;
-        }
+        this.logbackExternalConfigLocation = logbackExternalConfigLocation;
+        this.logbackXmlLocation = logbackXmlLocation;
     }
 
     @Override
@@ -68,7 +62,7 @@ public final class LogbackLoggingSystem implements LoggingSystem {
     public void refresh() {
         LoggerContext context = getLoggerContext();
         context.reset();
-        LogbackUtils.configure(getClass().getClassLoader(), context, logbackXmlLocation);
+        LogbackUtils.configure(getClass().getClassLoader(), context, logbackExternalConfigLocation, logbackXmlLocation);
     }
 
     /**

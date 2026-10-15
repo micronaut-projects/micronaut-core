@@ -21,17 +21,21 @@ import io.micronaut.context.bind.ExecutableBeanContextBinder;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.Executable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.event.annotation.EventListener;
+import io.micronaut.scheduling.ScheduledExecution;
 import io.micronaut.scheduling.ScheduledExecutorTaskScheduler;
 import io.micronaut.scheduling.TaskExceptionHandler;
 import io.micronaut.scheduling.TaskExecutors;
@@ -40,6 +44,7 @@ import io.micronaut.scheduling.annotation.Scheduled;
 import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -134,16 +139,26 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             Runnable task = () -> {
                 try {
                     ExecutableBeanContextBinder binder = new DefaultExecutableBeanContextBinder();
-                    BoundExecutable<B, ?> boundExecutable = binder.bind(method, beanContext);
+                    // a ScheduledExecution argument is not a bean: it is this invocation, supplied once it exists
+                    ExecutionAwareExecutable<B> executable = new ExecutionAwareExecutable<>(method);
+                    BoundExecutable<B, ?> boundExecutable = binder.bind(executable, beanContext);
+                    @Nullable Object[] arguments = executable.arguments(boundExecutable.getBoundArguments());
                     B bean = beanContext.getBean(beanDefinition);
                     AnnotationValue<Scheduled> finalAnnotationValue = scheduledAnnotation;
                     if (finalAnnotationValue instanceof EvaluatedAnnotationValue<Scheduled> evaluated) {
-                        finalAnnotationValue = evaluated.withArguments(bean, boundExecutable.getBoundArguments());
+                        finalAnnotationValue = evaluated.withArguments(bean, arguments);
                     }
                     boolean shouldRun = finalAnnotationValue.booleanValue(MEMBER_CONDITION).orElse(true);
                     if (shouldRun) {
+                        // tells an interceptor of the method that the scheduler invoked it, and by which schedule
+                        ScheduledExecution execution = new ScheduledExecution(method, finalAnnotationValue);
+                        // created for this invocation alone, so the method receives the execution of this call
+                        executable.supply(arguments, execution);
                         try {
-                            boundExecutable.invoke(bean);
+                            // a block, so that it is the Runnable overload: the result of the method is not used
+                            PropagatedContext.getOrEmpty().plus(execution).propagate(() -> {
+                                method.invoke(bean, arguments);
+                            });
                         } catch (Throwable e) {
                             handleException(beanDefinition.getBeanType(), bean, e);
                         }
@@ -225,6 +240,90 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             }
         } finally {
             scheduledTasks.clear();
+        }
+    }
+
+    /**
+     * A scheduled method as the bean context binder sees it: without its {@link ScheduledExecution} arguments,
+     * which no bean satisfies and which are supplied for each invocation instead.
+     *
+     * @param <B> The bean type
+     */
+    private static final class ExecutionAwareExecutable<B> implements Executable<B, Object> {
+
+        private final ExecutableMethod<B, ?> method;
+        private final Argument<?>[] beanArguments;
+
+        ExecutionAwareExecutable(ExecutableMethod<B, ?> method) {
+            this.method = method;
+            Argument<?>[] declared = method.getArguments();
+            List<Argument<?>> bound = new ArrayList<>(declared.length);
+            for (Argument<?> argument : declared) {
+                if (!isExecution(argument)) {
+                    bound.add(argument);
+                }
+            }
+            this.beanArguments = bound.size() == declared.length ? declared : bound.toArray(Argument.ZERO_ARGUMENTS);
+        }
+
+        private static boolean isExecution(Argument<?> argument) {
+            return argument.getType() == ScheduledExecution.class;
+        }
+
+        /**
+         * The arguments of the method, with the slots of the execution left empty.
+         *
+         * @param bound The arguments the binder resolved, in the order of {@link #getArguments()}
+         * @return The arguments of the method
+         */
+        @Nullable Object[] arguments(@Nullable Object[] bound) {
+            Argument<?>[] declared = method.getArguments();
+            if (bound.length == declared.length) {
+                return bound;
+            }
+            @Nullable Object[] arguments = new Object[declared.length];
+            int next = 0;
+            for (int i = 0; i < declared.length; i++) {
+                if (!isExecution(declared[i])) {
+                    arguments[i] = bound[next++];
+                }
+            }
+            return arguments;
+        }
+
+        /**
+         * Fills the slots of the execution.
+         *
+         * @param arguments The arguments of the method
+         * @param execution The execution of this invocation
+         */
+        void supply(@Nullable Object[] arguments, ScheduledExecution execution) {
+            Argument<?>[] declared = method.getArguments();
+            for (int i = 0; i < declared.length; i++) {
+                if (isExecution(declared[i])) {
+                    arguments[i] = execution;
+                }
+            }
+        }
+
+        @Override
+        public Class<B> getDeclaringType() {
+            return method.getDeclaringType();
+        }
+
+        @Override
+        public Argument<?>[] getArguments() {
+            return beanArguments;
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return method.getAnnotationMetadata();
+        }
+
+        @Override
+        public @Nullable Object invoke(B instance, @Nullable Object... arguments) {
+            throw new UnsupportedOperationException("Invoked by the scheduler with the execution supplied");
         }
     }
 
