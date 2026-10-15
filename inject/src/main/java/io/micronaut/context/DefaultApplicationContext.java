@@ -801,12 +801,13 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
                     // Lower priority than bootstrap property sources
                     bootstrapPropertySources.add(new BootstrapPropertySource(propertySource));
                 }
-            } catch (RuntimeException | Error e) {
+            } catch (Throwable e) {
                 // The load fails, so the property sources of the previous bootstrap context stay,
-                // and so does that context. Only the new one is closed.
+                // and so does that context. Only the new one is closed. Throwable, as a locator
+                // written in Groovy or Kotlin can throw a checked exception.
                 try {
                     bootstrapContext.close();
-                } catch (RuntimeException closeFailure) {
+                } catch (Throwable closeFailure) {
                     e.addSuppressed(closeFailure);
                 }
                 throw e;

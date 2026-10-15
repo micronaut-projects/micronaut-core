@@ -9,87 +9,104 @@ import jakarta.annotation.PreDestroy
 import jakarta.inject.Singleton
 import spock.lang.Specification
 
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.CopyOnWriteArrayList
 
 class BootstrapContextRefreshSpec extends Specification {
 
     def setup() {
-        CountingLocator.created.set(0)
-        CountingLocator.running.set(0)
-        CountingLocator.fail.set(false)
+        CountingLocator.instances.clear()
+        CountingLocator.failure = null
     }
 
     void "a refresh closes the bootstrap context it replaces, and closing the context closes the last one"() {
         given:
-        ApplicationContext ctx = ApplicationContext.builder()
-                .properties(['spec.name': 'BootstrapContextRefreshSpec'])
-                .bootstrapEnvironment(true)
-                .start()
+        ApplicationContext ctx = startContext()
 
         expect: "the start reads the bootstrap configuration with one bootstrap context"
-        CountingLocator.created.get() == 1
-        CountingLocator.running.get() == 1
+        CountingLocator.created() == 1
+        CountingLocator.running() == 1
 
         when:
         5.times { ctx.environment.refresh() }
 
         then: "each refresh reads it with a new bootstrap context and closes the previous one"
-        CountingLocator.created.get() == 6
-        CountingLocator.running.get() == 1
+        CountingLocator.created() == 6
+        CountingLocator.running() == 1
+        !CountingLocator.instances.last().destroyed
 
         when:
         ctx.close()
 
         then:
-        CountingLocator.running.get() == 0
+        CountingLocator.running() == 0
     }
 
-    void "a refresh that fails to read the bootstrap configuration closes the bootstrap context it created"() {
+    void "a refresh that fails to read the bootstrap configuration closes the bootstrap context it created: #failureType.simpleName"() {
         given:
-        ApplicationContext ctx = ApplicationContext.builder()
-                .properties(['spec.name': 'BootstrapContextRefreshSpec'])
-                .bootstrapEnvironment(true)
-                .start()
+        ApplicationContext ctx = startContext()
 
         when:
-        CountingLocator.fail.set(true)
+        CountingLocator.failure = failure
         ctx.environment.refresh()
 
         then: "the bootstrap context of the start, whose property sources stay, is still running"
-        thrown(IllegalStateException)
-        CountingLocator.created.get() == 2
-        CountingLocator.running.get() == 1
+        thrown(failureType)
+        CountingLocator.created() == 2
+        !CountingLocator.instances[0].destroyed
+        CountingLocator.instances[1].destroyed
 
         when:
         ctx.close()
 
         then:
-        CountingLocator.running.get() == 0
+        CountingLocator.running() == 0
+
+        cleanup:
+        ctx.close()
+
+        where: "a locator written in Groovy or Kotlin can throw a checked exception"
+        failure                                    | failureType
+        new IllegalStateException("cannot be read") | IllegalStateException
+        new IOException("cannot be read")           | IOException
+    }
+
+    private static ApplicationContext startContext() {
+        ApplicationContext.builder()
+                .properties(['spec.name': 'BootstrapContextRefreshSpec'])
+                .bootstrapEnvironment(true)
+                .start()
     }
 
     @BootstrapContextCompatible
     @Singleton
     @Requires(property = "spec.name", value = "BootstrapContextRefreshSpec")
     static class CountingLocator implements BootstrapPropertySourceLocator {
-        static final AtomicInteger created = new AtomicInteger()
-        static final AtomicInteger running = new AtomicInteger()
-        static final AtomicBoolean fail = new AtomicBoolean()
+        static final List<CountingLocator> instances = new CopyOnWriteArrayList<>()
+        static volatile Throwable failure
+
+        volatile boolean destroyed
 
         CountingLocator() {
-            created.incrementAndGet()
-            running.incrementAndGet()
+            instances.add(this)
+        }
+
+        static int created() {
+            instances.size()
+        }
+
+        static int running() {
+            instances.count { !it.destroyed }
         }
 
         @PreDestroy
         void destroy() {
-            running.decrementAndGet()
+            destroyed = true
         }
 
         @Override
         Iterable<PropertySource> findPropertySources(Environment environment) {
-            if (fail.get()) {
-                throw new IllegalStateException("the bootstrap configuration cannot be read")
+            if (failure != null) {
+                throw failure
             }
             return List.of()
         }
