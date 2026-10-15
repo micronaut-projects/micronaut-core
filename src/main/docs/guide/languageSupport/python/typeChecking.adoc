@@ -4,9 +4,9 @@ The compiler can check Python code against the Java types it uses. Decorators ar
 ----
 error: [python:unknown-method] Java type [java.util.ArrayList] has no method named [ad]; did you mean [add]?
   --> src/main/python/shop/service.py:14:16
-     |
-  14 |         values.ad(item.title)
-     |                ^^
+   |
+ 14 |         values.ad(item.title)
+   |                ^^
 ----
 
 The checker never guesses: anything it cannot type, such as a value of a third-party Python library, an untyped parameter or a local assigned different types, is left alone. It is experimental and off by default.
