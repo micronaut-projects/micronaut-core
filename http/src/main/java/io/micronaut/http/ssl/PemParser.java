@@ -52,10 +52,10 @@ record PemParser(
     private static final String START = DASHES + "BEGIN ";
     private static final String END = DASHES + "END ";
     /**
-     * The whitespace that RFC 7468 section 3 (lax grammar) allows anywhere in the base64 body:
-     * {@code WSP / CR / LF / VT / FF}.
+     * The characters that are not part of the base64 alphabet. As per RFC 7468 section 2, parsers
+     * should ignore whitespace and other non-base64 characters in the encapsulated text.
      */
-    private static final Pattern WHITESPACE = Pattern.compile("[ \\t\\r\\n\\u000B\\f]+");
+    private static final Pattern NON_BASE64 = Pattern.compile("[^A-Za-z0-9+/=]+");
 
     private static final String OID_RSA = "1.2.840.113549.1.1.1";
     private static final String OID_EC = "1.2.840.10045.2.1";
@@ -104,7 +104,7 @@ record PemParser(
             }
             Decoder decoder = getDecoder(label);
 
-            String contentString = WHITESPACE.matcher(pem.substring(i, sectionEnd)).replaceAll("");
+            String contentString = NON_BASE64.matcher(pem.substring(i, sectionEnd)).replaceAll("");
             i = indexOfBeginLine(pem, sectionEnd + trailer.length());
             byte[] content = Base64.getDecoder().decode(contentString);
             list.addAll(decoder.decode(content));

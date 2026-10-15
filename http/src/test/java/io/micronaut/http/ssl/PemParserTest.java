@@ -279,10 +279,17 @@ class PemParserTest {
     }
 
     @Test
-    public void invalidBase64IsRejected() {
+    public void nonBase64CharactersInsideBase64AreIgnored() throws Exception {
+        List<Object> items = new PemParser(null, null).loadPem(CERTIFICATE.replace("\n", "\n!.;"));
+        assertEquals(1, items.size());
+        assertEquals("CN=Test CA 1", subjectOf(items.get(0)));
+    }
+
+    @Test
+    public void truncatedBase64IsRejected() {
         String pem = """
             -----BEGIN CERTIFICATE-----
-            !!!!
+            MIIBf
             -----END CERTIFICATE-----
             """;
         assertThrows(IllegalArgumentException.class, () -> new PemParser(null, null).loadPem(pem));
