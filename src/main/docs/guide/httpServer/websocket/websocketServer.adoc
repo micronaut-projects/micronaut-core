@@ -10,6 +10,8 @@ snippet::io.micronaut.docs.http.server.netty.websocket.ChatServerWebSocket[tags=
 
 TIP: A working example of WebSockets in action can be found at https://guides.micronaut.io/latest/micronaut-websocket.html[Micronaut Guides].
 
+TIP: A WebSocket endpoint can also be declared in code, as a route of the route builder, with its handlers as functions, streams of messages and backpressure: see <<functionalRoutesWebSocket, WebSocket Routes>>.
+
 For binding, method arguments to each WebSocket method can be:
 
 * A variable from the URI template (in the above example `topic` and `username` are URI template variables)
