@@ -3210,7 +3210,10 @@ class ProductMappers:
                 assertEquals(new SourceSpan(path, 17, 5, 18, 36), greet.span());
                 assertEquals(new SourceSpan(path, 16, 6, 16, 16), greet.decorators().get(0).span());
                 assertEquals(new SourceSpan(path, 17, 21, 17, 30), greet.arguments().arguments().get(0).span());
-                assertEquals(new SourceSpan(path, 17, 33, 17, 42), greet.arguments().arguments().get(1).span());
+                // *rest is located at its name, after the star
+                ArgumentDef rest = greet.arguments().arguments().get(1);
+                assertTrue(rest.variadic());
+                assertEquals(new SourceSpan(path, 17, 33, 17, 42), rest.span());
                 assertEquals(new SourceSpan(path, 13, 5, 14, 31), greeter.constructor().span());
                 assertEquals(new SourceSpan(path, 21, 5, 22, 19), greeter.properties().get(0).span());
                 assertEquals(new SourceSpan(path, 21, 5, 22, 19), greeter.properties().get(0).getter().span());
@@ -3233,6 +3236,33 @@ class ProductMappers:
             """)) {
             ClassDef plain = environment.classes().get("Plain");
             assertEquals(new SourceSpan("Unknown", 1, 1, 2, 19), plain.span());
+        }
+    }
+
+    @Test
+    void definitionsOfCrLfSourcesAreLocatedByLine() {
+        // a module annotation invoked through a name imported from a Java package, in a source with Windows line endings
+        String source = String.join("\r\n",
+            "from micronaut.test.extensions.junit5.annotation import MicronautTest",
+            "",
+            "MicronautTest()",
+            "",
+            "def test_handler(first: str, *rest: str) -> None:",
+            "    pass",
+            "");
+        try (PythonEnvironment environment = new PythonAstParser().parse(source, "example")) {
+            ScriptDef script = environment.scripts().get("example.Unknown");
+            assertNotNull(script);
+            assertEquals(new SourceSpan("Unknown", 1, 1, 7, 1), script.span());
+
+            DecoratorDef micronautTest = script.decorators().getFirst();
+            assertEquals("io.micronaut.test.extensions.junit5.annotation.MicronautTest", micronautTest.annotationName());
+            assertEquals(new SourceSpan("Unknown", 3, 1, 3, 16), micronautTest.span());
+
+            FunctionDef handler = script.functions().getFirst();
+            assertEquals(new SourceSpan("Unknown", 5, 1, 6, 9), handler.span());
+            assertEquals(new SourceSpan("Unknown", 5, 18, 5, 28), handler.arguments().arguments().get(0).span());
+            assertEquals(new SourceSpan("Unknown", 5, 31, 5, 40), handler.arguments().arguments().get(1).span());
         }
     }
 
