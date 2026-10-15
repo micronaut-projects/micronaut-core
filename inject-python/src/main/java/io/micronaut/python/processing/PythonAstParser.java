@@ -118,6 +118,8 @@ public final class PythonAstParser {
     private final Context context;
     private final Value runtimeAstCompiler;
     private PythonImportMappings importMappings;
+    // The trees of the last transform(), kept so the model and the runtime bytecode come from them
+    // without a second parse. They hold one AST per source until the next transform() or close().
     private final IdentityHashMap<TransformResult, TransformArtifacts> transformArtifacts = new IdentityHashMap<>();
 
     public PythonAstParser() {
@@ -1072,12 +1074,38 @@ public final class PythonAstParser {
                                java.util.List<String> exportedTypes,
                                java.util.List<String> allClassNames,
                                java.util.List<PythonDiagnostic> validationErrors) {
-            this(originalSource, () -> code, runtimeCodeSupplier, decorators, javaClassImports, exportedTypes, allClassNames, validationErrors, List.of());
+            this(originalSource, code, runtimeCodeSupplier, decorators, javaClassImports, exportedTypes, allClassNames, validationErrors, List.of());
+        }
+
+        /**
+         * A transform result whose transformed code is already rendered.
+         *
+         * @param originalSource      The original source
+         * @param code                The transformed source
+         * @param runtimeCodeSupplier The diagnostic runtime source
+         * @param decorators          The generated decorators, by annotation name
+         * @param javaClassImports    The Java class imports, by module
+         * @param exportedTypes       The exported types
+         * @param allClassNames       The names of the classes of the source
+         * @param validationErrors    The validation errors
+         * @param facades             The curated Python modules (facades) the source imports
+         */
+        public TransformResult(Source originalSource,
+                               String code,
+                               Supplier<String> runtimeCodeSupplier,
+                               Map<String, String> decorators,
+                               Map<String, java.util.List<Map<String, String>>> javaClassImports,
+                               java.util.List<String> exportedTypes,
+                               java.util.List<String> allClassNames,
+                               java.util.List<PythonDiagnostic> validationErrors,
+                               java.util.List<String> facades) {
+            this(originalSource, () -> code, runtimeCodeSupplier, decorators, javaClassImports, exportedTypes, allClassNames, validationErrors, facades);
         }
 
         /**
          * The transformed source rendered as text. It is computed on first access; the processor
-         * itself visits the transformed tree.
+         * itself visits the transformed tree. A result of {@link PythonAstParser#transform} renders
+         * its text in the parser's context, so read it before the parser is closed.
          *
          * @return The transformed code
          */
@@ -1090,7 +1118,8 @@ public final class PythonAstParser {
         }
 
         /**
-         * The runtime source rendered for diagnostics. It is computed on first access.
+         * The runtime source rendered for diagnostics. It is computed on first access, like
+         * {@link #code()}, so read it before the parser is closed.
          *
          * @return The runtime code
          */
