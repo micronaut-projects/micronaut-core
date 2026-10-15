@@ -93,6 +93,10 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private static final String STRING = "string";
     private static final String DURATION = "duration";
     private static final String INTEGER = "integer";
+    private static final Set<String> INTEGRAL_TYPES = Set.of(
+        "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short",
+        "java.lang.Integer", "java.lang.Long", "java.math.BigInteger"
+    );
     private static final String READABLE_BYTES = "readable-bytes";
     /**
      * The values {@link io.micronaut.core.convert.format.ReadableBytesTypeConverter} accepts:
@@ -541,11 +545,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     }
 
     private static boolean isIntegral(String typeName) {
-        return switch (typeName) {
-            case "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short",
-                 "java.lang.Integer", "java.lang.Long", "java.math.BigInteger" -> true;
-            default -> false;
-        };
+        return INTEGRAL_TYPES.contains(typeName);
     }
 
     private void writeChildTypeSchema(Writer out, ClassElement t) throws IOException {
@@ -606,10 +606,8 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     }
 
     private void writeSimpleTypeName(Writer out, String fqcn) throws IOException {
-        String type = switch (fqcn) {
+        String type = isIntegral(fqcn) ? INTEGER : switch (fqcn) {
             case BOOLEAN, "java.lang.Boolean" -> BOOLEAN;
-            case "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short",
-                 "java.lang.Integer", "java.lang.Long", "java.math.BigInteger" -> "integer";
             case "float", "double", "java.lang.Float", "java.lang.Double", "java.math.BigDecimal" ->
                 "number";
             default -> STRING;
@@ -620,11 +618,11 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
 
     private @Nullable Object coerceDefault(String value, String typeName) {
         try {
+            if (isIntegral(typeName)) {
+                return Long.parseLong(value);
+            }
             return switch (typeName) {
                 case BOOLEAN, "java.lang.Boolean" -> Boolean.parseBoolean(value);
-                case "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short",
-                     "java.lang.Integer", "java.lang.Long", "java.math.BigInteger" ->
-                    Long.parseLong(value);
                 case "float", "double", "java.lang.Float", "java.lang.Double",
                      "java.math.BigDecimal" -> Double.parseDouble(value);
                 default -> value; // string/enum/uri fall back to string
