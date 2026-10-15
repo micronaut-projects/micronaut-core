@@ -1,30 +1,19 @@
-A bean introspection describes a bean, and its <<introspectionHierarchy, type hierarchy>> is raw. Some code needs the generic hierarchy of classes that are not beans: the class of an event payload whose generic supertypes decide which observers hear it, a class that appears as a type argument or a bound, or a class of a library or of the JDK. The ann:core.annotation.RecordTypeHierarchy[] annotation records that hierarchy at compile time, as it is declared, so that it is read without reflection through api:core.type.TypeHierarchies[]:
+A bean introspection describes a bean, and its <<introspectionHierarchy, type hierarchy>> is raw. Some code needs the generic hierarchy of classes that are not beans: the class of an event payload whose generic supertypes decide which observers hear it, a class that appears as a type argument or a bound, or a class of a library or of the JDK. The ann:core.annotation.TypeHierarchyImport[] annotation imports that hierarchy at compile time, as it is declared, so that it is read without reflection through api:core.type.TypeHierarchies[]:
 
-[source,java]
-----
-@RecordTypeHierarchy // <1>
-public class Payload<T extends Number> extends ArrayList<T> implements Supplier<List<T>> {
-    ...
-}
+snippet::io.micronaut.docs.ioc.hierarchy.Payload[tags="class"]
 
-@RecordTypeHierarchy(classes = {ArrayList.class, HashMap.class}) // <2>
-class Hierarchies {
-}
-----
-<1> Records the hierarchy of the annotated class
-<2> Records the hierarchies of the given classes instead, which can be classes of a library or of the JDK
+snippet::io.micronaut.docs.ioc.hierarchy.Hierarchies[tags="class"]
 
-[source,java]
-----
-TypeHierarchy hierarchy = TypeHierarchies.find(Payload.class).orElseThrow();
+<1> Imports the hierarchy of the annotated class
+<2> Imports the hierarchies of the given classes instead, which can be classes of a library or of the JDK
 
-hierarchy.getTypeVariables();      // [T extends Number]
-hierarchy.getGenericSuperclass();  // Optional[ArrayList<T>]
-hierarchy.getGenericInterfaces();  // [Supplier<List<T>>]
-hierarchy.getTypeClosure(Argument.of(Payload.class, Integer.class));
-// [Payload<Integer>, ArrayList<Integer>, AbstractList<Integer>, ..., Supplier<List<Integer>>, Object]
-----
+snippet::io.micronaut.docs.ioc.hierarchy.TypeHierarchySpec[tags="usage", indent=0]
+
+<1> Finds the record of a class; empty when none was imported
+<2> The type variables, each a placeholder with its bounds
+<3> The generic superclass with its arguments as declared, `ArrayList<T>`
+<4> The closure of a parameterization: `Payload<Integer>`, `ArrayList<Integer>`, `AbstractList<Integer>`, ..., `Supplier<List<Integer>>`, `Object`
 
 The hierarchy is made of api:core.type.Argument[] instances: a type variable is a api:core.type.GenericPlaceholder[] with its bounds, a wildcard a api:core.type.WildcardArgument[], a type written without its type arguments a raw type. The record holds every super type of the type as the compiler listed them (`ClassElement.getAllSuperTypes()`), with their type arguments written in the variables of the type, so the hierarchy is walked once, at compile time. `getTypeClosure(parameterization)` substitutes the actual type arguments into each entry, erasing all of them for a raw parameterization as the Java Language Specification does, each type once and `Object` last.
 
-A record is a small generated class, one per type, found through the `META-INF/micronaut` service entries like a bean definition is, and loaded only when its type is asked for. A compile-time visitor records a type with `recordTypeHierarchy` of api:inject.visitor.VisitorContext[].
+A record is a small generated class, one per type, found through the `META-INF/micronaut` service entries like a bean definition is, and loaded only when its type is asked for. A compile-time visitor imports a type with `importTypeHierarchy` of api:inject.visitor.VisitorContext[].
