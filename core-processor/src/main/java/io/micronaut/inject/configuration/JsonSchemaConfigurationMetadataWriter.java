@@ -16,6 +16,7 @@
 package io.micronaut.inject.configuration;
 
 import io.micronaut.context.annotation.BeanProperties;
+import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -501,7 +502,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                 return;
             }
             // Plain type
-            if (isReadableBytes(pe) && isIntegral(t.getName())) {
+            if (isReadableBytesProperty(pe)) {
                 writeReadableBytesType(out);
                 return;
             }
@@ -531,8 +532,20 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         str(out, READABLE_BYTES_PATTERN);
     }
 
+    /**
+     * @param pe The property
+     * @return Whether the property is an integral type bound through {@link ReadableBytes}
+     */
+    private static boolean isReadableBytesProperty(PropertyElement pe) {
+        ClassElement type = pe.getGenericType();
+        if (type.isOptional()) {
+            type = type.getOptionalValueType().orElse(type);
+        }
+        return isIntegral(type.getName()) && isReadableBytes(pe);
+    }
+
     private static boolean isReadableBytes(PropertyElement pe) {
-        if (pe.hasStereotype(ReadableBytes.class)) {
+        if (pe.hasStereotype(ReadableBytes.class) || isReadableBytesConstructorParameter(pe)) {
             return true;
         }
         MethodElement setter = pe.getWriteMethod().orElse(null);
@@ -544,6 +557,27 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             }
         }
         return pe.getField().map(field -> field.hasStereotype(ReadableBytes.class)).orElse(false);
+    }
+
+    /**
+     * Immutable configurations bind properties through the parameters of their
+     * {@link ConfigurationInject} or primary constructor.
+     */
+    private static boolean isReadableBytesConstructorParameter(PropertyElement pe) {
+        ClassElement owner = pe.getOwningType();
+        List<MethodElement> constructors = new ArrayList<>();
+        owner.getAccessibleConstructors().stream()
+            .filter(constructor -> constructor.hasStereotype(ConfigurationInject.class))
+            .forEach(constructors::add);
+        owner.getPrimaryConstructor().ifPresent(constructors::add);
+        for (MethodElement constructor : constructors) {
+            for (ParameterElement parameter : constructor.getParameters()) {
+                if (parameter.getName().equals(pe.getName()) && parameter.hasStereotype(ReadableBytes.class)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static boolean isIntegral(String typeName) {
@@ -838,7 +872,11 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             attr(out, ATTR_MAX);
             out.write("0");
         }
-        // Digits -> regex
+        // Digits -> regex. A readable-bytes value is matched by the byte size grammar instead, and a
+        // second pattern would reject sizes such as 1KB.
+        if (isReadableBytesProperty(pe)) {
+            return;
+        }
         Integer intDigits = intValue(pe, JV_DIGITS, JV_DIGITS_INTEGER);
         Integer fracDigits = intValue(pe, JV_DIGITS, JV_DIGITS_FRACTION);
         if (intDigits != null || fracDigits != null) {
