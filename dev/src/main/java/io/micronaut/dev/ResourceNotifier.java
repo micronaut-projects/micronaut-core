@@ -44,7 +44,7 @@ import java.util.function.Function;
  * under a root reaches the watches of that root's kind, the configuration root included; a watch of
  * {@link ResourceKind#CONFIG} asked for the files of that root and is told of the configuration files too, as it is
  * of every file when the context starts. Only a configuration file refreshes the configuration: one the environment
- * looked for when it read its property sources, found or not, as {@link Environment#getConfigurationLocations()}
+ * looked for when it read its property sources, found or not, as {@link Environment#getConfigurationFiles()}
  * records them: an application or bootstrap file of a configuration location, a file {@code micronaut.config.files}
  * names, or a file a {@code micronaut.config.import} imports, an optional import of a file created later included.</p>
  *
@@ -115,7 +115,7 @@ final class ResourceNotifier {
 
     /**
      * Whether a file is one the environment looked for when it read its configuration, as
-     * {@link Environment#isConfigurationLocation(String)} tells: the file itself, or the class path resource it is
+     * {@link Environment#isConfigurationFile(String)} tells: the file itself, or the class path resource it is
      * below one of the roots.
      *
      * @param environment The environment of the running context
@@ -125,13 +125,13 @@ final class ResourceNotifier {
      */
     static boolean isConfigurationFile(Environment environment, Path file, List<Path> roots) {
         Path absolute = file.toAbsolutePath().normalize();
-        if (environment.isConfigurationLocation(FileSystemResourceLoader.PREFIX + absolute)) {
+        if (environment.isConfigurationFile(FileSystemResourceLoader.PREFIX + absolute)) {
             return true;
         }
         for (Path root : roots) {
             Path normalizedRoot = root.toAbsolutePath().normalize();
             if (absolute.startsWith(normalizedRoot) && !absolute.equals(normalizedRoot)
-                && environment.isConfigurationLocation(ClassPathResourceLoader.PREFIX + normalizedRoot.relativize(absolute))) {
+                && environment.isConfigurationFile(ClassPathResourceLoader.PREFIX + normalizedRoot.relativize(absolute))) {
                 return true;
             }
         }
