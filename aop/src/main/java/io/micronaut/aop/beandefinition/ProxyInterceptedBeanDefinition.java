@@ -17,6 +17,7 @@ package io.micronaut.aop.beandefinition;
 
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.chain.InterceptorChainFactory;
+import io.micronaut.aop.chain.ProxyTargetHandler;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -49,13 +50,22 @@ public interface ProxyInterceptedBeanDefinition<T> extends InterceptedBeanDefini
             resolveInstantiationValues(resolutionContext, context),
             "Resolved instantiation values cannot be null"
         );
-        List<BeanRegistration<Interceptor<T, T>>> interceptors = (List) constructorValues[constructorValues.length - 2];
+        List<BeanRegistration<Interceptor<T, T>>> interceptors;
+        int additionalParameters;
+        if (constructorValues[constructorValues.length - 1] instanceof ProxyTargetHandler<?> handler) {
+            // a proxy that fronts a separate target is injected with its handler alone, which holds its interceptors
+            interceptors = (List) handler.interceptorRegistrations();
+            additionalParameters = 1;
+        } else {
+            interceptors = (List) constructorValues[constructorValues.length - 2];
+            additionalParameters = ADDITIONAL_PROXY_CONSTRUCTOR_PARAMETERS_COUNT;
+        }
         return context.getBean(InterceptorChainFactory.ARGUMENT).instantiate(
             resolutionContext,
             this,
             new InterceptedConstructor<>(this, resolutionContext, context),
             interceptors,
-            ADDITIONAL_PROXY_CONSTRUCTOR_PARAMETERS_COUNT,
+            additionalParameters,
             constructorValues
         );
     }

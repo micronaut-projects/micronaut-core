@@ -17,6 +17,7 @@ package io.micronaut.ast.transform.test
 
 import groovy.transform.CompileStatic
 import io.micronaut.aop.internal.InterceptorChainFactoryBean
+import io.micronaut.aop.internal.ProxyTargetHandlerBean
 import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
@@ -291,7 +292,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
                     .map({ clazz -> (BeanDefinitionReference) clazz.newInstance() })
                     .collect(Collectors.toList())
             return references + (includeAllBeans ? new DefaultBeanDefinitionsProvider().provide(it) : [
-                    new InterceptorChainFactoryBean(),
+                    new InterceptorChainFactoryBean(), new ProxyTargetHandlerBean.Fixed(), new ProxyTargetHandlerBean.Lazy(), new ProxyTargetHandlerBean.Cached(), new ProxyTargetHandlerBean.HotSwap(),
                     new InterceptorRegistryBean(),
                     new BeanProviderDefinition(),
                     new ApplicationEventPublisherFactory<>()

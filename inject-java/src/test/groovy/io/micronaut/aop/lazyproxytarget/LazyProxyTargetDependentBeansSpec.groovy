@@ -302,9 +302,12 @@ class Holder {
     }
 
     private static BeanResolutionContext retainedResolutionContext(Object proxy) {
-        def field = proxy.class.getDeclaredField('$beanResolutionContext')
+        def handlerField = proxy.class.getDeclaredField('$handler')
+        handlerField.accessible = true
+        def handler = handlerField.get(proxy)
+        def field = handler.class.getDeclaredField('lookupContext')
         field.accessible = true
-        return (BeanResolutionContext) field.get(proxy)
+        return (BeanResolutionContext) field.get(handler)
     }
 
     private static String source(String scope) {

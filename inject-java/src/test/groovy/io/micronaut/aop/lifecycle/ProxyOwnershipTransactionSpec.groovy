@@ -161,6 +161,12 @@ class Advice implements MethodInterceptor<Object, Object> {
         io.micronaut.context.BeanResolutionContext resolution
         resolution = java.lang.reflect.Proxy.newProxyInstance(getClass().classLoader,
             [io.micronaut.context.BeanResolutionContext] as Class[], { ignored, method, arguments ->
+                if (method.name == 'getBean' && arguments[0] instanceof io.micronaut.core.type.Argument
+                    && io.micronaut.aop.chain.ProxyTargetHandler.isAssignableFrom(arguments[0].type)) {
+                    // the handler the proxy is injected with is created in the context the proxy is created in
+                    return new io.micronaut.aop.chain.CachedProxyTargetHandler(new io.micronaut.aop.chain.ProxyTargetHandler.Creation(
+                        ctx.getBean(io.micronaut.aop.chain.InterceptorChainFactory), null, resolution, ctx, null))
+                }
                 switch (method.name) {
                     case 'getBeanDependencyGroup': return group
                     case 'copyForLazyProxyTarget': return resolution
