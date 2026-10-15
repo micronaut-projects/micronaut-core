@@ -5,6 +5,7 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.simple.SimpleHttpHeaders;
+import io.micronaut.json.body.JsonStreamMessageHandler;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,7 @@ class JsonChunkedDiscardTest {
     @Test
     void theDiscardHookReleasesANettyBuffer() {
         try (ApplicationContext ctx = ApplicationContext.run()) {
-            NettyJsonStreamHandler<Object> handler = ctx.getBean(NettyJsonStreamHandler.class);
+            JsonStreamMessageHandler<Object> handler = ctx.getBean(JsonStreamMessageHandler.class);
             AtomicReference<CoreSubscriber<?>> inputSubscriber = new AtomicReference<>();
             Publisher<ByteBuffer<?>> input = s -> {
                 inputSubscriber.set((CoreSubscriber<?>) s);

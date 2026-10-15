@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2023 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,161 +20,52 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Order;
-import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.Headers;
-import io.micronaut.core.type.MutableHeaders;
-import io.micronaut.http.ByteBodyHttpResponse;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.body.ByteBodyFactory;
-import io.micronaut.http.body.ChunkedMessageBodyReader;
-import io.micronaut.http.body.CloseableByteBody;
-import io.micronaut.http.body.MessageBodyHandler;
-import io.micronaut.http.body.PieceReader;
-import io.micronaut.http.body.stream.PieceReaders;
-import io.micronaut.http.body.PieceWriter;
-import io.micronaut.http.body.ResponseBodyWriter;
-import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.body.CustomizableJsonHandler;
 import io.micronaut.json.body.JsonMessageHandler;
 import jakarta.inject.Singleton;
-import org.jspecify.annotations.Nullable;
-import org.reactivestreams.Publisher;
-
-import java.io.InputStream;
-import java.io.OutputStream;
 
 /**
- * Replacement for {@link JsonMessageHandler} with {@link ChunkedMessageBodyReader} support.
+ * Compatibility bean for applications replacing the former Netty JSON handler.
  *
- * @param <T> The type
+ * @param <T> The body type
+ * @deprecated JSON streaming is provided by {@link JsonMessageHandler}. Existing custom Netty
+ * handlers should continue replacing this type until it is removed.
  */
-@Order(JsonMessageHandler.ORDER)
-@Singleton
+@Deprecated(since = "5.3.0", forRemoval = true)
 @Internal
+@Singleton
+@Order(JsonMessageHandler.ORDER)
 @Replaces(JsonMessageHandler.class)
 @JsonMessageHandler.ProducesJson
 @JsonMessageHandler.ConsumesJson
 @BootstrapContextCompatible
 @Requires(beans = JsonMapper.class)
-public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableJsonHandler, ResponseBodyWriter<T> {
-    private final JsonMessageHandler<T> jsonMessageHandler;
+public final class NettyJsonHandler<T> extends DelegatingJsonHandler<T, JsonMessageHandler<T>> {
 
+    /** @param jsonMapper The JSON mapper */
     public NettyJsonHandler(JsonMapper jsonMapper) {
-        this(new JsonMessageHandler<>(jsonMapper));
+        this(new JsonMessageHandler<>(jsonMapper, NettyForeignBufferReleaser.INSTANCE));
     }
 
-    private NettyJsonHandler(JsonMessageHandler<T> jsonMessageHandler) {
-        this.jsonMessageHandler = jsonMessageHandler;
-    }
-
-    @Override
-    public CustomizableJsonHandler customize(JsonFeatures jsonFeatures) {
-        return new NettyJsonHandler<>(jsonMessageHandler.getJsonMapper().cloneWithFeatures(jsonFeatures));
+    private NettyJsonHandler(JsonMessageHandler<T> delegate) {
+        super(delegate);
     }
 
     @Override
-    public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        JsonChunkedProcessor processor = new JsonChunkedProcessor();
-        if (Iterable.class.isAssignableFrom(type.getType())) {
-            // Publisher<List<T>> is parsed as a single item of type List
-            processor.counter.noTokenization();
-        } else {
-            // Publisher<T> is unwrapped
-            processor.counter.unwrapTopLevelArray();
-        }
-        return PieceReaders.publisherOfBuffers(input, new JsonPieceReader<>(processor, value -> read(type, mediaType, httpHeaders, value)), JsonPieceReader::adapt, JsonPieceReader::discardForeign);
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * <p>A top-level JSON array is always unwrapped: each of its elements is read as the given
-     * type, a collection too, e.g. {@code [[1,2],[3,4]]} as two lists.</p>
-     */
-    @Override
-    public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input, long maxElementSize) {
-        return PieceReaders.publisherOfBuffers(input, openPieceReader(type, mediaType, httpHeaders, maxElementSize), JsonPieceReader::adapt, JsonPieceReader::discardForeign);
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * <p>A top-level JSON array is unwrapped, like
-     * {@link #readChunked(Argument, MediaType, Headers, Publisher, long)}.</p>
-     */
-    @Override
-    public PieceReader<T> openPieceReader(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
-        JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
-        processor.counter.unwrapTopLevelArray();
-        return new JsonPieceReader<>(processor, value -> read(type, mediaType, httpHeaders, value));
-    }
-
-    @Override
-    public boolean isReadable(Argument<T> type, @Nullable MediaType mediaType) {
-        return jsonMessageHandler.isReadable(type, mediaType);
-    }
-
-    @Override
-    @Nullable
-    public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
-        return jsonMessageHandler.read(type, mediaType, httpHeaders, byteBuffer);
-    }
-
-    @Override
-    @Nullable
-    public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
-        return jsonMessageHandler.read(type, mediaType, httpHeaders, inputStream);
-    }
-
-    @Override
-    public boolean isWriteable(Argument<T> type, @Nullable MediaType mediaType) {
-        return jsonMessageHandler.isWriteable(type, mediaType);
-    }
-
-    @Override
-    public void writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        jsonMessageHandler.writeTo(type, mediaType, object, outgoingHeaders, outputStream);
-    }
-
-    @Override
-    public ByteBuffer<?> writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
-        return jsonMessageHandler.writeTo(type, mediaType, object, outgoingHeaders, bufferFactory);
-    }
-
-    @Override
-    public ByteBodyHttpResponse<?> write(ByteBodyFactory bodyFactory, HttpRequest<?> request, MutableHttpResponse<T> outgoingResponse, Argument<T> type, MediaType mediaType, T object) throws CodecException {
-        return jsonMessageHandler.write(bodyFactory, request, outgoingResponse, type, mediaType, object);
-    }
-
-    @Override
-    public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<T> type, MediaType mediaType, T object) {
-        return jsonMessageHandler.writePiece(bodyFactory, request, response, type, mediaType, object);
-    }
-
-    @Override
-    public PieceWriter<T> openPieceWriter(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<T> type, MediaType mediaType) throws CodecException {
-        return jsonMessageHandler.openPieceWriter(bodyFactory, request, response, type, mediaType);
+    public CustomizableJsonHandler customize(JsonFeatures features) {
+        return new NettyJsonHandler<>((JsonMessageHandler<T>) delegate.customize(features));
     }
 
     @Override
     public NettyJsonHandler<T> createSpecific(Argument<T> type) {
-        return new NettyJsonHandler<>(jsonMessageHandler.createSpecific(type));
+        return new NettyJsonHandler<>(delegate.createSpecific(type));
     }
 
     @Override
     public NettyJsonHandler<T> createSpecificReader(Argument<T> type) {
         return createSpecific(type);
-    }
-
-    @Override
-    public boolean isBlocking() {
-        return jsonMessageHandler.isBlocking();
     }
 }
