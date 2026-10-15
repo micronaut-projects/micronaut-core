@@ -40,13 +40,13 @@ public class RoundsVisitor implements TypeElementVisitor<Object, Object> {
     public static final String TRIGGER = PACKAGE + ".Trigger";
     public static final String GENERATED = PACKAGE + ".GeneratedLater";
 
-    private static final String ROUND_PREFIX = "round";
-    private static final String FINISH = "finish";
-
     /**
      * The callbacks in the order they were called, with the classes each round visited.
      */
     public static final List<String> EVENTS = new CopyOnWriteArrayList<>();
+
+    private static final String ROUND_PREFIX = "round";
+    private static final String FINISH = "finish";
 
     private static volatile boolean registerInFinish = true;
 

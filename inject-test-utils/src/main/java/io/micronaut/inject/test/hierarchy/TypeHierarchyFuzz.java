@@ -139,54 +139,178 @@ public final class TypeHierarchyFuzz {
     private TypeHierarchyFuzz() {
     }
 
+    // ---- the check
+
+    /**
+     * Compares the record of a generated class with reflection, for the declaration, a raw parameterization and a
+     * concrete one.
+     *
+     * @param g              The generated class
+     * @param type           The compiled class
+     * @param record         Its record
+     * @param ignoreInterface Interfaces of the compiled class to leave out, those a language adds to every class
+     * @return The mismatches, empty when the record agrees with reflection
+     */
+    public static List<String> check(Generated g, Class<?> type, TypeHierarchy record, Predicate<Class<?>> ignoreInterface) {
+        List<String> mismatches = new ArrayList<>();
+        // a Python type variable is named after its class as well, T0 for the T of Fuzz0: reflection and the record agree on it
+        compare(mismatches, g, g.declaration() + " declaration", TypeStrings.strings(record.getTypeClosure(record.getDeclaration())),
+            Oracle.closure(type, Oracle.identity(type), false, ignoreInterface));
+        if (type.getTypeParameters().length > 0) {
+            compare(mismatches, g, g.declaration() + " raw", TypeStrings.strings(record.getTypeClosure(Argument.of(type))),
+                Oracle.closure(type, Map.of(), true, ignoreInterface));
+            List<Concrete> actual = g.concreteArguments();
+            Argument<?> parameterization = Argument.of(type, (String) null, actual.stream().map(Concrete::argument).toArray(Argument[]::new));
+            Map<TypeVariable<?>, String> substitutions = new HashMap<>();
+            TypeVariable<?>[] typeParameters = type.getTypeParameters();
+            for (int i = 0; i < typeParameters.length; i++) {
+                substitutions.put(typeParameters[i], actual.get(i).rendering());
+            }
+            compare(mismatches, g, g.declaration() + " as " + actual.stream().map(Concrete::rendering).toList(),
+                TypeStrings.strings(record.getTypeClosure(parameterization)), Oracle.closure(type, substitutions, false, ignoreInterface));
+        }
+        return mismatches;
+    }
+
+    /**
+     * Compares the record of a generated Python class with the hierarchy the generator declared. The Java stub of a
+     * Python class carries neither its Python bases nor its type variables in its reflective signature, so the
+     * reference is the model itself: the helper classes of the prelude with their declared super types, the Java
+     * interfaces of the JDK through reflection.
+     *
+     * @param g      The generated class
+     * @param type   The compiled class
+     * @param record Its record
+     * @return The mismatches, empty when the record agrees with the declaration
+     */
+    public static List<String> checkPython(Generated g, Class<?> type, TypeHierarchy record) {
+        List<String> mismatches = new ArrayList<>();
+        Map<String, String> identity = new LinkedHashMap<>();
+        for (Variable variable : g.variables()) {
+            identity.put(variable.name(), Generator.pythonVar(g, variable.name()));
+        }
+        compare(mismatches, g, g.declaration() + " declaration", TypeStrings.strings(record.getTypeClosure(record.getDeclaration())),
+            ModelOracle.closure(g, identity));
+        if (!g.variables().isEmpty()) {
+            List<Concrete> actual = g.concreteArguments();
+            Argument<?> parameterization = Argument.of(type, (String) null, actual.stream().map(Concrete::argument).toArray(Argument[]::new));
+            Map<String, String> substitutions = new LinkedHashMap<>();
+            for (int i = 0; i < g.variables().size(); i++) {
+                substitutions.put(g.variables().get(i).name(), actual.get(i).rendering());
+            }
+            compare(mismatches, g, g.declaration() + " as " + actual.stream().map(Concrete::rendering).toList(),
+                TypeStrings.strings(record.getTypeClosure(parameterization)), ModelOracle.closure(g, substitutions));
+        }
+        return mismatches;
+    }
+
+    private static void compare(List<String> mismatches, Generated g, String what, List<String> recorded, List<String> reflected) {
+        if (!recorded.equals(reflected)) {
+            mismatches.add(what + "\n    source:     " + g.source().toString().trim().replace("\n", " ") + "\n    record:     " + recorded + "\n    reflection: " + reflected);
+        }
+    }
+
     // ---- the model
 
     /** A type expression. */
     public sealed interface TypeExpr permits Var, Cls, Param, Arr, Wild {
     }
 
-    /** A type variable of the class. */
+    /**
+     * A type variable of the class.
+     *
+     * @param name The name of the variable
+     */
     public record Var(String name) implements TypeExpr {
     }
 
-    /** A class without arguments: String, Integer, Number. */
+    /**
+     * A class without arguments: String, Integer, Number.
+     *
+     * @param name The simple name
+     */
     public record Cls(String name) implements TypeExpr {
     }
 
-    /** A parameterized class: List, Map, Optional. */
+    /**
+     * A parameterized class: List, Map, Optional.
+     *
+     * @param name The simple name
+     * @param args The type arguments
+     */
     public record Param(String name, List<TypeExpr> args) implements TypeExpr {
     }
 
-    /** An array. */
+    /**
+     * An array.
+     *
+     * @param component The component type
+     */
     public record Arr(TypeExpr component) implements TypeExpr {
     }
 
-    /** A wildcard: unbounded, upper bounded or lower bounded. */
+    /**
+     * A wildcard: unbounded, upper bounded or lower bounded.
+     *
+     * @param upper The upper bound, or {@code null}
+     * @param lower The lower bound, or {@code null}
+     */
     public record Wild(@Nullable TypeExpr upper, @Nullable TypeExpr lower) implements TypeExpr {
     }
 
-    /** A type variable declaration with its bounds, several for an intersection. */
+    /**
+     * A type variable declaration with its bounds, several for an intersection.
+     *
+     * @param name   The name of the variable
+     * @param bounds The bounds, empty for none
+     */
     public record Variable(String name, List<TypeExpr> bounds) {
     }
 
-    /** A super class or interface with its arguments; a raw one has none while its declaration has variables. */
+    /**
+     * A super class or interface with its arguments; a raw one has none while its declaration has variables.
+     *
+     * @param name The simple name
+     * @param args The type arguments
+     * @param raw  Whether the type is written raw
+     */
     public record SuperType(String name, List<TypeExpr> args, boolean raw) {
     }
 
-    /** A generated class. */
+    /**
+     * A generated class.
+     *
+     * @param name       The simple name
+     * @param variables  The type variables
+     * @param superclass The super class, or {@code null}
+     * @param interfaces The interfaces
+     * @param source     The source it was rendered as, filled once rendered
+     */
     public record Generated(String name, List<Variable> variables, @Nullable SuperType superclass, List<SuperType> interfaces, StringBuilder source) {
 
+        /**
+         * @param name       The simple name
+         * @param variables  The type variables
+         * @param superclass The super class, or {@code null}
+         * @param interfaces The interfaces
+         */
         public Generated(String name, List<Variable> variables, @Nullable SuperType superclass, List<SuperType> interfaces) {
             this(name, variables, superclass, interfaces, new StringBuilder());
         }
 
-        /** The declaration as it reads, {@code Foo<T, U>}. */
+        /**
+         * The declaration as it reads, {@code Foo<T, U>}.
+         *
+         * @return The declaration
+         */
         public String declaration() {
             return variables.isEmpty() ? name : name + "<" + variables.stream().map(Variable::name).collect(Collectors.joining(", ")) + ">";
         }
 
         /**
          * Concrete arguments that satisfy the bounds, as {@link Argument}s and as the oracle renders them.
+         *
+         * @return The arguments, one per variable
          */
         public List<Concrete> concreteArguments() {
             List<Concrete> arguments = new ArrayList<>();
@@ -210,7 +334,12 @@ public final class TypeHierarchyFuzz {
         }
     }
 
-    /** A concrete type argument. */
+    /**
+     * A concrete type argument.
+     *
+     * @param argument  The argument
+     * @param rendering The argument as the oracle renders it
+     */
     public record Concrete(Argument<?> argument, String rendering) {
     }
 
@@ -225,17 +354,27 @@ public final class TypeHierarchyFuzz {
         private final Language language;
         private final List<Generated> generated = new ArrayList<>();
 
+        /**
+         * @param seed     The seed of the random source
+         * @param language The language the declarations are rendered in
+         */
         public Generator(long seed, Language language) {
             this.random = new Random(seed);
             this.language = language;
         }
 
+        /**
+         * @return The classes generated so far
+         */
         public List<Generated> generated() {
             return generated;
         }
 
         /**
          * The source of the given number of classes, with the prelude of helper types.
+         *
+         * @param count The number of classes
+         * @return The source
          */
         public String source(int count) {
             StringBuilder source = new StringBuilder(switch (language) {
@@ -554,72 +693,6 @@ public final class TypeHierarchyFuzz {
         }
     }
 
-    // ---- the check
-
-    /**
-     * Compares the record of a generated class with reflection, for the declaration, a raw parameterization and a
-     * concrete one.
-     *
-     * @param g              The generated class
-     * @param type           The compiled class
-     * @param record         Its record
-     * @param ignoreInterface Interfaces of the compiled class to leave out, those a language adds to every class
-     * @return The mismatches, empty when the record agrees with reflection
-     */
-    public static List<String> check(Generated g, Class<?> type, TypeHierarchy record, Predicate<Class<?>> ignoreInterface) {
-        List<String> mismatches = new ArrayList<>();
-        // a Python type variable is named after its class as well, T0 for the T of Fuzz0: reflection and the record agree on it
-        compare(mismatches, g, g.declaration() + " declaration", TypeStrings.strings(record.getTypeClosure(record.getDeclaration())),
-            Oracle.closure(type, Oracle.identity(type), false, ignoreInterface));
-        if (type.getTypeParameters().length > 0) {
-            compare(mismatches, g, g.declaration() + " raw", TypeStrings.strings(record.getTypeClosure(Argument.of(type))),
-                Oracle.closure(type, Map.of(), true, ignoreInterface));
-            List<Concrete> actual = g.concreteArguments();
-            Argument<?> parameterization = Argument.of(type, (String) null, actual.stream().map(Concrete::argument).toArray(Argument[]::new));
-            Map<TypeVariable<?>, String> substitutions = new HashMap<>();
-            TypeVariable<?>[] typeParameters = type.getTypeParameters();
-            for (int i = 0; i < typeParameters.length; i++) {
-                substitutions.put(typeParameters[i], actual.get(i).rendering());
-            }
-            compare(mismatches, g, g.declaration() + " as " + actual.stream().map(Concrete::rendering).toList(),
-                TypeStrings.strings(record.getTypeClosure(parameterization)), Oracle.closure(type, substitutions, false, ignoreInterface));
-        }
-        return mismatches;
-    }
-
-
-    /**
-     * Compares the record of a generated Python class with the hierarchy the generator declared. The Java stub of a
-     * Python class carries neither its Python bases nor its type variables in its reflective signature, so the
-     * reference is the model itself: the helper classes of the prelude with their declared super types, the Java
-     * interfaces of the JDK through reflection.
-     *
-     * @param g      The generated class
-     * @param type   The compiled class
-     * @param record Its record
-     * @return The mismatches, empty when the record agrees with the declaration
-     */
-    public static List<String> checkPython(Generated g, Class<?> type, TypeHierarchy record) {
-        List<String> mismatches = new ArrayList<>();
-        Map<String, String> identity = new LinkedHashMap<>();
-        for (Variable variable : g.variables()) {
-            identity.put(variable.name(), Generator.pythonVar(g, variable.name()));
-        }
-        compare(mismatches, g, g.declaration() + " declaration", TypeStrings.strings(record.getTypeClosure(record.getDeclaration())),
-            ModelOracle.closure(g, identity));
-        if (!g.variables().isEmpty()) {
-            List<Concrete> actual = g.concreteArguments();
-            Argument<?> parameterization = Argument.of(type, (String) null, actual.stream().map(Concrete::argument).toArray(Argument[]::new));
-            Map<String, String> substitutions = new LinkedHashMap<>();
-            for (int i = 0; i < g.variables().size(); i++) {
-                substitutions.put(g.variables().get(i).name(), actual.get(i).rendering());
-            }
-            compare(mismatches, g, g.declaration() + " as " + actual.stream().map(Concrete::rendering).toList(),
-                TypeStrings.strings(record.getTypeClosure(parameterization)), ModelOracle.closure(g, substitutions));
-        }
-        return mismatches;
-    }
-
     /**
      * The closure the generator declared: the helper types of the prelude by their declarations, the types of the
      * JDK by reflection.
@@ -702,12 +775,6 @@ public final class TypeHierarchyFuzz {
         }
     }
 
-    private static void compare(List<String> mismatches, Generated g, String what, List<String> recorded, List<String> reflected) {
-        if (!recorded.equals(reflected)) {
-            mismatches.add(what + "\n    source:     " + g.source().toString().trim().replace("\n", " ") + "\n    record:     " + recorded + "\n    reflection: " + reflected);
-        }
-    }
-
     /**
      * The reflective closure, walked the way the compiler lists it: the type, the super class and its super types,
      * then each interface and its super types, each rendering once, Object last. A super type reached raw, or reached
@@ -718,6 +785,10 @@ public final class TypeHierarchyFuzz {
         private Oracle() {
         }
 
+        /**
+         * @param type The type
+         * @return Each type variable of the type bound to its own name
+         */
         public static Map<TypeVariable<?>, String> identity(Class<?> type) {
             Map<TypeVariable<?>, String> identity = new HashMap<>();
             for (TypeVariable<?> variable : type.getTypeParameters()) {
@@ -726,6 +797,13 @@ public final class TypeHierarchyFuzz {
             return identity;
         }
 
+        /**
+         * @param type            The type
+         * @param substitutions   What each type variable of the type stands for
+         * @param raw             Whether the parameterization is raw
+         * @param ignoreInterface Interfaces to leave out
+         * @return The closure, rendered
+         */
         public static List<String> closure(Class<?> type, Map<TypeVariable<?>, String> substitutions, boolean raw, Predicate<Class<?>> ignoreInterface) {
             Set<String> closure = new LinkedHashSet<>();
             closure.add(raw ? type.getSimpleName() : renderClass(type, substitutions));
@@ -781,6 +859,11 @@ public final class TypeHierarchyFuzz {
             throw new IllegalArgumentException(type.toString());
         }
 
+        /**
+         * @param type          The type
+         * @param substitutions What each type variable stands for
+         * @return The type, rendered
+         */
         public static String render(Type type, Map<TypeVariable<?>, String> substitutions) {
             if (type instanceof Class<?> cls) {
                 return cls.getSimpleName();
