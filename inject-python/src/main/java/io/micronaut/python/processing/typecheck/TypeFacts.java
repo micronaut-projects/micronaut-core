@@ -456,6 +456,7 @@ public final class TypeFacts {
             || element.hasStereotype("io.micronaut.aop.Around")
             || element.hasStereotype(AnnotationUtil.SCOPE)
             || element.hasStereotype("io.micronaut.context.annotation.Bean")
+            || "io.micronaut.context.annotation.Bean".equals(element.getName())
             || "jakarta.annotation.PostConstruct".equals(element.getName())
             || "jakarta.annotation.PreDestroy".equals(element.getName());
         boolean scope = element.hasStereotype(AnnotationUtil.SCOPE);
