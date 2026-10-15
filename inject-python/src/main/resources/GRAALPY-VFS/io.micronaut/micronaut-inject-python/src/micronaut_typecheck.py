@@ -16,7 +16,6 @@ unchecked.
 """
 import ast
 import keyword
-
 import java
 
 PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
@@ -156,16 +155,30 @@ class TypeChecker:
             for function_def, node in module.functions:
                 severity = self.scope.severity(function_def.decorators(), module_severity)
                 units.append(CheckUnit(module.source_path, function_def.name(), function_def, node, None, severity, module))
+            # a nested class takes the switch of the class around it, the nearest declaration winning
+            enclosing = _enclosing_classes([node for _, node in module.classes if node is not None])
+            by_node = {id(node): class_def for class_def, node in module.classes if node is not None}
+            class_scopes = {}
+
+            def class_scope(class_def, node):
+                key = id(node) if node is not None else id(class_def)
+                if key not in class_scopes:
+                    outer_node = enclosing.get(id(node)) if node is not None else None
+                    outer_severity = class_scope(by_node[id(outer_node)], outer_node)[0] if outer_node is not None and id(outer_node) in by_node else module_severity
+                    # a nested class is modelled by its binary name (Outer$Inner): its source name is Outer.Inner
+                    class_scopes[key] = (self.scope.severity(class_def.decorators(), outer_severity), class_def.name().replace("$", "."))
+                return class_scopes[key]
+
             for class_def, node in module.classes:
-                class_severity = self.scope.severity(class_def.decorators(), module_severity)
-                units.append(CheckUnit(module.source_path, class_def.name(), None, node, class_def, class_severity, module))
+                class_severity, class_name = class_scope(class_def, node)
+                units.append(CheckUnit(module.source_path, class_name, None, node, class_def, class_severity, module))
                 members = list(class_def.functions())
                 if class_def.constructor() is not None:
                     members.append(class_def.constructor())
                 for function_def in members:
                     severity = self.scope.severity(function_def.decorators(), class_severity)
-                    qualified_name = f"{class_def.name()}.{function_def.name()}"
-                    units.append(CheckUnit(module.source_path, qualified_name, function_def, _function_node(node, function_def.name()), class_def, severity, module))
+                    qualified_name = f"{class_name}.{function_def.name()}"
+                    units.append(CheckUnit(module.source_path, qualified_name, function_def, _function_node(node, function_def.name(), function_def), class_def, severity, module))
         return units
 
     def check(self, visitor_context):
@@ -359,6 +372,9 @@ class DecoratorRules:
                 continue
             simple_name = description.simpleName()
             if not description.annotation():
+                if description.pythonDefined():
+                    # a Python class of the compilation used as a decorator (a callable class): plain Python
+                    continue
                 self._report("not-an-annotation",
                              f"[{description.name()}] is not an annotation and cannot decorate {self.kind} [{self.unit.qualified_name}]",
                              node)
@@ -427,18 +443,15 @@ class DecoratorRules:
                              f"member [{name}] of @{simple_name} is {member.typeName()}; got {kind}",
                              element)
             elif member.enumType() and kind == "str":
+                # read at run time through the conversion of a string to the enum, which also accepts the
+                # constant spelt as an environment name (created, fooBar); the type facts give no constants for
+                # an enum with its own toString(), which the conversion matches too
                 constants = list(member.enumConstants())
-                if constants and element.value not in constants:
+                if constants and element.value not in constants and _environment_name(element.value) not in constants:
                     suggestions = suggest(element.value, constants)
                     self._report("decorator-member-type",
                                  f"member [{name}] of @{simple_name} is {member.typeName()}, which has no constant [{element.value}]{_did_you_mean(suggestions)}",
                                  element, suggestions)
-
-    def _targets_allow(self, targets, description):
-        if any(target in self.targets for target in targets):
-            return True
-        # a method-targeted around or introduction binding on a class advises all of its methods
-        return self.kind == "class" and description.interceptorBinding() and "METHOD" in targets
 
     def _targets_allow(self, targets, description):
         if any(target in self.targets for target in targets):
@@ -472,14 +485,67 @@ class DecoratorRules:
         self.checker.report(self.unit, rule, message, self.span_of(node), suggestions)
 
 
-def _function_node(class_node, name):
-    """The AST node of the method of the given name in a class body, or None."""
+def _environment_name(value):
+    """NameUtils.environmentName: the name a string is also tried as when it converts to an enum (fooBar -> FOO_BAR)."""
+    name = value.replace("-", "_").replace(".", "_")
+    out = []
+    first = True
+    last = "0"
+    for c in name:
+        if first:
+            if c != "_":
+                out.append(c)
+            first = False
+        elif c.isupper() and not last.isupper():
+            out.append("_")
+            out.append(c)
+        elif c != "_":
+            if last == "_":
+                out.append("_")
+            out.append(c)
+        last = c
+    return "".join(out).upper()
+
+
+def _function_node(class_node, name, function_def=None):
+    """
+    The AST node of the method of the given name in a class body, or None. A name defined more than once (a
+    property and its setter, @overload stubs and their implementation) is told apart by the line of the
+    definition the model recorded; without one, the first definition is taken, as before.
+    """
     if class_node is None:
         return None
-    for statement in getattr(class_node, "body", ()):
-        if getattr(statement, "name", None) == name and hasattr(statement, "args"):
-            return statement
-    return None
+    candidates = [statement for statement in getattr(class_node, "body", ())
+                  if getattr(statement, "name", None) == name and hasattr(statement, "args")]
+    if not candidates:
+        return None
+    span = function_def.span() if function_def is not None and hasattr(function_def, "span") else None
+    if span is not None:
+        for statement in candidates:
+            if statement.lineno == span.line():
+                return statement
+    return candidates[0]
+
+
+def _enclosing_classes(class_nodes):
+    """id(class node) -> the class node directly around it, for the classes nested in another class."""
+    enclosing = {}
+
+    def visit(node, outer):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.ClassDef):
+                if outer is not None:
+                    enclosing[id(child)] = outer
+                visit(child, child)
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+                # a class defined in a method is local to it, not a member of the class
+                visit(child, None)
+            else:
+                visit(child, outer)
+
+    for node in class_nodes:
+        visit(node, node)
+    return enclosing
 
 
 # ---------------------------------------------------------------- expression types
@@ -503,7 +569,9 @@ BUILTIN_HINTS = {
 BUILTIN_JAVA_TYPES = {"java.lang.String": "str", "java.lang.CharSequence": "str", "boolean": "bool", "java.lang.Boolean": "bool",
                       "int": "int", "long": "int", "short": "int", "byte": "int", "java.lang.Integer": "int", "java.lang.Long": "int",
                       "java.lang.Short": "int", "java.lang.Byte": "int", "double": "float", "float": "float",
-                      "java.lang.Double": "float", "java.lang.Float": "float", "void": "none"}
+                      "java.lang.Double": "float", "java.lang.Float": "float", "void": "none",
+                      # GraalPy hands a Java char to Python as a one-character str
+                      "char": "str", "java.lang.Character": "str"}
 # every Java object has these, whether or not the element model lists them
 OBJECT_METHODS = {"equals", "hashCode", "toString", "getClass", "notify", "notifyAll", "wait"}
 # the members GraalPy adds to host objects and classes
@@ -597,7 +665,9 @@ class Bindings:
         function_def = self.unit.function_def
         if self.unit.class_def is not None:
             if function_def.isStatic():
-                self.locals["cls"] = Typed(PY_REF, self.unit.class_def)
+                # a class method takes the class as its first parameter; a static method takes nothing implicit
+                if _is_class_method(self.unit.node):
+                    self.locals["cls"] = Typed(PY_REF, self.unit.class_def)
             else:
                 self.locals["self"] = Typed(PY, self.unit.class_def)
         for argument in function_def.arguments().arguments():
@@ -722,6 +792,39 @@ def _bound_names(target):
     return []
 
 
+def _is_class_method(function_node):
+    """Whether a function is decorated with @classmethod, which hands it the class as its first parameter."""
+    return any(isinstance(decorator, ast.Name) and decorator.id == "classmethod"
+               for decorator in getattr(function_node, "decorator_list", ()))
+
+
+def _assigned_names(statements):
+    """The names the statements bind, nested blocks included and nested scopes excluded."""
+    names = set()
+    pending = list(statements)
+    while pending:
+        node = pending.pop()
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+            continue
+        if isinstance(node, (ast.Assign,)):
+            for target in node.targets:
+                names.update(_bound_names(target))
+        elif isinstance(node, (ast.AnnAssign, ast.AugAssign)):
+            names.update(_bound_names(node.target))
+        elif isinstance(node, (ast.For, ast.AsyncFor)):
+            names.update(_bound_names(node.target))
+        elif isinstance(node, (ast.With, ast.AsyncWith)):
+            for item in node.items:
+                if item.optional_vars is not None:
+                    names.update(_bound_names(item.optional_vars))
+        elif isinstance(node, ast.NamedExpr):
+            names.update(_bound_names(node.target))
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            names.add(node.name)
+        pending.extend(ast.iter_child_nodes(node))
+    return names
+
+
 class JavaReceiverRules:
     """
     The checks of calls, attribute reads and constructions whose receiver is a Java type: the member
@@ -752,8 +855,10 @@ class JavaReceiverRules:
             for name in _bound_names(node.target):
                 self.bindings.forget(name)
             self.expression(node.iter)
-            for child in getattr(node, "body", []) + getattr(node, "orelse", []):
-                self.statement(child)
+            self._loop_body(getattr(node, "body", []), getattr(node, "orelse", []))
+            return
+        if isinstance(node, ast.While):
+            self._loop_body(node.body, node.orelse, node.test)
             return
         if isinstance(node, (ast.With, ast.AsyncWith)):
             for item in node.items:
@@ -784,6 +889,22 @@ class JavaReceiverRules:
                             self.statement(child)
                         elif isinstance(child, ast.expr):
                             self.expression(child)
+
+    def _loop_body(self, body, orelse, test=None):
+        """
+        A loop body is walked once, in order, but runs any number of times: a name it assigns may hold, at the
+        top of an iteration, what a later statement of the previous one assigned, and after the loop either that
+        or what it held before. Such a name is unknown at the top of the body and after the loop.
+        """
+        assigned = _assigned_names(body + orelse)
+        for name in assigned:
+            self.bindings.forget(name)
+        if test is not None:
+            self.expression(test)
+        for child in body + orelse:
+            self.statement(child)
+        for name in assigned:
+            self.bindings.forget(name)
 
     def assignment(self, node):
         if isinstance(node, ast.AugAssign):
