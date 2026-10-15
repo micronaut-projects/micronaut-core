@@ -1,6 +1,7 @@
 package io.micronaut.kotlin.processing.visitor
 
 import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
+import io.micronaut.core.type.TypeHierarchies
 
 class BeanTypeHierarchySpec extends AbstractKotlinCompilerSpec {
 
@@ -107,5 +108,39 @@ class Plain : Runnable {
     override fun run() { }
 }
 ''').getTypeHierarchy().isPresent()
+    }
+    void "the generic hierarchy of the introspected type is recorded beside the introspection"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Child', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import java.util.function.Supplier
+
+abstract class Base<T> : Supplier<T>
+
+@Introspected(hierarchy = true)
+class Child<T : Number> : Base<T>(), Comparable<Child<T>> {
+    override fun get(): T = throw UnsupportedOperationException()
+    override fun compareTo(other: Child<T>): Int = 0
+}
+''')
+        def hierarchy = introspection.getTypeHierarchy().orElseThrow()
+        TypeHierarchies.invalidate()
+        def record = hierarchy.genericHierarchy.orElseThrow()
+
+        expect: "the record is found through the service entries of the compiled classes"
+        record.type == introspection.beanType
+        record.typeVariables*.name == ['T']
+        record.typeVariables[0].type == Number
+        record.genericSuperclass.get().type == introspection.beanType.classLoader.loadClass('test.Base')
+        record.genericSuperclass.get().typeParameters[0].isUnresolvedTypeVariable()
+        record.genericInterfaces*.type == [Comparable]
+
+        and: "the closure keeps the variables of the type and the arguments of its super types"
+        hierarchy.typeClosure*.type == [introspection.beanType, introspection.beanType.classLoader.loadClass('test.Base'), java.util.function.Supplier, Comparable, Object]
+        hierarchy.typeClosure[1].typeParameters[0].isUnresolvedTypeVariable()
+        hierarchy.typeClosure[2].typeParameters[0].isUnresolvedTypeVariable()
+        hierarchy.typeClosure[3].typeParameters[0].type == introspection.beanType
     }
 }
