@@ -15,12 +15,16 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.util.SupplierUtil
 import io.micronaut.inject.ast.AnnotationElement
+import io.micronaut.inject.ast.AnnotationMemberElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.inject.ast.utils.DefaultAnnotationMemberElement
 import java.lang.annotation.ElementType
 import java.lang.annotation.RetentionPolicy
 import java.util.Collections
@@ -36,20 +40,29 @@ import java.util.Optional
 internal class KotlinAnnotationElement(
     private val annotationNativeType: KotlinClassNativeElement,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-    visitorContext: KotlinVisitorContext
+    visitorContext: KotlinVisitorContext,
+    arrayDimensions: Int = 0
 ) : KotlinClassElement(
     annotationNativeType,
     elementAnnotationMetadataFactory,
-    null,
-    visitorContext
+    null, // an annotation type cannot be generic, so the type arguments can be ignored
+    visitorContext,
+    arrayDimensions
 ), AnnotationElement {
 
-    // an annotation type cannot be generic, so the type arguments can be ignored
-    override fun copyThis() = KotlinAnnotationElement(
+    override fun copyThis() = copyArrayTypeAnnotations(KotlinAnnotationElement(
         annotationNativeType,
         elementAnnotationMetadataFactory,
-        visitorContext
-    )
+        visitorContext,
+        arrayDimensions
+    ))
+
+    override fun withArrayDimensions(arrayDimensions: Int) = copyArrayTypeAnnotations(KotlinAnnotationElement(
+        annotationNativeType,
+        elementAnnotationMetadataFactory,
+        visitorContext,
+        arrayDimensions
+    ))
 
     override fun isInherited() = declaration.annotations.any { annotation ->
         annotation.annotationType.resolve().declaration.qualifiedName?.asString() == AnnotationUtil.ANN_INHERITED
@@ -90,6 +103,20 @@ internal class KotlinAnnotationElement(
 
     override fun getRetentionPolicy(): RetentionPolicy =
         visitorContext.annotationMetadataBuilder.getRetentionPolicy(declaration)
+
+    /*
+     * KSP answers the members of an annotation class as its properties and no functions, a Java annotation
+     * on the classpath included; the defaults are only visible on a use of the annotation.
+     */
+    override fun getMembers(): List<AnnotationMemberElement> {
+        val defaultValues = SupplierUtil.memoized {
+            visitorContext.annotationMetadataBuilder.getAnnotationDefaultValues(name, declaration)
+        }
+        return declaration.getDeclaredProperties().map { property ->
+            val element = KotlinPropertyElement(this, property, elementAnnotationMetadataFactory, visitorContext)
+            DefaultAnnotationMemberElement(element, element.type, defaultValues)
+        }.toList()
+    }
 
     private fun addTargets(value: Any?, targets: EnumSet<ElementType>) {
         when (value) {
