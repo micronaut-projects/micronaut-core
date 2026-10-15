@@ -16,37 +16,35 @@
 package io.micronaut.http.netty.stream;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.netty.handler.codec.http.HttpContent;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.util.function.Function;
 
 /**
- * A Reactor subscriber used to handle JSON content. It delegates to an upstream subscriber, wrapping them with opening/closing brackets
- * where necessary.
+ * Frames the pieces of JSON content as the elements of a JSON array: an opening bracket in front
+ * of the first piece, a comma in front of the others, and a closing bracket after the last one.
  */
 @Internal
 public final class JsonSubscriber {
-    public static Flux<HttpContent> lift(Publisher<HttpContent> publisher) {
+    public static Publisher<HttpContent> lift(Publisher<HttpContent> publisher) {
         HttpContent closeBracket = HttpContentUtil.closeBracket();
-        return Flux.from(publisher)
-            .concatWithValues(closeBracket)
-            .map(new Function<>() {
-                boolean empty = true;
+        return BodyPublishers.map(BodyPublishers.append(publisher, closeBracket, HttpContent::release), new Function<>() {
+            boolean empty = true;
 
-                @Override
-                public HttpContent apply(HttpContent httpContent) {
-                    if (empty) {
-                        empty = false;
-                        return HttpContentUtil.prefixOpenBracket(httpContent);
-                    } else if (httpContent != closeBracket) {
-                        return HttpContentUtil.prefixComma(httpContent);
-                    } else {
-                        return httpContent;
-                    }
+            @Override
+            public HttpContent apply(HttpContent httpContent) {
+                if (empty) {
+                    empty = false;
+                    return HttpContentUtil.prefixOpenBracket(httpContent);
+                } else if (httpContent != closeBracket) {
+                    return HttpContentUtil.prefixComma(httpContent);
+                } else {
+                    return httpContent;
                 }
-            });
+            }
+        });
     }
 }
