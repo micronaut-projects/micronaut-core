@@ -42,6 +42,11 @@ class PythonDiagnosticsTest {
         assertTrue(PythonDiagnostics.isExcerptLine(" 6 |         return values.ad(name)"));
         assertTrue(PythonDiagnostics.isExcerptLine("  |                       ^^"));
         assertFalse(PythonDiagnostics.isExcerptLine("  --> /src/greeter.py:6:23"));
+        assertTrue(PythonDiagnostics.isExcerptLine("  |"));
+        // a line of a message that merely starts with a bar, or a number and a bar, is no excerpt
+        assertFalse(PythonDiagnostics.isExcerptLine("| a table row of a message"));
+        assertFalse(PythonDiagnostics.isExcerptLine("12 | not an excerpt"));
+        assertFalse(PythonDiagnostics.isExcerptLine("  | text after the gutter"));
     }
 
     @Test
