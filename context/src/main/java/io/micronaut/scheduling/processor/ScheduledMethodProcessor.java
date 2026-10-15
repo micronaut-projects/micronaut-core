@@ -27,6 +27,7 @@ import io.micronaut.context.watch.BeanExecutableMethod;
 import io.micronaut.context.watch.BeanWatch;
 import io.micronaut.context.watch.ExecutableMethodChange;
 import io.micronaut.context.watch.ExecutableMethodWatcher;
+import io.micronaut.context.watch.ReloadingConfigurationWatcher;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.BoundExecutable;
@@ -65,6 +66,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 /**
  * A {@link ExecutableMethodProcessor} for the {@link Scheduled} annotation.
@@ -93,6 +95,17 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
      */
     private final Map<BeanExecutableMethod<Scheduled>, ScheduledMethod> scheduledTasks = new ConcurrentHashMap<>();
     private volatile @Nullable BeanWatch watch; // NOSONAR java:S3077 only the handle is published; the watch is thread-safe
+    private volatile @Nullable BeanWatch configurationWatch; // NOSONAR java:S3077 only the handle is published; the watch is thread-safe
+    /**
+     * Serializes the batches of the method watch and of the configuration watch, which may be delivered on different
+     * threads: both cancel and create timers.
+     */
+    private final Object changeLock = new Object();
+    /**
+     * Whether the processor was closed, after which it registers no watch and keeps no timer. Set before the timers
+     * held are cancelled, under the processor's monitor.
+     */
+    private volatile boolean closed;
     /**
      * What scheduling the startup batch threw, if anything: the watch isolates a watcher's failure, and a
      * schedule that cannot be read must still fail the startup as it always has.
@@ -146,15 +159,21 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
     @Override
     public void onChange(ExecutableMethodChange<Scheduled> change) {
+        synchronized (changeLock) {
+            applyChange(change);
+        }
+    }
+
+    private void applyChange(ExecutableMethodChange<Scheduled> change) {
         for (BeanExecutableMethod<Scheduled> gone : change.removed()) {
             ScheduledMethod scheduled = scheduledTasks.remove(gone);
             if (scheduled == null) {
                 continue;
             }
             Optional<BeanExecutableMethod<Scheduled>> back = change.replacementOf(gone);
-            if (back.isPresent() && sameSchedule(gone, back.get())) {
-                // the same schedule in the new generation: the running timers stay, and from now on invoke the
-                // replacement method on the new generation's bean
+            if (back.isPresent() && sameSchedule(gone, back.get()) && scheduled.schedules().equals(resolveSchedules(back.get()))) {
+                // the same schedule in the new generation, as written and as resolved, on the same schedulers: the
+                // running timers stay, and from now on invoke the replacement method on the new generation's bean
                 scheduled.retarget(back.get());
                 scheduledTasks.put(back.get(), scheduled);
             } else {
@@ -179,6 +198,111 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
         return before.method().getAnnotationValuesByType(Scheduled.class).equals(after.method().getAnnotationValuesByType(Scheduled.class));
     }
 
+    /**
+     * After a configuration change, schedules again the methods whose schedules no longer resolve as they did when
+     * their timers were created, such as {@code fixedRate = "${x.rate}"} once {@code x.rate} changed.
+     */
+    private ReloadingConfigurationWatcher.Outcome rescheduleChanged() {
+        boolean rescheduled = false;
+        synchronized (changeLock) {
+            for (Map.Entry<BeanExecutableMethod<Scheduled>, ScheduledMethod> held : List.copyOf(scheduledTasks.entrySet())) {
+                BeanExecutableMethod<Scheduled> entry = held.getKey();
+                ScheduledMethod scheduled = held.getValue();
+                if (scheduled.schedules().equals(resolveSchedules(entry))) {
+                    continue;
+                }
+                // the new timers first: a schedule that no longer reads keeps the timers it has, and the next
+                // change compares against them again
+                ScheduledMethod replacement = new ScheduledMethod(entry);
+                try {
+                    scheduleTimers(entry, replacement);
+                } catch (RuntimeException e) {
+                    replacement.cancel();
+                    LOG.error("Failed to schedule method {} again after a configuration change, its timers are kept: {}", entry.method(), e.getMessage(), e);
+                    continue;
+                }
+                if (scheduledTasks.replace(entry, scheduled, replacement)) {
+                    scheduled.cancel();
+                    rescheduled = true;
+                    if (closed) {
+                        // a close that began before the replacement was installed may have cancelled the old timers only
+                        replacement.cancel();
+                    }
+                } else {
+                    // closed, or removed by a reload, meanwhile
+                    replacement.cancel();
+                }
+            }
+        }
+        return rescheduled ? ReloadingConfigurationWatcher.Outcome.APPLIED : ReloadingConfigurationWatcher.Outcome.IGNORED;
+    }
+
+    /**
+     * Watches the configuration once a schedule reads it through a placeholder, {@code fixedRate = "${x.rate}"}:
+     * such a schedule changes with the configuration and nothing else, and one written out in full never does.
+     *
+     * @param annotation The schedule
+     */
+    private void watchConfigurationFor(AnnotationValue<Scheduled> annotation) {
+        if (configurationWatch != null || !(beanContext instanceof WatchableBeanContext watchable) || !readsConfiguration(annotation)) {
+            return;
+        }
+        synchronized (this) {
+            if (configurationWatch == null && !closed) {
+                configurationWatch = watchable.configuration().watchReloading(change -> rescheduleChanged());
+            }
+        }
+    }
+
+    private static boolean readsConfiguration(AnnotationValue<Scheduled> annotation) {
+        for (Object value : annotation.getValues().values()) {
+            if (value != null && value.toString().contains("${")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * How the schedules of a method resolve now: its members with their placeholders resolved, and the scheduler
+     * each one names.
+     *
+     * @param entry The method
+     * @return The schedules, or null when one cannot be resolved, which never equals the schedules of timers
+     */
+    private @Nullable List<Schedule> resolveSchedules(BeanExecutableMethod<Scheduled> entry) {
+        try {
+            List<AnnotationValue<Scheduled>> annotations = entry.method().getAnnotationValuesByType(Scheduled.class);
+            List<Schedule> schedules = new ArrayList<>(annotations.size());
+            for (AnnotationValue<Scheduled> annotation : annotations) {
+                SchedulerBean scheduler = findScheduler(annotation).orElse(null);
+                if (scheduler == null) {
+                    return null;
+                }
+                schedules.add(Schedule.of(annotation, scheduler.identity()));
+            }
+            return schedules;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * The scheduler a schedule names: a {@link TaskScheduler} bean of the name, or else a
+     * {@link ScheduledExecutorService} bean of the name, wrapped.
+     */
+    private Optional<SchedulerBean> findScheduler(AnnotationValue<Scheduled> annotation) {
+        String scheduler = annotation.stringValue(MEMBER_SCHEDULER).orElse(TaskExecutors.SCHEDULED);
+        Optional<SchedulerBean> found = beanContext.findBean(TaskScheduler.class, Qualifiers.byName(scheduler))
+            .map(taskScheduler -> new SchedulerBean(taskScheduler, taskScheduler));
+        if (found.isEmpty()) {
+            found = beanContext.findBean(ExecutorService.class, Qualifiers.byName(scheduler))
+                .filter(ScheduledExecutorService.class::isInstance)
+                .map(executor -> new SchedulerBean(new ScheduledExecutorTaskScheduler(executor), executor));
+        }
+        return found;
+    }
+
     private void scheduleTask(BeanExecutableMethod<Scheduled> entry) {
         ScheduledMethod scheduled = new ScheduledMethod(entry);
         // registered first, so that a close while the timers are being created cancels them
@@ -196,32 +320,30 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
     @SuppressWarnings("unchecked")
     private <B> void scheduleTimers(BeanExecutableMethod<Scheduled> entry, ScheduledMethod scheduled) {
-        List<ScheduledFuture<?>> futures = scheduled.futures;
         ExecutableMethod<B, ?> method = (ExecutableMethod<B, ?>) entry.method();
-        BeanDefinition<B> beanDefinition = (BeanDefinition<B>) entry.definition();
         List<AnnotationValue<Scheduled>> scheduledAnnotations = method.getAnnotationValuesByType(Scheduled.class);
+        List<Schedule> schedules = new ArrayList<>(scheduledAnnotations.size());
+        // every schedule is read before any timer starts, so that one that cannot be read starts none
+        List<Supplier<ScheduledFuture<?>>> timers = new ArrayList<>(scheduledAnnotations.size());
         for (AnnotationValue<Scheduled> scheduledAnnotation : scheduledAnnotations) {
             String fixedRate = scheduledAnnotation.stringValue(MEMBER_FIXED_RATE).orElse(null);
 
             String initialDelayStr = scheduledAnnotation.stringValue(MEMBER_INITIAL_DELAY).orElse(null);
-            Duration initialDelay = null;
+            final Duration initialDelay;
             if (StringUtils.hasText(initialDelayStr)) {
                 initialDelay = conversionService.convert(initialDelayStr, Duration.class).orElseThrow(() ->
                     new SchedulerConfigurationException(method, "Invalid initial delay definition: " + initialDelayStr)
                 );
+            } else {
+                initialDelay = null;
             }
 
-            String scheduler = scheduledAnnotation.stringValue(MEMBER_SCHEDULER).orElse(TaskExecutors.SCHEDULED);
-            Optional<TaskScheduler> optionalTaskScheduler = beanContext
-                .findBean(TaskScheduler.class, Qualifiers.byName(scheduler));
-
-            if (optionalTaskScheduler.isEmpty()) {
-                optionalTaskScheduler = beanContext.findBean(ExecutorService.class, Qualifiers.byName(scheduler))
-                    .filter(ScheduledExecutorService.class::isInstance)
-                    .map(ScheduledExecutorTaskScheduler::new);
-            }
-
-            TaskScheduler taskScheduler = optionalTaskScheduler.orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduler));
+            SchedulerBean schedulerBean = findScheduler(scheduledAnnotation).orElseThrow(() -> new SchedulerConfigurationException(method,
+                "No scheduler of type TaskScheduler configured for name: " + scheduledAnnotation.stringValue(MEMBER_SCHEDULER).orElse(TaskExecutors.SCHEDULED)));
+            TaskScheduler taskScheduler = schedulerBean.scheduler();
+            // what the timers below were created from, which a reload or a configuration change compares against
+            schedules.add(Schedule.of(scheduledAnnotation, schedulerBean.identity()));
+            watchConfigurationFor(scheduledAnnotation);
             Runnable task = () -> {
                 // the method and the definition of the moment: a timer kept across a generation invokes the replacement
                 BeanExecutableMethod<Scheduled> current = scheduled.target();
@@ -272,8 +394,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     LOG.debug("Scheduling cron task [{}] for method: {}", cronExpr, method);
                 }
 
-                ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(cronExpr, zoneIdStr, task);
-                futures.add(scheduledFuture);
+                timers.add(() -> taskScheduler.schedule(cronExpr, zoneIdStr, task));
             } else if (StringUtils.isNotEmpty(fixedRate)) {
                 Optional<Duration> converted = conversionService.convert(fixedRate, Duration.class);
                 Duration duration = converted.orElseThrow(() ->
@@ -284,8 +405,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     LOG.debug("Scheduling fixed rate task [{}] for method: {}", duration, method);
                 }
 
-                ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleAtFixedRate(initialDelay, duration, task);
-                futures.add(scheduledFuture);
+                timers.add(() -> taskScheduler.scheduleAtFixedRate(initialDelay, duration, task));
             } else if (StringUtils.isNotEmpty(fixedDelay)) {
                 Optional<Duration> converted = conversionService.convert(fixedDelay, Duration.class);
                 Duration duration = converted.orElseThrow(() ->
@@ -296,15 +416,17 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     LOG.debug("Scheduling fixed delay task [{}] for method: {}", duration, method);
                 }
 
-                ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleWithFixedDelay(initialDelay, duration, task);
-                futures.add(scheduledFuture);
+                timers.add(() -> taskScheduler.scheduleWithFixedDelay(initialDelay, duration, task));
             } else if (initialDelay != null) {
-                ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(initialDelay, task);
-                futures.add(scheduledFuture);
+                timers.add(() -> taskScheduler.schedule(initialDelay, task));
             } else {
                 throw new SchedulerConfigurationException(method, "Failed to schedule task. Invalid definition");
             }
         }
+        for (Supplier<ScheduledFuture<?>> timer : timers) {
+            scheduled.add(timer.get());
+        }
+        scheduled.schedules(schedules);
     }
 
     private <B> void handleException(Class<B> beanType, B bean, Throwable e) {
@@ -326,6 +448,14 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             registered.close();
             watch = null;
         }
+        synchronized (this) {
+            closed = true;
+            BeanWatch configuration = configurationWatch;
+            if (configuration != null) {
+                configuration.close();
+                configurationWatch = null;
+            }
+        }
         try {
             for (ScheduledMethod scheduled : scheduledTasks.values()) {
                 scheduled.cancel();
@@ -338,7 +468,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     /**
      * @return How many scheduled methods hold timers
      */
-    public int scheduledMethods() {
+    int scheduledMethods() {
         return scheduledTasks.size();
     }
 
@@ -430,7 +560,12 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
      * The timers of one scheduled method and the method they invoke, which a replacement updates.
      */
     private static final class ScheduledMethod {
-        final List<ScheduledFuture<?>> futures = new ArrayList<>(1);
+        /**
+         * The timers, guarded by this method's monitor: a close may cancel them while they are being created.
+         */
+        private final List<ScheduledFuture<?>> futures = new ArrayList<>(1);
+        private boolean cancelled;
+        private List<Schedule> schedules = List.of();
         private final AtomicReference<BeanExecutableMethod<Scheduled>> target;
 
         ScheduledMethod(BeanExecutableMethod<Scheduled> entry) {
@@ -445,13 +580,77 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             target.set(entry);
         }
 
-        void cancel() {
+        /**
+         * Adds a timer, or cancels it at once when the method was cancelled while its timers were being created.
+         *
+         * @param future The timer
+         */
+        synchronized void add(ScheduledFuture<?> future) {
+            if (cancelled) {
+                future.cancel(false);
+            } else {
+                futures.add(future);
+            }
+        }
+
+        synchronized List<Schedule> schedules() {
+            return schedules;
+        }
+
+        synchronized void schedules(List<Schedule> resolved) {
+            this.schedules = List.copyOf(resolved);
+        }
+
+        synchronized void cancel() {
+            cancelled = true;
             for (ScheduledFuture<?> future : futures) {
                 if (!future.isCancelled()) {
                     future.cancel(false);
                 }
             }
+            futures.clear();
         }
     }
 
+    /**
+     * A scheduler bean, and the bean that identifies it: the {@link TaskScheduler}, or the executor it wraps.
+     *
+     * @param scheduler The scheduler
+     * @param identity The bean
+     */
+    private record SchedulerBean(TaskScheduler scheduler, Object identity) {
+    }
+
+    /**
+     * A schedule as it resolved when its timer was created: the members with their placeholders resolved, and the
+     * scheduler bean, compared by identity, that the timer runs on.
+     *
+     * @param cron The cron expression
+     * @param zoneId The zone of the cron expression
+     * @param fixedRate The fixed rate
+     * @param fixedDelay The fixed delay
+     * @param initialDelay The initial delay
+     * @param scheduler The scheduler bean
+     */
+    private record Schedule(@Nullable String cron, @Nullable String zoneId, @Nullable String fixedRate, @Nullable String fixedDelay,
+                            @Nullable String initialDelay, Object scheduler) {
+
+        static Schedule of(AnnotationValue<Scheduled> annotation, Object scheduler) {
+            return new Schedule(annotation.stringValue(MEMBER_CRON).orElse(null), annotation.stringValue(MEMBER_ZONE_ID).orElse(null),
+                annotation.stringValue(MEMBER_FIXED_RATE).orElse(null), annotation.stringValue(MEMBER_FIXED_DELAY).orElse(null),
+                annotation.stringValue(MEMBER_INITIAL_DELAY).orElse(null), scheduler);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof Schedule other && Objects.equals(cron, other.cron) && Objects.equals(zoneId, other.zoneId)
+                && Objects.equals(fixedRate, other.fixedRate) && Objects.equals(fixedDelay, other.fixedDelay)
+                && Objects.equals(initialDelay, other.initialDelay) && scheduler == other.scheduler;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(cron, zoneId, fixedRate, fixedDelay, initialDelay, System.identityHashCode(scheduler));
+        }
+    }
 }

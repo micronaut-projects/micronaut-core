@@ -70,6 +70,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
@@ -188,18 +189,22 @@ final class BeanWatchRegistry {
      * only additions. That the processor needs this adapter is what tells a launcher it is not
      * reload-capable.
      *
-     * <p>A processor that implements {@link ExecutableMethodWatcher} or {@link BeanDefinitionWatcher} is
-     * not adapted: implementing the interface is its statement that it registers its own watch, through
-     * {@link WatchableBeanContext}, and follows a reload by itself. One that implements it without
-     * registering sees nothing after startup, which is what the interface promises it handles.</p>
+     * <p>A processor that implements {@link ExecutableMethodWatcher} and has registered itself as the watcher of a
+     * method watch, through {@link WatchableBeanContext}, follows a reload by itself: the adapter stands aside for
+     * as long as that watch is open, and the processor does not count as adapted. One that implements the interface
+     * without such a watch is adapted like any other processor.</p>
      */
     <A extends Annotation> void adapt(Class<A> annotationType, ExecutableMethodProcessor<A> processor) {
-        if (processor instanceof ExecutableMethodWatcher<?> || !markAdapted(processor)) {
-            // a processor that is a watcher registers its own watch and follows a reload by itself
+        if (!markAdapted(processor)) {
             return;
         }
+        // the watch of its own that delivers all the adapter would: the methods of the same annotation, unfiltered
+        Predicate<Registration> selfWatch = processor instanceof ExecutableMethodWatcher<?>
+            ? candidate -> candidate instanceof MethodRegistration<?> methods && methods.annotationType == annotationType
+                && isEveryType(methods.beanType) && methods.qualifier == null
+            : null;
         MethodRegistration<A> registration = new MethodRegistration<>(annotationType, null, null, change -> {
-            if (change.initial() || change.added().isEmpty()) {
+            if (change.initial() || change.added().isEmpty() || watchesItself(processor, selfWatch)) {
                 return;
             }
             if (processor instanceof LifeCycle<?> cycle) {
@@ -220,19 +225,28 @@ final class BeanWatchRegistry {
             }
         }, new ChangeHandlers<>(), true);
         registration.adaptedProcessor = processor;
+        registration.selfWatch = selfWatch;
         register(registration);
     }
 
     /**
      * Feeds a {@link BeanDefinitionProcessor} the definitions added after startup, as a watcher that sees
-     * only additions.
+     * only additions. A processor that implements {@link BeanDefinitionWatcher} and has registered itself as the
+     * watcher of a definition watch follows a reload by itself, and the adapter stands aside while that watch is
+     * open, as it does for an {@link ExecutableMethodProcessor}.
      */
     void adapt(Class<? extends Annotation> annotationType, BeanDefinitionProcessor<?> processor) {
-        if (processor instanceof BeanDefinitionWatcher<?> || !markAdapted(processor)) {
+        if (!markAdapted(processor)) {
             return;
         }
-        DefinitionRegistration<Object> registration = new DefinitionRegistration<>(null, Qualifiers.byStereotype(annotationType), change -> {
-            if (change.initial() || change.added().isEmpty()) {
+        Qualifier<Object> stereotype = Qualifiers.byStereotype(annotationType);
+        // the watch of its own that delivers all the adapter would: every definition, or those of the stereotype
+        Predicate<Registration> selfWatch = processor instanceof BeanDefinitionWatcher<?>
+            ? candidate -> candidate instanceof DefinitionRegistration<?> definitions && isEveryType(definitions.beanType)
+                && (definitions.qualifier == null || definitions.qualifier.equals(stereotype))
+            : null;
+        DefinitionRegistration<Object> registration = new DefinitionRegistration<>(null, stereotype, change -> {
+            if (change.initial() || change.added().isEmpty() || watchesItself(processor, selfWatch)) {
                 return;
             }
             if (processor instanceof LifeCycle<?> cycle) {
@@ -249,7 +263,35 @@ final class BeanWatchRegistry {
             }
         }, new ChangeHandlers<>(), true);
         registration.adaptedProcessor = processor;
+        registration.selfWatch = selfWatch;
         register(registration);
+    }
+
+    /**
+     * Whether a processor is the watcher of an open watch of its own that delivers what its adapter would, which the
+     * adapter leaves the processor to: a method watch of the annotation the processor handles, or a definition watch.
+     *
+     * @param processor The processor
+     * @param selfWatch What such a watch is, or null when the processor is no watcher
+     * @return True if such a watch, not an adapter, has the processor itself as its watcher
+     */
+    private boolean watchesItself(Object processor, @Nullable Predicate<Registration> selfWatch) {
+        if (selfWatch == null) {
+            return false;
+        }
+        for (Registration registration : registrations) {
+            if (!registration.adapted && !registration.closed.get() && registration.watcher() == processor && selfWatch.test(registration)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a watch selects beans of every type: no type, or {@code Object}, as {@code definitions()} asks for.
+     */
+    private static boolean isEveryType(@Nullable Argument<?> beanType) {
+        return beanType == null || beanType.getType() == Object.class;
     }
 
     private boolean markAdapted(Object processor) {
@@ -264,8 +306,10 @@ final class BeanWatchRegistry {
     Collection<Object> adaptedProcessors() {
         List<Object> adapted = new ArrayList<>();
         for (Registration registration : registrations) {
-            if (registration.adapted && !registration.closed.get() && registration.adaptedProcessor != null) {
-                adapted.add(registration.adaptedProcessor);
+            Object processor = registration.adaptedProcessor;
+            if (registration.adapted && !registration.closed.get() && processor != null
+                && !watchesItself(processor, registration.selfWatch)) {
+                adapted.add(processor);
             }
         }
         return adapted;
@@ -957,6 +1001,12 @@ final class BeanWatchRegistry {
         final boolean adapted;
         @Nullable
         Object adaptedProcessor;
+        /**
+         * For an adapter whose processor is a watcher, which it stands aside for while the processor watches itself:
+         * what the watch of its own that would deliver instead is; null otherwise.
+         */
+        @Nullable
+        Predicate<Registration> selfWatch;
         @Nullable
         Owner owner;
 
