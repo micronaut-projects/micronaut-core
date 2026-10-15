@@ -358,9 +358,11 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                 throw IllegalStateException("This method doesn't support STAR")
             Variance.COVARIANT, Variance.CONTRAVARIANT -> {
                 // example List<*>, IN, OUT
+                // the bound is resolved below, which is what adds it to the visited types: adding it here as well made the
+                // resolution strip the arguments of every projected type, List<out Map<K, V>> reading as List<? extends Map>
                 val stripTypeArguments = when (typeArgument.type) {
                     null -> false
-                    else -> !visitedTypes.add(typeArgument.type!!)
+                    else -> visitedTypes.contains(typeArgument.type!!)
                 }
                 val upperBound =
                     resolveUpperBound(
@@ -414,7 +416,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
 
         val stripTypeArguments = when (typeArgument.type) {
             null -> false
-            else -> !visitedTypes.add(typeArgument.type!!)
+            else -> visitedTypes.contains(typeArgument.type!!)
         }
         val upperBound =
             resolveUpperBound(
@@ -696,6 +698,13 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                 elementAnnotationMetadataFactory,
                 visitorContext,
                 typeArguments
+            )
+        } else if (declaration.classKind == ClassKind.ANNOTATION_CLASS) {
+            // an annotation class cannot be generic
+            KotlinAnnotationElement(
+                KotlinClassNativeElement(declaration, type, owner),
+                elementAnnotationMetadataFactory,
+                visitorContext
             )
         } else {
             KotlinClassElement(
