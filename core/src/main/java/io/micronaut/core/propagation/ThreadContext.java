@@ -61,7 +61,7 @@ final class ThreadContext {
     }
 
     @NullUnmarked
-    private static void remove() {
+    static void remove() {
         if (useSlow()) {
             SLOW.remove();
         } else {
@@ -80,7 +80,7 @@ final class ThreadContext {
     }
 
     @NullUnmarked
-    private static void set(PropagatedContext value) {
+    static void set(PropagatedContext value) {
         if (useSlow()) {
             SLOW.set(value);
         } else {

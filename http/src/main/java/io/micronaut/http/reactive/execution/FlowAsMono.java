@@ -90,6 +90,7 @@ final class FlowAsMono<T> extends Mono<T> implements Fuseable {
         private volatile int state;
 
         private boolean requested;
+        private volatile boolean cancelled;
 
         private @Nullable T result;
         private @Nullable Throwable error;
@@ -124,10 +125,19 @@ final class FlowAsMono<T> extends Mono<T> implements Fuseable {
         }
 
         private void forward(@Nullable T v, @Nullable Throwable e) {
+            if (cancelled) {
+                if (v != null) {
+                    Operators.onDiscard(v, actual.currentContext());
+                }
+                return;
+            }
             if (v != null) {
                 actual.onNext(v);
             }
-            if (error == null) {
+            if (cancelled) {
+                return;
+            }
+            if (e == null) {
                 actual.onComplete();
             } else {
                 actual.onError(e);
@@ -136,6 +146,7 @@ final class FlowAsMono<T> extends Mono<T> implements Fuseable {
 
         @Override
         public void cancel() {
+            cancelled = true;
             requested = true;
             flow.cancel();
         }

@@ -26,12 +26,12 @@ import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
-import reactor.core.scheduler.Schedulers;
 
-import java.io.IOException;
 import java.io.InputStream;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.concurrent.Executor;
 
@@ -135,36 +135,13 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
 
     @Override
     public Flux<byte[]> toByteArrayPublisher() {
-        ExtendedInputStream s = toInputStream();
-        Sinks.Many<byte[]> sink = Sinks.many().unicast().onBackpressureBuffer();
-        return sink.asFlux()
-            .doOnRequest(req -> {
-                long remaining = req;
-                while (remaining > 0) {
-                    byte @Nullable [] arr;
-                    try {
-                        arr = s.readSome();
-                    } catch (IOException e) {
-                        sink.tryEmitError(e);
-                        break;
-                    }
-                    if (arr == null) {
-                        sink.tryEmitComplete();
-                        break;
-                    } else {
-                        remaining--;
-                        sink.tryEmitNext(arr);
-                    }
-                }
-            })
-            .doOnTerminate(s::close)
-            .doOnCancel(s::close)
-            .subscribeOn(Schedulers.fromExecutor(context.ioExecutor()));
+        // the declared type of this method is a Flux: the reads run without Reactor
+        return Flux.from(new StreamPublisher(toInputStream(), context.ioExecutor()));
     }
 
     @Override
     public Publisher<ReadBuffer> toReadBufferPublisher() {
-        return Flux.from(toByteArrayPublisher()).map(context.bodyFactory.readBufferFactory()::adapt);
+        return BodyPublishers.map(new StreamPublisher(toInputStream(), context.ioExecutor()), context.bodyFactory.readBufferFactory()::adapt);
     }
 
     @Override
@@ -182,6 +159,170 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
     @Override
     public CloseableByteBody move() {
         return new InputStreamByteBody(context, toInputStream());
+    }
+
+    /**
+     * Reads the stream on the IO executor as the bytes are requested, one read per requested
+     * array, and closes the stream when it ends, fails or is cancelled.
+     */
+    private static final class StreamPublisher implements Publisher<byte[]>, Subscription, Runnable {
+        private final ExtendedInputStream stream;
+        private final Executor executor;
+        private @Nullable Subscriber<? super byte[]> subscriber;
+
+        // guarded by this
+        private long demand;
+        /**
+         * A read task is scheduled or running.
+         */
+        private boolean reading;
+        private boolean cancelled;
+        private boolean done;
+        /**
+         * The failure of a request for no arrays, delivered by the read task.
+         */
+        private @Nullable Throwable badRequest;
+
+        StreamPublisher(ExtendedInputStream stream, Executor executor) {
+            this.stream = stream;
+            this.executor = executor;
+        }
+
+        @Override
+        public void subscribe(Subscriber<? super byte[]> s) {
+            synchronized (this) {
+                if (subscriber != null) {
+                    BodyPublishers.reject(s, "The bytes of a stream are published to a single subscriber");
+                    return;
+                }
+                subscriber = s;
+            }
+            s.onSubscribe(this);
+        }
+
+        @Override
+        public void request(long n) {
+            synchronized (this) {
+                if (n <= 0) {
+                    if (badRequest == null) {
+                        badRequest = BodyPublishers.nonPositiveRequest(n);
+                    }
+                } else {
+                    demand = BodyPublishers.addCap(demand, n);
+                }
+                if (reading || done || cancelled) {
+                    return;
+                }
+                reading = true;
+            }
+            try {
+                executor.execute(this);
+            } catch (java.util.concurrent.RejectedExecutionException e) {
+                boolean signal;
+                synchronized (this) {
+                    signal = !cancelled && !done;
+                    done = true;
+                    reading = false;
+                }
+                stream.close();
+                if (signal) {
+                    Objects.requireNonNull(subscriber).onError(e);
+                }
+            }
+        }
+
+        @Override
+        public void run() {
+            Subscriber<? super byte[]> s = Objects.requireNonNull(subscriber);
+            while (true) {
+                Throwable bad;
+                synchronized (this) {
+                    if (cancelled) {
+                        reading = false;
+                        break;
+                    }
+                    bad = badRequest;
+                    if (bad == null) {
+                        if (demand == 0) {
+                            reading = false;
+                            return;
+                        }
+                        if (demand != Long.MAX_VALUE) {
+                            demand--;
+                        }
+                    }
+                }
+                if (bad != null) {
+                    finish();
+                    s.onError(bad);
+                    return;
+                }
+                byte @Nullable [] bytes;
+                try {
+                    bytes = stream.readSome();
+                } catch (Throwable e) {
+                    synchronized (this) {
+                        if (cancelled) {
+                            reading = false;
+                            return;
+                        }
+                    }
+                    finish();
+                    s.onError(e);
+                    return;
+                }
+                if (bytes == null) {
+                    synchronized (this) {
+                        if (cancelled) {
+                            reading = false;
+                            return;
+                        }
+                    }
+                    finish();
+                    s.onComplete();
+                    return;
+                }
+                synchronized (this) {
+                    if (cancelled) {
+                        // cancelled while the array was read: it is not delivered
+                        reading = false;
+                        break;
+                    }
+                }
+                try {
+                    s.onNext(bytes);
+                } catch (Throwable e) {
+                    // a subscriber that throws is cancelled (rule 2.13)
+                    synchronized (this) {
+                        cancelled = true;
+                        reading = false;
+                    }
+                    break;
+                }
+            }
+            // cancelled while reading
+            stream.close();
+        }
+
+        private void finish() {
+            synchronized (this) {
+                done = true;
+                reading = false;
+            }
+            stream.close();
+        }
+
+        @Override
+        public void cancel() {
+            synchronized (this) {
+                if (cancelled || done) {
+                    return;
+                }
+                cancelled = true;
+            }
+            // Closing must unblock an active read, not wait for it to finish.
+            stream.close();
+        }
     }
 
     private record Context(

@@ -21,10 +21,19 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.naming.NameUtils;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.DelegatingExecutableMethod;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.web.router.DefaultRouteBuilder;
+import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.UriRoute;
+import io.micronaut.web.router.builder.RouteCondition;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
@@ -32,6 +41,7 @@ import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import jakarta.inject.Singleton;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -45,7 +55,7 @@ import java.util.Set;
 @Requires(classes = {ServerWebSocket.class, WebSocketBeanRegistry.class})
 public class ServerWebSocketProcessor extends DefaultRouteBuilder implements BeanDefinitionProcessor<ServerWebSocket> {
 
-    private Set<Class<?>> mappedWebSockets = new HashSet<>(4);
+    private final Set<Class<?>> mappedWebSockets = new HashSet<>(4);
 
     /**
      * Default constructor.
@@ -64,18 +74,97 @@ public class ServerWebSocketProcessor extends DefaultRouteBuilder implements Bea
         if (mappedWebSockets.contains(beanType)) {
             return;
         }
-
+        ExecutableMethod<?, ?> onOpen = null;
+        ExecutableMethod<?, ?> onMessage = null;
         for (ExecutableMethod<?, ?> method : beanDefinition.getExecutableMethods()) {
-            if (method.isAnnotationPresent(OnMessage.class) || method.isAnnotationPresent(OnOpen.class)) {
-                mappedWebSockets.add(beanType);
-                String uri = beanDefinition.stringValue(ServerWebSocket.class).orElse("/ws");
-
-                UriRoute route = GET(uri, method);
-
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Created WebSocket: {}", route);
-                }
+            if (onOpen == null && method.isAnnotationPresent(OnOpen.class)) {
+                onOpen = method;
+            } else if (onMessage == null && method.isAnnotationPresent(OnMessage.class)) {
+                onMessage = method;
             }
+        }
+        // the route targets the @OnOpen method, which the upgrade request opens the WebSocket
+        // with, or else the @OnMessage method
+        ExecutableMethod<?, ?> target = onOpen != null ? onOpen : onMessage;
+        if (target == null) {
+            return;
+        }
+        mappedWebSockets.add(beanType);
+        String uri = beanDefinition.stringValue(ServerWebSocket.class).orElse("/ws");
+
+        ExecutableMethod<Object, Object> method = (ExecutableMethod<Object, Object>) target;
+        if (onOpen != null && onMessage != null) {
+            // the upgrade request opens the WebSocket for both methods: the annotations of both,
+            // e.g. for security, filters and route conditions, are the annotations of the route.
+            // Where both methods declare an annotation, the one of the @OnOpen method applies,
+            // except for @RouteCondition, of which both apply
+            warnOfDifferingAnnotations(beanType, onOpen, onMessage);
+            method = new WebSocketRouteMethod(method, new AnnotationMetadataHierarchy(
+                onMessage.getAnnotationMetadata(),
+                onOpen.getAnnotationMetadata()
+            ));
+        }
+        MethodExecutionHandle<Object, Object> handle = (MethodExecutionHandle<Object, Object>) executionHandleLocator
+            .createExecutionHandle(beanDefinition, method);
+
+        // a single route per WebSocket, which only an upgrade request matches: a plain HTTP
+        // request to the same path is left to the other routes. The upgrade condition is a
+        // declared condition of the route, which is tested before the @RouteCondition of the
+        // methods, so that a plain request never evaluates the conditions of the WebSocket
+        UriRoute route = buildRoute(HttpMethod.GET, uri, handle);
+        WebSocketUpgradeCondition.registered();
+        if (route instanceof RouteAssembly.DefaultUriRoute defaultRoute) {
+            defaultRoute.settings().where(RouteCondition.custom(WebSocketUpgradeCondition.INSTANCE));
+        } else {
+            route = route.where(WebSocketUpgradeCondition.INSTANCE);
+        }
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Created WebSocket: {}", route);
+        }
+    }
+
+    /**
+     * Warn of an annotation that both the {@link OnOpen} and the {@link OnMessage} method declare,
+     * with different values: only the one of the {@link OnOpen} method applies to the route, e.g.
+     * a security annotation.
+     */
+    private static void warnOfDifferingAnnotations(Class<?> beanType, ExecutableMethod<?, ?> onOpen, ExecutableMethod<?, ?> onMessage) {
+        if (!LOG.isWarnEnabled()) {
+            return;
+        }
+        AnnotationMetadata openMetadata = onOpen.getAnnotationMetadata().getDeclaredMetadata();
+        AnnotationMetadata messageMetadata = onMessage.getAnnotationMetadata().getDeclaredMetadata();
+        for (String name : openMetadata.getDeclaredAnnotationNames()) {
+            if (name.equals(OnOpen.class.getName()) || name.equals(io.micronaut.http.annotation.RouteCondition.class.getName())) {
+                continue;
+            }
+            AnnotationValue<?> messageValue = messageMetadata.getDeclaredAnnotation(name);
+            if (messageValue != null && !Objects.equals(messageValue, openMetadata.getDeclaredAnnotation(name))) {
+                LOG.warn("The @OnOpen and @OnMessage methods of WebSocket {} declare different values of @{}: the route of the WebSocket has the one of the @OnOpen method {}",
+                    beanType.getName(), NameUtils.getSimpleName(name), onOpen.getMethodName());
+            }
+        }
+    }
+
+    /**
+     * The target of the route of a WebSocket with both an {@link OnOpen} and an
+     * {@link OnMessage} method: the {@link OnOpen} method, with the annotations of both.
+     *
+     * @param getTarget          The {@link OnOpen} method
+     * @param annotationMetadata The annotations of both methods
+     */
+    private record WebSocketRouteMethod(ExecutableMethod<Object, Object> getTarget,
+                                        AnnotationMetadata annotationMetadata) implements DelegatingExecutableMethod<Object, Object> {
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return annotationMetadata;
+        }
+
+        @Override
+        public String toString() {
+            return getTarget.toString();
         }
     }
 }
