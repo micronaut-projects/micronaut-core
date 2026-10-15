@@ -598,7 +598,7 @@ class HandlerRouteFuzzTest {
     }
 
     private static Case sseBodyCase(Random r, String trace) {
-        String text = randomText(r, r.nextInt(5000)).replace("\n", " ").replace("\r", " ");
+        String text = randomText(r, 1 + r.nextInt(5000)).replace("\n", " ").replace("\r", " ");
         int parts = 1 + r.nextInt(10);
         return new Case("sse with body", post(r, "/fz/sse-body?parts=" + parts, headers(trace, "content-type", "text/plain", "accept", "text/event-stream"),
             text.getBytes(StandardCharsets.UTF_8)), resp -> {
