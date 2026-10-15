@@ -27,6 +27,7 @@ import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketBroadcaster;
+import io.micronaut.websocket.WebSocketPongMessage;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.OnClose;
 import io.micronaut.websocket.annotation.OnError;
@@ -74,7 +75,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
- * {@link ServerWebSocket} beans, driven by the JDK WebSocket client.
+ * {@link ServerWebSocket} beans, driven by the JDK WebSocket client. Each operation is tested
+ * like for the routes of {@link FunctionalWebSocketRouteTest}, with the same tags, except for
+ * the handlers that only routes have: a message stream handler, a ping handler, and no message
+ * handler, as a bean has an {@code @OnMessage} method.
  */
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -200,6 +204,15 @@ public class ServerWebSocketTest {
     }
 
     @Test
+    @Tag(WEBSOCKET_PING_PONG)
+    void thePongHandlerReceivesThePongs() throws Exception {
+        WebSocketTestClient.Connection connection = client.connect("/ws/tck/pong");
+        connection.ws.sendPong(ByteBuffer.wrap("pong-data".getBytes(StandardCharsets.UTF_8))).get(TIMEOUT, TimeUnit.SECONDS);
+        assertEquals("pong pong-data", connection.next());
+        connection.close(1000, "bye");
+    }
+
+    @Test
     @Tag(WEBSOCKET_SUBPROTOCOL)
     void theHandshakeSelectsASubprotocolOfTheEndpoint() throws Exception {
         WebSocketTestClient.Connection connection = client.connect("/ws/tck/subprotocol", b -> b.subprotocols("chat.v2", "chat.v1"));
@@ -253,6 +266,28 @@ public class ServerWebSocketTest {
     }
 
     @Test
+    @Tag(WEBSOCKET_ERROR_HANDLING)
+    void theErrorHandlerSeesAThrownErrorAndAFailedStage() throws Exception {
+        WebSocketTestClient.Connection connection = client.connect("/ws/tck/failing");
+        connection.send("throw");
+        assertEquals("error thrown throw", connection.next());
+        connection.send("stage");
+        assertEquals("error failed stage", connection.next());
+        // the error handler decided not to close the connection
+        connection.send("fine");
+        assertEquals("ok fine", connection.next());
+        connection.close(1000, "bye");
+    }
+
+    @Test
+    @Tag(WEBSOCKET_ERROR_HANDLING)
+    void withoutAnErrorHandlerAFailingHandlerClosesTheConnection() throws Exception {
+        WebSocketTestClient.Connection connection = client.connect("/ws/tck/unhandled");
+        connection.send("boom");
+        assertEquals(CloseReason.INTERNAL_ERROR.getCode(), connection.closed().code());
+    }
+
+    @Test
     @Tag(WEBSOCKET_MAX_PAYLOAD)
     void aMessageLargerThanTheMaximumClosesTheConnection() throws Exception {
         WebSocketTestClient.Connection connection = client.connect("/ws/tck/small");
@@ -275,6 +310,12 @@ public class ServerWebSocketTest {
     @Tag(WEBSOCKET_HANDSHAKE_ERRORS)
     void anUpgradeWithoutAnEndpointIsNotFound() {
         assertEquals(404, client.handshakeStatus("/ws/tck/missing", b -> { }));
+    }
+
+    @Test
+    @Tag(WEBSOCKET_HANDSHAKE_ERRORS)
+    void aRequestThatIsNotAnUpgradeIsABadRequest() throws Exception {
+        assertEquals(400, client.plainGetStatus("/ws/tck/echo/lobby"));
     }
 
     @Test
@@ -458,6 +499,47 @@ public class ServerWebSocketTest {
         @OnError
         void onError(Throwable error, WebSocketSession session) {
             session.sendSync("error " + error.getMessage());
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    @ServerWebSocket("/ws/tck/failing")
+    static class FailingSocket {
+        @OnMessage
+        CompletionStage<?> onMessage(String message, WebSocketSession session) {
+            return switch (message) {
+                case "throw" -> throw new IllegalStateException("thrown " + message);
+                case "stage" -> CompletableFuture.failedFuture(new IllegalStateException("failed " + message));
+                default -> session.sendAsync("ok " + message);
+            };
+        }
+
+        @OnError
+        CompletionStage<?> onError(Throwable error, WebSocketSession session) {
+            return session.sendAsync("error " + error.getMessage());
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    @ServerWebSocket("/ws/tck/unhandled")
+    static class UnhandledSocket {
+        @OnMessage
+        void onMessage(String message) {
+            throw new IllegalStateException("unhandled " + message);
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    @ServerWebSocket("/ws/tck/pong")
+    static class PongSocket {
+        @OnMessage
+        void onMessage(String message) {
+            // not used
+        }
+
+        @OnMessage
+        void onPong(WebSocketPongMessage pong, WebSocketSession session) {
+            session.sendSync("pong " + pong.getContent().toString(StandardCharsets.UTF_8));
         }
     }
 

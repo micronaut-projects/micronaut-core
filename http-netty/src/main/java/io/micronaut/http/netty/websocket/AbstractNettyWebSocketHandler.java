@@ -631,7 +631,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 return;
             }
             // the handler may complete on another thread, e.g. an async close handler: the
-            // answer is written from the event loop
+            // answer is written from the event loop. The close frame allocates its buffer when
+            // it is created, and what this callback throws on another thread is lost in the
+            // stage of the handler, which leaves the connection open without an answer, e.g.
+            // the error of a leak detector that refuses buffers allocated outside the event loop
             EventExecutor executor = ctx.executor();
             if (executor.inEventLoop()) {
                 answerClose(ctx, closeReply);

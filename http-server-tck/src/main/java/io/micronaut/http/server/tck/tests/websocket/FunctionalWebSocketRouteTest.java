@@ -37,8 +37,11 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import reactor.core.publisher.Flux;
+
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -70,7 +73,15 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * WebSocket routes of handler functions declared with the route builder, driven by the JDK
- * WebSocket client.
+ * WebSocket client. Each operation is tested like for the beans of {@link ServerWebSocketTest},
+ * with the same tags, except where the APIs differ:
+ * <ul>
+ *     <li>a handler returns a stage, not a publisher: a route replies with the messages of a
+ *     publisher through {@link WebSocketSession#sendAllAsync(org.reactivestreams.Publisher)};</li>
+ *     <li>the message stream handler, the ping handler, and a route without a message handler
+ *     have no counterpart for beans, which have one {@code @OnMessage} method for the messages
+ *     and receive no pings.</li>
+ * </ul>
  */
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -216,6 +227,51 @@ public class FunctionalWebSocketRouteTest {
         assertEquals(1000, closed.code());
         assertEquals("bye", closed.reason());
         assertEquals("close answered 1000 bye", event());
+    }
+
+    @Test
+    @Tag(WEBSOCKET_CLOSE_HANDSHAKE)
+    void theCloseOfTheClientIsAnsweredOnceAnAsyncCloseHandlerCompleted() throws Exception {
+        WebSocketTestClient.Connection connection = client.connect("/ws/tck/async-close");
+        assertEquals("open", connection.next());
+        WebSocketTestClient.Closed closed = connection.close(1000, "bye");
+        assertEquals(1000, closed.code());
+        assertEquals("bye", closed.reason());
+        assertEquals("closed 1000", event());
+    }
+
+    @Test
+    @Tag(WEBSOCKET_CLOSE_HANDSHAKE)
+    void theCloseOfTheClientIsAnsweredWithoutACloseHandler() throws Exception {
+        WebSocketTestClient.Connection connection = client.connect("/ws/tck/push");
+        assertEquals("pushed", connection.next());
+        WebSocketTestClient.Closed closed = connection.close(1000, "bye");
+        assertEquals(1000, closed.code());
+        assertEquals("bye", closed.reason());
+    }
+
+    @Test
+    @Tag(WEBSOCKET_ASYNC_HANDLERS)
+    void aHandlerCanReplyWithTheMessagesOfAPublisher() throws Exception {
+        WebSocketTestClient.Connection connection = client.connect("/ws/tck/publisher");
+        connection.send("one");
+        connection.send("two");
+        assertEquals("ONE", connection.next());
+        assertEquals("one!", connection.next());
+        assertEquals("TWO", connection.next());
+        assertEquals("two!", connection.next());
+        connection.close(1000, "bye");
+    }
+
+    @Test
+    @Tag(WEBSOCKET_ASYNC_HANDLERS)
+    void aMessageStreamHandlerReceivesTheMessagesAsAPublisher() throws Exception {
+        WebSocketTestClient.Connection connection = client.connect("/ws/tck/stream");
+        connection.send("one");
+        connection.send("two");
+        assertEquals("ONE", connection.next());
+        assertEquals("TWO", connection.next());
+        connection.close(1000, "bye");
     }
 
     @Test
@@ -396,6 +452,18 @@ public class FunctionalWebSocketRouteTest {
                         session.close(new CloseReason(4000, "done " + message));
                         return null;
                     }));
+                routes.GET("/ws/tck/async-close").webSocket(ws -> ws
+                    .onOpen((session, request) -> session.sendAsync("open"))
+                    .onMessage(String.class, (session, message) -> null)
+                    .onClose((session, reason) -> CompletableFuture.runAsync(
+                        () -> log.add("closed " + reason.getCode()),
+                        CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS))));
+                routes.GET("/ws/tck/publisher").webSocket(ws -> ws
+                    .onMessage(String.class, (session, message) -> session.sendAllAsync(
+                        Flux.just(message.toUpperCase(Locale.ROOT), message + "!").delayElements(Duration.ofMillis(10)))));
+                routes.GET("/ws/tck/stream").webSocket(ws -> ws
+                    .onMessageStream(String.class, (session, messages) ->
+                        session.sendAllAsync(Flux.from(messages).map(message -> message.toUpperCase(Locale.ROOT)))));
                 routes.GET("/ws/tck/small").webSocket(ws -> ws
                     .maxPayloadLength(8)
                     .onMessage(String.class, (session, message) -> session.sendAsync(message)));
