@@ -228,6 +228,23 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         forwardErrorToUser(ctx, e -> handleUnexpected(ctx, e), cause);
     }
 
+    /**
+     * Handle the failure of a handler, e.g. of the stage a message handler returned. Unlike
+     * {@link #exceptionCaught}, the fragments of the message being read are kept: the failure may
+     * come at any time, also in the middle of the next message.
+     *
+     * @param ctx   The context
+     * @param cause The failure
+     * @since 5.3.0
+     */
+    protected final void handlerFailed(ChannelHandlerContext ctx, Throwable cause) {
+        if (!ctx.executor().inEventLoop()) {
+            ctx.executor().execute(() -> forwardErrorToUser(ctx, e -> handleUnexpected(ctx, e), cause));
+            return;
+        }
+        forwardErrorToUser(ctx, e -> handleUnexpected(ctx, e), cause);
+    }
+
     protected final void forwardErrorToUser(ChannelHandlerContext ctx, Consumer<Throwable> fallback, Throwable cause) {
         Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.errorMethod();
 
@@ -493,7 +510,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                             if (LOG.isErrorEnabled()) {
                                 LOG.error("Error Processing WebSocket Pong Message [{}]: {}", webSocketBean, t.getMessage(), t);
                             }
-                            exceptionCaught(ctx, t);
+                            handlerFailed(ctx, t);
                         }
                         content.release();
                     });
@@ -501,7 +518,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error Processing WebSocket Message [{}]: {}", webSocketBean, e.getMessage(), e);
                     }
-                    exceptionCaught(ctx, e);
+                    handlerFailed(ctx, e);
                 }
             }
         } else if (msg instanceof CloseWebSocketFrame cwsf) {
@@ -518,7 +535,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         if (LOG.isErrorEnabled()) {
             LOG.error("Error Processing WebSocket Message [{}]: {}", webSocketBean, e.getMessage(), e);
         }
-        exceptionCaught(ctx, e);
+        // the message was read: the fragments of the next one, if any, are kept
+        handlerFailed(ctx, e);
     }
 
     /**
@@ -567,7 +585,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                             Collections.singletonList(cr)
                     );
 
-                    invokeAndClose(ctx, target, boundExecutable, methodExecutionHandle, true);
+                    invokeAndClose(ctx, target, boundExecutable, methodExecutionHandle, true,
+                        writeCloseReason && answersCloseFrame() ? cr : null);
                 } catch (Throwable e) {
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error invoking @OnClose handler for WebSocket bean [{}]: {}", target, e.getMessage(), e);
@@ -583,10 +602,23 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
     private void handleCloseFrame(ChannelHandlerContext ctx, CloseWebSocketFrame cwsf) {
         CloseReason cr = new CloseReason(cwsf.statusCode(), cwsf.reasonText());
+        getSession().markCloseReceived();
         handleCloseReason(ctx, cr, true);
     }
 
-    private void invokeAndClose(ChannelHandlerContext ctx, Object target, BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> methodExecutionHandle, boolean isClose) {
+    /**
+     * Whether a close frame of the peer is answered with a close frame once the close handler
+     * is done, before the connection closes, rather than by closing the connection only.
+     *
+     * @return Whether to answer a close frame
+     * @since 5.3.0
+     */
+    protected boolean answersCloseFrame() {
+        return false;
+    }
+
+    private void invokeAndClose(ChannelHandlerContext ctx, Object target, BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> methodExecutionHandle, boolean isClose,
+                                @Nullable CloseReason closeReply) {
         ExecutionFlow<?> result;
         try {
             result = invokeExecutable(boundExecutable, methodExecutionHandle);
@@ -604,7 +636,14 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     LOG.error("Error subscribing to @{} handler for WebSocket bean [{}]: {}", (isClose ? "OnClose" : "OnError"), target, t.getMessage(), t);
                 }
             }
-            ctx.close();
+            if (closeReply != null && ctx.channel().isActive()) {
+                // the close frame of the peer is answered (RFC 6455, 5.5.1), so that the peer
+                // sees the close handshake complete rather than only the end of the connection
+                ctx.writeAndFlush(new CloseWebSocketFrame(closeReply.getCode(), closeReply.getReason()))
+                    .addListener(ChannelFutureListener.CLOSE);
+            } else {
+                ctx.close();
+            }
         });
     }
 

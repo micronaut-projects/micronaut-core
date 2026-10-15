@@ -791,7 +791,7 @@ public final class FormBinding {
     }
 
     @SuppressWarnings("unchecked")
-    private static <T> Optional<T> convert(ConversionService conversionService, ArgumentConversionContext<T> context, List<String> values) {
+    static <T> Optional<T> convert(ConversionService conversionService, ArgumentConversionContext<T> context, List<String> values) {
         if (values.isEmpty()) {
             return Optional.empty();
         }
