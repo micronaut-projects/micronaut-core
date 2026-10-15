@@ -1468,9 +1468,13 @@ public final class RouteAssembly {
                 predicates.add(RouteConditions.predicate(condition, conditionContext));
             }
             if (targetMethod.isPresent(io.micronaut.http.annotation.RouteCondition.class, AnnotationMetadata.VALUE_MEMBER)) {
-                AnnotationValue<io.micronaut.http.annotation.RouteCondition> annotation = targetMethod.getAnnotation(io.micronaut.http.annotation.RouteCondition.class);
-                if (annotation instanceof EvaluatedAnnotationValue<io.micronaut.http.annotation.RouteCondition>) {
-                    predicates.add(request -> annotation.booleanValue().orElse(false));
+                // every @RouteCondition of the target: the annotations of a target may combine
+                // those of several methods, e.g. the methods of a WebSocket
+                for (AnnotationValue<io.micronaut.http.annotation.RouteCondition> annotation : targetMethod.getAnnotationValuesByType(io.micronaut.http.annotation.RouteCondition.class)) {
+                    if (annotation instanceof EvaluatedAnnotationValue<io.micronaut.http.annotation.RouteCondition>
+                        && annotation.contains(AnnotationMetadata.VALUE_MEMBER)) {
+                        predicates.add(request -> annotation.booleanValue().orElse(false));
+                    }
                 }
             }
             predicates.addAll(conditions);
