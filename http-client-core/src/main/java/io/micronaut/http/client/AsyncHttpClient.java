@@ -22,6 +22,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.internal.ElementsStages;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Closeable;

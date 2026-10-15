@@ -152,8 +152,72 @@ public class WriterErrorHandlingTest {
     }
 
     @Test
+    void exceptionHandlerForCodecExceptionFromWriter() throws Exception {
+        var response = get("/writer-errors/codec");
+        assertEquals(418, response.statusCode());
+        assertEquals("handled codec: codec writer failure", response.body());
+        assertEquals("true", response.headers().firstValue("X-Filtered").orElse(null));
+        assertEquals(1, ctx.getBean(WriterErrorFilter.class).requests.get());
+    }
+
+    @Test
+    void exceptionHandlerForCodecExceptionFromBlockingWriter() throws Exception {
+        var response = get("/writer-errors/codec-blocking");
+        assertEquals(418, response.statusCode());
+        assertEquals("handled codec: blocking codec writer failure", response.body());
+        assertEquals("true", response.headers().firstValue("X-Filtered").orElse(null));
+    }
+
+    @Test
+    void exceptionHandlerForJsonSerializationFailure() throws Exception {
+        var response = get("/writer-errors/json");
+        assertEquals(418, response.statusCode());
+        assertTrue(response.body().startsWith("handled codec: Error encoding object"), response.body());
+        assertEquals("true", response.headers().firstValue("X-Filtered").orElse(null));
+        assertEquals(1, ctx.getBean(WriterErrorFilter.class).requests.get());
+    }
+
+    @Test
+    void errorRouteForCodecExceptionFromWriter() throws Exception {
+        var response = get("/writer-errors-local/codec");
+        assertEquals(409, response.statusCode());
+        assertEquals("local codec error route: codec writer failure", response.body());
+    }
+
+    @Test
     void streamingFailureAfterFirstChunkAborts() {
         assertThrows(IOException.class, () -> get("/writer-errors/stream"));
+    }
+
+    @Test
+    void codecErrorResponseWriterFailsToo() throws Exception {
+        // the error route answers a body whose writer fails with a CodecException too: the
+        // default error response is answered then
+        var response = get("/writer-errors-codec-twice/codec");
+        assertEquals(500, response.statusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.headers().firstValue("Content-Type").orElse(null));
+    }
+
+    @Test
+    void codecExceptionOnTheFirstElementOfAStreamingBody() throws Exception {
+        // nothing was sent yet: the streaming error handling answers the default error response
+        var response = get("/writer-errors/codec-stream");
+        assertEquals(500, response.statusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.headers().firstValue("Content-Type").orElse(null));
+    }
+
+    @Test
+    void codecExceptionAfterTheFirstElementOfAStreamingBodyAborts() {
+        assertThrows(IOException.class, () -> get("/writer-errors/codec-stream-after-first"));
+    }
+
+    @Test
+    void streamingErrorResponseWriterFailsWithACodecException() throws Exception {
+        // the body of the status exception that fails the stream cannot be serialized: the
+        // default error response is answered instead of the one of the status exception
+        var response = get("/writer-errors/stream-error-body-fails");
+        assertEquals(500, response.statusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.headers().firstValue("Content-Type").orElse(null));
     }
 
     record NotFoundBody() {
@@ -166,6 +230,21 @@ public class WriterErrorHandlingTest {
     }
 
     record AlwaysFailingBody() {
+    }
+
+    record CodecBody(String message) {
+    }
+
+    record BlockingCodecBody(String message) {
+    }
+
+    /**
+     * Fails to serialize to JSON: the mapper fails on the getter.
+     */
+    public static final class JsonFailingBody {
+        public String getValue() {
+            throw new IllegalStateException("cannot serialize");
+        }
     }
 
     static final class CustomWriterException extends RuntimeException {
@@ -210,9 +289,54 @@ public class WriterErrorHandlingTest {
             return new CustomBody("custom writer failure");
         }
 
+        @Get(value = "/codec", produces = MediaType.TEXT_PLAIN)
+        CodecBody codec() {
+            return new CodecBody("codec writer failure");
+        }
+
+        @Get(value = "/codec-blocking", produces = MediaType.TEXT_PLAIN)
+        BlockingCodecBody codecBlocking() {
+            return new BlockingCodecBody("blocking codec writer failure");
+        }
+
+        @Get("/json")
+        JsonFailingBody json() {
+            return new JsonFailingBody();
+        }
+
         @Get(value = "/stream", produces = MediaType.TEXT_PLAIN)
         Flux<CustomBody> stream() {
             return Flux.just(new CustomBody("first"), new CustomBody("fail"));
+        }
+
+        @Get(value = "/codec-stream", produces = MediaType.TEXT_PLAIN)
+        Flux<CodecBody> codecStream() {
+            return Flux.just(new CodecBody("streamed codec failure"));
+        }
+
+        @Get(value = "/codec-stream-after-first", produces = MediaType.TEXT_PLAIN)
+        Flux<Object> codecStreamAfterFirst() {
+            return Flux.just(new CustomBody("first"), new CodecBody("streamed codec failure"));
+        }
+
+        @Get(value = "/stream-error-body-fails", produces = MediaType.TEXT_PLAIN)
+        Flux<String> streamErrorBodyFails() {
+            return Flux.error(new HttpStatusException(HttpStatus.BAD_REQUEST, new JsonFailingBody()));
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC)
+    @Controller("/writer-errors-codec-twice")
+    static class CodecTwiceController {
+        @Get(value = "/codec", produces = MediaType.TEXT_PLAIN)
+        CodecBody codec() {
+            return new CodecBody("codec writer failure");
+        }
+
+        @Error(CodecException.class)
+        @Produces(MediaType.TEXT_PLAIN)
+        CodecBody onCodec(CodecException e) {
+            return new CodecBody("error route codec failure");
         }
     }
 
@@ -239,10 +363,21 @@ public class WriterErrorHandlingTest {
             return new CustomBody("custom writer failure");
         }
 
+        @Get(value = "/codec", produces = MediaType.TEXT_PLAIN)
+        CodecBody codec() {
+            return new CodecBody("codec writer failure");
+        }
+
         @Error(CustomWriterException.class)
         @Produces(MediaType.TEXT_PLAIN)
         HttpResponse<String> onCustom(CustomWriterException e) {
             return HttpResponse.<String>status(HttpStatus.CONFLICT).body("local error route: " + e.getMessage());
+        }
+
+        @Error(CodecException.class)
+        @Produces(MediaType.TEXT_PLAIN)
+        HttpResponse<String> onCodec(CodecException e) {
+            return HttpResponse.<String>status(HttpStatus.CONFLICT).body("local codec error route: " + e.getMessage());
         }
     }
 
@@ -343,6 +478,41 @@ public class WriterErrorHandlingTest {
         @Override
         public void writeTo(Argument<BlockingBody> type, MediaType mediaType, BlockingBody object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
             throw new CustomWriterException(object.message());
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC)
+    @Singleton
+    @Produces(MediaType.TEXT_PLAIN)
+    static class CodecWriter implements MessageBodyWriter<CodecBody> {
+        @Override
+        public void writeTo(Argument<CodecBody> type, MediaType mediaType, CodecBody object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+            throw new CodecException(object.message());
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC)
+    @Singleton
+    @Produces(MediaType.TEXT_PLAIN)
+    static class BlockingCodecWriter implements MessageBodyWriter<BlockingCodecBody> {
+        @Override
+        public boolean isBlocking() {
+            return true;
+        }
+
+        @Override
+        public void writeTo(Argument<BlockingCodecBody> type, MediaType mediaType, BlockingCodecBody object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+            throw new CodecException(object.message());
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC)
+    @Singleton
+    @Produces(MediaType.TEXT_PLAIN)
+    static class CodecExceptionHandler implements ExceptionHandler<CodecException, HttpResponse<String>> {
+        @Override
+        public HttpResponse<String> handle(HttpRequest request, CodecException exception) {
+            return HttpResponse.<String>status(HttpStatus.I_AM_A_TEAPOT).body("handled codec: " + exception.getMessage());
         }
     }
 
