@@ -31,12 +31,12 @@ public interface BootstrapLocatorMarker {
 
     /**
      * The configuration files the bootstrap environment looked for when the locator last loaded it, as
-     * {@link Environment#getConfigurationLocations()} gives them.
+     * {@link Environment#getConfigurationFiles()} gives them.
      *
      * @return The locations
      * @since 5.3.0
      */
-    default Set<String> getConfigurationLocations() {
+    default Set<String> getConfigurationFiles() {
         return Set.of();
     }
 }

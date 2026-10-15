@@ -125,11 +125,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     /**
      * The configuration files the last read of the property sources looked for, published when the read ends.
      */
-    private volatile Set<String> configurationLocations = Set.of(); // NOSONAR java:S3077 published whole; the set is immutable
+    private volatile Set<String> configurationFiles = Set.of(); // NOSONAR java:S3077 published whole; the set is immutable
     /**
      * The configuration files the read in progress has looked for so far.
      */
-    private Set<String> readingLocations = new LinkedHashSet<>();
+    private Set<String> readingFiles = new LinkedHashSet<>();
 
     // For configuration maps, sets with low access - it's enough to use Collections.synchronized
 
@@ -359,7 +359,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private void loadProperties() {
         refreshablePropertySources.clear();
         Set<String> locations = new LinkedHashSet<>();
-        readingLocations = locations;
+        readingFiles = locations;
         List<PropertySource> propertySources = new ArrayList<>(configLocations.size());
         Set<String> preExistingSourceNames = new LinkedHashSet<>(this.propertySources.keySet());
         if (configuration.isEnableDefaultPropertySources()) {
@@ -398,12 +398,12 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                     String location = source.getOrigin().location();
                     if (location.startsWith(ClassPathResourceLoader.PREFIX) || location.startsWith(CLASSPATH_ALL_PREFIX)
                         || location.startsWith(FileSystemResourceLoader.PREFIX)) {
-                        recordConfigurationLocation(location);
+                        recordConfigurationFile(location);
                     }
                 }
                 if (propertySourcesLocator instanceof BootstrapLocatorMarker bootstrapLocator) {
-                    for (String location : bootstrapLocator.getConfigurationLocations()) {
-                        recordConfigurationLocation(location);
+                    for (String location : bootstrapLocator.getConfigurationFiles()) {
+                        recordConfigurationFile(location);
                     }
                     for (PropertySource source : sources) {
                         internalAddPropertySource(source);
@@ -422,8 +422,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         for (PropertySource propertySource : propertySources) {
             internalProcessPropertySource(propertySource);
         }
-        configurationLocations = Set.copyOf(locations);
-        readingLocations = new LinkedHashSet<>();
+        configurationFiles = Set.copyOf(locations);
+        readingFiles = new LinkedHashSet<>();
     }
 
     private void internalAddPropertySource(PropertySource propertySource) {
@@ -464,7 +464,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 } else {
                     sourceOrigin = PropertySource.Origin.of(FileSystemResourceLoader.PREFIX + filePath);
                 }
-                recordConfigurationLocation(sourceOrigin.location());
+                recordConfigurationFile(sourceOrigin.location());
                 Optional<Map<String, Object>> properties = readPropertiesFromLoader(fileName, filePath, propertySourceLoader);
                 if (properties.isPresent()) {
                     propertySources.add(PropertySource.of(filePath, properties.get(), sourceOrigin, order));
@@ -522,20 +522,20 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         Set<String> activeNames = getActiveNames();
         for (PropertySourceLoader propertySourceLoader : propertySourceLoaders) {
             for (String extension : propertySourceLoader.getExtensions()) {
-                recordConfigurationLocation(directory + name + "." + extension);
+                recordConfigurationFile(directory + name + "." + extension);
                 for (String activeName : activeNames) {
-                    recordConfigurationLocation(directory + name + "-" + activeName + "." + extension);
+                    recordConfigurationFile(directory + name + "-" + activeName + "." + extension);
                 }
             }
         }
     }
 
-    private void recordConfigurationLocation(String location) {
-        readingLocations.add(normalizeConfigurationLocation(location));
+    private void recordConfigurationFile(String location) {
+        readingFiles.add(normalizeConfigurationFile(location));
     }
 
     /**
-     * The form {@link #getConfigurationLocations()} gives a location in: {@code classpath:} and the path of the
+     * The form {@link #getConfigurationFiles()} gives a location in: {@code classpath:} and the path of the
      * resource from the root of the class path, or {@code file:} and the absolute path of the file, with forward
      * slashes. A {@code classpath*:} location is a {@code classpath:} one, and a location without either prefix a
      * file, relative to the working directory.
@@ -543,7 +543,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * @param location The location
      * @return The normalized location
      */
-    static String normalizeConfigurationLocation(String location) {
+    static String normalizeConfigurationFile(String location) {
         boolean classpath = location.startsWith(ClassPathResourceLoader.PREFIX);
         if (classpath || location.startsWith(CLASSPATH_ALL_PREFIX)) {
             String path = location.substring(classpath ? ClassPathResourceLoader.PREFIX.length() : CLASSPATH_ALL_PREFIX.length());
@@ -569,14 +569,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     @Override
-    public Set<String> getConfigurationLocations() {
-        return configurationLocations;
-    }
-
-    @Override
-    public boolean isConfigurationLocation(String location) {
-        Set<String> locations = configurationLocations;
-        return !locations.isEmpty() && locations.contains(normalizeConfigurationLocation(location));
+    public Set<String> getConfigurationFiles() {
+        return configurationFiles;
     }
 
     private void readPropertySourceList(String name, ResourceLoader resourceLoader, List<PropertySource> propertySources) {
@@ -767,9 +761,9 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                     // the path as given
                 }
             }
-            recordConfigurationLocation(location);
+            recordConfigurationFile(location);
         } else if (resourceLoader == this) {
-            recordConfigurationLocation(ClassPathResourceLoader.PREFIX + resourcePath);
+            recordConfigurationFile(ClassPathResourceLoader.PREFIX + resourcePath);
         }
         try {
             Optional<InputStream> inputStream = resourceLoader.getResourceAsStream(resourcePath);
@@ -793,7 +787,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                                                                          PropertySource.Origin origin,
                                                                          PropertySourceLoader propertySourceLoader,
                                                                          boolean allowMultiple) {
-        recordConfigurationLocation(ClassPathResourceLoader.PREFIX + resourcePath);
+        recordConfigurationFile(ClassPathResourceLoader.PREFIX + resourcePath);
         ResourceLoadStrategy strategy = ResourceLoadStrategy.builder()
             .type(allowMultiple ? ResourceLoadStrategyType.MERGE_ALL : ResourceLoadStrategyType.FAIL_ON_DUPLICATE)
             .build();

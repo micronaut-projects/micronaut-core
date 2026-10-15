@@ -15,9 +15,6 @@
  */
 package io.micronaut.context.watch;
 
-import io.micronaut.context.annotation.Property;
-import io.micronaut.context.annotation.Value;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.naming.NameUtils;
 import org.jspecify.annotations.Nullable;
@@ -136,46 +133,6 @@ public record ConfigurationChange(boolean all, Set<String> changed, Map<String, 
             if (touches(prefix)) {
                 return true;
             }
-        }
-        return false;
-    }
-
-    /**
-     * Whether an injection point names a changed property: {@code @Property(name = "key")}, or a {@code @Value}
-     * expression with a {@code ${key}} or {@code ${key:default}} placeholder. An evaluated expression that reads
-     * the environment may read any key, so it names every change.
-     *
-     * @param metadata The annotation metadata of the injection point
-     * @return True if it names a changed key, any key when everything changed
-     */
-    public boolean mentions(AnnotationMetadata metadata) {
-        // the raw values: a string value read through the metadata has its placeholders resolved already
-        Object property = metadata.getValues(Property.class.getName()).get("name");
-        if (property != null && touches(property.toString())) {
-            return true;
-        }
-        Object raw = metadata.getValues(Value.class.getName()).get("value");
-        if (raw == null) {
-            return false;
-        }
-        String expression = raw.toString();
-        if (expression.contains("#{") && expression.contains("env")) {
-            // an evaluated expression reading the environment: which keys it reads is not known, so any change counts
-            return true;
-        }
-        int start = expression.indexOf("${");
-        while (start >= 0) {
-            int end = expression.indexOf('}', start);
-            if (end < 0) {
-                break;
-            }
-            String placeholder = expression.substring(start + 2, end);
-            int colon = placeholder.indexOf(':');
-            String key = (colon >= 0 ? placeholder.substring(0, colon) : placeholder).trim();
-            if (!key.isEmpty() && touches(key)) {
-                return true;
-            }
-            start = expression.indexOf("${", end);
         }
         return false;
     }
