@@ -18,11 +18,14 @@ package io.micronaut.http.body.stream;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.PieceReader;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.publisher.Flux;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -84,6 +87,56 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
         this.body = body;
         this.reader = reader;
         this.wrap = wrap;
+    }
+
+    /**
+     * The pieces of a body as they are received, pulled one at a time, see
+     * {@link io.micronaut.http.body.ByteBody#toReadBufferElements()}.
+     *
+     * @param body The body, which the elements take over
+     * @return The pieces, each of which its consumer closes
+     */
+    @SuppressWarnings("java:S2095") // the elements own the piece reader, and close it
+    public static ByteBodyElements<ReadBuffer> readBuffers(CloseableByteBody body) {
+        return new ByteBodyElements<>(body, new ReadBufferPieces(), Function.identity());
+    }
+
+    /**
+     * Transfer an untouched, already-buffered raw body without another buffer or subscription.
+     * Streaming bodies cannot use this shortcut: reusing their shared buffer would change the
+     * buffering limits of the adapted body. On success these elements are closed and the caller
+     * owns the returned body.
+     *
+     * @return The body, or {@code null} when the shortcut is not applicable
+     */
+    public synchronized @Nullable CloseableByteBody takeUnreadAvailableBody() {
+        if (subscribed || done || !(reader instanceof ReadBufferPieces) || !(body instanceof AvailableByteBody)) {
+            return null;
+        }
+        CloseableByteBody moved = body.move();
+        subscribed = true;
+        done = true;
+        close();
+        return moved;
+    }
+
+    /**
+     * The elements as a publisher for the reactive API: the elements are pushed as the pieces of
+     * the body are read, by a lock-free publisher without a future per element. These elements
+     * can no longer be pulled.
+     *
+     * @return The publisher of the elements, for one subscriber
+     */
+    public Publisher<T> toPublisher() {
+        synchronized (this) {
+            if (subscribed || done) {
+                throw new IllegalStateException("The elements were read already");
+            }
+            subscribed = true;
+            done = true;
+        }
+        Publisher<T> elements = PieceReaders.publisher(InternalByteBody.toUnbufferedReadBufferPublisher(body), reader);
+        return Flux.from(elements).onErrorMap(wrap::apply);
     }
 
     @Override
