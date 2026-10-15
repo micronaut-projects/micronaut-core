@@ -253,6 +253,27 @@ class Service:
 ''').isEmpty()
     }
 
+    void "a name a loop rebinds to the same type keeps it"() {
+        when:
+        def diagnostics = check('''
+from jakarta.inject import Singleton
+from java.util import ArrayList
+
+@Singleton
+class Service:
+    def run(self) -> None:
+        values = ArrayList()
+        for i in range(3):
+            values.ensureCapacity(i)
+            values = ArrayList(values)
+        values.no_such_method()
+''')
+
+        then:
+        diagnostics*.rule() == ['unknown-method']
+        diagnostics[0].span().line() == 12
+    }
+
     void "a static method takes no implicit class parameter"() {
         expect:
         check('''
