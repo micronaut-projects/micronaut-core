@@ -112,7 +112,7 @@ class JdkRawRequestBodySpec extends Specification {
         RawHttpClient client = server.applicationContext.createBean(RawHttpClient)
         Map body = body("unsent")
         HttpRequest<?> request = Stub(HttpRequest) {
-            toMutableRequest() >> { throw new IllegalStateException("cannot build") }
+            getUri() >> { throw new IllegalStateException("cannot build") }
         }
 
         when:

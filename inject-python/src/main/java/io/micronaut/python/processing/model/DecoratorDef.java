@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Represents a parsed Python decorator and its resolved metadata.
@@ -44,6 +45,8 @@ public record DecoratorDef(
     @Nullable List<DecoratorDef> stereotypes,
     @Nullable Map<String, List<DecoratorDef>> memberDecorators,
     @Nullable Map<String, TypeRef> memberTypes) {
+
+    private static final Set<String> TARGET_PARAMETER_NAMES = Set.of("func", "cls", "bean");
 
     /**
      * Simplified constructor with just the name.
@@ -126,6 +129,24 @@ public record DecoratorDef(
         } else {
             memberTypes = Collections.unmodifiableMap(memberTypes);
         }
+    }
+
+    /**
+     * Whether a parameter of the decorator is the decorated target rather than an annotation member: a decorator
+     * written as {@code def my_ann(func)} takes the decorated function, class or bean as its only parameter, with
+     * no type, no default and no decorators, and declares no member at all.
+     *
+     * @param memberName The parameter name
+     * @return {@code true} if the parameter is the decorated target
+     * @since 5.3.0
+     */
+    public boolean isTargetMember(String memberName) {
+        return memberTypes.size() <= 1
+            && members.size() <= 1
+            && members.get(memberName) == null
+            && memberTypes.get(memberName) == null
+            && memberDecorators.getOrDefault(memberName, List.of()).isEmpty()
+            && TARGET_PARAMETER_NAMES.contains(memberName);
     }
 
     @Override
