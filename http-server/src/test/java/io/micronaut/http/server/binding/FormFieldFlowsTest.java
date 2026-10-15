@@ -23,6 +23,105 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FormFieldFlowsTest {
+    @Test
+    void terminalDelayedFirstFlowUsesTheImmediateResult() throws Exception {
+        DelayedExecutionFlow<Integer> completed = DelayedExecutionFlow.create();
+        completed.complete(3);
+        var result = FormFieldFlows.firstFlatMap(reactor.core.publisher.Flux.just("abc"), s -> completed, n -> "length " + n);
+        assertEquals("length 3", result.get());
+        assertFalse(result.cancel(false));
+    }
+
+    @Test
+    void terminalReactiveFlowsPreserveCheckedErrorIdentity() {
+        var error = new java.io.IOException("field failure");
+        var first = FormFieldFlows.firstFlatMap(reactor.core.publisher.Flux.just("a"), value ->
+            io.micronaut.http.reactive.execution.ReactiveExecutionFlow.<Integer>fromPublisher(reactor.core.publisher.Mono.error(error)));
+        assertSame(error, assertThrows(ExecutionException.class, first::get).getCause());
+        Source<String> source = new Source<>();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        source.subscribe(new FormFieldFlows.Concat<String, Integer>(value ->
+            io.micronaut.http.reactive.execution.ReactiveExecutionFlow.fromPublisher(reactor.core.publisher.Mono.error(error)),
+            ignored -> { }, ignored -> { }, failure::set));
+        source.next("a");
+        assertSame(error, failure.get());
+    }
+
+    @Test
+    void concatDrainsImmediateReentrantSourcesWithoutRecursiveGrowth() {
+        AtomicLong count = new AtomicLong();
+        AtomicBoolean finished = new AtomicBoolean();
+        var concat = new FormFieldFlows.Concat<Integer, Integer>(ExecutionFlow::just, ignored -> { },
+            ignored -> count.incrementAndGet(), error -> {
+                assertNull(error);
+                finished.set(true);
+            });
+        reactor.core.publisher.Flux.range(0, 100_000).subscribe(concat);
+        assertEquals(100_000, count.get());
+        assertTrue(finished.get());
+    }
+
+    @Test
+    void cancellationDuringImmediateMappingSuppressesTheResult() {
+        Source<String> source = new Source<>();
+        AtomicReference<FormFieldFlows.Concat<String, Integer>> self = new AtomicReference<>();
+        List<Integer> values = new ArrayList<>();
+        AtomicBoolean finished = new AtomicBoolean();
+        var concat = new FormFieldFlows.Concat<String, Integer>(item -> {
+            self.get().cancel();
+            return ExecutionFlow.just(1);
+        }, ignored -> { }, values::add, error -> finished.set(true));
+        self.set(concat);
+        source.subscribe(concat);
+        source.next("a");
+        source.complete();
+        assertTrue(source.cancelled);
+        assertTrue(values.isEmpty());
+        assertFalse(finished.get());
+    }
+
+    @Test
+    void cancellationRacingWithCompletionSignalsAtMostOnce() {
+        for (int i = 0; i < 200; i++) {
+            Source<String> source = new Source<>();
+            DelayedExecutionFlow<Integer> flow = DelayedExecutionFlow.create();
+            AtomicLong values = new AtomicLong();
+            AtomicLong finished = new AtomicLong();
+            var concat = new FormFieldFlows.Concat<String, Integer>(item -> flow, ignored -> { },
+                ignored -> values.incrementAndGet(), error -> finished.incrementAndGet());
+            source.subscribe(concat);
+            source.next("a");
+            source.complete();
+            CompletableFuture<Void> start = new CompletableFuture<>();
+            var cancel = CompletableFuture.runAsync(() -> { start.join(); concat.cancel(); });
+            var complete = CompletableFuture.runAsync(() -> { start.join(); flow.complete(1); });
+            start.complete(null);
+            CompletableFuture.allOf(cancel, complete).join();
+            assertTrue(values.get() <= 1);
+            assertTrue(finished.get() <= 1);
+            assertTrue(finished.get() <= values.get());
+        }
+    }
+
+    @Test
+    void firstCancellationRacingWithArrivalClosesTheItemExactlyOnce() {
+        for (int i = 0; i < 200; i++) {
+            Source<Item> source = new Source<>();
+            Item item = new Item();
+            var result = FormFieldFlows.first(source, value -> {
+                value.close();
+                return 1;
+            });
+            CompletableFuture<Void> start = new CompletableFuture<>();
+            var cancel = CompletableFuture.runAsync(() -> { start.join(); result.cancel(false); });
+            var arrive = CompletableFuture.runAsync(() -> { start.join(); source.next(item); });
+            start.complete(null);
+            CompletableFuture.allOf(cancel, arrive).join();
+            assertTrue(result.isDone());
+            assertTrue(source.cancelled);
+            assertEquals(1, item.closeCalls.get());
+        }
+    }
 
     @Test
     void firstMapsTheFirstItemAndCancels() throws Exception {
@@ -185,9 +284,11 @@ class FormFieldFlowsTest {
 
     private static final class Item implements AutoCloseable {
         boolean closed;
+        final AtomicLong closeCalls = new AtomicLong();
 
         @Override
         public void close() {
+            closeCalls.incrementAndGet();
             closed = true;
         }
     }
