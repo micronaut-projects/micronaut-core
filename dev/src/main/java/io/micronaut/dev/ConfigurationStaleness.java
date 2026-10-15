@@ -389,18 +389,18 @@ final class ConfigurationStaleness {
 
     private static boolean injectsChangedProperty(BeanDefinition<?> definition, ConfigurationChange change) {
         for (Argument<?> argument : definition.getConstructor().getArguments()) {
-            if (change.mentions(argument.getAnnotationMetadata())) {
+            if (PropertyMentions.mentions(change, argument.getAnnotationMetadata())) {
                 return true;
             }
         }
         for (FieldInjectionPoint<?, ?> field : definition.getInjectedFields()) {
-            if (change.mentions(field.getAnnotationMetadata())) {
+            if (PropertyMentions.mentions(change, field.getAnnotationMetadata())) {
                 return true;
             }
         }
         for (MethodInjectionPoint<?, ?> method : definition.getInjectedMethods()) {
             for (Argument<?> argument : method.getArguments()) {
-                if (change.mentions(argument.getAnnotationMetadata())) {
+                if (PropertyMentions.mentions(change, argument.getAnnotationMetadata())) {
                     return true;
                 }
             }
