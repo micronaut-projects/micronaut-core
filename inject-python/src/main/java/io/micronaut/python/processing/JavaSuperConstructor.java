@@ -40,7 +40,8 @@ import java.util.stream.Collectors;
  * <p>
  * The generated Java class calls the resolved constructor with the arguments the Python
  * constructor passed to {@code super().__init__(...)}, read back from the Python object once its
- * {@code __init__} has run. The constructor is chosen by the arity of that call and the static
+ * {@code __init__} has run; a constructor without parameters is called before {@code __init__}
+ * runs, so that the inherited methods {@code __init__} calls reach the instance. The constructor is chosen by the arity of that call and the static
  * types of its arguments: a constructor parameter has the type of its annotation, a literal its
  * Python type, and an argument of unknown type accepts any parameter and prefers {@code String}.
  * A class whose constructor does not call {@code super().__init__(...)} uses the no-argument
@@ -167,6 +168,36 @@ final class JavaSuperConstructor {
             return null;
         }
         return new JavaSuperConstructor(noArguments);
+    }
+
+    /**
+     * Whether the Java super constructor a Python class calls takes no argument, for the stub of a
+     * Python subclass of that class.
+     *
+     * @param element The Python class extending the Java class
+     * @param superType The Java base class
+     * @param visitorContext The visitor context
+     * @return Whether the resolved constructor has no parameters
+     */
+    static boolean takesNoArguments(ClassElement element, ClassElement superType, PythonVisitorContext visitorContext) {
+        List<SuperArgumentDef> superArguments = superArguments(element);
+        if (superArguments != null && !superArguments.isEmpty()) {
+            return false;
+        }
+        // resolved without a problem: the stub of the class itself resolved it already
+        JavaSuperConstructor resolved = resolve(element, superType, visitorContext);
+        return resolved != null && !resolved.takesArguments();
+    }
+
+    /**
+     * Whether the super constructor takes arguments, which then come from the
+     * {@code super().__init__(...)} call of the Python constructor; without arguments the Java base
+     * can be constructed before the Python constructor runs.
+     *
+     * @return Whether the constructor has parameters
+     */
+    boolean takesArguments() {
+        return constructor.getParameters().length > 0;
     }
 
     /**
