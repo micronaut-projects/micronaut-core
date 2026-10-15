@@ -25,6 +25,7 @@ import io.micronaut.json.tree.JsonNode;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Processor;
 
+import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -245,6 +246,54 @@ public interface JsonMapper {
      * @throws IOException IOException
      */
     <T> void writeValue(OutputStream outputStream, Argument<T> type, @Nullable T object) throws IOException;
+
+    /**
+     * Open a writer for a sequence of values of the given type that are written one at a time to
+     * the same output stream, such as the elements of a streamed response. Where each call of
+     * {@link #writeValue(OutputStream, Argument, Object)} sets up the state of a serialization,
+     * such as the generator of the mapper, the returned writer keeps that state across the values,
+     * which is cheaper when many values go to one stream. The writer emits nothing between the
+     * values, so the caller frames the sequence.
+     *
+     * <p>The default implementation calls {@link #writeValue(OutputStream, Argument, Object)} for
+     * every value, with a view of the stream that the mapper cannot close: the stream is closed
+     * when the writer is.
+     *
+     * @param outputStream The stream to write to
+     * @param type         The type of the values
+     * @param <T>          The type of the values
+     * @return The writer
+     * @throws IOException If the writer cannot be created
+     * @since 5.3.0
+     */
+    @Experimental
+    default <T> JsonStreamWriter<T> createStreamWriter(OutputStream outputStream, Argument<T> type) throws IOException {
+        Objects.requireNonNull(outputStream, "Output stream cannot be null");
+        Objects.requireNonNull(type, "Type cannot be null");
+        // a mapper may close the stream it wrote a value to: only the writer closes the target
+        OutputStream nonClosing = new FilterOutputStream(outputStream) {
+            @Override
+            public void write(byte[] b, int off, int len) throws IOException {
+                out.write(b, off, len);
+            }
+
+            @Override
+            public void close() throws IOException {
+                out.flush();
+            }
+        };
+        return new JsonStreamWriter<>() {
+            @Override
+            public void write(@Nullable T value) throws IOException {
+                writeValue(nonClosing, type, value);
+            }
+
+            @Override
+            public void close() throws IOException {
+                outputStream.close();
+            }
+        };
+    }
 
     /**
      * Write an object as json.

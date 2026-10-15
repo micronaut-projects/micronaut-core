@@ -7,13 +7,17 @@ import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.MutableHeaders
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.body.MessageBodyWriter
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.codec.CodecException
+import io.micronaut.http.netty.NettyHttpResponseBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.buffer.ByteBuf
+import io.netty.handler.codec.http.FullHttpResponse
 import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -99,6 +103,27 @@ class ResponseBodySpec extends Specification {
             ConversionService.SHARED.convert(buffer, ByteBuffer).isPresent()
     }
 
+    def "netty response of an exchange still holds the body"() {
+        when:
+            def response = httpClient.toBlocking().exchange(HttpRequest.GET("/response-body/text"), String)
+            def nettyResponse = ((NettyHttpResponseBuilder) response).toHttpResponse()
+        then:
+            response.body() == "Hello text"
+            nettyResponse instanceof FullHttpResponse
+            ((FullHttpResponse) nettyResponse).content().toString(StandardCharsets.UTF_8) == "Hello text"
+            ((NettyHttpResponseBuilder) response).toFullHttpResponse().content().toString(StandardCharsets.UTF_8) == "Hello text"
+    }
+
+    def "error response body can be read in several forms"() {
+        when:
+            httpClient.toBlocking().exchange(HttpRequest.GET("/response-body/error"), String)
+        then:
+            def e = thrown(HttpClientResponseException)
+            e.response.getBody(String).get() == "Bad text"
+            new String(e.response.getBody(byte[]).get(), StandardCharsets.UTF_8) == "Bad text"
+            ((FullHttpResponse) ((NettyHttpResponseBuilder) e.response).toHttpResponse()).content().toString(StandardCharsets.UTF_8) == "Bad text"
+    }
+
     @Requires(property = 'spec.name', value = 'ResponseBodySpec')
     @Controller("/response-body")
     static class BodyController {
@@ -106,6 +131,16 @@ class ResponseBodySpec extends Specification {
         @Get("/string")
         StringResponseNoContent string() {
             return new StringResponseNoContent()
+        }
+
+        @Get(value = "/text", produces = MediaType.TEXT_PLAIN)
+        String text() {
+            return "Hello text"
+        }
+
+        @Get(value = "/error", produces = MediaType.TEXT_PLAIN)
+        HttpResponse<String> error() {
+            return HttpResponse.badRequest("Bad text").contentType(MediaType.TEXT_PLAIN_TYPE)
         }
 
         @Get("/number")

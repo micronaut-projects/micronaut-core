@@ -29,13 +29,9 @@ class PropertyMemberHooksSourceSpec extends GeneratedJavaSourceSpec {
     private static final String SET_MEMBER = 'public boolean micronautValueCoercibleSetMember(String key, Value value) {'
     private static final String PUT_MEMBER = 'public boolean micronautValueCoerciblePutMember(String key, Value value) {'
 
-    void "a plain dataclass keeps the property name lookups and inherits the default hooks"() {
+    void "a non-introspected class keeps the property name lookups and inherits the default hooks"() {
         given:
         def pythonCode = '''
-from dataclasses import dataclass
-
-
-@dataclass
 class Counter:
     count: int = 0
     label: str = "counter"
@@ -114,18 +110,13 @@ class Leaf(Middle):
         leaf.contains('this.c = ')
     }
 
-    void "a plain dataclass extending a plain dataclass declares no hooks"() {
+    void "a non-introspected class extending a non-introspected class declares no hooks"() {
         given:
         def pythonCode = '''
-from dataclasses import dataclass
-
-
-@dataclass
 class Base:
     a: int = 1
 
 
-@dataclass
 class Sub(Base):
     b: int = 2
 '''
@@ -138,6 +129,45 @@ class Sub(Base):
         sub.contains('public String micronautValueCoercibleGetterPropertyName(String key) {')
         !sub.contains(SET_MEMBER)
         !sub.contains(PUT_MEMBER)
+    }
+
+    void "dataclasses infer introspection and write declared and inherited property fields in their hooks"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+
+@dataclass
+class Counter:
+    count: int = 0
+    label: str = "counter"
+
+@dataclass
+class Base:
+    a: int = 1
+
+@dataclass
+class Sub(Base):
+    b: int = 2
+'''
+
+        when:
+        def counter = generatedSource(pythonCode, 'Counter')
+        def sub = generatedSource(pythonCode, 'Sub')
+
+        then:
+        counter.contains(SET_MEMBER)
+        counter.contains(PUT_MEMBER)
+        counter.contains('if ("count".equals(key)) {')
+        counter.contains('this.count = ')
+        counter.contains('if ("label".equals(key)) {')
+        counter.contains('this.label = ')
+        sub.contains('public class Sub extends Base implements PooledValueCoercible, Serializable, ValueCoercible.GeneratedPropertyMembers {')
+        sub.contains(SET_MEMBER)
+        sub.contains(PUT_MEMBER)
+        sub.contains('if ("a".equals(key)) {')
+        sub.contains('this.a = ')
+        sub.contains('if ("b".equals(key)) {')
+        sub.contains('this.b = ')
     }
 
     private static String generatedSource(String pythonCode, String simpleName) {

@@ -2640,13 +2640,13 @@ class MyBean {
         def saveAll2 = ce.findMethod("saveAll2").get()
         def listTypeArgument2 = saveAll2.getParameters()[0].getType().getTypeArguments(List).get("E")
         then:
-        validateBookArgument(listTypeArgument2)
+        validateBookArgumentOfAnnotatedTypeParameter(listTypeArgument2)
 
         when:
         def saveAll3 = ce.findMethod("saveAll3").get()
         def listTypeArgument3 = saveAll3.getParameters()[0].getType().getTypeArguments(List).get("E")
         then:
-        validateBookArgument(listTypeArgument3)
+        validateBookArgumentOfAnnotatedTypeParameter(listTypeArgument3)
 
         when:
         def saveAll4 = ce.findMethod("saveAll4").get()
@@ -2670,7 +2670,7 @@ class MyBean {
         def save3 = ce.findMethod("save3").get()
         def parameter3 = save3.getParameters()[0].getType()
         then:
-        validateBookArgument(parameter3)
+        validateBookArgumentOfAnnotatedTypeParameter(parameter3)
 
         when:
         def save4 = ce.findMethod("save4").get()
@@ -2689,6 +2689,14 @@ class MyBean {
         def returnType = get.getReturnType()
         then:
         validateBookArgument(returnType)
+    }
+
+    void validateBookArgumentOfAnnotatedTypeParameter(ClassElement classElement) {
+        // The annotations of the type parameter declaration don't apply to its uses
+        assert !classElement.hasAnnotation(TypeUseRuntimeAnn.class)
+        assert classElement.hasAnnotation(MyEntity.class)
+        assert classElement.hasAnnotation(Introspected.class)
+        assert !classElement.getTypeAnnotationMetadata().hasAnnotation(TypeUseRuntimeAnn.class)
     }
 
     void validateBookArgument(ClassElement classElement) {
@@ -3295,8 +3303,11 @@ class MyBean {
         when:
         def method = ce.findMethod("findById").get()
         then:
-        method.getReturnType().isEmpty()
-        method.getGenericReturnType().isEmpty()
+        // A declaration annotation applicable to TYPE_USE applies to the type too (JLS 9.7.4)
+        method.getReturnType().hasAnnotation(NotNull)
+        !method.getReturnType().hasAnnotation(Null)
+        method.getGenericReturnType().hasAnnotation(NotNull)
+        !method.getGenericReturnType().hasAnnotation(Null)
         method.hasAnnotation(NotNull)
         !method.hasAnnotation(Null)
     }
@@ -3437,8 +3448,9 @@ class MyBean {
         def method = ce.findMethod("findById").get()
         then:
         method.getAnnotationNames() == ["test.MyAnnotation1"] as Set
-        method.getGenericReturnType().isEmpty()
-        method.getReturnType().isEmpty()
+        // A declaration annotation applicable to TYPE_USE applies to the type too (JLS 9.7.4)
+        method.getGenericReturnType().getAnnotationNames() == ["test.MyAnnotation1"] as Set
+        method.getReturnType().getAnnotationNames() == ["test.MyAnnotation1"] as Set
         method.getGenericReturnType().getType().isEmpty()
         method.getReturnType().getGenericType().isEmpty()
     }
@@ -3508,8 +3520,9 @@ class MyBean {
         def method = ce.findMethod("findById").get()
         then:
         method.getParameters()[0].getAnnotationNames() == ["test.MyAnnotation1"] as Set
-        method.getParameters()[0].getType().getAnnotationNames().isEmpty()
-        method.getParameters()[0].getGenericType().getAnnotationNames().isEmpty()
+        // A declaration annotation applicable to TYPE_USE applies to the type too (JLS 9.7.4)
+        method.getParameters()[0].getType().getAnnotationNames() == ["test.MyAnnotation1"] as Set
+        method.getParameters()[0].getGenericType().getAnnotationNames() == ["test.MyAnnotation1"] as Set
     }
 
     void "test similar methods with arrays"() {

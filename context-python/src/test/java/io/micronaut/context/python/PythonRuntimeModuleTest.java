@@ -33,6 +33,42 @@ final class PythonRuntimeModuleTest {
     );
 
     @Test
+    void preparedIntroductionsPreserveCoroutineIdentityAcrossContexts() {
+        for (int i = 0; i < 2; i++) {
+            try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+                Value classes = context.eval(PYTHON, """
+                    from abc import ABC, abstractmethod
+                    import inspect
+                    class Base(ABC):
+                        @abstractmethod
+                        async def one(self): ...
+                        @abstractmethod
+                        def synchronous(self): ...
+                    class Sub(Base):
+                        @abstractmethod
+                        async def two(self): ...
+                    (Base, Sub, inspect.iscoroutinefunction)
+                    """);
+                Value prepare = PythonContextRuntime.helper(context, "__micronaut_prepare_introduction");
+                Value isCoroutine = classes.getArrayElement(2);
+                for (int j = 0; j < 2; j++) {
+                    Value type = classes.getArrayElement(j);
+                    prepare.execute(type);
+                    assertTrue(type.canInstantiate());
+                    assertTrue(isCoroutine.execute(type.getMember("one")).asBoolean());
+                    assertFalse(isCoroutine.execute(type.getMember("synchronous")).asBoolean());
+                    if (j == 1) {
+                        assertTrue(isCoroutine.execute(type.getMember("two")).asBoolean());
+                    }
+                    Value one = type.getMember("one");
+                    prepare.execute(type);
+                    assertEquals(one, type.getMember("one"), "repeated preparation replaces no methods");
+                }
+            }
+        }
+    }
+
+    @Test
     void anAbstractSubclassOfAPreparedIntroductionIsPreparedOnItsOwn() {
         try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
             Value classes = context.eval(PYTHON, """

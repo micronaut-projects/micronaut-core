@@ -12,26 +12,13 @@ name: Python CI
 # A large test suite is split across several jobs: a module sets `python-ci-shards=<count>` in its
 # gradle.properties and each job of the build matrix runs one shard of the test classes, selected
 # by the `python-ci-shard=<index>/<count>` Gradle property the build plugin understands.
+#
+# Called by Java CI (gradle.yml) once its build job passes and the Sonar quality gate did not
+# fail. The caller's triggers, draft check and concurrency group cover this workflow, so it
+# declares no concurrency of its own; reusing the caller's group expression here would make
+# the called jobs wait on, or cancel, their own run.
 on:
-  push:
-    branches:
-      - master
-      - main
-      - '[0-9]+.[0-9]+.x'
-  pull_request:
-    branches:
-      - master
-      - main
-      - '[0-9]+.[0-9]+.x'
-      # stacked PRs target each other's branches
-      - 'python/**'
-      - 'python-*'
-    types: [opened, synchronize, reopened, ready_for_review]
-# A new push to a pull request cancels its older run, freeing the shared runner
-# pool. Pushes to branches get a group of their own and are never cancelled.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
+  workflow_call:
 jobs:
   detect:
     name: "detect"

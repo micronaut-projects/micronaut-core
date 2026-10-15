@@ -16,11 +16,14 @@
 package io.micronaut.context;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.convert.ConversionServiceProvider;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.QualifiedBeanType;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
@@ -28,6 +31,7 @@ import io.micronaut.inject.validation.BeanDefinitionValidator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -56,6 +60,56 @@ public interface BeanContext extends
      * @since 3.0.0
      */
     BeanContextConfiguration getContextConfiguration();
+
+    /**
+     * Creates a fresh instance of the exact definition, bypassing its scope, and retains its complete
+     * dependency tree in the returned registration. Dependencies still obey their own scope rules.
+     * For a contextual target behind a proxy, supply the target definition. The caller owns the result.
+     * The same shutdown rule as {@link #createDependencyGroup()} applies.
+     * @param definition The definition to instantiate
+     * @param <T> The bean type
+     * @return The created instance and its lifecycle
+     * @since 5.3.0
+     */
+    @Experimental
+    default <T> CreatedBean<T> createBeanRegistration(BeanDefinition<T> definition) {
+        throw new UnsupportedOperationException("Fresh registrations are not supported by this context");
+    }
+
+    /**
+     * Creates an independent dependency group. The caller must close it; context shutdown does not take ownership.
+     *
+     * <p>Once shutdown begins, a group can only be created by a {@link io.micronaut.context.event.ShutdownEvent}
+     * listener, on the thread publishing the event. Lookups through it, and through groups created earlier, are only
+     * accepted on the thread performing the shutdown, and what they create is destroyed before the shutdown completes.
+     * A destruction listener that needs temporary dependencies uses
+     * {@link io.micronaut.context.event.BeanPreDestroyEvent#withDependencies(Function)}. Groups are also rejected
+     * before the context is configured.</p>
+     *
+     * @return The group
+     * @since 5.3.0
+     */
+    @Experimental
+    default BeanDependencyGroup createDependencyGroup() {
+        throw new UnsupportedOperationException("Dependency groups are not supported by this context");
+    }
+
+    /**
+     * Resolves dependencies for a synchronous invocation and always releases them afterwards. Cleanup failures
+     * are suppressed on an invocation failure. Once shutdown begins, it is only available to a
+     * {@link io.micronaut.context.event.ShutdownEvent} listener, see {@link #createDependencyGroup()};
+     * a destruction listener uses {@link io.micronaut.context.event.BeanPreDestroyEvent#withDependencies(Function)}.
+     * @param action The invocation
+     * @param <R> The result type
+     * @return The result (which must not retain an owned dependency)
+     * @since 5.3.0
+     */
+    @Experimental
+    default <R> R withDependencies(Function<BeanDependencyGroup, R> action) {
+        try (BeanDependencyGroup group = createDependencyGroup()) {
+            return action.apply(group);
+        }
+    }
 
     /**
      * The predicate the context was built with, as passed to
@@ -188,6 +242,29 @@ public interface BeanContext extends
     }
 
     /**
+     * <p>Creates a new instance of the bean of the given definition performing dependency injection and returning a new instance.</p>
+     *
+     * <p>The definition is not looked up again, so a caller that already holds it, for example from
+     * {@link #getBeanDefinitions(Class)}, can create instances repeatedly without resolving the bean type and qualifier
+     * on every call. The instance is otherwise created as by {@link #createBean(Class, Qualifier, Object...)}, including
+     * the {@link io.micronaut.context.event.BeanCreatedEventListener} callbacks.</p>
+     *
+     * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed in
+     * the {@code args} parameter will be used</p>
+     *
+     * <p>Note that the instance returned is not saved as a singleton in the context.</p>
+     *
+     * @param definition The bean definition, which must be one of this context
+     * @param args       The argument values
+     * @param <T>        The bean generic type
+     * @return The instance
+     * @since 5.3.0
+     */
+    default <T> T createBean(BeanDefinition<T> definition, @Nullable Object... args) {
+        return createBean(definition.getBeanType(), definition.getDeclaredQualifier(), args);
+    }
+
+    /**
      * Destroys the bean for the given type causing it to be re-created. If a singleton has been loaded it will be
      * destroyed and removed from the context, otherwise null will be returned.
      *
@@ -243,6 +320,42 @@ public interface BeanContext extends
      * @since 3.5.0
      */
     <T> void destroyBean(BeanRegistration<T> beanRegistration);
+
+    /**
+     * Destroys the given bean as a dependent, the way the context destroys the dependents of a bean when it destroys
+     * that bean.
+     *
+     * <p>This is for a bean that was resolved on behalf of something else, whose dependent it is, such as one of the
+     * registrations {@link BeanResolutionContext#getAndResetDependentBeans()} reports. It differs from
+     * {@link #destroyBean(BeanRegistration)} in what it leaves alone:</p>
+     *
+     * <ul>
+     *     <li>A proxy whose target lives in a custom scope, such as a {@code @ScopedProxy}, is destroyed together
+     *     with its own dependents, and its target stays in the scope: the target belongs to the scope, which may
+     *     have handed it to other beans as well. {@link #destroyBean(BeanRegistration)} removes the target from
+     *     the scope.</li>
+     *     <li>A proxy that is a singleton is not destroyed: a singleton is not the dependent of one bean.</li>
+     *     <li>The context does not call {@link LifeCycle#stop()} on a bean that implements {@link LifeCycle},
+     *     which {@link #destroyBean(BeanRegistration)} does once the bean's pre-destroy has run: stopping is for a
+     *     bean destroyed in its own right, not for one destroyed because whatever it was resolved for is gone. The
+     *     pre-destroy of the bean's definition runs either way, and stops the bean if the definition does.</li>
+     * </ul>
+     *
+     * <p>The bean's own dependents are destroyed as dependents in either case. A registration that was already
+     * closed, or destroyed through this method, is not destroyed again.</p>
+     *
+     * <p>Destroying a bean as a dependent needs a context that tracks what a bean owns. The default throws an
+     * {@link UnsupportedOperationException} rather than destroy the bean in its own right, which would take a scoped
+     * target out of its scope. {@link DefaultBeanContext} implements it.</p>
+     *
+     * @param registration The registration of the dependent bean
+     * @param <T>          The bean type
+     * @throws UnsupportedOperationException if the context cannot destroy a bean as a dependent
+     * @since 5.3.0
+     */
+    default <T> void destroyDependentBean(BeanRegistration<T> registration) {
+        throw new UnsupportedOperationException("This implementation of BeanContext doesn't support destroying a bean as a dependent");
+    }
 
     /**
      * <p>Refresh the state of the given registered bean applying dependency injection and configuration wiring again.</p>

@@ -79,4 +79,17 @@ public interface CustomScope<A extends Annotation> {
     default <T> Optional<BeanRegistration<T>> findBeanRegistration(BeanDefinition<T> beanDefinition) {
         return Optional.empty();
     }
+
+    /**
+     * Removes and destroys the bean held for the given definition. A scope that creates beans concurrently
+     * overrides this to wait for a creation in flight, so that a bean about to be published is not missed.
+     *
+     * @param beanDefinition The bean definition
+     * @param <T> The bean generic type
+     * @return The instance that was destroyed, if the scope held one
+     * @since 5.3.0
+     */
+    default <T> Optional<T> remove(BeanDefinition<T> beanDefinition) {
+        return findBeanRegistration(beanDefinition).flatMap(registration -> remove(registration.getIdentifier()));
+    }
 }

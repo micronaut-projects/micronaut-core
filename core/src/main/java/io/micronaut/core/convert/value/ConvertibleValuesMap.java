@@ -18,7 +18,10 @@ package io.micronaut.core.convert.value;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionServiceAware;
+import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.type.Argument;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -85,6 +88,25 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V>, Conversion
             return conversionService.convert(value, conversionContext);
         }
         return Optional.empty();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
+        V value = map.get(name);
+        if (value == null) {
+            return Optional.empty();
+        }
+        // Fast path mirroring the conversion service: avoid creating an argument and
+        // a conversion context when the value is already of the required type
+        if (requiredType == Object.class) {
+            return Optional.of((T) value);
+        }
+        Class<?> wrapperType = requiredType.isPrimitive() ? ReflectionUtils.getWrapperType(requiredType) : requiredType;
+        if (wrapperType.isInstance(value) && !(value instanceof Iterable) && !(value instanceof Map)) {
+            return Optional.of((T) value);
+        }
+        return conversionService.convert(value, ConversionContext.of(Argument.of(requiredType)));
     }
 
     @Override

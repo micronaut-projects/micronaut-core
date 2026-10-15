@@ -189,6 +189,15 @@ public final class PythonTypeElementVisitorProcessor {
             }
         }
 
+        // A Python compilation is a single round
+        for (LoadedVisitor loadedVisitor : loadedVisitors) {
+            try {
+                loadedVisitor.getVisitor().finishRound(pythonVisitorContext);
+            } catch (Throwable e) {
+                failVisitor(pythonVisitorContext, loadedVisitor, "finishRound", e);
+            }
+        }
+
         // The stubs are written when the stub generator finishes, so it finishes after every other visitor:
         // the producer methods of the associated beans a visitor registers in visitClass or in its own finish
         // are bridged into the stubs before they are written
@@ -440,7 +449,7 @@ public final class PythonTypeElementVisitorProcessor {
         Class<?> serviceClass = outputObjectDef.serviceClass();
         OriginatingElements originatingElements = outputObjectDef.originatingElements();
         if (serviceClass != null) {
-            pythonVisitorContext.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
+            pythonVisitorContext.visitServiceDescriptor(serviceClass.getName(), objectDef.getName(), originatingElements.getOriginatingElements()[0], outputObjectDef.serviceContent());
         }
         try (OutputStream outputStream = pythonVisitorContext.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
             outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, pythonVisitorContext));

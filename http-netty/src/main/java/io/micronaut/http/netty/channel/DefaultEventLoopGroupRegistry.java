@@ -214,6 +214,12 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
         if (explicit != 0) {
             return explicit;
         }
-        return Math.toIntExact(Math.round(configuration.getThreadCoreRatio() * NettyRuntime.availableProcessors()));
+        double ratio = configuration.getThreadCoreRatio();
+        int threads = Math.toIntExact(Math.round(ratio * NettyRuntime.availableProcessors()));
+        if (ratio > 0 && threads < 1) {
+            // 0 would make netty fall back to its default (2 * cores), so use at least one thread
+            return 1;
+        }
+        return threads;
     }
 }

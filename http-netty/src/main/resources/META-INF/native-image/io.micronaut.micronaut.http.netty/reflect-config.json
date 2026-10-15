@@ -25,5 +25,20 @@
       {"name":"toLeakAwareBuffer", "parameterTypes": ["io.netty.buffer.ByteBuf"]},
       {"name":"toLeakAwareBuffer", "parameterTypes": ["io.netty.buffer.CompositeByteBuf"]}
     ]
+  },
+  {
+    "name":"io.netty.util.ReferenceCountUtil",
+    "methods":[
+      {"name":"touch", "parameterTypes": ["java.lang.Object"]},
+      {"name":"touch", "parameterTypes": ["java.lang.Object", "java.lang.Object"]}
+    ]
+  },
+  {
+    "name":"io.netty.buffer.AdvancedLeakAwareByteBuf",
+    "methods":[
+      {"name":"touch", "parameterTypes": []},
+      {"name":"touch", "parameterTypes": ["java.lang.Object"]},
+      {"name":"recordLeakNonRefCountingOperation", "parameterTypes": ["io.netty.util.ResourceLeakTracker"]}
+    ]
   }
 ]

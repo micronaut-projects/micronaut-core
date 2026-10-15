@@ -64,7 +64,7 @@ public class DefaultChannelOptionFactory implements ChannelOptionFactory {
             final String optionName;
             if (idx > 0 && idx < name.length() - 1) {
                 // a composed name
-                optionName = name.substring(idx);
+                optionName = name.substring(idx + 1);
             } else {
                 // A simple name
                 optionName = name;

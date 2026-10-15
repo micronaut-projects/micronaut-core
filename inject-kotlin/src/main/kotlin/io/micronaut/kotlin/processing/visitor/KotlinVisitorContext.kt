@@ -37,6 +37,7 @@ import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.Origin
+import io.micronaut.core.annotation.Internal
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.value.MutableConvertibleValues
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
@@ -46,8 +47,11 @@ import io.micronaut.expressions.context.ExpressionCompilationContextFactory
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
+import io.micronaut.inject.ast.annotation.AbstractAnnotationElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.inject.ast.beans.BeanElementBuilder
 import io.micronaut.inject.visitor.VisitorContext
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import io.micronaut.inject.writer.GeneratedFile
 import io.micronaut.kotlin.processing.KotlinNativeElementsHelper
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
@@ -83,6 +87,12 @@ internal class KotlinVisitorContext(
     private val expressionCompilationContextFactory = DefaultExpressionCompilationContextFactory(this)
     val nativeElementsHelper = KotlinNativeElementsHelper(resolver)
     var aggregating: Boolean = false
+
+    /**
+     * Whether the visitors are finishing: every round is over, and KSP has invalidated the elements of the rounds.
+     */
+    var finishing: Boolean = false
+    private val beanDefinitionBuilders: MutableList<AbstractBeanDefinitionBuilder> = ArrayList()
 
     /*
      * Memos for the three call sites that between them drive 91% of all KSP type resolutions.
@@ -451,6 +461,16 @@ internal class KotlinVisitorContext(
         outputVisitor.visitServiceDescriptor(type, classname, originatingElement)
     }
 
+    @Internal
+    override fun visitServiceDescriptor(
+        type: String,
+        classname: String,
+        originatingElement: Element,
+        content: ByteArray?
+    ) {
+        outputVisitor.visitServiceDescriptor(type, classname, originatingElement, content)
+    }
+
     override fun visitMetaInfFile(
         path: String,
         vararg originatingElements: Element
@@ -472,6 +492,41 @@ internal class KotlinVisitorContext(
 
     override fun finish() {
         outputVisitor.finish()
+    }
+
+    override fun registerBean(beanType: ClassElement, vararg originatingElements: Element): BeanElementBuilder {
+        AbstractBeanDefinitionBuilder.requireOriginatingElements(beanType, *originatingElements)
+        val builder = addAssociatedBean(originatingElements[0], beanType)
+        builder.addOriginatingElements(*originatingElements)
+        return builder
+    }
+
+    /**
+     * Adds a bean of the given type, originating from the given element.
+     *
+     * @param originatingElement The originating element
+     * @param beanType The bean type
+     * @return The bean builder
+     */
+    fun addAssociatedBean(originatingElement: Element, beanType: ClassElement): KotlinBeanDefinitionBuilder =
+        KotlinBeanDefinitionBuilder(
+            originatingElement,
+            beanType,
+            if (beanType is AbstractAnnotationElement) beanType.elementAnnotationMetadataFactory else elementAnnotationMetadataFactory,
+            this
+        )
+
+    internal fun addBeanDefinitionBuilder(builder: KotlinBeanDefinitionBuilder) {
+        beanDefinitionBuilders.add(builder)
+    }
+
+    /**
+     * @return The bean definition builders added since the last call
+     */
+    fun takeBeanElementBuilders(): List<AbstractBeanDefinitionBuilder> {
+        val current = ArrayList(beanDefinitionBuilders)
+        beanDefinitionBuilders.clear()
+        return current
     }
 
     override fun getClassElement(

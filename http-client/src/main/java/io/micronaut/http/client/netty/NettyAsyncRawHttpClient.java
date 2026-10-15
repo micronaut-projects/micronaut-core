@@ -22,7 +22,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.RawRequestOptions;
-import io.micronaut.http.client.RawResponseFuture;
+import io.micronaut.http.client.internal.RawResponseFuture;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import org.jspecify.annotations.Nullable;
 
@@ -58,7 +58,8 @@ final class NettyAsyncRawHttpClient implements AsyncRawHttpClient {
 
     private CompletionStage<HttpResponse<?>> exchange0(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable RawRequestOptions options) {
         CloseableByteBody body = requestBody == null ? NettyByteBodyFactory.empty() : requestBody;
-        return RawResponseFuture.of(nettyHttpClient.rawExchangeFlow(PropagatedContext.getOrEmpty(), request, body, null, options), body);
+        return RawResponseFuture.of(nettyHttpClient.rawExchangeFlow(PropagatedContext.getOrEmpty(), request, body, null, options), body,
+            options != null && options.isReturnUnsentBody());
     }
 
     @Override

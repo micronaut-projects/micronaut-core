@@ -1010,9 +1010,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (annotationType == null) {
             return List.of();
         }
-        List<AnnotationValue<T>> results = resolveAnnotationValuesByName(annotationType, allAnnotations, allStereotypes);
-        annotationValuesByType.put(annotationType, results);
-        return results;
+        return resolveAnnotationValuesByName(annotationType, allAnnotations, allStereotypes);
     }
 
     protected <T extends Annotation> AnnotationValue<T> newAnnotationValue(String annotationType, Map<CharSequence, Object> values) {
@@ -1317,6 +1315,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 return Optional.of(newAnnotationValue(annotation, values));
             }
         }
+        if (findRepeatableAnnotationContainerInternal(annotation) == null) {
+            return Optional.empty();
+        }
         return firstRepeatedValue(getAnnotationValuesByName(annotation));
     }
 
@@ -1614,7 +1615,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             }
         }
         // a repeatable is stored under its container, so read the member off the first repeated value,
-        // which is the one the Class overloads answer with
+        // which is the one the Class overloads answer with; a miss on any other annotation ends here
+        if (findRepeatableAnnotationContainerInternal(annotation) == null) {
+            return null;
+        }
         List<AnnotationValue<Annotation>> repeated = getAnnotationValuesByName(annotation);
         if (repeated.isEmpty()) {
             return null;

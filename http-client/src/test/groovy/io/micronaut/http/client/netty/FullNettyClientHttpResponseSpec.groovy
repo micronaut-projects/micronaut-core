@@ -31,6 +31,23 @@ import spock.lang.Specification
 
 class FullNettyClientHttpResponseSpec extends Specification {
 
+    void "toHttpResponse content stays readable after the source response is released"() {
+        given:
+        FullHttpResponse source = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK,
+                Unpooled.copiedBuffer("hello", Charset.forName("UTF-8")))
+        var response = new FullNettyClientHttpResponse(source, null, null, false, ConversionService.SHARED)
+        // the client releases the aggregated response once the FullNettyClientHttpResponse is built
+        source.release()
+
+        when:
+        def netty = response.toHttpResponse()
+
+        then:
+        netty instanceof FullHttpResponse
+        ((FullHttpResponse) netty).content().refCnt() > 0
+        ((FullHttpResponse) netty).content().toString(Charset.forName("UTF-8")) == "hello"
+    }
+
     void "test cookies"() {
         given:
           String cookieDef = "simple-cookie=avalue; max-age=60; path=/; domain=.micronaut.io"

@@ -29,16 +29,20 @@ import java.util.Objects;
  * @param request           The request
  * @param response          The response
  * @param propagatedContext The propagated context
+ * @param reactive          Whether a reactive filter waits on the downstream of this context. The
+ *                          downstream has to stay reactive for the Reactor context to reach it,
+ *                          otherwise it can run without touching any reactive code
  * @author Denis Stepanov
  * @since 4.2.0
  */
 @Internal
 record FilterContext(HttpRequest<?> request,
                      @Nullable HttpResponse<?> response,
-                     PropagatedContext propagatedContext) {
+                     PropagatedContext propagatedContext,
+                     boolean reactive) {
 
     FilterContext(HttpRequest<?> request, PropagatedContext propagatedContext) {
-        this(request, null, propagatedContext);
+        this(request, null, propagatedContext, false);
     }
 
     FilterContext withRequest(HttpRequest<?> request) {
@@ -49,7 +53,7 @@ record FilterContext(HttpRequest<?> request,
             throw new IllegalStateException("Cannot modify the request after response is set!");
         }
         Objects.requireNonNull(request);
-        return new FilterContext(request, response, propagatedContext);
+        return new FilterContext(request, response, propagatedContext, reactive);
     }
 
     FilterContext withResponse(HttpResponse<?> response) {
@@ -57,7 +61,7 @@ record FilterContext(HttpRequest<?> request,
             return this;
         }
         Objects.requireNonNull(response);
-        return new FilterContext(request, response, propagatedContext);
+        return new FilterContext(request, response, propagatedContext, reactive);
     }
 
     FilterContext withPropagatedContext(PropagatedContext propagatedContext) {
@@ -65,7 +69,18 @@ record FilterContext(HttpRequest<?> request,
             return this;
         }
         Objects.requireNonNull(propagatedContext);
-        return new FilterContext(request, response, propagatedContext);
+        return new FilterContext(request, response, propagatedContext, reactive);
+    }
+
+    /**
+     * @return The context marked as having a reactive filter waiting on its downstream
+     * @since 5.3.0
+     */
+    FilterContext asReactive() {
+        if (reactive) {
+            return this;
+        }
+        return new FilterContext(request, response, propagatedContext, true);
     }
 
 }

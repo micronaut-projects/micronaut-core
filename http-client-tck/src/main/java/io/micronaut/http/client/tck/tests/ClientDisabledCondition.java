@@ -48,7 +48,7 @@ public class ClientDisabledCondition implements ExecutionCondition {
     private static final ConditionEvaluationResult DISABLED = disabled("Disabled");
     
     private static boolean jdkMajorVersionMatches(ClientDisabled d) {
-        return Integer.toString(Runtime.version().feature()).equals(d.jdk());
+        return d.jdk().isEmpty() || Integer.toString(Runtime.version().feature()).equals(d.jdk());
     }
 
     private static boolean clientParameterMatches(ExtensionContext context, ClientDisabled d) {
@@ -73,8 +73,14 @@ public class ClientDisabledCondition implements ExecutionCondition {
     @ExtendWith(ClientDisabledCondition.class)
     public @interface ClientDisabled {
 
+        /**
+         * @return The client configuration ({@link #JDK} or {@link #NETTY}) to disable the test for
+         */
         String httpClient() default "";
 
+        /**
+         * @return The JDK major version to disable the test on, or empty for any version
+         */
         String jdk() default "";
     }
 }

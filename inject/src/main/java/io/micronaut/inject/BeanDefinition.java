@@ -26,6 +26,7 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -374,6 +375,37 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
                 getAnnotationMetadata(),
                 getTypeParameters()
         );
+    }
+
+    /**
+     * The bean type the way it was declared: the class of a bean class, the return type of a factory method, the
+     * type of a factory field.
+     *
+     * <p>{@link #asArgument()} and {@link #getGenericBeanType()} rebuild the bean type from the classes of its
+     * type arguments, so each of them is a placeholder that holds a class - one that says it is
+     * {@link io.micronaut.core.type.GenericPlaceholder#isResolved() resolved} - anything nested below it is gone,
+     * and a type declared raw gets the type arguments its type declares. This answers the arguments the compiler
+     * recorded instead: {@code List<List<String>>} with its nested type argument, the {@code T} of a producer of
+     * {@code <T extends Comparable<T>> List<T>} as a {@link io.micronaut.core.type.GenericPlaceholder} with its
+     * own name and bounds, a raw {@code List} as an argument that is {@link Argument#isRawType() raw}, and an
+     * array with the type arguments of its component, the way an array is written everywhere else.</p>
+     *
+     * <p>A definition compiled before the rawness was recorded, and one that is not compiled at all, answers the
+     * type arguments it has without knowing whether the type was written raw.</p>
+     *
+     * @return The bean type as it was declared, a new argument on each call
+     * @since 5.3.0
+     */
+    @Experimental
+    default Argument<T> getDeclaredBeanType() {
+        Class<T> beanType = getBeanType();
+        Class<?> componentType = beanType;
+        while (componentType.isArray()) {
+            // an array has the type arguments of its component
+            componentType = componentType.getComponentType();
+        }
+        List<Argument<?>> typeArguments = getTypeArguments(componentType);
+        return Argument.of(beanType, getAnnotationMetadata(), typeArguments.toArray(Argument.ZERO_ARGUMENTS));
     }
 
     /**
