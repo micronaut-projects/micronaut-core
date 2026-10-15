@@ -51,6 +51,36 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_CLASSES;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_CONFIGURATION;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_ENTITIES;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_ENVIRONMENTS;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_MISSING_CLASSES;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_MISSING_PROPERTY;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_NOT_ENVIRONMENTS;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_NOT_OS;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_OS;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_PROPERTY;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_RESOURCES;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_SDK;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.HEADER_LENGTH;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.MAGIC;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_ANNOTATION;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_ARRAY;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_BOOLEAN;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_BYTE;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_CHAR;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_CLASS;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_DOUBLE;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_EMPTY_ARRAY;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_FLOAT;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_INT;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_LONG;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_SHORT;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_STRING;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_WRAPPER_ARRAY;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VERSION;
+
 /**
  * Reads the descriptor that the processors write into the {@code META-INF/micronaut} entry of a bean definition,
  * in the format of {@code io.micronaut.inject.writer.BeanDefinitionDescriptor} in {@code micronaut-core-processor}:
@@ -96,41 +126,12 @@ final class BeanDefinitionDescriptorReader {
      */
     static final int REVISION = 1;
 
-    private static final int MAGIC = 0x4D4E4244;
-    private static final int VERSION = 1;
-    private static final int HEADER_LENGTH = 10;
     /**
      * The longest payload read: a header that announces more is damaged, and is not given a buffer of that size.
      */
     private static final int MAX_LENGTH = 1 << 20;
 
-    private static final int VALUE_STRING = 1;
-    private static final int VALUE_BOOLEAN = 2;
-    private static final int VALUE_BYTE = 3;
-    private static final int VALUE_CHAR = 4;
-    private static final int VALUE_SHORT = 5;
-    private static final int VALUE_INT = 6;
-    private static final int VALUE_LONG = 7;
-    private static final int VALUE_FLOAT = 8;
-    private static final int VALUE_DOUBLE = 9;
-    private static final int VALUE_CLASS = 10;
-    private static final int VALUE_ANNOTATION = 11;
-    private static final int VALUE_ARRAY = 12;
-    private static final int VALUE_WRAPPER_ARRAY = 13;
-    private static final int VALUE_EMPTY_ARRAY = 14;
 
-    private static final int CONDITION_CLASSES = 1;
-    private static final int CONDITION_MISSING_CLASSES = 2;
-    private static final int CONDITION_ENVIRONMENTS = 3;
-    private static final int CONDITION_NOT_ENVIRONMENTS = 4;
-    private static final int CONDITION_ENTITIES = 5;
-    private static final int CONDITION_PROPERTY = 6;
-    private static final int CONDITION_MISSING_PROPERTY = 7;
-    private static final int CONDITION_CONFIGURATION = 8;
-    private static final int CONDITION_SDK = 9;
-    private static final int CONDITION_RESOURCES = 10;
-    private static final int CONDITION_OS = 11;
-    private static final int CONDITION_NOT_OS = 12;
 
     private static final String[] NO_STRINGS = new String[0];
 

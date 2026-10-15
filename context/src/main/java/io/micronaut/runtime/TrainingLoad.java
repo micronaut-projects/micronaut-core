@@ -220,8 +220,7 @@ final class TrainingLoad {
             return null;
         }
         BeanDefinition<Object> definition = reference.load(context);
-        if (definition == null) {
-            // a lazy reference whose definition cannot be linked
+        if (definition == null) { // NOSONAR java:S2583 a lazy reference answers null for a definition that cannot be linked
             return null;
         }
         boolean definitionEnabled = definition instanceof AbstractInitializableBeanDefinitionAndReference<Object> definitionAndReference

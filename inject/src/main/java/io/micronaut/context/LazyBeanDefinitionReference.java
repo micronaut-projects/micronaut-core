@@ -73,16 +73,22 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
     private static final Logger LOG = LoggerFactory.getLogger(LazyBeanDefinitionReference.class);
     private static final MethodHandles.Lookup PUBLIC_LOOKUP = MethodHandles.publicLookup();
     private static final MethodType NO_ARGUMENTS = MethodType.methodType(void.class);
-    private static final VarHandle STATE;
+    private static final VarHandle STATE_HANDLE;
     private static final String COULD_NOT_INITIALIZE = "Could not initialize class ";
     /**
      * The state of a reference whose definition cannot be linked, or whose bean type does not load.
      */
     private static final Object ABSENT = new Object();
+    /**
+     * The declared qualifier of a bean that declares none.
+     */
+    private static final Object NO_QUALIFIER = new Object();
+    private static final String GET_BEAN_NAME = "getBeanName";
+    private static final String GET_DECLARED_QUALIFIER = "getDeclaredQualifier";
 
     static {
         try {
-            STATE = MethodHandles.lookup().findVarHandle(LazyBeanDefinitionReference.class, "state", Object.class);
+            STATE_HANDLE = MethodHandles.lookup().findVarHandle(LazyBeanDefinitionReference.class, "state", Object.class);
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }
@@ -101,21 +107,26 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
      * {@code null} until the definition is loaded, then the instance of the class the entry names, {@link #ABSENT},
      * or the {@link Failed failure} met loading it.
      */
-    @SuppressWarnings({"unused", "java:S3077"}) // written through STATE
+    @SuppressWarnings({"unused", "java:S3077"}) // written through STATE_HANDLE
     private volatile @Nullable Object state;
+    @SuppressWarnings("java:S3077") // a class loader is thread-safe
     @Nullable
     private volatile ClassLoader owner;
     @SuppressWarnings("java:S3077") // immutable once published
     private volatile Condition @Nullable [] conditions;
+    @SuppressWarnings("java:S3077") // a class is immutable
     @Nullable
     private volatile Class<T> beanType;
+    @SuppressWarnings("java:S3077") // immutable once published
     @Nullable
     private volatile Set<Class<?>> exposedTypes;
     @SuppressWarnings("java:S3077") // immutable once published
     private volatile Class<?> @Nullable [] indexes;
-    @SuppressWarnings({"java:S3077", "OptionalUsedAsFieldOrParameterType"}) // immutable once published; empty means none
+    /**
+     * {@code null} until the declared qualifier is read from the descriptor, then the qualifier or {@link #NO_QUALIFIER}.
+     */
     @Nullable
-    private volatile Optional<Qualifier<T>> declaredQualifier;
+    private volatile Object declaredQualifier;
     /**
      * With the verification on, the difference found between the descriptor and the definition when it was loaded,
      * which every lookup that reaches the reference fails with, whichever thread loaded it.
@@ -148,47 +159,47 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
 
     @Override
     public boolean isContextScope() {
-        return data.is(BeanDefinitionDescriptorData.FLAG_CONTEXT_SCOPE);
+        return data.is(BeanDefinitionDescriptorFormat.FLAG_CONTEXT_SCOPE);
     }
 
     @Override
     public boolean isParallel() {
-        return data.is(BeanDefinitionDescriptorData.FLAG_PARALLEL);
+        return data.is(BeanDefinitionDescriptorFormat.FLAG_PARALLEL);
     }
 
     @Override
     public boolean isProxiedBean() {
-        return data.is(BeanDefinitionDescriptorData.FLAG_PROXIED_BEAN);
+        return data.is(BeanDefinitionDescriptorFormat.FLAG_PROXIED_BEAN);
     }
 
     @Override
     public boolean isProxyTarget() {
-        return data.is(BeanDefinitionDescriptorData.FLAG_PROXY_TARGET);
+        return data.is(BeanDefinitionDescriptorFormat.FLAG_PROXY_TARGET);
     }
 
     @Override
     public boolean isSingleton() {
-        return data.is(BeanDefinitionDescriptorData.FLAG_SINGLETON);
+        return data.is(BeanDefinitionDescriptorFormat.FLAG_SINGLETON);
     }
 
     @Override
     public boolean isPrimary() {
-        return data.is(BeanDefinitionDescriptorData.FLAG_PRIMARY);
+        return data.is(BeanDefinitionDescriptorFormat.FLAG_PRIMARY);
     }
 
     @Override
     public boolean isConfigurationProperties() {
-        return data.is(BeanDefinitionDescriptorData.FLAG_CONFIGURATION_PROPERTIES);
+        return data.is(BeanDefinitionDescriptorFormat.FLAG_CONFIGURATION_PROPERTIES);
     }
 
     @Override
     public boolean isContainerType() {
-        return data.is(BeanDefinitionDescriptorData.FLAG_CONTAINER_TYPE);
+        return data.is(BeanDefinitionDescriptorFormat.FLAG_CONTAINER_TYPE);
     }
 
     @Override
     public boolean requiresMethodProcessing() {
-        return data.is(BeanDefinitionDescriptorData.FLAG_REQUIRES_METHOD_PROCESSING);
+        return data.is(BeanDefinitionDescriptorFormat.FLAG_REQUIRES_METHOD_PROCESSING);
     }
 
     @Override
@@ -272,7 +283,7 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
             Class<T> loaded = (Class<T>) loadBeanType();
             if (loaded == null) {
                 // as the constructor of the definition would have failed on it
-                STATE.compareAndSet(this, null, ABSENT);
+                STATE_HANDLE.compareAndSet(this, null, ABSENT);
                 throw new NoClassDefFoundError(data.beanTypeName);
             }
             type = loaded;
@@ -299,7 +310,7 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
         if (types == null) {
             if (data.indexNames.length == 0) {
                 types = new Class<?>[0];
-            } else if (data.is(BeanDefinitionDescriptorData.FLAG_DECLARED_INDEXES)) {
+            } else if (data.is(BeanDefinitionDescriptorFormat.FLAG_DECLARED_INDEXES)) {
                 // all or none, as the generated definition answers
                 types = loadClasses(data.indexNames);
                 if (types == null) {
@@ -333,34 +344,36 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
     public Optional<String> getBeanName() {
         if (metadata.resolvesExpressions()) {
             // the name can be a property expression, which the loaded definition resolves
-            return loaded("getBeanName").getBeanName();
+            return loaded(GET_BEAN_NAME).getBeanName();
         }
         int named = data.membership(AnnotationUtil.NAMED);
-        if ((named & BeanDefinitionDescriptorData.MEMBERSHIP_DECLARED_ANNOTATION) == 0 && (named & BeanDefinitionDescriptorData.MEMBERSHIP_DECLARED_STEREOTYPE) == 0) {
-            return record("getBeanName", Optional.empty(), BeanDefinitionReference::getBeanName);
+        if ((named & BeanDefinitionDescriptorFormat.MEMBERSHIP_DECLARED_ANNOTATION) == 0 && (named & BeanDefinitionDescriptorFormat.MEMBERSHIP_DECLARED_STEREOTYPE) == 0) {
+            return record(GET_BEAN_NAME, Optional.empty(), BeanDefinitionReference::getBeanName);
         }
         AnnotationValue<?> qualifier = data.qualifier(AnnotationUtil.NAMED);
         Object name = qualifier == null ? null : qualifier.getValues().get(AnnotationMetadata.VALUE_MEMBER);
         if (name instanceof String value) {
-            return record("getBeanName", Optional.of(value), BeanDefinitionReference::getBeanName);
+            return record(GET_BEAN_NAME, Optional.of(value), BeanDefinitionReference::getBeanName);
         }
-        return loaded("getBeanName").getBeanName();
+        return loaded(GET_BEAN_NAME).getBeanName();
     }
 
     @Override
     public @Nullable Qualifier<T> getDeclaredQualifier() {
         if (metadata.resolvesExpressions()) {
             // its values can be property expressions, which the loaded definition resolves
-            return loaded("getDeclaredQualifier").getDeclaredQualifier();
+            return loaded(GET_DECLARED_QUALIFIER).getDeclaredQualifier();
         }
-        Optional<Qualifier<T>> qualifier = declaredQualifier;
+        Object qualifier = declaredQualifier;
         if (qualifier == null) {
-            qualifier = Optional.ofNullable(declaredQualifierOf());
+            Qualifier<T> read = declaredQualifierOf();
+            qualifier = read == null ? NO_QUALIFIER : read;
             declaredQualifier = qualifier;
         }
-        Qualifier<T> answered = qualifier.orElse(null);
+        @SuppressWarnings("unchecked")
+        Qualifier<T> answered = qualifier == NO_QUALIFIER ? null : (Qualifier<T>) qualifier;
         if (answers != null) {
-            LazyBeanDefinitionVerifier.record(this, "getDeclaredQualifier", answered, BeanDefinitionReference::getDeclaredQualifier);
+            LazyBeanDefinitionVerifier.record(this, GET_DECLARED_QUALIFIER, answered, BeanDefinitionReference::getDeclaredQualifier);
         }
         return answered;
     }
@@ -370,8 +383,8 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
         AnnotationValue<?>[] qualifiers = data.qualifiers;
         if (qualifiers.length == 0) {
             // the declared metadata can name the bean with a @Named that is not read as a qualifier annotation
-            return data.has(AnnotationUtil.NAMED, BeanDefinitionDescriptorData.MEMBERSHIP_ANNOTATION | BeanDefinitionDescriptorData.MEMBERSHIP_STEREOTYPE)
-                ? loaded("getDeclaredQualifier").getDeclaredQualifier()
+            return data.has(AnnotationUtil.NAMED, BeanDefinitionDescriptorFormat.MEMBERSHIP_ANNOTATION | BeanDefinitionDescriptorFormat.MEMBERSHIP_STEREOTYPE)
+                ? loaded(GET_DECLARED_QUALIFIER).getDeclaredQualifier()
                 : null;
         }
         if (qualifiers.length == 1) {
@@ -565,11 +578,11 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
             return true;
         } catch (ClassNotFoundException | NoClassDefFoundError | NoSuchMethodException | IllegalAccessException | IllegalAccessError e) {
             // what the eager read drops
-            STATE.compareAndSet(this, null, ABSENT);
+            STATE_HANDLE.compareAndSet(this, null, ABSENT);
             return false;
         } catch (LinkageError e) {
             // what the eager read fails on: kept, and met by the lookup that needs the definition
-            STATE.compareAndSet(this, null, new Failed(e));
+            STATE_HANDLE.compareAndSet(this, null, new Failed(e));
             return true;
         }
     }
@@ -827,7 +840,7 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
         Object current = state;
         if (current == null) {
             Object created = create();
-            if (STATE.compareAndSet(this, null, created)) {
+            if (STATE_HANDLE.compareAndSet(this, null, created)) {
                 current = created;
                 loaded(current, cause);
             } else {
@@ -835,7 +848,7 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
                 current = state;
                 if (created instanceof Failed mine && mine.cause() instanceof ExceptionInInitializerError
                     && current instanceof Failed kept && kept.cause() instanceof NoClassDefFoundError
-                    && STATE.compareAndSet(this, current, created)) {
+                    && STATE_HANDLE.compareAndSet(this, current, created)) {
                     // the thread that ran the static initializer keeps its failure, not the one that waited for it
                     current = created;
                 }

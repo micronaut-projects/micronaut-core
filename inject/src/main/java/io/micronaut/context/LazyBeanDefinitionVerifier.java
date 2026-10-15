@@ -176,7 +176,7 @@ final class LazyBeanDefinitionVerifier {
         }
         for (LazyBeanDefinitionReference<?> lazy : lazyReferences) {
             BeanDefinitionReference<?> loaded = lazy.loadedInstance();
-            if (loaded == null || isFailedInitialization(loaded) || lazy.data.is(BeanDefinitionDescriptorData.FLAG_PROPERTY_EXPRESSIONS)) {
+            if (loaded == null || isFailedInitialization(loaded) || lazy.data.is(BeanDefinitionDescriptorFormat.FLAG_PROPERTY_EXPRESSIONS)) {
                 // a definition with property expressions answers them resolved once it is configured, as eager mode
                 // does: what it answered before, as the descriptor did, was compared when it was loaded
                 continue;
@@ -231,7 +231,7 @@ final class LazyBeanDefinitionVerifier {
     private static void differences(LazyBeanDefinitionReference<?> lazy, BeanDefinitionReference<?> loaded, List<String> differences) {
         BeanDefinitionDescriptorData data = lazy.data;
         // the flags of the descriptor only, which the definition answers through what they select
-        check(differences, "flags", data.flags & ~(BeanDefinitionDescriptorData.FLAG_DECLARED_INDEXES | BeanDefinitionDescriptorData.FLAG_PROPERTY_EXPRESSIONS), flags(loaded));
+        check(differences, "flags", data.flags & ~(BeanDefinitionDescriptorFormat.FLAG_DECLARED_INDEXES | BeanDefinitionDescriptorFormat.FLAG_PROPERTY_EXPRESSIONS), flags(loaded));
         check(differences, "definitionName", data.definitionName, loaded.getBeanDefinitionName());
         check(differences, "beanType", data.beanTypeName, loaded.getBeanType().getName());
         check(differences, "order", data.order, loaded.getOrder());
@@ -241,7 +241,7 @@ final class LazyBeanDefinitionVerifier {
         }
         List<String> indexes = Arrays.asList(data.indexNames);
         List<String> answeredIndexes = Arrays.stream(loaded.getIndexes()).map(Class::getName).toList();
-        if (data.is(BeanDefinitionDescriptorData.FLAG_DECLARED_INDEXES)) {
+        if (data.is(BeanDefinitionDescriptorFormat.FLAG_DECLARED_INDEXES)) {
             check(differences, "indexes", loads(lazy, indexes) ? indexes : List.of(), answeredIndexes);
         } else {
             check(differences, "indexes", indexes.stream().filter(name -> lazy.loadClass(name) != null).toList(), answeredIndexes);
@@ -254,10 +254,10 @@ final class LazyBeanDefinitionVerifier {
         names.addAll(metadata.getStereotypeAnnotationNames());
         names.addAll(metadata.getDeclaredStereotypeAnnotationNames());
         for (String name : names) {
-            int answered = (metadata.hasDeclaredAnnotation(name) ? BeanDefinitionDescriptorData.MEMBERSHIP_DECLARED_ANNOTATION : 0)
-                | (metadata.hasAnnotation(name) ? BeanDefinitionDescriptorData.MEMBERSHIP_ANNOTATION : 0)
-                | (metadata.hasDeclaredStereotype(name) ? BeanDefinitionDescriptorData.MEMBERSHIP_DECLARED_STEREOTYPE : 0)
-                | (metadata.hasStereotype(name) ? BeanDefinitionDescriptorData.MEMBERSHIP_STEREOTYPE : 0);
+            int answered = (metadata.hasDeclaredAnnotation(name) ? BeanDefinitionDescriptorFormat.MEMBERSHIP_DECLARED_ANNOTATION : 0)
+                | (metadata.hasAnnotation(name) ? BeanDefinitionDescriptorFormat.MEMBERSHIP_ANNOTATION : 0)
+                | (metadata.hasDeclaredStereotype(name) ? BeanDefinitionDescriptorFormat.MEMBERSHIP_DECLARED_STEREOTYPE : 0)
+                | (metadata.hasStereotype(name) ? BeanDefinitionDescriptorFormat.MEMBERSHIP_STEREOTYPE : 0);
             check(differences, "annotation " + name, data.membership(name), answered);
         }
         for (Map.Entry<String, String> repeatable : data.repeatableContainers.entrySet()) {
@@ -331,16 +331,16 @@ final class LazyBeanDefinitionVerifier {
         Condition[] postLoadConditions = reference instanceof AbstractInitializableBeanDefinitionAndReference<?> definition
             ? definition.postLoadConditionsForVerification()
             : null;
-        return (reference.isContextScope() ? BeanDefinitionDescriptorData.FLAG_CONTEXT_SCOPE : 0)
-            | (reference.isParallel() ? BeanDefinitionDescriptorData.FLAG_PARALLEL : 0)
-            | (reference.isProxiedBean() ? BeanDefinitionDescriptorData.FLAG_PROXIED_BEAN : 0)
-            | (reference.isProxyTarget() ? BeanDefinitionDescriptorData.FLAG_PROXY_TARGET : 0)
-            | (reference.isSingleton() ? BeanDefinitionDescriptorData.FLAG_SINGLETON : 0)
-            | (reference.isPrimary() ? BeanDefinitionDescriptorData.FLAG_PRIMARY : 0)
-            | (reference.isConfigurationProperties() ? BeanDefinitionDescriptorData.FLAG_CONFIGURATION_PROPERTIES : 0)
-            | (reference.isContainerType() ? BeanDefinitionDescriptorData.FLAG_CONTAINER_TYPE : 0)
-            | (reference.requiresMethodProcessing() ? BeanDefinitionDescriptorData.FLAG_REQUIRES_METHOD_PROCESSING : 0)
-            | (postLoadConditions != null && postLoadConditions.length > 0 ? BeanDefinitionDescriptorData.FLAG_POST_LOAD_CONDITIONS : 0);
+        return (reference.isContextScope() ? BeanDefinitionDescriptorFormat.FLAG_CONTEXT_SCOPE : 0)
+            | (reference.isParallel() ? BeanDefinitionDescriptorFormat.FLAG_PARALLEL : 0)
+            | (reference.isProxiedBean() ? BeanDefinitionDescriptorFormat.FLAG_PROXIED_BEAN : 0)
+            | (reference.isProxyTarget() ? BeanDefinitionDescriptorFormat.FLAG_PROXY_TARGET : 0)
+            | (reference.isSingleton() ? BeanDefinitionDescriptorFormat.FLAG_SINGLETON : 0)
+            | (reference.isPrimary() ? BeanDefinitionDescriptorFormat.FLAG_PRIMARY : 0)
+            | (reference.isConfigurationProperties() ? BeanDefinitionDescriptorFormat.FLAG_CONFIGURATION_PROPERTIES : 0)
+            | (reference.isContainerType() ? BeanDefinitionDescriptorFormat.FLAG_CONTAINER_TYPE : 0)
+            | (reference.requiresMethodProcessing() ? BeanDefinitionDescriptorFormat.FLAG_REQUIRES_METHOD_PROCESSING : 0)
+            | (postLoadConditions != null && postLoadConditions.length > 0 ? BeanDefinitionDescriptorFormat.FLAG_POST_LOAD_CONDITIONS : 0);
     }
 
     private static boolean loads(LazyBeanDefinitionReference<?> lazy, List<String> names) {

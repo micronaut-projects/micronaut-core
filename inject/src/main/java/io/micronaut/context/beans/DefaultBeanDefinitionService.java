@@ -115,6 +115,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     /**
      * In lazy mode, the warm-up of the current definitions, or {@code null}.
      */
+    @SuppressWarnings("java:S3077") // the warm-up is thread-safe; only the reference changes
     @Nullable
     private volatile Object runningWarmUp;
     /**
@@ -947,20 +948,30 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             if (def == null) {
                 return null;
             }
+            return enabled(context, resolutionContext, def, defPredicate);
+        }
+
+        /**
+         * The definition the reference loaded, if it passes the predicate and is enabled, which is kept for the next
+         * lookups.
+         */
+        @Nullable
+        final <T> BeanDefinition<T> enabled(BeanContext context,
+                                            @Nullable BeanResolutionContext resolutionContext,
+                                            BeanDefinition<T> def,
+                                            @Nullable Predicate<BeanDefinition<T>> defPredicate) {
             if (defPredicate != null && !defPredicate.test(def)) {
                 return null;
             }
             if (isDefinitionEnabled(context, resolutionContext, def)) {
                 if (DEFINITION_UPDATER.compareAndSet(this, null, def)) {
                     return def;
-                } else {
-                    defObject = this.definition;
-                    return defObject != DEFINITION_DISABLED_SENTINEL && defObject != null ? (BeanDefinition<T>) defObject : null;
                 }
-            } else {
-                this.definition = DEFINITION_DISABLED_SENTINEL;
-                return null;
+                Object defObject = this.definition;
+                return defObject != DEFINITION_DISABLED_SENTINEL && defObject != null ? (BeanDefinition<T>) defObject : null;
             }
+            this.definition = DEFINITION_DISABLED_SENTINEL;
+            return null;
         }
 
         /**
@@ -1113,25 +1124,13 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                 }
                 throw e;
             }
-            BeanDefinition<T> def = ref.load(context);
+            // the reference is the lazy one, whose load answers null for a definition that cannot be linked
+            BeanDefinition<T> def = (BeanDefinition<T>) lazy.load(context);
             if (def == null) {
                 disable();
                 return null;
             }
-            if (defPredicate != null && !defPredicate.test(def)) {
-                return null;
-            }
-            if (isDefinitionEnabled(context, resolutionContext, def)) {
-                if (DEFINITION_UPDATER.compareAndSet(this, null, def)) {
-                    return def;
-                } else {
-                    defObject = this.definition;
-                    return defObject != DEFINITION_DISABLED_SENTINEL && defObject != null ? (BeanDefinition<T>) defObject : null;
-                }
-            } else {
-                this.definition = DEFINITION_DISABLED_SENTINEL;
-                return null;
-            }
+            return enabled(context, resolutionContext, def, defPredicate);
         }
     }
 
@@ -1470,6 +1469,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
         final LazyBeanDefinitionReference<?> reference;
         final List<String> reasons;
+        @SuppressWarnings("java:S3077") // immutable once built
         @Nullable
         private volatile Object built;
 

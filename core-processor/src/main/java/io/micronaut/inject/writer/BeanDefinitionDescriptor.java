@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
+import io.micronaut.context.BeanDefinitionDescriptorFormat;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.conditions.MatchesAbsenceOfClassesCondition;
@@ -53,6 +54,34 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
+
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_CLASSES;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_CONFIGURATION;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_ENTITIES;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_ENVIRONMENTS;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_MISSING_CLASSES;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_MISSING_PROPERTY;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_NOT_ENVIRONMENTS;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_NOT_OS;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_OS;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_PROPERTY;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_RESOURCES;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.CONDITION_SDK;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.HEADER_LENGTH;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_ANNOTATION;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_ARRAY;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_BOOLEAN;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_BYTE;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_CHAR;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_CLASS;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_DOUBLE;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_EMPTY_ARRAY;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_FLOAT;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_INT;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_LONG;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_SHORT;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_STRING;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.VALUE_WRAPPER_ARRAY;
 
 /**
  * What the reference of a bean definition answers before the definition is loaded, written as the content of its
@@ -159,12 +188,12 @@ record BeanDefinitionDescriptor(int flags,
     /**
      * The first four bytes of a descriptor: {@code MNBD}.
      */
-    static final int MAGIC = 0x4D4E4244;
+    static final int MAGIC = BeanDefinitionDescriptorFormat.MAGIC;
 
     /**
      * The version of the format.
      */
-    static final int VERSION = 1;
+    static final int VERSION = BeanDefinitionDescriptorFormat.VERSION;
 
     /**
      * The revision of what the fields answer. Increase it whenever a field answers differently for the same
@@ -175,52 +204,52 @@ record BeanDefinitionDescriptor(int flags,
     /**
      * {@link io.micronaut.inject.BeanDefinitionReference#isContextScope()}.
      */
-    static final int FLAG_CONTEXT_SCOPE = 1;
+    static final int FLAG_CONTEXT_SCOPE = BeanDefinitionDescriptorFormat.FLAG_CONTEXT_SCOPE;
 
     /**
      * {@link io.micronaut.inject.BeanDefinitionReference#isParallel()}.
      */
-    static final int FLAG_PARALLEL = 1 << 1;
+    static final int FLAG_PARALLEL = BeanDefinitionDescriptorFormat.FLAG_PARALLEL;
 
     /**
      * {@link io.micronaut.inject.BeanDefinitionReference#isProxiedBean()}.
      */
-    static final int FLAG_PROXIED_BEAN = 1 << 2;
+    static final int FLAG_PROXIED_BEAN = BeanDefinitionDescriptorFormat.FLAG_PROXIED_BEAN;
 
     /**
      * {@link io.micronaut.inject.BeanDefinitionReference#isProxyTarget()}.
      */
-    static final int FLAG_PROXY_TARGET = 1 << 3;
+    static final int FLAG_PROXY_TARGET = BeanDefinitionDescriptorFormat.FLAG_PROXY_TARGET;
 
     /**
      * {@link io.micronaut.inject.BeanDefinitionReference#isSingleton()}.
      */
-    static final int FLAG_SINGLETON = 1 << 4;
+    static final int FLAG_SINGLETON = BeanDefinitionDescriptorFormat.FLAG_SINGLETON;
 
     /**
      * {@link io.micronaut.inject.BeanType#isPrimary()}.
      */
-    static final int FLAG_PRIMARY = 1 << 5;
+    static final int FLAG_PRIMARY = BeanDefinitionDescriptorFormat.FLAG_PRIMARY;
 
     /**
      * {@link io.micronaut.inject.BeanDefinitionReference#isConfigurationProperties()}.
      */
-    static final int FLAG_CONFIGURATION_PROPERTIES = 1 << 6;
+    static final int FLAG_CONFIGURATION_PROPERTIES = BeanDefinitionDescriptorFormat.FLAG_CONFIGURATION_PROPERTIES;
 
     /**
      * {@link io.micronaut.inject.BeanType#isContainerType()}.
      */
-    static final int FLAG_CONTAINER_TYPE = 1 << 7;
+    static final int FLAG_CONTAINER_TYPE = BeanDefinitionDescriptorFormat.FLAG_CONTAINER_TYPE;
 
     /**
      * {@link io.micronaut.inject.BeanType#requiresMethodProcessing()}.
      */
-    static final int FLAG_REQUIRES_METHOD_PROCESSING = 1 << 8;
+    static final int FLAG_REQUIRES_METHOD_PROCESSING = BeanDefinitionDescriptorFormat.FLAG_REQUIRES_METHOD_PROCESSING;
 
     /**
      * The bean has conditions that can only be checked once the definition is loaded.
      */
-    static final int FLAG_POST_LOAD_CONDITIONS = 1 << 9;
+    static final int FLAG_POST_LOAD_CONDITIONS = BeanDefinitionDescriptorFormat.FLAG_POST_LOAD_CONDITIONS;
 
     /**
      * The indexes are the ones the bean declares with {@link io.micronaut.core.annotation.Indexed}, which a definition
@@ -228,65 +257,36 @@ record BeanDefinitionDescriptor(int flags,
      * the {@link io.micronaut.core.annotation.Indexes} of the annotation metadata, of a factory for instance, which
      * are read as class values.
      */
-    static final int FLAG_DECLARED_INDEXES = 1 << 10;
+    static final int FLAG_DECLARED_INDEXES = BeanDefinitionDescriptorFormat.FLAG_DECLARED_INDEXES;
 
     /**
      * The annotation metadata of the bean has property expressions, so that a definition answers it through a
      * metadata that resolves them, which knows no repeatable annotation by name:
      * {@link io.micronaut.core.annotation.AnnotationMetadata#findRepeatableAnnotation(String)} answers empty.
      */
-    static final int FLAG_PROPERTY_EXPRESSIONS = 1 << 11;
+    static final int FLAG_PROPERTY_EXPRESSIONS = BeanDefinitionDescriptorFormat.FLAG_PROPERTY_EXPRESSIONS;
 
     /**
      * {@link io.micronaut.core.annotation.AnnotationMetadata#hasDeclaredAnnotation(String)}.
      */
-    static final int MEMBERSHIP_DECLARED_ANNOTATION = 1;
+    static final int MEMBERSHIP_DECLARED_ANNOTATION = BeanDefinitionDescriptorFormat.MEMBERSHIP_DECLARED_ANNOTATION;
 
     /**
      * {@link io.micronaut.core.annotation.AnnotationMetadata#hasAnnotation(String)}.
      */
-    static final int MEMBERSHIP_ANNOTATION = 1 << 1;
+    static final int MEMBERSHIP_ANNOTATION = BeanDefinitionDescriptorFormat.MEMBERSHIP_ANNOTATION;
 
     /**
      * {@link io.micronaut.core.annotation.AnnotationMetadata#hasDeclaredStereotype(String)}.
      */
-    static final int MEMBERSHIP_DECLARED_STEREOTYPE = 1 << 2;
+    static final int MEMBERSHIP_DECLARED_STEREOTYPE = BeanDefinitionDescriptorFormat.MEMBERSHIP_DECLARED_STEREOTYPE;
 
     /**
      * {@link io.micronaut.core.annotation.AnnotationMetadata#hasStereotype(String)}.
      */
-    static final int MEMBERSHIP_STEREOTYPE = 1 << 3;
+    static final int MEMBERSHIP_STEREOTYPE = BeanDefinitionDescriptorFormat.MEMBERSHIP_STEREOTYPE;
 
-    private static final int HEADER_LENGTH = 10;
     private static final int MAX_COUNT = 0xFFFF;
-
-    private static final int VALUE_STRING = 1;
-    private static final int VALUE_BOOLEAN = 2;
-    private static final int VALUE_BYTE = 3;
-    private static final int VALUE_CHAR = 4;
-    private static final int VALUE_SHORT = 5;
-    private static final int VALUE_INT = 6;
-    private static final int VALUE_LONG = 7;
-    private static final int VALUE_FLOAT = 8;
-    private static final int VALUE_DOUBLE = 9;
-    private static final int VALUE_CLASS = 10;
-    private static final int VALUE_ANNOTATION = 11;
-    private static final int VALUE_ARRAY = 12;
-    private static final int VALUE_WRAPPER_ARRAY = 13;
-    private static final int VALUE_EMPTY_ARRAY = 14;
-
-    private static final int CONDITION_CLASSES = 1;
-    private static final int CONDITION_MISSING_CLASSES = 2;
-    private static final int CONDITION_ENVIRONMENTS = 3;
-    private static final int CONDITION_NOT_ENVIRONMENTS = 4;
-    private static final int CONDITION_ENTITIES = 5;
-    private static final int CONDITION_PROPERTY = 6;
-    private static final int CONDITION_MISSING_PROPERTY = 7;
-    private static final int CONDITION_CONFIGURATION = 8;
-    private static final int CONDITION_SDK = 9;
-    private static final int CONDITION_RESOURCES = 10;
-    private static final int CONDITION_OS = 11;
-    private static final int CONDITION_NOT_OS = 12;
 
     /**
      * Copies the collections: the exposed types are a set and are kept sorted, as the names of the maps are, so

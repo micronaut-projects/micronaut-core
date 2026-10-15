@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataSupport;
 import org.jspecify.annotations.Nullable;
@@ -32,10 +33,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
-import static io.micronaut.context.BeanDefinitionDescriptorData.MEMBERSHIP_ANNOTATION;
-import static io.micronaut.context.BeanDefinitionDescriptorData.MEMBERSHIP_DECLARED_ANNOTATION;
-import static io.micronaut.context.BeanDefinitionDescriptorData.MEMBERSHIP_DECLARED_STEREOTYPE;
-import static io.micronaut.context.BeanDefinitionDescriptorData.MEMBERSHIP_STEREOTYPE;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.MEMBERSHIP_ANNOTATION;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.MEMBERSHIP_DECLARED_ANNOTATION;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.MEMBERSHIP_DECLARED_STEREOTYPE;
+import static io.micronaut.context.BeanDefinitionDescriptorFormat.MEMBERSHIP_STEREOTYPE;
 
 /**
  * The annotation metadata of a {@link LazyBeanDefinitionReference}. It answers from the descriptor:
@@ -63,6 +64,14 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
 
     private static final int DECLARED = MEMBERSHIP_DECLARED_ANNOTATION | MEMBERSHIP_DECLARED_STEREOTYPE;
     private static final int ANY = MEMBERSHIP_ANNOTATION | MEMBERSHIP_STEREOTYPE | DECLARED;
+    /**
+     * How a recorded question names a {@link Class} argument: by its name and this suffix.
+     */
+    private static final String CLASS_ARGUMENT = ".class)";
+    /**
+     * The value of a member of an annotation the bean does not have, or that the metadata holds no value for.
+     */
+    private static final Object NO_VALUE = new Object();
 
     private final LazyBeanDefinitionReference<?> reference;
     private final BeanDefinitionDescriptorData data;
@@ -122,7 +131,7 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
         }
         boolean answered = data.has(repeatable(annotation.getName()), MEMBERSHIP_ANNOTATION);
         if (reference.answers != null) {
-            record("hasAnnotation(" + annotation.getName() + ".class)", answered, m -> m.hasAnnotation(annotation));
+            record("hasAnnotation(" + annotation.getName() + CLASS_ARGUMENT, answered, m -> m.hasAnnotation(annotation));
         }
         return answered;
     }
@@ -134,7 +143,7 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
         }
         boolean answered = data.has(repeatable(annotation.getName()), MEMBERSHIP_DECLARED_ANNOTATION);
         if (reference.answers != null) {
-            record("hasDeclaredAnnotation(" + annotation.getName() + ".class)", answered, m -> m.hasDeclaredAnnotation(annotation));
+            record("hasDeclaredAnnotation(" + annotation.getName() + CLASS_ARGUMENT, answered, m -> m.hasDeclaredAnnotation(annotation));
         }
         return answered;
     }
@@ -146,7 +155,7 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
         }
         boolean answered = data.has(repeatable(annotation.getName()), MEMBERSHIP_STEREOTYPE);
         if (reference.answers != null) {
-            record("hasStereotype(" + annotation.getName() + ".class)", answered, m -> m.hasStereotype(annotation));
+            record("hasStereotype(" + annotation.getName() + CLASS_ARGUMENT, answered, m -> m.hasStereotype(annotation));
         }
         return answered;
     }
@@ -158,7 +167,7 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
         }
         boolean answered = data.has(repeatable(stereotype.getName()), MEMBERSHIP_DECLARED_STEREOTYPE);
         if (reference.answers != null) {
-            record("hasDeclaredStereotype(" + stereotype.getName() + ".class)", answered, m -> m.hasDeclaredStereotype(stereotype));
+            record("hasDeclaredStereotype(" + stereotype.getName() + CLASS_ARGUMENT, answered, m -> m.hasDeclaredStereotype(stereotype));
         }
         return answered;
     }
@@ -211,7 +220,7 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
 
     @Override
     public boolean hasDeclaredStereotype(@Nullable String... annotations) {
-        if (annotations == null) {
+        if (ArrayUtils.isEmpty(annotations)) {
             return false;
         }
         for (String annotation : annotations) {
@@ -223,21 +232,25 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
     }
 
     @Override
+    @SuppressWarnings("java:S2589") // a null argument answers false, as the interface answers it
     public boolean isAnnotationPresent(Class<? extends Annotation> annotationClass) {
         return annotationClass != null && hasAnnotation(annotationClass);
     }
 
     @Override
+    @SuppressWarnings("java:S2589") // a null argument answers false, as the interface answers it
     public boolean isDeclaredAnnotationPresent(Class<? extends Annotation> annotationClass) {
         return annotationClass != null && hasDeclaredAnnotation(annotationClass);
     }
 
     @Override
+    @SuppressWarnings("java:S2589") // a null argument answers false, as the interface answers it
     public boolean isAnnotationPresent(String annotationName) {
         return annotationName != null && hasAnnotation(annotationName);
     }
 
     @Override
+    @SuppressWarnings("java:S2589") // a null argument answers false, as the interface answers it
     public boolean isDeclaredAnnotationPresent(String annotationName) {
         return annotationName != null && hasDeclaredAnnotation(annotationName);
     }
@@ -264,11 +277,11 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
 
     @Override
     public Optional<String> findRepeatableAnnotation(Class<? extends Annotation> annotation) {
-        if (data.is(BeanDefinitionDescriptorData.FLAG_PROPERTY_EXPRESSIONS)) {
-            // the metadata that resolves property expressions answers a class from its own annotation
+        if (data.annotationNames.length == 0 || data.is(BeanDefinitionDescriptorFormat.FLAG_PROPERTY_EXPRESSIONS)) {
+            // the empty metadata, as the one that resolves property expressions, answers a class from its own annotation
             Optional<String> answered = Optional.ofNullable(annotation.getAnnotation(Repeatable.class)).map(repeatable -> repeatable.value().getName());
             if (reference.answers != null) {
-                record("findRepeatableAnnotation(" + annotation.getName() + ".class)", answered, m -> m.findRepeatableAnnotation(annotation));
+                record("findRepeatableAnnotation(" + annotation.getName() + CLASS_ARGUMENT, answered, m -> m.findRepeatableAnnotation(annotation));
             }
             return answered;
         }
@@ -292,7 +305,7 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
      * @return Its container
      */
     Optional<String> repeatableAnswer(String annotation) {
-        if (data.annotationNames.length == 0 || data.is(BeanDefinitionDescriptorData.FLAG_PROPERTY_EXPRESSIONS)) {
+        if (data.annotationNames.length == 0 || data.is(BeanDefinitionDescriptorFormat.FLAG_PROPERTY_EXPRESSIONS)) {
             // no metadata, or the one that resolves property expressions, which knows no container by name
             return Optional.empty();
         }
@@ -384,11 +397,12 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
 
     @Override
     public Optional<String> stringValue(String annotation, String member) {
-        Optional<Object> raw = declaredValue(annotation, member);
-        if (raw == null || raw.isPresent() && firstElement(raw.get()) == null) {
+        Object raw = declaredValue(annotation, member);
+        Object first = raw == null || raw == NO_VALUE ? null : firstElement(raw);
+        if (raw == null || raw != NO_VALUE && first == null) {
             return getAnnotationMetadata().stringValue(annotation, member);
         }
-        Optional<String> answered = raw.map(DescriptorAnnotationMetadata::firstElement).map(Object::toString);
+        Optional<String> answered = first == null ? Optional.empty() : Optional.of(first.toString());
         if (reference.answers != null) {
             record("stringValue(" + annotation + ", " + member + ")", answered, m -> m.stringValue(annotation, member));
         }
@@ -402,11 +416,11 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
 
     @Override
     public String[] stringValues(String annotation, String member) {
-        Optional<Object> raw = declaredValue(annotation, member);
+        Object raw = declaredValue(annotation, member);
         if (raw == null) {
             return getAnnotationMetadata().stringValues(annotation, member);
         }
-        String[] answered = raw.isPresent() ? strings(raw.get()) : StringUtils.EMPTY_STRING_ARRAY;
+        String[] answered = raw == NO_VALUE ? StringUtils.EMPTY_STRING_ARRAY : strings(raw);
         if (answered == null) {
             // a value of a kind the metadata turns into strings in its own way
             return getAnnotationMetadata().stringValues(annotation, member);
@@ -425,13 +439,13 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
     @Override
     @SuppressWarnings("rawtypes")
     public Optional<Class> classValue(String annotation, String member) {
-        Optional<Object> raw = declaredValue(annotation, member);
+        Object raw = declaredValue(annotation, member);
         if (raw == null) {
             return getAnnotationMetadata().classValue(annotation, member);
         }
         Optional<Class> answered = Optional.empty();
-        if (raw.isPresent()) {
-            if (!(firstElement(raw.get()) instanceof AnnotationClassValue<?> classValue)) {
+        if (raw != NO_VALUE) {
+            if (!(firstElement(raw) instanceof AnnotationClassValue<?> classValue)) {
                 return getAnnotationMetadata().classValue(annotation, member);
             }
             answered = Optional.ofNullable(reference.loadClass(classValue.getName()));
@@ -462,10 +476,10 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
     /**
      * The value of a member as the metadata of the definition holds it, when the descriptor knows it.
      *
-     * @return The value, empty when the bean has no such annotation, or {@code null} when the descriptor does not tell
+     * @return The value, {@link #NO_VALUE} when the bean has no such annotation or the metadata no value for the
+     * member, or {@code null} when the descriptor does not tell
      */
-    @SuppressWarnings({"java:S2789", "OptionalAssignedToNull"}) // null means the definition has to answer
-    private @Nullable Optional<Object> declaredValue(String annotation, String member) {
+    private @Nullable Object declaredValue(String annotation, String member) {
         if (resolvesExpressions()) {
             return null;
         }
@@ -473,12 +487,12 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
         if (qualifier != null) {
             Object value = qualifier.getValues().get(member);
             if (value != null) {
-                return Optional.of(value);
+                return value;
             }
             // a member left at its default has no value in the metadata either, but for the one Micronaut records
-            return AnnotationUtil.NON_BINDING_ATTRIBUTE.equals(member) ? Optional.empty() : null;
+            return AnnotationUtil.NON_BINDING_ATTRIBUTE.equals(member) ? NO_VALUE : null;
         }
-        return isAbsent(annotation, ANY) ? Optional.empty() : null;
+        return isAbsent(annotation, ANY) ? NO_VALUE : null;
     }
 
     /**
@@ -486,7 +500,7 @@ final class DescriptorAnnotationMetadata implements AnnotationMetadataDelegate {
      * answers them resolved once a context configured it, which the descriptor cannot.
      */
     boolean resolvesExpressions() {
-        return data.is(BeanDefinitionDescriptorData.FLAG_PROPERTY_EXPRESSIONS) && reference.isInstantiated();
+        return data.is(BeanDefinitionDescriptorFormat.FLAG_PROPERTY_EXPRESSIONS) && reference.isInstantiated();
     }
 
     /**

@@ -861,10 +861,10 @@ public final class MicronautMetaServiceLoaderUtils {
      *
      * @param <S> The service type
      */
-    private static final class ServiceInstanceLoader<S> extends RecursiveActionValuesCollector<S> {
+    private static class ServiceInstanceLoader<S> extends RecursiveActionValuesCollector<S> {
 
-        private final ClassLoader classLoader;
-        private final String className;
+        final ClassLoader classLoader;
+        final String className;
         @Nullable
         private final Predicate<S> predicate;
         @Nullable
@@ -878,10 +878,20 @@ public final class MicronautMetaServiceLoaderUtils {
             this.predicate = predicate;
         }
 
+        /**
+         * Creates the instance of the entry.
+         *
+         * @return The instance, or {@code null} when the entry is not present
+         */
+        @Nullable
+        S create() {
+            return instantiate(className, classLoader);
+        }
+
         @Override
         protected void compute() {
             try {
-                result = instantiate(className, classLoader);
+                result = create();
                 if (result != null && predicate != null && !predicate.test(result)) {
                     result = null;
                 }
@@ -907,22 +917,12 @@ public final class MicronautMetaServiceLoaderUtils {
      *
      * @param <S> The service type
      */
-    private static final class DescribedEntryLoader<S> extends RecursiveActionValuesCollector<S> {
+    private static final class DescribedEntryLoader<S> extends ServiceInstanceLoader<S> {
 
-        private final ClassLoader classLoader;
-        private final String className;
-        @Nullable
-        private final Predicate<S> predicate;
         private final BiFunction<ClassLoader, String, @Nullable S> factory;
-        @Nullable
-        private S result;
-        @Nullable
-        private Throwable throwable;
 
         DescribedEntryLoader(ClassLoader classLoader, String className, @Nullable Predicate<S> predicate, BiFunction<ClassLoader, String, @Nullable S> factory) {
-            this.classLoader = classLoader;
-            this.className = className;
-            this.predicate = predicate;
+            super(classLoader, className, predicate);
             this.factory = factory;
         }
 
@@ -944,25 +944,9 @@ public final class MicronautMetaServiceLoaderUtils {
         }
 
         @Override
-        protected void compute() {
-            try {
-                result = create(factory, className, classLoader);
-                if (result != null && predicate != null && !predicate.test(result)) {
-                    result = null;
-                }
-            } catch (Throwable e) {
-                throwable = e;
-            }
-        }
-
-        @Override
-        public void collect(Collection<S> values) {
-            if (throwable != null) {
-                throw new SoftServiceLoader.ServiceLoadingException("Failed to load a service: " + throwable.getMessage(), throwable);
-            }
-            if (result != null) {
-                values.add(result);
-            }
+        @Nullable
+        S create() {
+            return create(factory, className, classLoader);
         }
     }
 

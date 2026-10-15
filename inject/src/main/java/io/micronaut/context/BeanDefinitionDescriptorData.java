@@ -36,24 +36,6 @@ import java.util.Map;
  */
 final class BeanDefinitionDescriptorData {
 
-    static final int FLAG_CONTEXT_SCOPE = 1;
-    static final int FLAG_PARALLEL = 1 << 1;
-    static final int FLAG_PROXIED_BEAN = 1 << 2;
-    static final int FLAG_PROXY_TARGET = 1 << 3;
-    static final int FLAG_SINGLETON = 1 << 4;
-    static final int FLAG_PRIMARY = 1 << 5;
-    static final int FLAG_CONFIGURATION_PROPERTIES = 1 << 6;
-    static final int FLAG_CONTAINER_TYPE = 1 << 7;
-    static final int FLAG_REQUIRES_METHOD_PROCESSING = 1 << 8;
-    static final int FLAG_POST_LOAD_CONDITIONS = 1 << 9;
-    static final int FLAG_DECLARED_INDEXES = 1 << 10;
-    static final int FLAG_PROPERTY_EXPRESSIONS = 1 << 11;
-
-    static final int MEMBERSHIP_DECLARED_ANNOTATION = 1;
-    static final int MEMBERSHIP_ANNOTATION = 1 << 1;
-    static final int MEMBERSHIP_DECLARED_STEREOTYPE = 1 << 2;
-    static final int MEMBERSHIP_STEREOTYPE = 1 << 3;
-
     final int flags;
     final String beanTypeName;
     final String[] exposedTypeNames;
@@ -111,7 +93,7 @@ final class BeanDefinitionDescriptorData {
     }
 
     /**
-     * @param flag One of the {@code FLAG_} constants
+     * @param flag One of the {@code FLAG_} constants of {@link BeanDefinitionDescriptorFormat}
      * @return Whether the reference answers true for it
      */
     boolean is(int flag) {
@@ -132,7 +114,7 @@ final class BeanDefinitionDescriptorData {
 
     /**
      * @param annotation The name of an annotation
-     * @param membership One of the {@code MEMBERSHIP_} constants, or several
+     * @param membership One of the {@code MEMBERSHIP_} constants of {@link BeanDefinitionDescriptorFormat}, or several
      * @return Whether the annotation metadata of the bean answers true for one of them
      */
     boolean has(@Nullable String annotation, int membership) {
