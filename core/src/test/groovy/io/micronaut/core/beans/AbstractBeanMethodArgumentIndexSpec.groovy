@@ -5,6 +5,7 @@ import spock.lang.Specification
 
 import java.util.concurrent.Callable
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class AbstractBeanMethodArgumentIndexSpec extends Specification {
@@ -65,23 +66,29 @@ class AbstractBeanMethodArgumentIndexSpec extends Specification {
         def pool = Executors.newFixedThreadPool(8)
 
         when:
-        boolean allCorrect = (1..200).every {
-            def method = new TestMethod(args(12))
-            def start = new CountDownLatch(1)
-            def futures = (1..8).collect {
-                pool.submit({
-                    start.await()
-                    (0..<12).every { i -> method.argumentIndexOf("arg$i".toString()) == i }
-                } as Callable<Boolean>)
-            }
-            start.countDown()
-            futures.every { it.get() }
-        }
+        boolean allCorrect = (1..200).every { raceFirstCalls(pool) }
 
         then:
         allCorrect
 
         cleanup:
         pool.shutdownNow()
+    }
+
+    private static boolean raceFirstCalls(ExecutorService pool) {
+        def method = new TestMethod(args(12))
+        def start = new CountDownLatch(1)
+        def futures = (1..8).collect {
+            pool.submit({
+                start.await()
+                indexesCorrect(method, 12)
+            } as Callable<Boolean>)
+        }
+        start.countDown()
+        return futures.every { it.get() }
+    }
+
+    private static boolean indexesCorrect(TestMethod method, int count) {
+        return (0..<count).every { i -> method.argumentIndexOf("arg$i".toString()) == i }
     }
 }
