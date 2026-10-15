@@ -70,11 +70,38 @@ class BootstrapContextRefreshSpec extends Specification {
         new IOException("cannot be read")           | IOException
     }
 
+    void "a refresh keeps the order of the builder properties"() {
+        given: "a property source of higher order than the builder properties, which sets the same key"
+        ApplicationContext ctx = ApplicationContext.builder()
+                .properties(['spec.name': 'BootstrapContextRefreshSpec', 'app.value': 'builder'])
+                .propertySources(PropertySource.of('remote', ['app.value': 'remote'], 30))
+                .bootstrapEnvironment(true)
+                .start()
+        int order = contextSource(ctx).order
+
+        expect:
+        ctx.getProperty('app.value', String).get() == 'remote'
+
+        when:
+        5.times { ctx.environment.refresh() }
+
+        then: "the builder properties do not come to override it"
+        contextSource(ctx).order == order
+        ctx.getProperty('app.value', String).get() == 'remote'
+
+        cleanup:
+        ctx.close()
+    }
+
     private static ApplicationContext startContext() {
         ApplicationContext.builder()
                 .properties(['spec.name': 'BootstrapContextRefreshSpec'])
                 .bootstrapEnvironment(true)
                 .start()
+    }
+
+    private static PropertySource contextSource(ApplicationContext ctx) {
+        ctx.environment.propertySources.find { it.name == PropertySource.CONTEXT }
     }
 
     @BootstrapContextCompatible

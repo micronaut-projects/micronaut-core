@@ -782,7 +782,12 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
             try {
                 for (PropertySource propertySource : environment.getPropertySources()) {
                     if (PropertySource.CONTEXT.equals(propertySource.getName())) {
-                        bootstrapContext.getEnvironment().addPropertySource(propertySource);
+                        // After the first load the environment holds the wrapper this locator
+                        // returned for the context source. Its delegate is added, or every refresh
+                        // would wrap the context source once more and raise its order again.
+                        bootstrapContext.getEnvironment().addPropertySource(
+                            propertySource instanceof BootstrapPropertySource bootstrapSource ? bootstrapSource.delegate() : propertySource
+                        );
                     }
                 }
 
