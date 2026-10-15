@@ -42,7 +42,49 @@ class EventService:
 
 Calling `reschedule` from Java with a `UUID`, `LocalDateTime`, and `Duration` passes native Python `UUID`, `datetime`, and `timedelta` objects to the method. A Python result is converted back to the declared Java type.
 
-`time` and `datetime` use naive Java representations. Values with `tzinfo` are rejected rather than having their time-zone information discarded. `timezone` conversion supports fixed offsets representable by `ZoneOffset`; custom `tzinfo` implementations are not supported.
+`time` and `datetime` use naive Java representations by default. Values with `tzinfo` are rejected rather than having their time-zone information discarded. `timezone` conversion supports fixed offsets representable by `ZoneOffset`; custom `tzinfo` implementations are not supported.
+
+=== Aware datetimes
+
+A `datetime` that holds an absolute instant, such as `datetime.now(timezone.utc)`, maps to `java.time.Instant`, `OffsetDateTime` or `ZonedDateTime` instead. Name the Java type as `Annotated` metadata:
+
+[source,python]
+----
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Annotated
+
+from java.time import Instant, OffsetDateTime
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity
+
+
+@dataclass
+@MappedEntity("fetch_log")
+class FetchLogEntry:
+    id: Annotated[int | None, Id, GeneratedValue]
+    run: Annotated[datetime, Instant]
+    finished: Annotated[datetime | None, OffsetDateTime]
+----
+
+The property stays a Python `datetime`; only its Java type changes. Declaring the Java type itself (`run: Instant`) is different: the value then stays the Java object, for Python code that passes it on to Java APIs. Saving `FetchLogEntry(None, datetime(2026, 10, 7, tzinfo=timezone.utc), None)` stores the instant, and reading it back gives an aware `datetime` again. The same applies to parameters and return types of executable methods and repository methods.
+
+[%header,cols="1,2"]
+|===
+|Java type |Python value
+
+|`java.time.Instant`
+|An aware `datetime` in UTC
+
+|`java.time.OffsetDateTime`
+|An aware `datetime` with a fixed-offset `timezone`
+
+|`java.time.ZonedDateTime`
+|An aware `datetime` in the `zoneinfo.ZoneInfo` region of the same name, or at its fixed offset when there is no time zone data for the region. A Python `zoneinfo` (or pytz) region converts to the Java region of the same name
+|===
+
+A naive `datetime` passed where one of these types is expected is rejected: it names no instant, and guessing a time zone would shift it silently. Give it a `tzinfo` first (`value.replace(tzinfo=timezone.utc)`).
+
+Where Java declares no particular type (an `Object` parameter, such as the erased type argument of a generic repository), a naive `datetime` converts to `LocalDateTime` and an aware one to `OffsetDateTime`, or `ZonedDateTime` when its `tzinfo` is a named region.
 
 === Class attributes without a type annotation
 
