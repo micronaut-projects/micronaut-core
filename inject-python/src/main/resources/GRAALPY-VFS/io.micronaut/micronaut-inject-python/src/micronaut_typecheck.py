@@ -764,6 +764,8 @@ class JavaReceiverRules:
         self.facts = checker.facts
         self.bindings = Bindings(checker, unit)
         self.span_of = unit.module.span_of
+        # a probe walk of a loop body (see _rebound_in) reports nothing
+        self._probing = 0
 
     def check(self):
         for statement in getattr(self.unit.node, "body", ()):
@@ -818,19 +820,43 @@ class JavaReceiverRules:
 
     def _loop_body(self, body, orelse, test=None):
         """
-        A loop body is walked once, in order, but runs any number of times: a name it assigns may hold, at the
-        top of an iteration, what a later statement of the previous one assigned, and after the loop either that
-        or what it held before. Such a name is unknown at the top of the body and after the loop.
+        A loop body is walked once, in order, but runs any number of times: a name it rebinds to another type may
+        hold, at the top of an iteration, what a later statement of the previous one assigned. Such a name is
+        unknown from the top of the body on; a name the body only ever assigns its own type (an accumulator) keeps it.
         """
-        assigned = _assigned_names(body + orelse)
-        for name in assigned:
+        for name in self._rebound_in(body + orelse, test):
             self.bindings.forget(name)
         if test is not None:
             self.expression(test)
         for child in body + orelse:
             self.statement(child)
-        for name in assigned:
-            self.bindings.forget(name)
+
+    def _rebound_in(self, statements, test):
+        """
+        The names the statements give a type other than the one they hold before them: found by a probe walk that
+        reports nothing and records nothing, after which the bindings are as they were.
+        """
+        assigned = _assigned_names(statements)
+        if not assigned:
+            return set()
+        bindings = self.bindings
+        locals_before, unknown_before = dict(bindings.locals), set(bindings.unknown_locals)
+        # what a walk records (the expression types, the resolved calls, the problems) goes to throwaway places
+        recorded = {field: getattr(self, field) for field in ("node_types", "targets", "problems") if hasattr(self, field)}
+        for field, value in recorded.items():
+            setattr(self, field, type(value)())
+        self._probing += 1
+        try:
+            if test is not None:
+                self.expression(test)
+            for child in statements:
+                self.statement(child)
+            return {name for name in assigned if name in bindings.unknown_locals and name not in unknown_before}
+        finally:
+            self._probing -= 1
+            bindings.locals, bindings.unknown_locals = locals_before, unknown_before
+            for field, value in recorded.items():
+                setattr(self, field, value)
 
     def assignment(self, node):
         if isinstance(node, ast.AugAssign):
@@ -1169,4 +1195,6 @@ class JavaReceiverRules:
         return ", ".join("?" if argument is None else argument.label() for argument in argument_types)
 
     def _report(self, rule, message, node, suggestions=()):
+        if self._probing:
+            return
         self.checker.report(self.unit, rule, message, self.span_of(node), suggestions)
