@@ -29,6 +29,8 @@ import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.form.FormCapableHttpRequest;
+import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.server.multipart.FormFactory;
@@ -172,7 +174,9 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
 
     /**
      * A collection, an array or an {@link Iterable} gets every field of the name, in order,
-     * like the fields of a form read whole.
+     * like the fields of a form read whole. A field is converted to its text, unless the element
+     * type is a completed part that the field is, e.g. a {@link CompletedFileUpload} of a
+     * {@code CompletedFileUpload[]}: then the element is the part itself.
      */
     private static <T> CompletableFuture<@Nullable Optional<T>> collectAll(ConversionService conversionService,
                                                                          ArgumentConversionContext<T> context,
@@ -181,9 +185,19 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
                                                                          FormRouteCompleter completer,
                                                                          String inputName) {
         CompletableFuture<@Nullable Optional<T>> result = new CompletableFuture<>();
-        List<String> values = new ArrayList<>();
-        FormFieldFlows.Concat<RawFormField, String> reading = new FormFieldFlows.Concat<>(
+        Class<?> elementType = elementType(context.getArgument());
+        @Nullable Class<?> partType = elementType != null && CompletedPart.class.isAssignableFrom(elementType) ? elementType : null;
+        List<Object> values = new ArrayList<>();
+        // the parts that are elements of the value: released if the value is not bound
+        List<CompletedPart> held = new ArrayList<>();
+        FormFieldFlows.Concat<RawFormField, Object> reading = new FormFieldFlows.Concat<>(
             field -> formFactory.completePart(formRequest, field).map(part -> {
+                if (partType != null && partType.isInstance(part)) {
+                    synchronized (held) {
+                        held.add(part);
+                    }
+                    return part;
+                }
                 try {
                     return conversionService.convert(part, String.class).orElse("");
                 } finally {
@@ -202,14 +216,41 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
                     result.complete(FormBinding.convert(conversionService, context, values));
                 }
             });
-        result.whenComplete((ignored, error) -> {
+        result.whenComplete((value, error) -> {
             if (result.isCancelled()) {
                 reading.cancel();
+            }
+            if (error != null || value == null || value.isEmpty()) {
+                synchronized (held) {
+                    for (CompletedPart part : held) {
+                        part.closeAsync(formFactory.getDiskWriteExecutor());
+                    }
+                    held.clear();
+                }
             }
         });
         completer.subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, context.getArgument()))
             .subscribe(reading);
         return result;
+    }
+
+    /**
+     * @param argument A collection, an array or an {@link Iterable}, or an {@code Optional} of one
+     * @return The type of its elements, if known
+     */
+    private static @Nullable Class<?> elementType(Argument<?> argument) {
+        if (argument.getType() == Optional.class) {
+            Argument<?> value = argument.getFirstTypeVariable().orElse(null);
+            if (value == null) {
+                return null;
+            }
+            argument = value;
+        }
+        Class<?> type = argument.getType();
+        if (type.isArray()) {
+            return type.getComponentType();
+        }
+        return argument.getFirstTypeVariable().map(Argument::getType).orElse(null);
     }
 
     @Override
