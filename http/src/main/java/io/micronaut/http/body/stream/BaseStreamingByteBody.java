@@ -74,22 +74,20 @@ public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends
 
     @Override
     public final Publisher<ReadBuffer> toReadBufferPublisher() {
-        BaseSharedBuffer.AsFlux asFlux = new BaseSharedBuffer.AsFlux(sharedBuffer);
-        BufferConsumer.Upstream primary = primary(asFlux);
-        return asFlux.asFlux(primary);
+        BaseSharedBuffer.AsPublisher reader = new BaseSharedBuffer.AsPublisher(sharedBuffer);
+        return reader.publisher(primary(reader));
     }
 
     /**
      * The reader is not held to the buffer limit of the body, and receives the bytes kept past
-     * it before it subscribed, see {@link BaseSharedBuffer.AsFlux#AsFlux(BaseSharedBuffer, boolean)}.
+     * it before it subscribed, see {@link BaseSharedBuffer.AsPublisher#AsPublisher(BaseSharedBuffer, boolean)}.
      *
      * @return The publisher
      */
     @Override
     public final Publisher<ReadBuffer> toUnbufferedReadBufferPublisher() {
-        BaseSharedBuffer.AsFlux asFlux = new BaseSharedBuffer.AsFlux(sharedBuffer, true);
-        BufferConsumer.Upstream primary = primary(asFlux);
-        return asFlux.asFlux(primary);
+        BaseSharedBuffer.AsPublisher reader = new BaseSharedBuffer.AsPublisher(sharedBuffer, true);
+        return reader.publisher(primary(reader));
     }
 
     @Override
