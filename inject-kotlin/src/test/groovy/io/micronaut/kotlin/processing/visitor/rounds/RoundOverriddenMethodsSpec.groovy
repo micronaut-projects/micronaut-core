@@ -67,23 +67,10 @@ class Trigger
                     record('round1', element)
                     break
                 case PACKAGE + '.Trigger':
-                    if (!generated) {
-                        generated = true
-                        context.visitGeneratedSourceFile(PACKAGE, 'Later', element).orElseThrow().write { writer ->
-                            writer.write('''package roundoverrides
-
-class Later : Sub() {
-    override fun foo(): String = "later"
-}
-''')
-                        }
-                    }
+                    generateLater(element, context)
                     break
                 case PACKAGE + '.Later':
-                    Map<String, List<Object>> current = entries(context)
-                    EVENTS.add('round2 retained ' + firstRoundEntries.collectEntries { name, old ->
-                        [name, current[name].any { entry -> old.any { it.is(entry) } }]
-                    })
+                    EVENTS.add('round2 retained ' + retained(entries(context)))
                     record('round2', element)
                     record('round2', context.getClassElement(PACKAGE + '.Sub').orElseThrow())
                     break
@@ -98,6 +85,31 @@ class Later : Sub() {
                 firstRoundEntries = entries(context)
                 EVENTS.add('round1 cached ' + firstRoundEntries.collectEntries { name, old -> [name, !old.isEmpty()] })
             }
+        }
+
+        private void generateLater(ClassElement element, VisitorContext context) {
+            if (generated) {
+                return
+            }
+            generated = true
+            context.visitGeneratedSourceFile(PACKAGE, 'Later', element).orElseThrow().write { writer ->
+                writer.write('''package roundoverrides
+
+class Later : Sub() {
+    override fun foo(): String = "later"
+}
+''')
+            }
+        }
+
+        private Map<String, Boolean> retained(Map<String, List<Object>> current) {
+            return firstRoundEntries.collectEntries { name, old ->
+                [name, current[name].any { entry -> containsIdentical(old, entry) }]
+            }
+        }
+
+        private static boolean containsIdentical(List<Object> entries, Object entry) {
+            return entries.any { it.is(entry) }
         }
 
         private static void record(String round, ClassElement element) {
