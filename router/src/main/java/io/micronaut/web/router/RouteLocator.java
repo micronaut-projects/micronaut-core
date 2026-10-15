@@ -270,6 +270,7 @@ public final class RouteLocator implements DynamicRouteTarget {
 
     @Override
     public <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                                            @Nullable Predicate<UriRouteMatch<T, R>> filter,
                                                             Consumer<? super PendingRouteMatch<T, R>> pending) {
         Located located = locate(request, match);
         if (located == null) {
@@ -279,6 +280,8 @@ public final class RouteLocator implements DynamicRouteTarget {
         try {
             // the routes of the target are pending on the body like the routes of the router
             target = located.routes().findClosest(located.request(), null,
+                // the filter sees the match of the request, as it does for the other routes
+                filter == null ? null : targetMatch -> filter.test(located.wrap(targetMatch)),
                 (PendingRouteMatch<T, R> targetPending) -> pending.accept(targetPending.located(located.request(), located::wrap)));
         } catch (RuntimeException e) {
             throw located.failed(e);

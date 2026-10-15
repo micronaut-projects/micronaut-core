@@ -256,8 +256,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request,
+                                                            @Nullable Predicate<UriRouteMatch<T, R>> filter,
                                                             Consumer<? super PendingRouteMatch<T, R>> pending) throws DuplicateRouteException {
-        return routes.findClosest(request, ports.get(), pending);
+        return routes.findClosest(request, ports.get(), filter, pending);
     }
 
     @Override

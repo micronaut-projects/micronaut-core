@@ -23,11 +23,14 @@ import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.filter.FilteredRouter;
+import io.micronaut.web.router.filter.RouteMatchFilter;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -75,6 +78,25 @@ class LocatedRouteBodyConditionsTest {
         List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
         assertNotNull(router.findClosest(HttpRequest.POST("/orders/1/items", "x"), pending::add));
         assertTrue(pending.isEmpty());
+    }
+
+    @Test
+    void aFilteredRouterLocatesTheTargetOfALocator() {
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/items", (request, pathVariables) -> HttpResponse.ok("item")));
+        Router router = new FilteredRouter(router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> "order", target -> items)),
+            new RouteMatchFilter() {
+                @Override
+                public <T, R> Predicate<UriRouteMatch<T, R>> filter(HttpRequest<?> request) {
+                    return match -> true;
+                }
+            });
+
+        List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
+        UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.POST("/orders/1/items", "x"), pending::add);
+        assertNotNull(match);
+        assertTrue(pending.isEmpty());
+        // the match of the located route, not of the locator
+        assertInstanceOf(RouteLocator.LocatedUriMatchInfo.class, ((DefaultUriRouteMatch<?, ?>) match).matchInfo());
     }
 
     private static Router router(Consumer<HttpRouteBuilder> routes) {

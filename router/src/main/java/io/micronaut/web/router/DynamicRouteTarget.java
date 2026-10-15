@@ -79,15 +79,16 @@ interface DynamicRouteTarget {
      *
      * @param request The request
      * @param match   The match of the route
+     * @param filter  The filter of the candidates, applied to the resolved matches before their
+     *                ambiguity is resolved, or {@code null}
      * @param pending Given the matches that depend on the body of the request
      * @param <T>     The target type
      * @param <R>     The result type
      * @return The match, or {@code null} if none or it depends on the body
      */
-    default <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request, UriRouteMatch<T, R> match,
-                                                             Consumer<? super PendingRouteMatch<T, R>> pending) {
-        return findClosest(request, match);
-    }
+    <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                                     @Nullable Predicate<UriRouteMatch<T, R>> filter,
+                                                     Consumer<? super PendingRouteMatch<T, R>> pending);
 
     /**
      * The closest matches to use instead of a closest match of the route, see

@@ -16,6 +16,7 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -697,6 +698,7 @@ public sealed interface RouteCondition {
          * @param serverLimit The limit of the server, {@code micronaut.server.max-request-buffer-size}
          * @return The number of bytes the condition reads at most
          */
+        @Internal
         public int effectiveMaxBytes(int serverLimit) {
             return maxBytes == SERVER_LIMIT ? serverLimit : Math.min(maxBytes, serverLimit);
         }
