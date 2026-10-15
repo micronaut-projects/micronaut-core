@@ -15,7 +15,7 @@ class ScheduledMethodWatcherSpec extends Specification {
         def context = ApplicationContext.run(["spec.name": "ScheduledMethodWatcherSpec"])
         def task = context.getBean(WatchedTask)
         def processor = context.getBean(ScheduledMethodProcessor)
-        def conditions = new PollingConditions(timeout: 5)
+        PollingConditions conditions = new PollingConditions(timeout: 5)
 
         expect: "the startup batch scheduled the method, and the processor is not adapted: it watches"
         conditions.eventually { task.runs.get() > 2 }
@@ -51,7 +51,7 @@ class ScheduledMethodWatcherSpec extends Specification {
         def task = context.getBean(PartlyScheduledTask)
         def processor = context.getBean(ScheduledMethodProcessor)
         def definition = context.getBeanDefinition(PartlyScheduledTask)
-        def conditions = new PollingConditions(timeout: 5)
+        PollingConditions conditions = new PollingConditions(timeout: 5)
 
         expect:
         conditions.eventually { task.runs.get() > 2 }
@@ -87,7 +87,7 @@ class ScheduledMethodWatcherSpec extends Specification {
         def task = context.getBean(ConfiguredRateTask)
         def processor = context.getBean(ScheduledMethodProcessor)
         def definition = context.getBeanDefinition(ConfiguredRateTask)
-        def conditions = new PollingConditions(timeout: 5)
+        PollingConditions conditions = new PollingConditions(timeout: 5)
 
         expect:
         conditions.eventually { task.runs.get() > 2 }
@@ -162,7 +162,7 @@ class ScheduledMethodWatcherSpec extends Specification {
                 "scheduled-watch.jobs.b.enabled": true,
         ])
         def processor = context.getBean(ScheduledMethodProcessor)
-        def conditions = new PollingConditions(timeout: 5)
+        PollingConditions conditions = new PollingConditions(timeout: 5)
 
         expect: "each entry's method runs on its own bean, and every method runs once: its next run is an hour away"
         conditions.eventually {
