@@ -58,6 +58,11 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      * The number of variables with a regular expression, computed once, or -1.
      */
     private int patternVariableCount = -1;
+    /**
+     * The path string, computed on first use like {@link #toString()}: the segments do not change
+     * after construction. A race only computes the (immutable) string twice.
+     */
+    private String pathString;
 
     /**
      * Construct a new URI template for the given template.
@@ -140,6 +145,15 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      * @return The path string
      */
     public String toPathString() {
+        String pathString = this.pathString;
+        if (pathString == null) {
+            pathString = computePathString();
+            this.pathString = pathString;
+        }
+        return pathString;
+    }
+
+    private String computePathString() {
         return toString(pathSegment -> {
             final Optional<String> var = pathSegment.getVariable();
             if (var.isPresent()) {
