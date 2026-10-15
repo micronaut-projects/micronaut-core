@@ -218,4 +218,116 @@ class BookController:
         return "x"
 ''', TypeCheckMode.OFF).isEmpty()
     }
+
+    void "a Python class of the compilation used as a decorator is plain Python"() {
+        given:
+        def srcDir = File.createTempDir("pyronaut-typecheck-callable-decorator", "")
+        new File(srcDir, "mypkg").mkdirs()
+        new File(srcDir, "mypkg/__init__.py").text = ""
+        new File(srcDir, "mypkg/retry.py").text = '''
+class RetryPolicy:
+    def __init__(self, attempts: int):
+        self.attempts = attempts
+
+    def __call__(self, func):
+        return func
+'''
+        new File(srcDir, "mypkg/service.py").text = '''
+from jakarta.inject import Singleton
+from mypkg.retry import RetryPolicy
+
+
+@Singleton
+class Service:
+    @RetryPolicy(3)
+    def run(self) -> str:
+        return "x"
+'''
+        List<PythonDiagnostic> diagnostics = []
+
+        when:
+        try {
+            PyronautCompiler.builder()
+                .pythonSrc(srcDir.absolutePath)
+                .typeCheck(TypeCheckMode.ERROR)
+                .pythonDiagnosticCallback { diagnostics.add(it) }
+                .build()
+                .buildClassLoader()
+        } catch (RuntimeException ignored) {
+            // only the diagnostics matter
+        }
+
+        then:
+        !diagnostics*.rule().contains('not-an-annotation')
+
+        cleanup:
+        srcDir.deleteDir()
+    }
+
+    void "an enum member accepts the spellings the conversion to the enum accepts"() {
+        when:
+        def diagnostics = check('''
+from micronaut.http.annotation import Controller, Get, Status
+
+@Controller("/books")
+class BookController:
+    @Get("/")
+    @Status("created")
+    def index(self) -> str:
+        return "x"
+
+    @Get("/other")
+    @Status("CREATED")
+    def other(self) -> str:
+        return "y"
+''')
+
+        then: "created converts to CREATED as an environment name"
+        diagnostics.isEmpty()
+    }
+
+    void "a Python-defined annotation counts its positional arguments against its parameters and checks member names"() {
+        when:
+        def diagnostics = check('''
+from micronaut.http.annotation import Controller, Get
+
+def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
+    def decorator(func):
+        return func
+    return decorator
+
+@micronaut_annotation("test.Labelled")
+def Labelled(name, colour="red", size="1"):
+    def decorator(target):
+        return target
+    return decorator
+
+@Controller("/books")
+class BookController:
+    @Get("/a")
+    @Labelled("x")
+    def one(self) -> str:
+        return "x"
+
+    @Get("/b")
+    @Labelled("x", "blue", "2")
+    def three(self) -> str:
+        return "x"
+
+    @Get("/c")
+    @Labelled("x", "blue", "2", "extra")
+    def four(self) -> str:
+        return "x"
+
+    @Get("/d")
+    @Labelled("x", color="blue")
+    def misspelt(self) -> str:
+        return "x"
+''')
+
+        then:
+        diagnostics*.rule() == ['decorator-positional', 'unknown-decorator-member']
+        diagnostics[0].message() == '@Labelled takes 3 positional arguments (name, colour, size); got 4'
+        diagnostics[1].message().startsWith('@Labelled has no member [color]')
+    }
 }
