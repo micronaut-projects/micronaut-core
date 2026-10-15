@@ -54,6 +54,8 @@ final class DefaultFilterRoute implements FilterRoute {
     private @Nullable AnnotationMetadata annotationMetadata;
     private final boolean isPreMatching;
     private @Nullable String matchingAnnotation;
+    // most filters have no matching annotation: the absence is kept too, not looked up for every request
+    private volatile boolean matchingAnnotationResolved;
 
     DefaultFilterRoute(Supplier<GenericHttpFilter> filter, AnnotationMetadataResolver annotationMetadataResolver, boolean isPreMatching) {
         Objects.requireNonNull(filter, "HttpFilter argument is required");
@@ -105,6 +107,7 @@ final class DefaultFilterRoute implements FilterRoute {
         this.patterns.add(pattern);
         this.annotationMetadata = annotationMetadata;
         this.matchingAnnotation = FilterRoute.super.findMatchingAnnotation();
+        this.matchingAnnotationResolved = true;
     }
 
     /**
@@ -123,8 +126,9 @@ final class DefaultFilterRoute implements FilterRoute {
     @Override
     @Nullable
     public String findMatchingAnnotation() {
-        if (matchingAnnotation == null) {
+        if (!matchingAnnotationResolved) {
             matchingAnnotation = FilterRoute.super.findMatchingAnnotation();
+            matchingAnnotationResolved = true;
         }
         return matchingAnnotation;
     }

@@ -77,6 +77,15 @@ import java.util.function.Function;
  */
 @Internal
 public abstract class ResponseLifecycle {
+    /**
+     * The arguments of the runtime classes of the bodies: created once, not for every response.
+     */
+    private static final ClassValue<Argument<?>> BODY_ARGUMENTS = new ClassValue<>() {
+        @Override
+        protected Argument<?> computeValue(Class<?> type) {
+            return Argument.of(type);
+        }
+    };
     private static final ConcatenatingSubscriber.Separators JSON_STREAM_SEPARATORS = LeakTracker.Factory.staticInitializer(() ->
         new ConcatenatingSubscriber.Separators(null, null, ReadBufferFactory.getJdkFactory().copyOf("\n", java.nio.charset.StandardCharsets.UTF_8), null));
     private final RouteExecutor routeExecutor;
@@ -290,16 +299,22 @@ public abstract class ResponseLifecycle {
                 responseMediaType = MediaType.APPLICATION_JSON_TYPE;
             }
         }
+        List<MediaType> responseMediaTypes = null;
         if (messageBodyWriter == null) {
             // lookup write to use, any logic that hits this path should consider setting
             // a body writer on the response before writing
+            responseMediaTypes = Collections.singletonList(responseMediaType);
             messageBodyWriter = messageBodyHandlerRegistry
-                .findWriter(responseBodyType, Collections.singletonList(responseMediaType))
+                .findWriter(responseBodyType, responseMediaTypes)
                 .orElse(null);
         }
         if (messageBodyWriter == null || !responseBodyType.isInstance(body) || !messageBodyWriter.isWriteable(responseBodyType, responseMediaType)) {
-            responseBodyType = Argument.ofInstance(body);
-            messageBodyWriter = messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(responseMediaType));
+            // the route declares no type for the body, e.g. a handler route: the runtime class of the body
+            responseBodyType = (Argument<Object>) BODY_ARGUMENTS.get(body.getClass());
+            if (responseMediaTypes == null) {
+                responseMediaTypes = Collections.singletonList(responseMediaType);
+            }
+            messageBodyWriter = messageBodyHandlerRegistry.getWriter(responseBodyType, responseMediaTypes);
         }
         return buildFinalResponse(nettyRequest, (MutableHttpResponse<Object>) response, responseBodyType, responseMediaType, body, messageBodyWriter, false);
     }
