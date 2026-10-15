@@ -157,7 +157,8 @@ public final class TypeFacts {
     public boolean isAssignable(String from, String to) {
         return assignable.computeIfAbsent(from + "->" + to, key -> {
             Boolean result = complete(() -> computeAssignable(from, to));
-            return result != null && result;  // an incomplete type fits nothing, and is never reported on
+            // a type javac completes in a later round is unknown, and unknown is never reported: it fits
+            return result == null || result;
         });
     }
 
@@ -419,7 +420,10 @@ public final class TypeFacts {
             ClassElement returnType = method.getReturnType();
             boolean array = returnType.isArray();
             ClassElement componentType = array ? returnType.fromArray() : returnType;
-            List<String> enumConstants = componentType instanceof EnumElement enumElement ? List.copyOf(enumElement.values()) : List.of();
+            // an enum with its own toString() also converts from what that returns, which is not known here
+            List<String> enumConstants = componentType instanceof EnumElement enumElement && !declaresToString(enumElement)
+                ? List.copyOf(enumElement.values())
+                : List.of();
             members.put(method.getName(), new MemberDescription(
                 method.getName(),
                 componentType.getName(),
@@ -436,12 +440,8 @@ public final class TypeFacts {
     }
 
     /**
-     * Looks a class up by its qualified name, trying the nested-class spellings
-     * ({@code a.b.Outer$Nested}) when the dotted name is not a class.
-     */
-    /**
-     * The element of a qualified name, trying the binary name of a nested type when the dotted name
-     * resolves to nothing.
+     * Looks a class up by its qualified name, trying the binary name of a nested type
+     * ({@code a.b.Outer$Nested}) when the dotted name resolves to nothing.
      */
     private @Nullable ClassElement resolveClass(String qualifiedName) {
         String candidate = qualifiedName;
@@ -456,6 +456,12 @@ public final class TypeFacts {
             }
             candidate = candidate.substring(0, lastDot) + '$' + candidate.substring(lastDot + 1);
         }
+    }
+
+    private static boolean declaresToString(EnumElement enumElement) {
+        return enumElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyInstance().named("toString"))
+            .stream()
+            .anyMatch(method -> method.getParameters().length == 0);
     }
 
     /**

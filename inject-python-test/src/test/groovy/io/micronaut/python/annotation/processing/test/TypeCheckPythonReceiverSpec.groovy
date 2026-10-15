@@ -405,4 +405,114 @@ class Catalog:
         diagnostics[1].span().line() == 30
     }
 
+    void "an unhinted method's return and an attribute its constructor assigns are inferred"() {
+        when:
+        def diagnostics = check('''
+from jakarta.inject import Singleton
+from java.util import ArrayList
+
+
+class Repository:
+    def items(self):
+        return ArrayList()
+
+
+class Holder:
+    def __init__(this):
+        this.items = ArrayList()
+
+
+@Singleton
+class Service:
+    def run(self, repository: Repository, holder: Holder) -> None:
+        repository.items().ensureCapacity(1)
+        repository.items().no_such_method()
+        holder.items.ensureCapacity(1)
+        holder.items.no_such_field
+''')
+
+        then:
+        diagnostics*.rule() == ['unknown-method', 'unknown-attribute']
+        diagnostics*.span()*.line() == [20, 22]
+    }
+
+    void "an attribute assigned in a nested block, a generator and a match statement are followed or left unknown"() {
+        when:
+        def diagnostics = check('''
+from jakarta.inject import Singleton
+from java.util import ArrayList, HashMap
+
+
+class Box:
+    def __init__(self, flag: bool):
+        self.content = ArrayList()
+        if flag:
+            self.content = HashMap()
+
+
+class Source:
+    def values(self):
+        yield ArrayList()
+
+
+class Picker:
+    def pick(self, kind: str):
+        match kind:
+            case "a":
+                return ArrayList()
+            case _:
+                return ArrayList()
+
+
+@Singleton
+class Service:
+    def run(self, box: Box, source: Source, picker: Picker) -> None:
+        box.content.put("k", "v")
+        source.values().anything()
+        picker.pick("a").no_such_method()
+''')
+
+        then: "the box may hold a map, the generator returns a generator, and every case returns a list"
+        diagnostics*.rule() == ['unknown-method']
+        diagnostics[0].span().line() == 32
+    }
+
+    void "a Java import is never resolved to a Python class of the same name"() {
+        given:
+        def srcDir = File.createTempDir("pyronaut-typecheck-java-import", "")
+        new File(srcDir, "helpers.py").text = '''
+class ArrayList:
+    def size(self) -> int:
+        return 0
+'''
+        new File(srcDir, "service.py").text = '''
+from jakarta.inject import Singleton
+from java.util import ArrayList
+
+
+@Singleton
+class Service:
+    def run(self) -> None:
+        ArrayList().ensureCapacity(10)
+'''
+        List<PythonDiagnostic> diagnostics = []
+
+        when:
+        try {
+            PyronautCompiler.builder()
+                .pythonSrc(srcDir.absolutePath)
+                .typeCheck(TypeCheckMode.ERROR)
+                .pythonDiagnosticCallback { diagnostics.add(it) }
+                .build()
+                .buildClassLoader()
+        } catch (RuntimeException ignored) {
+            // only the diagnostics matter
+        }
+
+        then: "the import names java.util.ArrayList, which has ensureCapacity"
+        diagnostics.isEmpty()
+
+        cleanup:
+        srcDir.deleteDir()
+    }
 }
