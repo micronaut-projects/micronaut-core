@@ -17,7 +17,7 @@ package io.micronaut.http.client.sse;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.ByteBodyHttpResponse;
@@ -30,18 +30,21 @@ import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.PieceReader;
+import io.micronaut.http.body.stream.ByteBodyElements;
 import io.micronaut.http.body.stream.PulledBodyElements;
-import io.micronaut.http.client.ByteBodyElements;
-import io.micronaut.http.client.ElementsResponse;
+import io.micronaut.http.client.internal.ElementsResponse;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.sse.Event;
 import io.micronaut.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -105,7 +108,7 @@ public final class EventStreams {
                                                                    Argument<B> eventType,
                                                                    long maxBufferSize,
                                                                    UnaryOperator<HttpClientException> decorate) {
-        Function<Throwable, Throwable> wrap = error -> wrap(error, decorate);
+        UnaryOperator<Throwable> wrap = error -> wrap(error, decorate);
         CloseableByteBody body = response.byteBody().move();
         try {
             MediaType contentType = response.getContentType().orElse(null);
@@ -113,16 +116,7 @@ public final class EventStreams {
             BodyElements<Event<B>> elements;
             if (contentType != null && MediaType.TEXT_EVENT_STREAM_TYPE.matches(contentType)) {
                 // the data of each event is JSON
-                Function<byte[], B> reader = dataReader(handlerRegistry, eventType, MediaType.APPLICATION_JSON_TYPE, headers);
-                EventStreamDecoder decoder = new EventStreamDecoder(maxBufferSize);
-                elements = new ByteBodyElements<>(body, piece -> {
-                    List<Event<byte[]>> events = decoder.decode(piece.toArray());
-                    List<Event<B>> decoded = new ArrayList<>(events.size());
-                    for (Event<byte[]> event : events) {
-                        decoded.add(Event.of(event, reader.apply(event.getData())));
-                    }
-                    return decoded;
-                }, wrap);
+                elements = new ByteBodyElements<>(body, reader(handlerRegistry, eventType, headers, maxBufferSize), wrap);
             } else {
                 // a single body, such as JSON, is one event
                 MediaType mediaType = contentType == null ? MediaType.APPLICATION_JSON_TYPE : contentType;
@@ -204,6 +198,73 @@ public final class EventStreams {
     }
 
     /**
+     * The events of the response of {@code SseClient#eventStream}: the body is read as an event
+     * stream whatever its content type, as that method always read it. A failure to read the
+     * body is an {@link HttpClientException}, decorated like the other failures of the client,
+     * and a failure to decode the data of an event is the failure of the reader of the data, as
+     * it is.
+     *
+     * @param response        The response, with a status that is not an error
+     * @param handlerRegistry The readers of the event data
+     * @param eventType       The event data type
+     * @param maxBufferSize   The maximum size of a line, and of the data of one event
+     * @param decorate        Decorates a failure of the events like the other failures of the
+     *                        client, e.g. with its service id
+     * @param <B>             The event data type
+     * @return The response, whose body is the events
+     */
+    @SuppressWarnings("java:S2095") // the elements own the event reader, and close it
+    public static <B> HttpResponse<BodyElements<Event<B>>> eventStreamResponse(ByteBodyHttpResponse<?> response,
+                                                                              MessageBodyHandlerRegistry handlerRegistry,
+                                                                              Argument<B> eventType,
+                                                                              long maxBufferSize,
+                                                                              UnaryOperator<HttpClientException> decorate) {
+        UnaryOperator<Throwable> wrap = error -> error instanceof DataDecodeFailure failure && failure.getCause() != null
+            ? failure.getCause()
+            : wrap(error, decorate);
+        CloseableByteBody body = response.byteBody().move();
+        try {
+            MessageBodyReader<B> reader = handlerRegistry.getReader(eventType, List.of(MediaType.APPLICATION_JSON_TYPE));
+            HttpHeaders headers = response.getHeaders();
+            Function<byte[], B> rawFailures = data -> {
+                B decoded;
+                try {
+                    decoded = reader.read(eventType, MediaType.APPLICATION_JSON_TYPE, headers, new ByteArrayInputStream(data));
+                } catch (RuntimeException e) {
+                    throw new DataDecodeFailure(e);
+                }
+                if (decoded == null) {
+                    // as the events were mapped with Objects.requireNonNull
+                    throw new DataDecodeFailure(new NullPointerException("Event data decoded to null for type " + eventType));
+                }
+                return decoded;
+            };
+            return ElementsResponse.of(response, new ByteBodyElements<>(body, new EventReader<>(new EventStreamDecoder(maxBufferSize), rawFailures), wrap));
+        } catch (RuntimeException e) {
+            body.close();
+            throw e;
+        }
+    }
+
+    /**
+     * The reader of the events of an event stream: the lines are split as the pieces are read,
+     * and the data of an event is decoded as JSON when the event is polled.
+     *
+     * @param handlerRegistry The readers of the event data
+     * @param eventType       The event data type
+     * @param headers         The headers of the response
+     * @param maxBufferSize   The maximum size of a line, and of the data of one event
+     * @param <B>             The event data type
+     * @return The reader
+     */
+    public static <B> PieceReader<Event<B>> reader(MessageBodyHandlerRegistry handlerRegistry,
+                                                   Argument<B> eventType,
+                                                   Headers headers,
+                                                   long maxBufferSize) {
+        return new EventReader<>(new EventStreamDecoder(maxBufferSize), dataReader(handlerRegistry, eventType, MediaType.APPLICATION_JSON_TYPE, headers));
+    }
+
+    /**
      * The failure of the events, an {@link HttpClientException}.
      *
      * @param error A failure to read or decode the events
@@ -231,7 +292,8 @@ public final class EventStreams {
                                                       Headers headers) {
         MessageBodyReader<B> reader = handlerRegistry.getReader(eventType, List.of(mediaType));
         return data -> {
-            B decoded = reader.read(eventType, mediaType, headers, ReadBufferFactory.getJdkFactory().adapt(data).toByteBuffer());
+            // a stream over the array: a buffer of it would be copied again to be decoded
+            B decoded = reader.read(eventType, mediaType, headers, new ByteArrayInputStream(data));
             if (decoded == null) {
                 throw new HttpClientException("Event data decoded to null for type " + eventType);
             }
@@ -284,7 +346,7 @@ public final class EventStreams {
                 }
                 Optional<ByteBuffer<?>> value;
                 try {
-                    value = piece.join();
+                    value = Objects.requireNonNullElse(piece.join(), Optional.empty());
                 } catch (CompletionException | CancellationException e) {
                     read(null, e.getCause() == null ? e : e.getCause());
                     readAgain();
@@ -374,6 +436,78 @@ public final class EventStreams {
         @Override
         protected void release() {
             pieces.close();
+        }
+    }
+
+    /**
+     * A failure to decode the data of an event, which {@code eventStream} reports as it is.
+     */
+    private static final class DataDecodeFailure extends RuntimeException {
+        DataDecodeFailure(RuntimeException cause) {
+            super(cause.getMessage(), cause, false, false);
+        }
+    }
+
+    /**
+     * Reads the events of the pieces of an event stream. The lines are split as the pieces are
+     * read, and the data of an event is decoded when the event is polled.
+     *
+     * @param <B> The event data type
+     */
+    private static final class EventReader<B> implements PieceReader<Event<B>> {
+        private final EventStreamDecoder decoder;
+        private final Function<byte[], B> dataReader;
+        private final ArrayDeque<Event<byte[]>> events = new ArrayDeque<>(1);
+        /**
+         * The bytes of a piece that is not a heap buffer.
+         */
+        private byte[] scratch = new byte[0];
+
+        EventReader(EventStreamDecoder decoder, Function<byte[], B> dataReader) {
+            this.decoder = decoder;
+            this.dataReader = dataReader;
+        }
+
+        @Override
+        public void read(ReadBuffer piece) {
+            try (piece) {
+                // a heap buffer is decoded in place, another one is copied into an array that is
+                // reused; the events before a line that exceeds the limit are delivered before the
+                // failure
+                int length = piece.readable();
+                Boolean decoded = piece.useFastHeapBuffer(nio -> {
+                    decoder.decode(nio.array(), nio.arrayOffset() + nio.position(), nio.remaining(), events::add);
+                    return Boolean.TRUE;
+                });
+                if (decoded == null) {
+                    if (scratch.length < length) {
+                        scratch = new byte[Math.max(length, scratch.length * 2)];
+                    }
+                    piece.toArray(scratch, 0);
+                    decoder.decode(scratch, 0, length, events::add);
+                }
+            }
+        }
+
+        @Override
+        public void complete() {
+            // an event not terminated by a blank line is discarded
+        }
+
+        @Override
+        public @Nullable Event<B> poll() {
+            Event<byte[]> event = events.poll();
+            return event == null ? null : Event.of(event, dataReader.apply(event.getData()));
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return events.isEmpty();
+        }
+
+        @Override
+        public void close() {
+            events.clear();
         }
     }
 }

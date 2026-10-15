@@ -10,6 +10,8 @@ import io.micronaut.http.body.stream.BodySizeLimits
 import io.micronaut.http.body.stream.BufferConsumer
 import io.micronaut.http.exceptions.ContentLengthExceededException
 import io.micronaut.http.netty.body.NettyByteBodyFactory
+import io.micronaut.http.netty.body.StreamingNettyByteBody
+import io.micronaut.buffer.netty.NettyReadBufferFactory
 import io.netty.buffer.AbstractByteBufAllocator
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.ByteBufAllocator
@@ -29,6 +31,7 @@ import io.netty.handler.codec.compression.ZlibWrapper
 import io.netty.handler.codec.http.DefaultFullHttpRequest
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpContent
+import io.netty.handler.codec.http.DefaultHttpHeaders
 import io.netty.handler.codec.http.DefaultHttpRequest
 import io.netty.handler.codec.http.DefaultHttpResponse
 import io.netty.handler.codec.http.DefaultLastHttpContent
@@ -38,6 +41,7 @@ import io.netty.handler.codec.http.FullHttpResponse
 import io.netty.handler.codec.http.HttpContent
 import io.netty.handler.codec.http.HttpHeaderNames
 import io.netty.handler.codec.http.HttpHeaderValues
+import io.netty.handler.codec.http.HttpHeaders
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpRequest
 import io.netty.handler.codec.http.HttpResponse
@@ -1708,6 +1712,142 @@ class PipeliningServerHandlerSpec extends Specification {
         void allowDiscard() {
             discards++
         }
+    }
+
+    def 'a second response is refused and released, and abort closes the connection'(boolean streaming) {
+        given:
+        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def sink = Sinks.many().unicast().<ByteBuf>onBackpressureBuffer()
+        OutboundAccess access = null
+        int responsesWritten = 0
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                access = outboundAccess
+                // a response that is being written, e.g. one whose write failed half way
+                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adaptNetty(sink.asFlux()))
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                responsesWritten++
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        def second = Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)
+        def factory = new NettyByteBodyFactory(ch)
+        def refused
+        if (streaming) {
+            def buffer = factory.createStreamingBuffer(BodySizeLimits.UNLIMITED, new RecordingUpstream())
+            buffer.add(NettyReadBufferFactory.of(ch.alloc()).adapt(second))
+            refused = new StreamingNettyByteBody(buffer)
+        } else {
+            refused = factory.adapt(second)
+        }
+        access.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR), refused)
+        then:
+        thrown IllegalStateException
+        second.refCnt() == 0
+        ch.isOpen()
+
+        when:
+        access.abort()
+        then:
+        !ch.isOpen()
+        responsesWritten == 1
+        sink.currentSubscriberCount() == 0
+
+        cleanup:
+        ch.finishAndReleaseAll()
+
+        where:
+        streaming << [false, true]
+    }
+
+    def 'abort does nothing after the response was written'() {
+        given:
+        OutboundAccess access = null
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                access = outboundAccess
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        access.abort()
+        then:
+        ch.isOpen()
+        ((FullHttpResponse) ch.readOutbound()).status() == HttpResponseStatus.NO_CONTENT
+
+        when:
+        // Once the connection was removed, a repeated abort must also be harmless.
+        ch.close()
+        access.abort()
+
+        then:
+        !ch.isOpen()
+        ch.checkException()
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
+    def 'a full response that fails before it reaches the connection releases its content'() {
+        given:
+        def content = Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)
+        Throwable failure = null
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                def headers = new DefaultHttpHeaders() {
+                    @Override
+                    HttpHeaders remove(CharSequence name) {
+                        throw new OutOfMemoryError("Simulated failure")
+                    }
+                }
+                try {
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, headers), new NettyByteBodyFactory(ctx.channel()).adapt(content))
+                } catch (Throwable t) {
+                    failure = t
+                    // the response did not reach the connection, so another one can be written
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR), NettyByteBodyFactory.empty())
+                }
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        then:
+        failure instanceof OutOfMemoryError
+        content.refCnt() == 0
+        ((FullHttpResponse) ch.readOutbound()).status() == HttpResponseStatus.INTERNAL_SERVER_ERROR
+
+        cleanup:
+        ch.finishAndReleaseAll()
     }
 
     /**

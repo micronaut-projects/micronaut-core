@@ -125,7 +125,8 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         this.isErrorRoute = isErrorRoute;
         this.isPermitsBody = isPermitsBody;
         this.isVoid = returnType.isVoid();
-        isWebSocketRoute = annotationMetadata.hasAnnotation("io.micronaut.websocket.annotation.OnMessage");
+        isWebSocketRoute = annotationMetadata.hasAnnotation("io.micronaut.websocket.annotation.OnMessage")
+            || annotationMetadata.hasAnnotation("io.micronaut.websocket.annotation.OnOpen");
         definedStatus = annotationMetadata.enumValue(Status.class, HttpStatus.class).orElse(null);
         definedContentDisposition = annotationMetadata.findAnnotation(ContentDisposition.class)
             .map(av -> ContentDispositionUtils.toHeaderValue(

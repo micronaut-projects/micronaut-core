@@ -294,8 +294,8 @@ abstract class AbstractBeanDefinitionDescriptorSpec extends Specification {
         given:
         Map<CharSequence, Object> values = descriptor('Blank').qualifiers()[0].values
 
-        expect:
-        values.keySet() == ['name', 'tags', 'levels', 'details'] as Set
+        expect: "the members that are written, and the ones that are not compared, which every occurrence names"
+        values.keySet() == ['name', 'tags', 'levels', 'details', AnnotationUtil.NON_BINDING_ATTRIBUTE] as Set
         [values.tags, values.levels, values.details]*.getClass() == emptyArrayTypes
         [values.tags, values.levels, values.details].every { java.lang.reflect.Array.getLength(it) == 0 }
     }

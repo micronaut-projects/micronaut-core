@@ -123,10 +123,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements BeanD
             return Optional.empty();
         }
         if (filterAnnotation == ServerFilter.class) {
-            Optional<ServerRequestBinderRegistry> server = beanContext.findBean(ServerRequestBinderRegistry.class);
-            if (server.isPresent()) {
-                return Optional.of(server.get());
-            }
+            return ServerRequestBinderRegistry.find(beanContext);
         }
         return beanContext.findBean(RequestBinderRegistry.class);
     }

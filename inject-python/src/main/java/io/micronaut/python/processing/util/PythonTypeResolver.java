@@ -37,6 +37,7 @@ import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.python.processing.model.AttributeDef;
 import io.micronaut.python.processing.model.DecoratorDef;
+import io.micronaut.python.processing.element.PythonGenericPlaceholderElement;
 import io.micronaut.python.processing.element.TypeAnnotatedClassElement;
 import io.micronaut.python.processing.model.TypeRef;
 
@@ -60,6 +61,64 @@ public final class PythonTypeResolver {
 
     public PythonTypeResolver(PythonVisitorContext visitorContext) {
         this.visitorContext = visitorContext;
+    }
+
+    /**
+     * The type of a member of a Python declared annotation: the type the decorator parameter declares, as the
+     * generated Java annotation stub declares the member. A {@code list[X]} parameter is an array of {@code X},
+     * a {@code type} parameter is a {@code Class}, and a parameter with no type is given the type of its default
+     * value, a string when it has none. The rule has to agree with the stub generator, so that the element model
+     * reports the member the way the compiled annotation declares it.
+     *
+     * @param decoratorDef The decorator declaring the annotation
+     * @param memberName   The member
+     * @return The type of the member
+     * @since 5.3.0
+     */
+    public ClassElement annotationMemberType(DecoratorDef decoratorDef, String memberName) {
+        TypeRef typeRef = decoratorDef.memberTypes().get(memberName);
+        Object defaultValue = decoratorDef.members().get(memberName);
+        if (typeRef == null) {
+            if (defaultValue instanceof Boolean) {
+                return PrimitiveElement.BOOLEAN;
+            }
+            if (defaultValue instanceof Integer) {
+                return PrimitiveElement.INT;
+            }
+            if (defaultValue instanceof Long) {
+                return PrimitiveElement.LONG;
+            }
+            if (defaultValue instanceof Double || defaultValue instanceof Float) {
+                return PrimitiveElement.DOUBLE;
+            }
+            return resolve("str", Map.of());
+        }
+        if (isListType(typeRef.name()) && typeRef.typeArguments().size() == 1) {
+            return annotationMemberComponentType(typeRef.typeArguments().getFirst(), null).toArray();
+        }
+        return annotationMemberComponentType(typeRef, defaultValue);
+    }
+
+    private ClassElement annotationMemberComponentType(TypeRef typeRef, @Nullable Object defaultValue) {
+        if (isClassLiteralType(typeRef)) {
+            return visitorContext.getClassElement(Class.class).orElseGet(() -> ClassElement.of(Class.class));
+        }
+        ClassElement classElement = resolve(typeRef, Map.of());
+        if (classElement.getName().equals(Object.class.getName()) && defaultValue instanceof String) {
+            return resolve("str", Map.of());
+        }
+        return classElement;
+    }
+
+    private static boolean isListType(String typeName) {
+        return "list".equals(typeName) || "List".equals(typeName) || "typing.List".equals(typeName);
+    }
+
+    private static boolean isClassLiteralType(TypeRef typeRef) {
+        return "type".equals(typeRef.name())
+            || "typing.Type".equals(typeRef.name())
+            || "Class".equals(typeRef.name())
+            || Class.class.getName().equals(typeRef.name());
     }
 
     /**
@@ -186,6 +245,9 @@ public final class PythonTypeResolver {
         if (baseType instanceof PrimitiveElement primitiveElement) {
             // A type annotation on a primitive, such as Annotated[int, ...]: an annotated copy of the shared constant
             return primitiveElement.withTypeAnnotationMetadata(metadata);
+        } else if (baseType instanceof PythonGenericPlaceholderElement placeholder) {
+            // A type annotation on a type variable, such as Annotated[E, ...]: the annotated copy is still the type variable
+            return placeholder.withTypeUseAnnotationMetadata(metadata);
         }
         return TypeAnnotatedClassElement.of(baseType, metadata);
     }

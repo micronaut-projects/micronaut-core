@@ -27,6 +27,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
+import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
 
@@ -40,9 +41,24 @@ import java.util.List;
 @Internal
 final class ExecutableMethodProcessorListener implements BeanCreatedEventListener<ExecutableMethodProcessor<?>> {
 
+    /**
+     * A processor created after startup, or one the startup pass did not need, still gets the methods of
+     * definitions added later: through the context's adapter, which feeds it additions only.
+     */
+    @SuppressWarnings("unchecked")
+    private static void adapt(BeanCreatedEvent<ExecutableMethodProcessor<?>> event) {
+        if (event.getSource() instanceof DefaultBeanContext defaultBeanContext) {
+            List<Argument<?>> typeArguments = event.getBeanDefinition().getTypeArguments(ExecutableMethodProcessor.class);
+            if (typeArguments.size() == 1) {
+                defaultBeanContext.adaptProcessor((Class<? extends Annotation>) typeArguments.get(0).getType(), event.getBean());
+            }
+        }
+    }
+
     @Override
     public ExecutableMethodProcessor<?> onCreated(BeanCreatedEvent<ExecutableMethodProcessor<?>> event) {
         AnnotationValue<Deprecated> deprecatedAnnotation = event.getBeanDefinition().getAnnotation(Deprecated.class);
+        adapt(event);
         if (deprecatedAnnotation == null) {
             return event.getBean();
         }

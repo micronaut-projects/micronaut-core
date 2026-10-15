@@ -19,6 +19,7 @@ dependencies {
     compileOnly(libs.managed.kotlin.stdlib)
     compileOnly(libs.managed.netty.common)
     testImplementation(libs.junit.jupiter.params)
+    testImplementation(libs.logback.classic)
 }
 
 spotless {

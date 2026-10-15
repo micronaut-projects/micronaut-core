@@ -1166,7 +1166,9 @@ public class DefaultMutableConversionService implements MutableConversionService
         // Micronaut ByteBuffer -> byte for streamed results from HTTP clients
         addInternalConverter(io.micronaut.core.io.buffer.ByteBuffer.class, byte[].class, (object, targetType, context) -> {
             byte[] result = object.toByteArray();
-            ((ReferenceCounted) object).release();
+            if (object instanceof ReferenceCounted counted) {
+                counted.release();
+            }
             return Optional.of(result);
         });
 

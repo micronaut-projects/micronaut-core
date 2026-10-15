@@ -129,16 +129,19 @@ final class JavaCompilationTracker implements TaskListener {
     void recordGeneratedSource(JavaFileObject generatedSource,
                                boolean pythonProcessor,
                                Element... originatingElements) {
-        if (originatingElements.length != 1) {
+        String generated = fileSourceKey(generatedSource);
+        if (generated == null) {
             return;
         }
-        String generated = fileSourceKey(generatedSource);
-        String origin = sourceKey(originatingElements[0]);
-        if (generated != null && origin != null) {
+        String origin = originatingElements.length == 1 ? sourceKey(originatingElements[0]) : null;
+        if (origin != null) {
             generatedSourceOrigins.put(generated, origin);
-            if (pythonProcessor) {
-                pythonGeneratedSources.add(generated);
-            }
+        }
+        // a source Python processing generates without an origin among the sources, such as the
+        // provider of the functional interfaces of all of them, is tracked too: the classes and the
+        // resources derived from it are then Python processing outputs rather than unknown ones
+        if (pythonProcessor) {
+            pythonGeneratedSources.add(generated);
         }
     }
 

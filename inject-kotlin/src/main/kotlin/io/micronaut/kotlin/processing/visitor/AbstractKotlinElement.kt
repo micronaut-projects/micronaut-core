@@ -701,6 +701,13 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                 visitorContext,
                 typeArguments
             )
+        } else if (declaration.classKind == ClassKind.ANNOTATION_CLASS) {
+            // an annotation class cannot be generic
+            KotlinAnnotationElement(
+                KotlinClassNativeElement(declaration, type, owner),
+                elementAnnotationMetadataFactory,
+                visitorContext
+            )
         } else {
             KotlinClassElement(
                 KotlinClassNativeElement(declaration, type, owner),
