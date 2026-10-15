@@ -5,10 +5,15 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.PropertySource
 import io.micronaut.core.annotation.Generated
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.ast.AnnotationElement
+import io.micronaut.inject.ast.AnnotationMemberElement
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
+import jakarta.inject.Named
 import jakarta.inject.Singleton
 
 import java.lang.annotation.ElementType
@@ -205,6 +210,140 @@ class MyBean {
         InheritedVisitor.RESULTS[Singleton.name] == false
     }
 
+    void "test getMembers reports the members in declaration order with their types, defaults and annotations"() {
+        given:
+        def element = (AnnotationElement) buildClassElement("""
+package test;
+
+import java.lang.annotation.*;
+
+@Marker
+@interface MyAnn {
+    String name();
+    @NonBinding String description() default "";
+    int priority() default 5;
+    Class<?> type() default Object.class;
+    ElementType target() default ElementType.METHOD;
+    String[] tags() default {"a", "b"};
+    /**
+     * The nested member.
+     * @return the nested annotation
+     */
+    Outer.Nested nested() default @Outer.Nested("n");
+    Outer.Nested[] list() default {};
+}
+
+@interface Marker {
+}
+
+@Target(ElementType.METHOD)
+@interface NonBinding {
+}
+
+class Outer {
+    @interface Nested {
+        String value();
+        boolean flag() default true;
+    }
+}
+""")
+        def members = element.getMembers()
+
+        expect: "the members in declaration order, each a member of the annotation"
+        members*.getName() == ['name', 'description', 'priority', 'type', 'target', 'tags', 'nested', 'list']
+        members.every { it instanceof AnnotationMemberElement && it.getDeclaringType().getName() == 'test.MyAnn' }
+
+        and: "the declared types, answered by the member itself as well"
+        members[0].getType().getName() == 'java.lang.String'
+        members[2].getType().getName() == 'int'
+        members[2].isPrimitive()
+        !members[0].isPrimitive()
+        members[5].isArray()
+        members[5].getArrayDimensions() == 1
+        !members[0].isArray()
+        members[3].getType().getName() == 'java.lang.Class'
+        members[4].getType().getName() == ElementType.name
+        members[5].getType().isArray()
+        members[5].getType().fromArray().getName() == 'java.lang.String'
+        members[6].getType().getName() == 'test.Outer$Nested'
+
+        and: "the defaults, as the metadata records them"
+        members[0].getDefaultValue() == Optional.empty()
+        members[1].getDefaultValue() == Optional.of('')
+        members[2].getDefaultValue() == Optional.of(5)
+        members[3].getDefaultValue().get() instanceof AnnotationClassValue
+        ((AnnotationClassValue) members[3].getDefaultValue().get()).getName() == 'java.lang.Object'
+        members[4].getDefaultValue() == Optional.of('METHOD')
+        members[5].getDefaultValue().get() == ['a', 'b'] as String[]
+        members[6].getDefaultValue().get() instanceof AnnotationValue
+        ((AnnotationValue) members[6].getDefaultValue().get()).getAnnotationName() == 'test.Outer$Nested'
+        ((AnnotationValue) members[6].getDefaultValue().get()).stringValue().get() == 'n'
+
+        and: "the annotations of a member are its own, not those of the annotation interface"
+        members[1].hasAnnotation('test.NonBinding')
+        members.count { it.hasAnnotation('test.NonBinding') } == 1
+        element.hasAnnotation('test.Marker')
+        members.every { !it.hasAnnotation('test.Marker') }
+
+        and: "a member can be annotated"
+        members[0].annotate('test.Marker')
+        members[0].hasAnnotation('test.Marker')
+        !members[1].hasAnnotation('test.Marker')
+
+        and: "the type of a nested annotation member is an annotation element with members of its own"
+        members[6].getType() instanceof AnnotationElement
+        members[6].getType().getDocumentation(true) == Optional.of('the nested annotation')
+        def nested = ((AnnotationElement) members[6].getType()).getMembers()
+        nested*.getName() == ['value', 'flag']
+        nested[0].getDefaultValue() == Optional.empty()
+        nested[1].getDefaultValue() == Optional.of(true)
+
+        and: "an array of a nested annotation keeps the annotation element through its component"
+        members[7].getType().isArray()
+        members[7].getType() instanceof AnnotationElement
+        members[7].getType().fromArray() instanceof AnnotationElement
+        ((AnnotationElement) members[7].getType().fromArray()).getMembers()*.getName() == ['value', 'flag']
+        members[6].getType().toArray() instanceof AnnotationElement
+        members[6].getType().toArray().isArray()
+        members[7].getDefaultValue().get() instanceof Object[]
+        ((Object[]) members[7].getDefaultValue().get()).length == 0
+
+        and: "a copy of the element keeps the members, and a copy of a member is a member"
+        def copy = (AnnotationElement) element.withAnnotationMetadata(element.getAnnotationMetadata())
+        copy.getMembers()*.getName() == members*.getName()
+        AnnotationMemberElement memberCopy = members[1].withAnnotationMetadata(members[1].getAnnotationMetadata())
+        memberCopy.getName() == 'description'
+        memberCopy.getDefaultValue() == Optional.of('')
+        memberCopy.hasAnnotation('test.NonBinding')
+
+        and: "a copy of a member answers the metadata it was given"
+        !members[1].withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA).hasAnnotation('test.NonBinding')
+        members[1].hasAnnotation('test.NonBinding')
+    }
+
+    void "test getMembers for annotations on the classpath"() {
+        given:
+        InheritedVisitor.MEMBERS.clear()
+        buildBeanDefinition('test.MyBean', '''
+package test;
+
+@jakarta.inject.Singleton
+class MyBean {
+}
+''')
+
+        expect:
+        InheritedVisitor.MEMBERS[Named.name] == [value: Optional.of('')]
+        InheritedVisitor.MEMBERS[Singleton.name] == [:]
+        InheritedVisitor.MEMBERS[Property.name] == [name: Optional.empty(), value: Optional.of(''), defaultValue: Optional.of('')]
+        InheritedVisitor.MEMBER_TYPES[Property.name] == [name: 'java.lang.String', value: 'java.lang.String', defaultValue: 'java.lang.String']
+    }
+
+    void "test the default getMembers implementation reports no members"() {
+        expect:
+        new NoNativeTypeAnnotationElement().getMembers().isEmpty()
+    }
+
     @Override
     protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
         return [new InheritedVisitor()]
@@ -258,16 +397,26 @@ class MyBean {
         static final Map<String, Set<ElementType>> TARGETS = [:]
         static final Map<String, Optional<String>> CONTAINERS = [:]
         static final Map<String, RetentionPolicy> RETENTIONS = [:]
+        static final Map<String, Map<String, Optional<Object>>> MEMBERS = [:]
+        static final Map<String, Map<String, String>> MEMBER_TYPES = [:]
 
         @Override
         void start(VisitorContext visitorContext) {
-            for (String name : [Introspected.name, Singleton.name, Property.name, Generated.name]) {
+            for (String name : [Introspected.name, Singleton.name, Property.name, Generated.name, Named.name]) {
                 visitorContext.getClassElement(name).ifPresent { ClassElement ce ->
                     def annotationElement = (AnnotationElement) ce
                     RESULTS.put(name, annotationElement.isInherited())
                     TARGETS.put(name, annotationElement.getTargets())
                     CONTAINERS.put(name, annotationElement.getRepeatableContainer())
                     RETENTIONS.put(name, annotationElement.getRetentionPolicy())
+                    def members = new LinkedHashMap<String, Optional<Object>>()
+                    def types = new LinkedHashMap<String, String>()
+                    for (AnnotationMemberElement member : annotationElement.getMembers()) {
+                        members.put(member.getName(), member.getDefaultValue())
+                        types.put(member.getName(), member.getType().getName())
+                    }
+                    MEMBERS.put(name, members)
+                    MEMBER_TYPES.put(name, types)
                 }
             }
         }
