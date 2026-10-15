@@ -753,11 +753,13 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             if (retained.size() == environment.classes().size()) {
                 return environment;
             }
+            // the problems found in the excluded classes' sources are reported all the same
             return new PythonEnvironment(
                 retained,
                 environment.scripts(),
                 environment.decorators(),
                 environment.shadowedTypes(),
+                environment.diagnostics(),
                 environment.context()
             );
         } catch (Exception e) {

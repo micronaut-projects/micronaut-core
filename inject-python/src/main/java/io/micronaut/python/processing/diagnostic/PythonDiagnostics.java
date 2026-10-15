@@ -47,7 +47,10 @@ public final class PythonDiagnostics {
     public static final String LOCATION_MARKER = "  --> ";
 
     private static final Pattern NEWLINE = Pattern.compile("\r\n|\r|\n");
-    private static final Pattern EXCERPT_LINE = Pattern.compile("^\\s*(\\d+ )?\\|");
+    // the three lines of an excerpt, as render() prints them (possibly indented further by the compiler output): the
+    // gutter alone, the numbered source line and the caret line; each starts with a space, which a message line
+    // starting with a bar, or with a number and a bar, does not
+    private static final Pattern EXCERPT_LINE = Pattern.compile("^ +\\|$|^ +\\d+ \\| |^ +\\| [\\t ]*\\^+$");
     private static final Pattern LOCATION_LINE = Pattern.compile("(?m)^\\s*--> \\S");
 
     private PythonDiagnostics() {

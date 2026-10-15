@@ -26,6 +26,7 @@ import io.micronaut.python.compiler.PythonBytecodeCompiler;
 import io.micronaut.python.imports.PythonImportMappingException;
 import io.micronaut.python.imports.PythonImportMappings;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
+import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
 import io.micronaut.python.processing.util.PythonJavaTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
 import io.micronaut.python.processing.util.VisitorContextClassIndex;
@@ -200,7 +201,26 @@ public final class PythonAstParser {
     }
 
     public PythonEnvironment parse(@Language("python") String sources, String packageName, VisitorContext visitorContext) {
-        return parse(sources, null, packageName, visitorContext);
+        return requireNoErrors(parse(sources, null, packageName, visitorContext));
+    }
+
+    /**
+     * The environment, once it is known to carry no error: the convenience entry points fail on the first problem
+     * a source has, as the processor did before it reported every problem as a {@link PythonDiagnostic}.
+     * {@link #parseTransformed(List, List, VisitorContext)} hands the diagnostics to its caller instead, which
+     * renders them with an excerpt of their sources.
+     */
+    private static PythonEnvironment requireNoErrors(PythonEnvironment environment) {
+        List<PythonDiagnostic> errors = environment.diagnostics().stream()
+            .filter(diagnostic -> diagnostic.kind() == PythonDiagnostic.Kind.ERROR)
+            .toList();
+        if (!errors.isEmpty()) {
+            environment.close();
+            throw new IllegalArgumentException(errors.stream()
+                .map(PythonDiagnostics::render)
+                .collect(java.util.stream.Collectors.joining(System.lineSeparator())));
+        }
+        return environment;
     }
 
     private PythonEnvironment parse(CharSequence sources, @Nullable Value tree, String packageName, VisitorContext visitorContext) {
@@ -309,9 +329,10 @@ public final class PythonAstParser {
      * @param srcDirs  The source directories
      * @param visitorContext The visitor context for constant resolution
      * @return The parsed environment
+     * @throws IllegalArgumentException When a source has an error, which the message renders
      */
     public PythonEnvironment parse(List<Source> sources, List<String> srcDirs, VisitorContext visitorContext) {
-        return parseSources(sources.stream().map(source -> new ParsedSource(source, null)).toList(), srcDirs, visitorContext);
+        return requireNoErrors(parseSources(sources.stream().map(source -> new ParsedSource(source, null)).toList(), srcDirs, visitorContext));
     }
 
     /**
@@ -322,7 +343,8 @@ public final class PythonAstParser {
      * @param transformed    The transformed sources, as returned by this parser
      * @param srcDirs        The source directories
      * @param visitorContext The visitor context for constant resolution
-     * @return The parsed environment
+     * @return The parsed environment; the problems of the sources are its {@link PythonEnvironment#diagnostics()},
+     * which the caller reports (the processor renders each with an excerpt of its source and fails on an error)
      * @since 5.3.0
      */
     public PythonEnvironment parseTransformed(List<TransformResult> transformed, List<String> srcDirs, VisitorContext visitorContext) {
@@ -708,7 +730,7 @@ public final class PythonAstParser {
         TransformResult transformedCode = transform(visitorContext, sources);
 
         // Then process the transformed tree
-        return parse(sources, artifacts(transformedCode).tree(), packageName, null);
+        return requireNoErrors(parse(sources, artifacts(transformedCode).tree(), packageName, null));
     }
 
     private static @Language("python") String getSource() {
@@ -772,7 +794,7 @@ public final class PythonAstParser {
                 "javaClassImports": transformer.get_java_class_imports(),
                 "exportedTypes": transformer.get_exported_types(),
                 "allClassNames": transformer.all_class_names,
-                "validationErrors": transformer.validation_errors + ([_Diagnostic.error("facade-import", message, None) for message in facade_rewriter.validation_errors] if facade_rewriter is not None else []),
+                "validationErrors": transformer.validation_errors + ([_Diagnostic.error("facade-import", message, transformer._span_of(error_node) if error_node is not None else None) for message, error_node in zip(facade_rewriter.validation_errors, facade_rewriter.validation_error_nodes)] if facade_rewriter is not None else []),
                 "facades": facade_rewriter.imported_facades if facade_rewriter is not None else []
             }
             """;
