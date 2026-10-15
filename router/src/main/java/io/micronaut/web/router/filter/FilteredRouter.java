@@ -102,9 +102,12 @@ public class FilteredRouter implements Router {
 
     @Override
     public <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request,
+                                                            @Nullable Predicate<UriRouteMatch<T, R>> filter,
                                                             Consumer<? super PendingRouteMatch<T, R>> pending) {
-        // filter before resolving the ambiguity, like findAllClosest, and the routes of located targets too
-        return router.findClosest(request, routeFilter.filter(request), pending);
+        // filter before resolving the ambiguity, like findAllClosest, and the routes of located
+        // targets too; the filter of an enclosing filtered router as well
+        Predicate<UriRouteMatch<T, R>> own = routeFilter.filter(request);
+        return router.findClosest(request, filter == null ? own : own.and(filter), pending);
     }
 
     @Override

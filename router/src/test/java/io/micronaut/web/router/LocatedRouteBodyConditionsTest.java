@@ -99,6 +99,50 @@ class LocatedRouteBodyConditionsTest {
         assertInstanceOf(RouteLocator.LocatedUriMatchInfo.class, ((DefaultUriRouteMatch<?, ?>) match).matchInfo());
     }
 
+    @Test
+    void stackedFilteredRoutersLocateTheTargetOfALocator() {
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/items", (request, pathVariables) -> HttpResponse.ok("item")));
+        RouteMatchFilter all = new RouteMatchFilter() {
+            @Override
+            public <T, R> Predicate<UriRouteMatch<T, R>> filter(HttpRequest<?> request) {
+                return match -> true;
+            }
+        };
+        Router router = new FilteredRouter(new FilteredRouter(router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> "order", target -> items)), all), all);
+
+        UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.POST("/orders/1/items", "x"), ignored -> { });
+        assertNotNull(match);
+        assertInstanceOf(RouteLocator.LocatedUriMatchInfo.class, ((DefaultUriRouteMatch<?, ?>) match).matchInfo());
+    }
+
+    @Test
+    void aFilteredRouterChoosesAmongTheRoutesOfLocatorsOfTheSamePrefixWithoutBodyConditions() {
+        LocatedRoutes<?> v1 = TestLocatedRoutes.of(located -> located.GET("/items").attribute("version", "1").handle((request, pathVariables) -> HttpResponse.ok("v1")));
+        LocatedRoutes<?> v2 = TestLocatedRoutes.of(located -> located.GET("/items").attribute("version", "2").handle((request, pathVariables) -> HttpResponse.ok("v2")));
+        RouteMatchFilter versions = new RouteMatchFilter() {
+            @Override
+            public <T, R> Predicate<UriRouteMatch<T, R>> filter(HttpRequest<?> request) {
+                String version = request.getHeaders().get("X-Version");
+                return match -> match.getRouteInfo().getAttribute("version", String.class).map(v -> v.equals(version)).orElse(false);
+            }
+        };
+        Router base = router(routes -> {
+            routes.locate("/orders/{id}", (request, pathVariables) -> "v1", target -> v1);
+            routes.locate("/orders/{id}", (request, pathVariables) -> "v2", target -> v2);
+        });
+        // the filter applies to the routes of the targets, not to the locators, also through stacked filtered routers
+        for (Router router : List.of(new FilteredRouter(base, versions), new FilteredRouter(new FilteredRouter(base, versions), versions))) {
+            for (String version : List.of("1", "2")) {
+            MutableHttpRequest<?> request = HttpRequest.GET("/orders/1/items").header("X-Version", version);
+            UriRouteMatch<Object, Object> match = router.findClosest(request, ignored -> { });
+            assertNotNull(match);
+            assertEquals(version, match.getRouteInfo().getAttribute("version", String.class).orElseThrow());
+            // as without the pending lookup
+            assertEquals(version, router.findClosest(request).getRouteInfo().getAttribute("version", String.class).orElseThrow());
+            }
+        }
+    }
+
     private static Router router(Consumer<HttpRouteBuilder> routes) {
         RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
         routes.accept(new DefaultHttpRouteBuilder(assembly));

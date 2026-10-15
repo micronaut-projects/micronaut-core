@@ -263,6 +263,14 @@ final class UriRouteSet {
         String path = request.getPath();
         List<UriRouteMatch<T, R>> matches = filter(findMatches(request, path, ports), filter);
         if (!PendingRouteMatch.anyHasBodyConditions(matches)) {
+            if (filter != null && hasDynamicTargets) {
+                // as findAllClosest: the targets resolve their routes, which the filter sees, before
+                // the ambiguity is resolved, e.g. a route of each version under the same prefix
+                List<UriRouteMatch<T, R>> resolved = findAllClosest(request, filter, ports);
+                return PendingRouteMatch.anyHasBodyConditions(resolved)
+                    ? pendingOrClosest(path, request, resolved, null, pending)
+                    : closest(path, resolved);
+            }
             return resolveDynamic(request, closestRoute(path, request, matches), filter, pending);
         }
         List<List<UriRouteMatch<T, R>>> ranks = BodyFallThrough.DEFAULT.rank(request, matches);
@@ -272,6 +280,21 @@ final class UriRouteSet {
         }
         pending.accept(new PendingRouteMatch<>(path, ranks,
             hasDynamicTargets ? (chosenRequest, chosen, next) -> resolveDynamic(chosenRequest, chosen, filter, next) : null));
+        return null;
+    }
+
+    /**
+     * The closest of resolved matches, or their matches pending on the body.
+     */
+    static <T, R> @Nullable UriRouteMatch<T, R> pendingOrClosest(String path, HttpRequest<?> request,
+                                                                List<UriRouteMatch<T, R>> resolved,
+                                                                PendingRouteMatch.@Nullable Resolver<T, R> resolver,
+                                                                Consumer<? super PendingRouteMatch<T, R>> pending) throws DuplicateRouteException {
+        List<List<UriRouteMatch<T, R>>> ranks = BodyFallThrough.DEFAULT.rank(request, resolved);
+        if (!PendingRouteMatch.anyHasBodyConditions(ranks.get(0))) {
+            return closest(path, ranks.get(0));
+        }
+        pending.accept(new PendingRouteMatch<>(path, ranks, resolver));
         return null;
     }
 

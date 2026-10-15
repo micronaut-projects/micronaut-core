@@ -282,7 +282,7 @@ public final class RouteLocator implements DynamicRouteTarget {
             target = located.routes().findClosest(located.request(), null,
                 // the filter sees the match of the request, as it does for the other routes
                 filter == null ? null : targetMatch -> filter.test(located.wrap(targetMatch)),
-                (PendingRouteMatch<T, R> targetPending) -> pending.accept(targetPending.located(located.request(), located::wrap)));
+                (PendingRouteMatch<T, R> targetPending) -> pending.accept(targetPending.located(located.request(), located::wrap, located::failed)));
         } catch (RuntimeException e) {
             throw located.failed(e);
         }

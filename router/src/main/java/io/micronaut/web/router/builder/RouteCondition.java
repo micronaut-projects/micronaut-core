@@ -684,11 +684,11 @@ public sealed interface RouteCondition {
          * meet it. The limit lowers the limit of the server, {@code micronaut.server.max-request-buffer-size},
          * and cannot raise it: a route with a limit above it fails the startup of the server.
          *
-         * @param maxBytes The limit
+         * @param maxBytes The limit, or {@link #SERVER_LIMIT} for the limit of the server
          * @return The condition with the limit
          */
         public Body<T> maxBytes(int maxBytes) {
-            if (maxBytes < 0) {
+            if (maxBytes < 0 && maxBytes != SERVER_LIMIT) {
                 throw new IllegalArgumentException("The limit of a body condition must not be negative: " + maxBytes);
             }
             return new Body<>(type, condition, maxBytes);

@@ -194,7 +194,8 @@ class RouteBodyConditionsTest {
 
     @Test
     void aBodyConditionLimitIsNotNegative() {
-        assertThrows(IllegalArgumentException.class, () -> EXPRESS.maxBytes(-1));
+        assertThrows(IllegalArgumentException.class, () -> EXPRESS.maxBytes(-2));
+        assertEquals(RouteCondition.Body.SERVER_LIMIT, EXPRESS.maxBytes(10).maxBytes(RouteCondition.Body.SERVER_LIMIT).maxBytes());
         assertEquals(10, EXPRESS.maxBytes(10).effectiveMaxBytes(100));
         assertEquals(100, EXPRESS.maxBytes(1000).effectiveMaxBytes(100), "a limit cannot raise the limit of the server");
         assertEquals(100, EXPRESS.effectiveMaxBytes(100));

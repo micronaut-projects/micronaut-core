@@ -80,12 +80,19 @@ public final class PendingRouteMatch<T, R> {
      *
      * @param targetRequest The request the routes of the target were matched with
      * @param wrap          Wraps the chosen match of the target
+     * @param failed        Records a failure to choose among the routes of the target as the
+     *                      outcome of its location, so that the error routes of the location answer it
      * @return The pending match of the request
      */
-    PendingRouteMatch<T, R> located(HttpRequest<?> targetRequest, UnaryOperator<UriRouteMatch<T, R>> wrap) {
+    PendingRouteMatch<T, R> located(HttpRequest<?> targetRequest, UnaryOperator<UriRouteMatch<T, R>> wrap,
+                                    UnaryOperator<RuntimeException> failed) {
         return new PendingRouteMatch<>(ranks, (request, matched, next) -> {
-            UriRouteMatch<T, R> match = choose(targetRequest, matched,
-                nested -> next.accept(nested.located(targetRequest, wrap)));
+            UriRouteMatch<T, R> match;
+            try {
+                match = choose(targetRequest, matched, nested -> next.accept(nested.located(targetRequest, wrap, failed)));
+            } catch (RuntimeException e) {
+                throw failed.apply(e);
+            }
             return match == null ? null : wrap.apply(match);
         });
     }

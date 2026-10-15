@@ -229,7 +229,8 @@ public interface Router {
      * passes its {@link io.micronaut.web.router.filter.RouteMatchFilter} here.
      *
      * <p>The default implementation finds the routes with {@link #find(HttpRequest, CharSequence)},
-     * and resolves a match that does not depend on the body with {@link #findAllClosest(HttpRequest, Predicate)}.</p>
+     * resolves a chosen route with a dynamic target, e.g. of a route locator, and otherwise
+     * resolves the routes with {@link #findAllClosest(HttpRequest, Predicate)}.</p>
      *
      * @param request The request
      * @param filter  The filter of the candidate matches, or {@code null}
@@ -244,19 +245,25 @@ public interface Router {
     default <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request,
                                                              @Nullable Predicate<UriRouteMatch<T, R>> filter,
                                                              Consumer<? super PendingRouteMatch<T, R>> pending) throws DuplicateRouteException {
-        if (hasBodyConditions()) {
-            Stream<UriRouteMatch<T, R>> found = this.<T, R>find(request, request.getPath());
-            List<UriRouteMatch<T, R>> matches = (filter == null ? found : found.filter(filter)).toList();
-            if (PendingRouteMatch.anyHasBodyConditions(matches)) {
-                List<List<UriRouteMatch<T, R>>> ranks = BodyFallThrough.DEFAULT.rank(request, matches);
-                if (PendingRouteMatch.anyHasBodyConditions(ranks.get(0))) {
-                    pending.accept(new PendingRouteMatch<>(request.getPath(), ranks, null));
-                    return null;
-                }
-            }
+        String path = request.getPath();
+        if (!hasBodyConditions()) {
+            return filter == null ? findClosest(request) : UriRouteSet.closest(path, findAllClosest(request, filter));
         }
-        // the body does not decide: as without body conditions, resolving the dynamic routes
-        return filter == null ? findClosest(request) : UriRouteSet.closest(request.getPath(), findAllClosest(request, filter));
+        // a route with a dynamic target is no candidate itself: the filter applies to the routes of its target
+        Stream<UriRouteMatch<T, R>> found = this.<T, R>find(request, path);
+        List<UriRouteMatch<T, R>> matches = (filter == null ? found
+            : found.filter(match -> DynamicRouteTarget.of(match.getRouteInfo()) != null || filter.test(match))).toList();
+        if (PendingRouteMatch.anyHasBodyConditions(matches)) {
+            return UriRouteSet.pendingOrClosest(path, request, matches, (chosenRequest, chosen, next) -> {
+                DynamicRouteTarget target = DynamicRouteTarget.of(chosen.getRouteInfo());
+                return target == null ? chosen : target.findClosest(chosenRequest, chosen, filter, next);
+            }, pending);
+        }
+        // the targets of the dynamic routes resolve their routes, which may depend on the body
+        List<UriRouteMatch<T, R>> resolved = filter == null ? findAllClosest(request) : findAllClosest(request, filter);
+        return PendingRouteMatch.anyHasBodyConditions(resolved)
+            ? UriRouteSet.pendingOrClosest(path, request, resolved, null, pending)
+            : UriRouteSet.closest(path, resolved);
     }
 
     /**
