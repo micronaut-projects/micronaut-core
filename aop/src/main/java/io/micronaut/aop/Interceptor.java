@@ -66,6 +66,13 @@ public interface Interceptor<T, R> extends Ordered {
     CharSequence CACHEABLE_LAZY_TARGET = "cacheableLazyTarget";
 
     /**
+     * The {@link Around#lazyInterceptorsPerTarget()} setting.
+     *
+     * @since 5.3.0
+     */
+    CharSequence LAZY_INTERCEPTORS_PER_TARGET = "lazyInterceptorsPerTarget";
+
+    /**
      * Intercepts an execution from a declared {@link Around} advice. The implementation can either call {@link InvocationContext#proceed()} to return the original value or provide a replacement value
      *
      * @param context The interception context

@@ -333,6 +333,19 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
         public static final Separators JDK_JSON = LeakTracker.Factory.staticInitializer(() -> jsonSeparators(ReadBufferFactory.getJdkFactory()));
 
         /**
+         * The separators that travel with the completion of the stream, {@link #afterLast} and
+         * {@link #empty}, without those in front of the items. For a stream whose items already
+         * carry {@link #beforeFirst} and {@link #between} in front of them, as the pieces of a
+         * {@link PieceWriter} do.
+         *
+         * @return The separators without {@link #beforeFirst} and {@link #between}
+         * @since 5.3.0
+         */
+        public Separators trailingOnly() {
+            return new Separators(null, afterLast, null, empty);
+        }
+
+        /**
          * Create the appropriate separators for JSON using the given buffer factory.
          *
          * @param factory The factory to use

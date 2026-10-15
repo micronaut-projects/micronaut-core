@@ -57,6 +57,13 @@ final class DefaultMutableByteBodyHttpResponse<B> implements MutableByteBodyHttp
         return original.byteBody();
     }
 
+    /**
+     * @return The response whose bytes this response keeps
+     */
+    ByteBodyHttpResponse<?> original() {
+        return original;
+    }
+
     @Override
     public void close() {
         if (!closed) {

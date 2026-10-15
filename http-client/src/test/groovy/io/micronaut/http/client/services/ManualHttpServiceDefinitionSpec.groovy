@@ -16,6 +16,7 @@
 package io.micronaut.http.client.services
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
@@ -45,7 +46,8 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
     void "test that manually defining an HTTP client creates a client bean"() {
         given:
-        EmbeddedServer firstApp = ApplicationContext.run(EmbeddedServer)
+        // the health checks of foo and bar run from the start of the client context
+        EmbeddedServer firstApp = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ManualHttpServiceDefinitionSpec'])
 
 
         ApplicationContext clientApp = ApplicationContext.run(
@@ -322,6 +324,15 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
         @Put("update")
         String update()
+    }
+
+    @Controller('/health')
+    @Requires(property = 'spec.name', value = 'ManualHttpServiceDefinitionSpec')
+    static class HealthController {
+        @Get
+        String health() {
+            return "up"
+        }
     }
 
     @Controller('manual/http/service')

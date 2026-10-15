@@ -23,6 +23,8 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.compiler.PythonBytecodeCompiler;
+import io.micronaut.python.imports.PythonImportMappingException;
+import io.micronaut.python.imports.PythonImportMappings;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 import io.micronaut.python.processing.staticcompile.Ir;
 import io.micronaut.python.processing.staticcompile.StaticCompilationConfiguration;
@@ -30,6 +32,7 @@ import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
 import io.micronaut.python.processing.typecheck.TypeCheckConfiguration;
 import io.micronaut.python.processing.util.PythonJavaTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
+import io.micronaut.python.processing.util.VisitorContextClassIndex;
 import io.micronaut.python.processing.model.ClassDef;
 import io.micronaut.python.processing.model.DecoratorDef;
 import io.micronaut.python.processing.model.ScriptDef;
@@ -90,10 +93,19 @@ public final class PythonAstParser {
     private static final Source PROCESSOR_SOURCE = Source.newBuilder(PYTHON, getSource(), "micronaut-processor-driver.py").cached(true).buildLiteral();
     private static final Source CALL_EXTRACTION_SOURCE = Source.newBuilder(PYTHON, getCallExtractionSource(), "micronaut-call-extraction.py").cached(true).buildLiteral();
     private static final Source TRANSFORM_SOURCE = Source.newBuilder(PYTHON, getTransformSource(), "micronaut-transform-driver.py").cached(true).buildLiteral();
+
+    /**
+     * The run time strips a leading {@code io.} from every Java package when it derives the Python
+     * module name, so {@code io.swagger.v3.oas.annotations} is imported as
+     * {@code swagger.v3.oas.annotations}. Compile-time lookups therefore have to try the prefixed
+     * name as well, for any library and not only {@code io.micronaut}.
+     */
+    private static final String JAVA_IO_PACKAGE_PREFIX = "io.";
     // the caches the modules of one compilation share: made afresh per transform and per parse, since
     // the class elements they hold belong to one javac task
     private static final Source TRANSFORM_CACHES_SOURCE = Source.newBuilder(PYTHON, "_mn_transform_caches = {}", "micronaut-transform-caches.py").cached(true).buildLiteral();
     private static final Source PROCESSOR_CACHES_SOURCE = Source.newBuilder(PYTHON, "_mn_processor_caches = {}", "micronaut-processor-caches.py").cached(true).buildLiteral();
+    private static final String VISITOR_CONTEXT_MEMBER = "visitor_context";
     private static final Source TYPE_CHECKER_SOURCE = Source.newBuilder(PYTHON, """
         if type_check_enabled:
             from micronaut_typecheck import TypeChecker
@@ -121,6 +133,7 @@ public final class PythonAstParser {
         """, "micronaut-static-plan-driver.py").cached(true).buildLiteral();
     private final Context context;
     private final Value runtimeAstCompiler;
+    private PythonImportMappings importMappings;
     private final IdentityHashMap<TransformResult, TransformArtifacts> transformArtifacts = new IdentityHashMap<>();
 
     public PythonAstParser() {
@@ -136,12 +149,32 @@ public final class PythonAstParser {
         // across compilations, but an engine pins every context created on it until that context is
         // closed, and the optimizing runtime keeps compiled code per engine: the compile-time test
         // suite, which creates hundreds of parsers in one JVM, ran out of heap on GraalVM CE.
+        this.importMappings = PythonImportMappings.load(classLoader != null ? classLoader : PythonAstParser.class.getClassLoader());
         long started = PipelineTimings.start();
         this.context = buildTolerantly(classLoader, incremental);
         context.initialize(PYTHON);
         context.eval(COMPILE_RUNTIME_AST_SOURCE);
         runtimeAstCompiler = context.getBindings(PYTHON).getMember("_mn_compile_runtime_ast");
-        PipelineTimings.record(PipelineTimings.CONTEXT, started);
+        PipelineTimings.stop(PipelineTimings.CONTEXT, started);
+    }
+
+    /**
+     * The curated Python modules (facades) the sources may import, by default those of the
+     * {@link io.micronaut.python.imports.PythonImportMapper mappers} the parser's class loader provides.
+     *
+     * @return The mappings
+     */
+    public PythonImportMappings importMappings() {
+        return importMappings;
+    }
+
+    /**
+     * Replaces the curated Python modules (facades) the sources may import.
+     *
+     * @param importMappings The mappings
+     */
+    public void importMappings(PythonImportMappings importMappings) {
+        this.importMappings = importMappings;
     }
 
     /**
@@ -270,7 +303,7 @@ public final class PythonAstParser {
         bindings.putMember("has_parsed_tree", tree != null);
         bindings.putMember("parsed_tree", tree != null ? tree : "");
         bindings.putMember("package_name", packageName);
-        bindings.putMember("visitor_context", visitorContext);
+        bindings.putMember(VISITOR_CONTEXT_MEMBER, visitorContext);
         bindings.putMember("file_name", fileName);
         bindings.putMember("source_path", sourcePath);
         bindings.putMember("src_root", srcRoot);
@@ -390,7 +423,7 @@ public final class PythonAstParser {
         try {
             return parseTransformedTimed(transformed, srcDirs, visitorContext, typeCheck, staticCompilation);
         } finally {
-            PipelineTimings.record(PipelineTimings.PARSE, started);
+            PipelineTimings.stop(PipelineTimings.PARSE, started);
         }
     }
 
@@ -444,10 +477,10 @@ public final class PythonAstParser {
         if (checker == null || checker.isNull()) {
             return List.of();
         }
-        bindings.putMember("visitor_context", visitorContext);
+        bindings.putMember(VISITOR_CONTEXT_MEMBER, visitorContext);
         long started = PipelineTimings.start();
         context.eval(TYPE_CHECK_SOURCE);
-        PipelineTimings.record(PipelineTimings.TYPE_CHECK, started);
+        PipelineTimings.stop(PipelineTimings.TYPE_CHECK, started);
         Value diagnostics = bindings.getMember("diagnostics");
         return diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class));
     }
@@ -468,10 +501,10 @@ public final class PythonAstParser {
         if (planner == null || planner.isNull()) {
             return StaticCompilationPlan.EMPTY;
         }
-        bindings.putMember("visitor_context", visitorContext);
+        bindings.putMember(VISITOR_CONTEXT_MEMBER, visitorContext);
         long started = PipelineTimings.start();
         context.eval(STATIC_PLAN_SOURCE);
-        PipelineTimings.record(PipelineTimings.PLAN, started);
+        PipelineTimings.stop(PipelineTimings.PLAN, started);
         Value decisions = bindings.getMember("static_decisions");
         Value bodies = bindings.getMember("static_bodies");
         Value diagnostics = bindings.getMember("static_diagnostics");
@@ -704,14 +737,6 @@ public final class PythonAstParser {
         return calls;
     }
 
-    /**
-     * The run time strips a leading {@code io.} from every Java package when it derives the Python
-     * module name, so {@code io.swagger.v3.oas.annotations} is imported as
-     * {@code swagger.v3.oas.annotations}. Compile-time lookups therefore have to try the prefixed
-     * name as well, for any library and not only {@code io.micronaut}.
-     */
-    private static final String JAVA_IO_PACKAGE_PREFIX = "io.";
-
     private static boolean isJavaIoPackage(String name) {
         return name.startsWith(JAVA_IO_PACKAGE_PREFIX);
     }
@@ -784,6 +809,19 @@ public final class PythonAstParser {
                 }
             );
         });
+        PythonImportMappings mappings = importMappings;
+        PythonImportMappings.Resolver facadeResolver = mappings.isEmpty() ? null : mappings.resolver(new VisitorContextClassIndex(visitorContext));
+        bindings.putMember("facade_module_names", mappings.modules().toArray(String[]::new));
+        bindings.putMember("callback_get_facade", (Function<String, Object>) name -> {
+            if (facadeResolver == null) {
+                return null;
+            }
+            try {
+                return facadeResolver.resolve(name).orElse(null);
+            } catch (PythonImportMappingException e) {
+                return e.getMessage();
+            }
+        });
         List<TransformResult> results = new ArrayList<>();
         for (Source source : pythonSource) {
             bindings.putMember("src", source.getCharacters());
@@ -796,7 +834,7 @@ public final class PythonAstParser {
             long started = PipelineTimings.start();
             try {
                 result = context.eval(TRANSFORM_SOURCE);
-                PipelineTimings.record(PipelineTimings.TRANSFORM, started);
+                PipelineTimings.stop(PipelineTimings.TRANSFORM, started);
             } catch (Exception e) {
                 StringWriter stack = new StringWriter();
                 e.printStackTrace(new PrintWriter(stack));
@@ -817,6 +855,7 @@ public final class PythonAstParser {
             java.util.List<String> exportedTypes = map.containsKey("exportedTypes") ? (java.util.List<String>) map.get("exportedTypes") : new ArrayList<>();
             java.util.List<String> allClassNames = map.containsKey("allClassNames") ? (java.util.List<String>) map.get("allClassNames") : new ArrayList<>();
             java.util.List<PythonDiagnostic> validationErrors = map.containsKey("validationErrors") ? (java.util.List<PythonDiagnostic>) map.get("validationErrors") : new ArrayList<>();
+            java.util.List<String> facades = map.containsKey("facades") ? List.copyOf((java.util.List<String>) map.get("facades")) : List.of();
             TransformResult transformResult = new TransformResult(
                 source,
                 code,
@@ -825,7 +864,8 @@ public final class PythonAstParser {
                 javaClassImports,
                 exportedTypes,
                 allClassNames,
-                validationErrors
+                validationErrors,
+                facades
             );
             results.add(transformResult);
             transformArtifacts.put(
@@ -940,9 +980,16 @@ public final class PythonAstParser {
     private static @Language("python") String getTransformSource() {
         return """
             import ast
-            from micronaut_transformer import MicronautRuntimeTransformer, MicronautTransformer, ast_equal, unparse
+            from micronaut_transformer import MicronautRuntimeTransformer, MicronautTransformer, _Diagnostic, ast_equal, unparse
+            from micronaut_facades import FacadeImportRewriter, FacadeRegistry
 
+            facades = FacadeRegistry(callback_get_facade, facade_module_names) if len(facade_module_names) > 0 else None
             tree = ast.parse(src)
+            # the curated modules (facades) a module imports become the Java imports they stand for, which the
+            # transformer and the processor resolve; the runtime source keeps them for the Java import finder
+            facade_rewriter = FacadeImportRewriter(facades) if facades is not None else None
+            if facade_rewriter is not None:
+                tree = facade_rewriter.rewrite(tree)
             transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, False, package_name, source_root, python_source_dirs=python_source_dirs, source_path=source_path, source_text=src, caches=_mn_transform_caches)
             transformed_tree = transformer.visit(tree)
             # The diagnostic runtime source is only read by tests and error reports, so it is
@@ -960,7 +1007,8 @@ public final class PythonAstParser {
                 callback_get_class_elements,
                 missing_decorator_code,
                 package_name,
-                source_root
+                source_root,
+                facades=facades
             )
             transformed_runtime_tree = runtime_transformer.visit(executable_runtime_tree)
             ast.fix_missing_locations(transformed_runtime_tree)
@@ -974,7 +1022,8 @@ public final class PythonAstParser {
                 "javaClassImports": transformer.get_java_class_imports(),
                 "exportedTypes": transformer.get_exported_types(),
                 "allClassNames": transformer.all_class_names,
-                "validationErrors": transformer.validation_errors
+                "validationErrors": transformer.validation_errors + ([_Diagnostic.error("facade-import", message, None) for message in facade_rewriter.validation_errors] if facade_rewriter is not None else []),
+                "facades": facade_rewriter.imported_facades if facade_rewriter is not None else []
             }
             """;
     }
@@ -1081,6 +1130,7 @@ public final class PythonAstParser {
      * @param exportedTypes    The types that have Micronaut decorators
      * @param allClassNames    All class names defined in the source
      * @param validationErrors The problems found while transforming the source, located in it
+     * @param facades          The curated Python modules (facades) the source imports, nested ones included
      */
     @Experimental
     public record TransformResult(
@@ -1091,10 +1141,11 @@ public final class PythonAstParser {
         Map<String, java.util.List<Map<String, String>>> javaClassImports,
         java.util.List<String> exportedTypes,
         java.util.List<String> allClassNames,
-        java.util.List<PythonDiagnostic> validationErrors) {
+        java.util.List<PythonDiagnostic> validationErrors,
+        java.util.List<String> facades) {
 
         /**
-         * Creates a result whose transformed code is already rendered.
+         * A transform result importing no curated Python module, whose transformed code is already rendered.
          *
          * @param originalSource      The original source
          * @param code                The transformed code
@@ -1105,7 +1156,6 @@ public final class PythonAstParser {
          * @param allClassNames       All class names defined in the source
          * @param validationErrors    The problems found while transforming the source, located in it
          */
-        @SuppressWarnings("checkstyle:ParameterNumber")
         public TransformResult(Source originalSource,
                                String code,
                                Supplier<String> runtimeCodeSupplier,
@@ -1114,7 +1164,7 @@ public final class PythonAstParser {
                                java.util.List<String> exportedTypes,
                                java.util.List<String> allClassNames,
                                java.util.List<PythonDiagnostic> validationErrors) {
-            this(originalSource, () -> code, runtimeCodeSupplier, decorators, javaClassImports, exportedTypes, allClassNames, validationErrors);
+            this(originalSource, () -> code, runtimeCodeSupplier, decorators, javaClassImports, exportedTypes, allClassNames, validationErrors, List.of());
         }
 
         /**

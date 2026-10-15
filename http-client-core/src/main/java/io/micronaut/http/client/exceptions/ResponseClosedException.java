@@ -22,7 +22,29 @@ package io.micronaut.http.client.exceptions;
  * @author Jonas Konrad
  */
 public class ResponseClosedException extends HttpClientException {
+    private final boolean headersReceived;
+
     public ResponseClosedException(String message) {
+        this(message, false);
+    }
+
+    /**
+     * @param message         The message
+     * @param headersReceived Whether the response headers had been received when the connection closed
+     * @since 5.3.0
+     */
+    public ResponseClosedException(String message, boolean headersReceived) {
         super(message);
+        this.headersReceived = headersReceived;
+    }
+
+    /**
+     * @return Whether the response headers had been received when the connection closed, i.e.
+     * the connection closed while the response body was read; {@code false} if it closed while
+     * the response was awaited
+     * @since 5.3.0
+     */
+    public boolean isHeadersReceived() {
+        return headersReceived;
     }
 }

@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 package io.micronaut.inject;
+
+import io.micronaut.core.annotation.Experimental;
+
 /**
  * Represents an execution handle that invokes a method.
  *
@@ -23,6 +26,12 @@ package io.micronaut.inject;
  * @since 1.0
  */
 public interface MethodExecutionHandle<T, R> extends ExecutionHandle<T, R>, MethodReference<T, R> {
+    @Override
+    @Experimental
+    default boolean hasTargetMethod() {
+        return getExecutableMethod().hasTargetMethod();
+    }
+
     /**
      * The underlying {@link ExecutableMethod} reference.
      *

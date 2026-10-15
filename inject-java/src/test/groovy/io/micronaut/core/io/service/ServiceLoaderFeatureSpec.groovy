@@ -96,4 +96,27 @@ class CustomCondition implements Condition {
         buildTimeInitialized.size() == 5
         buildTimeInitialized.any { EvaluatedExpression.isAssignableFrom(it)}
     }
+
+    void "the entries of the bean definitions are added to the image without their content"() {
+        given:
+        Map<String, byte[]> resources = [:]
+        ServiceLoaderFeature serviceLoaderFeature = new ServiceLoaderFeature() {
+            @Override
+            protected void addResource(String path, byte[] content) {
+                resources.put(path, content)
+            }
+        }
+        Set<String> names = MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(serviceLoaderFeature.getClass().classLoader)[BeanDefinitionReference.name]
+
+        when:
+        def staticServiceDefinitions = serviceLoaderFeature.buildStaticServiceDefinitions(Mock(Feature.BeforeAnalysisAccess))
+
+        then: "every entry of the class path, empty, and no other resource"
+        names.size() > 100
+        resources.keySet() == names.collect { "META-INF/micronaut/${BeanDefinitionReference.name}/$it".toString() } as Set
+        resources.values().every { it.length == 0 }
+
+        and: "the definitions are found by the names of the entries"
+        staticServiceDefinitions.serviceTypeMap()[BeanDefinitionReference.name].containsAll(names)
+    }
 }

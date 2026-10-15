@@ -19,19 +19,28 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.DelayedSubscriber;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ReactiveByteBufferByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
+import io.micronaut.http.client.exceptions.ResponseClosedException;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscription;
 
+import java.io.EOFException;
+import java.io.IOException;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /**
  * {@link HttpResponse.BodySubscriber} implementation that pushes data into a
@@ -42,13 +51,43 @@ import java.util.concurrent.Flow;
  */
 @Internal
 final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableByteBody> {
-    private static final ByteBodyFactory BODY_FACTORY = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
+    /**
+     * The pieces are heap buffers that hold no resource, made on the threads of the JDK client:
+     * they are not leak tracked.
+     */
+    private static final ByteBodyFactory BODY_FACTORY = new ByteBodyFactory(ByteArrayBufferFactory.INSTANCE, ReadBufferFactory.getUntrackedJdkFactory()) {
+    };
 
     private final DelayedSubscriber<ReadBuffer> defer = new DelayedSubscriber<>();
     private final CloseableByteBody mapped;
+    @Nullable
+    private final Consumer<@Nullable Throwable> onEnd;
+    private final AtomicBoolean ended = new AtomicBoolean();
+    private final boolean clientFailures;
 
     public ByteBodySubscriber(BodySizeLimits limits) {
+        this(limits, false, null);
+    }
+
+    /**
+     * @param limits         The body size limits
+     * @param clientFailures Whether an I/O failure of the body is passed on as an
+     *                       {@link HttpClientException}, as the failures of the bodies of the
+     *                       streams of the Netty client, instead of as it is
+     * @param onEnd          Called once when the body ends: with {@code null} when it is
+     *                       complete, or when its consumer let the rest go, and with the failure
+     *                       of the JDK client when it failed
+     */
+    public ByteBodySubscriber(BodySizeLimits limits, boolean clientFailures, @Nullable Consumer<@Nullable Throwable> onEnd) {
         this.mapped = BODY_FACTORY.adapt(defer, limits, null, null);
+        this.clientFailures = clientFailures;
+        this.onEnd = onEnd;
+    }
+
+    private void end(@Nullable Throwable failure) {
+        if (onEnd != null && ended.compareAndSet(false, true)) {
+            onEnd.accept(failure);
+        }
     }
 
     @Override
@@ -66,6 +105,8 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
 
             @Override
             public void cancel() {
+                // the consumer let the rest of the body go
+                end(null);
                 subscription.cancel();
             }
         });
@@ -78,21 +119,77 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
         } else if (item.size() == 1) {
             defer.onNext(BODY_FACTORY.readBufferFactory().adapt(item.get(0)));
         } else {
-            List<ReadBuffer> buffers = new ArrayList<>(item.size());
-            for (ByteBuffer byteBuffer : item) {
-                buffers.add(BODY_FACTORY.readBufferFactory().adapt(byteBuffer));
-            }
-            defer.onNext(BODY_FACTORY.readBufferFactory().compose(buffers));
+            defer.onNext(BODY_FACTORY.readBufferFactory().adapt(concat(item)));
         }
+    }
+
+    /**
+     * Copy the pieces into one array. The pieces of the JDK client are read-only heap buffers that
+     * expose no array, so composing them as {@link ReadBuffer}s would copy each piece twice: once
+     * out of the read-only buffer, and once more into the composite.
+     *
+     * @param item The pieces
+     * @return The bytes of all pieces
+     */
+    private static byte[] concat(List<ByteBuffer> item) {
+        int length = 0;
+        for (ByteBuffer byteBuffer : item) {
+            length = Math.addExact(length, byteBuffer.remaining());
+        }
+        byte[] bytes = new byte[length];
+        int offset = 0;
+        for (ByteBuffer byteBuffer : item) {
+            int remaining = byteBuffer.remaining();
+            byteBuffer.get(bytes, offset, remaining);
+            offset += remaining;
+        }
+        return bytes;
     }
 
     @Override
     public void onError(Throwable throwable) {
+        if (isTruncatedBody(throwable)) {
+            throwable = new ResponseClosedException("Connection closed before the response body was received completely", true);
+        }
+        end(throwable);
+        if (clientFailures) {
+            throwable = clientFailure(throwable);
+        }
         defer.onError(throwable);
+    }
+
+    /**
+     * @param failure A failure of the body
+     * @return The failure as a client exception
+     */
+    private static Throwable clientFailure(Throwable failure) {
+        if (failure instanceof HttpTimeoutException) {
+            return new ReadTimeoutException(true);
+        }
+        if (failure instanceof IOException) {
+            return new HttpClientException("Error occurred reading HTTP response: " + failure.getMessage(), failure);
+        }
+        return failure;
+    }
+
+    /**
+     * Whether the JDK client reports a connection closed before the body was complete: an EOF, or
+     * its messages for a fixed-length or a chunked body that ended early.
+     */
+    static boolean isTruncatedBody(Throwable throwable) {
+        if (throwable instanceof EOFException) {
+            return true;
+        }
+        if (throwable instanceof IOException) {
+            String message = throwable.getMessage();
+            return message != null && (message.startsWith("fixed content-length:") || message.startsWith("chunked transfer encoding"));
+        }
+        return false;
     }
 
     @Override
     public void onComplete() {
+        end(null);
         defer.onComplete();
     }
 }

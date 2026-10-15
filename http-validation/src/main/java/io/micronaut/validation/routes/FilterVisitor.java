@@ -17,23 +17,36 @@ package io.micronaut.validation.routes;
 
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.propagation.MutablePropagatedContext;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.PathVariables;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.ClientFilter;
 import io.micronaut.http.annotation.CookieValue;
 import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.Part;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.filter.FilterContinuation;
+import io.micronaut.http.form.FileUpload;
+import io.micronaut.http.form.FormData;
+import io.micronaut.http.form.FormPart;
+import io.micronaut.http.form.FormParts;
+import io.micronaut.http.multipart.CompletedPart;
+import io.micronaut.http.multipart.PartData;
+import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.http.server.annotation.PreMatching;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.TypeElementQuery;
@@ -41,11 +54,14 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -64,6 +80,28 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
         MutablePropagatedContext.class,
         RouteMatch.class,
         RouteInfo.class
+    );
+    /**
+     * The types that read the body of a server request, which a request filter method of a
+     * {@link ServerFilter} can declare, as a controller method can.
+     */
+    private static final Set<Class<?>> SERVER_REQUEST_BODY_CLASSES = Set.of(
+        AsyncRequestBody.class,
+        FormData.class,
+        FormParts.class,
+        FormPart.class,
+        FileUpload.class
+    );
+    /**
+     * The types of a {@link Part} that are read while the arguments of the route are fulfilled,
+     * after the filters ran: a filter method that declares one would wait for a part that is
+     * never read.
+     */
+    private static final Set<Class<?>> ROUTE_PART_CLASSES = Set.of(
+        CompletedPart.class,
+        StreamingFileUpload.class,
+        PartData.class,
+        Publisher.class
     );
     private static final Set<String> PERMITTED_BINDING_ANNOTATIONS = Set.of(
         Body.class.getName(),
@@ -113,16 +151,48 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
             ParameterElement continuationCreator = null;
             for (ParameterElement parameter : parameters) {
                 ClassElement parameterType = parameter.getGenericType();
+                boolean serverRequestFilter = !isResponseFilter && element.getDeclaringType().isAnnotationPresent(ServerFilter.class);
                 if (parameter.hasStereotype(Bindable.class)) {
                     String annotationName = parameter.getAnnotationNameByStereotype(Bindable.class).orElse(null);
+                    if (Part.class.getName().equals(annotationName)) {
+                        if (!serverRequestFilter) {
+                            context.fail("@Part can only be bound in a request filter method of a @ServerFilter", parameter);
+                            return;
+                        }
+                        ClassElement routePartType = findRoutePartType(parameterType);
+                        if (routePartType != null) {
+                            context.fail("A @Part of type " + routePartType.getName() + " cannot be bound in a filter method: it is read with the arguments of the route, after the filters. To read a part of the form in a filter, use "
+                                + FileUpload.class.getName() + ", " + FormPart.class.getName() + " or " + FormData.class.getName(), parameter);
+                            return;
+                        }
+                        continue;
+                    }
                     if (!PERMITTED_BINDING_ANNOTATIONS.contains(annotationName)) {
                         context.fail("Unsupported binding annotation on filter method: " + annotationName, parameter);
                         return;
                     } else if (Body.class.getName().equals(annotationName) && isResponseFilter) {
                         context.fail("Cannot bind @Body for response filter method", parameter);
                         return;
-                    } else if (Body.class.getName().equals(annotationName) && !isPermittedRawType(parameterType)) {
+                    } else if (Body.class.getName().equals(annotationName) && !isPermittedRawType(context, parameterType)) {
                         context.fail("The @Body to a filter method can only be a raw type (byte[], String, ByteBuffer etc.)", parameter);
+                        return;
+                    }
+                    continue;
+                }
+                if (isServerRequestBodyType(parameterType)) {
+                    if (!serverRequestFilter) {
+                        context.fail("The body of the request (" + parameterType.getName() + ") can only be bound in a request filter method of a @ServerFilter", parameter);
+                        return;
+                    }
+                    continue;
+                }
+                if (parameterType.getName().equals(PathVariables.class.getName())) {
+                    if (!element.getDeclaringType().isAnnotationPresent(ServerFilter.class)) {
+                        context.fail("The path variables of the route (" + parameterType.getName() + ") can only be bound in a filter method of a @ServerFilter", parameter);
+                        return;
+                    }
+                    if (element.hasAnnotation(PreMatching.class)) {
+                        context.fail("A @PreMatching filter method runs before the request is routed and cannot bind the path variables of the route (" + parameterType.getName() + ")", parameter);
                         return;
                     }
                     continue;
@@ -151,6 +221,14 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
                         return;
                     }
                     continuationCreator = parameter;
+                    ClassElement continuationWrapper = parameterType.getFirstTypeArgument().orElse(null);
+                    if (continuationWrapper != null && continuationWrapper.isAssignable(CompletionStage.class)
+                        && !continuationWrapper.getName().equals(CompletionStage.class.getName())
+                        && !continuationWrapper.getName().equals(CompletableFuture.class.getName())) {
+                        // the continuation yields a CompletableFuture
+                        context.fail("Unsupported continuation type: " + continuationWrapper.getName() + ", declare it as CompletionStage or CompletableFuture", parameter);
+                        return;
+                    }
                     ClassElement continuationReturnType = resolveType(parameterType.getFirstTypeArgument().orElse(ClassElement.of(Object.class)));
                     if (!continuationReturnType.isAssignable(HttpResponse.class) && !continuationReturnType.isAssignable(MutableHttpResponse.class)) {
                         context.fail("Unsupported continuation type: " + continuationReturnType.getName(), parameter);
@@ -159,6 +237,17 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
                 }
             }
             ClassElement returnType = resolveReturnType(element);
+            if (continuationCreator != null && returnType.isVoid()) {
+                ClassElement continuationType = continuationCreator.getGenericType().getFirstTypeArgument().orElse(null);
+                if (continuationType != null && isResultWrapper(continuationType)) {
+                    // the filter result is the response: a void method would complete the filter
+                    // before the downstream produced it, the same check as at runtime
+                    String simpleName = continuationType.getSimpleName();
+                    context.fail("A filter method with a FilterContinuation<" + simpleName + "<HttpResponse<?>>> must return the response, e.g. as "
+                        + simpleName + "<HttpResponse<?>>: a void method completes before the downstream produced the response", element);
+                    return;
+                }
+            }
             if (!returnType.isVoid()) {
                 if (isInvalidType(context, element, returnType, "Unsupported filter return type")) {
                     return;
@@ -182,11 +271,60 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
         }
     }
 
-    private boolean isPermittedRawType(ClassElement parameterType) {
-        if (parameterType.isArray() && parameterType.isPrimitive() && parameterType.getName().equals("byte")) {
-            return true;
+    /**
+     * @param parameterType The type of a parameter
+     * @return Whether it reads the body of a server request: one of the types, or a {@code List}
+     * or {@code Optional} of one
+     */
+    private static boolean isServerRequestBodyType(ClassElement parameterType) {
+        ClassElement type = parameterType;
+        if (type.isAssignable(List.class) || type.isOptional()) {
+            type = type.getFirstTypeArgument().orElse(type);
         }
-        return parameterType.isAssignable(byte[].class) || parameterType.isAssignable(ByteBuffer.class) || parameterType.isAssignable(String.class);
+        String name = type.getName();
+        return SERVER_REQUEST_BODY_CLASSES.stream().anyMatch(c -> c.getName().equals(name));
+    }
+
+    /**
+     * @param parameterType The type of a {@link Part} parameter
+     * @return The type that is only read with the arguments of the route, which is the type of
+     * the parameter or of the elements of its {@code List} or {@code Optional}, or {@code null}
+     */
+    private static @Nullable ClassElement findRoutePartType(ClassElement parameterType) {
+        ClassElement type = parameterType;
+        if (type.isAssignable(List.class) || type.isOptional()) {
+            type = type.getFirstTypeArgument().orElse(type);
+        }
+        for (Class<?> c : ROUTE_PART_CLASSES) {
+            if (type.isAssignable(c)) {
+                return type;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The filter binder buffers the body into a {@code byte[]}, a {@link ByteBuffer} or a
+     * {@link String}, so the parameter must be one of those or one of their supertypes.
+     *
+     * @param context       The visitor context
+     * @param parameterType The type of the {@code @Body} parameter
+     * @return Whether the filter binder can bind the body to the parameter
+     */
+    private static boolean isPermittedRawType(VisitorContext context, ClassElement parameterType) {
+        if (parameterType instanceof GenericPlaceholderElement placeholder) {
+            // the type argument is only known to the subclass, the binder checks it at runtime
+            parameterType = placeholder.getResolved().orElseGet(() -> placeholder.getBounds().get(0));
+        }
+        if (parameterType.isArray()) {
+            return parameterType.isPrimitive() && parameterType.getName().equals("byte");
+        }
+        String name = parameterType.getName();
+        return isAssignableTo(context, String.class, name) || isAssignableTo(context, ByteBuffer.class, name);
+    }
+
+    private static boolean isAssignableTo(VisitorContext context, Class<?> bodyType, String parameterTypeName) {
+        return context.getClassElement(bodyType).map(e -> e.isAssignable(parameterTypeName)).orElse(false);
     }
 
    private static ClassElement resolveReturnType(MethodElement element) {
@@ -195,14 +333,28 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
     }
 
    private static ClassElement resolveType(ClassElement returnType) {
-        if (returnType.isAssignable(Publisher.class) || returnType.isAssignable(CompletionStage.class) || returnType.isOptional()) {
+        if (isAsyncWrapper(returnType) || returnType.isOptional()) {
             returnType = returnType.getFirstTypeArgument().orElse(returnType);
         }
         return returnType;
     }
 
+    /**
+     * @param type The type a continuation produces
+     * @return Whether it produces the response later, and must be returned by the filter method
+     * (an {@link ExecutionFlow} or a {@link CompletionStage}; a reactive continuation is
+     * subscribed to by the method)
+     */
+    private static boolean isResultWrapper(ClassElement type) {
+        return type.isAssignable(CompletionStage.class) || type.isAssignable(ExecutionFlow.class);
+    }
+
+    private static boolean isAsyncWrapper(ClassElement type) {
+        return type.isAssignable(Publisher.class) || type.isAssignable(CompletionStage.class) || type.isAssignable(ExecutionFlow.class);
+    }
+
     private static boolean isInvalidType(VisitorContext context, Element parameter, ClassElement parameterType, String message) {
-        if (parameterType.isAssignable(Publisher.class) || parameterType.isAssignable(CompletionStage.class)) {
+        if (isAsyncWrapper(parameterType)) {
             parameterType = parameterType.getFirstTypeArgument().orElse(parameterType);
         }
         boolean valid = PERMITTED_CLASSES.stream().anyMatch(parameterType::isAssignable);

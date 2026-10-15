@@ -16,7 +16,7 @@
 package io.micronaut.aop.beandefinition;
 
 import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.chain.MethodInterceptorChain;
+import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.BeanRegistration;
@@ -38,18 +38,18 @@ import java.util.Objects;
 public interface InitializableIntercepted<T> extends InitializingBeanDefinition<T> {
 
     @Override
+    @SuppressWarnings("deprecation") // Reads the sharing stack populated by older callers.
     default T initialize(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
         // One chain runs for the post-construct event of the bean: proceeding it reaches doInitialize, which invokes
         // every @PostConstruct callback of the bean, superclass callbacks first. An interceptor that does not proceed
         // keeps all of them from running. The callbacks themselves are listed by getPostConstructExecutableMethods().
         Collection<BeanRegistration<Interceptor<?, ?>>> shared = SharedInterceptorRegistrations.peek(resolutionContext, this);
-        return Objects.requireNonNull(MethodInterceptorChain.initialize(
+        return Objects.requireNonNull(context.getBean(InterceptorChainFactory.ARGUMENT).initialize(
             resolutionContext,
-            context,
             this,
             new InitializableInterceptedMethod<>(this, resolutionContext, context, bean),
             bean,
-            shared
+            shared == null || shared.isEmpty() ? null : shared
         ));
     }
 

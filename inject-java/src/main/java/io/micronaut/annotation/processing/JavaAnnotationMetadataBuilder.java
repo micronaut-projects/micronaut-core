@@ -205,14 +205,17 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     /**
      * Lookup or build the metadata of the type annotations written on the given type mirror, such as those on
-     * a primitive type use, keyed by the mirror.
+     * a primitive type use, keyed by the mirror instance. javac compares array types by their component
+     * type, ignoring the annotations of the dimension, so every {@code String[]} use would otherwise share one
+     * entry: the annotations of the first use, and any mutation of a use, such as the non-null inferred for a
+     * {@code @NullMarked} declaration, would leak to every other.
      *
      * @param typeMirror The type mirror
      * @return The metadata
      * @since 5.3.0
      */
     public CachedAnnotationMetadata lookupOrBuildForTypeMirror(TypeMirror typeMirror) {
-        return lookupOrBuild(typeMirror, new AnnotationsElement(typeMirror));
+        return lookupOrBuild(new TypeMirrorKey(typeMirror), new AnnotationsElement(typeMirror));
     }
 
     @Override
@@ -905,6 +908,24 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             public Object visitArray(List<? extends javax.lang.model.element.AnnotationValue> vals, Object o) {
                 return null;
             }
+        }
+    }
+
+    /**
+     * A cache key comparing the type mirror by identity.
+     *
+     * @param typeMirror The type mirror
+     */
+    record TypeMirrorKey(TypeMirror typeMirror) {
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof TypeMirrorKey that && typeMirror == that.typeMirror;
+        }
+
+        @Override
+        public int hashCode() {
+            return System.identityHashCode(typeMirror);
         }
     }
 }

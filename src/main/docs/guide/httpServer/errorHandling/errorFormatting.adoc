@@ -20,7 +20,7 @@ To include these messages for compatibility or debugging, set `micronaut.server.
 The supported values are `never` (the default), `always`, and `on-param`. The `on-param` value includes the message when the request has a `message` query parameter whose value is not `false`.
 Enabling this option may expose sensitive implementation details and is not recommended for production environments.
 
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:

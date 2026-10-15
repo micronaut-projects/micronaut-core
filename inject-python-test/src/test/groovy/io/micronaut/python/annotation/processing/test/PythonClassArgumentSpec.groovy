@@ -15,14 +15,20 @@
  */
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.aop.MethodInvocationContext
+import io.micronaut.core.convert.ConversionService
+import io.micronaut.core.type.Argument
+import io.micronaut.core.type.ReturnType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.json.JsonMapper
 import io.micronaut.python.annotation.processing.test.classargs.TemporalApi
 import io.micronaut.python.annotation.processing.test.classargs.VectorLike
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.WebSocketClient
+import io.micronaut.websocket.interceptor.ClientWebSocketInterceptor
 import org.graalvm.polyglot.Context
 import org.graalvm.polyglot.Value
+import spock.util.concurrent.PollingConditions
 
 /**
  * Python classes passed to Java where a {@code Class} is expected, generated Java wrappers
@@ -266,6 +272,94 @@ class Exchange:
         cleanup:
         wsClient?.close()
         context?.close()
+    }
+
+    void "an abstract Python WebSocket close method closes the session without a Java base interface"() {
+        given:
+        def context = buildContext('''
+from abc import ABC, abstractmethod
+
+from micronaut.websocket import WebSocketSession
+from micronaut.websocket.annotation import ClientWebSocket, OnMessage, OnOpen, ServerWebSocket
+from reactor.core.publisher import Flux
+
+
+@ServerWebSocket("/close")
+class CloseServer:
+    @OnOpen
+    def on_open(self, session: WebSocketSession) -> None:
+        pass
+
+    @OnMessage
+    def on_message(self, message: str) -> None:
+        pass
+
+
+@ClientWebSocket("/close")
+class CloseClient(ABC):
+    def __init__(self):
+        self.session = None
+
+    @OnOpen
+    def on_open(self, session: WebSocketSession) -> None:
+        self.session = session
+
+    @OnMessage
+    def on_message(self, message: str) -> None:
+        pass
+
+    @abstractmethod
+    def close(self) -> None:
+        ...
+
+
+class Probe:
+    @staticmethod
+    def close_client(ws_client):
+        client = Flux.from_(ws_client.connect(CloseClient, "/close")).blockFirst()
+        assert client.session.isOpen()
+        client.close()
+        client.close()
+        return client.session
+''', true)
+        def server = context.getBean(EmbeddedServer).start()
+        def wsClient = context.createBean(WebSocketClient, server.URL)
+        def probe = context.getBean(Context).eval("python", "Probe")
+
+        when:
+        def session = probe.invokeMember("close_client", wsClient).asHostObject()
+
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            assert !session.isOpen()
+        }
+
+        cleanup:
+        wsClient?.close()
+        context?.close()
+    }
+
+    void "WebSocket close methods with bodies or other signatures keep their implementation"() {
+        given:
+        def invocation = Mock(MethodInvocationContext) {
+            getDeclaringType() >> Object
+            getMethodName() >> "close"
+            isAbstract() >> abstractMethod
+            getArguments() >> arguments
+            getReturnType() >> ReturnType.of(returnType)
+        }
+
+        when:
+        new ClientWebSocketInterceptor(ConversionService.SHARED).intercept(invocation)
+
+        then:
+        1 * invocation.proceed()
+
+        where:
+        abstractMethod | arguments                                     | returnType
+        false          | Argument.ZERO_ARGUMENTS                       | Void.TYPE
+        true           | [Argument.of(String, "reason")] as Argument[] | Void.TYPE
+        true           | Argument.ZERO_ARGUMENTS                       | String
     }
 
     void "a generated wrapper returned by a Java call behaves as the Python object it wraps"() {

@@ -54,6 +54,16 @@ class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
         private val reactorContextPresent: Boolean = ClassUtils.isPresent("kotlinx.coroutines.reactor.ReactorContext", null);
 
         /**
+         * Whether the Reactor context of the subscriber is added to a route's coroutine context as a
+         * `ReactorContext`, which is the case when `kotlinx-coroutines-reactor` is on the classpath.
+         *
+         * @return true if the Reactor context is propagated to coroutines
+         * @since 5.3.0
+         */
+        @JvmStatic
+        fun isReactorContextPropagated(): Boolean = reactorContextPresent
+
+        /**
          * Builds the dispatcher a route's coroutine should run and resume on.
          *
          * The returned dispatcher holds a reference to [executorService] and is meant to be resolved once per

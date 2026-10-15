@@ -66,7 +66,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -81,7 +80,6 @@ import static io.micronaut.inject.ast.beans.BeanParameterElement.ZERO_BEAN_PARAM
 @NullUnmarked
 @Internal
 public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilder {
-    private static final Map<String, AtomicInteger> BEAN_COUNTER = new HashMap<>(15);
     private static final Predicate<Set<ElementModifier>> PUBLIC_FILTER = (
         elementModifiers -> elementModifiers.contains(ElementModifier.PUBLIC));
     private static final Predicate<Set<ElementModifier>> NON_PUBLIC_FILTER = (
@@ -112,8 +110,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     protected final ElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
     private final Element originatingElement;
     private final ClassElement originatingType;
+    private final List<Element> additionalOriginatingElements = new ArrayList<>(0);
     private ClassElement beanType;
-    private final int identifier;
+    /**
+     * Tells apart the associated beans that would otherwise get the same name, see {@link #build(List, ElementBeanDefinitionBuilderFactory)}.
+     */
+    private int index;
     private final MutableAnnotationMetadata annotationMetadata;
     private final List<BeanMethodElement> executableMethods = new ArrayList<>(5);
     private final List<BeanMethodElement> interceptedMethods = new ArrayList<>(5);
@@ -150,8 +152,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         }
         this.beanType = beanType;
         this.visitorContext = visitorContext;
-        this.identifier = BEAN_COUNTER.computeIfAbsent(beanType.getName(), (s) -> new AtomicInteger(0))
-            .getAndIncrement();
         this.annotationMetadata = MutableAnnotationMetadata.of(beanType.getAnnotationMetadata());
         this.annotationMetadata.addDeclaredAnnotation(Bean.class.getName(), Collections.emptyMap());
         this.constructorElement = initConstructor(beanType);
@@ -170,8 +170,13 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     public static <R> List<R> build(List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders,
                                     ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilderFactory)
         throws IOException {
+        // Builders that would get the same name are numbered in the order they were added. Only the builders added
+        // for the same element can share a name, so the number depends neither on the other types of the compilation
+        // nor on an earlier compilation.
+        Map<String, Integer> nameCounts = new HashMap<>();
         List<R> result = new ArrayList<>();
         for (AbstractBeanDefinitionBuilder beanDefinitionBuilder : beanDefinitionBuilders) {
+            beanDefinitionBuilder.index = nameCounts.merge(beanDefinitionBuilder.getAssociatedBeanBaseName(), 1, Integer::sum) - 1;
             result.addAll(beanDefinitionBuilder.build(beanDefinitionBuilderFactory));
             final List<AbstractBeanDefinitionBuilder> childBeans = beanDefinitionBuilder.getChildBeans();
             for (AbstractBeanDefinitionBuilder childBean : childBeans) {
@@ -272,6 +277,40 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     @Override
     public Element getOriginatingElement() {
         return originatingElement;
+    }
+
+    /**
+     * Checks the originating elements of a bean registered with {@link VisitorContext#registerBean(ClassElement, Element...)}.
+     *
+     * @param beanType            The bean type
+     * @param originatingElements The originating elements
+     * @since 5.3.0
+     */
+    @Internal
+    public static void requireOriginatingElements(ClassElement beanType, Element... originatingElements) {
+        if (originatingElements == null || originatingElements.length == 0) {
+            throw new IllegalArgumentException("Bean [" + beanType.getName() + "] cannot be registered without an originating element");
+        }
+        if (!(originatingElements[0] instanceof ClassElement) && !(originatingElements[0] instanceof MethodElement)) {
+            throw new IllegalArgumentException("Bean [" + beanType.getName() + "] cannot be registered with the originating element ["
+                + originatingElements[0] + "]: the first originating element must be a class or a method");
+        }
+    }
+
+    /**
+     * Adds originating elements to the definition, after the originating element it is named after. A build that
+     * recompiles or deletes one of them has to replace or delete the definition.
+     *
+     * @param elements The additional originating elements
+     * @since 5.3.0
+     */
+    @Internal
+    public final void addOriginatingElements(Element... elements) {
+        for (Element element : elements) {
+            if (element != originatingElement && !additionalOriginatingElements.contains(element)) {
+                additionalOriginatingElements.add(element);
+            }
+        }
     }
 
     @Override
@@ -459,6 +498,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
     private BeanElementBuilder addChildBean(MethodElement producerMethod, Consumer<BeanElementBuilder> childBeanBuilder) {
         final AbstractBeanDefinitionBuilder childBuilder = createChildBean(producerMethod);
+        childBuilder.additionalOriginatingElements.addAll(additionalOriginatingElements);
         this.childBeans.add(childBuilder);
         if (childBeanBuilder != null) {
             childBeanBuilder.accept(childBuilder);
@@ -468,6 +508,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
     private BeanElementBuilder addChildBean(FieldElement producerMethod, Consumer<BeanElementBuilder> childBeanBuilder) {
         final AbstractBeanDefinitionBuilder childBuilder = createChildBean(producerMethod);
+        childBuilder.additionalOriginatingElements.addAll(additionalOriginatingElements);
         this.childBeans.add(childBuilder);
         if (childBeanBuilder != null) {
             childBeanBuilder.accept(childBuilder);
@@ -683,15 +724,24 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         if (constructorElement == null) {
             throw new ProcessingException(originatingElement, "Cannot create associated bean with no accessible primary constructor. Consider supply the constructor with createWith(..)");
         }
-        return elementBeanDefinitionBuilderFactory.constructor(
+        ElementBeanDefinitionBuilder<R> beanDefinitionBuilder = elementBeanDefinitionBuilderFactory.constructor(
             BeanInjectionUtils.createConstructorDefinition(constructorElement, constructorElement, visitorContext, !constructorElement.isPublic()),
-            getAssociatedBeanName(identifier, originatingType, beanType),
+            getAssociatedBeanBaseName() + index,
             annotationMetadata
         );
+        if (beanDefinitionBuilder instanceof BeanDefinitionWriter beanDefinitionWriter) {
+            // The definition is named after the element that added the bean, and that element alone decides whether
+            // the definition exists: a build that recompiles the element has to replace or delete it
+            beanDefinitionWriter.setOriginatingElement(originatingElement);
+            for (Element element : additionalOriginatingElements) {
+                beanDefinitionWriter.addOriginatingElement(element);
+            }
+        }
+        return beanDefinitionBuilder;
     }
 
-    private String getAssociatedBeanName(Integer uniqueIdentifier, ClassElement originatingClass, ClassElement beanType) {
-        return originatingClass.getPackageName() + "." + prefixClassName(originatingClass.getSimpleName()) + prefixClassName(beanType.getSimpleName()) + uniqueIdentifier;
+    private String getAssociatedBeanBaseName() {
+        return originatingType.getPackageName() + "." + prefixClassName(originatingType.getSimpleName()) + prefixClassName(beanType.getSimpleName());
     }
 
     private static String prefixClassName(String className) {

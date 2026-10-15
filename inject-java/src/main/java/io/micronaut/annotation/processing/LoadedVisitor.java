@@ -157,6 +157,15 @@ final class LoadedVisitor implements Ordered {
     }
 
     /**
+     * Whether the visitor is selected by no annotation: it visits every class and every member of it.
+     *
+     * @return True if the visitor visits every element
+     */
+    public boolean visitsEveryElement() {
+        return classAnnotation.equals(OBJECT_CLASS) && elementAnnotation.equals(OBJECT_CLASS);
+    }
+
+    /**
      * @param annotationMetadata The annotation data
      * @return True if the element should be visited
      */
