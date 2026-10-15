@@ -21,6 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Proxy;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -30,12 +32,13 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class DefaultEnvironmentConfigurationLocationsTest {
+class DefaultEnvironmentConfigurationFilesTest {
 
     @TempDir
     Path root;
@@ -45,18 +48,18 @@ class DefaultEnvironmentConfigurationLocationsTest {
         Files.writeString(root.resolve("application.yml"), "app.name: test\n");
         try (ApplicationContext context = builder().environments("dev").start()) {
             Environment environment = context.getEnvironment();
-            assertTrue(environment.getConfigurationLocations().contains("classpath:application.yml"));
-            assertTrue(environment.isConfigurationLocation("classpath:application.yml"));
-            assertTrue(environment.isConfigurationLocation("classpath:/application.yaml"));
+            assertTrue(environment.getConfigurationFiles().contains("classpath:application.yml"));
+            assertTrue(environment.isConfigurationFile("classpath:application.yml"));
+            assertTrue(environment.isConfigurationFile("classpath:/application.yaml"));
             // looked for whether or not they exist
-            assertTrue(environment.isConfigurationLocation("classpath:application-dev.properties"));
-            assertTrue(environment.isConfigurationLocation("file:config/application-dev.yml"));
-            assertTrue(environment.isConfigurationLocation(Path.of("config", "application.properties").toAbsolutePath().toString()));
-            assertFalse(environment.isConfigurationLocation("classpath:applications.yml"));
-            assertFalse(environment.isConfigurationLocation("classpath:application-other.yml"));
-            assertFalse(environment.isConfigurationLocation("classpath:config/application.yml"));
-            assertFalse(environment.isConfigurationLocation("classpath:schema.graphqls"));
-            assertFalse(environment.isConfigurationLocation("classpath:messages.properties"));
+            assertTrue(environment.isConfigurationFile("classpath:application-dev.properties"));
+            assertTrue(environment.isConfigurationFile("file:config/application-dev.yml"));
+            assertTrue(environment.isConfigurationFile(Path.of("config", "application.properties").toAbsolutePath().toString()));
+            assertFalse(environment.isConfigurationFile("classpath:applications.yml"));
+            assertFalse(environment.isConfigurationFile("classpath:application-other.yml"));
+            assertFalse(environment.isConfigurationFile("classpath:config/application.yml"));
+            assertFalse(environment.isConfigurationFile("classpath:schema.graphqls"));
+            assertFalse(environment.isConfigurationFile("classpath:messages.properties"));
         }
     }
 
@@ -68,13 +71,13 @@ class DefaultEnvironmentConfigurationLocationsTest {
         try (ApplicationContext context = builder().environments("dev").overrideConfigLocations("classpath:config/", "file:" + external).start()) {
             Environment environment = context.getEnvironment();
             assertEquals("config", environment.getProperty("app.name", String.class).orElse(null));
-            assertTrue(environment.isConfigurationLocation("classpath:config/application.yml"));
-            assertTrue(environment.isConfigurationLocation("classpath:config/application-dev.properties"));
+            assertTrue(environment.isConfigurationFile("classpath:config/application.yml"));
+            assertTrue(environment.isConfigurationFile("classpath:config/application-dev.properties"));
             // a file location that does not exist yet
-            assertTrue(environment.isConfigurationLocation("file:" + external.resolve("application-dev.yml")));
-            assertFalse(environment.isConfigurationLocation("classpath:application.yml"));
-            assertFalse(environment.isConfigurationLocation("file:config/application.yml"));
-            assertFalse(environment.isConfigurationLocation("classpath:config/schema.graphqls"));
+            assertTrue(environment.isConfigurationFile("file:" + external.resolve("application-dev.yml")));
+            assertFalse(environment.isConfigurationFile("classpath:application.yml"));
+            assertFalse(environment.isConfigurationFile("file:config/application.yml"));
+            assertFalse(environment.isConfigurationFile("classpath:config/schema.graphqls"));
         }
     }
 
@@ -103,26 +106,26 @@ class DefaultEnvironmentConfigurationLocationsTest {
             Environment environment = context.getEnvironment();
             assertTrue(environment.getProperty("app.nested", Boolean.class).orElse(false));
             // a list, a scalar, an indexed and a structured import, none of whose files exists
-            assertTrue(environment.isConfigurationLocation("classpath:late.yml"));
-            assertTrue(environment.isConfigurationLocation("classpath:scalar.yml"));
-            assertTrue(environment.isConfigurationLocation("classpath:indexed/one.yml"));
-            assertTrue(environment.isConfigurationLocation("classpath:structured/two.yml"));
-            assertTrue(environment.isConfigurationLocation("classpath:nested/app.yml"));
+            assertTrue(environment.isConfigurationFile("classpath:late.yml"));
+            assertTrue(environment.isConfigurationFile("classpath:scalar.yml"));
+            assertTrue(environment.isConfigurationFile("classpath:indexed/one.yml"));
+            assertTrue(environment.isConfigurationFile("classpath:structured/two.yml"));
+            assertTrue(environment.isConfigurationFile("classpath:nested/app.yml"));
             // an absolute file, given with the separators of the platform or with forward slashes
-            assertTrue(environment.isConfigurationLocation(absolute.toString()));
-            assertTrue(environment.isConfigurationLocation("file:" + absolute.toString().replace('\\', '/')));
+            assertTrue(environment.isConfigurationFile(absolute.toString()));
+            assertTrue(environment.isConfigurationFile("file:" + absolute.toString().replace('\\', '/')));
             // an import without an extension, of a file in any format a loader reads
-            assertTrue(environment.isConfigurationLocation("classpath:feature.yml"));
-            assertTrue(environment.isConfigurationLocation("classpath:feature.properties"));
-            assertFalse(environment.isConfigurationLocation("classpath:feature.graphqls"));
-            assertFalse(environment.isConfigurationLocation("classpath:notlate.yml"));
-            assertFalse(environment.isConfigurationLocation("classpath:nested/late.yml"));
+            assertTrue(environment.isConfigurationFile("classpath:feature.yml"));
+            assertTrue(environment.isConfigurationFile("classpath:feature.properties"));
+            assertFalse(environment.isConfigurationFile("classpath:feature.graphqls"));
+            assertFalse(environment.isConfigurationFile("classpath:notlate.yml"));
+            assertFalse(environment.isConfigurationFile("classpath:nested/late.yml"));
 
             // an optional import created later is read by a refresh
             Files.writeString(root.resolve("late.yml"), "app.late: true\n");
             environment.refresh();
             assertTrue(environment.getProperty("app.late", Boolean.class).orElse(false));
-            assertTrue(environment.isConfigurationLocation("classpath:late.yml"));
+            assertTrue(environment.isConfigurationFile("classpath:late.yml"));
         }
     }
 
@@ -132,9 +135,9 @@ class DefaultEnvironmentConfigurationLocationsTest {
         try (ApplicationContext context = builder().bootstrapEnvironment(true).environments("dev").start()) {
             Environment environment = context.getEnvironment();
             assertTrue(environment.getProperty("app.bootstrap", Boolean.class).orElse(false));
-            assertTrue(environment.isConfigurationLocation("classpath:bootstrap.yml"));
-            assertTrue(environment.isConfigurationLocation("classpath:bootstrap-dev.properties"));
-            assertTrue(environment.isConfigurationLocation("classpath:application.yml"));
+            assertTrue(environment.isConfigurationFile("classpath:bootstrap.yml"));
+            assertTrue(environment.isConfigurationFile("classpath:bootstrap-dev.properties"));
+            assertTrue(environment.isConfigurationFile("classpath:application.yml"));
         }
     }
 
@@ -146,18 +149,42 @@ class DefaultEnvironmentConfigurationLocationsTest {
         try (ApplicationContext context = builder().propertySourcesLocator(locator).start()) {
             Environment environment = context.getEnvironment();
             assertTrue(environment.getProperty("app.custom", Boolean.class).orElse(false));
-            assertTrue(environment.isConfigurationLocation(custom.toString()));
+            assertTrue(environment.isConfigurationFile(custom.toString()));
         }
     }
 
     @Test
     void locationsAreComparedInOneForm() {
-        assertEquals("classpath:config/app.yml", DefaultEnvironment.normalizeConfigurationLocation("classpath:/config/app.yml"));
-        assertEquals("classpath:config/app.yml", DefaultEnvironment.normalizeConfigurationLocation("classpath*:config/./app.yml"));
-        assertEquals("classpath:config/app.yml", DefaultEnvironment.normalizeConfigurationLocation("classpath:config\\app.yml"));
+        assertEquals("classpath:config/app.yml", DefaultEnvironment.normalizeConfigurationFile("classpath:/config/app.yml"));
+        assertEquals("classpath:config/app.yml", DefaultEnvironment.normalizeConfigurationFile("classpath*:config/./app.yml"));
+        assertEquals("classpath:config/app.yml", DefaultEnvironment.normalizeConfigurationFile("classpath:config\\app.yml"));
         String file = "file:" + Path.of("config", "app.yml").toAbsolutePath().toString().replace('\\', '/');
-        assertEquals(file, DefaultEnvironment.normalizeConfigurationLocation("config/app.yml"));
-        assertEquals(file, DefaultEnvironment.normalizeConfigurationLocation("file:config/../config/app.yml"));
+        assertEquals(file, DefaultEnvironment.normalizeConfigurationFile("config/app.yml"));
+        assertEquals(file, DefaultEnvironment.normalizeConfigurationFile("file:config/../config/app.yml"));
+    }
+
+    @Test
+    void anotherEnvironmentNormalizesTheLocationItIsAsked() {
+        String file = "file:" + Path.of("config", "app.yml").toAbsolutePath().toString().replace('\\', '/');
+        Environment environment = (Environment) Proxy.newProxyInstance(Environment.class.getClassLoader(), new Class<?>[]{Environment.class}, (proxy, method, args) -> {
+            if (method.getName().equals("getConfigurationFiles")) {
+                return Set.of("classpath:config/application.yml", file);
+            }
+            if (method.isDefault()) {
+                return InvocationHandler.invokeDefault(proxy, method, args);
+            }
+            throw new UnsupportedOperationException(method.getName());
+        });
+        assertTrue(environment.isConfigurationFile("classpath:config/application.yml"));
+        assertTrue(environment.isConfigurationFile("classpath:/config/application.yml"));
+        assertTrue(environment.isConfigurationFile("classpath*:config/./application.yml"));
+        assertTrue(environment.isConfigurationFile("classpath:config\\application.yml"));
+        assertTrue(environment.isConfigurationFile("config/app.yml"));
+        assertTrue(environment.isConfigurationFile("file:config/../config/app.yml"));
+        assertTrue(environment.isConfigurationFile(Path.of("config", "app.yml").toAbsolutePath().toString()));
+        assertFalse(environment.isConfigurationFile("classpath:application.yml"));
+        assertFalse(environment.isConfigurationFile("classpath:app.yml"));
+        assertFalse(environment.isConfigurationFile("config/other.yml"));
     }
 
     private ApplicationContextBuilder builder() throws MalformedURLException {
@@ -174,7 +201,7 @@ class DefaultEnvironmentConfigurationLocationsTest {
      * descriptors: the configuration files of the test class path stay out.
      */
     private static ClassLoader classLoader(Path root) throws MalformedURLException {
-        ClassLoader services = new ClassLoader(DefaultEnvironmentConfigurationLocationsTest.class.getClassLoader()) {
+        ClassLoader services = new ClassLoader(DefaultEnvironmentConfigurationFilesTest.class.getClassLoader()) {
             @Override
             public URL getResource(String name) {
                 return name.startsWith("META-INF/") ? super.getResource(name) : null;
