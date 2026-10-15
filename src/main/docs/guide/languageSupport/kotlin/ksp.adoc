@@ -6,13 +6,13 @@ ____
 
 If you use the https://micronaut-projects.github.io/micronaut-gradle-plugin/latest/[Micronaut Gradle Plugin], you can build Micronaut applications with Kotlin and https://kotlinlang.org/docs/ksp-overview.html[KSP]. You need to apply the `com.google.devtools.ksp` Gradle plugin.
 
-[source,kotlin]
+[source,kotlin,subs="attributes+"]
 .build.gradle.kts
 ----
 plugins {
-    id("org.jetbrains.kotlin.jvm") version "2.4.10"
-    id("com.google.devtools.ksp") version "2.3.12"
-    id("org.jetbrains.kotlin.plugin.allopen") version "2.4.10"
+    id("org.jetbrains.kotlin.jvm") version "{kotlinVersion}"
+    id("com.google.devtools.ksp") version "{kspVersion}"
+    id("org.jetbrains.kotlin.plugin.allopen") version "{kotlinVersion}"
     id("io.micronaut.application") version "5.0.2" // get latest version from https://plugins.gradle.org/plugin/io.micronaut.application
 }
 version = "0.1"
