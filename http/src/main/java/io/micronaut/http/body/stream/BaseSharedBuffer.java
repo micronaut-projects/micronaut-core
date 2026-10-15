@@ -25,8 +25,7 @@ import io.micronaut.http.body.ByteBody;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
+import org.reactivestreams.Publisher;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -115,7 +114,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     private final CompletableFuture<HttpHeaders> trailers = new CompletableFuture<>();
     /**
-     * If not negative, each {@link AsFlux} reader is charged for the bytes it has not delivered
+     * If not negative, each {@link AsPublisher} reader is charged for the bytes it has not delivered
      * yet against its own limit of this size, instead of against the buffered size of this
      * buffer, see {@link #setReaderBufferLimit(long)}.
      */
@@ -201,7 +200,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     }
 
     /**
-     * Charge each {@link AsFlux} reader for the bytes it has not delivered yet against a limit
+     * Charge each {@link AsPublisher} reader for the bytes it has not delivered yet against a limit
      * of its own, so that the buffered size of this buffer only counts the bytes it keeps for
      * the reserved readers. Must be called before the first reader subscribes.
      *
@@ -289,7 +288,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                     // We hand our copy of the data to a streaming subscriber and drop it, so we no
                     // longer hold these bytes and their charge has to go, the same way
                     // discardBuffer() releases it. From here on the subscriber is responsible for
-                    // whatever it keeps: AsFlux charges the bytes again until it delivers them,
+                    // whatever it keeps: AsPublisher charges the bytes again until it delivers them,
                     // and the other streaming consumers are not charged for anything they receive
                     // after subscribing either. Without this the bytes that arrived before the
                     // subscriber showed up stayed charged for the lifetime of the body, on top of
@@ -870,13 +869,16 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     }
 
     /**
-     * {@link BufferConsumer} that can subscribe to a {@link BaseSharedBuffer} and return the
-     * buffer as a {@link Flux}. Used to implement {@link ByteBody#toReadBufferPublisher()} and
-     * similar methods.
+     * {@link BufferConsumer} that can subscribe to a {@link BaseSharedBuffer} and publish its
+     * buffers to one subscriber, without Reactor. Used to implement
+     * {@link ByteBody#toReadBufferPublisher()} and similar methods. The buffers that arrive before
+     * they are requested are queued, and a failure is delivered after the queued buffers, see
+     * {@link BodyPublishers.Unicast}.
+     *
+     * @since 5.3.0
      */
-    public static final class AsFlux implements BufferConsumer {
+    public static final class AsPublisher extends BodyPublishers.Unicast<ReadBuffer> implements BufferConsumer {
         private final BaseSharedBuffer sharedBuffer;
-        private final Sinks.Many<ReadBuffer> sink = Sinks.many().unicast().onBackpressureBuffer();
         /**
          * The tracker of this reader alone, see {@link #setReaderBufferLimit(long)}, or
          * {@code null} to charge the buffered size of the shared buffer.
@@ -885,12 +887,13 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         private final SizeLimitTracker ownTracker;
         /**
          * Whether this reader is not charged for the bytes it has not delivered yet, see
-         * {@link #AsFlux(BaseSharedBuffer, boolean)}.
+         * {@link #AsPublisher(BaseSharedBuffer, boolean)}.
          */
         private final boolean unbuffered;
         private boolean first = true;
+        private BufferConsumer.@Nullable Upstream upstream;
 
-        public AsFlux(BaseSharedBuffer sharedBuffer) {
+        public AsPublisher(BaseSharedBuffer sharedBuffer) {
             this(sharedBuffer, false);
         }
 
@@ -901,13 +904,23 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
          *                     not delivered yet, which the backpressure of the upstream bounds,
          *                     and it receives the bytes kept past the buffer limit before it
          *                     subscribed, see {@link #setKeepInitialBytes()}
-         * @since 5.3.0
          */
-        public AsFlux(BaseSharedBuffer sharedBuffer, boolean unbuffered) {
+        public AsPublisher(BaseSharedBuffer sharedBuffer, boolean unbuffered) {
             this.sharedBuffer = sharedBuffer;
             this.unbuffered = unbuffered;
             long readerBufferLimit = sharedBuffer.readerBufferLimit;
             this.ownTracker = unbuffered || readerBufferLimit < 0 ? null : NotThreadSafe.create(readerBufferLimit, true).makeAtomic();
+        }
+
+        /**
+         * The publisher of the buffers, once this consumer was registered with the body.
+         *
+         * @param upstream The upstream of this consumer
+         * @return This publisher
+         */
+        public Publisher<ReadBuffer> publisher(BufferConsumer.Upstream upstream) {
+            this.upstream = upstream;
+            return this;
         }
 
         @Override
@@ -917,107 +930,90 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
         @Override
         public void add(ReadBuffer buf) {
-            if (unbuffered) {
-                if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
-                    buf.close();
-                }
-                return;
-            }
-            SizeLimitTracker readerTracker = ownTracker;
-            if (readerTracker != null) {
+            if (!unbuffered) {
                 int size = buf.readable();
-                Exception bufferExceededExc = readerTracker.add(size);
-                if (bufferExceededExc != null) {
-                    sink.tryEmitError(bufferExceededExc);
-                    buf.close();
-                } else if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
-                    readerTracker.subtract(size);
-                    buf.close();
+                Exception bufferExceededExc;
+                SizeLimitTracker readerTracker = ownTracker;
+                if (readerTracker != null) {
+                    bufferExceededExc = readerTracker.add(size);
+                } else {
+                    if (first) {
+                        // we need to upgrade to an atomic tracker so that we can properly subtract
+                        // when a buffer is delivered, on the thread of the subscriber
+                        sharedBuffer.sizeLimitTrackers = new SizeLimitTracker.TrackerPair(
+                            sharedBuffer.sizeLimitTrackers.totalSize(), sharedBuffer.sizeLimitTrackers.bufferedSize().makeAtomic()
+                        );
+                        first = false;
+                    }
+                    bufferExceededExc = sharedBuffer.sizeLimitTrackers.bufferedSize().add(size);
                 }
-                return;
+                if (bufferExceededExc != null) {
+                    error(bufferExceededExc);
+                    buf.close();
+                    return;
+                }
             }
-            if (first) {
-                // we need to upgrade to an atomic tracker so that we can properly subtract in doOnNext
-                sharedBuffer.sizeLimitTrackers = new SizeLimitTracker.TrackerPair(
-                    sharedBuffer.sizeLimitTrackers.totalSize(), sharedBuffer.sizeLimitTrackers.bufferedSize().makeAtomic()
-                );
-                first = false;
-            }
-            Exception bufferExceededExc = sharedBuffer.sizeLimitTrackers.bufferedSize().add(buf.readable());
-            if (bufferExceededExc != null) {
-                sink.tryEmitError(bufferExceededExc);
-                buf.close();
-            } else if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
-                buf.close();
+            if (!tryNext(buf)) {
+                discard(buf);
             }
         }
 
         @Override
         public void complete() {
-            sink.tryEmitComplete();
+            tryComplete();
         }
 
         @Override
         public void error(Throwable e) {
-            sink.tryEmitError(e);
+            tryError(e);
         }
 
-        public Flux<ReadBuffer> asFlux(Upstream upstream) {
-            if (unbuffered) {
-                return sink.asFlux()
-                    .doOnSubscribe(s -> upstream.start())
-                    .doOnNext(bb -> upstream.onBytesConsumed(bb.readable()))
-                    .doOnCancel(() -> {
-                        upstream.allowDiscard();
-                        upstream.disregardBackpressure();
-                    })
-                    .doOnError(e -> {
-                        // a reader that failed, e.g. over its limit, reads nothing more
-                        upstream.allowDiscard();
-                        upstream.disregardBackpressure();
-                    })
-                    .doOnDiscard(ReadBuffer.class, ReadBuffer::close);
+        @Override
+        protected void onSubscribing() {
+            upstream().start();
+        }
+
+        @Override
+        protected void beforeNext(ReadBuffer item) {
+            int size = item.readable();
+            uncharge(size);
+            upstream().onBytesConsumed(size);
+        }
+
+        @Override
+        protected void beforeError() {
+            // a reader that failed, e.g. over its limit, reads nothing more
+            upstream().allowDiscard();
+            upstream().disregardBackpressure();
+        }
+
+        @Override
+        protected void discard(ReadBuffer item) {
+            uncharge(item.readable());
+            item.close();
+        }
+
+        @Override
+        protected void onCancelled() {
+            upstream().allowDiscard();
+            upstream().disregardBackpressure();
+        }
+
+        /**
+         * The bytes of a buffer that is delivered or dropped are no longer held for this reader.
+         *
+         * @param size The number of bytes
+         */
+        private void uncharge(int size) {
+            if (ownTracker != null) {
+                ownTracker.subtract(size);
+            } else if (!unbuffered) {
+                sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
             }
-            SizeLimitTracker readerTracker = ownTracker;
-            if (readerTracker != null) {
-                return sink.asFlux()
-                    .doOnSubscribe(s -> upstream.start())
-                    .doOnNext(bb -> {
-                        int size = bb.readable();
-                        readerTracker.subtract(size);
-                        upstream.onBytesConsumed(size);
-                    })
-                    .doOnCancel(() -> {
-                        upstream.allowDiscard();
-                        upstream.disregardBackpressure();
-                    })
-                    .doOnError(e -> {
-                        // a reader that failed, e.g. over its limit, reads nothing more
-                        upstream.allowDiscard();
-                        upstream.disregardBackpressure();
-                    })
-                    .doOnDiscard(ReadBuffer.class, rb -> {
-                        readerTracker.subtract(rb.readable());
-                        rb.close();
-                    });
-            }
-            return sink.asFlux()
-                .doOnSubscribe(s -> upstream.start())
-                .doOnNext(bb -> {
-                    int size = bb.readable();
-                    sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
-                    upstream.onBytesConsumed(size);
-                })
-                .doOnCancel(() -> {
-                    upstream.allowDiscard();
-                    upstream.disregardBackpressure();
-                })
-                .doOnError(e -> {
-                    // a reader that failed, e.g. over its limit, reads nothing more
-                    upstream.allowDiscard();
-                    upstream.disregardBackpressure();
-                })
-                .doOnDiscard(ReadBuffer.class, ReadBuffer::close);
+        }
+
+        private BufferConsumer.Upstream upstream() {
+            return Objects.requireNonNull(upstream, "The publisher was not registered with the body");
         }
     }
 
