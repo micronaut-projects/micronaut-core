@@ -123,6 +123,50 @@ class BeanDefinitionDescriptorReaderSpec extends Specification {
         BeanDefinitionDescriptorReader.read(withRevision(descriptor, 0).toByteArray(), 'a.$Bean$Definition', SAME) == null
     }
 
+    void "the reader reads arrays of every primitive kind, wrapped or not, and names the arrays of every primitive type"() {
+        given:
+        Map<CharSequence, Object> values = [
+            booleans : [true, false] as boolean[],
+            bytes    : [1, 2] as byte[],
+            chars    : ['a', 'b'] as char[],
+            shorts   : [3, 4] as short[],
+            longs    : [5L, 6L] as long[],
+            floats   : [7.5f] as float[],
+            doubles  : [8.5d] as double[],
+            wBooleans: [true] as Boolean[],
+            wBytes   : [(byte) 1] as Byte[],
+            wChars   : [(char) 'c'] as Character[],
+            wShorts  : [(short) 2] as Short[],
+            wLongs   : [3L] as Long[],
+            wFloats  : [4.5f] as Float[],
+            wDoubles : [5.5d] as Double[]
+        ]
+        def descriptor = new BeanDefinitionDescriptor(
+            (1 << 4),
+            "a.Bean",
+            ["a.Bean", "boolean[]", "byte[]", "char[]", "short[]", "int[]", "long[]", "float[]", "double[][]"],
+            [],
+            new TreeMap<String, Integer>(["a.Qualifier": 15]),
+            new TreeMap<String, String>(),
+            [],
+            [new AnnotationValue<>("a.Qualifier", values)],
+            [],
+            'a.$Bean$Definition',
+            0,
+            "5.3.0",
+            BeanDefinitionDescriptor.REVISION,
+            []
+        )
+
+        when:
+        BeanDefinitionDescriptorData data = BeanDefinitionDescriptorReader.read(descriptor.toByteArray(), 'a.$Bean$Definition', SAME)
+
+        then:
+        data != null
+        data.exposedTypeNames as Set == ['a.Bean', '[Z', '[B', '[C', '[S', '[I', '[J', '[F', '[[D'] as Set
+        shape(data.qualifiers as List) == shape(descriptor.qualifiers())
+    }
+
     void "the reader agrees with the processor on every descriptor of the test classes of this module"() {
         given:
         ClassLoader loader = getClass().classLoader
