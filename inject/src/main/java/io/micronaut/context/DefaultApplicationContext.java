@@ -89,6 +89,11 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
      * True if the {@link #environment} was created by this context.
      */
     private final boolean environmentManaged;
+    /**
+     * The locator of the bootstrap property sources, if the {@link #environment} was created by
+     * this context with a bootstrap context.
+     */
+    private @Nullable BootstrapPropertySourcesLocator bootstrapPropertySourcesLocator;
 
     /**
      * Construct a new ApplicationContext for the given environment name.
@@ -195,12 +200,14 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
      */
     private Environment createEnvironment(ApplicationContextConfiguration configuration) {
         if (configuration.isEnableDefaultPropertySources() && isBootstrapEnabled(configuration)) {
+            BootstrapPropertySourcesLocator bootstrapLocator = createBootstrapPropertySourcesLocator();
+            this.bootstrapPropertySourcesLocator = bootstrapLocator;
             return Environment.create(new ApplicationContextConfigurationDelegate(configuration) {
 
                 @Override
                 public Collection<PropertySourcesLocator> getPropertySourcesLocators() {
                     List<PropertySourcesLocator> propertySourcesLocators = new ArrayList<>(super.getPropertySourcesLocators());
-                    propertySourcesLocators.add(createBootstrapPropertySourcesLocator());
+                    propertySourcesLocators.add(bootstrapLocator);
                     return propertySourcesLocators;
                 }
 
@@ -311,6 +318,11 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         super.stop();
         if (environmentManaged) {
             environment.stop();
+            if (bootstrapPropertySourcesLocator != null) {
+                // The environment is stopped, not closed, so the bootstrap context it was read with
+                // is closed here. A later start reads the bootstrap configuration again.
+                bootstrapPropertySourcesLocator.close();
+            }
         }
         return this;
     }
@@ -748,7 +760,11 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
 
         private final ApplicationContextConfiguration bootstrapConfiguration;
         private final ApplicationContext parentContext;
-        private final List<ApplicationContext> bootstrapContexts = new ArrayList<>();
+        /**
+         * The bootstrap context of the last successful {@link #load(Environment)}, if it has not
+         * been closed since.
+         */
+        private @Nullable ApplicationContext lastBootstrapContext;
 
         private BootstrapPropertySourcesLocator(ApplicationContextConfiguration bootstrapConfiguration, ApplicationContext parentContext) {
             this.bootstrapConfiguration = bootstrapConfiguration;
@@ -756,44 +772,66 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         }
 
         @Override
-        public Collection<PropertySource> load(Environment environment) {
+        public synchronized Collection<PropertySource> load(Environment environment) {
             List<PropertySource> bootstrapPropertySources = new ArrayList<>();
 
             LOG.info("Reading bootstrap environment configuration");
 
             // We have to always recreate the bootstrap context
             ApplicationContext bootstrapContext = new DefaultApplicationContext(bootstrapConfiguration);
-            bootstrapContexts.add(bootstrapContext);
-            for (PropertySource propertySource : environment.getPropertySources()) {
-                if (PropertySource.CONTEXT.equals(propertySource.getName())) {
-                    bootstrapContext.getEnvironment().addPropertySource(propertySource);
+            try {
+                for (PropertySource propertySource : environment.getPropertySources()) {
+                    if (PropertySource.CONTEXT.equals(propertySource.getName())) {
+                        bootstrapContext.getEnvironment().addPropertySource(propertySource);
+                    }
                 }
-            }
 
-            bootstrapContext.registerSingleton(BootstrapContextAccess.class, () -> parentContext, null, false);
-            bootstrapContext.start();
-            BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
-            if (bootstrapContext.containsBean(BootstrapPropertySourceLocator.class)) {
-                bootstrapPropertySourceLocator = bootstrapContext.getBean(BootstrapPropertySourceLocator.class);
-            } else {
-                bootstrapPropertySourceLocator = BootstrapPropertySourceLocator.EMPTY_LOCATOR;
+                bootstrapContext.registerSingleton(BootstrapContextAccess.class, () -> parentContext, null, false);
+                bootstrapContext.start();
+                BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
+                if (bootstrapContext.containsBean(BootstrapPropertySourceLocator.class)) {
+                    bootstrapPropertySourceLocator = bootstrapContext.getBean(BootstrapPropertySourceLocator.class);
+                } else {
+                    bootstrapPropertySourceLocator = BootstrapPropertySourceLocator.EMPTY_LOCATOR;
+                }
+                for (PropertySource propertySource : bootstrapPropertySourceLocator.findPropertySources(bootstrapContext.getEnvironment())) {
+                    bootstrapPropertySources.add(propertySource);
+                }
+                for (PropertySource propertySource : bootstrapContext.getEnvironment().getPropertySources()) {
+                    // Lower priority than bootstrap property sources
+                    bootstrapPropertySources.add(new BootstrapPropertySource(propertySource));
+                }
+            } catch (RuntimeException | Error e) {
+                // The load fails, so the property sources of the previous bootstrap context stay,
+                // and so does that context. Only the new one is closed.
+                try {
+                    bootstrapContext.close();
+                } catch (RuntimeException closeFailure) {
+                    e.addSuppressed(closeFailure);
+                }
+                throw e;
             }
-            for (PropertySource propertySource : bootstrapPropertySourceLocator.findPropertySources(bootstrapContext.getEnvironment())) {
-                bootstrapPropertySources.add(propertySource);
-            }
-            for (PropertySource propertySource : bootstrapContext.getEnvironment().getPropertySources()) {
-                // Lower priority than bootstrap property sources
-                bootstrapPropertySources.add(new BootstrapPropertySource(propertySource));
+            // The property sources just read replace those of the previous bootstrap context, which
+            // is not needed any more. Without closing it, every refresh would leave one running.
+            ApplicationContext previous = lastBootstrapContext;
+            lastBootstrapContext = bootstrapContext;
+            if (previous != null) {
+                try {
+                    previous.close();
+                } catch (RuntimeException e) {
+                    LOG.warn("Failed to close the previous bootstrap context: {}", e.getMessage(), e);
+                }
             }
             return bootstrapPropertySources;
         }
 
         @Override
-        public void close() {
-            for (ApplicationContext bootstrapContext : bootstrapContexts) {
+        public synchronized void close() {
+            ApplicationContext bootstrapContext = lastBootstrapContext;
+            lastBootstrapContext = null;
+            if (bootstrapContext != null) {
                 bootstrapContext.close();
             }
-            bootstrapContexts.clear();
         }
     }
 
