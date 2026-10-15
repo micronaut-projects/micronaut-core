@@ -40,6 +40,7 @@ import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.AsyncStreamingHttpClient;
+import io.micronaut.http.client.AsyncProxyHttpClient;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
@@ -100,7 +101,7 @@ public class DefaultHttpClient implements
      */
     DefaultHttpClient(NettyHttpClient nettyHttpClient) {
         this.nettyHttpClient = Objects.requireNonNull(nettyHttpClient, "nettyHttpClient");
-        this.asyncHttpClient = new DefaultAsyncHttpClient(nettyHttpClient);
+        this.asyncHttpClient = nettyHttpClient.toAsyncStreaming();
     }
 
     /**
@@ -352,7 +353,7 @@ public class DefaultHttpClient implements
      */
     @Deprecated
     public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
-        return nettyHttpClient.getMediaTypeCodecRegistry();
+        return Objects.requireNonNull(nettyHttpClient.getMediaTypeCodecRegistry());
     }
 
     /**
@@ -489,6 +490,11 @@ public class DefaultHttpClient implements
     @Override
     public AsyncRawHttpClient toAsyncRaw() {
         return nettyHttpClient.toAsyncRaw();
+    }
+
+    @Override
+    public AsyncProxyHttpClient toAsyncProxy() {
+        return nettyHttpClient.toAsyncProxy();
     }
 
     @Override
