@@ -72,6 +72,15 @@ class ConditionRoutesSpec extends Specification {
         then:
         HttpClientResponseException tooLarge = thrown()
         tooLarge.status == HttpStatus.NOT_FOUND
+
+        when:
+        String paid = http.retrieve(HttpRequest.POST("/payments", [customer: "alice"]))
+        http.retrieve(HttpRequest.POST("/payments", [customer: "bob"]))
+
+        then:
+        paid == "payment of alice"
+        HttpClientResponseException unknown = thrown()
+        unknown.status == HttpStatus.NOT_FOUND
     }
 
     void "a filter reads the attributes of the route"() {

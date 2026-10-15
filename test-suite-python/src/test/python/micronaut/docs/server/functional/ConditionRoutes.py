@@ -11,6 +11,7 @@ from micronaut.web.router import RouteAttributes
 from micronaut.web.router.builder import HttpRouteBuilder, HttpRoutes, RouteCondition, ValueMatcher
 
 Instant = java.type("java.time.Instant")
+CompletableFuture = java.type("java.util.concurrent.CompletableFuture")
 Long = java.type("java.lang.Long")
 Object = java.type("java.lang.Object")
 Set = java.type("java.util.Set")
@@ -19,6 +20,11 @@ String = java.type("java.lang.String")
 
 SHOPS = Set.of("north", "south")
 ORDER = Argument.mapOf(String, Object)
+
+
+def is_known_customer(customer):
+    # e.g. a lookup in a database
+    return CompletableFuture.completedFuture(customer == "alice")
 
 
 def text(text: str) -> HttpResponse:
@@ -74,6 +80,10 @@ class ConditionRoutes(HttpRoutes):
             .where(RouteCondition.bodyText(lambda body: body.startswith("id,")).maxBytes(1024))  # <4>
             .consumesAll()
             .handle(lambda request, path_variables: text("csv import")))
+        (routes.POST("/payments")
+            .where(RouteCondition.bodyAsync(ORDER, lambda order: is_known_customer(order.get("customer"))))  # <5>
+            .body(ORDER)
+            .handle(lambda request, path_variables, order: text(f"payment of {order.get('customer')}")))
         # end::body[]
         # tag::attributes[]
         def report_routes(reports):

@@ -14,6 +14,8 @@ import io.micronaut.web.router.builder.RouteCondition
 import io.micronaut.web.router.builder.ValueMatcher
 import jakarta.inject.Singleton
 import java.time.Instant
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
 // end::imports[]
 
 @Requires(property = "spec.name", value = "ConditionRoutesTest")
@@ -62,6 +64,10 @@ class ConditionRoutes(@Value("\${management.port}") private val managementPort: 
             .where(RouteCondition.bodyText { text -> text.startsWith("id,") }.maxBytes(1024)) // <4>
             .consumesAll()
             .handle { request, pathVariables -> text("csv import") }
+        routes.POST("/payments")
+            .where(RouteCondition.bodyAsync(ORDER) { order -> isKnownCustomer(order["customer"]) }) // <5>
+            .body(ORDER)
+            .handle { request, pathVariables, order -> text("payment of " + order["customer"]) }
         // end::body[]
         // tag::attributes[]
         routes.path("/reports") { reports ->
@@ -89,6 +95,10 @@ class ConditionRoutes(@Value("\${management.port}") private val managementPort: 
     companion object {
         private val SHOPS = setOf("north", "south")
         private val ORDER: Argument<Map<String, Any>> = Argument.mapOf(String::class.java, Any::class.java)
+
+        private fun isKnownCustomer(customer: Any?): CompletionStage<Boolean> =
+            // e.g. a lookup in a database
+            CompletableFuture.supplyAsync { customer == "alice" }
 
         private fun text(text: String): HttpResponse<*> = HttpResponse.ok(text).contentType(MediaType.TEXT_PLAIN_TYPE)
     }

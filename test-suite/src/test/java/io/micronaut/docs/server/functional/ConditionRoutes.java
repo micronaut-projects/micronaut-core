@@ -17,6 +17,8 @@ import jakarta.inject.Singleton;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 // end::imports[]
 
 @Requires(property = "spec.name", value = "ConditionRoutesTest")
@@ -76,6 +78,10 @@ public class ConditionRoutes implements HttpRoutes {
             .where(RouteCondition.bodyText(text -> text.startsWith("id,")).maxBytes(1024)) // <4>
             .consumesAll()
             .handle((request, pathVariables) -> text("csv import"));
+        routes.POST("/payments")
+            .where(RouteCondition.bodyAsync(ORDER, order -> isKnownCustomer(order.get("customer")))) // <5>
+            .body(ORDER)
+            .handle((request, pathVariables, order) -> text("payment of " + order.get("customer")));
         // end::body[]
 
         // tag::attributes[]
@@ -100,6 +106,11 @@ public class ConditionRoutes implements HttpRoutes {
             management.GET("/health", (request, pathVariables) -> text("UP"));
         });
         // end::port[]
+    }
+
+    private static CompletionStage<Boolean> isKnownCustomer(Object customer) {
+        // e.g. a lookup in a database
+        return CompletableFuture.supplyAsync(() -> "alice".equals(customer));
     }
 
     private static HttpResponse<?> text(String text) {

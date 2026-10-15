@@ -15,6 +15,8 @@ import io.micronaut.web.router.builder.ValueMatcher
 import jakarta.inject.Singleton
 
 import java.time.Instant
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
 // end::imports[]
 
 @Requires(property = "spec.name", value = "ConditionRoutesSpec")
@@ -73,6 +75,10 @@ class ConditionRoutes implements HttpRoutes {
             .where(RouteCondition.bodyText { String text -> text.startsWith("id,") }.maxBytes(1024)) // <4>
             .consumesAll()
             .handle { request, pathVariables -> text("csv import") }
+        routes.POST("/payments")
+            .where(RouteCondition.bodyAsync(ORDER) { Map<String, Object> order -> isKnownCustomer(order.customer) }) // <5>
+            .body(ORDER)
+            .handle { request, pathVariables, Map<String, Object> order -> text("payment of " + order.customer) }
         // end::body[]
         // tag::attributes[]
         routes.path("/reports") { reports ->
@@ -95,6 +101,11 @@ class ConditionRoutes implements HttpRoutes {
             management.GET("/health") { request, pathVariables -> text("UP") }
         }
         // end::port[]
+    }
+
+    private static CompletionStage<Boolean> isKnownCustomer(Object customer) {
+        // e.g. a lookup in a database
+        CompletableFuture.supplyAsync { customer == "alice" }
     }
 
     private static HttpResponse<?> text(String text) {

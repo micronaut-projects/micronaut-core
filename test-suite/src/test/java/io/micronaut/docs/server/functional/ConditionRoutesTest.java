@@ -95,6 +95,10 @@ class ConditionRoutesTest {
         HttpClientResponseException tooLarge = assertThrows(HttpClientResponseException.class,
             () -> http.retrieve(HttpRequest.POST("/imports", "id," + "x".repeat(2048)).contentType(MediaType.TEXT_PLAIN_TYPE)));
         assertEquals(HttpStatus.NOT_FOUND, tooLarge.getStatus());
+        assertEquals("payment of alice", http.retrieve(HttpRequest.POST("/payments", Map.of("customer", "alice"))));
+        HttpClientResponseException unknown = assertThrows(HttpClientResponseException.class,
+            () -> http.retrieve(HttpRequest.POST("/payments", Map.of("customer", "bob"))));
+        assertEquals(HttpStatus.NOT_FOUND, unknown.getStatus());
     }
 
     @Test

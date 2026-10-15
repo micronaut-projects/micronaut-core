@@ -39,6 +39,7 @@ snippet::io.micronaut.docs.server.functional.ConditionRoutes[tags="body", indent
 <2> A body condition gives a route no priority: the order ranks the routes of the same URI template, here before the fallback. Two routes of the same rank that the body both matches make the request ambiguous, answered with `400`.
 <3> The route for the other bodies, which reads the same body.
 <4> A condition on the text of the body, decoded with the charset of the request, with a limit of the bytes it reads.
+<5> A condition decided later: `bodyAsync(...)` returns a `CompletionStage<Boolean>`, e.g. of a lookup in a database, and the route is chosen when it completes, without blocking.
 
 `RouteCondition.bodyAsync(type, condition)` decides later: its condition returns a `CompletionStage<Boolean>`, e.g. of a lookup in a database, and the route is chosen when the stage completes, without blocking. A stage that fails does not meet the condition, which is logged as a warning. A request whose client goes away while a stage is pending stops waiting for it; the stage is not cancelled, since it may be shared. The conditions of the routes are evaluated one after the other, so a slow stage delays the choice of the route of every request to the path: keep such lookups fast, e.g. cached.
 

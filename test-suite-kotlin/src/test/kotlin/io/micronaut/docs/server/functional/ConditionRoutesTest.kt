@@ -89,6 +89,11 @@ class ConditionRoutesTest {
             http.retrieve(HttpRequest.POST("/imports", "id," + "x".repeat(2048)).contentType(MediaType.TEXT_PLAIN_TYPE))
         }
         assertEquals(HttpStatus.NOT_FOUND, tooLarge.status)
+        assertEquals("payment of alice", http.retrieve(HttpRequest.POST("/payments", mapOf("customer" to "alice"))))
+        val unknown = assertThrows<HttpClientResponseException> {
+            http.retrieve(HttpRequest.POST("/payments", mapOf("customer" to "bob")))
+        }
+        assertEquals(HttpStatus.NOT_FOUND, unknown.status)
     }
 
     @Test

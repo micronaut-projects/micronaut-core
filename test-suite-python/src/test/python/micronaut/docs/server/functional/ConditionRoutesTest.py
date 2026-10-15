@@ -67,6 +67,8 @@ class ConditionRoutesTest:
         assert http.retrieve(HttpRequest.POST("/imports", "id,name\n1,lamp").contentType(MediaType.TEXT_PLAIN_TYPE)) == "csv import"
         assert self._status(HttpRequest.POST("/imports", "name,id").contentType(MediaType.TEXT_PLAIN_TYPE)) == HttpStatus.NOT_FOUND
         assert self._status(HttpRequest.POST("/imports", "id," + "x" * 2048).contentType(MediaType.TEXT_PLAIN_TYPE)) == HttpStatus.NOT_FOUND
+        assert http.retrieve(HttpRequest.POST("/payments", Map.of("customer", "alice"))) == "payment of alice"
+        assert self._status(HttpRequest.POST("/payments", Map.of("customer", "bob"))) == HttpStatus.NOT_FOUND
 
     @Test
     def a_filter_reads_the_attributes_of_the_route(self):
