@@ -17,6 +17,7 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ClassUtils;
 import java.lang.reflect.Array;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Modifier;
@@ -110,14 +111,20 @@ abstract class ReflectTypeElement<T extends Type> implements ClassElement {
 
     @Override
     public boolean isAssignable(String type) {
-        // unsupported by this impl
-        return false;
+        Class<?> erasure = getErasure();
+        if (erasure.getName().equals(type)) {
+            return true;
+        }
+        // Only a class the element can load, as the element itself is one
+        return ClassUtils.forName(type, erasure.getClassLoader()).map(this::isAssignable).orElse(false);
     }
 
     @Override
     public boolean isAssignable(ClassElement type) {
-        // unsupported by this impl
-        return false;
+        if (type instanceof ReflectTypeElement<?> reflectType) {
+            return isAssignable(reflectType.getErasure());
+        }
+        return !type.isArray() && isAssignable(type.getName());
     }
 
     @Override
