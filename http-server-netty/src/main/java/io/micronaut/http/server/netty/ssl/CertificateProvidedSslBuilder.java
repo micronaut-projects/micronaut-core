@@ -104,7 +104,7 @@ public class CertificateProvidedSslBuilder extends AbstractServerSslBuilder impl
     }
 
     @Override
-    public void reload() {
+    public void invalidate() {
         // a store is cached with the settings it was loaded from, so a changed setting is a miss on its own; clearing
         // reloads an unchanged path too, for a store file rewritten in place
         keyStoreCache = null;
@@ -113,7 +113,7 @@ public class CertificateProvidedSslBuilder extends AbstractServerSslBuilder impl
 
     @Override
     public void onApplicationEvent(RefreshEvent event) {
-        reload();
+        invalidate();
     }
 
     @Override
