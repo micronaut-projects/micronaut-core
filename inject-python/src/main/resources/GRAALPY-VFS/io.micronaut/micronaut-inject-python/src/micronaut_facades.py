@@ -220,6 +220,8 @@ class FacadeImportRewriter:
     def __init__(self, facades: FacadeRegistry):
         self.facades = facades
         self.validation_errors: List[str] = []
+        # the statement or expression each error is about, in the order of validation_errors: its location
+        self.validation_error_nodes: List[Optional[ast.AST]] = []
         # the facades the module imports, nested ones included: the run time serves them
         self.imported_facades: List[str] = []
         # bound name -> facade name, for a name bound to a facade (``http``) or to a namespace (``pyronaut``)
@@ -288,16 +290,21 @@ class FacadeImportRewriter:
             if nested_facade is not None and nested_facade.active:
                 self.record_facade(nested_facade)
 
-    def usable_facade(self, name: str, statement: str) -> Optional[Facade]:
+    def error(self, message: str, node: Optional[ast.AST]):
+        """Records a problem of the module with the node it is about, which locates it."""
+        self.validation_errors.append(message)
+        self.validation_error_nodes.append(node)
+
+    def usable_facade(self, name: str, statement: str, node: Optional[ast.AST] = None) -> Optional[Facade]:
         """The facade a statement imports, reporting one that fails to resolve or whose sources are missing."""
         facade = self.facades.get(name)
         if isinstance(facade, str):
-            self.validation_errors.append(f"Cannot import [{name}] in [{statement}]: {facade}")
+            self.error(f"Cannot import [{name}] in [{statement}]: {facade}", node)
             return None
         if facade is None:
             return None
         if not facade.active:
-            self.validation_errors.append(f"Cannot import [{name}] in [{statement}]: {facade.inactive_reason}")
+            self.error(f"Cannot import [{name}] in [{statement}]: {facade.inactive_reason}", node)
             return None
         self.record_facade(facade)
         return facade
@@ -354,7 +361,7 @@ class _ImportPass(ast.NodeTransformer):
         statement = f"from {node.module} import {', '.join(a.name for a in node.names)}"
         facade_or_error = rewriter.facades.get(node.module)
         if facade_or_error is not None:
-            facade = rewriter.usable_facade(node.module, statement)
+            facade = rewriter.usable_facade(node.module, statement, node)
             if facade is None:
                 return None
             replacements = []
@@ -367,7 +374,7 @@ class _ImportPass(ast.NodeTransformer):
                     continue
                 member = facade.members.get(alias.name)
                 if member is None:
-                    rewriter.validation_errors.append(f"Cannot import [{alias.name}] from [{node.module}]: {rewriter.unknown_member(facade, alias.name)}")
+                    rewriter.error(f"Cannot import [{alias.name}] from [{node.module}]: {rewriter.unknown_member(facade, alias.name)}", node)
                     continue
                 replacements.extend(self._bind(alias.asname or alias.name, member, node))
             return replacements or None
@@ -376,7 +383,7 @@ class _ImportPass(ast.NodeTransformer):
         for alias in node.names:
             full_name = f'{node.module}.{alias.name}'
             if alias.name != '*' and rewriter.facades.get(full_name) is not None:
-                facade = rewriter.usable_facade(full_name, statement)
+                facade = rewriter.usable_facade(full_name, statement, node)
                 if facade is not None:
                     rewriter.module_bindings[alias.asname or alias.name] = facade.name
             else:
@@ -394,7 +401,7 @@ class _ImportPass(ast.NodeTransformer):
             if rewriter.facades.get(alias.name) is None:
                 kept.append(alias)
                 continue
-            facade = rewriter.usable_facade(alias.name, f"import {alias.name}")
+            facade = rewriter.usable_facade(alias.name, f"import {alias.name}", node)
             if facade is None:
                 continue
             if alias.asname:
@@ -535,9 +542,9 @@ class _ReferencePass(ast.NodeTransformer):
         if bound is None:
             if root in rewriter.unbound_facade_names and root not in rewriter.bound_names:
                 facade_name = rewriter.unbound_facade_names[root]
-                rewriter.validation_errors.append(
+                rewriter.error(
                     f"[import {facade_name}] binds the name [{facade_name.split('.')[0]}], not [{root}]: "
-                    f"write [from {facade_name.rsplit('.', 1)[0]} import {root}] to use [{root}.{chain[0]}]")
+                    f"write [from {facade_name.rsplit('.', 1)[0]} import {root}] to use [{root}.{chain[0]}]", node)
                 rewriter.unbound_facade_names.pop(root)
             return self.generic_visit(node)
         replacement = self._resolve(bound, chain, node)
@@ -560,7 +567,7 @@ class _ReferencePass(ast.NodeTransformer):
                 return None
             member = facade.members.get(chain[index])
             if member is None:
-                rewriter.validation_errors.append(rewriter.unknown_member(facade, chain[index]))
+                rewriter.error(rewriter.unknown_member(facade, chain[index]), node)
                 return None
             index += 1
             if member.kind != 'MODULE':
