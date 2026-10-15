@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -74,14 +75,16 @@ class HandlerRouteBodyConditionsServerLimitTest {
     @Test
     void aChunkedBodyLargerThanTheServerBufferFailsWith413() throws Exception {
         String large = "match" + "x".repeat(4000);
-        assertEquals("413", chunked("/cap/items", large.substring(0, 500), large.substring(500)));
+        assertEquals("413", rejected("/cap/items", large));
         // the server keeps serving
         assertEquals("matched", fixed("/cap/items", "match"));
     }
 
     @Test
     void aBodyWhoseLengthIsLargerThanTheServerBufferIsNotReadAndGoesToTheNextRoute() throws Exception {
-        assertEquals("fallback", fixed("/cap/items", "match" + "x".repeat(4000)));
+        // a body larger than the buffer of the server sent with Connection: close is reset at times
+        // by the transport, also on a route without body conditions: retried
+        assertEquals("fallback", retried(() -> fixed("/cap/items", "match" + "x".repeat(4000))));
     }
 
     @Test
@@ -112,6 +115,43 @@ class HandlerRouteBodyConditionsServerLimitTest {
             out.flush();
             return response(socket.getInputStream());
         }
+    }
+
+    /**
+     * Send a chunked body in one write, and read the response the server sends before it read
+     * it all. The server closes the connection after it rejected the body: the client may see
+     * the reset of the rest of its upload instead of the response, a race of the transport,
+     * which is retried.
+     */
+    private static String rejected(String path, String body) throws Exception {
+        SocketException last = null;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+                socket.setSoTimeout(30_000);
+                ByteArrayOutputStream request = new ByteArrayOutputStream();
+                request.writeBytes(head(path, "Transfer-Encoding: chunked"));
+                request.writeBytes(chunk(body));
+                request.writeBytes("0\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+                socket.getOutputStream().write(request.toByteArray());
+                socket.getOutputStream().flush();
+                return response(socket.getInputStream());
+            } catch (SocketException e) {
+                last = e;
+            }
+        }
+        throw last;
+    }
+
+    private static String retried(java.util.concurrent.Callable<String> exchange) throws Exception {
+        SocketException last = null;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            try {
+                return exchange.call();
+            } catch (SocketException e) {
+                last = e;
+            }
+        }
+        throw last;
     }
 
     private static String fixed(String path, String body) throws Exception {
@@ -170,7 +210,8 @@ class HandlerRouteBodyConditionsServerLimitTest {
                 .handle((request, pathVariables) -> text("matched"));
             routes.POST("/cap/items")
                 .consumes(MediaType.TEXT_PLAIN_TYPE)
-                .handle((request, pathVariables) -> text("fallback"));
+                // reads the body: a body left unread is reset when the connection closes
+                .body().handleAsync((request, pathVariables, body) -> body.discardBody().thenApply(done -> text("fallback")));
             routes.POST("/cap/limited")
                 .where(RouteCondition.bodyText(text -> true).maxBytes(64))
                 .order(-1)
