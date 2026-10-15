@@ -68,6 +68,7 @@ class DefaultHttpClientConfigurationSpec extends Specification {
         'read-idle-timeout'         | 'readIdleTimeout'        | '-1'    | Optional.empty()
         'connect-ttl'               | 'connectTtl'             | '1s'    | Optional.of(Duration.ofSeconds(1))
         'exception-on-error-status' | 'exceptionOnErrorStatus' | 'false' | false
+        'exception-on-error-status' | 'exceptionOn404Status'   | 'false' | false
         'shutdown-quiet-period'     | 'shutdownQuietPeriod'    | '1ms'   | Optional.of(Duration.ofMillis(1))
         'shutdown-quiet-period'     | 'shutdownQuietPeriod'    | '2s'    | Optional.of(Duration.ofSeconds(2))
         'shutdown-timeout'          | 'shutdownTimeout'        | '100ms' | Optional.of(Duration.ofMillis(100))

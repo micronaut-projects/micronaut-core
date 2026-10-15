@@ -480,9 +480,7 @@ public class DefaultHttpClient implements
         return acceptHeader != null && acceptHeader.equalsIgnoreCase(MediaType.TEXT_EVENT_STREAM);
     }
 
-    /**
-     * @return The configuration used by this client
-     */
+    @Override
     public HttpClientConfiguration getConfiguration() {
         return configuration;
     }
