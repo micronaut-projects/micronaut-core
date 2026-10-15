@@ -141,11 +141,19 @@ class ScheduledMethodWatcherSpec extends Specification {
 
         when: "a refresh that leaves the rate as it is"
         def before = task.runs.get()
-        ((DefaultBeanContext) context).notifyConfigurationChange(ConfigurationChange.ofKeys(["other.key"] as Set))
+        def outcomes = ((DefaultBeanContext) context).notifyConfigurationChange(ConfigurationChange.ofKeys(["other.key"] as Set))
 
-        then: "keeps the timer running"
+        then: "keeps the timer running, and the processor, which watches only the keys its schedules read, is not consulted"
+        outcomes.isEmpty()
         processor.scheduledMethods() == 1
         conditions.eventually { task.runs.get() > before + 2 }
+
+        when: "the method goes with a reload"
+        ((DefaultBeanContext) context).notifyDefinitionChange([definition], [])
+
+        then: "the key it read is no longer watched"
+        processor.scheduledMethods() == 0
+        ((DefaultBeanContext) context).notifyConfigurationChange(ConfigurationChange.ofKeys(["configured.rate"] as Set)).isEmpty()
 
         cleanup:
         context.close()
