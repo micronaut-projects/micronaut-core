@@ -70,17 +70,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Checks the switch, the stand-downs and the hand-over of the bean definition prefetch in
- * {@link Micronaut}, each in a fresh JVM, since the prefetch starts in the static initializer of
- * {@link Micronaut}.
+ * {@link Micronaut}, each in a fresh JVM, since the prefetch overlaps the configuration of
+ * logging, which a JVM does once.
  */
 @Tag("child-jvm")
 @Timeout(value = 5, unit = TimeUnit.MINUTES)
 class BeanDefinitionPrefetchStartupTest {
-    private static final String ON = "-D" + BeanDefinitionPrefetch.PROPERTY + "=true";
+    // Main turns the prefetch on with the builder
+    private static final String ON = "-D" + Main.ON + "=true";
     // The fewest pool threads the prefetch starts with, whatever the machine running the test has
     private static final String PARALLELISM = "-Djava.util.concurrent.ForkJoinPool.common.parallelism=";
     private static final String THREE_THREADS = PARALLELISM + "3";
     private static final String TASK = BeanDefinitionPrefetch.class.getName();
+    // Initialized once the prefetch has started, never when it stands down
+    private static final String STARTED = "Initializing '" + TASK.replace('.', '/') + "$Preload'";
+    private static final String CLASS_INIT = "-Xlog:class+init=info";
     private static final String WORKER_PREFIX = "ForkJoinPool.commonPool-worker-";
 
     @TempDir
@@ -88,32 +92,50 @@ class BeanDefinitionPrefetchStartupTest {
 
     @Test
     void offLoadsNothingNewAndLeavesTheProviderAlone() {
-        ChildJvm initialized = run(List.of(), "-Dprefetch-test.mode=init", "-verbose:class", THREE_THREADS);
-        ChildJvm started = run(List.of(), THREE_THREADS);
+        ChildJvm started = run(List.of(), "-verbose:class", THREE_THREADS);
 
-        assertEquals("0", initialized.value("POOL_SIZE"), initialized.output());
-        assertTrue(initialized.output().contains(Micronaut.class.getName() + " source:"), initialized.output());
-        assertFalse(initialized.output().contains(TASK + " source:"), "the task class was loaded:\n" + initialized.output());
+        // What this test's application prints after the start loads the task class
+        String starting = started.output().substring(0, started.output().indexOf("PROVIDER="));
+        assertTrue(starting.contains(Micronaut.class.getName() + " source:"), started.output());
+        assertFalse(starting.contains(TASK + " source:"), "the task class was loaded:\n" + started.output());
         assertEquals(DefaultBeanDefinitionsProvider.class.getName(), started.value("PROVIDER"), started.output());
     }
 
     @Test
-    void onHandsTheReferencesOfTheDefaultProviderToTheContext() {
-        ChildJvm initialized = run(List.of(), "-Dprefetch-test.mode=init", ON, THREE_THREADS);
+    void onHandsTheReferencesOfTheDefaultProviderToTheContext() throws IOException {
         ChildJvm started = run(List.of(), ON, THREE_THREADS);
+        ChildJvm configured = run(List.of(prefetchConfigurer()), THREE_THREADS);
         ChildJvm off = run(List.of(), THREE_THREADS);
 
-        assertNotEquals("0", initialized.value("POOL_SIZE"), initialized.output());
-        assertEquals(TASK, started.value("PROVIDER"), started.output());
-        assertEquals(off.value("REFERENCES"), started.value("REFERENCES"));
-        assertNotEquals("org.slf4j.helpers.NOPLogger", started.value("REFLECTION_LOGGER"));
+        for (ChildJvm on : List.of(started, configured)) {
+            assertEquals(TASK, on.value("PROVIDER"), on.output());
+            assertEquals(off.value("REFERENCES"), on.value("REFERENCES"));
+            assertNotEquals("org.slf4j.helpers.NOPLogger", on.value("REFLECTION_LOGGER"));
+        }
+    }
+
+    /**
+     * A launcher started again prefetches again: the prefetch it handed over before is not a
+     * provider of the application's own.
+     */
+    @Test
+    void aLauncherStartedAgainPrefetchesAgain() {
+        ChildJvm child = run(List.of(), ON, THREE_THREADS, "-Dprefetch-test.restart=true");
+
+        assertEquals(TASK, child.value("PROVIDER_AGAIN"), child.output());
+        assertNotEquals(child.value("PROVIDER_ID"), child.value("PROVIDER_ID_AGAIN"), child.output());
+        assertEquals(child.value("REFERENCES"), child.value("REFERENCES_AGAIN"));
     }
 
     @Test
     void standsDownBelowThreePoolThreadsAndInANativeImage() {
+        ChildJvm started = run(List.of(), "-Dprefetch-test.mode=init", ON, THREE_THREADS, CLASS_INIT);
+        assertEquals(TASK, started.value("PROVIDER"), started.output());
+        assertTrue(started.output().contains(STARTED), started.output());
         for (String standDown : List.of(PARALLELISM + "1", PARALLELISM + "2", "-Dorg.graalvm.nativeimage.imagecode=runtime")) {
-            ChildJvm child = run(List.of(), "-Dprefetch-test.mode=init", ON, THREE_THREADS, standDown);
-            assertEquals("0", child.value("POOL_SIZE"), standDown + "\n" + child.output());
+            ChildJvm child = run(List.of(), "-Dprefetch-test.mode=init", ON, THREE_THREADS, standDown, CLASS_INIT);
+            assertEquals(DefaultBeanDefinitionsProvider.class.getName(), child.value("PROVIDER"), standDown + "\n" + child.output());
+            assertFalse(child.output().contains(STARTED), standDown + "\n" + child.output());
         }
     }
 
@@ -270,31 +292,36 @@ class BeanDefinitionPrefetchStartupTest {
     @Test
     void loadsTheReferenceClassesWithoutInitializingThemWhileLoggingIsConfigured() throws IOException {
         List<Path> classPath = List.of(entries(FIRST), services(Map.of(Configurator.class, PoolFirstConfigurator.class)));
+        List<Path> configuredClassPath = new ArrayList<>(classPath);
+        configuredClassPath.add(prefetchConfigurer());
         String classLog = "-Xlog:class+load=info,class+init=info";
-        ChildJvm on = run(classPath, ON, THREE_THREADS, classLog);
+        ChildJvm started = run(classPath, ON, THREE_THREADS, classLog);
+        // A configurer turns it on early enough as well
+        ChildJvm configured = run(configuredClassPath, THREE_THREADS, classLog);
         ChildJvm off = run(classPath, THREE_THREADS, classLog);
 
-        assertEquals(TASK, on.value("PROVIDER"), on.output());
-        assertTrue(on.value("REFERENCES").contains(FIRST), on.output());
-        int configuring = on.line(ConfiguringLogging.class.getName() + " source:");
-        assertTrue(on.line(FIRST + " source:") < configuring, on.output());
-        assertTrue(on.line("Initializing '" + FIRST.replace('.', '/') + "'") > configuring, on.output());
+        for (ChildJvm on : List.of(started, configured)) {
+            assertEquals(TASK, on.value("PROVIDER"), on.output());
+            assertTrue(on.value("REFERENCES").contains(FIRST), on.output());
+            int configuring = on.line(ConfiguringLogging.class.getName() + " source:");
+            assertTrue(on.line(FIRST + " source:") < configuring, on.output());
+            assertTrue(on.line("Initializing '" + FIRST.replace('.', '/') + "'") > configuring, on.output());
+        }
         // Without the prefetch, the context loads it
         assertTrue(off.line(FIRST + " source:") > off.line(ConfiguringLogging.class.getName() + " source:"), off.output());
     }
 
     /**
-     * A failed task that the context did not take is reported once, with the property that turns
-     * the prefetch off.
+     * A failed task that the context did not take is reported once.
      */
     @Test
     void warnsOnceAboutAFailedTaskThatTheContextDidNotTake() throws IOException {
         ChildJvm child = run(List.of(entries(FAILS_AT_RUNTIME)), ON, THREE_THREADS, "-Dprefetch-test.provider=true", "-Dprefetch-test.await=true");
 
         assertEquals(0, child.exitCode(), child.output());
-        String warning = "The bean definition prefetch (" + BeanDefinitionPrefetch.PROPERTY + "=true) failed and was not handed to the application context";
+        String warning = "The bean definition prefetch failed and was not handed to the application context";
         assertEquals(1, child.output().lines().filter(line -> line.contains(warning)).count(), child.output());
-        assertTrue(child.output().contains("Start without " + BeanDefinitionPrefetch.PROPERTY + "=true"), child.output());
+        assertTrue(child.output().contains("Start without the prefetch"), child.output());
     }
 
     private Path entries(String... registered) throws IOException {
@@ -304,6 +331,13 @@ class BeanDefinitionPrefetchStartupTest {
             Files.createFile(directory.resolve(name));
         }
         return entries;
+    }
+
+    /**
+     * A class path entry that registers {@link PrefetchConfigurer}.
+     */
+    private Path prefetchConfigurer() throws IOException {
+        return services(Map.of(ApplicationContextConfigurer.class, PrefetchConfigurer.class));
     }
 
     /**
@@ -396,6 +430,16 @@ class BeanDefinitionPrefetchStartupTest {
         @Override
         public List<BeanDefinitionReference<?>> provide(ClassLoader classLoader) {
             return new DefaultBeanDefinitionsProvider().provide(classLoader);
+        }
+    }
+
+    /**
+     * Turns the prefetch on, as a configurer service.
+     */
+    public static final class PrefetchConfigurer implements ApplicationContextConfigurer {
+        @Override
+        public void configure(ApplicationContextBuilder builder) {
+            builder.beanDefinitionPrefetchEnabled(true);
         }
     }
 
@@ -513,7 +557,7 @@ class BeanDefinitionPrefetchStartupTest {
         public void register(MutableConversionService conversionService) {
             if ("main".equals(Thread.currentThread().getName())) {
                 Main.FREE_POOL.countDown();
-                if (Boolean.getBoolean(BeanDefinitionPrefetch.PROPERTY)) {
+                if (Boolean.getBoolean(Main.ON)) {
                     System.out.println("TASK_IN_CONVERT=" + awaitTaskInConvert());
                 }
             }
@@ -580,6 +624,8 @@ class BeanDefinitionPrefetchStartupTest {
      * context class loader that a test asks for.
      */
     static final class Main {
+        // The system property of the test that makes this application turn the prefetch on with the builder
+        static final String ON = "prefetch-test.on";
         // Counted down by MainFirstRegistrar, to free the pool that prefetch-test.busy-pool keeps busy
         static final CountDownLatch FREE_POOL = new CountDownLatch(1);
         static volatile ClassLoader contextClassLoader;
@@ -603,19 +649,25 @@ class BeanDefinitionPrefetchStartupTest {
                     });
                 }
             }
-            Class.forName(Micronaut.class.getName(), true, Main.class.getClassLoader());
-            if ("init".equals(System.getProperty("prefetch-test.mode"))) {
-                System.out.println("POOL_SIZE=" + ForkJoinPool.commonPool().getPoolSize());
-                return;
-            }
-            if (Boolean.getBoolean("prefetch-test.await")) {
-                // Only watches the pool: a join or a quiescence wait could run the task on this thread
-                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
-                while (!ForkJoinPool.commonPool().isQuiescent() && System.nanoTime() < deadline) {
-                    Thread.sleep(5);
+            Micronaut micronaut = new Micronaut() {
+                @Override
+                protected ApplicationContext newApplicationContext() {
+                    // start() has started the prefetch by now and set it as the provider, and the context has read nothing yet
+                    if ("init".equals(System.getProperty("prefetch-test.mode"))) {
+                        System.out.println("PROVIDER=" + getBeanDefinitionsProvider().getClass().getName());
+                        System.out.flush();
+                        System.exit(0);
+                    }
+                    if (Boolean.getBoolean("prefetch-test.await")) {
+                        awaitPool();
+                    }
+                    return super.newApplicationContext();
                 }
+            };
+            micronaut.args(args).properties(Map.of("spec.name", "BeanDefinitionPrefetchStartupTest"));
+            if (Boolean.getBoolean(ON)) {
+                micronaut.beanDefinitionPrefetchEnabled(true);
             }
-            Micronaut micronaut = Micronaut.build(args).properties(Map.of("spec.name", "BeanDefinitionPrefetchStartupTest"));
             if (Boolean.getBoolean("prefetch-test.provider")) {
                 micronaut.beanDefinitionsProvider(new OwnProvider());
             }
@@ -627,6 +679,31 @@ class BeanDefinitionPrefetchStartupTest {
                 System.out.println("REGISTRAR_THREAD=" + ContextClassLoaderRegistrar.thread);
                 System.out.println("REGISTRAR_CONTEXT_CLASS_LOADER=" + ContextClassLoaderRegistrar.contextClassLoader);
                 System.out.println("REGISTRAR_LOGGER=" + registrarLogger);
+            }
+            if (Boolean.getBoolean("prefetch-test.restart")) {
+                System.out.println("PROVIDER_ID=" + System.identityHashCode(micronaut.getBeanDefinitionsProvider()));
+                try (ApplicationContext context = micronaut.start()) {
+                    System.out.println("PROVIDER_AGAIN=" + micronaut.getBeanDefinitionsProvider().getClass().getName());
+                    System.out.println("PROVIDER_ID_AGAIN=" + System.identityHashCode(micronaut.getBeanDefinitionsProvider()));
+                    System.out.println("REFERENCES_AGAIN=" + String.join(",", names(context.getBeanDefinitionReferences())));
+                }
+            }
+        }
+
+        /**
+         * Waits until the pool is done, so that the task has finished before the context reads
+         * anything. Only watches the pool: a join or a quiescence wait could run the task on this
+         * thread.
+         */
+        private static void awaitPool() {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+            while (!ForkJoinPool.commonPool().isQuiescent() && System.nanoTime() < deadline) {
+                try {
+                    Thread.sleep(5);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
             }
         }
     }

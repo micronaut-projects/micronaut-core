@@ -413,6 +413,19 @@ public interface ApplicationContextBuilder {
     }
 
     /**
+     * Whether {@code io.micronaut.runtime.Micronaut} reads the bean definitions on the common pool
+     * while it configures logging and builds the context. Other builders ignore it.
+     *
+     * @param enabled True to prefetch the bean definitions
+     * @return This builder
+     * @since 5.3.0
+     */
+    @Experimental
+    default ApplicationContextBuilder beanDefinitionPrefetchEnabled(boolean enabled) {
+        return this;
+    }
+
+    /**
      * Singleton registrations of a stopped context the built context adopts when it starts: the bean
      * instances are registered under their definitions instead of being created again. A development
      * launcher passes what {@link DefaultBeanContext#stopRetaining(java.util.function.Predicate)} returned.
