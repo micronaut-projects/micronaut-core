@@ -64,19 +64,19 @@ public class RoutesAllocProfile {
     public static class FnRoutes implements HttpRoutes {
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.GET("/f/hello", (request, pv) -> HttpResponse.ok("Hello").contentType(MediaType.TEXT_PLAIN_TYPE));
-            routes.GET("/f/var/{id}", (request, pv) -> HttpResponse.ok("id " + pv.getInt("id")).contentType(MediaType.TEXT_PLAIN_TYPE));
-            routes.POST("/f/json").consumes(MediaType.APPLICATION_JSON_TYPE).body(Item.class)
+            routes.GET("/f/hello").produces(MediaType.TEXT_PLAIN_TYPE).handle((request, pv) -> HttpResponse.ok("Hello").contentType(MediaType.TEXT_PLAIN_TYPE));
+            routes.GET("/f/var/{id}").produces(MediaType.TEXT_PLAIN_TYPE).handle((request, pv) -> HttpResponse.ok("id " + pv.getInt("id")).contentType(MediaType.TEXT_PLAIN_TYPE));
+            routes.POST("/f/json").produces(MediaType.TEXT_PLAIN_TYPE).consumes(MediaType.APPLICATION_JSON_TYPE).body(Item.class)
                 .handle((request, pv, item) -> HttpResponse.ok("got " + item.name()).contentType(MediaType.TEXT_PLAIN_TYPE));
-            routes.POST("/f/json-async").consumes(MediaType.APPLICATION_JSON_TYPE).body()
+            routes.POST("/f/json-async").produces(MediaType.TEXT_PLAIN_TYPE).consumes(MediaType.APPLICATION_JSON_TYPE).body()
                 .handleAsync((request, pv, body) -> body.body(Item.class)
                     .thenApply(item -> HttpResponse.ok("got " + item.name()).contentType(MediaType.TEXT_PLAIN_TYPE)));
-            routes.POST("/f/text-async").consumes(MediaType.TEXT_PLAIN_TYPE).body()
+            routes.POST("/f/text-async").produces(MediaType.TEXT_PLAIN_TYPE).consumes(MediaType.TEXT_PLAIN_TYPE).body()
                 .handleAsync((request, pv, body) -> body.text(1024)
                     .thenApply(t -> HttpResponse.ok("len " + t.length()).contentType(MediaType.TEXT_PLAIN_TYPE)));
-            routes.POST("/f/form").form().handle((request, pv, form) ->
+            routes.POST("/f/form").produces(MediaType.TEXT_PLAIN_TYPE).form().handle((request, pv, form) ->
                 HttpResponse.ok("Welcome " + form.getString("name") + ", " + form.getInt("age", 18)).contentType(MediaType.TEXT_PLAIN_TYPE));
-            routes.POST("/f/multipart").consumes(MediaType.MULTIPART_FORM_DATA_TYPE).body()
+            routes.POST("/f/multipart").produces(MediaType.TEXT_PLAIN_TYPE).consumes(MediaType.MULTIPART_FORM_DATA_TYPE).body()
                 .handleAsync((request, pv, body) -> body.form().thenApply(form ->
                     HttpResponse.ok(form.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE)));
             routes.GET("/f/sse").sse((request, pv, events) -> {
@@ -84,11 +84,11 @@ public class RoutesAllocProfile {
                     events.send(Event.of("e" + i).id(String.valueOf(i)));
                 }
             });
-            routes.GET("/f/filtered")
+            routes.GET("/f/filtered").produces(MediaType.TEXT_PLAIN_TYPE)
                 .before(request -> request.getHeaders().add("X-In", "1")).and()
                 .after((request, response) -> response.header("X-Out", "1")).and()
                 .handle((request, pv) -> HttpResponse.ok("filtered").contentType(MediaType.TEXT_PLAIN_TYPE));
-            routes.GET("/f/ctx")
+            routes.GET("/f/ctx").produces(MediaType.TEXT_PLAIN_TYPE)
                 .beforeReplacing((request, ctx) -> {
                     ctx.add(new Tenant("t1"));
                     return null;
