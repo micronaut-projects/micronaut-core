@@ -27,6 +27,7 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.internal.RawHttpRequestWrapper;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import reactor.adapter.JdkFlowAdapter;
@@ -70,15 +71,20 @@ public final class HttpRequestFactory {
         MutableHttpRequest<I> mutableHttpRequest = request.toMutableRequest();
         final HttpRequest.Builder builder = HttpRequest.newBuilder().uri(uri);
         configuration.getReadTimeout().ifPresent(builder::timeout);
+        boolean hasBody;
         if (mutableHttpRequest.getMethod() == HttpMethod.GET) {
             builder.GET();
+            hasBody = false;
         } else {
             HttpRequest.BodyPublisher bodyPublisher = publisherForRequest(mutableHttpRequest, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
             // the name of a custom method, e.g. PROPFIND, not CUSTOM
             builder.method(mutableHttpRequest.getMethodName(), bodyPublisher);
+            // a body of an unknown length is -1
+            hasBody = bodyPublisher.contentLength() != 0;
         }
         mutableHttpRequest.getHeaders().forEach((name, values) -> values.forEach(value -> builder.header(name, value)));
-        if (mutableHttpRequest.getContentType().isEmpty()) {
+        // a request without a body, e.g. the GET of a redirect, has no content type
+        if (hasBody && mutableHttpRequest.getContentType().isEmpty()) {
             builder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
         }
         configuration.getReadTimeout().ifPresent(builder::timeout);
