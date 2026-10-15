@@ -338,6 +338,31 @@ class BeanWatchTest {
     }
 
     @Test
+    void aProcessorThatIsAWatcherIsAdaptedUnlessItWatchesItself() {
+        Map<String, Object> properties = new java.util.HashMap<>(DEVELOPMENT);
+        properties.put("spec.watchers", true);
+        try (ApplicationContext context = ApplicationContext.run(properties)) {
+            DefaultBeanContext beanContext = (DefaultBeanContext) context;
+            SelfWatchingTickProcessor watching = context.getBean(SelfWatchingTickProcessor.class);
+            UnwatchedTickProcessor unwatched = context.getBean(UnwatchedTickProcessor.class);
+
+            // both were given the startup pass; only the one without a watch of its own needs the adapter
+            assertEquals(Set.of("tick", "tock"), Set.copyOf(watching.processed));
+            assertEquals(Set.of("tick", "tock"), Set.copyOf(unwatched.processed));
+            assertFalse(beanContext.adaptedProcessors().contains(watching));
+            assertTrue(beanContext.adaptedProcessors().contains(unwatched));
+
+            // a reload: the watching processor learns it from its watch, the other is fed the additions
+            BeanDefinition<Ticker> definition = context.getBeanDefinition(Ticker.class);
+            int batches = watching.changes.size();
+            beanContext.notifyDefinitionChange(List.of(definition), List.of(definition));
+            assertEquals(batches + 1, watching.changes.size());
+            assertEquals(2, watching.processed.size());
+            assertEquals(4, unwatched.processed.size());
+        }
+    }
+
+    @Test
     void aConfigurationWatchRegisteredWhileItsBeanIsCreatedCanRecreateTheBeanAndClosesWithIt() {
         Pool.CREATED.set(0);
         try (ApplicationContext context = ApplicationContext.builder(PROPERTIES).beanDependencyTrackingEnabled(true).start()) {
