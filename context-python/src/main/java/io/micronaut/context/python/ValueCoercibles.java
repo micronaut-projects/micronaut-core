@@ -184,6 +184,14 @@ public final class ValueCoercibles {
         if (boxedType == Character.class) {
             return value.isString() && value.asString().length() == 1;
         }
+        if (boxedType == Class.class) {
+            // a Python class stands for its generated Java class, through the mapping of the host access
+            try {
+                return value.as(Class.class) != null;
+            } catch (RuntimeException e) {
+                return false;
+            }
+        }
         return false;
     }
 }
