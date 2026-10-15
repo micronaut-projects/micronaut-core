@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.body.NettyWriteContext;
+import io.netty.handler.codec.http.FullHttpResponse;
 
 /**
  * @since 4.4.0
@@ -35,6 +36,17 @@ public interface OutboundAccess extends NettyWriteContext {
      * unrecoverable error that may corrupt future requests. This method has no effect on HTTP/2.
      */
     void closeAfterWrite();
+
+    /**
+     * Write a response whose body is in memory, like {@link #write(io.netty.handler.codec.http.HttpResponse, io.micronaut.http.body.ByteBody)}
+     * writes an available body, without wrapping the content in a body first: the
+     * {@code Content-Length} is set to the length of the content, or removed for a status that
+     * has no body. The response, and its content, are released once written.
+     *
+     * @param response The response
+     * @since 5.3.0
+     */
+    void writeFull(FullHttpResponse response);
 
     /**
      * Write the next response as it is, never compressed, see

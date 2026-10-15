@@ -41,7 +41,9 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
@@ -226,7 +228,7 @@ final class NettyDirectRoutes {
             writeServerError(outboundAccess);
             return true;
         }
-        write(ctx, request, head, content, outboundAccess);
+        write(request, head, content, outboundAccess);
         return true;
     }
 
@@ -314,7 +316,7 @@ final class NettyDirectRoutes {
             }
             writeServerError(outboundAccess);
         } else if (prepared != null) {
-            write(ctx, request, prepared.head(), prepared.content(), outboundAccess);
+            write(request, prepared.head(), prepared.content(), outboundAccess);
         } else {
             writeServerError(outboundAccess);
         }
@@ -358,7 +360,7 @@ final class NettyDirectRoutes {
     /**
      * Write a response, on the event loop.
      */
-    private void write(ChannelHandlerContext ctx, HttpRequest request, HttpResponse head, ByteBuf content, OutboundAccess outboundAccess) {
+    private void write(HttpRequest request, HttpResponse head, ByteBuf content, OutboundAccess outboundAccess) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Direct response {} - {} {}", head.status().code(), request.method(), request.uri());
         }
@@ -384,15 +386,9 @@ final class NettyDirectRoutes {
             content.release();
             outboundAccess.writeHeadResponse(head);
         } else {
-            outboundAccess.write(head, content.isReadable()
-                ? new NettyByteBodyFactory(ctx.channel()).adapt(content)
-                : releaseEmpty(content));
+            // the content as it is: no body wraps it
+            outboundAccess.writeFull(new DefaultFullHttpResponse(head.protocolVersion(), head.status(), content, headers, EmptyHttpHeaders.INSTANCE));
         }
-    }
-
-    private static CloseableByteBody releaseEmpty(ByteBuf content) {
-        content.release();
-        return NettyByteBodyFactory.empty();
     }
 
     private void writeServerError(OutboundAccess outboundAccess) {
@@ -462,6 +458,10 @@ final class NettyDirectRoutes {
     private static ByteBuf content(ChannelHandlerContext ctx, MutableHttpResponse<?> response, @Nullable ResolvedWriter writer) {
         Object body = response.body();
         if (body == null) {
+            return Unpooled.EMPTY_BUFFER;
+        }
+        if ((writer != null || body instanceof CharSequence) && !PipeliningServerHandler.canHaveBody(HttpResponseStatus.valueOf(response.code()))) {
+            // e.g. 204 or 304: the body is never written, nor encoded
             return Unpooled.EMPTY_BUFFER;
         }
         if (writer != null) {
