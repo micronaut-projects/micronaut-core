@@ -164,7 +164,10 @@ class HandlerRouteFuzzTest {
         // the server survived the aborted and malformed requests
         Resp health = send(new Req("GET", "/fz/path/1/2", Map.of("x-trace", "health"), new byte[0], false, 0, 0, false));
         assertEquals(200, health.status, health.text());
-        assertEquals(0, Events.OPEN_SSE.get(), "every event stream was closed");
+        for (int i = 0; i < 100 && Events.OPEN_SSE.get() != 0; i++) {
+            Thread.sleep(100);
+        }
+        assertEquals(0, Events.OPEN_SSE.get(), "every event stream was closed, also of the clients that left");
     }
 
     @Test
@@ -199,11 +202,12 @@ class HandlerRouteFuzzTest {
     private static String webSocketScenario(Random random) throws Exception {
         String trace = "w" + TRACES.incrementAndGet();
         String room = "room" + random.nextInt(1000);
-        boolean binaryMode = random.nextBoolean();
+        int mode = random.nextInt(4);
+        boolean binaryMode = mode == 1;
         LinkedBlockingQueue<Object> received = new LinkedBlockingQueue<>();
         WebSocket ws = wsClient.newWebSocketBuilder()
             .header("X-Trace", trace)
-            .buildAsync(URI.create("ws://localhost:" + server.getPort() + (binaryMode ? "/fz/wsb/" : "/fz/ws/") + room + "?t=" + trace), new WebSocket.Listener() {
+            .buildAsync(URI.create("ws://localhost:" + server.getPort() + (binaryMode ? "/fz/wsb/" : mode == 2 ? "/fz/wss/" : mode == 3 ? "/fz/wsc/" : "/fz/ws/") + room + "?t=" + trace), new WebSocket.Listener() {
                 private final StringBuilder text = new StringBuilder();
                 private final ByteArrayOutputStream binary = new ByteArrayOutputStream();
 
@@ -215,6 +219,19 @@ class HandlerRouteFuzzTest {
                         text.setLength(0);
                     }
                     webSocket.request(1);
+                    return null;
+                }
+
+                @Override
+                public CompletionStage<?> onPong(WebSocket webSocket, ByteBuffer message) {
+                    received.add("pong");
+                    webSocket.request(1);
+                    return null;
+                }
+
+                @Override
+                public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
+                    received.add("closed:" + statusCode);
                     return null;
                 }
 
@@ -237,6 +254,20 @@ class HandlerRouteFuzzTest {
             if (!(open instanceof String s) || !s.startsWith(expectedOpen)) {
                 return "open message " + open + " expected " + expectedOpen;
             }
+            if (mode == 3) {
+                // pings are answered, a message makes the server close the connection
+                int pings = 1 + random.nextInt(3);
+                for (int i = 0; i < pings; i++) {
+                    ws.sendPing(ByteBuffer.wrap(new byte[]{1, 2, 3})).get(20, TimeUnit.SECONDS);
+                    Object pong = received.poll(20, TimeUnit.SECONDS);
+                    if (!"pong".equals(pong)) {
+                        return "no pong for " + trace + ": " + describeObject(pong);
+                    }
+                }
+                ws.sendText("close", true).get(20, TimeUnit.SECONDS);
+                Object closed = received.poll(20, TimeUnit.SECONDS);
+                return "closed:1000".equals(closed) ? null : "server close of " + trace + ": " + describeObject(closed);
+            }
             int messages = 1 + random.nextInt(12);
             for (int i = 0; i < messages; i++) {
                 if (binaryMode) {
@@ -255,7 +286,7 @@ class HandlerRouteFuzzTest {
                     String text = randomText(random, random.nextInt(3000));
                     send(ws, text, random);
                     Object reply = received.poll(20, TimeUnit.SECONDS);
-                    String expected = "echo " + room + " trace=" + trace + " " + text;
+                    String expected = (mode == 2 ? "stream " : "echo ") + room + " trace=" + trace + " " + text;
                     if (!expected.equals(reply)) {
                         return "text reply of " + trace + " was " + describeObject(reply) + " expected " + abbreviate(expected);
                     }
@@ -315,11 +346,14 @@ class HandlerRouteFuzzTest {
         }
     }
 
-    private record Case(String name, Req request, Consumer<Resp> check) {
+    private record Case(String name, Req request, Consumer<Resp> check, java.util.concurrent.Callable<Void> custom) {
+        Case(String name, Req request, Consumer<Resp> check) {
+            this(name, request, check, null);
+        }
     }
 
     private static Case generate(Random r, String trace) {
-        return switch (r.nextInt(17)) {
+        return switch (r.nextInt(30)) {
             case 0 -> textCase(r, trace, "/fz/text", "sync text");
             case 1 -> textCase(r, trace, "/fz/blocking/text", "sync text on the blocking executor");
             case 2 -> asyncTextCase(r, trace);
@@ -336,7 +370,17 @@ class HandlerRouteFuzzTest {
             case 13 -> malformedCase(r, trace);
             case 14 -> asyncFilterCase(r, trace);
             case 15 -> lateReplyCase(r, trace);
-            default -> textCase(r, trace, "/fz/group/text", "group text with group filters");
+            case 16 -> textCase(r, trace, "/fz/group/text", "group text with group filters");
+            case 17, 18 -> methodCase(r, trace);
+            case 19, 20 -> elementsCase(r, trace);
+            case 21 -> pipelineCase(r, trace);
+            case 22 -> sseAbortCase(r, trace);
+            case 23 -> negotiationCase(r, trace);
+            case 24, 25 -> bigResponseCase(r, trace);
+            case 26 -> queryCase(r, trace);
+            case 27 -> earlyReplyCase(r, trace);
+            case 28 -> readThenThrowCase(r, trace);
+            default -> rewriteCase(r, trace);
         };
     }
 
@@ -725,11 +769,280 @@ class HandlerRouteFuzzTest {
         });
     }
 
+
+    private static Case methodCase(Random r, String trace) {
+        String[] methods = {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"};
+        String method = methods[r.nextInt(methods.length)];
+        boolean withBody = r.nextBoolean() && !method.equals("GET") && !method.equals("HEAD") && !method.equals("OPTIONS");
+        byte[] body = new byte[withBody ? 1 + r.nextInt(20_000) : 0];
+        r.nextBytes(body);
+        String segment = "s" + r.nextInt(1000);
+        Req base = new Req(method, "/fz/any/" + segment, headers(trace, "content-type", "application/octet-stream"), body, false, Integer.MAX_VALUE, 0, false);
+        Req request = withBody ? post(r, base.path, base.headers, body) : base;
+        Req typed = new Req(method, request.path, request.headers, request.body, request.chunked, request.fragment, request.pauseMillis, false);
+        return new Case("any method " + method, typed, resp -> {
+            if (method.equals("OPTIONS")) {
+                // CORS is off: the route answers like any other method
+                assertTrue(resp.status < 500, () -> "OPTIONS " + resp.status);
+                return;
+            }
+            assertEquals(200, resp.status, () -> method + " " + resp.text());
+            if (method.equals("HEAD")) {
+                assertEquals(0, resp.body.length);
+                return;
+            }
+            assertEquals(method + ":" + segment + ":" + body.length, resp.text());
+            assertContext(resp.headers.get("x-handler-ctx"), trace, "handler");
+        });
+    }
+
+    private static Case elementsCase(Random r, String trace) {
+        int n = r.nextInt(300);
+        StringBuilder body = new StringBuilder("[");
+        long sum = 0;
+        long chars = 0;
+        for (int i = 0; i < n; i++) {
+            if (i > 0) {
+                body.append(r.nextBoolean() ? "," : " ,\n");
+            }
+            String text = randomText(r, r.nextInt(100));
+            int value = r.nextInt(1000);
+            sum += value;
+            chars += text.codePointCount(0, text.length());
+            body.append("{\"n\":").append(value).append(",\"s\":").append(jsonString(text)).append('}');
+        }
+        body.append(']');
+        long expectedSum = sum;
+        long expectedChars = chars;
+        return new Case("body elements", post(r, "/fz/elements", headers(trace, "content-type", "application/json"),
+            body.toString().getBytes(StandardCharsets.UTF_8)), resp -> {
+            assertEquals(200, resp.status, () -> abbreviate(resp.text()));
+            assertEquals(n + ":" + expectedSum + ":" + expectedChars, resp.text());
+            assertNoForeignTrace(resp.headers.get("x-continuation-ctx"), trace);
+        });
+    }
+
+    /**
+     * Two requests written back to back on one connection: answered in order, each with its own context.
+     */
+    private static Case pipelineCase(Random r, String trace) {
+        String second = trace + "b";
+        int a = r.nextInt(10_000);
+        int b = r.nextInt(10_000);
+        boolean closeAtEnd = r.nextBoolean();
+        Req dummy = new Req("GET", "/", Map.of(), new byte[0], false, 0, 0, false);
+        return new Case("pipelined requests", dummy, null, () -> {
+            try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+                socket.setSoTimeout(60_000);
+                String one = "GET /fz/path/first/" + a + " HTTP/1.1\r\nHost: localhost\r\nx-trace: " + trace + "\r\n\r\n";
+                byte[] text = randomText(r, 1 + r.nextInt(3000)).getBytes(StandardCharsets.UTF_8);
+                String two = "POST /fz/text HTTP/1.1\r\nHost: localhost\r\nx-trace: " + second + "\r\ncontent-type: text/plain\r\ncontent-length: "
+                    + text.length + "\r\n" + (closeAtEnd ? "Connection: close\r\n" : "") + "\r\n";
+                OutputStream out = socket.getOutputStream();
+                byte[] both = new byte[one.length() + two.length() + text.length];
+                System.arraycopy(one.getBytes(StandardCharsets.US_ASCII), 0, both, 0, one.length());
+                System.arraycopy(two.getBytes(StandardCharsets.US_ASCII), 0, both, one.length(), two.length());
+                System.arraycopy(text, 0, both, one.length() + two.length(), text.length);
+                out.write(both);
+                out.flush();
+                InputStream in = socket.getInputStream();
+                Resp first = readOne(in);
+                assertEquals(200, first.status);
+                assertEquals("first|" + a, first.text());
+                Resp secondResponse = readOne(in);
+                assertEquals(200, secondResponse.status, secondResponse::text);
+                assertEquals(text.length + ":" + sha(text), secondResponse.text());
+                assertContext(secondResponse.headers.get("x-handler-ctx"), second, "pipelined handler");
+            }
+            return null;
+        });
+    }
+
+    /** Reads one response with a content-length or chunked body from a keep-alive connection. */
+    private static Resp readOne(InputStream in) throws IOException {
+        ByteArrayOutputStream head = new ByteArrayOutputStream();
+        int state = 0;
+        while (state < 4) {
+            int c = in.read();
+            if (c < 0) {
+                throw new IOException("closed in the head: " + head);
+            }
+            head.write(c);
+            state = (c == '\r' && (state == 0 || state == 2)) || (c == '\n' && (state == 1 || state == 3)) ? state + 1 : (c == '\r' ? 1 : 0);
+        }
+        String[] lines = head.toString(StandardCharsets.ISO_8859_1).split("\r\n");
+        int status = Integer.parseInt(lines[0].split(" ")[1]);
+        Map<String, String> headers = new HashMap<>();
+        for (int i = 1; i < lines.length; i++) {
+            int colon = lines[i].indexOf(':');
+            if (colon > 0) {
+                headers.put(lines[i].substring(0, colon).toLowerCase(Locale.ROOT), lines[i].substring(colon + 1).trim());
+            }
+        }
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        if ("chunked".equalsIgnoreCase(headers.get("transfer-encoding"))) {
+            while (true) {
+                StringBuilder size = new StringBuilder();
+                int c;
+                while ((c = in.read()) != '\r') {
+                    size.append((char) c);
+                }
+                in.read();
+                int n = Integer.parseInt(size.toString().split(";")[0].trim(), 16);
+                if (n == 0) {
+                    in.read();
+                    in.read();
+                    break;
+                }
+                body.write(in.readNBytes(n));
+                in.read();
+                in.read();
+            }
+        } else if (headers.containsKey("content-length")) {
+            body.write(in.readNBytes(Integer.parseInt(headers.get("content-length"))));
+        }
+        return new Resp(status, headers, body.toByteArray(), false);
+    }
+
+    /** The client reads a few events of a long stream and leaves: the server closes the stream. */
+    private static Case sseAbortCase(Random r, String trace) {
+        int readBytes = 1 + r.nextInt(500);
+        Req dummy = new Req("GET", "/", Map.of(), new byte[0], false, 0, 0, false);
+        return new Case("sse client leaves", dummy, null, () -> {
+            try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+                socket.setSoTimeout(30_000);
+                socket.getOutputStream().write(("GET /fz/sse/100000?delay=1&size=100 HTTP/1.1\r\nHost: localhost\r\nx-trace: " + trace
+                    + "\r\nAccept: text/event-stream\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+                socket.getOutputStream().flush();
+                byte[] buffer = new byte[readBytes];
+                int total = 0;
+                while (total < readBytes) {
+                    int n = socket.getInputStream().read(buffer, total, readBytes - total);
+                    if (n < 0) {
+                        break;
+                    }
+                    total += n;
+                }
+                socket.setSoLinger(true, 0);
+            }
+            return null;
+        });
+    }
+
+    private static Case negotiationCase(Random r, String trace) {
+        String[] accepts = {"application/json", "text/plain", "application/xml", "*/*", "text/html, application/json;q=0.5", "text/*;q=0.1, application/json"};
+        String accept = accepts[r.nextInt(accepts.length)];
+        return new Case("negotiation " + accept, new Req("GET", "/fz/neg", headers(trace, "accept", accept), new byte[0], false, Integer.MAX_VALUE, 0, false), resp -> {
+            if (accept.equals("application/xml")) {
+                assertEquals(406, resp.status, resp::text);
+                return;
+            }
+            assertEquals(200, resp.status, resp::text);
+            String type = resp.headers.get("content-type");
+            if (accept.equals("text/plain")) {
+                assertTrue(type.startsWith("text/plain"), type);
+                assertEquals("hello", resp.text());
+            } else {
+                assertTrue(type.startsWith("application/json"), type);
+                assertEquals("hello", resp.text());
+            }
+        });
+    }
+
+    private static Case bigResponseCase(Random r, String trace) {
+        boolean gzip = r.nextBoolean();
+        int size = randomLength(r) + 1;
+        long seed = r.nextLong();
+        String path = gzip ? "/fz/bigtext/" + size + "/" + seed : "/fz/big/" + size + "/" + seed;
+        Map<String, String> headers = headers(trace);
+        if (gzip) {
+            headers.put("accept-encoding", "gzip");
+        }
+        return new Case("big response " + (gzip ? "text" : "bytes"), new Req("GET", path, headers, new byte[0], false, Integer.MAX_VALUE, 0, false), resp -> {
+            assertEquals(200, resp.status, () -> abbreviate(resp.text()));
+            byte[] body = resp.body;
+            if ("gzip".equals(resp.headers.get("content-encoding"))) {
+                try {
+                    body = new java.util.zip.GZIPInputStream(new java.io.ByteArrayInputStream(body)).readAllBytes();
+                } catch (IOException e) {
+                    throw new AssertionError("gzip", e);
+                }
+            }
+            assertEquals(size, body.length);
+            assertEquals(sha(bigBytes(size, seed, gzip)), sha(body));
+        });
+    }
+
+    static byte[] bigBytes(int size, long seed, boolean text) {
+        byte[] bytes = new byte[size];
+        Random random = new Random(seed);
+        if (text) {
+            for (int i = 0; i < size; i++) {
+                bytes[i] = (byte) ('a' + random.nextInt(4));
+            }
+        } else {
+            random.nextBytes(bytes);
+        }
+        return bytes;
+    }
+
+    private static Case queryCase(Random r, String trace) {
+        int n = r.nextInt(8);
+        StringBuilder query = new StringBuilder();
+        Map<String, List<String>> expected = new TreeMap<>();
+        for (int i = 0; i < n; i++) {
+            String name = "q" + r.nextInt(4);
+            String value = randomText(r, r.nextInt(60)).replace("\n", "").replace("\t", "");
+            query.append(query.length() == 0 ? "?" : "&").append(name).append('=').append(URLEncoder.encode(value, StandardCharsets.UTF_8));
+            expected.computeIfAbsent(name, k -> new ArrayList<>()).add(value);
+        }
+        String cookie = "c" + r.nextInt(100);
+        String header = "h" + r.nextInt(100);
+        Map<String, String> headers = headers(trace, "cookie", "session=" + cookie, "x-custom", header);
+        return new Case("query, cookie and header", new Req("GET", "/fz/query" + query, headers, new byte[0], false, Integer.MAX_VALUE, 0, false), resp -> {
+            assertEquals(200, resp.status, resp::text);
+            assertEquals(render(expected) + cookie + "|" + header, resp.text());
+        });
+    }
+
+    private static Case earlyReplyCase(Random r, String trace) {
+        byte[] body = new byte[1 + r.nextInt(300_000)];
+        r.nextBytes(body);
+        return new Case("reply before the body", post(r, "/fz/early", headers(trace, "content-type", "application/octet-stream"), body), resp -> {
+            // the answer comes without reading the body; the server may close once it has answered
+            assertTrue(resp.status == 200 || resp.closedWithoutResponse, () -> "status " + resp.status);
+            if (resp.status == 200) {
+                assertEquals("early", resp.text());
+            }
+        });
+    }
+
+    private static Case readThenThrowCase(Random r, String trace) {
+        byte[] body = new byte[1 + r.nextInt(100_000)];
+        r.nextBytes(body);
+        return new Case("read the body then throw", post(r, "/fz/readthrow", headers(trace, "content-type", "application/octet-stream"), body), resp -> {
+            assertEquals(418, resp.status, () -> abbreviate(resp.text()));
+            assertContext(resp.headers.get("x-error-ctx"), trace, "error route after a body read");
+        });
+    }
+
+    private static Case rewriteCase(Random r, String trace) {
+        String a = "w" + r.nextInt(100_000);
+        return new Case("pre-matching rewrite", new Req("GET", "/fz/rewrite/" + a, headers(trace), new byte[0], false, Integer.MAX_VALUE, 0, false), resp -> {
+            assertEquals(200, resp.status, resp::text);
+            assertEquals(a + "|7", resp.text());
+        });
+    }
+
     // ----------------------------------------------------------------------------------------
     // The client
     // ----------------------------------------------------------------------------------------
 
     private static void run(Random random, Case c) throws Exception {
+        if (c.custom != null) {
+            c.custom.call();
+            return;
+        }
         Resp resp = send(c.request);
         if (c.request.abort) {
             return;
@@ -858,6 +1171,9 @@ class HandlerRouteFuzzTest {
     }
 
     record Item(String name, List<Integer> numbers) {
+    }
+
+    record Elem(int n, String s) {
     }
 
     static String describe() {
@@ -1082,6 +1398,57 @@ class HandlerRouteFuzzTest {
                 return future;
             });
 
+
+            // any method
+            routes.any("/fz/any/{segment}").consumesAll().before(Routes::routeTrace).and().body().handleAsync((request, pv, body) -> {
+                String handler = describe();
+                return body.bytes(10_000_000).thenApply(bytes -> HttpResponse.ok(request.getMethodName() + ":" + pv.getString("segment") + ":" + bytes.length)
+                    .contentType(MediaType.TEXT_PLAIN_TYPE).header("X-Handler-Ctx", handler));
+            });
+
+            // a streamed JSON array, element by element
+            routes.POST("/fz/elements").before(Routes::routeTrace).and().body().handleAsync((request, pv, body) -> {
+                long[] sums = new long[3];
+                return body.elements(Elem.class).forEach(element -> {
+                    sums[0]++;
+                    sums[1] += element.n();
+                    sums[2] += element.s() == null ? 0 : element.s().codePointCount(0, element.s().length());
+                    return CompletableFuture.completedFuture(null);
+                }).thenApply(done -> HttpResponse.ok(sums[0] + ":" + sums[1] + ":" + sums[2]).contentType(MediaType.TEXT_PLAIN_TYPE)
+                    .header("X-Continuation-Ctx", describe()));
+            });
+
+            // content negotiation
+            routes.GET("/fz/neg").produces(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_PLAIN_TYPE).handle((request, pv) -> HttpResponse.ok("hello"));
+
+            // large responses, compressed or not
+            routes.GET("/fz/big/{size}/{seed}").produces(MediaType.APPLICATION_OCTET_STREAM_TYPE)
+                .handle((request, pv) -> HttpResponse.ok(bigBytes(pv.getInt("size"), pv.getLong("seed"), false)));
+            routes.GET("/fz/bigtext/{size}/{seed}").produces(MediaType.TEXT_PLAIN_TYPE)
+                .handle((request, pv) -> HttpResponse.ok(new String(bigBytes(pv.getInt("size"), pv.getLong("seed"), true), StandardCharsets.US_ASCII)));
+
+            // parameters, cookies and headers
+            routes.GET("/fz/query").handle((request, pv) -> {
+                Map<String, List<String>> all = new TreeMap<>();
+                request.getParameters().names().forEach(name -> all.put(name, request.getParameters().getAll(name)));
+                return HttpResponse.ok(render(all) + request.getCookies().get("session").getValue() + "|" + request.getHeaders().get("X-Custom"))
+                    .contentType(MediaType.TEXT_PLAIN_TYPE);
+            });
+
+            // the answer comes before the body is read
+            routes.POST("/fz/early").consumesAll().body().handleAsync((request, pv, body) ->
+                CompletableFuture.completedFuture(HttpResponse.ok("early").contentType(MediaType.TEXT_PLAIN_TYPE)));
+
+            // the body is read, then the handler fails: the error route runs with the context
+            routes.POST("/fz/readthrow").consumesAll().before(Routes::routeTrace).and().body().handleAsync((request, pv, body) ->
+                body.bytes(10_000_000).thenApply(bytes -> {
+                    throw new IllegalStateException("after " + bytes.length);
+                }));
+
+            // a pre-matching filter rewrites the URI before the route is matched
+            routes.serverFilter("/fz/rewrite/**").preMatching().before(request -> request.uri(
+                URI.create("/fz/path/" + request.getPath().substring("/fz/rewrite/".length()) + "/7"))).and();
+
             // WebSocket
             routes.GET("/fz/ws/{room}").webSocket(ws -> ws
                 .onOpen((session, request) -> session.sendAsync("open " + room(session) + " trace=" + request.getHeaders().get("X-Trace") + " " + request.getPath()))
@@ -1090,6 +1457,16 @@ class HandlerRouteFuzzTest {
                         return sent;
                     }))
                 );
+            routes.GET("/fz/wss/{room}").webSocket(ws -> ws
+                .onOpen((session, request) -> session.sendAsync("open " + room(session) + " trace=" + request.getHeaders().get("X-Trace") + " " + request.getPath()))
+                .onMessageStream(String.class, (session, messages) -> session.sendAllAsync(
+                    reactor.core.publisher.Flux.from(messages).map(message -> "stream " + room(session) + " trace=" + session.getRequestParameters().getFirst("t").orElse("-") + " " + message))));
+            routes.GET("/fz/wsc/{room}").webSocket(ws -> ws
+                .onOpen((session, request) -> session.sendAsync("open " + room(session) + " trace=" + request.getHeaders().get("X-Trace") + " " + request.getPath()))
+                .onMessage(String.class, (session, message) -> {
+                    session.close(io.micronaut.websocket.CloseReason.NORMAL);
+                    return CompletableFuture.completedFuture(null);
+                }));
             routes.GET("/fz/wsb/{room}").webSocket(ws -> ws
                 .onOpen((session, request) -> session.sendAsync("open " + room(session) + " trace=" + request.getHeaders().get("X-Trace") + " " + request.getPath()))
                 .onMessage(byte[].class, (session, bytes) -> {
