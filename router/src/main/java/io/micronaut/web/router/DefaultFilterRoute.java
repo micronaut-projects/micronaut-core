@@ -19,9 +19,9 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.filter.FilterPatternMatcher;
 import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.GenericHttpFilter;
 import org.jspecify.annotations.Nullable;
@@ -54,6 +54,9 @@ final class DefaultFilterRoute implements FilterRoute {
     private @Nullable AnnotationMetadata annotationMetadata;
     private final boolean isPreMatching;
     private @Nullable String matchingAnnotation;
+    // computed from the patterns and the pattern style on the first match, reset when they change
+    @SuppressWarnings("java:S3077") // the matcher is immutable, only the reference is written
+    private volatile @Nullable FilterPatternMatcher patternMatcher;
 
     DefaultFilterRoute(Supplier<GenericHttpFilter> filter, AnnotationMetadataResolver annotationMetadataResolver, boolean isPreMatching) {
         Objects.requireNonNull(filter, "HttpFilter argument is required");
@@ -184,15 +187,17 @@ final class DefaultFilterRoute implements FilterRoute {
         if (httpMethods != null && !httpMethods.contains(method)) {
             return Optional.empty();
         }
-        PathMatcher matcher = getPatternStyle().getPathMatcher();
-        for (String pattern : patterns) {
-            if (matcher.matches(pattern, path)) {
-                GenericHttpFilter filter = getFilter();
-                if (!GenericHttpFilter.isEnabled(filter)) {
-                    return Optional.empty();
-                }
-                return Optional.of(filter);
+        FilterPatternMatcher matcher = patternMatcher;
+        if (matcher == null) {
+            matcher = FilterPatternMatcher.of(patternStyle, patterns);
+            patternMatcher = matcher;
+        }
+        if (matcher.matches(path)) {
+            GenericHttpFilter filter = getFilter();
+            if (!GenericHttpFilter.isEnabled(filter)) {
+                return Optional.empty();
             }
+            return Optional.of(filter);
         }
         return Optional.empty();
     }
@@ -201,6 +206,7 @@ final class DefaultFilterRoute implements FilterRoute {
     public FilterRoute pattern(String pattern) {
         if (StringUtils.isNotEmpty(pattern)) {
             this.patterns.add(pattern);
+            this.patternMatcher = null;
         }
         return this;
     }
@@ -219,6 +225,7 @@ final class DefaultFilterRoute implements FilterRoute {
     @Override
     public FilterRoute patternStyle(FilterPatternStyle patternStyle) {
         this.patternStyle = patternStyle;
+        this.patternMatcher = null;
         return this;
     }
 }
