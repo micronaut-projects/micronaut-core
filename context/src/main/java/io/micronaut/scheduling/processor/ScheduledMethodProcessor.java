@@ -18,6 +18,7 @@ package io.micronaut.scheduling.processor;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.bind.DefaultExecutableBeanContextBinder;
 import io.micronaut.context.bind.ExecutableBeanContextBinder;
+import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.context.WatchableBeanContext;
@@ -36,6 +37,7 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
@@ -57,10 +59,13 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ConcurrentHashMap;
@@ -86,6 +91,11 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     private static final String MEMBER_FIXED_DELAY = "fixedDelay";
     private static final String MEMBER_SCHEDULER = "scheduler";
     private static final String MEMBER_CONDITION = "condition";
+    /**
+     * Only parses the placeholders of a schedule, never resolves them.
+     */
+    private static final DefaultPropertyPlaceholderResolver PLACEHOLDERS =
+        new DefaultPropertyPlaceholderResolver(new MapPropertyResolver(Map.of()), ConversionService.SHARED);
 
     private final BeanContext beanContext;
     private final ConversionService conversionService;
@@ -95,7 +105,11 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
      */
     private final Map<BeanExecutableMethod<Scheduled>, ScheduledMethod> scheduledTasks = new ConcurrentHashMap<>();
     private volatile @Nullable BeanWatch watch; // NOSONAR java:S3077 only the handle is published; the watch is thread-safe
-    private volatile @Nullable BeanWatch configurationWatch; // NOSONAR java:S3077 only the handle is published; the watch is thread-safe
+    /**
+     * The configuration watches, one per key a schedule reads through a placeholder, so that a change to any other key
+     * does not consult the processor. Guarded by the processor's monitor.
+     */
+    private final Map<String, BeanWatch> keyWatches = new HashMap<>();
     /**
      * Serializes the batches of the method watch and of the configuration watch, which may be delivered on different
      * threads: both cancel and create timers.
@@ -160,7 +174,38 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     @Override
     public void onChange(ExecutableMethodChange<Scheduled> change) {
         synchronized (changeLock) {
-            applyChange(change);
+            try {
+                applyChange(change);
+            } finally {
+                retireUnusedKeyWatches();
+            }
+        }
+    }
+
+    /**
+     * Closes the watches of the keys no scheduled method reads any more, after a reload removed or changed the
+     * methods whose placeholders named them.
+     */
+    private void retireUnusedKeyWatches() {
+        synchronized (this) {
+            if (keyWatches.isEmpty()) {
+                return;
+            }
+        }
+        Set<String> used = new LinkedHashSet<>();
+        for (ScheduledMethod scheduled : scheduledTasks.values()) {
+            for (AnnotationValue<Scheduled> annotation : scheduled.target().method().getAnnotationValuesByType(Scheduled.class)) {
+                used.addAll(placeholderKeys(annotation));
+            }
+        }
+        synchronized (this) {
+            keyWatches.entrySet().removeIf(keyWatch -> {
+                if (used.contains(keyWatch.getKey())) {
+                    return false;
+                }
+                keyWatch.getValue().close();
+                return true;
+            });
         }
     }
 
@@ -238,29 +283,51 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     }
 
     /**
-     * Watches the configuration once a schedule reads it through a placeholder, {@code fixedRate = "${x.rate}"}:
-     * such a schedule changes with the configuration and nothing else, and one written out in full never does.
+     * Watches the keys a schedule reads through its placeholders, {@code fixedRate = "${x.rate}"} reading
+     * {@code x.rate}: such a schedule changes with them and nothing else, and one written out in full never does.
      *
      * @param annotation The schedule
      */
     private void watchConfigurationFor(AnnotationValue<Scheduled> annotation) {
-        if (configurationWatch != null || !(beanContext instanceof WatchableBeanContext watchable) || !readsConfiguration(annotation)) {
+        if (!(beanContext instanceof WatchableBeanContext watchable)) {
+            return;
+        }
+        Set<String> keys = placeholderKeys(annotation);
+        if (keys.isEmpty()) {
             return;
         }
         synchronized (this) {
-            if (configurationWatch == null && !closed) {
-                configurationWatch = watchable.configuration().watchReloading(change -> rescheduleChanged());
+            for (String key : keys) {
+                if (!closed && !keyWatches.containsKey(key)) {
+                    keyWatches.put(key, watchable.configuration(key).watchReloading(change -> rescheduleChanged()));
+                }
             }
         }
     }
 
-    private static boolean readsConfiguration(AnnotationValue<Scheduled> annotation) {
+    /**
+     * The keys the placeholders of a schedule name, parsed as the environment parses them: the key of
+     * {@code ${key:default}}, the fallback keys of {@code ${a:b:default}}, and the inner key of {@code ${a:${b}}}.
+     */
+    private static Set<String> placeholderKeys(AnnotationValue<Scheduled> annotation) {
+        Set<String> keys = new LinkedHashSet<>();
         for (Object value : annotation.getValues().values()) {
-            if (value != null && value.toString().contains("${")) {
-                return true;
+            String text = value == null ? "" : value.toString();
+            int start = text.indexOf(DefaultPropertyPlaceholderResolver.PREFIX);
+            while (start >= 0) {
+                List<DefaultPropertyPlaceholderResolver.Segment> segments = PLACEHOLDERS.buildSegments(text.substring(start), false);
+                if (!segments.isEmpty() && segments.getFirst() instanceof DefaultPropertyPlaceholderResolver.PlaceholderSegment placeholder) {
+                    for (String expression : placeholder.getExpressions()) {
+                        String key = expression.trim();
+                        if (!key.isEmpty() && !key.contains(DefaultPropertyPlaceholderResolver.PREFIX)) {
+                            keys.add(key);
+                        }
+                    }
+                }
+                start = text.indexOf(DefaultPropertyPlaceholderResolver.PREFIX, start + 1);
             }
         }
-        return false;
+        return keys;
     }
 
     /**
@@ -450,11 +517,10 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
         }
         synchronized (this) {
             closed = true;
-            BeanWatch configuration = configurationWatch;
-            if (configuration != null) {
-                configuration.close();
-                configurationWatch = null;
+            for (BeanWatch keyWatch : keyWatches.values()) {
+                keyWatch.close();
             }
+            keyWatches.clear();
         }
         try {
             for (ScheduledMethod scheduled : scheduledTasks.values()) {
