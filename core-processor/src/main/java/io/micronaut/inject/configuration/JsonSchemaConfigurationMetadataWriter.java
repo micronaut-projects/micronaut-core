@@ -79,6 +79,8 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private static final String JV_MIN = "jakarta.validation.constraints.Min";
     private static final String JV_MAX = "jakarta.validation.constraints.Max";
     private static final String JV_DIGITS = "jakarta.validation.constraints.Digits";
+    private static final String JV_DIGITS_INTEGER = "integer";
+    private static final String JV_DIGITS_FRACTION = "fraction";
     private static final String JV_NEGATIVE = "jakarta.validation.constraints.Negative";
     private static final String JV_NEGATIVE_OR_ZERO = "jakarta.validation.constraints.NegativeOrZero";
     private static final String ATTR_EXCLUSIVE_MINIMUM = "exclusiveMinimum";
@@ -837,8 +839,8 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             out.write("0");
         }
         // Digits -> regex
-        Integer intDigits = intValue(pe, JV_DIGITS, "integer");
-        Integer fracDigits = intValue(pe, JV_DIGITS, "fraction");
+        Integer intDigits = intValue(pe, JV_DIGITS, JV_DIGITS_INTEGER);
+        Integer fracDigits = intValue(pe, JV_DIGITS, JV_DIGITS_FRACTION);
         if (intDigits != null || fracDigits != null) {
             StringBuilder re = new StringBuilder("^");
             int id = intDigits != null ? intDigits : 0;
