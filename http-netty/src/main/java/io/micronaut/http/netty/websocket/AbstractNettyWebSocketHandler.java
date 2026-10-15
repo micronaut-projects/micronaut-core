@@ -52,6 +52,7 @@ import io.micronaut.websocket.context.WebSocketBean;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -592,6 +593,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error invoking @OnClose handler for WebSocket bean [{}]: {}", target, e.getMessage(), e);
                     }
+                    // the close handler could not be bound: the close is still answered
+                    closeAfterHandler(ctx, writeCloseReason ? cr : null);
                 }
             } else {
                 if (writeCloseReason) {
@@ -612,48 +615,82 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         ExecutionFlow<?> result;
         try {
             result = invokeExecutable(boundExecutable, methodExecutionHandle);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error invoking @OnClose handler {}.{}: {}", target.getClass().getSimpleName(), methodExecutionHandle.getExecutableMethod(), e.getMessage(), e);
             }
-            ctx.close();
+            // a failed close handler still answers the close of the peer
+            closeAfterHandler(ctx, closeReply);
             return;
         }
 
         result.onComplete((v, t) -> {
-            if (t != null) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error subscribing to @{} handler for WebSocket bean [{}]: {}", (isClose ? "OnClose" : "OnError"), target, t.getMessage(), t);
-                }
+            if (t != null && LOG.isErrorEnabled()) {
+                LOG.error("Error subscribing to @{} handler for WebSocket bean [{}]: {}", (isClose ? "OnClose" : "OnError"), target, t.getMessage(), t);
             }
-            if (closeReply == null) {
-                ctx.close();
-                return;
-            }
-            // the handler may complete on another thread, e.g. an async close handler: the
-            // answer is written from the event loop. The close frame allocates its buffer when
-            // it is created, and what this callback throws on another thread is lost in the
-            // stage of the handler, which leaves the connection open without an answer, e.g.
-            // the error of a leak detector that refuses buffers allocated outside the event loop
-            EventExecutor executor = ctx.executor();
-            if (executor.inEventLoop()) {
-                answerClose(ctx, closeReply);
-            } else {
-                executor.execute(() -> answerClose(ctx, closeReply));
-            }
+            closeAfterHandler(ctx, closeReply);
         });
     }
 
-    private void answerClose(ChannelHandlerContext ctx, CloseReason closeReply) {
-        if (ctx.channel().isActive() && getSession().markCloseSent()) {
-            // the close frame of the peer is answered (RFC 6455, 5.5.1), so that the peer
-            // sees the close handshake complete rather than only the end of the connection,
-            // unless a close was sent already, e.g. by the close handler
-            ctx.writeAndFlush(new CloseWebSocketFrame(closeReply.getCode(), closeReply.getReason()))
-                .addListener(ChannelFutureListener.CLOSE);
-        } else {
+    /**
+     * Closes the channel once the close handler is done, answering the close of the peer first
+     * when there is one to answer.
+     *
+     * @param ctx The context
+     * @param closeReply The close to answer, or {@code null} to only close the channel
+     */
+    private void closeAfterHandler(ChannelHandlerContext ctx, @Nullable CloseReason closeReply) {
+        if (closeReply == null) {
             ctx.close();
+            return;
         }
+        // the handler may complete on another thread, e.g. an async close handler: the
+        // answer is written from the event loop. The close frame allocates its buffer when
+        // it is created, and what this callback throws on another thread is lost in the
+        // stage of the handler, which leaves the connection open without an answer, e.g.
+        // the error of a leak detector that refuses buffers allocated outside the event loop
+        EventExecutor executor = ctx.executor();
+        if (executor.inEventLoop()) {
+            answerClose(ctx, closeReply);
+        } else {
+            try {
+                executor.execute(() -> answerClose(ctx, closeReply));
+            } catch (Throwable e) {
+                // the event loop rejected the task, e.g. it is shutting down
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Failed to answer the close of WebSocket session {}: {}", getSession(), e.getMessage(), e);
+                }
+                ctx.channel().close();
+            }
+        }
+    }
+
+    private void answerClose(ChannelHandlerContext ctx, CloseReason closeReply) {
+        if (!ctx.channel().isActive() || !getSession().markCloseSent()) {
+            // nothing to answer on, or a close was sent already, e.g. by the close handler
+            ctx.close();
+            return;
+        }
+        // the close frame of the peer is answered (RFC 6455, 5.5.1), so that the peer
+        // sees the close handshake complete rather than only the end of the connection.
+        // Whether the answer is written or not, the channel is closed: a peer waiting for
+        // the answer must not wait for its timeout
+        ChannelFuture write;
+        try {
+            write = ctx.writeAndFlush(new CloseWebSocketFrame(closeReply.getCode(), closeReply.getReason()));
+        } catch (Throwable e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Failed to answer the close of WebSocket session {}: {}", getSession(), e.getMessage(), e);
+            }
+            ctx.close();
+            return;
+        }
+        write.addListener(future -> {
+            if (!future.isSuccess() && LOG.isDebugEnabled()) {
+                LOG.debug("Failed to write the close answer of WebSocket session {}: {}", getSession(), future.cause().getMessage(), future.cause());
+            }
+            ctx.close();
+        });
     }
 
     private BoundExecutable bindMethod(HttpRequest<?> request, ArgumentBinderRegistry<WebSocketState> binderRegistry, MethodExecutionHandle<?, ?> openMethod, List<?> parameters) {
