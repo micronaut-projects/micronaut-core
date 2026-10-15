@@ -221,7 +221,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * that work which outlived the callbacks is rolled back. Advanced, and read when recording, while holding
      * {@link #shutdownDependents}.
      */
-    private volatile long shutdownPhase;
+    private final AtomicLong shutdownPhase = new AtomicLong();
     /** What dependency groups created during shutdown, destroyed before it completes. Guarded by itself. */
     private final List<ShutdownDependent> shutdownDependents = new ArrayList<>();
     /**
@@ -580,7 +580,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 LOG.debug("Stopping BeanContext");
             }
             synchronized (shutdownDependents) {
-                shutdownPhase++;
+                shutdownPhase.incrementAndGet();
             }
             try {
                 publishEvent(new ShutdownEvent(this));
@@ -6029,7 +6029,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @Override
     public <T> CreatedBean<T> createBeanRegistration(BeanDefinition<T> definition) {
         ArgumentUtils.requireNonNull(ARGUMENT_DEFINITION, definition);
-        long phase = shutdownPhase;
+        long phase = shutdownPhase.get();
         if (isDependencyResolutionClosed()) {
             throw new IllegalStateException("Cannot create a bean before the context is configured or after its shutdown has begun");
         }
@@ -6085,14 +6085,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @return Whether the lookups are rejected
      */
     boolean isDependencyResolutionClosed() {
-        return !configured.get() || terminating.get() && !isShutdownWindowOpen(shutdownPhase);
+        return !configured.get() || terminating.get() && !isShutdownWindowOpen(shutdownPhase.get());
     }
 
     /**
      * @return The current shutdown phase, which work that may be recorded as a shutdown dependent captures as it starts
      */
     long shutdownPhase() {
-        return shutdownPhase;
+        return shutdownPhase.get();
     }
 
     private static boolean isShutdownWindowOpen(long phase) {
@@ -6104,8 +6104,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * completes. Called while holding {@link #shutdownDependents}.
      */
     private void closeShutdownWindow() {
-        if (isShutdownWindowOpen(shutdownPhase)) {
-            shutdownPhase++;
+        if (isShutdownWindowOpen(shutdownPhase.get())) {
+            shutdownPhase.incrementAndGet();
         }
     }
 
@@ -6118,7 +6118,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @throws IllegalStateException if the shutdown callbacks have completed since the work started
      */
     private boolean isInShutdownWindow(long startPhase) {
-        long phase = shutdownPhase;
+        long phase = shutdownPhase.get();
         if (phase == startPhase && !isShutdownWindowOpen(phase)) {
             return false;
         }
@@ -6138,11 +6138,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @param startPhase The shutdown phase its creation started in
      */
     void singletonPublished(@Nullable BeanResolutionContext resolutionContext, BeanRegistration<?> registration, long startPhase) {
-        if (shutdownPhase == startPhase && !isShutdownWindowOpen(startPhase)) {
+        if (shutdownPhase.get() == startPhase && !isShutdownWindowOpen(startPhase)) {
             return;
         }
         synchronized (shutdownDependents) {
-            long phase = shutdownPhase;
+            long phase = shutdownPhase.get();
             if (phase == startPhase && !isShutdownWindowOpen(phase)) {
                 return;
             }
@@ -6189,7 +6189,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * destroys the registrations
      */
     void trackShutdownDependents(long startPhase, @Nullable DefaultBeanDependencies owner, List<BeanRegistration<?>> created) {
-        if (shutdownPhase == startPhase && !isShutdownWindowOpen(startPhase)) {
+        if (shutdownPhase.get() == startPhase && !isShutdownWindowOpen(startPhase)) {
             return;
         }
         synchronized (shutdownDependents) {
