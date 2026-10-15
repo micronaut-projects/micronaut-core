@@ -26,8 +26,8 @@ import java.util.Optional;
  * those variables.
  *
  * <p>A hierarchy is recorded at compile time, by the Micronaut processors, for the types a compilation asks for with
- * {@link io.micronaut.core.annotation.RecordTypeHierarchy} or through
- * {@code VisitorContext.recordTypeHierarchy(ClassElement, Element...)}, and found at run time with
+ * {@link io.micronaut.core.annotation.TypeHierarchyImport} or through
+ * {@code VisitorContext.importTypeHierarchy(ClassElement, Element...)}, and found at run time with
  * {@link TypeHierarchies#find(Class)}. It is read from the record only: no signature of the class is read
  * reflectively. Unlike a bean definition or a bean introspection, a hierarchy can be recorded for any class a
  * compilation sees, a class of a library or of the JDK included, and describes nothing but the declaration of the
@@ -45,7 +45,7 @@ import java.util.Optional;
  * @since 5.3.0
  */
 @Experimental
-public interface TypeHierarchy {
+public sealed interface TypeHierarchy permits GeneratedTypeHierarchy {
 
     /**
      * @return The type the hierarchy is of

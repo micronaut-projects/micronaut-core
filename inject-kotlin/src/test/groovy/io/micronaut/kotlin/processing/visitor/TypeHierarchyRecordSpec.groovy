@@ -26,10 +26,10 @@ class TypeHierarchyRecordSpec extends AbstractKotlinCompilerSpec {
         def classLoader = buildClassLoader('test.Payload', '''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 import java.util.function.Supplier
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 open class Payload<T> : ArrayList<T>(), Supplier<List<out T>> where T : Number, T : Comparable<T> {
     override fun get(): List<out T> = this
 }
@@ -63,13 +63,13 @@ open class Payload<T> : ArrayList<T>(), Supplier<List<out T>> where T : Number, 
         def classLoader = buildClassLoader('test.Diamond', '''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 
 interface Top<T>
 interface Left<T> : Top<T>
 interface Right<T> : Top<T>
 
-@RecordTypeHierarchy(classes = [Top::class, Left::class, Right::class, Diamond::class, java.util.ArrayList::class, java.util.AbstractList::class,
+@TypeHierarchyImport(classes = [Top::class, Left::class, Right::class, Diamond::class, java.util.ArrayList::class, java.util.AbstractList::class,
     java.util.List::class, java.util.Collection::class, java.lang.Iterable::class, java.util.AbstractCollection::class])
 class Diamond : java.util.ArrayList<Int>(), Left<String>, Right<String>
 ''')
@@ -105,10 +105,10 @@ class Diamond : java.util.ArrayList<Int>(), Left<String>, Right<String>
         def classLoader = buildClassLoader('test.Payload', '''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 import java.util.function.Supplier
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 class Payload<T> : Supplier<Array<T>> {
     override fun get(): Array<T> = throw UnsupportedOperationException()
 }
@@ -133,7 +133,7 @@ class Payload<T> : Supplier<Array<T>> {
         def classLoader = buildClassLoader('test.Annotated', '''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 import java.util.function.Supplier
 
 @Target(AnnotationTarget.TYPE) @Retention(AnnotationRetention.RUNTIME) annotation class Marker
@@ -141,7 +141,7 @@ import java.util.function.Supplier
 
 open class Base<T>
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 class Annotated<T> : Base<@Marker T>(), Supplier<List<@Other String>> {
     override fun get(): List<@Other String> = throw UnsupportedOperationException()
 }
@@ -167,11 +167,11 @@ class Annotated<T> : Base<@Marker T>(), Supplier<List<@Other String>> {
         def classLoader = buildClassLoader('test.Wild', '''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 import java.util.function.Consumer
 import java.util.function.Supplier
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 class Wild<T> : Supplier<List<out T>>, Consumer<MutableList<in T>>, java.util.function.Function<MutableList<*>, MutableMap<out Number, in T>> {
     override fun get(): List<out T> = throw UnsupportedOperationException()
     override fun accept(list: MutableList<in T>) { }
@@ -203,9 +203,9 @@ class Wild<T> : Supplier<List<out T>>, Consumer<MutableList<in T>>, java.util.fu
         def classLoader = buildClassLoader('test.Swapped', '''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 
-@RecordTypeHierarchy(classes = [Swapped::class, Nested::class])
+@TypeHierarchyImport(classes = [Swapped::class, Nested::class])
 open class Swapped<K, V> : java.util.HashMap<V, K>()
 
 class Nested<T> : java.util.ArrayList<List<Array<T>>>(), Comparable<Nested<T>> {
@@ -228,10 +228,10 @@ class Nested<T> : java.util.ArrayList<List<Array<T>>>(), Comparable<Nested<T>> {
         def classLoader = buildClassLoader('test.Ordered', '''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 import java.util.function.Supplier
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 class Ordered<T, U> : Supplier<U> where T : Comparable<T>, T : java.io.Serializable, U : List<T> {
     override fun get(): U = throw UnsupportedOperationException()
 }
@@ -251,9 +251,9 @@ class Ordered<T, U> : Supplier<U> where T : Comparable<T>, T : java.io.Serializa
         def classLoader = buildClassLoader('test.Holder', '''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 private class Hidden<T> : java.util.function.Supplier<T> {
     override fun get(): T = throw UnsupportedOperationException()
 }
@@ -270,12 +270,12 @@ private class Hidden<T> : java.util.function.Supplier<T> {
         def classLoader = buildClassLoader('test.One', '''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 
-@RecordTypeHierarchy(classes = [java.util.ArrayList::class, java.util.ArrayList::class])
+@TypeHierarchyImport(classes = [java.util.ArrayList::class, java.util.ArrayList::class])
 class One
 
-@RecordTypeHierarchy(classes = [java.util.ArrayList::class])
+@TypeHierarchyImport(classes = [java.util.ArrayList::class])
 class Two
 ''')
 

@@ -8,4 +8,4 @@ io.micronaut.context.visitor.ConfigurationReaderVisitor
 io.micronaut.context.visitor.ConfigurationMetadataWriterVisitor
 io.micronaut.validation.visitor.async.AsyncTypeElementVisitor
 io.micronaut.inject.annotation.RegisterAnnotationsVisitor
-io.micronaut.inject.visitor.TypeHierarchyVisitor
+io.micronaut.inject.visitor.TypeHierarchyImportVisitor

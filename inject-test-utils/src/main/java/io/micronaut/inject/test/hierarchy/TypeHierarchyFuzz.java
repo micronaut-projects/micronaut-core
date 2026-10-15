@@ -63,7 +63,7 @@ public final class TypeHierarchyFuzz {
     private static final String JAVA_PRELUDE = """
         package fuzz;
 
-        import io.micronaut.core.annotation.RecordTypeHierarchy;
+        import io.micronaut.core.annotation.TypeHierarchyImport;
         import java.io.Serializable;
         import java.util.*;
         import java.util.function.*;
@@ -80,7 +80,7 @@ public final class TypeHierarchyFuzz {
     private static final String KOTLIN_PRELUDE = """
         package fuzz
 
-        import io.micronaut.core.annotation.RecordTypeHierarchy
+        import io.micronaut.core.annotation.TypeHierarchyImport
         import java.util.Optional
         import java.util.function.BiFunction
         import java.util.function.Consumer
@@ -102,7 +102,7 @@ public final class TypeHierarchyFuzz {
         from java.io import Serializable
         from java.util import List, Map, Optional
         from java.util.function import BiFunction, Consumer, Function, Supplier
-        from micronaut.core.annotation import RecordTypeHierarchy
+        from micronaut.core.annotation import TypeHierarchyImport
 
         A = TypeVar("A")
         B = TypeVar("B")
@@ -546,7 +546,7 @@ public final class TypeHierarchyFuzz {
         }
 
         private String renderJava(Generated g) {
-            StringBuilder sb = new StringBuilder("@RecordTypeHierarchy\nabstract class ").append(g.name());
+            StringBuilder sb = new StringBuilder("@TypeHierarchyImport\nabstract class ").append(g.name());
             if (!g.variables().isEmpty()) {
                 sb.append('<').append(g.variables().stream().map(v -> v.name() + (v.bounds().isEmpty() ? ""
                     : " extends " + v.bounds().stream().map(this::java).collect(Collectors.joining(" & ")))).collect(Collectors.joining(", "))).append('>');
@@ -585,7 +585,7 @@ public final class TypeHierarchyFuzz {
         }
 
         private String renderKotlin(Generated g) {
-            StringBuilder sb = new StringBuilder("@RecordTypeHierarchy\nabstract class ").append(g.name());
+            StringBuilder sb = new StringBuilder("@TypeHierarchyImport\nabstract class ").append(g.name());
             List<String> where = new ArrayList<>();
             if (!g.variables().isEmpty()) {
                 sb.append('<').append(g.variables().stream().map(v -> {
@@ -664,7 +664,7 @@ public final class TypeHierarchyFuzz {
             if (!g.variables().isEmpty()) {
                 bases.add("Generic[" + g.variables().stream().map(v -> pythonVar(g, v.name())).collect(Collectors.joining(", ")) + "]");
             }
-            sb.append("@RecordTypeHierarchy\nclass ").append(g.name());
+            sb.append("@TypeHierarchyImport\nclass ").append(g.name());
             if (!bases.isEmpty()) {
                 sb.append('(').append(String.join(", ", bases)).append(')');
             }

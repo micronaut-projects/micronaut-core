@@ -449,7 +449,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @since 5.3.0
      */
     @Experimental
-    default String recordTypeHierarchy(ClassElement type, Element... originatingElements) {
+    default String importTypeHierarchy(ClassElement type, Element... originatingElements) {
         // the declaration, not the usage that was passed: Box<String> records Box<T> and its supertypes in terms of T
         ClassElement declaration = type.getTypeArguments().isEmpty() ? type : getClassElement(type.getName()).orElse(type);
         String recordName = TypeHierarchyWriter.recordClassName(declaration, originatingElements);

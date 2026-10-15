@@ -41,7 +41,7 @@ class TypeHierarchyRecordSpec extends AbstractPythonTypeElementSpec {
 from typing import Generic, TypeVar
 from java.lang import Number
 from java.util.function import Supplier
-from micronaut.core.annotation import RecordTypeHierarchy
+from micronaut.core.annotation import TypeHierarchyImport
 
 T = TypeVar("T", bound=Number)
 
@@ -49,7 +49,7 @@ class Base(Generic[T]):
     def value(self) -> T:
         return None
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 class Payload(Base[T], Supplier[T], Generic[T]):
     def get(self) -> T:
         return None
@@ -80,7 +80,7 @@ from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 from java.util import ArrayList, AbstractList, List, Collection, AbstractCollection
 from java.lang import Iterable
-from micronaut.core.annotation import RecordTypeHierarchy
+from micronaut.core.annotation import TypeHierarchyImport
 
 T = TypeVar("T")
 
@@ -100,7 +100,7 @@ class Right(Top[T], Generic[T]):
     def right(self) -> T:
         ...
 
-@RecordTypeHierarchy(classes=[Top, Left, Right, Diamond, ArrayList, AbstractList, List, Collection, Iterable, AbstractCollection])
+@TypeHierarchyImport(classes=[Top, Left, Right, Diamond, ArrayList, AbstractList, List, Collection, Iterable, AbstractCollection])
 class Diamond(Left[str], Right[str]):
     def top(self) -> str:
         return "top"

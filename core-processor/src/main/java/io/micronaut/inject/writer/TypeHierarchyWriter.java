@@ -54,7 +54,7 @@ import java.util.function.Predicate;
 
 /**
  * Writes the record of the generic hierarchy of a type, a {@link TypeHierarchy} found at run time with
- * {@link TypeHierarchies}. See {@link VisitorContext#recordTypeHierarchy(ClassElement, Element...)}.
+ * {@link TypeHierarchies}. See {@link VisitorContext#importTypeHierarchy(ClassElement, Element...)}.
  *
  * <p>A record is a class with a constructor and nothing else, which passes the type, its variables, its direct super
  * types and {@link ClassElement#getAllSuperTypes() all its super types}, built with the argument factories from class

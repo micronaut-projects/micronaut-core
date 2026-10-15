@@ -25,13 +25,15 @@ import java.util.Optional;
 /**
  * The {@link TypeHierarchy} a generated record extends: a class with a single constructor, which the record calls with
  * the type, its variables, its direct super types and all its super types built as {@link Argument}s from constants,
- * so that a record is as small as that one call.
+ * so that a record is as small as that one call. It is public and not final because the records, generated into the
+ * packages of the application, extend it: {@link TypeHierarchy} is sealed to it, so this class and its subclasses are
+ * the only implementations.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-public class GeneratedTypeHierarchy implements TypeHierarchy {
+public non-sealed class GeneratedTypeHierarchy implements TypeHierarchy {
 
     private final Class<?> type;
     private final List<Argument<?>> typeVariables;

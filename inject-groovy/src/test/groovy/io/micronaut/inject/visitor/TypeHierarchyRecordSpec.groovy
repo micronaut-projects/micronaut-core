@@ -25,10 +25,10 @@ class TypeHierarchyRecordSpec extends AbstractBeanDefinitionSpec {
         def classLoader = buildClassLoader('''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 import java.util.function.Supplier
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 class Payload<T extends Number & Comparable<T>> extends ArrayList<T> implements Supplier<List<? extends T>> {
     List<? extends T> get() { this }
 }
@@ -61,13 +61,13 @@ class Payload<T extends Number & Comparable<T>> extends ArrayList<T> implements 
         def classLoader = buildClassLoader('''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 
 interface Top<T> {}
 interface Left<T> extends Top<T> {}
 interface Right<T> extends Top<T> {}
 
-@RecordTypeHierarchy(classes = [Top, Left, Right, Diamond, ArrayList, AbstractList, List, Collection, Iterable, AbstractCollection])
+@TypeHierarchyImport(classes = [Top, Left, Right, Diamond, ArrayList, AbstractList, List, Collection, Iterable, AbstractCollection])
 class Diamond extends ArrayList<Integer> implements Left<String>, Right<String> {
 }
 ''')
@@ -97,9 +97,9 @@ class Diamond extends ArrayList<Integer> implements Left<String>, Right<String> 
         def classLoader = buildClassLoader('''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 
-@RecordTypeHierarchy(classes = [Raw, ArrayList, AbstractList])
+@TypeHierarchyImport(classes = [Raw, ArrayList, AbstractList])
 class Raw extends ArrayList implements Comparable {
     int compareTo(Object o) { 0 }
 }
@@ -127,10 +127,10 @@ class Raw extends ArrayList implements Comparable {
         def classLoader = buildClassLoader('''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 import java.util.function.Supplier
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 class Payload<T> implements Supplier<T[]> {
     T[] get() { null }
 }
@@ -155,11 +155,11 @@ class Payload<T> implements Supplier<T[]> {
         def classLoader = buildClassLoader('''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 import java.util.*
 import java.util.function.*
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 class Wild<T> implements Supplier<List<? extends T>>, Consumer<List<? super T>>, Function<List<?>, Map<? extends Number, ? super T>> {
     public List<? extends T> get() { return null; }
     void accept(List<? super T> list) { }
@@ -195,10 +195,10 @@ class Wild<T> implements Supplier<List<? extends T>>, Consumer<List<? super T>>,
         def classLoader = buildClassLoader('''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 import java.util.*
 
-@RecordTypeHierarchy(classes = [Swapped, Nested])
+@TypeHierarchyImport(classes = [Swapped, Nested])
 class Swapped<K, V> extends HashMap<V, K> {
 }
 
@@ -222,12 +222,12 @@ class Nested<T> extends ArrayList<List<T[]>> implements Comparable<Nested<T>> {
         def classLoader = buildClassLoader('''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 import java.io.Serializable
 import java.util.*
 import java.util.function.Supplier
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 class Ordered<T extends Comparable<T> & Serializable, U extends List<T>> implements Supplier<U> {
     public U get() { return null; }
 }
@@ -249,7 +249,7 @@ class Ordered<T extends Comparable<T> & Serializable, U extends List<T>> impleme
         def classLoader = buildClassLoader('''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 import groovy.transform.PackageScope
 
 @PackageScope
@@ -260,7 +260,7 @@ class Base<T> implements java.util.function.Supplier<T> {
 class Sub extends Base<String> {
 }
 
-@RecordTypeHierarchy(classes = [Sub])
+@TypeHierarchyImport(classes = [Sub])
 class Holder {
 }
 ''')
@@ -274,13 +274,13 @@ class Holder {
         def classLoader = buildClassLoader('''
 package test
 
-import io.micronaut.core.annotation.RecordTypeHierarchy
+import io.micronaut.core.annotation.TypeHierarchyImport
 
-@RecordTypeHierarchy(classes = [ArrayList, ArrayList])
+@TypeHierarchyImport(classes = [ArrayList, ArrayList])
 class One {
 }
 
-@RecordTypeHierarchy(classes = [ArrayList])
+@TypeHierarchyImport(classes = [ArrayList])
 class Two {
 }
 ''')

@@ -18,27 +18,27 @@ package io.micronaut.inject.visitor;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.RecordTypeHierarchy;
+import io.micronaut.core.annotation.TypeHierarchyImport;
 import io.micronaut.inject.ast.ClassElement;
 
 /**
- * Records the generic hierarchies that {@link RecordTypeHierarchy} asks for.
+ * Records the generic hierarchies that {@link TypeHierarchyImport} asks for.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-public final class TypeHierarchyVisitor implements TypeElementVisitor<RecordTypeHierarchy, Object> {
+public final class TypeHierarchyImportVisitor implements TypeElementVisitor<TypeHierarchyImport, Object> {
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
-        AnnotationValue<RecordTypeHierarchy> annotation = element.getAnnotation(RecordTypeHierarchy.class);
+        AnnotationValue<TypeHierarchyImport> annotation = element.getAnnotation(TypeHierarchyImport.class);
         if (annotation == null) {
             return;
         }
         AnnotationClassValue<?>[] classes = annotation.annotationClassValues("classes");
         if (classes.length == 0) {
-            context.recordTypeHierarchy(element, element);
+            context.importTypeHierarchy(element, element);
             return;
         }
         for (AnnotationClassValue<?> classValue : classes) {
@@ -46,7 +46,7 @@ public final class TypeHierarchyVisitor implements TypeElementVisitor<RecordType
             if (type == null) {
                 context.fail("The hierarchy of [" + classValue.getName() + "] cannot be recorded: the class is not on the class path", element);
             } else {
-                context.recordTypeHierarchy(type, element);
+                context.importTypeHierarchy(type, element);
             }
         }
     }

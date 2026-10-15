@@ -22,15 +22,16 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Asks the compiler to record the generic hierarchy of a type, to be found at run time with
- * {@link io.micronaut.core.type.TypeHierarchies#find(Class)} as a {@link io.micronaut.core.type.TypeHierarchy}.
+ * Imports the generic hierarchy of a type into the compilation, as a record the compiler writes, to be found at run time
+ * with {@link io.micronaut.core.type.TypeHierarchies#find(Class)} as a {@link io.micronaut.core.type.TypeHierarchy}.
+ * Like {@link Introspected#classes()}, it can import the hierarchies of classes that cannot be annotated.
  *
- * <p>Put on a class without {@link #classes()}, it records the hierarchy of that class. With {@link #classes()}, it
- * records the hierarchies of those classes instead, which can be classes of a library or of the JDK, such as the
+ * <p>Put on a class without {@link #classes()}, it imports the hierarchy of that class. With {@link #classes()}, it
+ * imports the hierarchies of those classes instead, which can be classes of a library or of the JDK, such as the
  * class of a value an application passes where its generic supertypes are needed at run time:</p>
  *
  * <pre class="code">
- * &#064;RecordTypeHierarchy(classes = {ArrayList.class, HashMap.class})
+ * &#064;TypeHierarchyImport(classes = {ArrayList.class, HashMap.class})
  * class Hierarchies {
  * }</pre>
  *
@@ -45,12 +46,14 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 @Experimental
-public @interface RecordTypeHierarchy {
+public @interface TypeHierarchyImport {
 
     /**
-     * The classes to record the hierarchies of, instead of the annotated class.
+     * The classes to import the hierarchies of, instead of the annotated class. When none is given, the default, the
+     * hierarchy of the annotated class itself is imported, and the annotated class can be the type whose hierarchy a
+     * consumer asks for at run time.
      *
-     * @return The classes
+     * @return The classes, empty for the annotated class
      */
     Class<?>[] classes() default {};
 }

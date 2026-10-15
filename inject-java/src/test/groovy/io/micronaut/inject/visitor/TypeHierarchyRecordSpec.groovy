@@ -28,11 +28,11 @@ class TypeHierarchyRecordSpec extends AbstractTypeElementSpec {
         def classLoader = buildClassLoader('test.Payload', '''
 package test;
 
-import io.micronaut.core.annotation.RecordTypeHierarchy;
+import io.micronaut.core.annotation.TypeHierarchyImport;
 import java.util.*;
 import java.util.function.Supplier;
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 public class Payload<T extends Number & Comparable<T>> extends ArrayList<T> implements Supplier<List<? extends T>> {
     public List<? extends T> get() { return this; }
 }
@@ -66,14 +66,14 @@ public class Payload<T extends Number & Comparable<T>> extends ArrayList<T> impl
         def classLoader = buildClassLoader('test.Diamond', '''
 package test;
 
-import io.micronaut.core.annotation.RecordTypeHierarchy;
+import io.micronaut.core.annotation.TypeHierarchyImport;
 import java.util.*;
 
 interface Top<T> {}
 interface Left<T> extends Top<T> {}
 interface Right<T> extends Top<T> {}
 
-@RecordTypeHierarchy(classes = {Top.class, Left.class, Right.class, Diamond.class, ArrayList.class, AbstractList.class, List.class, Collection.class, Iterable.class, AbstractCollection.class})
+@TypeHierarchyImport(classes = {Top.class, Left.class, Right.class, Diamond.class, ArrayList.class, AbstractList.class, List.class, Collection.class, Iterable.class, AbstractCollection.class})
 public class Diamond extends ArrayList<Integer> implements Left<String>, Right<String> {
 }
 ''')
@@ -104,10 +104,10 @@ public class Diamond extends ArrayList<Integer> implements Left<String>, Right<S
         def classLoader = buildClassLoader('test.Raw', '''
 package test;
 
-import io.micronaut.core.annotation.RecordTypeHierarchy;
+import io.micronaut.core.annotation.TypeHierarchyImport;
 import java.util.*;
 
-@RecordTypeHierarchy(classes = {Raw.class, ArrayList.class, AbstractList.class})
+@TypeHierarchyImport(classes = {Raw.class, ArrayList.class, AbstractList.class})
 public class Raw extends ArrayList implements Comparable {
     public int compareTo(Object o) { return 0; }
 }
@@ -135,10 +135,10 @@ public class Raw extends ArrayList implements Comparable {
         def classLoader = buildClassLoader('test.Payload', '''
 package test;
 
-import io.micronaut.core.annotation.RecordTypeHierarchy;
+import io.micronaut.core.annotation.TypeHierarchyImport;
 import java.util.function.Supplier;
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 public class Payload<T> implements Supplier<T[]> {
     public T[] get() { return null; }
 }
@@ -177,9 +177,9 @@ public class Sub extends Base<String> {
             .add('test.Holder', '''
 package test;
 
-import io.micronaut.core.annotation.RecordTypeHierarchy;
+import io.micronaut.core.annotation.TypeHierarchyImport;
 
-@RecordTypeHierarchy(classes = {other.Sub.class, java.util.ArrayList.class})
+@TypeHierarchyImport(classes = {other.Sub.class, java.util.ArrayList.class})
 public class Holder {
 }
 '''))
@@ -196,13 +196,13 @@ public class Holder {
         def classLoader = buildClassLoader('test.One', '''
 package test;
 
-import io.micronaut.core.annotation.RecordTypeHierarchy;
+import io.micronaut.core.annotation.TypeHierarchyImport;
 
-@RecordTypeHierarchy(classes = {java.util.ArrayList.class, java.util.ArrayList.class})
+@TypeHierarchyImport(classes = {java.util.ArrayList.class, java.util.ArrayList.class})
 class One {
 }
 
-@RecordTypeHierarchy(classes = java.util.ArrayList.class)
+@TypeHierarchyImport(classes = java.util.ArrayList.class)
 class Two {
 }
 ''')
@@ -216,7 +216,7 @@ class Two {
         def classLoader = buildClassLoader('test.Annotated', '''
 package test;
 
-import io.micronaut.core.annotation.RecordTypeHierarchy;
+import io.micronaut.core.annotation.TypeHierarchyImport;
 import java.lang.annotation.*;
 import java.util.*;
 import java.util.function.Supplier;
@@ -227,7 +227,7 @@ import java.util.function.Supplier;
 class Base<T> {
 }
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 public class Annotated<T> extends @Marker Base<@Marker T> implements Supplier<List<@Other String>> {
     public List<@Other String> get() { return null; }
 }
@@ -259,11 +259,11 @@ public class Annotated<T> extends @Marker Base<@Marker T> implements Supplier<Li
         def classLoader = buildClassLoader('test.Wild', '''
 package test;
 
-import io.micronaut.core.annotation.RecordTypeHierarchy;
+import io.micronaut.core.annotation.TypeHierarchyImport;
 import java.util.*;
 import java.util.function.*;
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 public class Wild<T> implements Supplier<List<? extends T>>, Consumer<List<? super T>>, Function<List<?>, Map<? extends Number, ? super T>> {
     public List<? extends T> get() { return null; }
     public void accept(List<? super T> list) { }
@@ -299,10 +299,10 @@ public class Wild<T> implements Supplier<List<? extends T>>, Consumer<List<? sup
         def classLoader = buildClassLoader('test.Swapped', '''
 package test;
 
-import io.micronaut.core.annotation.RecordTypeHierarchy;
+import io.micronaut.core.annotation.TypeHierarchyImport;
 import java.util.*;
 
-@RecordTypeHierarchy(classes = {Swapped.class, Nested.class})
+@TypeHierarchyImport(classes = {Swapped.class, Nested.class})
 public class Swapped<K, V> extends HashMap<V, K> {
 }
 
@@ -328,12 +328,12 @@ class Nested<T> extends ArrayList<List<T[]>> implements Comparable<String> {
         def classLoader = buildClassLoader('test.Ordered', '''
 package test;
 
-import io.micronaut.core.annotation.RecordTypeHierarchy;
+import io.micronaut.core.annotation.TypeHierarchyImport;
 import java.io.Serializable;
 import java.util.*;
 import java.util.function.Supplier;
 
-@RecordTypeHierarchy
+@TypeHierarchyImport
 public class Ordered<T extends Comparable<T> & Serializable, U extends List<T>> implements Supplier<U> {
     public U get() { return null; }
 }
@@ -381,7 +381,7 @@ class FieldHolder {
     @Override
     protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
         // local visitors replace the ones found as services: the annotation visitor is kept
-        return [new TypeHierarchyVisitor(), new FieldTypeRecordingVisitor()]
+        return [new TypeHierarchyImportVisitor(), new FieldTypeRecordingVisitor()]
     }
 
     static class FieldTypeRecordingVisitor implements TypeElementVisitor<Object, Object> {
@@ -389,7 +389,7 @@ class FieldHolder {
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
             if (element.simpleName == 'FieldHolder') {
-                element.fields.each { field -> context.recordTypeHierarchy(field.genericType, element) }
+                element.fields.each { field -> context.importTypeHierarchy(field.genericType, element) }
             }
         }
 
