@@ -54,6 +54,7 @@ import com.fasterxml.jackson.databind.deser.NullValueProvider;
 import com.fasterxml.jackson.databind.deser.SettableBeanProperty;
 import com.fasterxml.jackson.databind.deser.ValueInstantiator;
 import com.fasterxml.jackson.databind.deser.impl.MethodProperty;
+import com.fasterxml.jackson.databind.deser.impl.PropertyValueBuffer;
 import com.fasterxml.jackson.databind.deser.std.StdValueInstantiator;
 import com.fasterxml.jackson.databind.introspect.AccessorNamingStrategy;
 import com.fasterxml.jackson.databind.introspect.AnnotatedClass;
@@ -646,6 +647,28 @@ public class BeanIntrospectionModule extends SimpleModule {
                     public boolean canCreateUsingDefault() {
                         return constructorArguments.length == 0;
                     }
+
+                    @Override
+                    public Object createFromObjectWith(DeserializationContext ctxt,
+                                                       SettableBeanProperty[] props, PropertyValueBuffer buffer) throws IOException {
+
+                        List<Object> args = new ArrayList<>();
+
+                        for (var prop : props ) {
+                            var isOptionalConstructorArg = Arrays.stream(constructorArguments)
+                                .anyMatch(introspectionProp ->
+                                    introspectionProp.getName().equals(prop.getName())
+                                        && introspectionProp.findAnnotation(jakarta.annotation.Nullable.class).isPresent()
+                                );
+                            if (!buffer.hasParameter(prop) && isOptionalConstructorArg) {
+                                args.add(null);
+                            } else {
+                                args.add(buffer.getParameter(prop));
+                            }
+                        }
+                        return createFromObjectWith(ctxt, args.toArray());
+                    }
+
 
                     @Override
                     public boolean canCreateFromObjectWith() {
