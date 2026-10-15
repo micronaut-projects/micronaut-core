@@ -23,7 +23,6 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
-import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.tck.AssertionUtils;
@@ -34,7 +33,9 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
 
@@ -50,6 +51,7 @@ import java.util.Map;
 public class UploadArrivalOrderTest {
     private static final String SPEC_NAME = "UploadArrivalOrderTest";
     private static final int ITERATIONS = 30;
+    private static final String BOUNDARY = "arrival-order-boundary";
     private static final String EXPECTED = "a.txt,b.txt,c.txt";
 
     @Test
@@ -81,13 +83,25 @@ public class UploadArrivalOrderTest {
             .run();
     }
 
-    private static HttpRequest<MultipartBody> request(String path, byte[] large) {
-        MultipartBody body = MultipartBody.builder()
-            .addPart("file", "a.txt", MediaType.TEXT_PLAIN_TYPE, "a".getBytes())
-            .addPart("file", "b.txt", MediaType.TEXT_PLAIN_TYPE, large)
-            .addPart("file", "c.txt", MediaType.TEXT_PLAIN_TYPE, "c".getBytes())
-            .build();
-        return HttpRequest.POST(path, body).contentType(MediaType.MULTIPART_FORM_DATA);
+    // the multipart body is written by hand: not every client under test can encode a MultipartBody
+    private static HttpRequest<byte[]> request(String path, byte[] large) {
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        writePart(body, "a.txt", "a".getBytes(StandardCharsets.UTF_8));
+        writePart(body, "b.txt", large);
+        writePart(body, "c.txt", "c".getBytes(StandardCharsets.UTF_8));
+        body.writeBytes(("--" + BOUNDARY + "--\r\n").getBytes(StandardCharsets.US_ASCII));
+        return HttpRequest.POST(path, body.toByteArray())
+            .contentType(MediaType.MULTIPART_FORM_DATA + "; boundary=" + BOUNDARY);
+    }
+
+    private static void writePart(ByteArrayOutputStream body, String filename, byte[] content) {
+        String headers = "--" + BOUNDARY + "\r\n"
+            + "Content-Disposition: form-data; name=\"file\"; filename=\"" + filename + "\"\r\n"
+            + "Content-Type: text/plain\r\n"
+            + "\r\n";
+        body.writeBytes(headers.getBytes(StandardCharsets.US_ASCII));
+        body.writeBytes(content);
+        body.writeBytes("\r\n".getBytes(StandardCharsets.US_ASCII));
     }
 
     private static String partName(CompletedPart part) {
