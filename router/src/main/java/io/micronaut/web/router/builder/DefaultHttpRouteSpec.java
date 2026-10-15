@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.builder;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -24,6 +25,8 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.form.FormData;
+import io.micronaut.web.router.websocket.WebSocketRouteEndpoint;
+import io.micronaut.web.router.websocket.WebSocketEndpointSpec;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -206,6 +209,35 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     public void respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response) {
         Function<? super PathVariables, ? extends HttpResponse<?>> checked = route.terminal(response, RESPONSE);
         respond(() -> HandlerMethod.respond(checked), null, false);
+    }
+
+    @Override
+    public void webSocket(Consumer<WebSocketEndpointSpec> endpoint) {
+        Consumer<WebSocketEndpointSpec> checked = route.terminal(endpoint, "endpoint");
+        String template = route.webSocketTemplate();
+        AnnotationMetadata metadata;
+        try {
+            // loads the endpoint, which is a bean of micronaut-websocket, before the lambda runs
+            metadata = WebSocketRouteEndpoint.ROUTE_METADATA;
+        } catch (LinkageError e) {
+            route.drop();
+            throw new IllegalStateException("The WebSocket route " + route.description() + " requires micronaut-websocket", e);
+        }
+        // an Object: no type of micronaut-websocket is in the signatures of this class, its
+        // lambdas included, so that it can be reflected on without it, e.g. by Groovy
+        Object webSocket;
+        try {
+            webSocket = WebSocketRouteEndpoint.of(template, checked);
+        } catch (RuntimeException e) {
+            route.drop();
+            throw e;
+        }
+        // the upgrade request has no body and the connection no response body: the media types
+        // of a group do not apply, its executor runs the handlers of the connections
+        route.end(() -> HandlerMethod.webSocket(webSocket, metadata),
+            // the server finds the endpoint in the attribute of the route
+            settings -> settings.attribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, webSocket),
+            RouteGroupDefaults.CONSUMES_SETTING | RouteGroupDefaults.PRODUCES_SETTING);
     }
 
     @Override

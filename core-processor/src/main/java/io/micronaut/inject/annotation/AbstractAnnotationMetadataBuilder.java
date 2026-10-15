@@ -269,20 +269,30 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     public final Map<CharSequence, Object> getAnnotationDefaultValues(String annotationName) {
         return getAnnotationMirror(annotationName)
-            .map(annotationType -> {
-                Map<? extends T, ?> annotationDefaultValues = readAnnotationDefaultValues(annotationName, annotationType, true);
-                Map<CharSequence, Object> defaultValues = getAnnotationDefaults(
-                    annotationType,
-                    annotationName,
-                    annotationDefaultValues,
-                    new HashMap<>()
-                );
-                if (defaultValues == null || defaultValues.isEmpty()) {
-                    return Collections.<CharSequence, Object>emptyMap();
-                }
-                return Collections.unmodifiableMap(defaultValues);
-            })
+            .map(annotationType -> getAnnotationDefaultValues(annotationName, annotationType))
             .orElse(Collections.emptyMap());
+    }
+
+    /**
+     * Resolves the default values declared by the given annotation type, including empty string defaults.
+     *
+     * @param annotationName The annotation type name
+     * @param annotationType The native annotation type
+     * @return The default values by member name, in declaration order; empty when the type declares none
+     * @since 5.3.0
+     */
+    public final Map<CharSequence, Object> getAnnotationDefaultValues(String annotationName, T annotationType) {
+        Map<? extends T, ?> annotationDefaultValues = readAnnotationDefaultValues(annotationName, annotationType, true);
+        Map<CharSequence, Object> defaultValues = getAnnotationDefaults(
+            annotationType,
+            annotationName,
+            annotationDefaultValues,
+            new HashMap<>()
+        );
+        if (defaultValues == null || defaultValues.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return Collections.unmodifiableMap(defaultValues);
     }
 
     /**
