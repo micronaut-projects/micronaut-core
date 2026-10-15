@@ -30,9 +30,9 @@ import java.util.regex.Pattern;
  * <pre>
  * [python:unknown-method] Java type [java.util.ArrayList] has no method named [ad]; did you mean [add]?
  *   --&gt; src/main/python/shop/service.py:14:16
- *      |
- *   14 |         values.ad(item.title)
- *      |                ^^
+ *    |
+ *  14 |         values.ad(item.title)
+ *    |                ^^
  * </pre>
  *
  * @since 5.3.0
@@ -47,7 +47,10 @@ public final class PythonDiagnostics {
     public static final String LOCATION_MARKER = "  --> ";
 
     private static final Pattern NEWLINE = Pattern.compile("\r\n|\r|\n");
-    private static final Pattern EXCERPT_LINE = Pattern.compile("^\\s*(\\d+ )?\\|");
+    // the three lines of an excerpt, as render() prints them (possibly indented further by the compiler output): the
+    // gutter alone, the numbered source line and the caret line; each starts with a space, which a message line
+    // starting with a bar, or with a number and a bar, does not
+    private static final Pattern EXCERPT_LINE = Pattern.compile("^ +\\|$|^ +\\d+ \\| |^ +\\| [\\t ]*\\^+$");
     private static final Pattern LOCATION_LINE = Pattern.compile("(?m)^\\s*--> \\S");
 
     private PythonDiagnostics() {
