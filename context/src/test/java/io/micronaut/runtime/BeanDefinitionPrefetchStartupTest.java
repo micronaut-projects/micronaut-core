@@ -26,6 +26,8 @@ import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
+import io.micronaut.core.io.service.ServiceIndex;
+import io.micronaut.core.io.service.ServiceIndexBuilder;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
@@ -98,6 +100,8 @@ class BeanDefinitionPrefetchStartupTest {
         String starting = started.output().substring(0, started.output().indexOf("PROVIDER="));
         assertTrue(starting.contains(Micronaut.class.getName() + " source:"), started.output());
         assertFalse(starting.contains(TASK + " source:"), "the task class was loaded:\n" + started.output());
+        // Nor does the context load the class of the service index to log it, when there is none
+        assertFalse(started.output().contains(ServiceIndex.class.getName() + " source:"), started.output());
         assertEquals(DefaultBeanDefinitionsProvider.class.getName(), started.value("PROVIDER"), started.output());
     }
 
@@ -312,6 +316,33 @@ class BeanDefinitionPrefetchStartupTest {
     }
 
     /**
+     * The same with a service index, which the lookup of the configurers checks before the
+     * prefetch starts: that check creates no logger, so logging is still configured after the
+     * prefetch has started. With a context class loader that the index is not served for, the
+     * prefetch's own lookup checks the index on a pool thread, while logging is configured: SLF4J
+     * hands out no substitute logger. The context logs the check once it starts.
+     */
+    @Test
+    void loadsTheReferenceClassesWhileLoggingIsConfiguredWithAServiceIndex() throws IOException {
+        List<Path> classPath = List.of(entries(FIRST), prefetchConfigurer(),
+            services(Map.of(Configurator.class, PoolFirstConfigurator.class, StaticOptimizations.Loader.class, IndexLoader.class)));
+        String classLog = "-Xlog:class+load=info,class+init=info";
+        ChildJvm indexed = run(classPath, THREE_THREADS, classLog);
+        ChildJvm otherContextClassLoader = run(classPath, THREE_THREADS, classLog, "-Dprefetch-test.ccl=" + Files.createDirectories(temp.resolve("ccl")));
+
+        for (ChildJvm on : List.of(indexed, otherContextClassLoader)) {
+            assertEquals(TASK, on.value("PROVIDER"), on.output());
+            assertTrue(on.value("REFERENCES").contains(FIRST), on.output());
+            int configuring = on.line(ConfiguringLogging.class.getName() + " source:");
+            assertTrue(on.line(FIRST + " source:") < configuring, on.output());
+            assertTrue(on.line("Initializing '" + FIRST.replace('.', '/') + "'") > configuring, on.output());
+            assertFalse(on.output().contains("org.slf4j.helpers.SubstituteLogger source:"), on.output());
+            assertFalse(on.output().contains("SLF4J(W)"), on.output());
+            assertEquals(1, on.output().lines().filter(line -> line.contains("Using the service index")).count(), on.output());
+        }
+    }
+
+    /**
      * A failed task that the context did not take is reported once.
      */
     @Test
@@ -440,6 +471,20 @@ class BeanDefinitionPrefetchStartupTest {
         @Override
         public void configure(ApplicationContextBuilder builder) {
             builder.beanDefinitionPrefetchEnabled(true);
+        }
+    }
+
+    /**
+     * Registers a service index of the class path, as a packaging tool generates one.
+     */
+    public static final class IndexLoader implements StaticOptimizations.Loader<ServiceIndex> {
+        @Override
+        public ServiceIndex load() {
+            try {
+                return ServiceIndexBuilder.build(IndexLoader.class.getClassLoader(), List.of(ApplicationContextConfigurer.class.getName()));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
     }
 

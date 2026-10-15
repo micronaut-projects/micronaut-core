@@ -414,7 +414,7 @@ public interface ApplicationContextBuilder {
 
     /**
      * Whether {@code io.micronaut.runtime.Micronaut} reads the bean definitions on the common pool
-     * while it configures logging and builds the context. Other builders ignore it.
+     * while it starts. Off by default; other builders ignore it.
      *
      * @param enabled True to prefetch the bean definitions
      * @return This builder
