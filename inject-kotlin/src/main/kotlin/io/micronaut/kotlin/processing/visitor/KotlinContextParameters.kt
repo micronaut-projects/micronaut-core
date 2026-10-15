@@ -344,39 +344,47 @@ private class KotlinLexer(private val source: String) {
         var braces = 0
         while (position < source.length) {
             val c = source[position]
-            when {
-                c == '\n' -> {
-                    line++
-                    position++
-                }
-                c.isWhitespace() -> position++
-                c == '/' && peek(1) == '/' -> skipLine()
-                c == '/' && peek(1) == '*' -> skipBlockComment()
-                c == '"' -> string(1)
-                c == '$' && isMultiDollarString() -> {
-                    val dollars = countDollars()
-                    position += dollars
-                    string(dollars)
-                }
-                c == '\'' -> charLiteral()
-                c == '`' -> quotedIdentifier()
-                c == '_' || c.isLetter() -> identifier()
-                c.isDigit() -> number()
-                else -> {
-                    if (inTemplate) {
-                        if (c == '{') {
-                            braces++
-                        } else if (c == '}') {
-                            if (braces == 0) {
-                                position++
-                                return
-                            }
-                            braces--
-                        }
-                    }
-                    symbol()
-                }
+            if (inTemplate && c == '}' && braces == 0) {
+                // The brace closing the template
+                position++
+                return
             }
+            if (inTemplate) {
+                braces += braceDelta(c)
+            }
+            token(c)
+        }
+    }
+
+    private fun braceDelta(c: Char) = when (c) {
+        '{' -> 1
+        '}' -> -1
+        else -> 0
+    }
+
+    /**
+     * Lexes the token, comment or whitespace starting with the given character.
+     */
+    private fun token(c: Char) {
+        when {
+            c == '\n' -> {
+                line++
+                position++
+            }
+            c.isWhitespace() -> position++
+            c == '/' && peek(1) == '/' -> skipLine()
+            c == '/' && peek(1) == '*' -> skipBlockComment()
+            c == '"' -> string(1)
+            c == '$' && isMultiDollarString() -> {
+                val dollars = countDollars()
+                position += dollars
+                string(dollars)
+            }
+            c == '\'' -> charLiteral()
+            c == '`' -> quotedIdentifier()
+            c == '_' || c.isLetter() -> identifier()
+            c.isDigit() -> number()
+            else -> symbol()
         }
     }
 
@@ -439,31 +447,50 @@ private class KotlinLexer(private val source: String) {
         val raw = source.startsWith("\"\"\"", position)
         position += if (raw) 3 else 1
         while (position < source.length) {
-            val c = source[position]
-            if (raw && source.startsWith("\"\"\"", position)) {
-                // A raw string can end with more quotes, the last three close it
-                while (peek(0) == '"') {
-                    position++
-                }
+            if (closesString(raw)) {
                 break
-            } else if (!raw && c == '"') {
-                position++
-                break
-            } else if (!raw && c == '\\') {
-                position++
-                if (position < source.length) {
-                    advance()
-                }
-            } else if (c == '$' && countDollars() == dollars && peek(dollars) == '{') {
-                position += dollars + 1
-                templateDepth++
-                code(inTemplate = true)
-                templateDepth--
-            } else {
-                advance()
             }
+            stringContent(raw, dollars)
         }
         add(SourceTokenKind.LITERAL, "\"", startLine)
+    }
+
+    /**
+     * Consumes the closing quotes if the string literal ends at the current position.
+     */
+    private fun closesString(raw: Boolean): Boolean {
+        if (raw && source.startsWith("\"\"\"", position)) {
+            // A raw string can end with more quotes, the last three close it
+            while (peek(0) == '"') {
+                position++
+            }
+            return true
+        }
+        if (!raw && source[position] == '"') {
+            position++
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Lexes the escape, template or character of a string literal at the current position.
+     */
+    private fun stringContent(raw: Boolean, dollars: Int) {
+        val c = source[position]
+        if (!raw && c == '\\') {
+            position++
+            if (position < source.length) {
+                advance()
+            }
+        } else if (c == '$' && countDollars() == dollars && peek(dollars) == '{') {
+            position += dollars + 1
+            templateDepth++
+            code(inTemplate = true)
+            templateDepth--
+        } else {
+            advance()
+        }
     }
 
     private fun charLiteral() {
