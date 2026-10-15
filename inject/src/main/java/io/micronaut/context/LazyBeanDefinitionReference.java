@@ -125,6 +125,7 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
     /**
      * {@code null} until the declared qualifier is read from the descriptor, then the qualifier or {@link #NO_QUALIFIER}.
      */
+    @SuppressWarnings("java:S3077") // a qualifier is immutable once published
     @Nullable
     private volatile Object declaredQualifier;
     /**
@@ -414,7 +415,7 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
      * @return The definition, or {@code null} if it cannot be linked
      */
     @Override
-    @SuppressWarnings("NullAway") // null when the definition is not present, which an eager reference never is
+    @SuppressWarnings({"NullAway", "java:S2638"}) // null when the definition is not present, which an eager reference never is
     public @Nullable BeanDefinition<T> load() {
         BeanDefinitionReference<T> reference = instance("load");
         return reference == null ? null : reference.load();
@@ -427,7 +428,7 @@ public final class LazyBeanDefinitionReference<T> implements BeanDefinitionRefer
      * @return The definition, or {@code null} if it cannot be linked
      */
     @Override
-    @SuppressWarnings("NullAway") // null when the definition is not present, which an eager reference never is
+    @SuppressWarnings({"NullAway", "java:S2638"}) // null when the definition is not present, which an eager reference never is
     public @Nullable BeanDefinition<T> load(BeanContext context) {
         BeanDefinitionReference<T> reference = instance("load");
         return reference == null ? null : reference.load(context);

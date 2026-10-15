@@ -131,6 +131,7 @@ class MicronautMetaServiceLoaderUtilsTest {
     public static final class Instantiated implements Runnable {
         @Override
         public void run() {
+            // only its class matters: the entry names it
         }
     }
 

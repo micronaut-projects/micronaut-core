@@ -861,6 +861,7 @@ public final class MicronautMetaServiceLoaderUtils {
      *
      * @param <S> The service type
      */
+    @SuppressWarnings({"serial", "java:S1948"}) // a task that is never serialized
     private static class ServiceInstanceLoader<S> extends RecursiveActionValuesCollector<S> {
 
         final ClassLoader classLoader;
@@ -917,6 +918,7 @@ public final class MicronautMetaServiceLoaderUtils {
      *
      * @param <S> The service type
      */
+    @SuppressWarnings({"serial", "java:S1948"}) // a task that is never serialized
     private static final class DescribedEntryLoader<S> extends ServiceInstanceLoader<S> {
 
         private final BiFunction<ClassLoader, String, @Nullable S> factory;
