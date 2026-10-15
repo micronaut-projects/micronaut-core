@@ -16,7 +16,6 @@ unchecked.
 """
 import ast
 import keyword
-
 import java
 
 PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
@@ -170,16 +169,30 @@ class TypeChecker:
             for function_def, node in module.functions:
                 severity = self.scope.severity(function_def.decorators(), module_severity)
                 units.append(CheckUnit(module.source_path, function_def.name(), function_def, node, None, severity, module))
+            # a nested class takes the switch of the class around it, the nearest declaration winning
+            enclosing = _enclosing_classes([node for _, node in module.classes if node is not None])
+            by_node = {id(node): class_def for class_def, node in module.classes if node is not None}
+            class_scopes = {}
+
+            def class_scope(class_def, node):
+                key = id(node) if node is not None else id(class_def)
+                if key not in class_scopes:
+                    outer_node = enclosing.get(id(node)) if node is not None else None
+                    outer_severity = class_scope(by_node[id(outer_node)], outer_node)[0] if outer_node is not None and id(outer_node) in by_node else module_severity
+                    # a nested class is modelled by its binary name (Outer$Inner): its source name is Outer.Inner
+                    class_scopes[key] = (self.scope.severity(class_def.decorators(), outer_severity), class_def.name().replace("$", "."))
+                return class_scopes[key]
+
             for class_def, node in module.classes:
-                class_severity = self.scope.severity(class_def.decorators(), module_severity)
-                units.append(CheckUnit(module.source_path, class_def.name(), None, node, class_def, class_severity, module))
+                class_severity, class_name = class_scope(class_def, node)
+                units.append(CheckUnit(module.source_path, class_name, None, node, class_def, class_severity, module))
                 members = list(class_def.functions())
                 if class_def.constructor() is not None:
                     members.append(class_def.constructor())
                 for function_def in members:
                     severity = self.scope.severity(function_def.decorators(), class_severity)
-                    qualified_name = f"{class_def.name()}.{function_def.name()}"
-                    units.append(CheckUnit(module.source_path, qualified_name, function_def, _function_node(node, function_def.name()), class_def, severity, module))
+                    qualified_name = f"{class_name}.{function_def.name()}"
+                    units.append(CheckUnit(module.source_path, qualified_name, function_def, _function_node(node, function_def.name(), function_def), class_def, severity, module))
         return units
 
     def check(self, visitor_context):
@@ -227,6 +240,9 @@ class TypeChecker:
         The type of the values an unhinted method returns, when every return statement of its body
         has the one type the checker infers; None when they disagree or one is unknown.
         """
+        if isinstance(function_node, ast.AsyncFunctionDef) or _yields(function_node):
+            # a call returns a coroutine or a generator, not what the return statements give
+            return None
         rules = self.rules_of(model, function_def, function_node)
         if rules is None:
             return None
@@ -373,6 +389,9 @@ class DecoratorRules:
                 continue
             simple_name = description.simpleName()
             if not description.annotation():
+                if description.pythonDefined():
+                    # a Python class of the compilation used as a decorator (a callable class): plain Python
+                    continue
                 self._report("not-an-annotation",
                              f"[{description.name()}] is not an annotation and cannot decorate {self.kind} [{self.unit.qualified_name}]",
                              node)
@@ -441,18 +460,15 @@ class DecoratorRules:
                              f"member [{name}] of @{simple_name} is {member.typeName()}; got {kind}",
                              element)
             elif member.enumType() and kind == "str":
+                # read at run time through the conversion of a string to the enum, which also accepts the
+                # constant spelt as an environment name (created, fooBar); the type facts give no constants for
+                # an enum with its own toString(), which the conversion matches too
                 constants = list(member.enumConstants())
-                if constants and element.value not in constants:
+                if constants and element.value not in constants and _environment_name(element.value) not in constants:
                     suggestions = suggest(element.value, constants)
                     self._report("decorator-member-type",
                                  f"member [{name}] of @{simple_name} is {member.typeName()}, which has no constant [{element.value}]{_did_you_mean(suggestions)}",
                                  element, suggestions)
-
-    def _targets_allow(self, targets, description):
-        if any(target in self.targets for target in targets):
-            return True
-        # a method-targeted around or introduction binding on a class advises all of its methods
-        return self.kind == "class" and description.interceptorBinding() and "METHOD" in targets
 
     def _targets_allow(self, targets, description):
         if any(target in self.targets for target in targets):
@@ -486,14 +502,67 @@ class DecoratorRules:
         self.checker.report(self.unit, rule, message, self.span_of(node), suggestions)
 
 
-def _function_node(class_node, name):
-    """The AST node of the method of the given name in a class body, or None."""
+def _environment_name(value):
+    """NameUtils.environmentName: the name a string is also tried as when it converts to an enum (fooBar -> FOO_BAR)."""
+    name = value.replace("-", "_").replace(".", "_")
+    out = []
+    first = True
+    last = "0"
+    for c in name:
+        if first:
+            if c != "_":
+                out.append(c)
+            first = False
+        elif c.isupper() and not last.isupper():
+            out.append("_")
+            out.append(c)
+        elif c != "_":
+            if last == "_":
+                out.append("_")
+            out.append(c)
+        last = c
+    return "".join(out).upper()
+
+
+def _function_node(class_node, name, function_def=None):
+    """
+    The AST node of the method of the given name in a class body, or None. A name defined more than once (a
+    property and its setter, @overload stubs and their implementation) is told apart by the line of the
+    definition the model recorded; without one, the first definition is taken, as before.
+    """
     if class_node is None:
         return None
-    for statement in getattr(class_node, "body", ()):
-        if getattr(statement, "name", None) == name and hasattr(statement, "args"):
-            return statement
-    return None
+    candidates = [statement for statement in getattr(class_node, "body", ())
+                  if getattr(statement, "name", None) == name and hasattr(statement, "args")]
+    if not candidates:
+        return None
+    span = function_def.span() if function_def is not None and hasattr(function_def, "span") else None
+    if span is not None:
+        for statement in candidates:
+            if statement.lineno == span.line():
+                return statement
+    return candidates[0]
+
+
+def _enclosing_classes(class_nodes):
+    """id(class node) -> the class node directly around it, for the classes nested in another class."""
+    enclosing = {}
+
+    def visit(node, outer):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.ClassDef):
+                if outer is not None:
+                    enclosing[id(child)] = outer
+                visit(child, child)
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+                # a class defined in a method is local to it, not a member of the class
+                visit(child, None)
+            else:
+                visit(child, outer)
+
+    for node in class_nodes:
+        visit(node, node)
+    return enclosing
 
 
 # ---------------------------------------------------------------- expression types
@@ -517,7 +586,9 @@ BUILTIN_HINTS = {
 BUILTIN_JAVA_TYPES = {"java.lang.String": "str", "java.lang.CharSequence": "str", "boolean": "bool", "java.lang.Boolean": "bool",
                       "int": "int", "long": "int", "short": "int", "byte": "int", "java.lang.Integer": "int", "java.lang.Long": "int",
                       "java.lang.Short": "int", "java.lang.Byte": "int", "double": "float", "float": "float",
-                      "java.lang.Double": "float", "java.lang.Float": "float", "void": "none"}
+                      "java.lang.Double": "float", "java.lang.Float": "float", "void": "none",
+                      # GraalPy hands a Java char to Python as a one-character str
+                      "char": "str", "java.lang.Character": "str"}
 # the Java types the builtin hints are as type arguments (a list[int] is a List<Integer>)
 BOXED_JAVA_NAMES = {"str": "java.lang.String", "int": "java.lang.Integer", "float": "java.lang.Double", "bool": "java.lang.Boolean"}
 # every Java object has these, whether or not the element model lists them
@@ -618,7 +689,9 @@ class Bindings:
         function_def = self.unit.function_def
         if self.unit.class_def is not None:
             if function_def.isStatic():
-                self.locals["cls"] = Typed(PY_REF, self.unit.class_def)
+                # a class method takes the class as its first parameter; a static method takes nothing implicit
+                if _is_class_method(self.unit.node):
+                    self.locals["cls"] = Typed(PY_REF, self.unit.class_def)
             else:
                 self.locals["self"] = Typed(PY, self.unit.class_def)
         for argument in function_def.arguments().arguments():
@@ -735,7 +808,18 @@ def _own_statements(function_node):
             stack.extend(reversed(getattr(statement, field, []) or []))
         for handler in getattr(statement, "handlers", []) or []:
             stack.extend(reversed(handler.body))
+        for case in getattr(statement, "cases", []) or []:
+            stack.extend(reversed(case.body))
     return own
+
+
+def _yields(function_node):
+    """Whether the function is a generator: its own body yields."""
+    for statement in _own_statements(function_node):
+        for child in ast.walk(statement):
+            if isinstance(child, (ast.Yield, ast.YieldFrom)):
+                return True
+    return False
 
 
 def _bound_names(target):
@@ -746,6 +830,39 @@ def _bound_names(target):
     if isinstance(target, ast.Starred):
         return _bound_names(target.value)
     return []
+
+
+def _is_class_method(function_node):
+    """Whether a function is decorated with @classmethod, which hands it the class as its first parameter."""
+    return any(isinstance(decorator, ast.Name) and decorator.id == "classmethod"
+               for decorator in getattr(function_node, "decorator_list", ()))
+
+
+def _assigned_names(statements):
+    """The names the statements bind, nested blocks included and nested scopes excluded."""
+    names = set()
+    pending = list(statements)
+    while pending:
+        node = pending.pop()
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+            continue
+        if isinstance(node, (ast.Assign,)):
+            for target in node.targets:
+                names.update(_bound_names(target))
+        elif isinstance(node, (ast.AnnAssign, ast.AugAssign)):
+            names.update(_bound_names(node.target))
+        elif isinstance(node, (ast.For, ast.AsyncFor)):
+            names.update(_bound_names(node.target))
+        elif isinstance(node, (ast.With, ast.AsyncWith)):
+            for item in node.items:
+                if item.optional_vars is not None:
+                    names.update(_bound_names(item.optional_vars))
+        elif isinstance(node, ast.NamedExpr):
+            names.update(_bound_names(node.target))
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            names.add(node.name)
+        pending.extend(ast.iter_child_nodes(node))
+    return names
 
 
 class JavaReceiverRules:
@@ -767,6 +884,8 @@ class JavaReceiverRules:
         self.problems = []
         self.node_types = {}
         self.targets = {}
+        # a probe walk of a loop body (see _rebound_in) reports nothing
+        self._probing = 0
 
     def check(self):
         for statement in getattr(self.unit.node, "body", ()):
@@ -787,8 +906,23 @@ class JavaReceiverRules:
             element = self._element_type(node.iter, iterated)
             if isinstance(node.target, ast.Name) and element is not None and not isinstance(node, ast.comprehension):
                 self.bindings.assign(node.target.id, element)
-            for child in getattr(node, "body", []) + getattr(node, "orelse", []):
-                self.statement(child)
+            self._loop_body(getattr(node, "body", []), getattr(node, "orelse", []))
+            return
+        if isinstance(node, ast.While):
+            self._loop_body(node.body, node.orelse, node.test)
+            return
+        if isinstance(node, ast.Match):
+            self.expression(node.subject)
+            for case in node.cases:
+                for child in ast.walk(case.pattern):
+                    # the names a pattern captures (case [first, *rest], case {"k": value}, case Point(x=x) as p)
+                    for name in (getattr(child, "name", None), getattr(child, "rest", None)):
+                        if name:
+                            self.bindings.forget(name)
+                if case.guard is not None:
+                    self.expression(case.guard)
+                for child in case.body:
+                    self.statement(child)
             return
         if isinstance(node, (ast.With, ast.AsyncWith)):
             for item in node.items:
@@ -823,6 +957,46 @@ class JavaReceiverRules:
                             self.statement(child)
                         elif isinstance(child, ast.expr):
                             self.expression(child)
+
+    def _loop_body(self, body, orelse, test=None):
+        """
+        A loop body is walked once, in order, but runs any number of times: a name it rebinds to another type may
+        hold, at the top of an iteration, what a later statement of the previous one assigned. Such a name is
+        unknown from the top of the body on; a name the body only ever assigns its own type (an accumulator) keeps it.
+        """
+        for name in self._rebound_in(body + orelse, test):
+            self.bindings.forget(name)
+        if test is not None:
+            self.expression(test)
+        for child in body + orelse:
+            self.statement(child)
+
+    def _rebound_in(self, statements, test):
+        """
+        The names the statements give a type other than the one they hold before them: found by a probe walk that
+        reports nothing and records nothing, after which the bindings are as they were.
+        """
+        assigned = _assigned_names(statements)
+        if not assigned:
+            return set()
+        bindings = self.bindings
+        locals_before, unknown_before = dict(bindings.locals), set(bindings.unknown_locals)
+        # what a walk records (the expression types, the resolved calls, the problems) goes to throwaway places
+        recorded = {field: getattr(self, field) for field in ("node_types", "targets", "problems") if hasattr(self, field)}
+        for field, value in recorded.items():
+            setattr(self, field, type(value)())
+        self._probing += 1
+        try:
+            if test is not None:
+                self.expression(test)
+            for child in statements:
+                self.statement(child)
+            return {name for name in assigned if name in bindings.unknown_locals and name not in unknown_before}
+        finally:
+            self._probing -= 1
+            bindings.locals, bindings.unknown_locals = locals_before, unknown_before
+            for field, value in recorded.items():
+                setattr(self, field, value)
 
     def assignment(self, node):
         if isinstance(node, ast.AugAssign):
@@ -1217,6 +1391,8 @@ class JavaReceiverRules:
         return ", ".join("?" if argument is None else argument.label() for argument in argument_types)
 
     def _report(self, rule, message, node, suggestions=()):
+        if self._probing:
+            return
         if self.silent:
             self.problems.append((rule, message, self.span_of(node)))
             return
@@ -1533,20 +1709,17 @@ class PythonClassModel:
             return None
         function_def, node = self.constructor
         hints = {argument.name(): argument.typeAnnotation() for argument in function_def.arguments().arguments()}
-        assigned = [statement for statement in node.body
-                    if isinstance(statement, ast.Assign) and len(statement.targets) == 1
-                    and isinstance(statement.targets[0], ast.Attribute) and isinstance(statement.targets[0].value, ast.Name)
-                    and statement.targets[0].value.id == "self" and statement.targets[0].attr == name]
-        if not assigned:
+        values = _receiver_assignments(node, name)
+        if not values:
             return None
         found = None
-        for statement in assigned:
-            if isinstance(statement.value, ast.Name):
-                hint = hints.get(statement.value.id)
+        for value in values:
+            if isinstance(value, ast.Name):
+                hint = hints.get(value.id)
                 typed = bindings.of_hint(hint) if hint is not None else None
-            elif isinstance(statement.value, ast.Call):
+            elif isinstance(value, ast.Call):
                 rules = self.classes.checker.rules_of(self, function_def, node)
-                typed = rules.node_types.get(id(statement.value)) if rules is not None else None
+                typed = rules.node_types.get(id(value)) if rules is not None else None
                 if typed is not None and typed.kind != JAVA:
                     typed = None
             else:
@@ -1570,6 +1743,41 @@ class PythonClassModel:
                             if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == receiver and target.attr == name:
                                 return True
         return False
+
+
+def _receiver_assignments(function_node, name):
+    """
+    The values a method assigns to <receiver>.<name>, the receiver being its first parameter, in nested
+    blocks too; a None in the list for an assignment the checker does not follow (an unpacking, an augmented
+    assignment, a loop target), which makes the type unknown.
+    """
+    if not function_node.args.args:
+        return []
+    receiver = function_node.args.args[0].arg
+
+    def names_it(target):
+        return isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == receiver and target.attr == name
+
+    def mentions(target):
+        return any(names_it(element) for element in ast.walk(target))
+
+    values = []
+    for statement in _own_statements(function_node):
+        if isinstance(statement, ast.Assign):
+            for target in statement.targets:
+                if names_it(target):
+                    values.append(statement.value)
+                elif mentions(target):
+                    values.append(None)
+        elif isinstance(statement, ast.AnnAssign) and names_it(statement.target):
+            values.append(statement.value)
+        elif isinstance(statement, ast.AugAssign) and mentions(statement.target):
+            values.append(None)
+        elif isinstance(statement, (ast.For, ast.AsyncFor)) and mentions(statement.target):
+            values.append(None)
+        elif isinstance(statement, (ast.With, ast.AsyncWith)) and any(item.optional_vars is not None and mentions(item.optional_vars) for item in statement.items):
+            values.append(None)
+    return values
 
 
 # the constructor of a class whose arguments the checker cannot follow
