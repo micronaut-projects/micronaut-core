@@ -269,11 +269,15 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
     /**
      * Obtain the property index position.
      *
+     * <p>Property names are expected to be unique.</p>
+     *
      * @param name The name of the property
      * @return A property index or -1 of not found.
+     * @throws NullPointerException if {@code name} is null
      * @since 3.1
      */
     default int propertyIndexOf(String name) {
+        ArgumentUtils.requireNonNull("name", name);
         int index = 0;
         for (BeanProperty<T, Object> property : getBeanProperties()) {
             if (property.getName().equals(name)) {
@@ -282,6 +286,41 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
             index++;
         }
         return -1;
+    }
+
+    /**
+     * Finds the index of the constructor argument with the given name.
+     *
+     * @param name The argument name
+     * @return The index into {@link #getConstructorArguments()}, or {@code -1} if there is no such
+     * argument. Argument names are expected to be unique; if they are not, implementations may
+     * throw {@link IllegalArgumentException}. This default returns the first match.
+     * @throws NullPointerException if {@code name} is null
+     * @since 5.3.0
+     */
+    default int constructorArgumentIndexOf(String name) {
+        ArgumentUtils.requireNonNull("name", name);
+        Argument<?>[] arguments = getConstructorArguments();
+        for (int i = 0; i < arguments.length; i++) {
+            if (arguments[i].getName().equals(name)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Finds the constructor argument with the given name.
+     *
+     * @param name The argument name
+     * @return The constructor argument, or an empty {@link Optional} if there is no such argument
+     * @throws NullPointerException if {@code name} is null
+     * @see #constructorArgumentIndexOf(String)
+     * @since 5.3.0
+     */
+    default Optional<Argument<?>> getConstructorArgument(String name) {
+        int index = constructorArgumentIndexOf(name);
+        return index == -1 ? Optional.empty() : Optional.of(getConstructorArguments()[index]);
     }
 
     /**

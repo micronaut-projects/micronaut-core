@@ -83,6 +83,20 @@ public interface PieceReader<T> extends Closeable {
     T poll() throws IOException;
 
     /**
+     * Whether the pieces read so far are known to complete no other element, without decoding
+     * one: {@link #poll()} would return {@code null}. A caller that has no demand for another
+     * element uses it to discover the end of the elements after {@link #complete()}, where
+     * polling would decode an element that nobody requested.
+     *
+     * @return {@code true} if no element is available; {@code false} if one may be, also when the
+     * reader cannot tell without decoding (the default): the caller then waits for a request to
+     * {@link #poll()}
+     */
+    default boolean isEmpty() {
+        return false;
+    }
+
+    /**
      * Release what the reader holds, e.g. the bytes of a partial element, or of the elements that
      * were not polled. May be called more than once.
      */
