@@ -80,7 +80,7 @@ final class PythonAnnotationStubGenerator {
         memberNames.addAll(decoratorDef.memberTypes().keySet());
         memberNames.addAll(decoratorDef.members().keySet());
         for (String memberName : memberNames) {
-            if (isDecoratorTargetMember(memberName, decoratorDef)) {
+            if (decoratorDef.isTargetMember(memberName)) {
                 continue;
             }
             TypeDef memberType = annotationMemberType(memberName, decoratorDef, visitorContext);
@@ -113,20 +113,6 @@ final class PythonAnnotationStubGenerator {
             return true;
         }
         return visitorContext.getProcessingEnvironment().environment().decorators().containsKey(annotationName);
-    }
-
-    private static boolean isDecoratorTargetMember(String memberName, DecoratorDef decoratorDef) {
-        Object memberValue = decoratorDef.members().get(memberName);
-        return decoratorDef.memberTypes().size() <= 1
-            && decoratorDef.members().size() <= 1
-            && isNullAnnotationMemberValue(memberValue)
-            && decoratorDef.memberTypes().get(memberName) == null
-            && decoratorDef.memberDecorators().getOrDefault(memberName, List.of()).isEmpty()
-            && Set.of("func", "cls", "bean").contains(memberName);
-    }
-
-    private static boolean isNullAnnotationMemberValue(@Nullable Object value) {
-        return value == null;
     }
 
     private static TypeDef annotationMemberType(String memberName, DecoratorDef decoratorDef, PythonVisitorContext visitorContext) {
