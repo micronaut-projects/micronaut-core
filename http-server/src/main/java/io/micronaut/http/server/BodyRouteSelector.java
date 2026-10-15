@@ -34,6 +34,7 @@ import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.server.binding.ServerRequestBody;
 import io.micronaut.web.router.PendingRouteMatch;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.builder.RouteCondition;
@@ -138,7 +139,7 @@ final class BodyRouteSelector {
                                                                PendingRouteMatch<T, R> pending,
                                                                PropagatedContext propagatedContext) {
         int serverLimit = serverLimit();
-        return read(request, pending.getMaxBytes(serverLimit))
+        return read(request, pending.getMaxBytes(serverLimit), serverLimit)
             .flatMap(body -> propagatedContext.propagate(() -> choose(new Selection<>(request, pending, body, serverLimit, propagatedContext), 0)));
     }
 
@@ -161,16 +162,41 @@ final class BodyRouteSelector {
                 int next = i + 1;
                 return matchedFlow.flatMap(m -> selection.propagate(() -> m.isEmpty()
                     ? choose(selection, next)
-                    : ExecutionFlow.just(Optional.ofNullable(selection.pending.choose(selection.request, m)))));
+                    : chosen(selection, m)));
             }
             if (!matched.isEmpty()) {
-                return ExecutionFlow.just(Optional.ofNullable(selection.pending.choose(selection.request, matched)));
+                return chosen(selection, matched);
             }
         }
         if (LOG.isDebugEnabled()) {
             LOG.debug("The body of the request {} {} meets the body conditions of no route", selection.request.getMethodName(), selection.request.getPath());
         }
         return ExecutionFlow.just(Optional.empty());
+    }
+
+    /**
+     * The route chosen among the matches of a rank the body meets. A chosen route locator
+     * locates its target: when the routes of the target depend on the body too, the body is
+     * read again for them, and an asynchronous locator that has not located its target yet is
+     * waited for, like the router does without body conditions.
+     */
+    private <T, R> ExecutionFlow<Optional<UriRouteMatch<T, R>>> chosen(Selection<T, R> selection, List<UriRouteMatch<T, R>> matched) {
+        List<PendingRouteMatch<T, R>> next = new ArrayList<>(1);
+        UriRouteMatch<T, R> match;
+        try {
+            match = selection.pending.choose(selection.request, matched, next::add);
+        } catch (RuntimeException e) {
+            CompletionStage<?> location = RouteLocator.pendingLocation(e);
+            if (location == null) {
+                throw e;
+            }
+            return CompletableFutureExecutionFlow.just(location)
+                .flatMap(located -> selection.propagate(() -> chosen(selection, matched)));
+        }
+        if (!next.isEmpty()) {
+            return select(selection.request, next.getFirst(), selection.context);
+        }
+        return ExecutionFlow.just(Optional.ofNullable(match));
     }
 
     /**
@@ -256,9 +282,10 @@ final class BodyRouteSelector {
      *
      * @param request  The request
      * @param maxBytes The limit
+     * @param serverLimit The limit of the server for buffered request content
      * @return The body
      */
-    private ExecutionFlow<RequestBody> read(HttpRequest<?> request, int maxBytes) {
+    private ExecutionFlow<RequestBody> read(HttpRequest<?> request, int maxBytes, int serverLimit) {
         if (ServerRequestBody.isBodySet(request) || ServerRequestBody.of(request) == null) {
             // a body a filter set, as an object, or cleared
             Object object = request.getBody().orElse(null);
@@ -282,9 +309,13 @@ final class BodyRouteSelector {
                         return new RequestBody(request, bytes, bytes.length);
                     }
                     Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
-                    if (cause instanceof ContentLengthExceededException) {
+                    if (cause instanceof ContentLengthExceededException && maxBytes < serverLimit) {
+                        // larger than the limit of the conditions, within the buffer of the server, which
+                        // keeps the body for the next route
                         return oversized(request, maxBytes + 1L, maxBytes);
                     }
+                    // larger than the server may buffer: the body is not kept for another route, the
+                    // request fails with 413, like a @Body argument of the route would
                     throw error instanceof CompletionException completion ? completion : new CompletionException(cause);
                 });
         } catch (RuntimeException e) {
@@ -355,7 +386,13 @@ final class BodyRouteSelector {
             this.request = request;
             this.bytes = null;
             this.object = object;
-            this.length = 0;
+            // the limits of the conditions apply to the bytes of a body a filter set; another object
+            // has no size of its own
+            this.length = switch (object) {
+                case byte[] array -> array.length;
+                case CharSequence text -> text.toString().getBytes(charset()).length;
+                default -> 0;
+            };
         }
 
         long length() {

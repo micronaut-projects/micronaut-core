@@ -627,15 +627,15 @@ public class RequestLifecycle {
                                                                   @Nullable UriRouteMatch<Object, Object> routeMatch,
                                                                   PropagatedContext propagatedContext) {
         if (routeMatch == null) {
+            if (bodyUnmatched) {
+                // as for a condition the request does not meet: never a 405, 415 or 406 of the
+                // routes whose body conditions the body did not meet, nor a file on their path
+                return onStatusError(request, new NotFoundException(), null, propagatedContext);
+            }
             //Check if there is a file for the route before returning route not found
             FileCustomizableResponseType fileCustomizableResponseType = findFile(request);
             if (fileCustomizableResponseType != null) {
                 return ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType));
-            }
-            if (bodyUnmatched) {
-                // as for a condition the request does not meet: never a 405, 415 or 406 of the
-                // routes whose body conditions the body did not meet
-                return onStatusError(request, new NotFoundException(), null, propagatedContext);
             }
             return onRouteMiss(request, propagatedContext);
         }
