@@ -3,6 +3,7 @@ package io.micronaut.scheduling.watch
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.watch.ConfigurationChange
 import io.micronaut.scheduling.processor.ScheduledMethodProcessor
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -75,6 +76,76 @@ class ScheduledMethodWatcherSpec extends Specification {
         then:
         processor.scheduledMethods() == 1
         conditions.eventually { task.runs.get() > stopped + 2 }
+
+        cleanup:
+        context.close()
+    }
+
+    void "a schedule read from configuration is scheduled again when the property changes, by a reload or a refresh"() {
+        given:
+        def context = ApplicationContext.run(["spec.name": "ScheduledMethodWatcherSpec-configured"])
+        def task = context.getBean(ConfiguredRateTask)
+        def processor = context.getBean(ScheduledMethodProcessor)
+        def definition = context.getBeanDefinition(ConfiguredRateTask)
+        def conditions = new PollingConditions(timeout: 5)
+
+        expect:
+        conditions.eventually { task.runs.get() > 2 }
+        processor.scheduledMethods() == 1
+
+        when: "only the property behind the rate changes, and the method comes back unchanged with a reload"
+        context.environment.addPropertySource(PropertySource.of("configured-slow", ["configured.rate": "1h"], 1000))
+        ((DefaultBeanContext) context).notifyDefinitionChange([definition], [definition])
+        Thread.sleep(150)
+        int stopped = task.runs.get()
+        Thread.sleep(150)
+
+        then: "the timer was scheduled again at the new rate, not kept at the old one"
+        processor.scheduledMethods() == 1
+        task.runs.get() == stopped
+
+        when: "the property changes back, with a configuration refresh alone"
+        context.environment.addPropertySource(PropertySource.of("configured-fast", ["configured.rate": "30ms"], 2000))
+        ((DefaultBeanContext) context).notifyConfigurationChange(ConfigurationChange.ofKeys(["configured.rate"] as Set))
+
+        then: "the method runs at the rate it resolves to now"
+        processor.scheduledMethods() == 1
+        conditions.eventually { task.runs.get() > stopped + 2 }
+
+        when: "the property changes to a rate that cannot be read"
+        context.environment.addPropertySource(PropertySource.of("configured-broken", ["configured.rate": "not a duration"], 3000))
+        ((DefaultBeanContext) context).notifyConfigurationChange(ConfigurationChange.ofKeys(["configured.rate"] as Set))
+        def broken = task.runs.get()
+
+        then: "the timers it has are kept"
+        processor.scheduledMethods() == 1
+        conditions.eventually { task.runs.get() > broken + 2 }
+
+        when: "the property is fixed"
+        context.environment.addPropertySource(PropertySource.of("configured-fixed", ["configured.rate": "1h"], 4000))
+        ((DefaultBeanContext) context).notifyConfigurationChange(ConfigurationChange.ofKeys(["configured.rate"] as Set))
+        Thread.sleep(150)
+        int fixed = task.runs.get()
+        Thread.sleep(150)
+
+        then: "the method is scheduled at the rate it now reads"
+        processor.scheduledMethods() == 1
+        task.runs.get() == fixed
+
+        when: "the rate is 30ms again"
+        context.environment.addPropertySource(PropertySource.of("configured-again", ["configured.rate": "30ms"], 5000))
+        ((DefaultBeanContext) context).notifyConfigurationChange(ConfigurationChange.ofKeys(["configured.rate"] as Set))
+
+        then:
+        conditions.eventually { task.runs.get() > fixed + 2 }
+
+        when: "a refresh that leaves the rate as it is"
+        def before = task.runs.get()
+        ((DefaultBeanContext) context).notifyConfigurationChange(ConfigurationChange.ofKeys(["other.key"] as Set))
+
+        then: "keeps the timer running"
+        processor.scheduledMethods() == 1
+        conditions.eventually { task.runs.get() > before + 2 }
 
         cleanup:
         context.close()
