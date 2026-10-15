@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.client.internal.ElementsStages;
 import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Mono;
 

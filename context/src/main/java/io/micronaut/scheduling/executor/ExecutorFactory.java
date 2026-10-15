@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
@@ -111,6 +112,9 @@ public class ExecutorFactory implements GracefulShutdownCapable {
      * Create the ExecutorService with the given configuration, by calling {@link #executorService(ExecutorConfiguration)},
      * which a subclass that replaces this factory may override, with the thread factory of the configuration's name.
      *
+     * <p>Unless {@link ExecutorConfiguration#isPropagateContext()} is {@code false}, the executor runs submitted tasks
+     * with the {@link io.micronaut.core.propagation.PropagatedContext} of the submitting thread.</p>
+     *
      * @param executorConfiguration The configuration to create a thread pool that creates new threads as needed
      * @param namedThreadFactory The thread factory bean of the same name as the configuration, which
      * {@link #eventLoopGroupThreadFactory(ExecutorConfiguration)} creates unless the application replaced it; used when
@@ -126,7 +130,11 @@ public class ExecutorFactory implements GracefulShutdownCapable {
         ThreadFactory previous = PRODUCING_THREAD_FACTORY.get();
         PRODUCING_THREAD_FACTORY.set(configured);
         try {
-            return executorService(executorConfiguration);
+            ExecutorService executorService = executorService(executorConfiguration);
+            if (executorConfiguration.isPropagateContext()) {
+                return ContextPropagatingExecutorService.instrument(executorService);
+            }
+            return executorService;
         } finally {
             if (previous == null) {
                 PRODUCING_THREAD_FACTORY.remove();
