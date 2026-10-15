@@ -78,6 +78,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /** The interceptor being created for an intercepted bean at the moment, or null; see {@link InterceptionTarget}. */
     @Nullable
     InterceptorCreation interceptorCreation;
+    /** The singletons this context published after the shutdown callbacks it started in completed, or null. */
+    @Nullable
+    private List<BeanRegistration<?>> lateSingletons;
     /** The attribute a {@link ProxyInterceptors} waits under between {@link #prepareProxyTarget} and the creation of the target. */
     private static final String PROXY_INTERCEPTORS = "io.micronaut.proxyInterceptors";
 
@@ -689,6 +692,28 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         final List<BeanRegistration<?>> registrations = Collections.unmodifiableList(dependentBeans);
         dependentBeans = null;
         return registrations;
+    }
+
+    /**
+     * Remembers a singleton this context published after the shutdown callbacks it started in completed, so that a
+     * resolution rolled back for outliving them destroys it.
+     *
+     * @param registration The singleton registration
+     */
+    final void addLateSingleton(BeanRegistration<?> registration) {
+        if (lateSingletons == null) {
+            lateSingletons = new ArrayList<>(1);
+        }
+        lateSingletons.add(registration);
+    }
+
+    /**
+     * @return The singletons this context published after the shutdown callbacks completed, which it then forgets
+     */
+    final List<BeanRegistration<?>> takeLateSingletons() {
+        List<BeanRegistration<?>> taken = lateSingletons == null ? List.of() : lateSingletons;
+        lateSingletons = null;
+        return taken;
     }
 
     @Override

@@ -77,8 +77,10 @@ final class SingletonScope {
                 singletonsInCreationLocks.remove(identity, lock);
                 return existingRegistration;
             }
+            long shutdownPhase = beanContext.shutdownPhase();
             BeanRegistration<T> newRegistration = beanContext.createRegistration(resolutionContext, beanType, qualifier, definition, false);
             registerSingletonBean(newRegistration, qualifier);
+            beanContext.singletonPublished(resolutionContext, newRegistration, shutdownPhase);
             // The lock is only let go of once the registration is in the map. A creation that threw keeps it,
             // so that the threads blocked on it and the ones yet to arrive contend for the same object: were it
             // removed, a newcomer would get a fresh lock and create the singleton alongside a waiter on the old one.

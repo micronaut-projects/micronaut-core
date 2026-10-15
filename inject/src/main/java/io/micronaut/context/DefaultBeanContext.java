@@ -214,14 +214,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
     protected final AtomicBoolean terminating = new AtomicBoolean(false);
     /**
-     * Whether {@link #stop()} is still running its callbacks: the {@link ShutdownEvent} listeners and the destruction
-     * callbacks of the beans. Until the last of them returns, dependency groups may be created and resolved through,
-     * on any thread, and what they create is destroyed before the shutdown completes. Cleared, and read when recording
-     * a dependent, while holding {@link #shutdownDependents}.
+     * Advances when {@link #stop()} starts running its callbacks, the {@link ShutdownEvent} listeners and the
+     * destruction callbacks of the beans, and again when the last of them has returned, so it is odd while they run.
+     * Until then dependency groups may be created and resolved through, on any thread, and what they create is
+     * destroyed before the shutdown completes. Work compares the phase it started in with the one it completes in, so
+     * that work which outlived the callbacks is rolled back. Advanced, and read when recording, while holding
+     * {@link #shutdownDependents}.
      */
-    private volatile boolean shutdownCallbacksRunning;
+    private volatile long shutdownPhase;
     /** What dependency groups created during shutdown, destroyed before it completes. Guarded by itself. */
     private final List<ShutdownDependent> shutdownDependents = new ArrayList<>();
+    /**
+     * How many singletons were published while the shutdown callbacks run, so that one published after the last
+     * destruction pass took its snapshot is destroyed by another pass. Guarded by {@link #shutdownDependents}.
+     */
+    private long singletonsPublishedDuringShutdown;
 
     final BeanResolutionTraceMode traceMode;
     final Set<String> tracePatterns;
@@ -572,7 +579,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Stopping BeanContext");
             }
-            shutdownCallbacksRunning = true;
+            synchronized (shutdownDependents) {
+                shutdownPhase++;
+            }
             try {
                 publishEvent(new ShutdownEvent(this));
                 attributes.clear();
@@ -590,15 +599,20 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 // the context. Destroy those stragglers too, with a bound so a pathological hook that
                 // always creates a bean cannot spin forever
                 for (int pass = 0; ; pass++) {
+                    long publishedSingletons;
+                    synchronized (shutdownDependents) {
+                        publishedSingletons = singletonsPublishedDuringShutdown;
+                    }
                     List<BeanRegistration> stragglers = singletonScope.getBeanRegistrations()
                         .stream()
                         .filter(br -> !processed.contains(br.bean))
                         .toList();
                     synchronized (shutdownDependents) {
-                        // a dependent recorded by another thread after the check above is destroyed by the next pass,
-                        // one recorded after the callbacks ended is rejected
-                        if (stragglers.isEmpty() && shutdownDependents.isEmpty()) {
-                            shutdownCallbacksRunning = false;
+                        // a dependent recorded, or a singleton published, by another thread after the check above is
+                        // destroyed by the next pass; one completing after the callbacks ended is rolled back
+                        if (stragglers.isEmpty() && shutdownDependents.isEmpty()
+                            && publishedSingletons == singletonsPublishedDuringShutdown) {
+                            closeShutdownWindow();
                             break;
                         }
                         if (pass == MAX_SHUTDOWN_PASSES) {
@@ -607,7 +621,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                                     + "Giving up, {} bean(s) will not be destroyed.", MAX_SHUTDOWN_PASSES,
                                     stragglers.size() + shutdownDependents.size());
                             }
-                            shutdownCallbacksRunning = false;
+                            closeShutdownWindow();
                             shutdownDependents.clear();
                             break;
                         }
@@ -619,7 +633,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 }
             } finally {
                 synchronized (shutdownDependents) {
-                    shutdownCallbacksRunning = false;
+                    closeShutdownWindow();
                 }
             }
 
@@ -6015,15 +6029,27 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @Override
     public <T> CreatedBean<T> createBeanRegistration(BeanDefinition<T> definition) {
         ArgumentUtils.requireNonNull(ARGUMENT_DEFINITION, definition);
+        long phase = shutdownPhase;
         if (isDependencyResolutionClosed()) {
             throw new IllegalStateException("Cannot create a bean before the context is configured or after its shutdown has begun");
         }
-        BeanRegistration<T> registration = createFreshRegistration(null, definition);
+        // A context of its own collects the singletons the creation publishes after the shutdown callbacks completed
+        SingletonBeanResolutionContext resolution = new SingletonBeanResolutionContext(definition);
+        BeanRegistration<T> registration;
+        try {
+            registration = createFreshRegistration(resolution, definition);
+        } catch (RuntimeException | Error e) {
+            destroyLateSingletons(resolution.takeLateSingletons(), e);
+            throw e;
+        }
+        // the caller owns the fresh registration, not the context it was created in
+        resolution.getAndResetDependentBeans();
         List<BeanRegistration<?>> created = List.of(registration);
         try {
-            trackShutdownDependents(null, created);
+            trackShutdownDependents(phase, null, created);
         } catch (IllegalStateException e) {
             destroyCreatedBeans(created, e);
+            destroyLateSingletons(resolution.takeLateSingletons(), e);
             throw e;
         }
         return registration;
@@ -6059,23 +6085,116 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @return Whether the lookups are rejected
      */
     boolean isDependencyResolutionClosed() {
-        return !configured.get() || terminating.get() && !shutdownCallbacksRunning;
+        return !configured.get() || terminating.get() && !isShutdownWindowOpen(shutdownPhase);
+    }
+
+    /**
+     * @return The current shutdown phase, which work that may be recorded as a shutdown dependent captures as it starts
+     */
+    long shutdownPhase() {
+        return shutdownPhase;
+    }
+
+    private static boolean isShutdownWindowOpen(long phase) {
+        return (phase & 1) == 1;
+    }
+
+    /**
+     * Ends the shutdown callbacks: later work is rejected, and work that started before is rolled back as it
+     * completes. Called while holding {@link #shutdownDependents}.
+     */
+    private void closeShutdownWindow() {
+        if (isShutdownWindowOpen(shutdownPhase)) {
+            shutdownPhase++;
+        }
+    }
+
+    /**
+     * Whether work that started in the given phase completes in a shutdown window it may be recorded in: the one that
+     * was open as it started, or one that opened while it ran. Called while holding {@link #shutdownDependents}.
+     *
+     * @param startPhase The phase the work started in
+     * @return True to record it, false when no shutdown overlapped it
+     * @throws IllegalStateException if the shutdown callbacks have completed since the work started
+     */
+    private boolean isInShutdownWindow(long startPhase) {
+        long phase = shutdownPhase;
+        if (phase == startPhase && !isShutdownWindowOpen(phase)) {
+            return false;
+        }
+        if (!isShutdownWindowOpen(phase) || phase - startPhase > 1) {
+            throw new IllegalStateException("Cannot complete a dependency resolution that outlived the context shutdown callbacks");
+        }
+        return true;
+    }
+
+    /**
+     * Notes a singleton published into the scope. One published while the shutdown callbacks run is counted, so that
+     * the shutdown makes another destruction pass for it. One whose creation outlived the callbacks is remembered by
+     * the resolution that created it, which destroys it when that resolution is rolled back.
+     *
+     * @param resolutionContext The resolution context that created it, or null
+     * @param registration The registration
+     * @param startPhase The shutdown phase its creation started in
+     */
+    void singletonPublished(@Nullable BeanResolutionContext resolutionContext, BeanRegistration<?> registration, long startPhase) {
+        if (shutdownPhase == startPhase && !isShutdownWindowOpen(startPhase)) {
+            return;
+        }
+        synchronized (shutdownDependents) {
+            long phase = shutdownPhase;
+            if (phase == startPhase && !isShutdownWindowOpen(phase)) {
+                return;
+            }
+            if (isShutdownWindowOpen(phase) && phase - startPhase <= 1) {
+                singletonsPublishedDuringShutdown++;
+                return;
+            }
+        }
+        if (resolutionContext instanceof AbstractBeanResolutionContext abstractContext) {
+            abstractContext.addLateSingleton(registration);
+        }
+    }
+
+    /**
+     * Destroys the singletons a rolled back resolution published after the shutdown callbacks completed, unless the
+     * scope no longer holds them. A failure to destroy one is added to the failure of the resolution.
+     *
+     * @param singletons The singletons
+     * @param failure The failure of the resolution
+     */
+    @SuppressWarnings("java:S1181") // Destroy every late singleton before the original failure is rethrown.
+    void destroyLateSingletons(List<BeanRegistration<?>> singletons, Throwable failure) {
+        for (int i = singletons.size() - 1; i >= 0; i--) {
+            BeanRegistration<?> registration = singletons.get(i);
+            try {
+                if (singletonScope.findBeanRegistration(registration.beanDefinition) == registration) {
+                    destroyBean(registration);
+                }
+            } catch (RuntimeException | Error e) {
+                if (failure != e) {
+                    failure.addSuppressed(e);
+                }
+            }
+        }
     }
 
     /**
      * Records the registrations a lookup created during shutdown, so they are destroyed before it completes.
      *
      * @param owner The dependencies that own the registrations, or null when the caller of the context owns them
+     * @param startPhase The shutdown phase the lookup started in
      * @param created The registrations
-     * @throws IllegalStateException if the shutdown callbacks have ended, the caller then destroys the registrations
+     * @throws IllegalStateException if the shutdown callbacks have completed since the lookup started, the caller then
+     * destroys the registrations
      */
-    void trackShutdownDependents(@Nullable DefaultBeanDependencies owner, List<BeanRegistration<?>> created) {
-        if (created.isEmpty() || !terminating.get()) {
+    void trackShutdownDependents(long startPhase, @Nullable DefaultBeanDependencies owner, List<BeanRegistration<?>> created) {
+        if (shutdownPhase == startPhase && !isShutdownWindowOpen(startPhase)) {
             return;
         }
         synchronized (shutdownDependents) {
-            if (!shutdownCallbacksRunning) {
-                throw new IllegalStateException("Cannot resolve a dependency after the context shutdown callbacks have completed");
+            if (!isInShutdownWindow(startPhase)) {
+                return;
             }
             for (BeanRegistration<?> registration : created) {
                 shutdownDependents.add(new ShutdownDependent(owner, registration));

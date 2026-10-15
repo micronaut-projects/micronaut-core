@@ -36,7 +36,7 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     /** The owner of a child group, which forgets it once the group is closed. */
     private @Nullable DefaultBeanDependencies parent;
     /** The registration of a child group in its parent. */
-    private @Nullable BeanRegistration<?> registration;
+    private @Nullable BeanRegistration<?> registrationInParent;
     /** The bean the resolver was injected into, which the dependency graph records what it receives under; unset when not recorded. */
     private final AtomicReference<@Nullable Ownership> ownership = new AtomicReference<>();
 
@@ -57,7 +57,7 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
      */
     void ownedBy(DefaultBeanDependencies parent, BeanRegistration<?> registration) {
         this.parent = parent;
-        this.registration = registration;
+        this.registrationInParent = registration;
     }
 
     @Override
@@ -155,8 +155,8 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
         try {
             dependencies.close(context);
         } finally {
-            if (parent != null && registration != null) {
-                parent.remove(registration);
+            if (parent != null && registrationInParent != null) {
+                parent.remove(registrationInParent);
             }
         }
     }

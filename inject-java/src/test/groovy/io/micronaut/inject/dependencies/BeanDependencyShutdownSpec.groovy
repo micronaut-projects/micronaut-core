@@ -2,6 +2,9 @@ package io.micronaut.inject.dependencies
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.TimeUnit
+
 class BeanDependencyShutdownSpec extends AbstractTypeElementSpec {
     private static final String HEADER = '''
 package test;
@@ -337,6 +340,88 @@ class Holder { static BeanDependencyGroup group; }
         def e = thrown(java.util.concurrent.ExecutionException)
         e.cause instanceof IllegalStateException
         log.EVENTS.isEmpty()
+    }
+
+    void "a singleton a group lookup is still creating when the shutdown callbacks complete is destroyed"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+class Holder {
+    static BeanDependencyGroup group;
+    static final CountDownLatch ENTERED = new CountDownLatch(1);
+    static final CountDownLatch RESUME = new CountDownLatch(1);
+    static CompletableFuture<LateSingleton> work;
+}
+@Singleton class LateSingleton {
+    LateSingleton() throws InterruptedException {
+        Log.EVENTS.add("late created");
+        Holder.ENTERED.countDown();
+        Holder.RESUME.await(30, TimeUnit.SECONDS);
+    }
+    @PreDestroy void close() { Log.EVENTS.add("late destroyed"); }
+}
+@Singleton class Owner {
+    @PreDestroy void close() throws InterruptedException {
+        Holder.work = CompletableFuture.supplyAsync(() -> Holder.group.getBean(LateSingleton.class));
+        Holder.ENTERED.await(30, TimeUnit.SECONDS);
+    }
+}
+''')
+        def holder = ctx.classLoader.loadClass('test.Holder')
+        def log = ctx.classLoader.loadClass('test.Log')
+        holder.group = ctx.createDependencyGroup()
+        ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+
+        when:
+        ctx.close()
+        holder.RESUME.countDown()
+        holder.work.get(30, TimeUnit.SECONDS)
+
+        then: 'the lookup is rejected and the singleton it published after the shutdown is destroyed'
+        def e = thrown(ExecutionException)
+        e.cause instanceof IllegalStateException
+        log.EVENTS == ['late created', 'late destroyed']
+    }
+
+    void "a fresh registration still being created when the shutdown completes is destroyed"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+class Holder {
+    static final CountDownLatch ENTERED = new CountDownLatch(1);
+    static final CountDownLatch RESUME = new CountDownLatch(1);
+    static CompletableFuture<CreatedBean<Slow>> work;
+}
+@Prototype class Slow {
+    final Shared shared;
+    Slow(Shared shared) throws InterruptedException {
+        this.shared = shared;
+        Log.EVENTS.add("slow created");
+        Holder.ENTERED.countDown();
+        Holder.RESUME.await(30, TimeUnit.SECONDS);
+    }
+    @PreDestroy void close() { Log.EVENTS.add("slow destroyed"); }
+}
+@Singleton class Owner {
+    final BeanContext context;
+    Owner(BeanContext context) { this.context = context; }
+    @PreDestroy void close() throws InterruptedException {
+        Holder.work = CompletableFuture.supplyAsync(() -> context.createBeanRegistration(context.getBeanDefinition(Slow.class)));
+        Holder.ENTERED.await(30, TimeUnit.SECONDS);
+    }
+}
+''')
+        def holder = ctx.classLoader.loadClass('test.Holder')
+        def log = ctx.classLoader.loadClass('test.Log')
+        ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+
+        when:
+        ctx.close()
+        holder.RESUME.countDown()
+        holder.work.get(30, TimeUnit.SECONDS)
+
+        then: 'the singleton it resolved while the callbacks ran goes with the shutdown, the registration is rejected and destroyed'
+        def e = thrown(ExecutionException)
+        e.cause instanceof IllegalStateException
+        log.EVENTS == ['slow created', 'shared', 'slow destroyed']
     }
 
     void "a per-target interceptor first needed during shutdown is destroyed with its target"() {
