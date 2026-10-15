@@ -16,7 +16,10 @@
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.util.ArgumentUtils;
 import org.jspecify.annotations.Nullable;
+
+import java.util.Optional;
 
 /**
  * <p>Represents an executable reference. The reference could be implemented via reflection (slow) or via generated
@@ -41,6 +44,42 @@ public interface Executable<T, R> extends AnnotationMetadataProvider {
      * @return The arguments
      */
     Argument<?>[] getArguments();
+
+    /**
+     * Finds the index of the argument with the given name.
+     *
+     * @param name The argument name
+     * @return The index into {@link #getArguments()}, or {@code -1} if there is no such argument.
+     * If several arguments share the name, the first one's index is returned; for example the
+     * synthetic {@code continuation} argument of a Kotlin {@code suspend} method can share its name
+     * with a declared parameter.
+     * @throws NullPointerException if {@code name} is null
+     * @since 5.3.0
+     */
+    default int argumentIndexOf(String name) {
+        ArgumentUtils.requireNonNull("name", name);
+        Argument<?>[] arguments = getArguments();
+        for (int i = 0; i < arguments.length; i++) {
+            if (arguments[i].getName().equals(name)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Finds the argument with the given name.
+     *
+     * @param name The argument name
+     * @return The argument, or an empty {@link Optional} if there is no such argument
+     * @throws NullPointerException if {@code name} is null
+     * @see #argumentIndexOf(String)
+     * @since 5.3.0
+     */
+    default Optional<Argument<?>> getArgument(String name) {
+        int index = argumentIndexOf(name);
+        return index == -1 ? Optional.empty() : Optional.of(getArguments()[index]);
+    }
 
     /**
      * Invokes the method.
