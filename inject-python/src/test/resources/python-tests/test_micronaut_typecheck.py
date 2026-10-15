@@ -121,3 +121,83 @@ class Service:
         self.assertFalse(scope.switch([Decorator(False)]))
         self.assertFalse(scope.switch([Decorator("False")]))
         self.assertIsNone(scope.switch([]))
+NESTED = '''
+from micronaut.context.python.annotation import TypeChecked
+
+
+@TypeChecked(False)
+class Legacy:
+    def run(self) -> str:
+        return "x"
+
+    class Inner:
+        def m(self) -> str:
+            return "x"
+
+        @TypeChecked
+        class Checked:
+            def deep(self) -> str:
+                return "x"
+
+
+@TypeChecked
+class Opted:
+    class Inner:
+        def m(self) -> str:
+            return "x"
+'''
+
+
+class NestedClassScopeTest(unittest.TestCase):
+    """A nested class takes the switch of the class around it, and is named after it."""
+
+    def test_a_nested_class_inherits_the_switch_of_its_outer_class_under_mode_error(self):
+        severities = units(NESTED, MODE_ERROR)
+        self.assertIsNone(severities["Legacy.run"])
+        self.assertIsNone(severities["Legacy.Inner.m"])
+        self.assertEqual(MODE_ERROR, severities["Legacy.Inner.Checked.deep"])
+
+    def test_a_nested_class_inherits_an_opt_in_under_mode_off(self):
+        severities = units(NESTED, MODE_OFF)
+        self.assertEqual(MODE_ERROR, severities["Opted.Inner.m"])
+        self.assertIsNone(severities["Legacy.Inner.m"])
+
+
+ACCESSORS = '''
+class Account:
+    @property
+    def owner(self) -> str:
+        return self._owner
+
+    @owner.setter
+    def owner(self, value: str):
+        self._owner = value
+'''
+
+
+class FunctionNodeTest(unittest.TestCase):
+    def test_a_name_defined_twice_maps_to_the_definition_on_the_recorded_line(self):
+        from micronaut_typecheck import _function_node
+        tree = ast.parse(ACCESSORS)
+        class_node = tree.body[0]
+
+        class Span:
+            def __init__(self, line):
+                self._line = line
+
+            def line(self):
+                return self._line
+
+        class Def:
+            def __init__(self, line):
+                self._span = Span(line)
+
+            def span(self):
+                return self._span
+
+        getter, setter = class_node.body
+        self.assertIs(getter, _function_node(class_node, "owner", Def(getter.lineno)))
+        self.assertIs(setter, _function_node(class_node, "owner", Def(setter.lineno)))
+        self.assertIs(getter, _function_node(class_node, "owner"))
+
+

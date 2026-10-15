@@ -21,6 +21,7 @@ import org.graalvm.polyglot.Source;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /**
  * The type checking requested for a compilation.
@@ -61,8 +62,10 @@ public record TypeCheckConfiguration(TypeCheckMode mode, List<String> annotation
 
     /**
      * Whether the checker has anything to do for the given sources: the mode checks by default, or
-     * a source mentions one of the switch decorators, which can switch checking on under
-     * {@link TypeCheckMode#OFF}. A compilation that checks nothing does not pay for the checker.
+     * a source names one of the switch decorators outside a comment, which can switch checking on under
+     * {@link TypeCheckMode#OFF}. A compilation that checks nothing does not pay for the checker. The test is
+     * conservative: a switch imported under another name ({@code TypeChecked as Checked}) is still named by
+     * its import, and a module re-exporting it is a source of the compilation too.
      *
      * @param sources The sources of the compilation
      * @return Whether the checker runs
@@ -71,11 +74,16 @@ public record TypeCheckConfiguration(TypeCheckMode mode, List<String> annotation
         if (mode != TypeCheckMode.OFF) {
             return true;
         }
+        List<Pattern> patterns = annotationNames.stream()
+            .map(name -> name.substring(name.lastIndexOf('.') + 1))
+            .distinct()
+            // the simple name as a whole word, on a line before any comment
+            .map(simpleName -> Pattern.compile("(?m)^[^#\\n]*\\b" + Pattern.quote(simpleName) + "\\b"))
+            .toList();
         for (Source source : sources) {
             CharSequence text = source.getCharacters();
-            for (String name : annotationNames) {
-                String simpleName = name.substring(name.lastIndexOf('.') + 1);
-                if (text.toString().contains(simpleName)) {
+            for (Pattern pattern : patterns) {
+                if (pattern.matcher(text).find()) {
                     return true;
                 }
             }

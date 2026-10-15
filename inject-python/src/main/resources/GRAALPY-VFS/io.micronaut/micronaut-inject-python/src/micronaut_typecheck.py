@@ -14,6 +14,7 @@ declaration wins, a function over its class over its module over the mode; ``@Ty
 under mode ``off`` checks that scope at ``error`` severity, ``@TypeChecked(False)`` leaves it
 unchecked.
 """
+import ast
 import java
 
 PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
@@ -142,15 +143,29 @@ class TypeChecker:
             for function_def, node in module.functions:
                 severity = self.scope.severity(function_def.decorators(), module_severity)
                 units.append(CheckUnit(module.source_path, function_def.name(), function_def, node, None, severity))
+            # a nested class takes the switch of the class around it, the nearest declaration winning
+            enclosing = _enclosing_classes([node for _, node in module.classes if node is not None])
+            by_node = {id(node): class_def for class_def, node in module.classes if node is not None}
+            class_scopes = {}
+
+            def class_scope(class_def, node):
+                key = id(node) if node is not None else id(class_def)
+                if key not in class_scopes:
+                    outer_node = enclosing.get(id(node)) if node is not None else None
+                    outer_severity = class_scope(by_node[id(outer_node)], outer_node)[0] if outer_node is not None and id(outer_node) in by_node else module_severity
+                    # a nested class is modelled by its binary name (Outer$Inner): its source name is Outer.Inner
+                    class_scopes[key] = (self.scope.severity(class_def.decorators(), outer_severity), class_def.name().replace("$", "."))
+                return class_scopes[key]
+
             for class_def, node in module.classes:
-                class_severity = self.scope.severity(class_def.decorators(), module_severity)
+                class_severity, class_name = class_scope(class_def, node)
                 members = list(class_def.functions())
                 if class_def.constructor() is not None:
                     members.append(class_def.constructor())
                 for function_def in members:
                     severity = self.scope.severity(function_def.decorators(), class_severity)
-                    qualified_name = f"{class_def.name()}.{function_def.name()}"
-                    units.append(CheckUnit(module.source_path, qualified_name, function_def, _function_node(node, function_def.name()), class_def, severity))
+                    qualified_name = f"{class_name}.{function_def.name()}"
+                    units.append(CheckUnit(module.source_path, qualified_name, function_def, _function_node(node, function_def.name(), function_def), class_def, severity))
         return units
 
     def check(self, visitor_context):
@@ -171,11 +186,42 @@ class TypeChecker:
         self.diagnostics.append(factory(rule, message, span))
 
 
-def _function_node(class_node, name):
-    """The AST node of the method of the given name in a class body, or None."""
+def _function_node(class_node, name, function_def=None):
+    """
+    The AST node of the method of the given name in a class body, or None. A name defined more than once (a
+    property and its setter, @overload stubs and their implementation) is told apart by the line of the
+    definition the model recorded; without one, the first definition is taken, as before.
+    """
     if class_node is None:
         return None
-    for statement in getattr(class_node, "body", ()):
-        if getattr(statement, "name", None) == name and hasattr(statement, "args"):
-            return statement
-    return None
+    candidates = [statement for statement in getattr(class_node, "body", ())
+                  if getattr(statement, "name", None) == name and hasattr(statement, "args")]
+    if not candidates:
+        return None
+    span = function_def.span() if function_def is not None and hasattr(function_def, "span") else None
+    if span is not None:
+        for statement in candidates:
+            if statement.lineno == span.line():
+                return statement
+    return candidates[0]
+
+
+def _enclosing_classes(class_nodes):
+    """id(class node) -> the class node directly around it, for the classes nested in another class."""
+    enclosing = {}
+
+    def visit(node, outer):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.ClassDef):
+                if outer is not None:
+                    enclosing[id(child)] = outer
+                visit(child, child)
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+                # a class defined in a method is local to it, not a member of the class
+                visit(child, None)
+            else:
+                visit(child, outer)
+
+    for node in class_nodes:
+        visit(node, node)
+    return enclosing
