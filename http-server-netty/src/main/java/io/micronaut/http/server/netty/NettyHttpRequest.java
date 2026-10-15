@@ -46,6 +46,7 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.DirectByteBodyAccess;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
+import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
@@ -772,7 +773,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public Optional<io.netty.handler.codec.http.HttpRequest> toHttpRequestDirect() {
-        return Optional.of(new DelegateStreamedHttpRequest(nettyRequest, NettyByteBodyFactory.toByteBufs(byteBody()).map(DefaultHttpContent::new)));
+        return Optional.of(new DelegateStreamedHttpRequest(nettyRequest, BodyPublishers.map(NettyByteBodyFactory.toByteBufs(byteBody()), DefaultHttpContent::new)));
     }
 
     @Override
