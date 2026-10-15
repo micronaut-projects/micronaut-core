@@ -226,6 +226,9 @@ class TypeChecker:
         The type of the values an unhinted method returns, when every return statement of its body
         has the one type the checker infers; None when they disagree or one is unknown.
         """
+        if isinstance(function_node, ast.AsyncFunctionDef) or _yields(function_node):
+            # a call returns a coroutine or a generator, not what the return statements give
+            return None
         rules = self.rules_of(model, function_def, function_node)
         if rules is None:
             return None
@@ -779,7 +782,18 @@ def _own_statements(function_node):
             stack.extend(reversed(getattr(statement, field, []) or []))
         for handler in getattr(statement, "handlers", []) or []:
             stack.extend(reversed(handler.body))
+        for case in getattr(statement, "cases", []) or []:
+            stack.extend(reversed(case.body))
     return own
+
+
+def _yields(function_node):
+    """Whether the function is a generator: its own body yields."""
+    for statement in _own_statements(function_node):
+        for child in ast.walk(statement):
+            if isinstance(child, (ast.Yield, ast.YieldFrom)):
+                return True
+    return False
 
 
 def _bound_names(target):
@@ -832,12 +846,17 @@ class JavaReceiverRules:
     checker cannot type is unknown and never reported.
     """
 
-    def __init__(self, checker, unit):
+    def __init__(self, checker, unit, silent=False):
         self.checker = checker
         self.unit = unit
         self.facts = checker.facts
         self.bindings = Bindings(checker, unit)
         self.span_of = unit.module.span_of
+        # a silent run records what it infers instead of reporting: the type of every expression, which
+        # the inference of an unhinted return or of an attribute reads, and the problems found
+        self.silent = silent
+        self.problems = []
+        self.node_types = {}
 
     def check(self):
         for statement in getattr(self.unit.node, "body", ()):
@@ -859,6 +878,19 @@ class JavaReceiverRules:
             return
         if isinstance(node, ast.While):
             self._loop_body(node.body, node.orelse, node.test)
+            return
+        if isinstance(node, ast.Match):
+            self.expression(node.subject)
+            for case in node.cases:
+                for child in ast.walk(case.pattern):
+                    # the names a pattern captures (case [first, *rest], case {"k": value}, case Point(x=x) as p)
+                    for name in (getattr(child, "name", None), getattr(child, "rest", None)):
+                        if name:
+                            self.bindings.forget(name)
+                if case.guard is not None:
+                    self.expression(case.guard)
+                for child in case.body:
+                    self.statement(child)
             return
         if isinstance(node, (ast.With, ast.AsyncWith)):
             for item in node.items:
@@ -943,6 +975,12 @@ class JavaReceiverRules:
 
     def expression(self, node):
         """Check an expression and return its type, or None when unknown."""
+        typed = self._expression(node)
+        if node is not None:
+            self.node_types[id(node)] = typed
+        return typed
+
+    def _expression(self, node):
         if node is None:
             return None
         if isinstance(node, ast.Constant):
@@ -1246,6 +1284,9 @@ class JavaReceiverRules:
         return ", ".join("?" if argument is None else argument.label() for argument in argument_types)
 
     def _report(self, rule, message, node, suggestions=()):
+        if self.silent:
+            self.problems.append((rule, message, self.span_of(node)))
+            return
         self.checker.report(self.unit, rule, message, self.span_of(node), suggestions)
 
 
@@ -1559,20 +1600,17 @@ class PythonClassModel:
             return None
         function_def, node = self.constructor
         hints = {argument.name(): argument.typeAnnotation() for argument in function_def.arguments().arguments()}
-        assigned = [statement for statement in node.body
-                    if isinstance(statement, ast.Assign) and len(statement.targets) == 1
-                    and isinstance(statement.targets[0], ast.Attribute) and isinstance(statement.targets[0].value, ast.Name)
-                    and statement.targets[0].value.id == "self" and statement.targets[0].attr == name]
-        if not assigned:
+        values = _receiver_assignments(node, name)
+        if not values:
             return None
         found = None
-        for statement in assigned:
-            if isinstance(statement.value, ast.Name):
-                hint = hints.get(statement.value.id)
+        for value in values:
+            if isinstance(value, ast.Name):
+                hint = hints.get(value.id)
                 typed = bindings.of_hint(hint) if hint is not None else None
-            elif isinstance(statement.value, ast.Call):
+            elif isinstance(value, ast.Call):
                 rules = self.classes.checker.rules_of(self, function_def, node)
-                typed = rules.node_types.get(id(statement.value)) if rules is not None else None
+                typed = rules.node_types.get(id(value)) if rules is not None else None
                 if typed is not None and typed.kind != JAVA:
                     typed = None
             else:
@@ -1596,6 +1634,41 @@ class PythonClassModel:
                             if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == receiver and target.attr == name:
                                 return True
         return False
+
+
+def _receiver_assignments(function_node, name):
+    """
+    The values a method assigns to <receiver>.<name>, the receiver being its first parameter, in nested
+    blocks too; a None in the list for an assignment the checker does not follow (an unpacking, an augmented
+    assignment, a loop target), which makes the type unknown.
+    """
+    if not function_node.args.args:
+        return []
+    receiver = function_node.args.args[0].arg
+
+    def names_it(target):
+        return isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == receiver and target.attr == name
+
+    def mentions(target):
+        return any(names_it(element) for element in ast.walk(target))
+
+    values = []
+    for statement in _own_statements(function_node):
+        if isinstance(statement, ast.Assign):
+            for target in statement.targets:
+                if names_it(target):
+                    values.append(statement.value)
+                elif mentions(target):
+                    values.append(None)
+        elif isinstance(statement, ast.AnnAssign) and names_it(statement.target):
+            values.append(statement.value)
+        elif isinstance(statement, ast.AugAssign) and mentions(statement.target):
+            values.append(None)
+        elif isinstance(statement, (ast.For, ast.AsyncFor)) and mentions(statement.target):
+            values.append(None)
+        elif isinstance(statement, (ast.With, ast.AsyncWith)) and any(item.optional_vars is not None and mentions(item.optional_vars) for item in statement.items):
+            values.append(None)
+    return values
 
 
 # the constructor of a class whose arguments the checker cannot follow
