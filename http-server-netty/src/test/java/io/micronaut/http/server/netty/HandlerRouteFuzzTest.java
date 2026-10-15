@@ -118,7 +118,35 @@ class HandlerRouteFuzzTest {
 
     @BeforeAll
     static void start() {
-        context = ApplicationContext.run(Map.of("spec.name", SPEC, "micronaut.server.port", -1));
+        Map<String, Object> properties = new HashMap<>(Map.of("spec.name", SPEC, "micronaut.server.port", -1));
+        String profile = setting("fuzz.profile", "FUZZ_PROFILE", "default");
+        switch (profile) {
+            case "default" -> { }
+            // one event loop thread: every handler, filter and continuation interleaves on it
+            case "oneloop" -> properties.put("micronaut.netty.event-loops.default.num-threads", 1);
+            case "io" -> properties.put("micronaut.server.thread-selection", "IO");
+            case "auto" -> properties.put("micronaut.server.thread-selection", "AUTO");
+            // HTTP/2 cleartext, the HTTP/1.1 requests of the fuzzer pass through the upgrade handler
+            case "h2" -> {
+                properties.put("micronaut.server.http-version", "2.0");
+                properties.put("micronaut.server.ssl.enabled", false);
+            }
+            case "compress" -> properties.put("micronaut.server.netty.compression-threshold", 0);
+            case "disk" -> properties.put("micronaut.server.multipart.disk", true);
+            case "mixed" -> properties.put("micronaut.server.multipart.mixed", true);
+            case "tinychunks" -> {
+                properties.put("micronaut.server.netty.max-chunk-size", 64);
+                properties.put("micronaut.server.responses.stream.high-water-mark", "1KB");
+            }
+            case "gzipandtiny" -> {
+                properties.put("micronaut.server.netty.compression-threshold", 0);
+                properties.put("micronaut.server.netty.max-chunk-size", 128);
+                properties.put("micronaut.netty.event-loops.default.num-threads", 2);
+            }
+            default -> throw new IllegalArgumentException("unknown profile " + profile);
+        }
+        System.out.println("HandlerRouteFuzzTest profile=" + profile);
+        context = ApplicationContext.run(properties);
         server = context.getBean(EmbeddedServer.class).start();
         json = context.getBean(JsonMapper.class);
         wsClient = HttpClient.newHttpClient();
