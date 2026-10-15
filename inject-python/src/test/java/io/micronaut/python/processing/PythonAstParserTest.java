@@ -158,9 +158,14 @@ public class PythonAstParserTest {
                 def make(ctx: str = Inject()) -> str:
                     return "x"
             """;
-        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> new PythonAstParser().parse(source).close());
+        PythonAstParser parser = new PythonAstParser();
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> parseAndClose(parser, source));
         assertTrue(error.getMessage().contains("[python:injected-parameter]"), error.getMessage());
         assertTrue(error.getMessage().contains("-->"), error.getMessage());
+    }
+
+    private static void parseAndClose(PythonAstParser parser, String source) {
+        parser.parse(source).close();
     }
 
     @Test
