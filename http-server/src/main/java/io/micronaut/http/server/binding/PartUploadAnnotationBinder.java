@@ -29,6 +29,7 @@ import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.form.FormCapableHttpRequest;
+import io.micronaut.http.form.FormFieldException;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.multipart.RawFormField;
@@ -176,7 +177,8 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
      * A collection, an array or an {@link Iterable} gets every field of the name, in order,
      * like the fields of a form read whole. A field is converted to its text, unless the element
      * type is a completed part that the field is, e.g. a {@link CompletedFileUpload} of a
-     * {@code CompletedFileUpload[]}: then the element is the part itself.
+     * {@code CompletedFileUpload[]}: then the element is the part itself, and a text field of the
+     * name fails the binding.
      */
     private static <T> CompletableFuture<@Nullable Optional<T>> collectAll(ConversionService conversionService,
                                                                          ArgumentConversionContext<T> context,
@@ -188,15 +190,29 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
         Class<?> elementType = elementType(context.getArgument());
         @Nullable Class<?> partType = elementType != null && CompletedPart.class.isAssignableFrom(elementType) ? elementType : null;
         List<Object> values = new ArrayList<>();
-        // the parts that are elements of the value: released if the value is not bound
+        // the parts that are elements of the value: released here if the value is not bound;
+        // once bound, they belong to the value, and are released with the request if the route
+        // does not run, like a single CompletedFileUpload argument
         List<CompletedPart> held = new ArrayList<>();
+        // set under the lock of held once the held parts were released: a part completed
+        // afterwards is released at once
+        boolean[] released = {false};
         FormFieldFlows.Concat<RawFormField, Object> reading = new FormFieldFlows.Concat<>(
             field -> formFactory.completePart(formRequest, field).map(part -> {
                 if (partType != null && partType.isInstance(part)) {
                     synchronized (held) {
-                        held.add(part);
+                        if (!released[0]) {
+                            held.add(part);
+                            return part;
+                        }
                     }
+                    part.closeAsync(formFactory.getDiskWriteExecutor());
                     return part;
+                }
+                if (partType != null && CompletedFileUpload.class.isAssignableFrom(partType)) {
+                    // a text field where a file was expected, answered like a CompletedFileUpload
+                    part.closeAsync(formFactory.getDiskWriteExecutor());
+                    throw FormFieldException.notAFile(inputName);
                 }
                 try {
                     return conversionService.convert(part, String.class).orElse("");
@@ -221,11 +237,14 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
                 reading.cancel();
             }
             if (error != null || value == null || value.isEmpty()) {
+                List<CompletedPart> toRelease;
                 synchronized (held) {
-                    for (CompletedPart part : held) {
-                        part.closeAsync(formFactory.getDiskWriteExecutor());
-                    }
+                    released[0] = true;
+                    toRelease = new ArrayList<>(held);
                     held.clear();
+                }
+                for (CompletedPart part : toRelease) {
+                    part.closeAsync(formFactory.getDiskWriteExecutor());
                 }
             }
         });

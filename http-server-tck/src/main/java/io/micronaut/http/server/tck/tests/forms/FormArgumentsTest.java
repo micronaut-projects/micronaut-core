@@ -333,13 +333,32 @@ public class FormArgumentsTest {
                 .addPart("name", "Fred")
                 .addPart("files", "b.txt", MediaType.TEXT_PLAIN_TYPE, bytes("bbb"))
                 .build();
-            for (String uri : List.of(LEGACY + "/files-array", LEGACY + "/files-list")) {
+            for (String uri : List.of(LEGACY + "/files-array", LEGACY + "/files-list", LEGACY + "/files-optional")) {
                 Response response = call(server, multipart(uri, one));
                 assertEquals(HttpStatus.OK, response.status(), response.body());
                 assertEquals("[only.txt=data]", response.body(), uri);
                 response = call(server, multipart(uri, two));
                 assertEquals(HttpStatus.OK, response.status(), response.body());
                 assertEquals("[a.txt=aa, b.txt=bbb]", response.body(), uri);
+            }
+            // no file of the name
+            Response absent = call(server, multipart(LEGACY + "/files-optional", MultipartBody.builder().addPart("name", "Fred").build()));
+            assertEquals(HttpStatus.OK, absent.status(), absent.body());
+            assertEquals("empty", absent.body());
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void aCollectionOfCompletedFileUploadsWithATextFieldOfTheNameIsNotBound() throws IOException {
+        try (ServerUnderTest server = server()) {
+            MultipartBody mixed = MultipartBody.builder()
+                .addPart("files", "a.txt", MediaType.TEXT_PLAIN_TYPE, bytes("aa"))
+                .addPart("files", "not a file")
+                .build();
+            for (String uri : List.of(LEGACY + "/files-array", LEGACY + "/files-list")) {
+                Response response = call(server, multipart(uri, mixed));
+                assertEquals(HttpStatus.BAD_REQUEST, response.status(), uri + " " + response.body());
             }
         }
     }
@@ -1005,6 +1024,11 @@ public class FormArgumentsTest {
         @Post(uri = "/files-list", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
         String filesList(@Part("files") List<CompletedFileUpload> files) throws IOException {
             return describe(files);
+        }
+
+        @Post(uri = "/files-optional", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+        String filesOptional(@Part("files") Optional<List<CompletedFileUpload>> files) throws IOException {
+            return files.isPresent() ? describe(files.get()) : "empty";
         }
 
         private static String describe(List<CompletedFileUpload> files) throws IOException {
