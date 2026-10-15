@@ -54,7 +54,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
@@ -98,10 +97,10 @@ class BlockedRouteThreadStreamingTest {
 
     @ParameterizedTest(name = "{0} {1}")
     @MethodSource("streams")
-    void theFirstEventIsWrittenWhileTheRouteThreadIsBlocked(String method, String path) throws IOException {
+    void theFirstEventIsWrittenWhileTheRouteThreadIsBlocked(String method, String path) throws IOException, InterruptedException {
         Routes routes = ctx.getBean(Routes.class);
-        CountDownLatch release = new CountDownLatch(1);
-        routes.release.set(release);
+        Block block = new Block();
+        routes.block.set(block);
         try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.getPort())) {
             socket.setSoTimeout(READ_TIMEOUT_MILLIS);
             send(socket, method, path);
@@ -112,21 +111,21 @@ class BlockedRouteThreadStreamingTest {
             String head = received.toString(StandardCharsets.ISO_8859_1);
             assertTrue(head.startsWith("HTTP/1.1 200"), head);
             assertTrue(head.toLowerCase().contains("content-type: text/event-stream"), head);
-            assertTrue(routes.blocked.get(), "The route thread should still be blocked");
+            assertStillBlocked(block);
 
-            release.countDown();
+            block.release.countDown();
             readUntil(in, received, "data: second");
         } finally {
-            release.countDown();
+            block.release.countDown();
         }
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"none", "request-filter", "reactive-filter"})
-    void aSingleBodyIsWrittenWhileTheRouteThreadIsBlocked(String filter) throws IOException {
+    void aSingleBodyIsWrittenWhileTheRouteThreadIsBlocked(String filter) throws IOException, InterruptedException {
         Routes routes = ctx.getBean(Routes.class);
-        CountDownLatch release = new CountDownLatch(1);
-        routes.release.set(release);
+        Block block = new Block();
+        routes.block.set(block);
         try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), server.getPort())) {
             socket.setSoTimeout(READ_TIMEOUT_MILLIS);
             send(socket, "GET", "/blocked-thread/" + filter + "/single");
@@ -136,10 +135,21 @@ class BlockedRouteThreadStreamingTest {
             readUntil(in, received, "\r\n\r\nthe body");
             String response = received.toString(StandardCharsets.ISO_8859_1);
             assertTrue(response.startsWith("HTTP/1.1 200"), response);
-            assertTrue(routes.blocked.get(), "The route thread should still be blocked");
+            assertStillBlocked(block);
         } finally {
-            release.countDown();
+            block.release.countDown();
         }
+    }
+
+    /**
+     * The route emits before it starts to block, so what it emitted can be read first. Wait for the blocking to start,
+     * then check the route thread has not been released: what was read was written while the thread was kept.
+     *
+     * @param block The state of the request
+     */
+    private static void assertStillBlocked(Block block) throws InterruptedException {
+        assertTrue(block.started.await(ROUTE_WAIT_SECONDS, TimeUnit.SECONDS), "The route thread never started to block");
+        assertTrue(block.blocked, "The route thread should still be blocked");
     }
 
     private static void send(Socket socket, String method, String path) throws IOException {
@@ -166,11 +176,19 @@ class BlockedRouteThreadStreamingTest {
         }
     }
 
+    /**
+     * What one request blocks on, so that a route thread of an earlier case cannot change what a later case reads.
+     */
+    static final class Block {
+        final CountDownLatch release = new CountDownLatch(1);
+        final CountDownLatch started = new CountDownLatch(1);
+        volatile boolean blocked;
+    }
+
     @Controller("/blocked-thread")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class Routes {
-        final AtomicReference<CountDownLatch> release = new AtomicReference<>(new CountDownLatch(0));
-        final AtomicBoolean blocked = new AtomicBoolean();
+        final AtomicReference<Block> block = new AtomicReference<>(released());
 
         @ExecuteOn(TaskExecutors.BLOCKING)
         @Get(uris = {"/none/stream", "/request-filter/stream", "/reactive-filter/stream"}, produces = MediaType.TEXT_EVENT_STREAM)
@@ -194,20 +212,20 @@ class BlockedRouteThreadStreamingTest {
         @ExecuteOn(TaskExecutors.BLOCKING)
         @Get(uris = {"/none/single", "/request-filter/single", "/reactive-filter/single"}, produces = MediaType.TEXT_PLAIN)
         HttpResponse<Mono<String>> single() {
-            CountDownLatch latch = release.get();
+            Block current = block.get();
             return HttpResponse.ok(Mono.create(sink -> {
                 sink.success("the body");
-                block(latch);
+                block(current);
             }));
         }
 
         private Mono<HttpResponse<Publisher<Event<String>>>> emitFirstEventThenBlock() {
-            CountDownLatch latch = release.get();
+            Block current = block.get();
             return Mono.create(sink -> {
                 Sinks.Many<Event<String>> events = Sinks.many().unicast().onBackpressureBuffer();
                 sink.success(HttpResponse.ok(events.asFlux()));
                 events.emitNext(Event.of("first"), Sinks.EmitFailureHandler.FAIL_FAST);
-                boolean released = block(latch);
+                boolean released = block(current);
                 events.emitNext(Event.of(released ? "second" : "not released"), Sinks.EmitFailureHandler.FAIL_FAST);
                 events.emitComplete(Sinks.EmitFailureHandler.FAIL_FAST);
             });
@@ -216,19 +234,26 @@ class BlockedRouteThreadStreamingTest {
         /**
          * Keep the thread until the test has read what was emitted before.
          *
-         * @param latch The latch the test releases
+         * @param current The state of the request, whose latch the test releases
          * @return Whether the test released the latch
          */
-        private boolean block(CountDownLatch latch) {
-            blocked.set(true);
+        private boolean block(Block current) {
+            current.blocked = true;
+            current.started.countDown();
             try {
-                return latch.await(ROUTE_WAIT_SECONDS, TimeUnit.SECONDS);
+                return current.release.await(ROUTE_WAIT_SECONDS, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return false;
             } finally {
-                blocked.set(false);
+                current.blocked = false;
             }
+        }
+
+        private static Block released() {
+            Block released = new Block();
+            released.release.countDown();
+            return released;
         }
     }
 
