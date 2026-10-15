@@ -43,11 +43,14 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.http.annotation.Part;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.web.router.builder.HttpRoutes;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -239,7 +242,17 @@ final class FuzzApp {
 
     @Controller("/r")
     @Requires(property = "spec.name", value = SPEC)
-    static class ResponseController {
+    static class ResponseController implements AutoCloseable {
+        // A scheduler of the fuzz app, rather than the global parallel one of Reactor, so that its threads are not
+        // started, and kept, under the leak detection scope of this test class, which would fail the later TCK tests
+        // whose Reactor timers then allocate buffers on those threads.
+        private final Scheduler timer = Schedulers.newParallel("fuzz-timer", 2, true);
+
+        @Override
+        @PreDestroy
+        public void close() {
+            timer.dispose();
+        }
 
         @Get("/plain")
         @Produces(MediaType.TEXT_PLAIN)
@@ -336,14 +349,14 @@ final class FuzzApp {
         @Produces(MediaType.APPLICATION_JSON_STREAM)
         Flux<Item> infinite() {
             STARTED.incrementAndGet();
-            return Flux.interval(Duration.ofMillis(5)).onBackpressureDrop().map(i -> new Item("x".repeat(100) + i)).doOnCancel(CANCELLED::incrementAndGet);
+            return Flux.interval(Duration.ofMillis(5), timer).onBackpressureDrop().map(i -> new Item("x".repeat(100) + i)).doOnCancel(CANCELLED::incrementAndGet);
         }
 
         @Get("/infinite-sse")
         @Produces(MediaType.TEXT_EVENT_STREAM)
         Flux<Event<String>> infiniteSse() {
             STARTED.incrementAndGet();
-            return Flux.interval(Duration.ofMillis(5)).onBackpressureDrop().map(i -> Event.of("x" + i)).doOnCancel(CANCELLED::incrementAndGet);
+            return Flux.interval(Duration.ofMillis(5), timer).onBackpressureDrop().map(i -> Event.of("x" + i)).doOnCancel(CANCELLED::incrementAndGet);
         }
 
         @Get("/counters")
@@ -355,7 +368,7 @@ final class FuzzApp {
         @Get("/slow")
         @Produces(MediaType.APPLICATION_JSON_STREAM)
         Flux<Item> slow(@QueryValue int n) {
-            return Flux.range(0, n).delayElements(Duration.ofMillis(20)).map(i -> new Item("s" + i));
+            return Flux.range(0, n).delayElements(Duration.ofMillis(20), timer).map(i -> new Item("s" + i));
         }
     }
 
