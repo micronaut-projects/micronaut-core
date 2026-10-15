@@ -69,9 +69,7 @@ class KotlinGreeter : Greeter {
                 KotlinCompiler.kotlinSource('Kotlin.kt', KOTLIN)
         ], { ClassElement ce ->
             if (ce.name == className) {
-                ce.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance()).findAll { it.name in ['greet', 'describe'] }.each { MethodElement m ->
-                    nullability[m.name] = m.parameters.collect { p -> p.name + ':' + state(p) } + ['return:' + state(m)]
-                }
+                nullability.putAll(methodNullability(ce))
             }
         }, [])
 
@@ -115,5 +113,15 @@ class KotlinGreeter : Greeter {
         classpath << pair.component1().component2().outputDirectory.toURI().toURL()
         classpath.addAll(pair.component1().component1().classpaths.collect { it.toURI().toURL() })
         return new URLClassLoader(classpath as URL[], KotlinCompiler.classLoader)
+    }
+
+    private static Map<String, List<String>> methodNullability(ClassElement ce) {
+        return ce.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance())
+                .findAll { it.name in ['greet', 'describe'] }
+                .collectEntries { MethodElement m -> [m.name, parameterNullability(m) + ['return:' + state(m)]] }
+    }
+
+    private static List<String> parameterNullability(MethodElement m) {
+        return m.parameters.collect { p -> p.name + ':' + state(p) }
     }
 }
