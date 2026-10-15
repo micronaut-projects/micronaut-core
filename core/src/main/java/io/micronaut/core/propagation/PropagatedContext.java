@@ -16,9 +16,12 @@
 package io.micronaut.core.propagation;
 
 import io.micronaut.core.annotation.Experimental;
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -131,6 +134,30 @@ public interface PropagatedContext {
     }
 
     /**
+     * Whether the current propagation mode supports {@link Scope open/close scopes}, i.e. bringing a context into
+     * scope with one call and taking it out of scope with a later, separate call.
+     *
+     * <p>Scopes are only supported by thread-local propagation (the default, {@code micronaut.propagation=thread-local}).
+     * With scoped-value propagation ({@code micronaut.propagation=scoped-value}) the context is bound with a
+     * {@link ScopedValue}, and a scoped value binding only exists for the dynamic extent of a single
+     * {@link ScopedValue.Carrier#run(Runnable)} or {@link ScopedValue.Carrier#call(ScopedValue.CallableOp)} invocation:
+     * it is tied to that stack frame and there is no way to bind it in one method and unbind it in another.
+     * In that mode only the callback forms such as {@link #propagate(Supplier)}, {@link #propagate(Runnable)} and
+     * {@link #propagateCall(Callable)} can be used.</p>
+     *
+     * <p>Integrations that cannot use a callback, because the context must stay in scope across separate calls into
+     * user code (for example an {@link java.util.Iterator} that brings the context of an element into scope in
+     * {@code next()} and takes it out of scope on the following {@code next()} or {@code close()}), can use this
+     * method or {@link #propagateIfSupported()} to degrade gracefully instead of failing.</p>
+     *
+     * @return true if {@link #propagateIfSupported()} returns a scope
+     * @since 5.3.0
+     */
+    static boolean supportsScopes() {
+        return PropagatedContextConfiguration.get() == PropagatedContextConfiguration.Mode.THREAD_LOCAL;
+    }
+
+    /**
      * Is this propagated context bound? If yes the propagation is not needed.
      * @return true if bound
      * @since 5.0
@@ -186,6 +213,34 @@ public interface PropagatedContext {
     <T extends PropagatedContextElement> Optional<T> find(Class<T> elementType);
 
     /**
+     * Finds the last added element of the given type, like {@link #find(Class)}, but without
+     * wrapping it in an {@link Optional}.
+     *
+     * @param elementType The element type
+     * @param <T> The element's type
+     * @return the element or {@code null} if there is none
+     * @since 5.3
+     */
+    default <T extends PropagatedContextElement> @Nullable T findOrNull(Class<T> elementType) {
+        return find(elementType).orElse(null);
+    }
+
+    /**
+     * Finds the last added element of the given type that matches the given filter. Elements are tested from the
+     * last added to the first one, so this is equivalent to
+     * {@code findAll(elementType).filter(filter).findFirst().orElse(null)} without creating a stream.
+     *
+     * @param elementType The element type
+     * @param filter      The filter the element must match
+     * @param <T>         The element's type
+     * @return the most recently added matching element or {@code null} if there is none
+     * @since 5.3.0
+     */
+    default <T extends PropagatedContextElement> @Nullable T findOrNull(Class<T> elementType, Predicate<? super T> filter) {
+        return findAll(elementType).filter(filter).findFirst().orElse(null);
+    }
+
+    /**
      * Find all elements of the given type. The first element in the stream will be the last element added.
      *
      * @param elementType The element type
@@ -205,7 +260,7 @@ public interface PropagatedContext {
     <T extends PropagatedContextElement> T get(Class<T> elementType);
 
     /**
-     * Gets all elements.
+     * Gets all elements in the order they were added. The returned list is unmodifiable.
      *
      * @return all elements.
      */
@@ -216,10 +271,41 @@ public interface PropagatedContext {
      * object must be closed to undo the propagation.
      *
      * @return auto-closeable block to be used in try-resource block.
-     * @deprecated The method is only allowed for thread-local propagation.
+     * @throws IllegalStateException if the propagation mode doesn't {@link #supportsScopes() support scopes}
+     * @deprecated The method is only allowed for thread-local propagation. Prefer the callback forms such as
+     * {@link #propagate(Supplier)}, or {@link #propagateIfSupported()} when the context must stay in scope across
+     * separate calls.
      */
     @Deprecated(since = "5.0")
     Scope propagate();
+
+    /**
+     * Brings this context into scope if the current propagation mode {@link #supportsScopes() supports scopes},
+     * temporarily replacing the previous context (if any). The returned scope must be closed, on the same thread, to
+     * undo the propagation.
+     *
+     * <p>Unlike {@link #propagate()} this method doesn't fail with scoped-value propagation: it returns a scope that
+     * does nothing when closed, and nothing is brought into scope. It is intended for integrations that cannot use a
+     * callback, because the context must stay in scope across separate calls into user code, and that would rather
+     * skip the propagation than fail when it isn't possible:</p>
+     *
+     * <pre>{@code
+     * PropagatedContext.Scope scope = context.propagateIfSupported();
+     * // ... later, possibly from another method
+     * scope.close();
+     * }</pre>
+     *
+     * <p>Prefer the callback forms such as {@link #propagate(Supplier)} whenever possible, they work in both
+     * propagation modes.</p>
+     *
+     * @return the scope to close, a no-op scope if the current propagation mode doesn't {@link #supportsScopes()
+     * support scopes}
+     * @since 5.3.0
+     */
+    @SuppressWarnings("deprecation")
+    default Scope propagateIfSupported() {
+        return supportsScopes() ? propagate() : PropagatedContextImpl.NOOP_SCOPE;
+    }
 
     /**
      * Returns a new runnable that runs the given runnable with this context in scope.

@@ -17,7 +17,9 @@ package io.micronaut.ast.groovy
 
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
+import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.visitor.GroovyClassElement
+import io.micronaut.ast.groovy.visitor.GroovyGeneratedSourceFiles
 import io.micronaut.ast.groovy.visitor.GroovyNativeElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
@@ -63,6 +65,11 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
     private static ClassNode generatedNode = new ClassNode(Generated)
     protected static ThreadLocal<Map<String, LoadedVisitor>> loadedVisitors = new ThreadLocal<>()
     protected static ThreadLocal<List<AbstractBeanDefinitionBuilder>> beanDefinitionBuilders = ThreadLocal.withInitial({ -> [] })
+    /**
+     * Whether classes were visited since the visitors last finished a round.
+     */
+    protected static ThreadLocal<Boolean> roundPending = ThreadLocal.withInitial({ -> Boolean.FALSE })
+    private final Set<SourceUnit> finishedRoundSources = Collections.newSetFromMap(new IdentityHashMap<SourceUnit, Boolean>())
     private CompilationUnit compilationUnit
 
     /**
@@ -71,8 +78,12 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
      * {@code @Canonical} or {@code @Immutable} class before its constructors and methods exist. The visiting is
      * therefore deferred to a phase operation for CANONICALIZATION: registered from an earlier phase, the compiler
      * appends it after every operation of that phase, the local transforms included, and it still runs before the
-     * operation {@link InjectTransform} registers from within CANONICALIZATION. The operation is registered once per
-     * compilation unit and processes every source unit of the compilation, the ones queued later included.
+     * operation writing the bean definitions. The operations are registered once per compilation unit and process
+     * every source unit of the compilation, the ones queued later included.
+     *
+     * <p>The bean definitions and the queueing of the generated sources are registered here as well, in that order,
+     * so that all three run in CANONICALIZATION ahead of the check of the source queue that ends the phase: the
+     * generated classes then exist before the hand-written sources are type checked, in INSTRUCTION_SELECTION.</p>
      */
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
@@ -84,6 +95,9 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         if (ast.getNodeMetaData(TypeElementVisitorTransform) == null) {
             ast.putNodeMetaData(TypeElementVisitorTransform, Boolean.TRUE)
             compilationUnit.addNewPhaseOperation({ SourceUnit sourceUnit -> visitTypes(sourceUnit) } as CompilationUnit.ISourceUnitOperation, Phases.CANONICALIZATION)
+            compilationUnit.addNewPhaseOperation({ SourceUnit sourceUnit -> finishRound(sourceUnit) } as CompilationUnit.ISourceUnitOperation, Phases.CANONICALIZATION)
+            InjectTransform.registerInjection(compilationUnit)
+            GroovyGeneratedSourceFiles.registerCanonicalizationQueue(compilationUnit)
         }
     }
 
@@ -129,7 +143,57 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
 
         loadedVisitors.set(visitors)
         beanDefinitionBuilders.get().addAll(visitorContext.getBeanElementBuilders())
+        roundPending.set(Boolean.TRUE)
 
+        visitorContext.finish()
+    }
+
+    /**
+     * Ends the round of the sources the compiler is taking through canonicalization: the classes of the compilation,
+     * then each set of generated sources it queues. A phase operation runs for every source before the next operation
+     * runs for any, so when this one runs for the first source of the round, every source of the round has been
+     * visited. It runs before the bean definitions are written and the generated sources are queued.
+     */
+    private void finishRound(SourceUnit source) {
+        if (!finishedRoundSources.add(source)) {
+            return
+        }
+        Iterator<SourceUnit> sources = compilationUnit.iterator()
+        while (sources.hasNext()) {
+            finishedRoundSources.add(sources.next())
+        }
+        finishRound(new GroovyVisitorContext(source, compilationUnit), source)
+    }
+
+    /**
+     * Calls {@link io.micronaut.inject.visitor.TypeElementVisitor#finishRound} on the loaded visitors, when a class was
+     * visited since the last call.
+     *
+     * @param visitorContext The visitor context
+     * @param sourceUnit The source unit of the visitor context
+     */
+    static void finishRound(GroovyVisitorContext visitorContext, SourceUnit sourceUnit) {
+        Map<String, LoadedVisitor> visitors = loadedVisitors.get()
+        if (visitors == null || !roundPending.get()) {
+            return
+        }
+        roundPending.set(Boolean.FALSE)
+        List<LoadedVisitor> sortedVisitors = new ArrayList<>(visitors.values())
+        OrderUtil.reverseSort(sortedVisitors)
+        for (LoadedVisitor loadedVisitor : sortedVisitors) {
+            try {
+                loadedVisitor.getVisitor().finishRound(visitorContext)
+            } catch (ProcessingException ex) {
+                def element = ex.getOriginatingElement()
+                visitorContext.fail(ex.getMessage(), element instanceof GroovyNativeElement ? (element as GroovyNativeElement).annotatedNode() : (ASTNode) null)
+            } catch (Throwable e) {
+                AstMessageUtils.error(
+                        sourceUnit,
+                        sourceUnit.getAST(),
+                        "Error finishing the round of type visitor [$loadedVisitor.visitor]: $e.message")
+            }
+        }
+        beanDefinitionBuilders.get().addAll(visitorContext.getBeanElementBuilders())
         visitorContext.finish()
     }
 

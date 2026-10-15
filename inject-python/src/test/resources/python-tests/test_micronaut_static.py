@@ -1542,5 +1542,38 @@ class Calc:
         compile(tree, "delegated.py", "exec")
 
 
+CREATED = '''
+from micronaut.core.annotation import Creator
+
+class Created:
+    @staticmethod
+    @Creator
+    def create(name: str) -> "Created":
+        return Created()
+
+class Plain:
+    @staticmethod
+    def make() -> "Plain":
+        return Plain()
+'''
+
+
+class StaticCreatorTest(unittest.TestCase):
+    """A class with a static @Creator gets a generated constructor shaped like the creator, so __init__ cannot be assumed."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.decisions, _ = plan(CREATED, MODE_ALL, facts=FakeFacts())
+
+    def test_constructing_a_class_with_a_static_creator_is_refused(self):
+        decision = self.decisions["Created.create"]
+        self.assertNotEqual("COMPILED", decision.outcome().name())
+        messages = [reason.message() for reason in decision.reasons()]
+        self.assertTrue(any("static creator [create]" in message for message in messages), messages)
+
+    def test_constructing_a_class_without_a_creator_still_compiles(self):
+        self.assertEqual("COMPILED", self.decisions["Plain.make"].outcome().name(), rules(self.decisions["Plain.make"]))
+
+
 if __name__ == "__main__":
     unittest.main()

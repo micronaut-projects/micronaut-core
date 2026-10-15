@@ -123,7 +123,11 @@ class ClaimedRequestBodyUpstreamFailureSpec extends Specification {
         }
 
         then:
-        buffers.every { it.refCnt() == 0 }
+        // the exchange closes the body when it terminates, which can run on the event loop just
+        // after the error was delivered to this thread
+        new PollingConditions(timeout: 10).eventually {
+            assert buffers.every { it.refCnt() == 0 }
+        }
 
         where:
         options << [null, RawRequestOptions.getDefault(), RawRequestOptions.proxy()]

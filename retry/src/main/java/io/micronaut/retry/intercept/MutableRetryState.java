@@ -33,4 +33,33 @@ public interface MutableRetryState extends RetryState {
      * @return The next delay in milliseconds
      */
     long nextDelay();
+
+    /**
+     * Called when an attempt fails with an exception this state does not capture, see
+     * {@link #getCapturedException()}, and which is rethrown without a retry.
+     *
+     * @param exception The exception
+     * @since 5.3.0
+     */
+    default void onUncaptured(Throwable exception) {
+    }
+
+    /**
+     * Called when the subscriber of a publisher cancels it before it produced a value. By
+     * default it is a success, see {@link #close(Throwable)}.
+     *
+     * @since 5.3.0
+     */
+    default void onCancel() {
+        close(null);
+    }
+
+    /**
+     * Called when the operation ends without an outcome, e.g. its thread was interrupted while
+     * it waited for a retry: a state that holds a permit returns it.
+     *
+     * @since 5.3.0
+     */
+    default void release() {
+    }
 }

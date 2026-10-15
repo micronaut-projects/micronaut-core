@@ -53,6 +53,8 @@ snippet::io.micronaut.docs.server.routes.IssuesControllerTest[tags="defaultvalue
 <1> This test illustrates the substitution of a default `PathVariable` value when the URI variable is missing
 <2> And another test to illustrate when the optional URI variable is provided
 
+TIP: To read all the variables of the route with one argument, see <<pathVariables, Path Variables>>.
+
 The following table provides examples of URI templates and what they match:
 
 .URI Template Matching

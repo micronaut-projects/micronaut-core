@@ -17,6 +17,7 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import org.reactivestreams.Publisher;
@@ -24,6 +25,7 @@ import org.reactivestreams.Publisher;
 import java.io.InputStream;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * A body that hides the {@link #expectedLength() length} of the body it wraps. The
@@ -75,6 +77,11 @@ final class UnknownLengthByteBody implements CloseableByteBody {
     @Override
     public CloseableByteBody move() {
         return new UnknownLengthByteBody(delegate.move());
+    }
+
+    @Override
+    public CompletionStage<HttpHeaders> trailers() {
+        return delegate.trailers();
     }
 
     @Override

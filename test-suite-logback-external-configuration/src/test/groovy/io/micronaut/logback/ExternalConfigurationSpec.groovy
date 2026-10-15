@@ -2,10 +2,14 @@ package io.micronaut.logback
 
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.LoggerContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanInstantiationException
+import io.micronaut.logging.LoggingSystem
+import io.micronaut.management.endpoint.loggers.ManagedLoggingSystem
 import io.micronaut.runtime.server.EmbeddedServer
 import org.slf4j.LoggerFactory
+import spock.lang.Issue
 import spock.lang.See
 import spock.lang.Specification
 import spock.util.environment.RestoreSystemProperties
@@ -53,6 +57,69 @@ class ExternalConfigurationSpec extends Specification {
 
         cleanup:
         server.stop()
+    }
+
+    @RestoreSystemProperties
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13390")
+    def "the loggers endpoint should still use the external config if custom levels are defined"() {
+        given:
+        System.setProperty("logback.configurationFile", "src/external/external-logback.xml")
+
+        when:
+        def server = ApplicationContext.run(EmbeddedServer, [
+                "logger.levels.app.customisation": "DEBUG",
+                "endpoints.loggers.enabled"      : true,
+        ])
+        Logger fromXml = (Logger) LoggerFactory.getLogger("i.should.not.exist")
+        Logger custom = (Logger) LoggerFactory.getLogger("app.customisation")
+        Logger external = (Logger) LoggerFactory.getLogger("external.logging")
+
+        then: 'the logging system of the loggers endpoint refreshed the configuration'
+        server.applicationContext.getBean(LoggingSystem) instanceof ManagedLoggingSystem
+
+        and: 'logback.xml is ignored as we have set a configurationFile'
+        fromXml.level == null
+
+        and: 'custom levels are still respected'
+        custom.level == Level.DEBUG
+
+        and: 'external configuration is used'
+        external.level == Level.TRACE
+
+        cleanup:
+        server.stop()
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13390")
+    def "the loggers endpoint should use logback.configurationFile set only in Micronaut configuration"() {
+        given: 'Logback does not know the file, and holds no level of it from a previous feature'
+        assert System.getProperty("logback.configurationFile") == null
+        ((LoggerContext) LoggerFactory.getILoggerFactory()).reset()
+
+        when:
+        def server = ApplicationContext.run(EmbeddedServer, [
+                "logback.configurationFile"      : "src/external/external-logback.xml",
+                "logger.levels.app.customisation": "DEBUG",
+                "endpoints.loggers.enabled"      : true,
+        ])
+        Logger fromXml = (Logger) LoggerFactory.getLogger("i.should.not.exist")
+        Logger custom = (Logger) LoggerFactory.getLogger("app.customisation")
+        Logger external = (Logger) LoggerFactory.getLogger("external.logging")
+
+        then: 'the logging system of the loggers endpoint refreshed the configuration'
+        server.applicationContext.getBean(LoggingSystem) instanceof ManagedLoggingSystem
+
+        and: 'logback.xml is ignored as Micronaut configuration sets a configurationFile'
+        fromXml.level == null
+
+        and: 'custom levels are still respected'
+        custom.level == Level.DEBUG
+
+        and: 'the file set in Micronaut configuration is used'
+        external.level == Level.TRACE
+
+        cleanup:
+        server?.stop()
     }
 
     def "configuration via logger.config should work without configuring levels"() {

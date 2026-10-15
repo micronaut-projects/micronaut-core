@@ -45,8 +45,10 @@ sealed interface Pool permits Pool49, Pool40 {
      * Create a new {@link PendingRequest} that can be used to claim a connection from this pool.
      *
      * @param blockHint The thread that is blocked waiting for this request
-     * @return The request handle
+     * @return The request handle, or {@code null} if this pool has been retired (see
+     * {@link Listener#onPoolRetired()}) and the caller should look up a fresh pool instead
      */
+    @Nullable
     PendingRequest createPendingRequest(@Nullable BlockHint blockHint);
 
     /**
@@ -92,6 +94,13 @@ sealed interface Pool permits Pool49, Pool40 {
          * @param eventLoop The event loop the connection should live on
          */
         void openNewConnection(EventLoop eventLoop);
+
+        /**
+         * Called once when this pool has no connections and no pending requests left and retires
+         * itself. A retired pool will not accept new requests, so the listener should remove it
+         * from any lookup structure.
+         */
+        void onPoolRetired();
     }
 
     /**

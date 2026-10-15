@@ -760,14 +760,14 @@ class MyBean {
         context.close()
     }
 
-    void 'test a runtime proxy reuses lifecycle interceptor registrations'() {
+    void 'test a runtime proxy reuses lifecycle interceptor registrations - construction #construction parameterized #parameterized'() {
         given:
-        ApplicationContext context = buildContext('''
+        ApplicationContext context = buildContext('reuse.runtime.MyBean', '''
 package reuse.runtime;
 
 import io.micronaut.aop.*;
 import io.micronaut.aop.runtime.RuntimeProxy;
-import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.*;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
@@ -777,12 +777,14 @@ import java.util.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Around
+CONSTRUCTION_BINDING
 @InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
 @InterceptorBinding(kind = InterceptorKind.PRE_DESTROY)
 @interface Managed {
 }
 
 @Prototype
+@InterceptorBinding(value = Managed.class, kind = InterceptorKind.AROUND_CONSTRUCT)
 @InterceptorBinding(value = Managed.class, kind = InterceptorKind.AROUND)
 @InterceptorBinding(value = Managed.class, kind = InterceptorKind.POST_CONSTRUCT)
 @InterceptorBinding(value = Managed.class, kind = InterceptorKind.PRE_DESTROY)
@@ -801,15 +803,19 @@ class LifecycleInterceptor implements Interceptor<Object, Object> {
     }
 }
 
-@Singleton
+@Singleton class Seed {}
+BEAN_SCOPE
 @RuntimeProxy(io.micronaut.aop.ByteBuddyRuntimeProxy.class)
 @Managed
 class MyBean {
+    CONSTRUCTOR
     @PostConstruct void init() {}
     String work() { return "done"; }
     @PreDestroy void close() {}
 }
-''')
+'''.replace('CONSTRUCTION_BINDING', construction ? '@AroundConstruct' : '')
+            .replace('BEAN_SCOPE', parameterized ? '@EachBean(Seed.class)' : '@Singleton')
+            .replace('CONSTRUCTOR', parameterized ? 'MyBean(@Parameter Seed seed) {}' : ''), true)
         context.registerSingleton(new io.micronaut.aop.ByteBuddyRuntimeProxy())
         Class<?> interceptorType = context.classLoader.loadClass('reuse.runtime.LifecycleInterceptor')
 
@@ -819,7 +825,7 @@ class MyBean {
 
         then:
         interceptorType.instances == 1
-        interceptorType.events == [
+        interceptorType.events == (construction ? ['1:AROUND_CONSTRUCT'] : []) + [
             '1:POST_CONSTRUCT',
             '1:AROUND',
             '1:PRE_DESTROY'
@@ -827,6 +833,9 @@ class MyBean {
 
         cleanup:
         context.close()
+
+        where:
+        [construction, parameterized] << [[false, true], [false, true]].combinations()
     }
 
     void 'test the registrations a proxy exposes are exactly the ones injected into it'() {

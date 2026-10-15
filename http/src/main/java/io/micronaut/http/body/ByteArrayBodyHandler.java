@@ -25,15 +25,19 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.stream.BodyPublishers;
+import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.codec.CodecException;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Arrays;
 
 /**
  * The body handler for byte[].
@@ -44,7 +48,14 @@ import java.io.OutputStream;
 @Singleton
 @BootstrapContextCompatible
 @Internal
-final class ByteArrayBodyHandler implements TypedMessageBodyHandler<byte[]>, ChunkedMessageBodyReader<byte[]> {
+final class ByteArrayBodyHandler implements TypedMessageBodyHandler<byte[]>, ChunkedMessageBodyReader<byte[]>, ResponseBodyWriter<byte[]> {
+    /**
+     * Pieces up to this size are copied to the heap: the transport combines small pieces into
+     * larger buffers anyway, and a heap copy needs no pooled buffer. Larger pieces are copied
+     * into a buffer of the body factory once.
+     */
+    private static final int HEAP_COPY_LIMIT = 1024;
+
     /**
      * The type this handler is for, resolved once: isWriteable asks for it on every response.
      */
@@ -94,8 +105,23 @@ final class ByteArrayBodyHandler implements TypedMessageBodyHandler<byte[]>, Chu
     }
 
     @Override
+    public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<byte[]> type, MediaType mediaType, byte[] object) throws CodecException {
+        addContentType(response.toMutableResponse().getHeaders(), mediaType);
+        // the array is copied: a publisher may reuse it once the piece is emitted
+        if (object.length <= HEAP_COPY_LIMIT) {
+            return bodyFactory.adapt(Arrays.copyOf(object, object.length));
+        }
+        return bodyFactory.adapt(bodyFactory.readBufferFactory().copyOf(java.nio.ByteBuffer.wrap(object)));
+    }
+
+    @Override
     public Publisher<byte[]> readChunked(Argument<byte[]> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        return Flux.from(input).map(ByteArrayBodyHandler::read0);
+        return BodyPublishers.map(input, ByteArrayBodyHandler::read0);
+    }
+
+    @Override
+    public PieceReader<byte[]> openPieceReader(Argument<byte[]> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
+        return PieceReaders.eachPiece(ByteArrayBodyHandler::read0);
     }
 
     private static void addContentType(MutableHeaders outgoingHeaders, @Nullable MediaType mediaType) {

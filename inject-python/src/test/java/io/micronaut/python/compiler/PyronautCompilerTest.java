@@ -54,6 +54,57 @@ final class PyronautCompilerTest {
     }
 
     @Test
+    void visitsAPythonClassOnceWhenItsAnnotationsAreCopiedForReflection(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path output = Files.createDirectories(directory.resolve("classes"));
+        Files.writeString(python.resolve("reflected.py"), """
+            from io.micronaut.python.compiler import TestIsolate
+            @TestIsolate
+            class Reflected:
+                value: int = 1
+            """);
+
+        // the reflection gate copies @TestIsolate onto the generated Java class; the visitors of the
+        // Java round must not visit that class a second time, or the META-INF file is written twice
+        PyronautCompiler.builder()
+            .pythonSrc(python.toString())
+            .targetDir(output.toFile())
+            .options(List.of("-Amicronaut.introspection.allowReflection=*"))
+            .build()
+            .compile();
+
+        assertTrue(Files.isRegularFile(output.resolve("META-INF/pyronaut/isolating-Reflected.txt")));
+        try (var classLoader = new URLClassLoader(new URL[] {output.toUri().toURL()}, getClass().getClassLoader())) {
+            assertTrue(classLoader.loadClass("python.Reflected").isAnnotationPresent(TestIsolate.class));
+        }
+    }
+
+    @Test
+    void visitsAPythonClassOnceWhenItAllowsReflection(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path output = Files.createDirectories(directory.resolve("classes"));
+        Files.writeString(python.resolve("hinted.py"), """
+            from io.micronaut.python.compiler import TestIsolate
+            from micronaut.core.annotation import AllowsReflection
+            @AllowsReflection
+            @TestIsolate
+            class Hinted:
+                value: int = 1
+            """);
+
+        PyronautCompiler.builder()
+            .pythonSrc(python.toString())
+            .targetDir(output.toFile())
+            .build()
+            .compile();
+
+        assertTrue(Files.isRegularFile(output.resolve("META-INF/pyronaut/isolating-Hinted.txt")));
+        try (var classLoader = new URLClassLoader(new URL[] {output.toUri().toURL()}, getClass().getClassLoader())) {
+            assertTrue(classLoader.loadClass("python.Hinted").isAnnotationPresent(TestIsolate.class));
+        }
+    }
+
+    @Test
     void compilesJavaSourcesWithoutPythonApplication(@TempDir Path sourceDirectory) throws Exception {
         Files.writeString(sourceDirectory.resolve("Greeting.java"), "public class Greeting {}\n");
 
@@ -339,6 +390,70 @@ final class PyronautCompilerTest {
         assertTrue(regularClass.contains("asPolyglotValue(Context "));
         assertTrue(regularClass.contains("newUninitializedInstance(arg1,"));
 
+    }
+
+    @Test
+    void poolsAModuleWhoseOnlyModuleLevelDecoratorsAreNotScopes(@TempDir Path sourceDirectory) throws Exception {
+        // A module-level decorator that is not a scope must not cost the module its
+        // pooling. @Controller carries @DefaultScope(Singleton), which is a default
+        // rather than a declaration, so @ContextPooled is free to override it.
+        Files.writeString(sourceDirectory.resolve("routes.py"), """
+            from typing import Annotated
+
+            from jakarta.inject import Inject
+            from micronaut.http.annotation import Controller, Get
+
+            from greeter import Greeter
+
+            Controller("/module")
+
+            greeter: Annotated[Greeter, Inject]
+
+            @Get("/")
+            def module_root() -> str:
+                return greeter.greet()
+        """.indent(-4));
+        // The guard it replaces: a module that declares a scope of its own keeps it.
+        Files.writeString(sourceDirectory.resolve("scoped_routes.py"), """
+            from typing import Annotated
+
+            from jakarta.inject import Inject
+            from jakarta.inject import Singleton
+            from micronaut.http.annotation import Controller, Get
+
+            from greeter import Greeter
+
+            Controller("/scoped")
+            Singleton()
+
+            greeter: Annotated[Greeter, Inject]
+
+            @Get("/")
+            def scoped_root() -> str:
+                return greeter.greet()
+        """.indent(-4));
+        Files.writeString(sourceDirectory.resolve("greeter.py"), """
+            from jakarta.inject import Singleton
+
+            @Singleton
+            class Greeter:
+                def greet(self) -> str:
+                    return "hello"
+        """.indent(-4));
+
+        Path outputDirectory = sourceDirectory.resolve("output");
+        Files.createDirectories(outputDirectory);
+        PyronautCompiler.builder()
+            .pythonSrc(sourceDirectory.toString())
+            .targetDir(outputDirectory.toFile())
+            .build()
+            .compile();
+
+        String pooled = Files.readString(findGeneratedSource(outputDirectory, "Routes.java"));
+        assertTrue(pooled.contains("PooledValueCoercible"), "a module whose decorators are not scopes should be pooled");
+
+        String scoped = Files.readString(findGeneratedSource(outputDirectory, "ScopedRoutes.java"));
+        assertFalse(scoped.contains("PooledValueCoercible"), "a module that declares a scope should keep it");
     }
 
     @Test

@@ -395,6 +395,33 @@ public interface BeanDefinitionRegistry {
     <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<T> beanDefinition);
 
     /**
+     * Find a bean registration for the given bean definition, resolved as the given bean type.
+     *
+     * <p>The registration is the one {@link #getBeanRegistration(Argument, Qualifier)} returns for the bean type when
+     * its lookup picks this definition, without the lookup: the caller has already chosen the definition, and no
+     * other candidate is considered. The bean is resolved in the scope of the definition, and with the definition's
+     * declared qualifier, as {@link #getBeanRegistration(BeanDefinition)} resolves it. What differs from that method
+     * is the type the bean is resolved as: a definition that builds its bean from the type it was asked for, such as
+     * the one of {@link BeanProvider}, sees the type arguments of the given bean type rather than those of its own
+     * type.</p>
+     *
+     * <p>The definition may be of a subtype of the bean type: a definition of an implementation is resolved as an
+     * interface it implements.</p>
+     *
+     * <p>A bean of a scope is the one an ordinary lookup returns: the definition is resolved under the key its scope
+     * holds it by, which is why the registry resolves the definition itself rather than narrowing a lookup with a
+     * qualifier, which would become part of that key.</p>
+     *
+     * @param beanDefinition The bean definition
+     * @param beanType       The potentially parameterized bean type to resolve the definition as
+     * @param <T>            The concrete type
+     * @return The bean registration
+     * @throws NoSuchBeanException if the definition is not a candidate for the bean type
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> beanDefinition, Argument<T> beanType);
+
+    /**
      * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
      *
      * @param beanType  The type

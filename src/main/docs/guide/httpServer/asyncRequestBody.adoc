@@ -1,0 +1,110 @@
+A method argument of type api:http.body.AsyncRequestBody[] gives the body of the request without reading it. The method decides how to read it: decoded to a type, as text or bytes, element by element, written to a file, or taken as is. Each read returns a `CompletionStage`, so the method can return a stage and never block.
+
+NOTE: api:http.body.AsyncRequestBody[] and api:http.body.BodyElements[] are experimental. Their API may change in a future release.
+
+snippet::io.micronaut.docs.server.asyncbody.PeopleController[tags="imports,class,body,store,endclass", title="Decoding the Body"]
+
+<1> The method declares an api:http.body.AsyncRequestBody[] argument, and returns a `CompletionStage`
+<2> `body` decodes the whole body to a type, like a api:http.annotation.Body[] argument
+<3> The decoded body is stored, and the stage completes with the response
+
+`body` decodes the same way as a api:http.annotation.Body[] argument: with the same message body readers and the same errors. A malformed JSON body is answered with `400 Bad Request`, and a body larger than `micronaut.server.max-request-buffer-size` is answered with `413 Request Entity Too Large`. The stage returned by the method fails with the exception, which the error handlers answer like they answer it for a api:http.annotation.Body[] argument.
+
+== Reading the Body
+
+The other ways to read the body are:
+
+* `text()` reads the body as a string, in the charset of the request, up to `micronaut.server.max-request-buffer-size` bytes. `text(maximumBytes)` sets a lower limit, and `text(maximumBytes, charset)` reads the body in the given charset instead.
+* `bytes(maximumBytes)` reads the body into a `byte[]`, up to `maximumBytes` and never more than `micronaut.server.max-request-buffer-size` bytes.
+* `transferTo(path)` writes the body to a new file, without holding it in memory, so `micronaut.server.max-request-buffer-size` does not limit it.
+* `takeBody()` hands the body over as a api:http.body.CloseableByteBody[], unread. The method must then consume or close it, e.g. by sending it on with an HTTP client.
+* `discardBody()` discards the body without reading it.
+* `form()` and `parts()` read a form, see <<formUploads, Form Data and File Uploads>>.
+
+`body`, `text` and `bytes` hold the whole body in memory, so `micronaut.server.max-request-buffer-size` always limits them, however the body is chunked and whenever it arrives. The `maximumBytes` of `text` and `bytes` lowers that limit and never raises it: the body is read up to the smaller of the two, and a larger body is answered with `413 Request Entity Too Large`. To read a body larger than the buffer limit, read it with `elements`, which limits each element, write it to a file with `transferTo`, or take it with `takeBody()`.
+
+snippet::io.micronaut.docs.server.asyncbody.PeopleController[tags="text", indent=0, title="Reading the Body as Text"]
+
+<1> `text` completes with the whole body as a string
+
+`hasBody()` and `expectedBodySize()` tell whether the request has a body and how large the client said it is, without reading it.
+
+WARNING: The body can be read once. The first read owns the body, and a second read, even with another method, throws an `IllegalStateException`. A body that is not read is discarded when the request ends. To read the body more than once, read a copy of it, see <<asyncRequestBodyCopies, Copies of the Body>>.
+
+What a read left open is released when the method completes, before the response is written or the filter chain continues: a read the method did not wait for, e.g. `elements` or `transferTo` whose stage it did not return, is aborted and its buffers and files are released, so the work on the body must be part of the stage the method returns. A controller method that answers with a streamed response, e.g. a `Publisher` of many items, keeps the body until the stream ends: when it completes, fails or is cancelled, e.g. because the client disconnected. The stream can be made of the reads of the body, e.g. one item for each element read with `elements`.
+
+`body` and `elements` decode a whole value in memory, so they refuse the types that would read it in some other way: a `Publisher`, a `CompletableFuture` or another asynchronous type, and `InputStream` throw an `IllegalArgumentException`. To stream the body, read it element by element, or take it with `takeBody()`.
+
+== Reading the Elements of a JSON Array or Stream
+
+`elements` decodes a JSON array (`application/json`) or a JSON stream (`application/x-json-stream`, one value per line) one element at a time:
+
+snippet::io.micronaut.docs.server.asyncbody.PeopleController[tags="elements", indent=0, title="Reading the Elements"]
+
+<1> The route accepts a JSON array and a JSON stream
+<2> `elements` returns the api:http.body.BodyElements[] of the body, nothing is read yet
+<3> `forEach` reads an element, and reads the next one once the stage the consumer returned completes
+<4> The stage of `forEach` completes once every element was consumed
+
+Only what the method asks for is read: the next element is received once the consumer is done with the previous one, so a slow consumer slows down the client instead of filling the memory of the server. `next()` reads a single element instead, and completes with an empty `Optional` at the end of the body. The elements that are not read are discarded.
+
+The limit `micronaut.server.max-request-buffer-size` applies to each element, not to the whole body: an element larger than the limit fails with `413`, while the body as a whole is only limited by `micronaut.server.max-request-size`. This holds even for a limit smaller than what the server receives before the method reads the elements, e.g. with the request headers.
+
+A request of another media type fails the first read of the elements with `415 Unsupported Media Type`.
+
+IMPORTANT: The readers that decode JSON one element at a time are part of `micronaut-http-netty`, which the Netty server includes. A server that is not the Netty server, e.g. a servlet container, needs `micronaut-http-netty` on its runtime classpath to read elements. Without it, the first read fails with an `UnsupportedOperationException`.
+
+TIP: The stages complete on a thread chosen by the server, usually an event loop thread, so a consumer must not block. Return the stage of an asynchronous call instead, e.g. of a reactive database driver.
+
+[[asyncRequestBodyCopies]]
+== Copies of the Body
+
+`copy()` returns another api:http.body.AsyncRequestBody[] over a copy of the bytes of the body. Reading the copy does not consume the body: the route, or another reader, can still read it in any way. The copy has its own single read, and so does the body it was copied from.
+
+The bytes the copy reads are kept for the body until it is read, so a copy is held to `micronaut.server.max-request-buffer-size` as a whole, like a api:http.annotation.Body[] argument of a filter, and a larger body is answered with `413 Request Entity Too Large`. This holds for the streaming reads of a copy too, `elements`, `parts` and `transferTo`: a copy is for looking at the body, not for streaming a large upload. `form()` of a copy is the one form of the request, which it reads from a split of the bytes, so the body stays readable in any way and the form is held to the limit as a whole, and `parts()` of a copy decodes the form a second time, from a split of the bytes.
+
+== In Filters
+
+The request filter methods of a api:http.annotation.ServerFilter[] can declare an api:http.body.AsyncRequestBody[] argument too, and read the body before the route runs. The filter method returns the stage of the read, and the request continues once it completes.
+
+The arguments of a filter look at the body, the reads of an api:http.body.AsyncRequestBody[] consume it, and the reads of a copy look at it:
+
+[cols="2,3,3"]
+|===
+|In a filter |Reads |The route afterwards
+
+|A api:http.annotation.Body[] argument
+|A buffered copy of the bytes
+|Reads the body in any way
+
+|A api:http.form.FormData[], api:http.form.FileUpload[] or api:http.annotation.Part[] argument
+|The one form of the request, shared by the filters and the route
+|Reads the form in any way
+
+|`body`, `text`, `bytes`, `elements`, `transferTo`, `form`, `parts`, `takeBody` or `discardBody` of an api:http.body.AsyncRequestBody[], the parts of a api:http.form.FormParts[] argument, or a api:http.form.FormPart[] argument
+|The body itself: what the filter does not read is discarded
+|Fails when it reads the body, with a api:http.annotation.Body[], api:http.form.FormData[], api:http.form.FileUpload[] or api:http.annotation.Part[] argument or an api:http.body.AsyncRequestBody[], with `500 Internal Server Error`. A route that does not read the body answers.
+
+|The same reads of `copy()`
+|A copy of the bytes, or the shared form for `copy().form()`
+|Reads the body in any way
+|===
+
+The reads of an api:http.body.AsyncRequestBody[] in a filter are for a filter that consumes the body itself, e.g. to forward it with `takeBody()`, or to reject the request. When the route reads the body after them, the `IllegalStateException` of the failure names the read of the filter, e.g. `The body of the request was already read with text() of an AsyncRequestBody, e.g. by a filter, which consumes it: read it with copy() in the filter to leave it for the route, or bind it with @Body`.
+
+To look at the body and leave it for the route, the filter reads a copy:
+
+snippet::io.micronaut.docs.server.asyncbody.SpamFilter[tags="imports,class", title="Reading a Copy of the Body in a Filter"]
+
+<1> The request filter method declares an api:http.body.AsyncRequestBody[] argument, and returns a `CompletionStage` of a nullable response
+<2> `copy()` reads a copy of the body, and leaves the body for the route
+<3> The filter answers the request itself when the body contains spam
+<4> Otherwise the request continues to the route
+
+snippet::io.micronaut.docs.server.asyncbody.MessageController[tags="imports,class", title="The Route Reads the Body"]
+
+<1> The route reads the same body with a api:http.annotation.Body[] argument
+
+A filter that reads the body or a copy of it buffers the body before the route runs, and the body is then held to `micronaut.server.max-request-buffer-size` as a whole. For a form, a api:http.form.FormData[] argument or `copy().form()` is the shared form, which the form arguments of the route do not decode a second time. After a api:http.form.FormData[] argument of a filter the route reads the form, not the bytes of the body. After `copy().form()` the route can still read the body in any way, e.g. with `text()` or a api:http.annotation.Body[] argument, since the copy keeps the bytes for it. `copy().parts()` decodes the form a second time, so it is only for a filter that must stream through the parts and still leave the body for the route. See <<formUploads, Form Data and File Uploads>>.
+
+A filter that continues with a mutable request whose body it cleared, with `request.body(null)`, leaves no body: `hasBody()` is `false` and `text()` is empty. A body the filter set to an object is read with `body`, which converts it like a api:http.annotation.Body[] argument.

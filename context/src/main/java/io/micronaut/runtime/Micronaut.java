@@ -18,16 +18,26 @@ package io.micronaut.runtime;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.DefaultApplicationContextBuilder;
+import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.banner.Banner;
 import io.micronaut.context.banner.MicronautBanner;
 import io.micronaut.context.banner.ResourceBanner;
+import io.micronaut.context.env.CachedEnvironment;
+import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.EnvironmentPropertySource;
+import io.micronaut.context.env.SystemPropertiesPropertySource;
+import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.context.event.ShutdownEvent;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySource;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Described;
+import io.micronaut.core.util.ExceptionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
@@ -35,9 +45,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.PrintStream;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
@@ -45,16 +57,55 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
 /**
  * <p>Main entry point for running a Micronaut application.</p>
  *
+ * <p><b>Experimental:</b> starting the JVM with the system property
+ * {@code micronaut.bean-definitions.prefetch=true} makes {@link #start()} use bean definitions
+ * that the common {@link java.util.concurrent.ForkJoinPool} loaded while the main thread
+ * configured logging, and read while it created the builder. It is off by default and may change
+ * or be removed. It is read when this class is initialized, so only a JVM system property switches
+ * it on, not the application's configuration. It stands down in a native image and when the common
+ * pool has fewer than three threads. A context gets it only through {@code Micronaut.run(...)} or
+ * {@code Micronaut.build(...).start()} with the default bean definitions provider. With it on,
+ * {@code TypeConverterRegistrar} services and the static initializers of bean definitions can run
+ * on a pool thread before {@link #start()}. Code that runs in between must not construct
+ * {@code DefaultMutableConversionService} directly (use {@code MutableConversionService.create()})
+ * or call {@code StaticOptimizations.set(...)}. Measure startup with and without it: it helps
+ * mostly without a JDK AOT cache.</p>
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
 @NullMarked
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
+    static final String TRAINING_ENABLED_ENVIRONMENT_VARIABLE = "MICRONAUT_APPLICATION_TRAINING_ENABLED";
     private static final String BANNER_NAME = "micronaut-banner.txt";
+    /**
+     * The experimental bean definition prefetch, or {@code null} when it is off or stood down.
+     * Created before {@link #LOG}, whose creation usually configures logging: in the meantime the
+     * pool only loads the bean definition reference classes, which runs none of their code. The
+     * task itself is submitted once {@link #LOG} exists, so that no pool thread creates a logger
+     * while logging is being configured. With the property unset, the class of the task is not
+     * even loaded.
+     */
+    @Nullable
+    private static final BeanDefinitionPrefetch BEAN_DEFINITION_PREFETCH = Boolean.getBoolean(BeanDefinitionPrefetch.PROPERTY)
+        ? BeanDefinitionPrefetch.start(Micronaut.class.getClassLoader())
+        : null;
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
+    private static final long SHUTDOWN_MONITOR_INTERVAL_MS = 250;
+
+    static {
+        if (BEAN_DEFINITION_PREFETCH != null) {
+            BEAN_DEFINITION_PREFETCH.submit();
+        }
+    }
 
     private final Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
+    /**
+     * Whether this launcher may exit the JVM, decided once the environment started: a server that fails to start, or
+     * an application that stops, stops the context and with it the environment, whose properties are then gone.
+     */
+    private @Nullable Boolean exitAllowed;
 
     /**
      * The default constructor.
@@ -69,14 +120,43 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     @SuppressWarnings({"java:S1181", "java:S3776", "java:S1141"})
     public ApplicationContext start() {
         long start = System.nanoTime();
+        // a launcher started again decides again: until its environment starts, a failure is judged by that environment
+        exitAllowed = null;
         printBanner();
-        ApplicationContext applicationContext = super.build();
-
+        ApplicationContext applicationContext = buildContext();
+        // set once handleStartupException handled a failure of the embedded application, whose exception is rethrown as is
+        boolean embeddedFailureHandled = false;
         try {
 
+            // The training mode decides whether the context starts at all, so the switch is read before
+            // applicationContext.start(), from the environment that start() would otherwise start first
+            Environment environment = applicationContext.getEnvironment();
+            // Test Resources reads the configuration together with the environment, so a training run that is
+            // already known disables it first
+            boolean trainingRunBeforeStart = isTrainingRunBeforeStart(environment);
+            startEnvironment(environment, trainingRunBeforeStart);
+            exitAllowed = isExitAllowed(environment);
+            boolean trainingRun = isTrainingRun(environment);
+            if (trainingRun) {
+                TrainingTestResources.checkDisabled(environment, trainingRunBeforeStart);
+                if (TrainingLoad.isSelected(environment)) {
+                    TrainingLoad.run(applicationContext);
+                    return applicationContext;
+                }
+            } else if (trainingRunBeforeStart) {
+                // A source that the environment only reads when it starts turned the switch off again
+                TrainingTestResources.warnNotATrainingRun(environment);
+            }
+
+            // listening from before the context starts: whoever stops it, a development launcher among them, may do
+            // so while this thread is still starting the embedded application and has yet to register the hook
+            ShutdownHookRemoval hookRemoval = ShutdownHookRemoval.register(applicationContext);
             applicationContext.start();
 
             EmbeddedApplication<?> embeddedApplication = applicationContext.findBean(EmbeddedApplication.class).orElse(null);
+            if (trainingRun) {
+                announceTrainingRun(environment, embeddedApplication != null);
+            }
 
             if (embeddedApplication != null) {
                 try {
@@ -112,12 +192,18 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                         }
                     }
 
+                    if (trainingRun) {
+                        finishTrainingRun(applicationContext, embeddedApplication);
+                        return applicationContext;
+                    }
+
                     Thread mainThread = Thread.currentThread();
                     boolean finalKeepAlive = keepAlive;
                     CountDownLatch countDownLatch = new CountDownLatch(1);
+                    Thread shutdownHook = null;
                     if (embeddedApplication.isShutdownHookNeeded()) {
                         try {
-                            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                            Thread hook = new Thread(() -> {
                                 if (LOG.isInfoEnabled()) {
                                     LOG.info("Embedded Application shutting down");
                                 }
@@ -130,7 +216,10 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                                         mainThread.interrupt();
                                     }
                                 }
-                            }));
+                            });
+                            Runtime.getRuntime().addShutdownHook(hook);
+                            shutdownHook = hook;
+                            hookRemoval.added(hook);
                         } catch (IllegalStateException e) {
                             try (applicationContext) {
                                 embeddedApplication.stop();
@@ -142,16 +231,21 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                     }
 
                     if (keepAlive) {
-                        new Thread(() -> {
+                        // release the calling thread once the application stops, however it was stopped: through
+                        // the shutdown hook, or by another component such as a development launcher restarting it
+                        Thread monitor = new Thread(() -> {
                             try {
-                                if (!embeddedApplication.isRunning()) {
-                                    countDownLatch.countDown();
-                                    Thread.sleep(1000);
+                                while (embeddedApplication.isRunning()) {
+                                    Thread.sleep(SHUTDOWN_MONITOR_INTERVAL_MS);
                                 }
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
+                            } finally {
+                                countDownLatch.countDown();
                             }
-                        }, SHUTDOWN_MONITOR_THREAD).start();
+                        }, SHUTDOWN_MONITOR_THREAD);
+                        monitor.setDaemon(true);
+                        monitor.start();
 
                         boolean interrupted = false;
                         while (true) {
@@ -163,19 +257,22 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                                 Thread.currentThread().interrupt();
                             }
                         }
+                        monitor.interrupt();
                         if (interrupted) {
                             Thread.currentThread().interrupt();
                         }
                         if (LOG.isInfoEnabled()) {
                             LOG.info("Embedded Application shutting down");
                         }
+                        removeShutdownHook(shutdownHook);
                     }
 
-                    if (embeddedApplication.isForceExit()) {
+                    if (embeddedApplication.isForceExit() && mayExit(applicationContext.getEnvironment())) {
                         System.exit(0);
                     }
 
                 } catch (Throwable e) {
+                    embeddedFailureHandled = true;
                     handleStartupException(applicationContext.getEnvironment(), e);
                     Thread.currentThread().interrupt();
                 }
@@ -186,14 +283,215 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             }
             return applicationContext;
         } catch (Throwable e) {
+            if (embeddedFailureHandled && e instanceof ApplicationStartupException startupException) {
+                // already handled for the embedded application, exit handlers included: not a second time
+                throw startupException;
+            }
             handleStartupException(applicationContext.getEnvironment(), e);
             Thread.currentThread().interrupt();
             return applicationContext;
         }
     }
 
+    /**
+     * Builds the context. A running or finished bean definition prefetch is handed to it, unless
+     * the application or a configurer set a provider of its own, and afterwards a prefetch that
+     * the context did not take gives its result up.
+     *
+     * <p>When the prefetch failed to build the shared conversion service, the context fails on
+     * the class that this left erroneous, with a {@link NoClassDefFoundError}. What the prefetch
+     * met, which the context would have met without it, is rethrown instead. When this thread
+     * ran the initializer of the conversion service itself, its own error is kept.</p>
+     *
+     * @return The application context, not started
+     */
+    @SuppressWarnings("java:S1181") // Rethrown, or replaced by what the prefetch met first
+    private ApplicationContext buildContext() {
+        BeanDefinitionPrefetch prefetch = BEAN_DEFINITION_PREFETCH;
+        if (prefetch == null) {
+            return super.build();
+        }
+        if (getBeanDefinitionsProvider() instanceof DefaultBeanDefinitionsProvider) {
+            beanDefinitionsProvider(prefetch);
+        }
+        try {
+            return super.build();
+        } catch (Throwable t) {
+            Throwable conversionFailure = prefetch.conversionFailure(t);
+            if (conversionFailure != null) {
+                return ExceptionUtils.sneakyThrow(conversionFailure);
+            }
+            throw t;
+        } finally {
+            Throwable failure = prefetch.giveUp();
+            if (failure != null) {
+                // The context read the references itself, beside the prefetch. A reference whose static initializer
+                // failed on the prefetch's thread reached it as a NoClassDefFoundError, which Micronaut skips
+                LOG.warn("The bean definition prefetch ({}=true) failed and was not handed to the application context, "
+                        + "so Micronaut may have skipped a bean definition that would otherwise stop the application. "
+                        + "Start without {}=true to see Micronaut's own handling",
+                    BeanDefinitionPrefetch.PROPERTY, BeanDefinitionPrefetch.PROPERTY, failure);
+            }
+        }
+    }
+
     private static long elapsedMillis(long startNanos) {
         return TimeUnit.MILLISECONDS.convert(System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
+    }
+
+    /**
+     * Reads the training run switch the way the beans of a training run do with
+     * {@code @Requires(property = TRAINING_ENABLED, pattern = "(?i)true")}: only {@code true}, in
+     * any case, turns it on. A {@code Boolean} conversion would also accept the strings
+     * {@code yes} and {@code on}, which those beans do not match.
+     *
+     * <p>Every application runs this on startup, so it is a plain call: no lambda to link. With
+     * {@link #isTrainingRunBeforeStart(Environment)}, it is the only thing an application that is
+     * not training pays for: the mode ({@link ApplicationConfiguration#TRAINING_MODE}) is only read
+     * when the switch is on.</p>
+     *
+     * <p>This read decides whether this run is a training run. The one before the start only
+     * decides whether Micronaut Test Resources is disabled while the environment starts.</p>
+     *
+     * @param environment The started environment
+     * @return Whether this run is a training run
+     */
+    private static boolean isTrainingRun(Environment environment) {
+        return StringUtils.TRUE.equalsIgnoreCase(environment.getProperty(ApplicationConfiguration.TRAINING_ENABLED, String.class).orElse(null));
+    }
+
+    /**
+     * Reads the training run switch before the environment starts, from the sources that the
+     * environment does not have to read and that take precedence over the configuration files: the
+     * system properties, the environment variables (with the includes and the excludes of this
+     * builder, as the environment reads them), the properties and the arguments given to this
+     * builder, and the property sources given to this builder whose order is at least that of the
+     * environment variables. A switch that is only set in the configuration of the application, or
+     * in a property source of this builder with a lower order, which a configuration file can
+     * override, is not seen here.
+     *
+     * <p>A source that the environment only reads when it starts and that takes precedence over
+     * these, such as distributed configuration, can still turn the switch off. {@link #start()} then
+     * logs a warning, because Micronaut Test Resources was disabled for a run that is not a training
+     * run (see {@link TrainingTestResources}).</p>
+     *
+     * <p>Every application runs this on startup: two lookups and a look at the property sources that
+     * this builder has added, usually none or one.</p>
+     *
+     * @param environment The environment, not started
+     * @return Whether this run is a training run
+     */
+    private boolean isTrainingRunBeforeStart(Environment environment) {
+        @Nullable String value = null;
+        int order = Integer.MIN_VALUE;
+        if (isEnableDefaultPropertySources()) {
+            value = CachedEnvironment.getProperty(ApplicationConfiguration.TRAINING_ENABLED);
+            order = SystemPropertiesPropertySource.POSITION;
+            if (value == null && readsTrainingVariable()) {
+                value = CachedEnvironment.getenv(TRAINING_ENABLED_ENVIRONMENT_VARIABLE);
+                order = EnvironmentPropertySource.POSITION;
+            }
+        }
+        // The source with the highest order wins, and the sources of the builder win a tie, as in the started environment
+        for (PropertySource propertySource : environment.getPropertySources()) {
+            int sourceOrder = propertySource.getOrder();
+            // Below the environment variables, a configuration file, which is not read yet, could override it
+            if (sourceOrder < EnvironmentPropertySource.POSITION) {
+                continue;
+            }
+            Object sourceValue = propertySource.get(ApplicationConfiguration.TRAINING_ENABLED);
+            if (sourceValue != null && (value == null || sourceOrder >= order)) {
+                value = sourceValue.toString();
+                order = sourceOrder;
+            }
+        }
+        return StringUtils.TRUE.equalsIgnoreCase(value);
+    }
+
+    /**
+     * @return Whether the started environment reads {@value #TRAINING_ENABLED_ENVIRONMENT_VARIABLE}:
+     * the environment variables are a property source, and the includes and the excludes of this
+     * builder let that variable through, as {@link EnvironmentPropertySource} applies them
+     */
+    private boolean readsTrainingVariable() {
+        if (!isEnvironmentPropertySource()) {
+            return false;
+        }
+        @Nullable List<String> includes = getEnvironmentVariableIncludes();
+        @Nullable List<String> excludes = getEnvironmentVariableExcludes();
+        return (includes == null || includes.contains(TRAINING_ENABLED_ENVIRONMENT_VARIABLE))
+            && (excludes == null || !excludes.contains(TRAINING_ENABLED_ENVIRONMENT_VARIABLE));
+    }
+
+    /**
+     * Starts the environment. In a training run that is known before the start, the Micronaut Test
+     * Resources client is disabled while the environment reads the configuration (see
+     * {@link TrainingTestResources}).
+     *
+     * @param environment The environment
+     * @param trainingRun Whether the switch is on before the environment starts
+     */
+    private static void startEnvironment(Environment environment, boolean trainingRun) {
+        if (!trainingRun) {
+            environment.start();
+            return;
+        }
+        @Nullable String testResourcesClient = TrainingTestResources.disableClient();
+        try {
+            environment.start();
+        } finally {
+            TrainingTestResources.restoreClient(testResourcesClient);
+        }
+    }
+
+    /**
+     * Says as soon as the switch is read that this JVM is a training run, so that a switch set by
+     * mistake on a deployment target is visible before the application stops itself. Without an
+     * {@link EmbeddedApplication} it says that nothing stops the application.
+     *
+     * @param environment The environment
+     * @param hasEmbeddedApplication Whether the context has an {@link EmbeddedApplication} to stop
+     */
+    private static void announceTrainingRun(Environment environment, boolean hasEmbeddedApplication) {
+        if (!LOG.isWarnEnabled()) {
+            return;
+        }
+        if (hasEmbeddedApplication) {
+            LOG.warn("Training run ({}=true): this JVM is a training run and does not serve traffic. It stops the application as soon as startup has completed{}. "
+                    + "Never set this property or {} on a deployment target",
+                ApplicationConfiguration.TRAINING_ENABLED, exitsAfterTrainingRun(environment) ? " and exits with status 0" : "", TRAINING_ENABLED_ENVIRONMENT_VARIABLE);
+        } else {
+            // The beans that require the switch are still created: only the stop and the exit are missing
+            LOG.warn("Training run ({}=true): the application is not stopped, because it has no EmbeddedApplication. The JVM exits when the application's own threads end",
+                ApplicationConfiguration.TRAINING_ENABLED);
+        }
+    }
+
+    private static boolean exitsAfterTrainingRun(Environment environment) {
+        return !environment.getActiveNames().contains(Environment.TEST);
+    }
+
+    /**
+     * Ends a training run ({@link ApplicationConfiguration#TRAINING_ENABLED}): the application has
+     * started and every startup listener, warm-up included, has run. Stops the application, closes
+     * the context and exits with status 0, except in the {@code test} environment.
+     *
+     * @param applicationContext The application context
+     * @param embeddedApplication The started application
+     */
+    @SuppressWarnings("java:S1147") // Exiting the JVM is the point of a training run
+    private static void finishTrainingRun(ApplicationContext applicationContext, EmbeddedApplication<?> embeddedApplication) {
+        boolean exit = exitsAfterTrainingRun(applicationContext.getEnvironment());
+        if (LOG.isWarnEnabled()) {
+            LOG.warn("Training run ({}=true): startup completed, stopping the application{}. This JVM was a training run and served no traffic",
+                ApplicationConfiguration.TRAINING_ENABLED, exit ? " and exiting with status 0" : "");
+        }
+        try (applicationContext) {
+            embeddedApplication.stop();
+        }
+        if (exit) {
+            System.exit(0);
+        }
     }
 
     @Override
@@ -364,13 +662,50 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     protected void handleStartupException(Environment environment, Throwable exception) {
         Function<Throwable, Integer> exitCodeMapper = exitHandlers.computeIfAbsent(exception.getClass(), exceptionType -> (throwable -> 1));
         int code = exitCodeMapper.apply(exception);
-        if (code > 0 && !environment.getActiveNames().contains(Environment.TEST)) {
+        if (code > 0 && mayExit(environment)) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error starting Micronaut server: {}", exception.getMessage(), exception);
             }
             System.exit(code);
         }
         throw new ApplicationStartupException("Error starting Micronaut server: " + exception.getMessage(), exception);
+    }
+
+    /**
+     * Whether this launcher may terminate the JVM, on a startup failure or when the embedded application
+     * asks for a forced exit. It may not while the {@link Environment#TEST test} environment is active,
+     * because the test owns the JVM, and not in {@link DevelopmentMode development mode}, because the
+     * development launcher owns it and keeps serving the previous version of the application instead.
+     *
+     * <p>{@link #start()} calls this once, as soon as the environment started, and keeps the answer for the rest of
+     * that start: a failure afterwards, including one handled by an overridden
+     * {@link #handleStartupException(Environment, Throwable)}, and a forced exit are judged by that answer, whatever
+     * environment they pass, because the failure may already have stopped the context and with it the environment's
+     * properties. Only a failure before the environment started calls this method with the environment given to
+     * {@code handleStartupException}. Each call of {@code start()} decides again.</p>
+     *
+     * @param environment The environment
+     * @return True if the launcher may call {@code System.exit}
+     * @since 5.3.0
+     */
+    private static boolean isExitAllowed(Environment environment) {
+        return !environment.getActiveNames().contains(Environment.TEST) && !DevelopmentMode.isEnabled(environment);
+    }
+
+    private boolean mayExit(Environment environment) {
+        Boolean decided = exitAllowed;
+        return decided != null ? decided : isExitAllowed(environment);
+    }
+
+    private static void removeShutdownHook(@Nullable Thread shutdownHook) {
+        if (shutdownHook == null) {
+            return;
+        }
+        try {
+            Runtime.getRuntime().removeShutdownHook(shutdownHook);
+        } catch (IllegalStateException e) {
+            // the JVM is already shutting down and the hook is running or about to: leave it be
+        }
     }
 
     @SuppressWarnings("java:S106")
@@ -388,4 +723,45 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             .orElseGet(() -> new MicronautBanner(out));
     }
 
+    /**
+     * Removes the shutdown hook when the context stops, however it is stopped. An application that is not kept
+     * alive, such as the Netty server, returns from {@link #start()} with the hook registered, and a context
+     * stopped by its embedder (a test, or a development launcher that starts the next generation in the same
+     * JVM) would otherwise stay reachable from the hook, with the hook's context class loader, until the JVM
+     * exits. The listener is registered before the context starts: a context stopped before the hook is added, while
+     * the embedded application is still starting, has the hook removed as it is added. When the hook itself stops the
+     * context, the JVM is already shutting down and the hook stays.
+     */
+    private static final class ShutdownHookRemoval implements ApplicationEventListener<ShutdownEvent> {
+        private static final Object STOPPED = new Object();
+        private final AtomicReference<@Nullable Object> hook = new AtomicReference<>();
+
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        static ShutdownHookRemoval register(ApplicationContext applicationContext) {
+            ShutdownHookRemoval removal = new ShutdownHookRemoval();
+            applicationContext.registerBeanDefinition(
+                RuntimeBeanDefinition.builder((Class) ApplicationEventListener.class, () -> removal)
+                    .singleton(true)
+                    .typeArguments(Argument.of(ShutdownEvent.class))
+                    .build()
+            );
+            return removal;
+        }
+
+        /**
+         * @param shutdownHook The hook just registered for the context, removed at once if the context stopped meanwhile
+         */
+        void added(Thread shutdownHook) {
+            if (!hook.compareAndSet(null, shutdownHook)) {
+                removeShutdownHook(shutdownHook);
+            }
+        }
+
+        @Override
+        public void onApplicationEvent(ShutdownEvent event) {
+            if (hook.getAndSet(STOPPED) instanceof Thread shutdownHook) {
+                removeShutdownHook(shutdownHook);
+            }
+        }
+    }
 }

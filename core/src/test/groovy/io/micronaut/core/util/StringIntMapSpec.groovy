@@ -36,4 +36,34 @@ class StringIntMapSpec extends Specification {
         map.get("fizz", -1) == 3
         map.get("buzz", -1) == 4
     }
+
+    def "empty map returns the supplied default"() {
+        expect:
+        new StringIntMap(0).get("missing", Integer.MIN_VALUE) == Integer.MIN_VALUE
+    }
+
+    def "lookup handles collisions and wraparound"() {
+        given:
+        def map = new StringIntMap(3)
+        def values = [Integer.MIN_VALUE, -1, Integer.MAX_VALUE]
+        keys.eachWithIndex { key, i -> map.put(key, values[i]) }
+
+        expect:
+        keys.withIndex().every { key, i ->
+            map.get(new String(key.toCharArray()), 42) == values[i]
+        }
+        map.get(missing, 42) == 42
+
+        when:
+        map.put(new String(keys[1].toCharArray()), 42)
+
+        then:
+        thrown(IllegalArgumentException)
+        map.get(keys[1], 42) == -1
+
+        where:
+        keys                       | missing
+        ["AaAa", "BBBB", "AaBB"]   | "BBAa"
+        ["g", "o", "w"]            | "?"
+    }
 }

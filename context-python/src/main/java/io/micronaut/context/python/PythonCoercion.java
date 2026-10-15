@@ -23,11 +23,15 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import java.lang.reflect.Array;
+import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -606,6 +610,39 @@ public final class PythonCoercion {
     }
 
     /**
+     * A member of the Python object of a generated wrapper as the caller reads it: a standard library
+     * value of the object ({@code uuid.UUID}, {@code decimal.Decimal}, a {@code datetime}, ...) read by
+     * Python code of another context is materialised again in the context of the caller.
+     * <p>
+     * A wrapper keeps the object of the context it created it in, the primary context for an entity
+     * that Java created (a repository result, a joined association). Python code of a pooled context
+     * that reads an attribute of the wrapper through its proxy would otherwise get the value of that
+     * other context, which it sees as a {@code ForeignObject}: its {@code str()} is the {@code repr} of
+     * the Python value ({@code UUID('...')}) and it compares equal to no value of its own context, so
+     * the same attribute read the same way differed with the context the wrapper was created in.
+     * Wrappers and other host objects are not copied (they cross contexts by reference), nor are the
+     * objects and callables of the wrapper's own context, which keep their identity.
+     *
+     * @param member The member read from the Python object of a wrapper
+     * @return The member of the context the caller runs in, or the member itself
+     */
+    static Object memberInEnteredContext(Value member) {
+        if (member.isHostObject() || member.isString() || member.isNumber() || member.isBoolean()) {
+            return member;
+        }
+        Context current = enteredContext();
+        if (current == null || isValueInContext(member, current)) {
+            return member;
+        }
+        Object standardValue = GraalPyHostAccessFactory.standardLibraryValue(member);
+        if (standardValue == null) {
+            return member;
+        }
+        Object converted = coerceStandardTypeToContext(standardValue, current);
+        return converted != null ? converted : member;
+    }
+
+    /**
      * The polyglot context the calling thread is executing in.
      *
      * @return The entered context, or {@code null} when the caller is plain Java
@@ -676,12 +713,24 @@ public final class PythonCoercion {
     private static @Nullable Object coerceStandardTypeToContext(@Nullable Object value, Context context) {
         return switch (value) {
             case null -> null;
+            case BigDecimal decimal -> standardTypeHelper(context).execute("decimal", decimal.toString());
             case LocalDate localDate ->
                 standardTypeHelper(context).execute("date", localDate.toString());
             case LocalTime localTime ->
                 standardTypeHelper(context).execute("time", localTime.toString());
             case LocalDateTime localDateTime ->
                 standardTypeHelper(context).execute("datetime", localDateTime.toString());
+            case PythonDateTimeValue(Instant instant) ->
+                standardTypeHelper(context).execute("datetime", instant.toString());
+            case PythonDateTimeValue(OffsetDateTime offsetDateTime) ->
+                standardTypeHelper(context).execute("datetime", offsetDateTime.toString());
+            case PythonDateTimeValue(ZonedDateTime zonedDateTime) -> standardTypeHelper(context).execute(
+                "zoned_datetime",
+                zonedDateTime.toOffsetDateTime().toString(),
+                0,
+                zonedDateTime.getZone() instanceof ZoneOffset ? null : zonedDateTime.getZone().getId()
+            );
+            case PythonDateTimeValue(Object other) -> coerceStandardTypeToContext(other, context);
             case Duration duration ->
                 standardTypeHelper(context).execute("duration", duration.getSeconds(), duration.getNano());
             case ZoneOffset zoneOffset ->
@@ -689,6 +738,22 @@ public final class PythonCoercion {
             case UUID uuid -> standardTypeHelper(context).execute("uuid", uuid.toString());
             default -> value;
         };
+    }
+
+    /**
+     * Tags the Java value of an element whose Python type is {@code datetime}, declared with
+     * {@code Annotated[datetime, Instant]} (see {@code PythonDateTime}), so that it reaches Python as an
+     * aware {@code datetime}. An {@code Instant}, {@code OffsetDateTime} or {@code ZonedDateTime} without
+     * the tag stays the Java object: Python code that declares the Java type calls Java APIs with it.
+     *
+     * @param value The Java value
+     * @return The tagged value, or the value itself when it is not one of those types
+     */
+    @UsedByGeneratedCode
+    public static @Nullable Object pythonDateTime(@Nullable Object value) {
+        return value instanceof Instant || value instanceof OffsetDateTime || value instanceof ZonedDateTime
+            ? new PythonDateTimeValue(value)
+            : value;
     }
 
     private static Value standardTypeHelper(Context context) {
@@ -730,6 +795,47 @@ public final class PythonCoercion {
             }
             return result;
         });
+    }
+
+    /**
+     * Coerce the dependencies a pooled bean is constructed with into a context.
+     *
+     * <p>As {@link #coerceArgumentsToContext} except for a dependency that is a Python bean of a
+     * single context: a singleton, or anything else that is not pooled. Such a bean cannot be
+     * reconstructed elsewhere -- there is one Python object and it belongs to its own context -- so
+     * the Java wrapper is passed instead, and calls through it return to the context that owns it.
+     * Rebuilding it is not merely unsupported, it is wrong: two contexts would hold two objects
+     * where the application asked for one.
+     *
+     * <p>This is the same choice module injection makes for the same reason, and it is what the
+     * compile-time warning about a pooled type depending on a singleton Python bean is naming: the
+     * dependency works, and the work behind it runs in one context however many the pool has.
+     *
+     * @param context The target context
+     * @param args The dependencies, already resolved by injection
+     * @return The arguments to construct with
+     */
+    public static Object[] coerceDependenciesToContext(Context context, Object[] args) {
+        Object[] pinned = null;
+        for (int i = 0; i < args.length; i++) {
+            if (args[i] instanceof ValueCoercible && !(args[i] instanceof PooledValueCoercible)) {
+                if (pinned == null) {
+                    pinned = args.clone();
+                }
+                // a placeholder the coercion leaves alone, replaced with the wrapper below
+                pinned[i] = null;
+            }
+        }
+        if (pinned == null) {
+            return coerceArgumentsToContext(context, args);
+        }
+        Object[] coerced = coerceArgumentsToContext(context, pinned);
+        for (int i = 0; i < args.length; i++) {
+            if (pinned[i] == null && args[i] != null) {
+                coerced[i] = args[i];
+            }
+        }
+        return coerced;
     }
 
     /**
@@ -935,10 +1041,10 @@ public final class PythonCoercion {
     }
 
     /**
-     * Convert a constructor argument of a startup-context object for the replayed constructor in an event-loop
-     * context: Python beans and host beans as async members, other values as a constructor call converts them.
+     * Convert a constructor argument of an instance whose class declares coroutine methods: Python beans and host
+     * beans as async members, other values as a constructor call converts them.
      *
-     * @param context The event-loop context
+     * @param context The context the instance is created in
      * @param value The Java constructor argument
      * @return The context-local argument
      */
@@ -1258,5 +1364,13 @@ public final class PythonCoercion {
             }
             return scalarFuture(publisher, reactiveContext);
         }
+    }
+
+    /**
+     * A Java instant bound for Python as an aware {@code datetime}; see {@link #pythonDateTime(Object)}.
+     *
+     * @param value The Java value
+     */
+    private record PythonDateTimeValue(Object value) {
     }
 }

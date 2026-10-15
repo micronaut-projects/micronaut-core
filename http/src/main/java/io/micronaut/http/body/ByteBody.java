@@ -17,16 +17,20 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.http.body.stream.ByteBodyElements;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.body.stream.BodyPublishers;
+import io.micronaut.http.body.stream.NoTrailers;
 import org.jetbrains.annotations.Contract;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * This class represents a stream of bytes from an HTTP connection. These bytes may be streamed or
@@ -123,7 +127,26 @@ public sealed interface ByteBody permits AvailableByteBody, CloseableByteBody, I
      * @return The streamed bytes
      */
     default Publisher<ReadBuffer> toReadBufferPublisher() {
-        return Flux.from(toByteArrayPublisher()).map(ReadBufferFactory.getJdkFactory()::adapt);
+        return BodyPublishers.map(toByteArrayPublisher(), ReadBufferFactory.getJdkFactory()::adapt);
+    }
+
+    /**
+     * Get this body as {@link ReadBuffer}s pulled one at a time, without Reactive Streams: a
+     * piece of the body is read when {@link BodyElements#next()} asks for it. The caller must
+     * close the buffers it receives, and {@link BodyElements#close() close} the elements if it
+     * does not read them to the end, which discards the rest of the body.
+     * <p>This is a primary operation. After this operation, no other primary operation or
+     * {@link #split()} may be done.
+     *
+     * <p>Once a requested piece is delivered, one additional piece may be received ahead of
+     * the next read. This prefetch never decodes an element ahead of the caller.</p>
+     *
+     * @return The pieces of the body
+     * @since 5.3.0
+     */
+    @Experimental
+    default BodyElements<ReadBuffer> toReadBufferElements() {
+        return ByteBodyElements.readBuffers(move());
     }
 
     /**
@@ -136,11 +159,11 @@ public sealed interface ByteBody permits AvailableByteBody, CloseableByteBody, I
      * @return The streamed bytes
      */
     default Publisher<ByteBuffer<?>> toByteBufferPublisher() {
-        return Flux.from(toReadBufferPublisher()).doOnDiscard(ReadBuffer.class, ReadBuffer::close).map(rb -> {
+        return BodyPublishers.map(toReadBufferPublisher(), rb -> {
             try (rb) {
                 return rb.toByteBuffer();
             }
-        });
+        }, BodyPublishers::closeReadBuffer);
     }
 
     /**
@@ -167,6 +190,25 @@ public sealed interface ByteBody permits AvailableByteBody, CloseableByteBody, I
      * @since 4.8.0
      */
     CloseableByteBody move();
+
+    /**
+     * Get the trailers of this body: the header fields that follow the last bytes of a chunked
+     * HTTP/1 message or of an HTTP/2 stream, e.g. {@code grpc-status}. The returned stage
+     * completes when the body has ended, with empty headers if the message carried no trailers,
+     * and fails when the body fails. A body that cannot carry trailers, such as a buffered body,
+     * returns a stage that is already complete with empty headers.
+     * <p>The trailers are shared by the bodies returned from {@link #split()} and
+     * {@link #move()}, and they are lost when the body is buffered with {@link #buffer()}. A
+     * body created in code carries trailers when it is created with
+     * {@link ByteBodyFactory#withTrailers(CloseableByteBody, CompletionStage)}.
+     * <p>This is <i>not</i> a primary operation and does not modify this {@link ByteBody}.
+     *
+     * @return The trailers of this body
+     * @since 5.3.0
+     */
+    default CompletionStage<HttpHeaders> trailers() {
+        return NoTrailers.STAGE;
+    }
 
     /**
      * Debug trace for leak detection.
