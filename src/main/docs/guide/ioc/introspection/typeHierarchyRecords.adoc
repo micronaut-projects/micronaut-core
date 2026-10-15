@@ -7,7 +7,7 @@ snippet::io.micronaut.docs.ioc.hierarchy.Hierarchies[tags="class"]
 <1> Imports the hierarchy of the annotated class
 <2> Imports the hierarchies of the given classes instead, which can be classes of a library or of the JDK
 
-snippet::io.micronaut.docs.ioc.hierarchy.TypeHierarchySpec[tags="usage", indent=0]
+snippet::io.micronaut.docs.ioc.hierarchy.TypeHierarchyTest[tags="usage", indent=0]
 
 <1> Finds the record of a class; empty when none was imported
 <2> The type variables, each a placeholder with its bounds

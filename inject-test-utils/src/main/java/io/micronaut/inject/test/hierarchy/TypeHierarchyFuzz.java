@@ -147,17 +147,17 @@ public final class TypeHierarchyFuzz {
      *
      * @param g              The generated class
      * @param type           The compiled class
-     * @param record         Its record
+     * @param hierarchy      Its record
      * @param ignoreInterface Interfaces of the compiled class to leave out, those a language adds to every class
      * @return The mismatches, empty when the record agrees with reflection
      */
-    public static List<String> check(Generated g, Class<?> type, TypeHierarchy record, Predicate<Class<?>> ignoreInterface) {
+    public static List<String> check(Generated g, Class<?> type, TypeHierarchy hierarchy, Predicate<Class<?>> ignoreInterface) {
         List<String> mismatches = new ArrayList<>();
         // a Python type variable is named after its class as well, T0 for the T of Fuzz0: reflection and the record agree on it
-        compare(mismatches, g, g.declaration() + " declaration", TypeStrings.strings(record.getTypeClosure(record.getDeclaration())),
+        compare(mismatches, g, g.declaration() + " declaration", TypeStrings.strings(hierarchy.getTypeClosure(hierarchy.getDeclaration())),
             Oracle.closure(type, Oracle.identity(type), false, ignoreInterface));
         if (type.getTypeParameters().length > 0) {
-            compare(mismatches, g, g.declaration() + " raw", TypeStrings.strings(record.getTypeClosure(Argument.of(type))),
+            compare(mismatches, g, g.declaration() + " raw", TypeStrings.strings(hierarchy.getTypeClosure(Argument.of(type))),
                 Oracle.closure(type, Map.of(), true, ignoreInterface));
             List<Concrete> actual = g.concreteArguments();
             Argument<?> parameterization = Argument.of(type, (String) null, actual.stream().map(Concrete::argument).toArray(Argument[]::new));
@@ -167,7 +167,7 @@ public final class TypeHierarchyFuzz {
                 substitutions.put(typeParameters[i], actual.get(i).rendering());
             }
             compare(mismatches, g, g.declaration() + " as " + actual.stream().map(Concrete::rendering).toList(),
-                TypeStrings.strings(record.getTypeClosure(parameterization)), Oracle.closure(type, substitutions, false, ignoreInterface));
+                TypeStrings.strings(hierarchy.getTypeClosure(parameterization)), Oracle.closure(type, substitutions, false, ignoreInterface));
         }
         return mismatches;
     }
@@ -180,16 +180,16 @@ public final class TypeHierarchyFuzz {
      *
      * @param g      The generated class
      * @param type   The compiled class
-     * @param record Its record
+     * @param hierarchy      Its record
      * @return The mismatches, empty when the record agrees with the declaration
      */
-    public static List<String> checkPython(Generated g, Class<?> type, TypeHierarchy record) {
+    public static List<String> checkPython(Generated g, Class<?> type, TypeHierarchy hierarchy) {
         List<String> mismatches = new ArrayList<>();
         Map<String, String> identity = new LinkedHashMap<>();
         for (Variable variable : g.variables()) {
             identity.put(variable.name(), Generator.pythonVar(g, variable.name()));
         }
-        compare(mismatches, g, g.declaration() + " declaration", TypeStrings.strings(record.getTypeClosure(record.getDeclaration())),
+        compare(mismatches, g, g.declaration() + " declaration", TypeStrings.strings(hierarchy.getTypeClosure(hierarchy.getDeclaration())),
             ModelOracle.closure(g, identity));
         if (!g.variables().isEmpty()) {
             List<Concrete> actual = g.concreteArguments();
@@ -199,7 +199,7 @@ public final class TypeHierarchyFuzz {
                 substitutions.put(g.variables().get(i).name(), actual.get(i).rendering());
             }
             compare(mismatches, g, g.declaration() + " as " + actual.stream().map(Concrete::rendering).toList(),
-                TypeStrings.strings(record.getTypeClosure(parameterization)), ModelOracle.closure(g, substitutions));
+                TypeStrings.strings(hierarchy.getTypeClosure(parameterization)), ModelOracle.closure(g, substitutions));
         }
         return mismatches;
     }
@@ -440,18 +440,17 @@ public final class TypeHierarchyFuzz {
             int interfaceCount = random.nextInt(4);
             boolean top = false;
             for (String candidate : interfacePool.subList(0, Math.min(interfaceCount, interfacePool.size()))) {
+                boolean reachesTop = candidate.equals("LeftRight") || candidate.equals("Top");
+                if (reachesTop && top) {
+                    // Top is reached once: a second parameterization of it would clash
+                    continue;
+                }
                 if (candidate.equals("LeftRight")) {
-                    if (top) {
-                        continue;
-                    }
                     List<TypeExpr> x = List.of(typeArgument(names, 0));
                     interfaces.add(new SuperType("Left", x, false));
                     interfaces.add(new SuperType("Right", x, false));
                     top = true;
                 } else if (candidate.equals("Top")) {
-                    if (top) {
-                        continue;
-                    }
                     interfaces.add(new SuperType("Top", arguments("Top", names), false));
                     top = true;
                 } else {
