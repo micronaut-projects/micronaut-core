@@ -49,7 +49,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 /**
@@ -131,16 +133,18 @@ final class BodyRouteSelector {
      * @param request           The request, as the pre-matching filters left it
      * @param pending           The matches that depend on the body
      * @param propagatedContext The context the conditions are evaluated in
+     * @param waits             Tells the lifecycle of the request what the choice waits for, so that it stops waiting when the request is abandoned
      * @param <T>               The target type
      * @param <R>               The result type
-     * @return A flow of the chosen match, empty if the body matches no route
+     * @return A flow of the choice: the chosen match, and whether the body met the conditions of a route
      */
-    <T, R> ExecutionFlow<Optional<UriRouteMatch<T, R>>> select(HttpRequest<?> request,
-                                                               PendingRouteMatch<T, R> pending,
-                                                               PropagatedContext propagatedContext) {
+    <T, R> ExecutionFlow<Choice<T, R>> select(HttpRequest<?> request,
+                                              PendingRouteMatch<T, R> pending,
+                                              PropagatedContext propagatedContext,
+                                              Waits waits) {
         int serverLimit = serverLimit();
         return read(request, pending.getMaxBytes(serverLimit), serverLimit)
-            .flatMap(body -> propagatedContext.propagate(() -> choose(new Selection<>(request, pending, body, serverLimit, propagatedContext), 0)));
+            .flatMap(body -> propagatedContext.propagate(() -> choose(new Selection<>(request, pending, body, serverLimit, propagatedContext, waits), 0)));
     }
 
     private int serverLimit() {
@@ -152,7 +156,7 @@ final class BodyRouteSelector {
      * conditions the body meets. The conditions are evaluated one after the other, and an
      * asynchronous condition continues the choice when its stage completes.
      */
-    private <T, R> ExecutionFlow<Optional<UriRouteMatch<T, R>>> choose(Selection<T, R> selection, int from) {
+    private <T, R> ExecutionFlow<Choice<T, R>> choose(Selection<T, R> selection, int from) {
         List<List<UriRouteMatch<T, R>>> ranks = selection.pending.getRanks();
         for (int i = from; i < ranks.size(); i++) {
             List<UriRouteMatch<T, R>> rank = ranks.get(i);
@@ -171,7 +175,7 @@ final class BodyRouteSelector {
         if (LOG.isDebugEnabled()) {
             LOG.debug("The body of the request {} {} meets the body conditions of no route", selection.request.getMethodName(), selection.request.getPath());
         }
-        return ExecutionFlow.just(Optional.empty());
+        return ExecutionFlow.just(Choice.unmet());
     }
 
     /**
@@ -180,7 +184,7 @@ final class BodyRouteSelector {
      * read again for them, and an asynchronous locator that has not located its target yet is
      * waited for, like the router does without body conditions.
      */
-    private <T, R> ExecutionFlow<Optional<UriRouteMatch<T, R>>> chosen(Selection<T, R> selection, List<UriRouteMatch<T, R>> matched) {
+    private <T, R> ExecutionFlow<Choice<T, R>> chosen(Selection<T, R> selection, List<UriRouteMatch<T, R>> matched) {
         List<PendingRouteMatch<T, R>> next = new ArrayList<>(1);
         UriRouteMatch<T, R> match;
         try {
@@ -190,13 +194,17 @@ final class BodyRouteSelector {
             if (location == null) {
                 throw e;
             }
+            // a locator started after the body was read: the request stops waiting for it when abandoned
+            selection.waits.onPendingLocation(selection.request, location);
             return CompletableFutureExecutionFlow.just(location)
                 .flatMap(located -> selection.propagate(() -> chosen(selection, matched)));
         }
         if (!next.isEmpty()) {
-            return select(selection.request, next.getFirst(), selection.context);
+            return select(selection.request, next.getFirst(), selection.context, selection.waits);
         }
-        return ExecutionFlow.just(Optional.ofNullable(match));
+        // the body met the conditions of a route, which may still resolve to no route, e.g. a
+        // located target without a route for the method: answered as without body conditions
+        return ExecutionFlow.just(new Choice<>(match, true));
     }
 
     /**
@@ -262,9 +270,43 @@ final class BodyRouteSelector {
         if (stage == null) {
             return ExecutionFlow.just(false);
         }
-        return CompletableFutureExecutionFlow.just(stage)
+        return CompletableFutureExecutionFlow.just(detached(selection, stage))
             .map(Boolean.TRUE::equals)
-            .onErrorResume(error -> failed(selection.request, error));
+            .onErrorResume(error -> error instanceof ConditionAbandoned || error.getCause() instanceof ConditionAbandoned
+                ? ExecutionFlow.error(error)
+                : failed(selection.request, error));
+    }
+
+    /**
+     * The outcome of the stage of a condition, which the request stops waiting for when it is
+     * abandoned: the stage, which may be shared, e.g. by a cache, is not cancelled, and it no
+     * longer references the choice, the request or its body then.
+     */
+    private static CompletionStage<Boolean> detached(Selection<?, ?> selection, CompletionStage<Boolean> stage) {
+        CompletableFuture<Boolean> outcome = new CompletableFuture<>();
+        AtomicReference<@Nullable CompletableFuture<Boolean>> waiting = new AtomicReference<>(outcome);
+        stage.whenComplete((met, error) -> {
+            CompletableFuture<Boolean> waiter = waiting.getAndSet(null);
+            if (waiter != null) {
+                if (error != null) {
+                    waiter.completeExceptionally(error);
+                } else {
+                    waiter.complete(met);
+                }
+            }
+        });
+        if (!outcome.isDone()) {
+            Runnable remove = selection.waits.whenAbandoned(selection.request, () -> {
+                CompletableFuture<Boolean> waiter = waiting.getAndSet(null);
+                if (waiter != null) {
+                    waiter.completeExceptionally(new ConditionAbandoned());
+                }
+            });
+            if (remove != null) {
+                outcome.whenComplete((met, error) -> remove.run());
+            }
+        }
+        return outcome;
     }
 
     /**
@@ -402,7 +444,7 @@ final class BodyRouteSelector {
         @SuppressWarnings("unchecked")
         <V> Optional<V> decode(Argument<V> type) {
             for (Decoded d : decoded) {
-                if (d.type().equalsType(type)) {
+                if (sameDecoding(d.type(), type)) {
                     return (Optional<V>) d.value();
                 }
             }
@@ -451,6 +493,16 @@ final class BodyRouteSelector {
     }
 
     /**
+     * @return Whether the body decoded to one argument is the body decoded to another: the same
+     * argument, or the same type without annotations, which may change the decoding, e.g. a
+     * {@code @JsonView}
+     */
+    private static boolean sameDecoding(Argument<?> decoded, Argument<?> type) {
+        return decoded == type || decoded.equalsType(type)
+            && decoded.getAnnotationMetadata().isEmpty() && type.getAnnotationMetadata().isEmpty();
+    }
+
+    /**
      * The body decoded to a type.
      *
      * @param type  The type
@@ -467,6 +519,7 @@ final class BodyRouteSelector {
      * @param body        The body, as the conditions read it
      * @param serverLimit The limit of the server for buffered request content
      * @param context     The context the conditions are evaluated in
+     * @param waits       What the choice waits for
      * @param <T>         The target type
      * @param <R>         The result type
      */
@@ -474,9 +527,54 @@ final class BodyRouteSelector {
                                    PendingRouteMatch<T, R> pending,
                                    RequestBody body,
                                    int serverLimit,
-                                   PropagatedContext context) {
+                                   PropagatedContext context,
+                                   Waits waits) {
         <U> ExecutionFlow<U> propagate(Supplier<ExecutionFlow<U>> next) {
             return context.propagate(next);
+        }
+    }
+
+    /**
+     * The route chosen by the body of a request.
+     *
+     * @param match   The chosen match, or {@code null} if there is none
+     * @param bodyMet Whether the body met the conditions of a route: a request whose body met
+     *                none is not found, without a {@code 405}, {@code 415} or {@code 406} of the routes
+     *                whose conditions it did not meet
+     * @param <T>     The target type
+     * @param <R>     The result type
+     */
+    record Choice<T, R>(@Nullable UriRouteMatch<T, R> match, boolean bodyMet) {
+        static <T, R> Choice<T, R> unmet() {
+            return new Choice<>(null, false);
+        }
+    }
+
+    /**
+     * Tells the lifecycle of a request what choosing its route waits for, so that it stops waiting
+     * when the client abandons the request.
+     */
+    interface Waits {
+        /**
+         * @param request The request
+         * @param located Completes when the target of a route locator is located
+         */
+        void onPendingLocation(HttpRequest<?> request, CompletionStage<?> located);
+
+        /**
+         * @param request The request
+         * @param action  Run when the client abandons the request
+         * @return Removes the action, or {@code null} if the server cannot tell
+         */
+        @Nullable Runnable whenAbandoned(HttpRequest<?> request, Runnable action);
+    }
+
+    /**
+     * The request was abandoned while a condition was decided: an expected outcome, without a stack trace.
+     */
+    private static final class ConditionAbandoned extends RuntimeException {
+        ConditionAbandoned() {
+            super("The request was abandoned before the body conditions of its routes were decided", null, false, false);
         }
     }
 }

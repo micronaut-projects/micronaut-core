@@ -29,6 +29,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.ConditionalFilter;
 import io.micronaut.http.server.annotation.PreMatching;
 import io.micronaut.http.tck.AssertionUtils;
@@ -38,6 +39,7 @@ import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.LocatedRoutes;
+import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
@@ -88,6 +90,26 @@ public class HandlerRouteBodyConditionsResolutionTest {
     }
 
     @Test
+    void anAmbiguityAmongTheRoutesOfALocatedTargetIsAnsweredByTheErrorRoutesOfItsGroup() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertThrows(server, HttpRequest.POST("/bcr/dup/shops/7/orders", "x").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.CONFLICT)
+                .body("ambiguous in the group")
+                .build());
+        }
+    }
+
+    @Test
+    void aLocatedTargetWithoutARouteForTheMethodIsNotAllowed() throws IOException {
+        try (ServerUnderTest server = server()) {
+            // the body meets the condition of the group, the target has a GET route only
+            AssertionUtils.assertThrows(server, HttpRequest.POST("/bcr/vip/shops/7/report", "vip").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.METHOD_NOT_ALLOWED)
+                .build());
+        }
+    }
+
+    @Test
     void aBodyAFilterSetIsHeldToTheLimitOfTheCondition() throws IOException {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/bcr/set-body", "x").header("X-Body", "12345678").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
@@ -108,6 +130,17 @@ public class HandlerRouteBodyConditionsResolutionTest {
                 .status(HttpStatus.OK)
                 .body("traced")
                 .headers(Map.of("X-Traced", "t1"))
+                .build());
+        }
+    }
+
+    @Test
+    void theFiltersAfterTheRouteMatchSeeTheRequestAfterADelayedConditionWithoutPreMatchingFilters() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/bcr/gated", "x").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("gated")
+                .headers(Map.of("X-Gated", "POST /bcr/gated"))
                 .build());
         }
     }
@@ -170,6 +203,24 @@ public class HandlerRouteBodyConditionsResolutionTest {
         }
     }
 
+    /**
+     * A filter after the route match, without a pre-matching filter on its path, enabled when
+     * the request is in the propagated context.
+     */
+    @ServerFilter("/bcr/gated")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class GatedFilter implements ConditionalFilter {
+        @Override
+        public boolean isEnabled(HttpRequest<?> request) {
+            return ServerRequestContext.currentRequest().isPresent();
+        }
+
+        @ResponseFilter
+        void gated(HttpRequest<?> request, MutableHttpResponse<?> response) {
+            response.header("X-Gated", request.getMethodName() + " " + request.getPath());
+        }
+    }
+
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class Routes implements HttpRoutes {
@@ -181,9 +232,19 @@ public class HandlerRouteBodyConditionsResolutionTest {
 
         @Override
         public void routes(HttpRouteBuilder routes) {
-            LocatedRoutes<String> shops = TckLocatedRoutes.of(String.class, shop ->
+            LocatedRoutes<String> shops = TckLocatedRoutes.of(String.class, shop -> {
                 shop.POST("/orders").where(bodyText(text -> text.contains("express"))).consumesAll()
-                    .body(String.class).handle((request, pathVariables, id, body) -> text("shop " + id + " express " + body)));
+                    .body(String.class).handle((request, pathVariables, id, body) -> text("shop " + id + " express " + body));
+                shop.GET("/report").handle((request, pathVariables, id) -> text("report " + id));
+            });
+            LocatedRoutes<String> ambiguous = TckLocatedRoutes.of(String.class, shop -> {
+                shop.POST("/orders").where(bodyText(text -> true)).consumesAll().handle((request, pathVariables, id) -> text("first"));
+                shop.POST("/orders").where(bodyText(text -> true)).consumesAll().handle((request, pathVariables, id) -> text("second"));
+            });
+            routes.path("/bcr/dup", dup -> {
+                dup.error(DuplicateRouteException.class, (request, error) -> HttpResponse.status(HttpStatus.CONFLICT).body("ambiguous in the group").contentType(MediaType.TEXT_PLAIN_TYPE));
+                dup.locate("/shops/{id}", (request, pathVariables) -> pathVariables.getString("id"), shop -> ambiguous);
+            });
             routes.path("/bcr/vip", vip -> {
                 vip.where(bodyText(text -> text.startsWith("vip")));
                 vip.locate("/shops/{id}", (request, pathVariables) -> pathVariables.getString("id"), shop -> shops);
@@ -200,6 +261,16 @@ public class HandlerRouteBodyConditionsResolutionTest {
             routes.POST("/bcr/set-body").consumesAll()
                 .handle((request, pathVariables) -> text("fallback"));
 
+            // completes after the route match waits for it: the continuation runs on the lookup thread
+            routes.POST("/bcr/gated").where(bodyAsync(String.class, body -> CompletableFuture.supplyAsync(() -> {
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return true;
+            }, lookups))).consumesAll()
+                .handle((request, pathVariables) -> text("gated"));
             routes.POST("/bcr/traced").where(bodyAsync(String.class, body -> CompletableFuture.supplyAsync(() -> true, lookups))).consumesAll()
                 .handle((request, pathVariables) -> text("traced"));
         }

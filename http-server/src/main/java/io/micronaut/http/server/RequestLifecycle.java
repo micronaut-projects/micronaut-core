@@ -525,10 +525,20 @@ public class RequestLifecycle {
                         // the route depends on the body: read it, and choose
                         pendingMatch = null;
                         return routeExecutor.bodyRouteSelector()
-                            .select(request, pending, PropagatedContext.getOrEmpty())
+                            .select(request, pending, PropagatedContext.getOrEmpty(), new BodyRouteSelector.Waits() {
+                                @Override
+                                public void onPendingLocation(HttpRequest<?> waiting, CompletionStage<?> located) {
+                                    RequestLifecycle.this.onPendingLocation(waiting, located);
+                                }
+
+                                @Override
+                                public @Nullable Runnable whenAbandoned(HttpRequest<?> waiting, Runnable action) {
+                                    return RequestLifecycle.this.whenAbandoned(waiting, action);
+                                }
+                            })
                             .map(chosen -> {
-                                routeMatch = chosen.orElse(null);
-                                bodyUnmatched = chosen.isEmpty();
+                                routeMatch = chosen.match();
+                                bodyUnmatched = !chosen.bodyMet();
                                 matched(request);
                                 return Boolean.TRUE;
                             });
@@ -822,6 +832,21 @@ public class RequestLifecycle {
      */
     protected void onPendingLocation(HttpRequest<?> request, CompletionStage<?> located) {
         // nothing to abandon by default: a server that knows when the client goes away overrides this
+    }
+
+    /**
+     * Run an action when the client abandons the request, e.g. closes the connection, while its
+     * route is chosen by its body, see {@link io.micronaut.web.router.builder.RouteCondition.Body}:
+     * the request stops waiting for an asynchronous body condition then.
+     *
+     * @param request The request
+     * @param action  The action
+     * @return Removes the action, or {@code null} if the server cannot tell when the client goes away
+     * @since 5.3.0
+     */
+    protected @Nullable Runnable whenAbandoned(HttpRequest<?> request, Runnable action) {
+        // nothing to abandon by default: a server that knows when the client goes away overrides this
+        return null;
     }
 
     /**

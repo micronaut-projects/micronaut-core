@@ -35,6 +35,9 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 
@@ -52,6 +55,9 @@ class HandlerRouteBodyConditionsStreamingTest {
     private static final long TIMEOUT_MILLIS = 10_000;
     private static final AtomicInteger EVALUATED = new AtomicInteger();
     private static final AtomicInteger FILTERED = new AtomicInteger();
+    private static final AtomicInteger HANDLED = new AtomicInteger();
+    private static final CountDownLatch HOLDING = new CountDownLatch(1);
+    private static final CompletableFuture<Boolean> HELD = new CompletableFuture<>();
 
     private static ApplicationContext ctx;
     private static EmbeddedServer server;
@@ -112,6 +118,25 @@ class HandlerRouteBodyConditionsStreamingTest {
         }
         assertEquals(evaluated, EVALUATED.get(), "the condition never saw a body that did not arrive");
         // the server keeps serving
+        assertEquals("matched match", fixed("/bcs/items", "match"));
+    }
+
+    @Test
+    void aClientThatAbandonsTheRequestWhileAConditionIsDecidedStopsTheChoice() throws Exception {
+        try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+            socket.getOutputStream().write(head("/bcs/held", "Content-Length: 4"));
+            socket.getOutputStream().write("held".getBytes(StandardCharsets.US_ASCII));
+            socket.getOutputStream().flush();
+            assertTrue(HOLDING.await(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS), "the condition is decided");
+            // abruptly: a reset, not a graceful close
+            socket.setSoLinger(true, 0);
+        }
+        // the server finds the dead connection by its reset, or its idle timeout on the loopback of macOS
+        Thread.sleep(4_000);
+        // the shared stage completes later: no one waits for the route of the request any more
+        HELD.complete(true);
+        Thread.sleep(500);
+        assertEquals(0, HANDLED.get(), "the route of an abandoned request is not invoked");
         assertEquals("matched match", fixed("/bcs/items", "match"));
     }
 
@@ -215,6 +240,16 @@ class HandlerRouteBodyConditionsStreamingTest {
                 }).maxBytes(64))
                 .consumes(MediaType.TEXT_PLAIN_TYPE)
                 .handle((request, pathVariables) -> text("only"));
+            routes.POST("/bcs/held")
+                .where(RouteCondition.bodyAsync(String.class, text -> {
+                    HOLDING.countDown();
+                    return HELD;
+                }))
+                .consumes(MediaType.TEXT_PLAIN_TYPE)
+                .handle((request, pathVariables) -> {
+                    HANDLED.incrementAndGet();
+                    return text("held");
+                });
             routes.path("/bcs/large", large -> {
                 large.where(RouteCondition.bodyBytes(bytes -> EVALUATED.incrementAndGet() > 0).maxBytes(1024 * 1024));
                 large.POST("/")

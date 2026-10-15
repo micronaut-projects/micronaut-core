@@ -94,6 +94,12 @@ class HandlerRouteBodyConditionsServerLimitTest {
     }
 
     @Test
+    void aChunkLargerThanTheServerBufferIsNotTakenForTheLimitOfTheConditions() throws Exception {
+        // the limit of the conditions is lower than the buffer of the server, which one chunk exceeds
+        assertEquals("413", rejected("/cap/limited", "match" + "x".repeat(4000)));
+    }
+
+    @Test
     void aBodyThatMeetsNoConditionIsNotFoundEvenWithAStaticResourceOnThePath() throws Exception {
         assertEquals("404", fixed("/static/index.html", "other"));
         assertEquals("matched static", fixed("/static/index.html", "static"));
