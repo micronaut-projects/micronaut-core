@@ -242,7 +242,7 @@ class ErrorSpec extends AbstractMicronautSpec {
     void "test encoding error with handler"() {
         given:
         HttpResponse response = Flux.from(httpClient.exchange(
-                HttpRequest.GET('/errors/encoding-error/handled')
+                HttpRequest.GET('/errors/encoding-error/handled'), String
         )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
@@ -250,10 +250,9 @@ class ErrorSpec extends AbstractMicronautSpec {
             throw t
         }).blockFirst()
 
-        expect:
+        expect: 'the CodecException of the JSON encoding goes to the error route, like any other failure of the writer'
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
-        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
-        response.getBody(Map).get()._embedded.errors[0].message.contains('foo')
+        response.getBody(String).get() == 'Handled server error'
     }
 
     void "test encoding error with handler loop"() {

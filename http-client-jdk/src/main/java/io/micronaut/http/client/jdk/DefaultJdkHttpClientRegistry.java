@@ -45,7 +45,9 @@ import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.ProxyHttpClient;
+import io.micronaut.http.client.AsyncProxyHttpClient;
 import io.micronaut.http.client.AsyncRawHttpClient;
+import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.DefaultAsyncOverRawHttpClient;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawHttpClientRegistry;
@@ -93,7 +95,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     private final Map<ClientKey, DefaultJdkHttpClient> clients = new ConcurrentHashMap<>(10);
     private final BeanContext beanContext;
     private final LoadBalancerResolver loadBalancerResolver;
-    private final HttpClientConfiguration defaultHttpClientConfiguration;
+    private final DefaultJdkHttpClientConfiguration defaultHttpClientConfiguration;
     private final JsonMapper jsonMapper;
     @Nullable
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
@@ -106,7 +108,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     public DefaultJdkHttpClientRegistry(
         BeanContext beanContext,
         LoadBalancerResolver loadBalancerResolver,
-        HttpClientConfiguration defaultHttpClientConfiguration,
+        DefaultJdkHttpClientConfiguration defaultHttpClientConfiguration,
         HttpClientFilterResolver<ClientFilterResolutionContext> httpClientFilterResolver,
         JsonMapper jsonMapper,
         @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
@@ -180,6 +182,32 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     }
 
     /**
+     * Creates an {@link AsyncStreamingHttpClient} based on the {@literal java.net.http.*} HTTP
+     * Client, which is also the {@link io.micronaut.http.client.AsyncHttpClient}: the
+     * {@link io.micronaut.http.client.StreamingHttpClient#toAsyncStreaming() async view} of the
+     * client that a {@code HttpClient} injection point gets, which also reads server-sent events.
+     *
+     * @param injectionPoint The injection point
+     * @param loadBalancer   The load balancer
+     * @param configuration  The configuration
+     * @param beanContext    The bean context
+     * @return An async HTTP client
+     * @since 5.3.0
+     */
+    @Bean
+    @BootstrapContextCompatible
+    @Primary
+    @Order(2) // If both this and the netty client are present, netty is the default.
+    AsyncStreamingHttpClient asyncHttpClient(
+        @Nullable InjectionPoint<?> injectionPoint,
+        @Parameter @Nullable LoadBalancer loadBalancer,
+        @Parameter @Nullable HttpClientConfiguration configuration,
+        BeanContext beanContext
+    ) {
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsyncStreaming();
+    }
+
+    /**
      * Creates an {@link AsyncRawHttpClient} based on the {@literal java.net.http.*} HTTP Client.
      *
      * @param injectionPoint The injection point
@@ -224,6 +252,31 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         BeanContext beanContext
     ) {
         return new JdkRawHttpClient(resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext));
+    }
+
+    /**
+     * Creates an {@link AsyncProxyHttpClient} for the given injection point: the async view of
+     * the {@link ProxyHttpClient} the same injection point gets.
+     *
+     * @param injectionPoint The injection point
+     * @param loadBalancer   The load balancer to use (Optional)
+     * @param configuration  The configuration (Optional)
+     * @param beanContext    The bean context to use
+     * @return The client
+     * @since 5.3.0
+     */
+    @Bean
+    @BootstrapContextCompatible
+    @Primary
+    @Order(2) // If both this and the netty client are present, netty is the default.
+    @SuppressWarnings("java:S2095") // the async proxy wraps the raw client, which shares the pipeline of the client bean
+    AsyncProxyHttpClient asyncProxyHttpClient(
+        @Nullable InjectionPoint<?> injectionPoint,
+        @Parameter @Nullable LoadBalancer loadBalancer,
+        @Parameter @Nullable HttpClientConfiguration configuration,
+        BeanContext beanContext
+    ) {
+        return new JdkRawHttpClient(resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext)).toAsyncProxy();
     }
 
     private DefaultJdkHttpClient resolveDefaultHttpClient(
@@ -409,7 +462,8 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
             clientId,
             conversionService,
             jdkClientSslBuilder,
-            cookieDecoder
+            cookieDecoder,
+            defaultHttpClientConfiguration.getJdk()
         );
     }
 
