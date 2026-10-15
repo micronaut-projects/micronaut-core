@@ -23,6 +23,7 @@ import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * Wraps {@link ExecutorService} to instrument it for propagating the {@link PropagatedContext}
@@ -93,6 +94,24 @@ public class ContextPropagatingExecutorService implements InstrumentedExecutorSe
             target = ies.getTarget();
         }
         return Optional.empty();
+    }
+
+    /**
+     * Instruments the given {@link ExecutorService} to run submitted tasks with the {@link PropagatedContext}
+     * of the submitting thread, unless it is already instrumented.
+     *
+     * @param executorService The executor service
+     * @return The instrumented executor service
+     * @since 5.3.0
+     */
+    public static ExecutorService instrument(ExecutorService executorService) {
+        if (isInstrumented(executorService)) {
+            return executorService;
+        }
+        if (executorService instanceof ScheduledExecutorService scheduledExecutorService) {
+            return new ContextPropagatingScheduledExecutorService(scheduledExecutorService);
+        }
+        return new ContextPropagatingExecutorService(executorService);
     }
 
     /**
