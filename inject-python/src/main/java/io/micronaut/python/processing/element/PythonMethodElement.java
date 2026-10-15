@@ -121,10 +121,22 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
                                ClassElement declaringType,
                                ClassElement owningType,
                                ElementAnnotationMetadataFactory metadataFactory) {
+        this(functionDef, environment, declaringType, owningType, metadataFactory, null);
+    }
+
+    private PythonMethodElement(FunctionDef functionDef,
+                                PythonProcessingEnvironment environment,
+                                ClassElement declaringType,
+                                ClassElement owningType,
+                                ElementAnnotationMetadataFactory metadataFactory,
+                                @Nullable AnnotationMetadata presetAnnotationMetadata) {
         super(Objects.requireNonNull(functionDef, "FunctionDef cannot be null").name(), functionDef, metadataFactory);
         this.environment = Objects.requireNonNull(environment, "PythonProcessingEnvironment cannot be null");
         this.declaringType = Objects.requireNonNull(declaringType, "Declaring type cannot be null");
         this.owningType = Objects.requireNonNull(owningType, "Owning type cannot be null");
+        // the metadata a copy was given replaces the method's own, and has to be in place before the
+        // validation check below reads and caches the metadata
+        this.presetAnnotationMetadata = presetAnnotationMetadata;
 
         // Resolve return type
         this.returnType = resolveReturnType(functionDef);
@@ -919,7 +931,15 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public MethodElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        PythonMethodElement methodElement = (PythonMethodElement) makeCopy();
+        PythonMethodElement methodElement = new PythonMethodElement(
+            getNativeType(),
+            environment,
+            declaringType,
+            owningType,
+            getElementAnnotationMetadataFactory(),
+            annotationMetadata
+        );
+        copyValues(methodElement);
         methodElement.presetAnnotationMetadata = annotationMetadata;
         return methodElement;
     }
