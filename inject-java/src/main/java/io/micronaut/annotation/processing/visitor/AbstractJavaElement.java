@@ -334,6 +334,16 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                         doc
                     );
                 }
+                if (typeElement.getKind() == ElementKind.ANNOTATION_TYPE) {
+                    // an annotation interface cannot be generic or a type variable
+                    return new JavaAnnotationElement(
+                        new JavaNativeElement.Class(typeElement, type, owner),
+                        elementAnnotationMetadataFactory,
+                        visitorContext,
+                        0,
+                        doc
+                    );
+                }
                 return new JavaClassElement(
                     new JavaNativeElement.Class(typeElement, arrayType == null ? type : arrayType, owner),
                     elementAnnotationMetadataFactory,

@@ -1740,7 +1740,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 return;
             }
         }
-        T beanToDestroy = registration.getBean();
+        T beanToDestroy = registration.beanOrNull();
         BeanDefinition<T> definition = registration.getBeanDefinition();
         if (beanToDestroy != null) {
             purgeCacheForBeanInstance(beanToDestroy);
@@ -1753,6 +1753,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             // what a destroyed bean held is released with it; what held the bean stays recorded until that is destroyed.
             // A singleton definition may have a fresh registration beside the scoped instance, and both record under it
             dependencyGraph.destroyed(registration, definition.isSingleton() && singletonScope.findBeanRegistration(definition) != null);
+        }
+        if (beanToDestroy == null) {
+            // A @Nullable factory method produced no bean, so there is no instance for the pre-destroy listeners
+            // or a @PreDestroy method to see. What the factory method resolved to produce it is still released.
+            releaseDependents(registration, null);
+            return;
         }
         try {
             beanToDestroy = triggerPreDestroyListeners(resolutionContext, definition, beanToDestroy);
@@ -1887,7 +1893,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 try {
                     bean = (T) Objects.requireNonNull(
                         listener.bean.onPreDestroy(event),
-                        "PreDestroy event listener illegally returned null: " + listener.getClass()
+                        "PreDestroy event listener illegally returned null: " + listener.bean.getClass()
                     );
                 } catch (Exception e) {
                     throw new BeanDestructionException(beanDefinition, e);
@@ -4090,7 +4096,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             return scoped;
         }
         // Unknown scope, prototype scope etc
-        BeanRegistration<T> prototype = createRegistration(resolutionContext, beanType, qualifier, definition, true);
+        BeanRegistration<T> prototype = createRegistration(resolutionContext, beanType, qualifier, definition, true, false, true);
         // a prototype belongs to the bean that received it, and what the prototype received is recorded
         // under the prototype's definition, so a path through it is not lost
         recordDependency(resolutionContext, prototype.beanDefinition, qualifier);
@@ -4237,13 +4243,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                                                      @Nullable Qualifier<T> qualifier,
                                                      BeanDefinition<T> definition,
                                                      boolean dependent) {
-        return createRegistration(resolutionContext, beanType, qualifier, definition, dependent, false);
+        return createRegistration(resolutionContext, beanType, qualifier, definition, dependent, false, false);
     }
 
     final <T> BeanRegistration<T> createFreshRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                          BeanDefinition<T> definition) {
         BeanRegistration<T> registration = createRegistration(resolutionContext, definition.asArgument(), definition.getDeclaredQualifier(),
-            definition, resolutionContext != null, true);
+            definition, resolutionContext != null, true, true);
         if (dependencyGraph != null) {
             // what the fresh instance received is recorded under its definition as it is created; a singleton's
             // fresh instance shares those edges with the scoped one, so destroying either must not forget them
@@ -4326,7 +4332,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                                                       @Nullable Qualifier<T> qualifier,
                                                       BeanDefinition<T> definition,
                                                       boolean dependent,
-                                                      boolean customizeNull) {
+                                                      boolean customizeNull,
+                                                      boolean ownLifecycle) {
         if (resolutionContext instanceof AbstractBeanResolutionContext abstractContext && abstractContext.isLazyProxyTarget()) {
             // The context is retained by a lazy proxy, which resolves its target through it on every call. Create
             // the bean in a copy, so that the created bean is not recorded as a dependent of the retained context
@@ -4396,7 +4403,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                         BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
                         List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
                         BeanDisposingRegistration<T> disposing = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
-                            dependentBeans, interceptorCandidates, creation.dependencies);
+                            dependentBeans, interceptorCandidates, creation.dependencies, ownLifecycle);
                         if (dependencyGraph != null && created != bean) {
                             // a listener replaced the instance: a development context retains the one it received
                             disposing.setBeforeListeners(created);

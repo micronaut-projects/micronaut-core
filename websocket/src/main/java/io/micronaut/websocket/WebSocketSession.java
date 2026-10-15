@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.websocket;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -23,6 +24,7 @@ import org.reactivestreams.Publisher;
 
 import java.net.URI;
 import java.security.Principal;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -162,6 +164,53 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      */
     default void sendSync(Object message) {
         sendSync(message, MediaType.APPLICATION_JSON_TYPE);
+    }
+
+    /**
+     * Send the messages of a publisher to the remote peer, in order, no faster than the connection
+     * writes them: the publisher produces only as the connection asks for more. The Netty sessions
+     * ask for the next message while the connection is writable, and flush the messages of a
+     * batch together; the default implementation asks for it once the previous one was sent. The
+     * session closing stops the publisher: an implementation that observes the close cancels it
+     * then, and any other when the next message would be sent. Cancelling the returned future
+     * cancels the publisher too.
+     *
+     * <p>When the future fails, the messages before the failing one may have been sent: the
+     * future does not tell how many were.</p>
+     *
+     * <pre>{@code
+     * routes.GET("/ticks").webSocket(ws -> ws
+     *     .onOpen((session, request) -> session.sendAllAsync(ticks)));
+     * }</pre>
+     *
+     * @param messages The messages
+     * @return A future that completes with {@code true} when the publisher completed and its
+     * messages were sent, with {@code false} when the session closed first, and fails when the
+     * publisher or a send fails
+     * @since 5.3.0
+     */
+    @Experimental
+    default CompletableFuture<Boolean> sendAllAsync(Publisher<?> messages) {
+        return sendAllAsync(messages, MediaType.APPLICATION_JSON_TYPE);
+    }
+
+    /**
+     * Send the messages of a publisher to the remote peer, see {@link #sendAllAsync(Publisher)}.
+     *
+     * @param messages  The messages
+     * @param mediaType The media type of the messages
+     * @return A future that completes with {@code true} when the publisher completed and its
+     * messages were sent, with {@code false} when the session closed first, and fails when the
+     * publisher or a send fails
+     * @since 5.3.0
+     */
+    @Experimental
+    default CompletableFuture<Boolean> sendAllAsync(Publisher<?> messages, MediaType mediaType) {
+        Objects.requireNonNull(messages, "messages");
+        Objects.requireNonNull(mediaType, "mediaType");
+        CompletableFuture<Boolean> sent = new CompletableFuture<>();
+        messages.subscribe(new WebSocketMessagesSubscriber(this, mediaType, sent));
+        return sent;
     }
 
     /**
