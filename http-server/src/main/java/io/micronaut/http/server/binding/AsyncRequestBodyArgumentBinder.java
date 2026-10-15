@@ -29,6 +29,7 @@ import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.server.multipart.FormFactory;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -51,6 +52,11 @@ final class AsyncRequestBodyArgumentBinder implements TypedRequestArgumentBinder
     private final BeanProvider<RequestArgumentSatisfier> argumentSatisfier;
     private final BeanProvider<MessageBodyHandlerRegistry> bodyHandlerRegistry;
     private final BeanProvider<FormFactory> formFactory;
+    // the beans are looked up on first use, as the providers break a dependency cycle, and then kept:
+    // a provider resolves the bean again at every call, which allocates for each body read
+    private volatile @Nullable RequestBinderRegistry binderRegistry;
+    private volatile @Nullable MessageBodyHandlerRegistry messageBodyHandlerRegistry;
+    private volatile @Nullable FormFactory resolvedFormFactory;
 
     AsyncRequestBodyArgumentBinder(BeanProvider<RequestArgumentSatisfier> argumentSatisfier,
                                    BeanProvider<MessageBodyHandlerRegistry> bodyHandlerRegistry,
@@ -88,20 +94,35 @@ final class AsyncRequestBodyArgumentBinder implements TypedRequestArgumentBinder
      * @return The binders of the arguments of the routes, which bind the {@code @Body} arguments
      */
     RequestBinderRegistry binderRegistry() {
-        return argumentSatisfier.get().getBinderRegistry();
+        RequestBinderRegistry registry = binderRegistry;
+        if (registry == null) {
+            registry = argumentSatisfier.get().getBinderRegistry();
+            binderRegistry = registry;
+        }
+        return registry;
     }
 
     /**
      * @return The message body readers
      */
     MessageBodyHandlerRegistry bodyHandlerRegistry() {
-        return bodyHandlerRegistry.get();
+        MessageBodyHandlerRegistry registry = messageBodyHandlerRegistry;
+        if (registry == null) {
+            registry = bodyHandlerRegistry.get();
+            messageBodyHandlerRegistry = registry;
+        }
+        return registry;
     }
 
     /**
      * @return The form factory
      */
     FormFactory formFactory() {
-        return formFactory.get();
+        FormFactory factory = resolvedFormFactory;
+        if (factory == null) {
+            factory = formFactory.get();
+            resolvedFormFactory = factory;
+        }
+        return factory;
     }
 }
