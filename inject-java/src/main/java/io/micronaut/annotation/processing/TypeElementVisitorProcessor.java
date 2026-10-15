@@ -412,7 +412,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             Class<?> serviceClass = outputObjectDef.serviceClass();
             OriginatingElements originatingElements = outputObjectDef.originatingElements();
             if (serviceClass != null) {
-                classWriterOutputVisitor.visitServiceDescriptor(serviceClass.getName(), objectDef.getName(), originatingElements.getOriginatingElements()[0], outputObjectDef.serviceContent());
+                classWriterOutputVisitor.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
             }
             try (OutputStream outputStream = classWriterOutputVisitor.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
                 outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
