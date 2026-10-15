@@ -21,7 +21,7 @@ import spock.lang.Specification
 
 import java.util.function.Supplier
 
-class TypeHierarchySpec extends Specification {
+class TypeHierarchyTest extends Specification {
 
     void "reads the recorded hierarchy"() {
         given:

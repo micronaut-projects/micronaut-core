@@ -21,7 +21,6 @@ import io.micronaut.core.type.Argument
 import io.micronaut.core.type.WildcardArgument
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
-import spock.lang.PendingFeature
 import spock.lang.Shared
 import spock.lang.Unroll
 
