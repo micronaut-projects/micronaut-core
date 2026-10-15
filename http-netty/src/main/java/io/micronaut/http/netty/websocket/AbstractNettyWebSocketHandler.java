@@ -63,6 +63,7 @@ import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
+import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -586,7 +587,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     );
 
                     invokeAndClose(ctx, target, boundExecutable, methodExecutionHandle, true,
-                        writeCloseReason && answersCloseFrame() ? cr : null);
+                        writeCloseReason ? cr : null);
                 } catch (Throwable e) {
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error invoking @OnClose handler for WebSocket bean [{}]: {}", target, e.getMessage(), e);
@@ -604,17 +605,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         CloseReason cr = new CloseReason(cwsf.statusCode(), cwsf.reasonText());
         getSession().markCloseReceived();
         handleCloseReason(ctx, cr, true);
-    }
-
-    /**
-     * Whether a close frame of the peer is answered with a close frame once the close handler
-     * is done, before the connection closes, rather than by closing the connection only.
-     *
-     * @return Whether to answer a close frame
-     * @since 5.3.0
-     */
-    protected boolean answersCloseFrame() {
-        return false;
     }
 
     private void invokeAndClose(ChannelHandlerContext ctx, Object target, BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> methodExecutionHandle, boolean isClose,
@@ -636,15 +626,31 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     LOG.error("Error subscribing to @{} handler for WebSocket bean [{}]: {}", (isClose ? "OnClose" : "OnError"), target, t.getMessage(), t);
                 }
             }
-            if (closeReply != null && ctx.channel().isActive()) {
-                // the close frame of the peer is answered (RFC 6455, 5.5.1), so that the peer
-                // sees the close handshake complete rather than only the end of the connection
-                ctx.writeAndFlush(new CloseWebSocketFrame(closeReply.getCode(), closeReply.getReason()))
-                    .addListener(ChannelFutureListener.CLOSE);
-            } else {
+            if (closeReply == null) {
                 ctx.close();
+                return;
+            }
+            // the handler may complete on another thread, e.g. an async close handler: the
+            // answer is written from the event loop
+            EventExecutor executor = ctx.executor();
+            if (executor.inEventLoop()) {
+                answerClose(ctx, closeReply);
+            } else {
+                executor.execute(() -> answerClose(ctx, closeReply));
             }
         });
+    }
+
+    private void answerClose(ChannelHandlerContext ctx, CloseReason closeReply) {
+        if (ctx.channel().isActive() && getSession().markCloseSent()) {
+            // the close frame of the peer is answered (RFC 6455, 5.5.1), so that the peer
+            // sees the close handshake complete rather than only the end of the connection,
+            // unless a close was sent already, e.g. by the close handler
+            ctx.writeAndFlush(new CloseWebSocketFrame(closeReply.getCode(), closeReply.getReason()))
+                .addListener(ChannelFutureListener.CLOSE);
+        } else {
+            ctx.close();
+        }
     }
 
     private BoundExecutable bindMethod(HttpRequest<?> request, ArgumentBinderRegistry<WebSocketState> binderRegistry, MethodExecutionHandle<?, ?> openMethod, List<?> parameters) {
@@ -691,6 +697,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
     private void writeCloseFrameAndTerminate(ChannelHandlerContext ctx, int code, String reason) {
         cleanupBuffer();
+        getSession().markCloseSent();
         final CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(code, reason);
         ctx.channel().writeAndFlush(closeFrame)
                       .addListener(future -> handleCloseReason(ctx, new CloseReason(code, reason), false));
@@ -701,6 +708,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             cleanupBuffer();
             ctx.channel().config().setAutoRead(false);
             getSession().markClosing();
+            getSession().markCloseSent();
             CloseReason closeReason = CloseReason.MESSAGE_TO_BIG;
             ScheduledFuture<?> closeTimeout = ctx.executor().schedule(() -> {
                 ctx.close();

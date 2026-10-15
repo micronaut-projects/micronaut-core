@@ -149,8 +149,29 @@ public class ServerWebSocketTest {
     @Test
     @Tag(WEBSOCKET_CLOSE_HANDSHAKE)
     void theCloseOfTheClientIsAnsweredWithACloseFrame() throws Exception {
-        // an endpoint without an @OnClose method: the server answers the close frame, see
-        // AbstractNettyWebSocketHandler#answersCloseFrame for the endpoints with one
+        // an endpoint with an @OnClose method: the server answers the close frame once it ran
+        WebSocketTestClient.Connection connection = client.connect("/ws/tck/echo/handshake");
+        assertEquals("open handshake", connection.next());
+        WebSocketTestClient.Closed closed = connection.close(1000, "bye");
+        assertEquals(1000, closed.code());
+        assertEquals("bye", closed.reason());
+        assertEquals("close handshake 1000 bye", events().poll(TIMEOUT, TimeUnit.SECONDS));
+    }
+
+    @Test
+    @Tag(WEBSOCKET_CLOSE_HANDSHAKE)
+    void theCloseOfTheClientIsAnsweredOnceAnAsyncCloseHandlerCompleted() throws Exception {
+        WebSocketTestClient.Connection connection = client.connect("/ws/tck/async-close");
+        assertEquals("open", connection.next());
+        WebSocketTestClient.Closed closed = connection.close(1000, "bye");
+        assertEquals(1000, closed.code());
+        assertEquals("bye", closed.reason());
+        assertEquals("closed 1000", events().poll(TIMEOUT, TimeUnit.SECONDS));
+    }
+
+    @Test
+    @Tag(WEBSOCKET_CLOSE_HANDSHAKE)
+    void theCloseOfTheClientIsAnsweredWithoutACloseHandler() throws Exception {
         WebSocketTestClient.Connection connection = client.connect("/ws/tck/subprotocol");
         assertEquals("subprotocol none", connection.next());
         WebSocketTestClient.Closed closed = connection.close(1000, "bye");
@@ -385,6 +406,33 @@ public class ServerWebSocketTest {
                 .supplyAsync(() -> message.toUpperCase(Locale.ROOT), CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS))
                 .thenCompose(session::sendAsync)
                 .thenRun(() -> events.events.add("handled " + message));
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    @ServerWebSocket("/ws/tck/async-close")
+    static class AsyncCloseSocket {
+        private final Events events;
+
+        AsyncCloseSocket(Events events) {
+            this.events = events;
+        }
+
+        @OnOpen
+        void onOpen(WebSocketSession session) {
+            session.sendSync("open");
+        }
+
+        @OnMessage
+        void onMessage(String message) {
+            // not used
+        }
+
+        @OnClose
+        CompletionStage<Void> onClose(CloseReason reason) {
+            return CompletableFuture.runAsync(
+                () -> events.events.add("closed " + reason.getCode()),
+                CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS));
         }
     }
 
