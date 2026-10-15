@@ -398,29 +398,36 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, R
      * of a file that did not exist included. Creating, changing or deleting one of these files changes what a
      * refresh reads.
      *
-     * <p>A location is {@code classpath:} followed by the path of a resource below the root of the class path, or
-     * {@code file:} followed by an absolute path, with forward slashes in both.</p>
+     * <p>A file is given as {@code classpath:} followed by the path of a resource below the root of the class path,
+     * or {@code file:} followed by an absolute path, with forward slashes in both.</p>
      *
-     * @return The locations
+     * <p>Only sources read from the class path or the file system are included: a source a
+     * {@link PropertySourcesLocator} or a bootstrap locator reads from elsewhere, such as a distributed configuration
+     * store (Consul, Kubernetes and the like), names no file, so none is listed for it, and a change there is not
+     * seen through these files.</p>
+     *
+     * @return The files, empty when the environment does not record them
      * @since 5.3.0
      */
     @Experimental
-    default Set<String> getConfigurationLocations() {
+    default Set<String> getConfigurationFiles() {
         return Set.of();
     }
 
     /**
-     * Whether a location is one of the {@link #getConfigurationLocations() configuration locations}: a
-     * {@code classpath:} or {@code classpath*:} resource path, or a {@code file:} path or a plain file path, which
-     * a relative path names from the working directory.
+     * Whether a location names one of the {@link #getConfigurationFiles() configuration files}: a
+     * {@code classpath:} or {@code classpath*:} resource path, with or without a leading slash, or a {@code file:}
+     * path or a plain file path, which a relative path names from the working directory. The location is
+     * normalized to the form {@link #getConfigurationFiles()} uses before it is looked up.
      *
      * @param location The location
      * @return Whether the environment looked for configuration there
      * @since 5.3.0
      */
     @Experimental
-    default boolean isConfigurationLocation(String location) {
-        return getConfigurationLocations().contains(location);
+    default boolean isConfigurationFile(String location) {
+        Set<String> files = getConfigurationFiles();
+        return !files.isEmpty() && files.contains(DefaultEnvironment.normalizeConfigurationFile(location));
     }
 
     /**
