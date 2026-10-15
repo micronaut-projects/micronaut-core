@@ -78,7 +78,7 @@ public final class InputStreamBodyBinder implements NonBlockingBodyArgumentBinde
      * {@link ContentLengthExceededException} itself rather than the {@link IOException} wrapping it, so that a route
      * that lets the read failure propagate is answered with 413 like any other body over the limit, instead of 500.
      */
-    private static final class SizeLimitInputStream extends FilterInputStream {
+    static final class SizeLimitInputStream extends FilterInputStream {
         SizeLimitInputStream(InputStream in) {
             super(in);
         }
