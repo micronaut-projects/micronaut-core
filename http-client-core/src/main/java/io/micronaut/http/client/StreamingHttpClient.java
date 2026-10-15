@@ -102,7 +102,9 @@ public interface StreamingHttpClient extends HttpClient {
      * @param request The {@link HttpRequest} to execute
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    <I> Publisher<Map<String, Object>> jsonStream(HttpRequest<I> request);
+    default <I> Publisher<Map<String, Object>> jsonStream(HttpRequest<I> request) {
+        return jsonStream(request, Argument.mapOf(String.class, Object.class));
+    }
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of JSON objects as they become available without blocking.</p>
