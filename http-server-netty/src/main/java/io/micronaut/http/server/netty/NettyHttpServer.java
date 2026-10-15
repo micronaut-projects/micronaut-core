@@ -186,6 +186,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         // the bootstrap options are set when the bootstraps are built, and a bound bootstrap keeps them
         HttpServerConfiguration.PREFIX + ".netty.options",
         HttpServerConfiguration.PREFIX + ".netty.child-options",
+        // the QUIC codec of an HTTP/3 listener is set up on its bound channel, with these settings
+        NettyHttpServerConfiguration.PREFIX + ".http3",
         SslConfiguration.PREFIX + ".port",
         SslConfiguration.PREFIX + ".enabled"
     };
@@ -1203,7 +1205,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             if (sslBuilder != null && (change.all() || change.touches(SslConfiguration.PREFIX) || change.touches(ServerSslConfiguration.PREFIX))) {
                 // before the pipelines are rebuilt, and not after, as the legacy listener used to: a store file
                 // replaced in place keeps its path, and must be read again
-                sslBuilder.reload();
+                sslBuilder.invalidate();
             }
             refreshListeners();
             return ReloadingConfigurationWatcher.Outcome.APPLIED;
