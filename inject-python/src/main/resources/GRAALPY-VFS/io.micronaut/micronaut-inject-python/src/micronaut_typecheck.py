@@ -305,6 +305,9 @@ class DecoratorRules:
                 continue
             simple_name = description.simpleName()
             if not description.annotation():
+                if description.pythonDefined():
+                    # a Python class of the compilation used as a decorator (a callable class): plain Python
+                    continue
                 self._report("not-an-annotation",
                              f"[{description.name()}] is not an annotation and cannot decorate {self.kind} [{self.unit.qualified_name}]",
                              node)
@@ -373,8 +376,11 @@ class DecoratorRules:
                              f"member [{name}] of @{simple_name} is {member.typeName()}; got {kind}",
                              element)
             elif member.enumType() and kind == "str":
+                # read at run time through the conversion of a string to the enum, which also accepts the
+                # constant spelt as an environment name (created, fooBar); the type facts give no constants for
+                # an enum with its own toString(), which the conversion matches too
                 constants = list(member.enumConstants())
-                if constants and element.value not in constants:
+                if constants and element.value not in constants and _environment_name(element.value) not in constants:
                     suggestions = suggest(element.value, constants)
                     self._report("decorator-member-type",
                                  f"member [{name}] of @{simple_name} is {member.typeName()}, which has no constant [{element.value}]{_did_you_mean(suggestions)}",
@@ -410,6 +416,28 @@ class DecoratorRules:
 
     def _report(self, rule, message, node, suggestions=()):
         self.checker.report(self.unit, rule, message, self.span_of(node), suggestions)
+
+
+def _environment_name(value):
+    """NameUtils.environmentName: the name a string is also tried as when it converts to an enum (fooBar -> FOO_BAR)."""
+    name = value.replace("-", "_").replace(".", "_")
+    out = []
+    first = True
+    last = "0"
+    for c in name:
+        if first:
+            if c != "_":
+                out.append(c)
+            first = False
+        elif c.isupper() and not last.isupper():
+            out.append("_")
+            out.append(c)
+        elif c != "_":
+            if last == "_":
+                out.append("_")
+            out.append(c)
+        last = c
+    return "".join(out).upper()
 
 
 def _function_node(class_node, name):

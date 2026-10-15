@@ -86,7 +86,10 @@ public final class TypeFacts {
             ClassElement returnType = method.getReturnType();
             boolean array = returnType.isArray();
             ClassElement componentType = array ? returnType.fromArray() : returnType;
-            List<String> enumConstants = componentType instanceof EnumElement enumElement ? List.copyOf(enumElement.values()) : List.of();
+            // an enum with its own toString() also converts from what that returns, which is not known here
+            List<String> enumConstants = componentType instanceof EnumElement enumElement && !declaresToString(enumElement)
+                ? List.copyOf(enumElement.values())
+                : List.of();
             members.put(method.getName(), new MemberDescription(
                 method.getName(),
                 componentType.getName(),
@@ -118,6 +121,12 @@ public final class TypeFacts {
             }
             candidate = candidate.substring(0, lastDot) + '$' + candidate.substring(lastDot + 1);
         }
+    }
+
+    private static boolean declaresToString(EnumElement enumElement) {
+        return enumElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyInstance().named("toString"))
+            .stream()
+            .anyMatch(method -> method.getParameters().length == 0);
     }
 
     /**
