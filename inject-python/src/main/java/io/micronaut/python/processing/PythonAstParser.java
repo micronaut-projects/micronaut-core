@@ -25,6 +25,8 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.compiler.PythonBytecodeCompiler;
 import io.micronaut.python.imports.PythonImportMappingException;
 import io.micronaut.python.imports.PythonImportMappings;
+import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
+import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
 import io.micronaut.python.processing.util.PythonJavaTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
 import io.micronaut.python.processing.util.VisitorContextClassIndex;
@@ -201,7 +203,26 @@ public final class PythonAstParser {
     }
 
     public PythonEnvironment parse(@Language("python") String sources, String packageName, VisitorContext visitorContext) {
-        return parse(sources, null, packageName, visitorContext);
+        return requireNoErrors(parse(sources, null, packageName, visitorContext));
+    }
+
+    /**
+     * The environment, once it is known to carry no error: the convenience entry points fail on the first problem
+     * a source has, as the processor did before it reported every problem as a {@link PythonDiagnostic}.
+     * {@link #parseTransformed(List, List, VisitorContext)} hands the diagnostics to its caller instead, which
+     * renders them with an excerpt of their sources.
+     */
+    private static PythonEnvironment requireNoErrors(PythonEnvironment environment) {
+        List<PythonDiagnostic> errors = environment.diagnostics().stream()
+            .filter(diagnostic -> diagnostic.kind() == PythonDiagnostic.Kind.ERROR)
+            .toList();
+        if (!errors.isEmpty()) {
+            environment.close();
+            throw new IllegalArgumentException(errors.stream()
+                .map(PythonDiagnostics::render)
+                .collect(java.util.stream.Collectors.joining(System.lineSeparator())));
+        }
+        return environment;
     }
 
     private PythonEnvironment parse(CharSequence sources, @Nullable Value tree, String packageName, VisitorContext visitorContext) {
@@ -222,11 +243,13 @@ public final class PythonAstParser {
             }
             return o;
         });
-        evaluateProcessor(bindings, sources, tree, packageName != null ? packageName : "", "Unknown", "Unknown", "", visitorContext);
+        List<PythonDiagnostic> diagnostics = evaluateProcessor(bindings, sources, tree, packageName != null ? packageName : "", "Unknown", "Unknown", "", visitorContext);
         return new PythonEnvironment(
             classes,
             scripts,
             decorators,
+            Map.of(),
+            diagnostics,
             context
         );
     }
@@ -235,15 +258,18 @@ public final class PythonAstParser {
      * Runs the processor over one source. The processor visits the tree the transformer produced
      * when there is one, so every definition keeps the position it has in the original source; the
      * source text is still bound because the positions of the tree refer to it.
+     *
+     * @return The problems the processor found in the source
      */
-    private void evaluateProcessor(Value bindings,
-                                   CharSequence sources,
-                                   @Nullable Value tree,
-                                   String packageName,
-                                   String fileName,
-                                   String sourcePath,
-                                   String srcRoot,
-                                   VisitorContext visitorContext) {
+    @SuppressWarnings("unchecked")
+    private List<PythonDiagnostic> evaluateProcessor(Value bindings,
+                                                     CharSequence sources,
+                                                     @Nullable Value tree,
+                                                     String packageName,
+                                                     String fileName,
+                                                     String sourcePath,
+                                                     String srcRoot,
+                                                     VisitorContext visitorContext) {
         bindings.putMember("src", sources);
         bindings.putMember("has_parsed_tree", tree != null);
         bindings.putMember("parsed_tree", tree != null ? tree : "");
@@ -253,6 +279,22 @@ public final class PythonAstParser {
         bindings.putMember("source_path", sourcePath);
         bindings.putMember("src_root", srcRoot);
         context.eval(PROCESSOR_SOURCE);
+        Value diagnostics = bindings.getMember("diagnostics");
+        return diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class));
+    }
+
+    /**
+     * The path a source is reported under: its path, or its name when it has none.
+     *
+     * @param source The source
+     * @return The path
+     */
+    static String sourcePathOf(Source source) {
+        if (source.getPath() != null) {
+            return source.getPath();
+        }
+        String name = source.getName();
+        return name == null || name.isBlank() ? "Unnamed" : name;
     }
 
     private static @NotNull String resolveQualifiedName(String packageName, ClassDef classDef) {
@@ -289,9 +331,10 @@ public final class PythonAstParser {
      * @param srcDirs  The source directories
      * @param visitorContext The visitor context for constant resolution
      * @return The parsed environment
+     * @throws IllegalArgumentException When a source has an error, which the message renders
      */
     public PythonEnvironment parse(List<Source> sources, List<String> srcDirs, VisitorContext visitorContext) {
-        return parseSources(sources.stream().map(source -> new ParsedSource(source, null)).toList(), srcDirs, visitorContext);
+        return requireNoErrors(parseSources(sources.stream().map(source -> new ParsedSource(source, null)).toList(), srcDirs, visitorContext));
     }
 
     /**
@@ -302,7 +345,8 @@ public final class PythonAstParser {
      * @param transformed    The transformed sources, as returned by this parser
      * @param srcDirs        The source directories
      * @param visitorContext The visitor context for constant resolution
-     * @return The parsed environment
+     * @return The parsed environment; the problems of the sources are its {@link PythonEnvironment#diagnostics()},
+     * which the caller reports (the processor renders each with an excerpt of its source and fails on an error)
      * @since 5.3.0
      */
     public PythonEnvironment parseTransformed(List<TransformResult> transformed, List<String> srcDirs, VisitorContext visitorContext) {
@@ -330,6 +374,7 @@ public final class PythonAstParser {
         // Java type name in different sources would silently overwrite each other; they are keyed by
         // that name here and resolved once all sources are parsed (see resolveDefinition)
         Map<String, List<Definition>> definitions = new LinkedHashMap<>();
+        List<PythonDiagnostic> diagnostics = new ArrayList<>();
         String[] currentSource = new String[1];
         Value bindings = context.getBindings(PYTHON);
         bindings.putMember("callback", (Function<Object, Object>) o -> {
@@ -355,11 +400,11 @@ public final class PythonAstParser {
                     String packageName = getPackageNameOfSource(srcDir, source);
                     String fileName = source.getName();
                     String effectiveName = fileName == null || fileName.isBlank() ? "Unnamed" : fileName;
-                    evaluateProcessor(bindings, source.getCharacters(), parsedSource.tree(), packageName, effectiveName, effectiveName, srcDir, visitorContext);
+                    diagnostics.addAll(evaluateProcessor(bindings, source.getCharacters(), parsedSource.tree(), packageName, effectiveName, effectiveName, srcDir, visitorContext));
                     processed = true;
                 } else if (isWithinSourceDir(srcDir, path)) {
                     String packageName = getPackageNameOfSource(srcDir, source);
-                    evaluateProcessor(bindings, source.getCharacters(), parsedSource.tree(), packageName, source.getName(), path, srcDir, visitorContext);
+                    diagnostics.addAll(evaluateProcessor(bindings, source.getCharacters(), parsedSource.tree(), packageName, source.getName(), path, srcDir, visitorContext));
                     processed = true;
                 }
             }
@@ -393,6 +438,7 @@ public final class PythonAstParser {
             scripts,
             decorators,
             shadowedTypes,
+            diagnostics,
             context
         );
     }
@@ -601,6 +647,7 @@ public final class PythonAstParser {
         List<TransformResult> results = new ArrayList<>();
         for (Source source : pythonSource) {
             bindings.putMember("src", source.getCharacters());
+            bindings.putMember("source_path", sourcePathOf(source));
             String sourceRoot = sourceRootOf(srcDirs, source);
             bindings.putMember("source_root", sourceRoot);
             bindings.putMember("package_name", sourceRoot.isEmpty() ? "" : getPackageNameOfSource(sourceRoot, source));
@@ -627,7 +674,7 @@ public final class PythonAstParser {
                 map.containsKey("javaClassImports") ? (Map<String, java.util.List<Map<String, String>>>) map.get("javaClassImports") : null;
             java.util.List<String> exportedTypes = map.containsKey("exportedTypes") ? (java.util.List<String>) map.get("exportedTypes") : new ArrayList<>();
             java.util.List<String> allClassNames = map.containsKey("allClassNames") ? (java.util.List<String>) map.get("allClassNames") : new ArrayList<>();
-            java.util.List<String> validationErrors = map.containsKey("validationErrors") ? (java.util.List<String>) map.get("validationErrors") : new ArrayList<>();
+            java.util.List<PythonDiagnostic> validationErrors = map.containsKey("validationErrors") ? (java.util.List<PythonDiagnostic>) map.get("validationErrors") : new ArrayList<>();
             java.util.List<String> facades = map.containsKey("facades") ? List.copyOf((java.util.List<String>) map.get("facades")) : List.of();
             TransformResult transformResult = new TransformResult(
                 source,
@@ -685,7 +732,7 @@ public final class PythonAstParser {
         TransformResult transformedCode = transform(visitorContext, sources);
 
         // Then process the transformed tree
-        return parse(sources, artifacts(transformedCode).tree(), packageName, null);
+        return requireNoErrors(parse(sources, artifacts(transformedCode).tree(), packageName, null));
     }
 
     private static @Language("python") String getSource() {
@@ -695,17 +742,19 @@ public final class PythonAstParser {
             from micronaut_processor import MicronautAstVisitor
 
             tree = parsed_tree if has_parsed_tree else ast.parse(src)
-            MicronautAstVisitor(
+            visitor = MicronautAstVisitor(
                 callback, package_name, file_name, visitor_context, src_root,
                 source_path=source_path, source_text=src
-            ).visit(tree)
+            )
+            visitor.visit(tree)
+            diagnostics = visitor.diagnostics
             """;
     }
 
     private static @Language("python") String getTransformSource() {
         return """
             import ast
-            from micronaut_transformer import MicronautRuntimeTransformer, MicronautTransformer, ast_equal, unparse
+            from micronaut_transformer import MicronautRuntimeTransformer, MicronautTransformer, _Diagnostic, ast_equal, unparse
             from micronaut_facades import FacadeImportRewriter, FacadeRegistry
 
             facades = FacadeRegistry(callback_get_facade, facade_module_names) if len(facade_module_names) > 0 else None
@@ -715,7 +764,7 @@ public final class PythonAstParser {
             facade_rewriter = FacadeImportRewriter(facades) if facades is not None else None
             if facade_rewriter is not None:
                 tree = facade_rewriter.rewrite(tree)
-            transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, False, package_name, source_root, python_source_dirs=python_source_dirs)
+            transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, False, package_name, source_root, python_source_dirs=python_source_dirs, source_path=source_path, source_text=src)
             transformed_tree = transformer.visit(tree)
             # The diagnostic runtime source is only read by tests and error reports, so it is
             # produced on demand instead of costing a parse, a transformer pass and an unparse per file.
@@ -747,7 +796,7 @@ public final class PythonAstParser {
                 "javaClassImports": transformer.get_java_class_imports(),
                 "exportedTypes": transformer.get_exported_types(),
                 "allClassNames": transformer.all_class_names,
-                "validationErrors": transformer.validation_errors + (facade_rewriter.validation_errors if facade_rewriter is not None else []),
+                "validationErrors": transformer.validation_errors + ([_Diagnostic.error("facade-import", message, transformer._span_of(error_node) if error_node is not None else None) for message, error_node in zip(facade_rewriter.validation_errors, facade_rewriter.validation_error_nodes)] if facade_rewriter is not None else []),
                 "facades": facade_rewriter.imported_facades if facade_rewriter is not None else []
             }
             """;
@@ -854,7 +903,7 @@ public final class PythonAstParser {
      * @param javaClassImports The Java class imports
      * @param exportedTypes    The types that have Micronaut decorators
      * @param allClassNames    All class names defined in the source
-     * @param validationErrors Validation errors found while transforming the source
+     * @param validationErrors The problems found while transforming the source, located in it
      * @param facades          The curated Python modules (facades) the source imports, nested ones included
      */
     @Experimental
@@ -866,20 +915,20 @@ public final class PythonAstParser {
         Map<String, java.util.List<Map<String, String>>> javaClassImports,
         java.util.List<String> exportedTypes,
         java.util.List<String> allClassNames,
-        java.util.List<String> validationErrors,
+        java.util.List<PythonDiagnostic> validationErrors,
         java.util.List<String> facades) {
 
         /**
          * A transform result importing no curated Python module, whose transformed code is already rendered.
          *
          * @param originalSource      The original source
-         * @param code                The transformed source
-         * @param runtimeCodeSupplier The diagnostic runtime source
-         * @param decorators          The generated decorators, by annotation name
-         * @param javaClassImports    The Java class imports, by module
-         * @param exportedTypes       The exported types
-         * @param allClassNames       The names of the classes of the source
-         * @param validationErrors    The validation errors
+         * @param code                The transformed code
+         * @param runtimeCodeSupplier Produces the runtime code for diagnostics on demand
+         * @param decorators          The decorators
+         * @param javaClassImports    The Java class imports
+         * @param exportedTypes       The types that have Micronaut decorators
+         * @param allClassNames       All class names defined in the source
+         * @param validationErrors    The problems found while transforming the source, located in it
          */
         public TransformResult(Source originalSource,
                                String code,
@@ -888,7 +937,7 @@ public final class PythonAstParser {
                                Map<String, java.util.List<Map<String, String>>> javaClassImports,
                                java.util.List<String> exportedTypes,
                                java.util.List<String> allClassNames,
-                               java.util.List<String> validationErrors) {
+                               java.util.List<PythonDiagnostic> validationErrors) {
             this(originalSource, code, runtimeCodeSupplier, decorators, javaClassImports, exportedTypes, allClassNames, validationErrors, List.of());
         }
 
@@ -912,7 +961,7 @@ public final class PythonAstParser {
                                Map<String, java.util.List<Map<String, String>>> javaClassImports,
                                java.util.List<String> exportedTypes,
                                java.util.List<String> allClassNames,
-                               java.util.List<String> validationErrors,
+                               java.util.List<PythonDiagnostic> validationErrors,
                                java.util.List<String> facades) {
             this(originalSource, () -> code, runtimeCodeSupplier, decorators, javaClassImports, exportedTypes, allClassNames, validationErrors, facades);
         }

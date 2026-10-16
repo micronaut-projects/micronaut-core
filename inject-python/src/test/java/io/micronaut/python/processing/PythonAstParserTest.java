@@ -141,6 +141,34 @@ public class PythonAstParserTest {
     }
 
     @Test
+    void parseFailsOnAnErrorOfTheSourceWhileParseTransformedReportsIt() {
+        // an annotation declared in the source, as the processor reads it without a Java visitor context
+        String source = """
+            @micronaut_annotation("jakarta.inject.Inject")
+            def Inject(*args, **kwargs):
+                def decorator(func):
+                    return func
+                return decorator
+
+            def micronaut_annotation(name):
+                return lambda func: func
+
+            class Service:
+                @staticmethod
+                def make(ctx: str = Inject()) -> str:
+                    return "x"
+            """;
+        PythonAstParser parser = new PythonAstParser();
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> parseAndClose(parser, source));
+        assertTrue(error.getMessage().contains("[python:injected-parameter]"), error.getMessage());
+        assertTrue(error.getMessage().contains("-->"), error.getMessage());
+    }
+
+    private static void parseAndClose(PythonAstParser parser, String source) {
+        parser.parse(source).close();
+    }
+
+    @Test
     void testParse() {
         try (PythonEnvironment environment = buildEnv()) {
             ClassDef myClass = environment.classes().get("MyClass");

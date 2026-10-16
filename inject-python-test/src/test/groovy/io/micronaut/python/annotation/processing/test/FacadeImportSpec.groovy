@@ -250,6 +250,8 @@ class Hello:
         def e = thrown(RuntimeException)
         messageOf(e).contains("Cannot import [Controler] from [facadetest.http]")
         messageOf(e).contains("[Controller]")
+        // the error is located at the import statement
+        messageOf(e) =~ /--> \S*:2:1/
     }
 
     void "test a facade whose sources are missing is reported"() {
