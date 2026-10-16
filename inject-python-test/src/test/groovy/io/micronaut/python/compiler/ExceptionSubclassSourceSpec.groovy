@@ -67,6 +67,61 @@ public OutOfStockException() {
 ''')
     }
 
+    void "a Python exception class is generated as a RuntimeException whose message is the str of the exception"() {
+        given:
+        def pythonCode = '''
+class EmailAlreadyUsed(Exception):
+    """Raised when an email address is already registered."""
+
+
+class Coded(Exception):
+    def __init__(self, code: int, detail: str):
+        super().__init__(code, detail)
+        self.code = code
+
+
+class Narrow(EmailAlreadyUsed):
+    pass
+'''
+
+        expect:
+        assertGeneratedSourceContains(pythonCode, 'public class EmailAlreadyUsed extends RuntimeException implements ValueCoercible')
+        assertGeneratedSourceContains(pythonCode, '''
+public EmailAlreadyUsed(Value value) {
+    super(PythonExceptions.message(value));
+''')
+        assertGeneratedSourceContains(pythonCode, '''
+public EmailAlreadyUsed() {
+    this(PythonContextRuntime.newInstance(EmailAlreadyUsed.__PYTHON_CLASS_REFERENCE));
+  }
+''')
+        // Exception(*args): the message constructor creates the Python exception with the message as its argument
+        assertGeneratedSourceContains(pythonCode, '''
+public EmailAlreadyUsed(String message) {
+    this(PythonContextRuntime.newInstance(EmailAlreadyUsed.__PYTHON_CLASS_REFERENCE, (Object) message));
+  }
+''')
+        // the arguments of super().__init__(...) stay the args of the Python exception; the Java message is str(exception)
+        assertGeneratedSourceContains(pythonCode, 'public class Coded extends RuntimeException implements ValueCoercible')
+        assertGeneratedSourceContains(pythonCode, '''
+public Coded(Value value) {
+    super(PythonExceptions.message(value));
+''')
+        assertGeneratedSourceContains(pythonCode, '''
+public Coded(int code, String detail) {
+    this(PythonContextRuntime.newInstance(Coded.__PYTHON_CLASS_REFERENCE, (Object) code, (Object) detail));
+  }
+''')
+        assertGeneratedSourceDoesNotContain(pythonCode, 'public Coded(String message)')
+        // a subclass extends the generated class of its Python base, and takes a message like it
+        assertGeneratedSourceContains(pythonCode, 'public class Narrow extends EmailAlreadyUsed')
+        assertGeneratedSourceContains(pythonCode, '''
+public Narrow(String message) {
+    this(PythonContextRuntime.newInstance(Narrow.__PYTHON_CLASS_REFERENCE, (Object) message));
+  }
+''')
+    }
+
     void "a super constructor call that matches no Java constructor fails compilation"() {
         given:
         def pythonCode = '''

@@ -161,6 +161,15 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         return copy;
     }
 
+    /**
+     * Whether the class extends the Python builtin {@code Exception}, directly or through a Python base.
+     *
+     * @return {@code true} for a Python exception class, whose generated class is a {@link RuntimeException}
+     */
+    public boolean extendsPythonException() {
+        return false;
+    }
+
     protected final @Nullable ClassElement findPythonClass(TypeRef typeRef) {
         Map<String, ClassElement> classes = environment.classes();
         ClassElement classElement = classes.get(typeRef.name());
