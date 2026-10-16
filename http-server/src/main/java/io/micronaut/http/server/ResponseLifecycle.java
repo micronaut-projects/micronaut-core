@@ -17,6 +17,7 @@ package io.micronaut.http.server;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -202,9 +203,10 @@ public abstract class ResponseLifecycle {
             // the route executor moves the body of a HEAD response aside
             Object headBody = body != null ? body : RouteAttributes.getHeadBody(response).orElse(null);
             response.body(null);
-            if (headBody instanceof FileCustomizableResponseType || headBody instanceof InputStream) {
+            if (headBody != null && (headBody instanceof FileCustomizableResponseType || headBody instanceof InputStream || isFullHeadBody(headBody))) {
                 // the writer of a file sets the headers of a GET response and opens the file,
-                // so write it and discard the content
+                // and the writer of an object sets its type and length (RFC 9110 9.3.2), so write
+                // it and discard the content
                 ((MutableHttpResponse<Object>) response).body(headBody);
                 return encodeBody(nettyRequest, response, headBody).map(this::discardContent);
             }
@@ -739,6 +741,21 @@ public abstract class ResponseLifecycle {
         // default error response
         return ExecutionFlow.just(wrap(messageBodyWriter)
             .write(byteBodyFactory, nettyRequest, response, responseBodyType, mediaType, body));
+    }
+
+    /**
+     * Whether the body that a route returned for a HEAD request is a single object, written
+     * whole: the writer gives the headers and the length a GET request would get. A stream is
+     * not written, and a reference counted body is released already.
+     *
+     * @param body The body moved aside by the route executor
+     * @return Whether to write the body to know the headers of the response
+     */
+    private static boolean isFullHeadBody(Object body) {
+        return !(body instanceof BodyElements<?>)
+            && !(body instanceof ReferenceCounted)
+            && !(body instanceof io.micronaut.http.body.ByteBody)
+            && !Publishers.isConvertibleToPublisher(body);
     }
 
     private static boolean isImplicitlyEmptyBody(Object body) {

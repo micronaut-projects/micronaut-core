@@ -1740,7 +1740,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 return;
             }
         }
-        T beanToDestroy = registration.getBean();
+        T beanToDestroy = registration.beanOrNull();
         BeanDefinition<T> definition = registration.getBeanDefinition();
         if (beanToDestroy != null) {
             purgeCacheForBeanInstance(beanToDestroy);
@@ -1753,6 +1753,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             // what a destroyed bean held is released with it; what held the bean stays recorded until that is destroyed.
             // A singleton definition may have a fresh registration beside the scoped instance, and both record under it
             dependencyGraph.destroyed(registration, definition.isSingleton() && singletonScope.findBeanRegistration(definition) != null);
+        }
+        if (beanToDestroy == null) {
+            // A @Nullable factory method produced no bean, so there is no instance for the pre-destroy listeners
+            // or a @PreDestroy method to see. What the factory method resolved to produce it is still released.
+            releaseDependents(registration, null);
+            return;
         }
         try {
             beanToDestroy = triggerPreDestroyListeners(resolutionContext, definition, beanToDestroy);
@@ -1887,7 +1893,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 try {
                     bean = (T) Objects.requireNonNull(
                         listener.bean.onPreDestroy(event),
-                        "PreDestroy event listener illegally returned null: " + listener.getClass()
+                        "PreDestroy event listener illegally returned null: " + listener.bean.getClass()
                     );
                 } catch (Exception e) {
                     throw new BeanDestructionException(beanDefinition, e);
