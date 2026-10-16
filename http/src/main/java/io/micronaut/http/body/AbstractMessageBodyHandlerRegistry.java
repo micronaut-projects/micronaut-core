@@ -21,7 +21,6 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
-import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 import org.jspecify.annotations.Nullable;
@@ -117,12 +116,31 @@ abstract sealed class AbstractMessageBodyHandlerRegistry implements MessageBodyH
                 return false;
             }
             HandlerKey<?> that = (HandlerKey<?>) o;
-            return type.equalsType(that.type) && mediaTypes.equals(that.mediaTypes);
+            if (!type.equalsType(that.type)) {
+                return false;
+            }
+            // by index: List.equals iterates, which allocates two iterators for every lookup
+            List<MediaType> other = that.mediaTypes;
+            int size = mediaTypes.size();
+            if (size != other.size()) {
+                return false;
+            }
+            for (int i = 0; i < size; i++) {
+                if (!mediaTypes.get(i).equals(other.get(i))) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         @Override
         public int hashCode() {
-            return ObjectUtils.hash(type.typeHashCode(), mediaTypes);
+            // not ObjectUtils.hash, whose varargs allocate an array for every lookup
+            int hash = type.typeHashCode();
+            for (int i = 0, size = mediaTypes.size(); i < size; i++) {
+                hash = 31 * hash + mediaTypes.get(i).hashCode();
+            }
+            return hash;
         }
     }
 
