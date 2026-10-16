@@ -62,6 +62,7 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
 
     private RequestArgumentBinder<Object> @Nullable [] argumentBinders;
     private final boolean needsBody;
+    private final boolean asyncRequestBody;
 
     public DefaultMethodBasedRouteInfo(MethodExecutionHandle<T, R> targetMethod,
                                        @Nullable
@@ -118,6 +119,12 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
             return specificReader(messageBodyHandlerRegistry, b, readableMediaTypes);
         }).orElse(null);
         needsBody = optionalBodyArgument.isPresent() || hasArg(arguments, HttpRequest.class);
+        asyncRequestBody = MethodBasedRouteInfo.super.isAsyncRequestBody();
+    }
+
+    @Override
+    public final boolean isAsyncRequestBody() {
+        return asyncRequestBody;
     }
 
     private static <B> Optional<MessageBodyReader<?>> specificReader(MessageBodyHandlerRegistry registry, Argument<B> type, List<MediaType> mediaTypes) {
