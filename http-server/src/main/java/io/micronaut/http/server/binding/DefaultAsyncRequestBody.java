@@ -99,6 +99,16 @@ import java.util.function.Supplier;
  */
 @Internal
 final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBody {
+    /**
+     * The arguments of the classes the handlers read, created once: a handler reads a body of the same
+     * class at every request.
+     */
+    private static final ClassValue<Argument<?>> ARGUMENTS = new ClassValue<>() {
+        @Override
+        protected Argument<?> computeValue(Class<?> type) {
+            return Argument.of(type);
+        }
+    };
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultAsyncRequestBody.class);
     private static final List<String> ELEMENT_MEDIA_TYPES = List.of(MediaType.APPLICATION_JSON, MediaType.APPLICATION_JSON_STREAM);
@@ -170,6 +180,11 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         return cleared == null ? server.byteBody() : cleared;
     }
 
+    @SuppressWarnings("unchecked")
+    private static <T> Argument<T> argumentOf(Class<T> type) {
+        return (Argument<T>) ARGUMENTS.get(type);
+    }
+
     @Override
     public boolean hasBody() {
         if (decoded) {
@@ -186,7 +201,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
     @Override
     public <T> CompletionStage<@Nullable T> body(Class<T> type) {
-        return body(Argument.of(type));
+        return body(argumentOf(type));
     }
 
     @Override
@@ -309,7 +324,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
     @Override
     public <T> BodyElements<T> elements(Class<T> type) {
-        return elements(Argument.of(type));
+        return elements(argumentOf(type));
     }
 
     @Override
