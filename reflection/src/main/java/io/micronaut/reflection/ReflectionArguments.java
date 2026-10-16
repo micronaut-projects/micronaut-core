@@ -25,6 +25,7 @@ import io.micronaut.core.type.WildcardArgument;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import org.jspecify.annotations.Nullable;
 
+import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedArrayType;
 import java.lang.reflect.AnnotatedElement;
@@ -513,6 +514,12 @@ public final class ReflectionArguments {
      * <p>The super types of a variable or of a wildcard are those of the type it is bounded by, and the closure
      * of a primitive is the primitive alone.</p>
      *
+     * <p>An array is an array of each super type of its component, with the arguments of the component, then,
+     * for an array of arrays, an array of {@code Object}, {@code Cloneable} and {@code Serializable} of each fewer
+     * dimension, then {@code Cloneable}, {@code Serializable} and {@code Object} (JLS 4.10.3), as
+     * {@code ClassElement.getAllSuperTypes()} lists them at compile time: {@code String[][]} holds
+     * {@code CharSequence[][]}, {@code Object[][]} and {@code Object[]}.</p>
+     *
      * @param argument The argument
      * @return The closure, the argument first
      * @since 5.3.0
@@ -522,6 +529,10 @@ public final class ReflectionArguments {
         closure.add(argument);
         Class<?> type = argument.getType();
         if (type.isPrimitive()) {
+            return closure;
+        }
+        if (type.isArray()) {
+            collectArraySupertypes(argument, closure);
             return closure;
         }
         Set<Class<?>> collected = new HashSet<>();
@@ -534,6 +545,53 @@ public final class ReflectionArguments {
             closure.add(Argument.OBJECT_ARGUMENT);
         }
         return closure;
+    }
+
+    /**
+     * Collects the super types of an array: the arrays of the super types of its component, as many dimensions
+     * deep as the array, then the arrays of {@code Object}, {@code Cloneable} and {@code Serializable} its
+     * component arrays make it, then the three themselves.
+     */
+    private static void collectArraySupertypes(Argument<?> array, List<Argument<?>> closure) {
+        Class<?> component = array.getType();
+        int dimensions = 0;
+        while (component.isArray()) {
+            component = component.getComponentType();
+            dimensions++;
+        }
+        Set<Class<?>> collected = new HashSet<>();
+        collected.add(array.getType());
+        if (!component.isPrimitive()) {
+            // an array carries the type arguments of its component, List<String>[] being a List[] of String
+            Argument<?>[] typeParameters = array.getTypeParameters();
+            Argument<?> componentArgument = !array.isRawType() && typeParameters.length > 0 && typeParameters.length == component.getTypeParameters().length
+                ? Argument.of(component, (String) null, typeParameters)
+                : Argument.of(component);
+            List<Argument<?>> componentClosure = typeClosureOf(componentArgument);
+            for (int i = 1; i < componentClosure.size(); i++) {
+                Argument<?> superType = componentClosure.get(i);
+                for (int j = 0; j < dimensions; j++) {
+                    superType = superType.arrayType();
+                }
+                if (collected.add(superType.getType())) {
+                    closure.add(superType);
+                }
+            }
+        }
+        for (int arrayDimensions = dimensions - 1; arrayDimensions > 0; arrayDimensions--) {
+            for (Class<?> arraySuperType : List.of(Object.class, Cloneable.class, Serializable.class)) {
+                Class<?> superType = arraySuperType;
+                for (int j = 0; j < arrayDimensions; j++) {
+                    superType = superType.arrayType();
+                }
+                if (collected.add(superType)) {
+                    closure.add(Argument.of(superType));
+                }
+            }
+        }
+        closure.add(Argument.of(Cloneable.class));
+        closure.add(Argument.of(Serializable.class));
+        closure.add(Argument.OBJECT_ARGUMENT);
     }
 
     private static void collectSupertypes(Class<?> type,
