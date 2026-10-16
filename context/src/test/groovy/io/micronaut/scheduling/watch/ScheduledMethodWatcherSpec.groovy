@@ -38,6 +38,11 @@ class ScheduledMethodWatcherSpec extends Specification {
         graph.dependentsOf(executorDefinition).any { !it.lazy() && it.dependent().beanType == ScheduledExecutorTaskScheduler }
         graph.transitiveDependentsOf(executorDefinition)*.beanType.contains(ScheduledMethodProcessor)
 
+        and: "a bean holding a provider of the executor, which resolves the cached executor, still holds it lazily"
+        context.getBean(ExecutorProviderHolder).executor.get().is(executor)
+        graph.dependenciesOf(context.getBeanDefinition(ExecutorProviderHolder)).every { it.lazy() }
+        !graph.transitiveDependentsOf(executorDefinition)*.beanType.contains(ExecutorProviderHolder)
+
         when: "the executor is recreated, as a refresh of its configuration does"
         boolean recreated = context.recreate(ExecutorService, Qualifiers.byName(TaskExecutors.SCHEDULED))
         def newExecutor = context.getBean(ExecutorService, Qualifiers.byName(TaskExecutors.SCHEDULED))
