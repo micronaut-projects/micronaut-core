@@ -509,7 +509,9 @@ public final class ReflectionArguments {
      * holds {@code List<String>}, {@code Collection<String>} and {@code Iterable<String>}, and ends with
      * {@code Object}. A super type is read as {@link #ofExact(Type)} reads one, with the type-use annotations of
      * the {@code extends} and {@code implements} clauses that reach it, as {@link #resolveGenericToArgument(Class, Class)}
-     * reads one.
+     * reads one. The order is the one {@code ClassElement.getAllSuperTypes()} lists at compile time: the superclass
+     * and its super types first, then each interface and its super types, in declaration order, {@code Object}
+     * last.
      *
      * <p>The super types of a variable or of a wildcard are those of the type it is bounded by, and the closure
      * of a primitive is the primitive alone. The super types of a raw argument, a generic type used without its
@@ -529,7 +531,7 @@ public final class ReflectionArguments {
         List<Argument<?>> closure = new ArrayList<>();
         closure.add(argument);
         Class<?> type = argument.getType();
-        if (type.isPrimitive()) {
+        if (type.isPrimitive() || type == Object.class) {
             return closure;
         }
         if (type.isArray()) {
@@ -546,10 +548,7 @@ public final class ReflectionArguments {
             collectTypeSubstitutions(toExactType(argument), substitutions);
         }
         collectSupertypes(type, substitutions, raw, closure, collected);
-        if (collected.add(Object.class)) {
-            // an interface has no superclass to reach it through
-            closure.add(Argument.OBJECT_ARGUMENT);
-        }
+        closure.add(Argument.OBJECT_ARGUMENT);
         return closure;
     }
 
@@ -612,7 +611,8 @@ public final class ReflectionArguments {
                                           Set<Class<?>> collected) {
         for (AnnotatedType supertype : getSupertypes(type).toList()) {
             Class<?> erasure = getRawType(supertype.getType());
-            if (!collected.add(erasure)) {
+            // Object is listed last, after the interfaces, as the processors list it, not where a superclass reaches it
+            if (erasure == Object.class || !collected.add(erasure)) {
                 continue;
             }
             AnnotatedType resolved = substitutions.isEmpty() ? supertype : new LazySubstitutingType(supertype, substitutions);

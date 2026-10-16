@@ -5,7 +5,11 @@ import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.core.type.WildcardArgument
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ElementQuery
 
+import java.lang.constant.Constable
+import java.lang.constant.ConstantDesc
 import java.lang.reflect.GenericArrayType
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
@@ -306,13 +310,23 @@ class Shelf {
     void "the closure of an array of arrays holds the arrays of the super types of each array it is an array of"() {
         given:
         def string = ReflectionArguments.typeClosureOf(Argument.of(String))
+        def array = ReflectionArguments.typeClosureOf(Argument.of(String[]))
         def strings = ReflectionArguments.typeClosureOf(Argument.of(String[][]))
         def matrix = ReflectionArguments.typeClosureOf(ReflectionArguments.ofExact(typeOf("matrix")))
 
-        expect: "String[][] is an array of the super types of String, then of those String[] has as an array"
-        strings*.type == [String[][]] + string.tail().collect { it.type.arrayType().arrayType() } +
-            [Object[], Cloneable[], Serializable[], Cloneable, Serializable, Object]
+        expect: "Object is last for a class, after its interfaces, as the processors list it"
+        string*.type == [String, Serializable, Comparable, CharSequence, Constable, ConstantDesc, Object]
+
+        and: "String[] is an array of the super types of String, in their order"
+        array*.type == [String[], Serializable[], Comparable[], CharSequence[], Constable[], ConstantDesc[], Object[], Cloneable, Serializable, Object]
+
+        and: "String[][] is an array of the super types of String, then of those String[] has as an array"
+        strings*.type == [String[][], Serializable[][], Comparable[][], CharSequence[][], Constable[][], ConstantDesc[][], Object[][],
+                          Object[], Cloneable[], Serializable[], Cloneable, Serializable, Object]
         ReflectionArguments.toExactType(strings.find { it.type == Comparable[][] }).typeName == "java.lang.Comparable<java.lang.String>[][]"
+
+        and: "Object stands alone"
+        ReflectionArguments.typeClosureOf(Argument.OBJECT_ARGUMENT)*.type == [Object]
 
         and: "a primitive component has no super types of its own"
         ReflectionArguments.typeClosureOf(Argument.of(int[][]))*.type == [int[][], Object[], Cloneable[], Serializable[], Cloneable, Serializable, Object]
@@ -348,5 +362,60 @@ class Shelf {
 
     @SuppressWarnings("rawtypes")
     static abstract class RawList extends ArrayList {
+    }
+
+    void "the reflective closure lists what the processor lists, in its order, for classes and arrays"() {
+        given:
+        def source = '''
+package test;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+
+class Holder {
+    Object object;
+    String string;
+    ArrayList<String> list;
+    @SuppressWarnings("rawtypes") ArrayList rawList;
+    String[] strings;
+    String[][] stringMatrix;
+    Integer[][][] integerCube;
+    Object[][] objects;
+    Serializable[] serializables;
+    int[] ints;
+    int[][] intMatrix;
+    int[][][] intCube;
+    List<String>[][] lists;
+    @SuppressWarnings("rawtypes") List[][] rawLists;
+    ArrayList<String>[] arrayLists;
+}
+'''
+        Map<String, List<String>> processor = buildClassElement(source) { ClassElement holder ->
+            holder.getEnclosedElements(ElementQuery.ALL_FIELDS).collectEntries { field ->
+                [(field.name): field.genericType.getAllSuperTypes().collect { [render(it), it.rawType] }]
+            }
+        }
+        Class<?> holder = buildClassLoader('test.Holder', source).loadClass('test.Holder')
+
+        expect:
+        processor.size() == 15
+        processor.each { name, superTypes ->
+            def reflective = ReflectionArguments.typeClosureOf(ReflectionArguments.ofExact(holder.getDeclaredField(name).genericType))
+            // the argument itself is the one passed, ofExact reading a raw array as not raw: its super types are compared
+            assert ReflectionArguments.toExactType(reflective[0]).typeName == superTypes[0][0]
+            assert reflective.tail().collect { [ReflectionArguments.toExactType(it).typeName, it.isRawType()] } == superTypes.tail()
+        }
+    }
+
+    /**
+     * A super type a processor lists, as {@code Type.getTypeName()} reads it.
+     */
+    private static String render(ClassElement type) {
+        String dimensions = "[]" * type.arrayDimensions
+        if (type.rawType || type.typeArguments.isEmpty()) {
+            return type.name + dimensions
+        }
+        return type.name + "<" + type.typeArguments.values().collect { render(it) }.join(", ") + ">" + dimensions
     }
 }
