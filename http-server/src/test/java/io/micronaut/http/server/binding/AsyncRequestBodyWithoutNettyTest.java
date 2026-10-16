@@ -31,8 +31,11 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.server.exceptions.UnsupportedMediaException;
 import io.micronaut.http.simple.SimpleHttpRequest;
+import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteInfo;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.io.InputStream;
 import java.time.Duration;
@@ -158,6 +161,57 @@ class AsyncRequestBodyWithoutNettyTest {
         assertInstanceOf(UnsupportedMediaException.class, failure);
     }
 
+    @Test
+    void aRequestWithoutAContentTypeIsReadAsTheRouteConsumes() throws Exception {
+        assertEquals(Map.of("a", 1), readBody(null, List.of(MediaType.APPLICATION_JSON_TYPE)));
+    }
+
+    @Test
+    void theContentTypeOfTheRequestIsNotReplacedByTheRoute() {
+        // the route consumes JSON, the request says it is text: the JSON reader is not used
+        assertThrows(ExecutionException.class, () -> readBody(MediaType.TEXT_PLAIN_TYPE, List.of(MediaType.APPLICATION_JSON_TYPE)));
+    }
+
+    @Test
+    void aRouteThatConsumesSeveralTypesDoesNotChooseOne() {
+        assertThrows(ExecutionException.class, () -> readBody(null, List.of(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_PLAIN_TYPE)));
+    }
+
+    @Test
+    void aRouteThatConsumesAnyTypeDoesNotChooseOne() {
+        assertThrows(ExecutionException.class, () -> readBody(null, List.of(MediaType.ALL_TYPE)));
+    }
+
+    private static Object readBody(MediaType contentType, List<MediaType> consumes) throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run();
+             OtherServerRequest server = request("{\"a\":1}", contentType)) {
+            // a route whose handler takes an AsyncRequestBody: it has no reader for the type read later
+            RouteInfo<?> route = (RouteInfo<?>) Proxy.newProxyInstance(AsyncRequestBodyWithoutNettyTest.class.getClassLoader(), new Class<?>[]{RouteInfo.class}, (proxy, method, args) -> {
+                switch (method.getName()) {
+                    case "getConsumes":
+                        return consumes;
+                    case "getMessageBodyReader":
+                        return null;
+                    case "toString":
+                        return "route";
+                    case "hashCode":
+                        return 1;
+                    case "equals":
+                        return proxy == args[0];
+                    default:
+                        throw new UnsupportedOperationException(method.getName());
+                }
+            });
+            RouteAttributes.setRouteInfo(server, route);
+            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyArgumentBinder.class));
+            try {
+                return body.body(Map.class).toCompletableFuture().get(10, TimeUnit.SECONDS);
+            } finally {
+                body.releaseBody().toCompletableFuture().get(10, TimeUnit.SECONDS);
+            }
+        }
+    }
+
     private static Throwable firstElementFailure(String content, MediaType contentType) throws Exception {
         try (ApplicationContext ctx = ApplicationContext.run();
              OtherServerRequest server = request(content, contentType)) {
@@ -187,7 +241,9 @@ class AsyncRequestBodyWithoutNettyTest {
 
     private static OtherServerRequest request(String content, MediaType contentType) {
         SimpleHttpRequest<Object> request = new SimpleHttpRequest<>(HttpMethod.POST, "/body", null);
-        request.contentType(contentType);
+        if (contentType != null) {
+            request.contentType(contentType);
+        }
         return new OtherServerRequest(request, content);
     }
 
