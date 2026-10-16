@@ -364,6 +364,34 @@ class Shelf {
     static abstract class RawList extends ArrayList {
     }
 
+    void "an array of a raw type is raw, at the array and at each component, as the processors read it (JLS 4.8)"() {
+        given:
+        def read = [
+            ReflectionArguments.ofExact(List[]),
+            ReflectionArguments.ofExact(List[][]),
+            ReflectionArguments.ofExact(typeOf("rawLists")),
+            ReflectionArguments.ofExact(typeOf("rawMatrix")),
+            ReflectionArguments.ofExact(RoundTripTypes.getDeclaredField("rawMatrix").annotatedType),
+        ]
+
+        expect:
+        read*.type == [List[], List[][], List[], List[][], List[][]]
+        read.every { argument ->
+            for (def level = argument; level != null; level = level.componentType()) {
+                assert level.isRawType()
+                assert level.typeParameters*.name == ['E']
+            }
+            true
+        }
+        read.every { ReflectionArguments.toExactType(it) instanceof Class }
+
+        and: "an array of a parameterized type is not"
+        def parameterized = ReflectionArguments.ofExact(typeOf("matrix"))
+        !parameterized.isRawType()
+        !parameterized.componentType().isRawType()
+        !parameterized.componentType().componentType().isRawType()
+    }
+
     void "the reflective closure lists what the processor lists, in its order, for classes and arrays"() {
         given:
         def source = '''
@@ -402,9 +430,7 @@ class Holder {
         processor.size() == 15
         processor.each { name, superTypes ->
             def reflective = ReflectionArguments.typeClosureOf(ReflectionArguments.ofExact(holder.getDeclaredField(name).genericType))
-            // the argument itself is the one passed, ofExact reading a raw array as not raw: its super types are compared
-            assert ReflectionArguments.toExactType(reflective[0]).typeName == superTypes[0][0]
-            assert reflective.tail().collect { [ReflectionArguments.toExactType(it).typeName, it.isRawType()] } == superTypes.tail()
+            assert reflective.collect { [ReflectionArguments.toExactType(it).typeName, it.isRawType()] } == superTypes
         }
     }
 

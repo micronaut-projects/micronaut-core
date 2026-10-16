@@ -117,7 +117,8 @@ public final class ReflectionArguments {
      * {@link GenericPlaceholder} of the type it erases to with every bound the variable declares, a wildcard a
      * {@link WildcardArgument} of the type it is bounded by with its upper and lower bounds, a generic array the
      * array of its component carrying the type arguments or the variable of the component, and a generic type
-     * named without its type arguments a {@link Argument#isRawType() raw} argument. The conversion is lossless:
+     * named without its type arguments a {@link Argument#isRawType() raw} argument, as is an array of one, {@code List[]},
+     * at the array and at its component. The conversion is lossless:
      * {@link #toExactType(Argument)} renders the argument back as an equal type.
      *
      * <p>Unlike {@link #of(Type)}, which reads a wildcard as its bound and a generic array as the array of its
@@ -942,6 +943,20 @@ public final class ReflectionArguments {
             Type[] bounds = lowerBounds.length == 0 ? wt.getUpperBounds() : lowerBounds;
             return toArgument(name, bounds.length == 0 ? Object.class : bounds[0], substitutions, resolving, false, false);
         } else if (type instanceof Class<?> cl) {
+            if (cl.isArray()) {
+                // an array of a raw type, List[], is raw as its component is, with the variables the component
+                // declares, as the processors read it (JLS 4.8)
+                Argument<?> component = toArgument(null, cl.getComponentType(), substitutions, resolving, false, exact);
+                if (component.getTypeParameters().length == 0) {
+                    return Argument.of(cl, name);
+                }
+                if (exact) {
+                    return arrayOf(component, name, component.getAnnotationMetadata());
+                }
+                return component.isRawType()
+                    ? Argument.ofRawType(cl, name, null, component.getTypeParameters())
+                    : Argument.of(cl, name, component.getTypeParameters());
+            }
             TypeVariable<?>[] variables = cl.getTypeParameters();
             if (variables.length == 0) {
                 return Argument.of(cl, name);
