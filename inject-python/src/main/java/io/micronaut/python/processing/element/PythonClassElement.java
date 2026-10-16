@@ -525,7 +525,7 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
      *
      * @return The linearized Python bases
      */
-    private List<PythonClassElement> pythonMro() {
+    public List<PythonClassElement> pythonMro() {
         List<PythonClassElement> bases = new ArrayList<>();
         for (TypeRef base : getNativeType().bases()) {
             if (findPythonClass(base) instanceof PythonClassElement pythonBase && !pythonBase.getName().equals(getName())) {

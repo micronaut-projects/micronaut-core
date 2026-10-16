@@ -16,6 +16,15 @@ import java
 
 from micronaut_typecheck import BUILTIN, CALLABLE, JAVA, JAVA_REF, MODULE, PY, PY_REF, STANDARD_TYPES, Typed
 
+# names Java cannot declare: its keywords and literals, and the methods of Object
+JAVA_RESERVED_NAMES = frozenset((
+    "abstract assert boolean break byte case catch char class const continue default do double else enum "
+    "extends final finally float for goto if implements import instanceof int interface long native new "
+    "package private protected public return short static strictfp super switch synchronized this throw "
+    "throws transient try void volatile while true false null "
+    "equals hashCode toString getClass notify notifyAll wait clone finalize"
+).split())
+
 Ir = java.type("io.micronaut.python.processing.staticcompile.Ir")
 CompiledBody = java.type("io.micronaut.python.processing.staticcompile.Ir$CompiledBody")
 Stats = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Stats")
@@ -332,6 +341,8 @@ class Lowering:
     def _assign(self, target, value, node, hinted=None):
         if isinstance(target, ast.Name):
             name = target.id
+            if name in JAVA_RESERVED_NAMES:
+                self._refuse("java-reserved-name", f"local [{name}] cannot be declared in Java", node)
             if name in self.parameters:
                 self._refuse("unsupported-statement", f"reassigning the parameter [{name}] has no static lowering", node)
             if hinted is not None:

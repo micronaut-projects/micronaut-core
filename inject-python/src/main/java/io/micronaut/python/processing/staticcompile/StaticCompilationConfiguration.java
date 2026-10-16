@@ -33,6 +33,7 @@ import java.util.Objects;
  * @param reportDirectory The directory the report is written to, or {@code null} for no report files
  * @param strict          Whether an explicit {@code CompileStatic} that cannot be honoured is an error
  * @param annotationNames The qualified names of the decorators accepted as the switch
+ * @param trace           Whether compiled bodies count their entries, see {@code PythonStatic.entries()}
  * @author Graeme Rocher
  * @since 5.3.0
  */
@@ -40,7 +41,8 @@ import java.util.Objects;
 public record StaticCompilationConfiguration(StaticCompilationMode mode,
                                              @Nullable Path reportDirectory,
                                              boolean strict,
-                                             List<String> annotationNames) {
+                                             List<String> annotationNames,
+                                             boolean trace) {
 
     /**
      * The decorator names accepted by default: the framework's annotation and the name the pyronaut
@@ -54,7 +56,7 @@ public record StaticCompilationConfiguration(StaticCompilationMode mode,
     /**
      * No static compilation at all.
      */
-    public static final StaticCompilationConfiguration OFF = new StaticCompilationConfiguration(StaticCompilationMode.OFF, null, false, DEFAULT_ANNOTATION_NAMES);
+    public static final StaticCompilationConfiguration OFF = new StaticCompilationConfiguration(StaticCompilationMode.OFF, null, false, DEFAULT_ANNOTATION_NAMES, false);
 
     public StaticCompilationConfiguration {
         Objects.requireNonNull(mode, "mode");
@@ -62,11 +64,23 @@ public record StaticCompilationConfiguration(StaticCompilationMode mode,
     }
 
     /**
+     * A configuration without tracing.
+     *
+     * @param mode            The mode
+     * @param reportDirectory The directory the report is written to, or {@code null}
+     * @param strict          Whether an explicit switch that cannot be honoured is an error
+     * @param annotationNames The qualified names of the decorators accepted as the switch
+     */
+    public StaticCompilationConfiguration(StaticCompilationMode mode, @Nullable Path reportDirectory, boolean strict, List<String> annotationNames) {
+        this(mode, reportDirectory, strict, annotationNames, false);
+    }
+
+    /**
      * @param mode The mode
      * @return A configuration of that mode without report files, accepting the default decorator names
      */
     public static StaticCompilationConfiguration of(StaticCompilationMode mode) {
-        return new StaticCompilationConfiguration(mode, null, false, DEFAULT_ANNOTATION_NAMES);
+        return new StaticCompilationConfiguration(mode, null, false, DEFAULT_ANNOTATION_NAMES, false);
     }
 
     /**
