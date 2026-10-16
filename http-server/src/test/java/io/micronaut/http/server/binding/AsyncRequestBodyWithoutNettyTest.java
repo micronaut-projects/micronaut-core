@@ -25,12 +25,20 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.ServerHttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.server.exceptions.UnsupportedMediaException;
 import io.micronaut.http.simple.SimpleHttpRequest;
+import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.Router;
+import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.HttpRoutes;
+import io.micronaut.http.PathVariables;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -158,6 +166,67 @@ class AsyncRequestBodyWithoutNettyTest {
         assertInstanceOf(UnsupportedMediaException.class, failure);
     }
 
+    @Test
+    void aRequestWithoutAContentTypeIsReadAsTheRouteConsumes() throws Exception {
+        assertEquals(Map.of("a", 1), readBody(null, "/consumes-json"));
+    }
+
+    @Test
+    void aRequestWithoutAContentTypeIsReadAsJsonByARouteThatDeclaresNone() throws Exception {
+        assertEquals(Map.of("a", 1), readBody(null, "/consumes-nothing"));
+    }
+
+    @Test
+    void theContentTypeOfTheRequestIsNotReplacedByTheRoute() {
+        // the route consumes JSON, the request says it is text: the JSON reader is not used
+        assertThrows(ExecutionException.class, () -> readBody(MediaType.TEXT_PLAIN_TYPE, "/consumes-json"));
+    }
+
+    @Test
+    void aRouteThatConsumesSeveralTypesDoesNotChooseOne() {
+        assertThrows(ExecutionException.class, () -> readBody(null, "/consumes-several"));
+    }
+
+    @Test
+    void aRouteThatConsumesAnyTypeDoesNotChooseOne() {
+        assertThrows(ExecutionException.class, () -> readBody(null, "/consumes-any"));
+    }
+
+    /**
+     * Handler routes whose handler takes an {@link io.micronaut.http.body.AsyncRequestBody}: the route has no
+     * reader for the type that is read later.
+     */
+    @jakarta.inject.Singleton
+    @io.micronaut.context.annotation.Requires(property = "spec.name", value = "async-body-routes")
+    static class Routes implements HttpRoutes {
+        @Override
+        public void routes(HttpRouteBuilder routes) {
+            routes.POST("/consumes-json").consumes(MediaType.APPLICATION_JSON_TYPE).body().handleAsync(AsyncRequestBodyWithoutNettyTest::answer);
+            routes.POST("/consumes-nothing").body().handleAsync(AsyncRequestBodyWithoutNettyTest::answer);
+            routes.POST("/consumes-several").consumes(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_PLAIN_TYPE).body().handleAsync(AsyncRequestBodyWithoutNettyTest::answer);
+            routes.POST("/consumes-any").consumes(MediaType.ALL_TYPE).body().handleAsync(AsyncRequestBodyWithoutNettyTest::answer);
+        }
+    }
+
+    private static CompletableFuture<HttpResponse<?>> answer(HttpRequest<?> request, PathVariables pathVariables, AsyncRequestBody body) {
+        return CompletableFuture.<HttpResponse<?>>completedFuture(HttpResponse.ok());
+    }
+
+    private static Object readBody(MediaType contentType, String uri) throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", "async-body-routes"));
+             OtherServerRequest server = request("{\"a\":1}", contentType)) {
+            // the route the router matched, as the server does before it binds the body
+            RouteInfo<?> route = ctx.getBean(Router.class).findClosest(HttpRequest.POST(uri, null)).getRouteInfo();
+            RouteAttributes.setRouteInfo(server, route);
+            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyArgumentBinder.class));
+            try {
+                return body.body(Map.class).toCompletableFuture().get(10, TimeUnit.SECONDS);
+            } finally {
+                body.releaseBody().toCompletableFuture().get(10, TimeUnit.SECONDS);
+            }
+        }
+    }
+
     private static Throwable firstElementFailure(String content, MediaType contentType) throws Exception {
         try (ApplicationContext ctx = ApplicationContext.run();
              OtherServerRequest server = request(content, contentType)) {
@@ -187,7 +256,9 @@ class AsyncRequestBodyWithoutNettyTest {
 
     private static OtherServerRequest request(String content, MediaType contentType) {
         SimpleHttpRequest<Object> request = new SimpleHttpRequest<>(HttpMethod.POST, "/body", null);
-        request.contentType(contentType);
+        if (contentType != null) {
+            request.contentType(contentType);
+        }
         return new OtherServerRequest(request, content);
     }
 

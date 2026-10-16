@@ -75,7 +75,7 @@ public sealed interface LocatedHttpRouteSpec<T> extends HttpRouteSpec permits De
     LocatedHttpRouteSpec<T> attribute(String name, Object value);
 
     @Override
-    LocatedHttpRouteSpec<T> where(RouteCondition condition);
+    LocatedHttpRouteSpec<T> where(RequestCondition condition);
 
     @Override
     LocatedHttpRouteSpec<T> constrain(Predicate<? super PathVariables> accepted);
