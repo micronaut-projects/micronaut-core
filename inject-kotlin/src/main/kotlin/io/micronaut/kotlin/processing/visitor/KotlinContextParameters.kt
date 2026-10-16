@@ -187,15 +187,15 @@ internal class KotlinSourceTokens private constructor(private val tokens: List<S
         var index = closeIndex
         while (index >= 0) {
             val token = tokens[index]
-            if (token.isSymbol(">")) {
-                depth++
-            } else if (token.isSymbol("<")) {
-                depth--
-                if (depth == 0) {
-                    return tokens.getOrNull(index - 1)?.isIdentifier() == true
+            when {
+                token.isSymbol(">") -> depth++
+                token.isSymbol("<") -> {
+                    depth--
+                    if (depth == 0) {
+                        return tokens.getOrNull(index - 1)?.isIdentifier() == true
+                    }
                 }
-            } else if (!token.isIdentifier() && !(token.kind == SourceTokenKind.SYMBOL && token.text in TYPE_SYMBOLS)) {
-                return false
+                !token.isIdentifier() && !(token.kind == SourceTokenKind.SYMBOL && token.text in TYPE_SYMBOLS) -> return false
             }
             index--
         }

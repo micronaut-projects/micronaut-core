@@ -4,7 +4,6 @@ import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.inject.BeanDefinition
-import spock.lang.Unroll
 
 /**
  * KSP 2.3 does not expose Kotlin context parameters, so the processor would model

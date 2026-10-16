@@ -501,20 +501,17 @@ internal open class KotlinClassElement(
         val kotlinNativeElement = el.nativeType as KotlinNativeElement
         val nativeEl = kotlinNativeElement.element
         val excludedAnnotations = propertyElementQuery.excludedAnnotations
-        return if (hasAnnotation(nativeEl, JvmField::class.java) || excludedAnnotations.any { hasAnnotation(nativeEl, it) }) {
-            false
-        } else if (nativeEl is KSPropertyDeclaration && nativeEl.getter == null && nativeEl.setter == null) {
+        return when {
+            hasAnnotation(nativeEl, JvmField::class.java) || excludedAnnotations.any { hasAnnotation(nativeEl, it) } -> false
             // KSP models a Java field as a property without accessors. It cannot be read or
             // written as a bean property, so leave it to the field handling below, which
             // applies the configured access kinds and visibility.
-            false
-        } else if (nativeEl is KSPropertyDeclaration && visitorContext.hasContextParameters(nativeEl)) {
+            nativeEl is KSPropertyDeclaration && nativeEl.getter == null && nativeEl.setter == null -> false
             // The getter of a property with context parameters takes them as arguments, so like
             // any other getter with arguments it is not a bean property. KSP does not report them,
             // so the property would otherwise be read without them.
-            false
-        } else {
-            !propertyElementQuery.excludes.contains(el.name)
+            nativeEl is KSPropertyDeclaration && visitorContext.hasContextParameters(nativeEl) -> false
+            else -> !propertyElementQuery.excludes.contains(el.name)
                     && (propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(el.name))
         }
     }
