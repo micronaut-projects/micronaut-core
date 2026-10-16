@@ -57,13 +57,13 @@ class LocatedRouteBodyConditionsTest {
         assertTrue(router.hasBodyConditions(), "a located target may have routes with body conditions");
         MutableHttpRequest<?> request = HttpRequest.POST("/orders/1/items", "express");
         List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
-        assertNull(router.findClosest(request, pending::add));
+        assertNull(Resolutions.resolve(router, request, pending::add));
         assertEquals(1, pending.size());
         List<List<UriRouteMatch<Object, Object>>> ranks = pending.get(0).getRanks();
         assertEquals(2, ranks.size(), "the conditioned route, then the fallback");
         assertEquals(List.of(EXPRESS), ranks.get(0).get(0).getRouteInfo().getBodyConditions());
 
-        UriRouteMatch<Object, Object> chosen = pending.get(0).choose(request, ranks.get(0));
+        UriRouteMatch<Object, Object> chosen = Resolutions.choose(pending.get(0), request, ranks.get(0));
         assertNotNull(chosen);
         // a match of the request: the target is bound to it
         assertInstanceOf(RouteLocator.LocatedUriMatchInfo.class, ((DefaultUriRouteMatch<?, ?>) chosen).matchInfo());
@@ -76,7 +76,7 @@ class LocatedRouteBodyConditionsTest {
         Router router = router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> "order", target -> items));
 
         List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
-        assertNotNull(router.findClosest(HttpRequest.POST("/orders/1/items", "x"), pending::add));
+        assertNotNull(Resolutions.resolve(router, HttpRequest.POST("/orders/1/items", "x"), pending::add));
         assertTrue(pending.isEmpty());
     }
 
@@ -92,7 +92,7 @@ class LocatedRouteBodyConditionsTest {
             });
 
         List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
-        UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.POST("/orders/1/items", "x"), pending::add);
+        UriRouteMatch<Object, Object> match = Resolutions.resolve(router, HttpRequest.POST("/orders/1/items", "x"), pending::add);
         assertNotNull(match);
         assertTrue(pending.isEmpty());
         // the match of the located route, not of the locator
@@ -110,7 +110,7 @@ class LocatedRouteBodyConditionsTest {
         };
         Router router = new FilteredRouter(new FilteredRouter(router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> "order", target -> items)), all), all);
 
-        UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.POST("/orders/1/items", "x"), ignored -> { });
+        UriRouteMatch<Object, Object> match = Resolutions.resolve(router, HttpRequest.POST("/orders/1/items", "x"), ignored -> { });
         assertNotNull(match);
         assertInstanceOf(RouteLocator.LocatedUriMatchInfo.class, ((DefaultUriRouteMatch<?, ?>) match).matchInfo());
     }
@@ -134,7 +134,7 @@ class LocatedRouteBodyConditionsTest {
         for (Router router : List.of(new FilteredRouter(base, versions), new FilteredRouter(new FilteredRouter(base, versions), versions))) {
             for (String version : List.of("1", "2")) {
             MutableHttpRequest<?> request = HttpRequest.GET("/orders/1/items").header("X-Version", version);
-            UriRouteMatch<Object, Object> match = router.findClosest(request, ignored -> { });
+            UriRouteMatch<Object, Object> match = Resolutions.resolve(router, request, ignored -> { });
             assertNotNull(match);
             assertEquals(version, match.getRouteInfo().getAttribute("version", String.class).orElseThrow());
             // as without the pending lookup
@@ -158,7 +158,7 @@ class LocatedRouteBodyConditionsTest {
         };
         for (Router router : List.of(base, new FilteredRouter(base, all), new RouterDefaultBodyConditionsTest.DelegatingRouter(base))) {
             List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
-            assertNull(router.findClosest(HttpRequest.POST("/review/items/special", "ordinary"), pending::add), router.toString());
+            assertNull(Resolutions.resolve(router, HttpRequest.POST("/review/items/special", "ordinary"), pending::add), router.toString());
             assertEquals(2, pending.getFirst().getRanks().size(), "the literal route, then its fallback: " + router);
         }
     }

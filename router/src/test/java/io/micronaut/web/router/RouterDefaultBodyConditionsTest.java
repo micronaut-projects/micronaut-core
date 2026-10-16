@@ -57,9 +57,9 @@ class RouterDefaultBodyConditionsTest {
     void aRouterWithoutBodyConditionsFindsTheClosestRoute() {
         Router router = new DelegatingRouter(router(routes -> routes.POST("/orders", (request, pathVariables) -> HttpResponse.ok())));
 
-        assertNotNull(router.findClosest(HttpRequest.POST("/orders", "x"), ignored -> fail()));
-        assertNotNull(router.findClosest(HttpRequest.POST("/orders", "x"), match -> true, ignored -> fail()));
-        assertNull(router.findClosest(HttpRequest.POST("/orders", "x"), match -> false, ignored -> fail()));
+        assertNotNull(Resolutions.resolve(router, HttpRequest.POST("/orders", "x"), ignored -> fail()));
+        assertNotNull(Resolutions.resolve(router, HttpRequest.POST("/orders", "x"), match -> true, ignored -> fail()));
+        assertNull(Resolutions.resolve(router, HttpRequest.POST("/orders", "x"), match -> false, ignored -> fail()));
     }
 
     @Test
@@ -71,12 +71,12 @@ class RouterDefaultBodyConditionsTest {
 
         MutableHttpRequest<?> request = HttpRequest.POST("/orders", "vip");
         List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
-        assertNull(router.findClosest(request, pending::add));
+        assertNull(Resolutions.resolve(router, request, pending::add));
         assertEquals(2, pending.getFirst().getRanks().size());
-        assertNotNull(pending.getFirst().choose(request, pending.getFirst().getRanks().getFirst()));
+        assertNotNull(Resolutions.choose(pending.getFirst(), request, pending.getFirst().getRanks().getFirst()));
 
         // the filter rejects the route with body conditions: the body does not decide
-        assertNotNull(router.findClosest(request, match -> match.getRouteInfo().getBodyConditions().isEmpty(), ignored -> fail()));
+        assertNotNull(Resolutions.resolve(router, request, match -> match.getRouteInfo().getBodyConditions().isEmpty(), ignored -> fail()));
     }
 
     @Test
@@ -90,8 +90,8 @@ class RouterDefaultBodyConditionsTest {
         MutableHttpRequest<?> request = HttpRequest.POST("/vip/orders/1/items", "vip");
         for (Predicate<UriRouteMatch<Object, Object>> filter : List.<Predicate<UriRouteMatch<Object, Object>>>of(match -> true, match -> match.getRouteInfo().getHttpMethod() == HttpMethod.POST)) {
             List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
-            assertNull(router.findClosest(request, filter, pending::add));
-            UriRouteMatch<Object, Object> chosen = pending.getFirst().choose(request, pending.getFirst().getRanks().getFirst());
+            assertNull(Resolutions.resolve(router, request, filter, pending::add));
+            UriRouteMatch<Object, Object> chosen = Resolutions.choose(pending.getFirst(), request, pending.getFirst().getRanks().getFirst());
             assertNotNull(chosen);
             assertInstanceOf(RouteLocator.LocatedUriMatchInfo.class, ((DefaultUriRouteMatch<?, ?>) chosen).matchInfo());
         }
@@ -114,9 +114,9 @@ class RouterDefaultBodyConditionsTest {
             }
         }))) {
             List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
-            assertNull(router.findClosest(request, match -> true, pending::add));
+            assertNull(Resolutions.resolve(router, request, match -> true, pending::add));
             assertEquals(1, pending.size());
-            UriRouteMatch<Object, Object> chosen = pending.getFirst().choose(request, pending.getFirst().getRanks().getFirst());
+            UriRouteMatch<Object, Object> chosen = Resolutions.choose(pending.getFirst(), request, pending.getFirst().getRanks().getFirst());
             assertNotNull(chosen);
             assertEquals(List.of(VIP), chosen.getRouteInfo().getBodyConditions());
         }
@@ -127,7 +127,7 @@ class RouterDefaultBodyConditionsTest {
         LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/items", (request, pathVariables) -> HttpResponse.ok("item")));
         Router router = new DelegatingRouter(router(routes -> routes.locate("/orders/{id}", (request, pathVariables) -> "order", target -> items)));
 
-        UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.POST("/orders/1/items", "x"), ignored -> fail());
+        UriRouteMatch<Object, Object> match = Resolutions.resolve(router, HttpRequest.POST("/orders/1/items", "x"), ignored -> fail());
         assertNotNull(match);
         assertInstanceOf(RouteLocator.LocatedUriMatchInfo.class, ((DefaultUriRouteMatch<?, ?>) match).matchInfo());
         assertTrue(router.hasBodyConditions(), "a route locator may resolve to routes with body conditions");

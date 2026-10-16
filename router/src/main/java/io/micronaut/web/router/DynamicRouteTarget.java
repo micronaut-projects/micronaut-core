@@ -24,7 +24,6 @@ import io.micronaut.web.router.builder.HandlerMethod;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -73,22 +72,19 @@ interface DynamicRouteTarget {
     <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request, UriRouteMatch<T, R> match);
 
     /**
-     * The closest match to use instead of the closest match of the route, or the matches that
-     * depend on the body of the request, given to {@code pending}, see
-     * {@link Router#findClosest(HttpRequest, Consumer)}.
+     * The resolution to use instead of the closest match of the route: the closest match, none,
+     * or the matches that depend on the body of the request, see {@link Router#resolve(HttpRequest)}.
      *
      * @param request The request
      * @param match   The match of the route
      * @param filter  The filter of the candidates, applied to the resolved matches before their
      *                ambiguity is resolved, or {@code null}
-     * @param pending Given the matches that depend on the body of the request
      * @param <T>     The target type
      * @param <R>     The result type
-     * @return The match, or {@code null} if none or it depends on the body
+     * @return The resolution
      */
-    <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request, UriRouteMatch<T, R> match,
-                                                     @Nullable Predicate<UriRouteMatch<T, R>> filter,
-                                                     Consumer<? super PendingRouteMatch<T, R>> pending);
+    <T, R> RouteResolution<T, R> resolve(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                         @Nullable Predicate<UriRouteMatch<T, R>> filter);
 
     /**
      * The closest matches to use instead of a closest match of the route, see

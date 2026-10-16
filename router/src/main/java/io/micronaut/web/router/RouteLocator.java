@@ -46,7 +46,6 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -269,24 +268,26 @@ public final class RouteLocator implements DynamicRouteTarget {
     }
 
     @Override
-    public <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request, UriRouteMatch<T, R> match,
-                                                            @Nullable Predicate<UriRouteMatch<T, R>> filter,
-                                                            Consumer<? super PendingRouteMatch<T, R>> pending) {
+    public <T, R> RouteResolution<T, R> resolve(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                                @Nullable Predicate<UriRouteMatch<T, R>> filter) {
         Located located = locate(request, match);
         if (located == null) {
-            return null;
+            return RouteResolution.notFound();
         }
-        UriRouteMatch<T, R> target;
+        RouteResolution<T, R> target;
         try {
             // the routes of the target are pending on the body like the routes of the router
-            target = located.routes().findClosest(located.request(), null,
+            target = located.routes().resolve(located.request(), null,
                 // the filter sees the match of the request, as it does for the other routes
-                filter == null ? null : targetMatch -> filter.test(located.wrap(targetMatch)),
-                (PendingRouteMatch<T, R> targetPending) -> pending.accept(targetPending.located(located.request(), located::wrap, located::failed)));
+                filter == null ? null : targetMatch -> filter.test(located.wrap(targetMatch)));
         } catch (RuntimeException e) {
             throw located.failed(e);
         }
-        return target == null ? null : located.wrap(target);
+        return switch (target) {
+            case RouteResolution.Matched<T, R> m -> new RouteResolution.Matched<>(located.wrap(m.match()));
+            case RouteResolution.Pending<T, R> p -> new RouteResolution.Pending<>(p.pending().located(located.request(), located::wrap, located::failed));
+            case RouteResolution.NotFound<T, R> n -> n;
+        };
     }
 
     @Override

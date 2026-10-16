@@ -45,7 +45,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -255,10 +254,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    public <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request,
-                                                            @Nullable Predicate<UriRouteMatch<T, R>> filter,
-                                                            Consumer<? super PendingRouteMatch<T, R>> pending) throws DuplicateRouteException {
-        return routes.findClosest(request, ports.get(), filter, pending);
+    public <T, R> RouteResolution<T, R> resolve(HttpRequest<?> request,
+                                                @Nullable Predicate<UriRouteMatch<T, R>> filter) throws DuplicateRouteException {
+        return routes.resolve(request, ports.get(), filter);
     }
 
     @Override

@@ -22,13 +22,12 @@ import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
-import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 /**
  * The match of a request that depends on its body: the routes the request matched without its
  * body, some with {@link UriRouteInfo#getBodyConditions() body conditions}, ranked as the router
- * ranks them, see {@link Router#findClosest(HttpRequest, java.util.function.Consumer)}. The server
+ * ranks them, see {@link Router#resolve(HttpRequest)}. The server
  * reads the body, evaluates the body conditions rank by rank, and {@link #choose chooses} the
  * route among the routes of the first rank that the body matches.
  *
@@ -38,7 +37,7 @@ import java.util.function.UnaryOperator;
  *
  * <p>The chosen route may be a route locator, see {@link RouteLocator}: its target is located
  * then, and when the routes of the target depend on the body too, the choice is another pending
- * match, given to the caller of {@link #choose(HttpRequest, List, Consumer)}.</p>
+ * match, see {@link #choose(HttpRequest, List)}.</p>
  *
  * @param <T> The target type
  * @param <R> The result type
@@ -59,12 +58,12 @@ public final class PendingRouteMatch<T, R> {
     PendingRouteMatch(String path, List<List<UriRouteMatch<T, R>>> ranks, @Nullable Resolver<T, R> resolver) {
         // the ranks are built by a BodyFallThrough, the only place that decides where a request
         // whose body conditions fail goes
-        this(ranks, (request, matched, next) -> {
+        this(ranks, (request, matched) -> {
             UriRouteMatch<T, R> match = UriRouteSet.closest(path, matched);
             if (match == null || resolver == null) {
-                return match;
+                return RouteResolution.of(match);
             }
-            return resolver.resolve(request, match, next);
+            return resolver.resolve(request, match);
         });
     }
 
@@ -86,14 +85,18 @@ public final class PendingRouteMatch<T, R> {
      */
     PendingRouteMatch<T, R> located(HttpRequest<?> targetRequest, UnaryOperator<UriRouteMatch<T, R>> wrap,
                                     UnaryOperator<RuntimeException> failed) {
-        return new PendingRouteMatch<>(ranks, (request, matched, next) -> {
-            UriRouteMatch<T, R> match;
+        return new PendingRouteMatch<>(ranks, (request, matched) -> {
+            RouteResolution<T, R> resolution;
             try {
-                match = choose(targetRequest, matched, nested -> next.accept(nested.located(targetRequest, wrap, failed)));
+                resolution = choose(targetRequest, matched);
             } catch (RuntimeException e) {
                 throw failed.apply(e);
             }
-            return match == null ? null : wrap.apply(match);
+            return switch (resolution) {
+                case RouteResolution.Matched<T, R> m -> new RouteResolution.Matched<>(wrap.apply(m.match()));
+                case RouteResolution.Pending<T, R> p -> new RouteResolution.Pending<>(p.pending().located(targetRequest, wrap, failed));
+                case RouteResolution.NotFound<T, R> n -> n;
+            };
         });
     }
 
@@ -127,37 +130,18 @@ public final class PendingRouteMatch<T, R> {
     /**
      * Choose the route among the matches of a rank that the body matches. A chosen route
      * locator locates its target, see {@link RouteLocator}: when the routes of the target depend
-     * on the body too, they are given to {@code next}, and no match is returned. An asynchronous
-     * locator that has not located its target yet fails like it does for the router, see
-     * {@link RouteLocator#pendingLocation(Throwable)}.
+     * on the body too, the resolution is {@link RouteResolution.Pending pending} again. An
+     * asynchronous locator that has not located its target yet fails like it does for the
+     * router, see {@link RouteLocator#pendingLocation(Throwable)}.
      *
      * @param request The request
      * @param matched The matches of a rank whose routes the body matches
-     * @param next    Given the matches of a located target that depend on the body
-     * @return The match, or {@code null} if there is none or it depends on the body again
+     * @return The resolution: the chosen match, none, or the matches of a located target that
+     * depend on the body
      * @throws DuplicateRouteException if several routes match
      */
-    public @Nullable UriRouteMatch<T, R> choose(HttpRequest<?> request,
-                                               List<UriRouteMatch<T, R>> matched,
-                                               Consumer<? super PendingRouteMatch<T, R>> next) throws DuplicateRouteException {
-        return chooser.choose(request, matched, next);
-    }
-
-    /**
-     * Choose the route among the matches of a rank that the body matches, see
-     * {@link #choose(HttpRequest, List, Consumer)}, for routes whose resolution does not depend
-     * on the body again.
-     *
-     * @param request The request
-     * @param matched The matches of a rank whose routes the body matches
-     * @return The match, or {@code null} if there is none
-     * @throws DuplicateRouteException if several routes match
-     * @throws IllegalStateException if the chosen route depends on the body again
-     */
-    public @Nullable UriRouteMatch<T, R> choose(HttpRequest<?> request, List<UriRouteMatch<T, R>> matched) throws DuplicateRouteException {
-        return choose(request, matched, nested -> {
-            throw new IllegalStateException("The chosen route of " + request + " depends on the body again");
-        });
+    public RouteResolution<T, R> choose(HttpRequest<?> request, List<UriRouteMatch<T, R>> matched) throws DuplicateRouteException {
+        return chooser.choose(request, matched);
     }
 
     /**
@@ -181,9 +165,7 @@ public final class PendingRouteMatch<T, R> {
      */
     @FunctionalInterface
     private interface Chooser<T, R> {
-        @Nullable UriRouteMatch<T, R> choose(HttpRequest<?> request,
-                                             List<UriRouteMatch<T, R>> matched,
-                                             Consumer<? super PendingRouteMatch<T, R>> next);
+        RouteResolution<T, R> choose(HttpRequest<?> request, List<UriRouteMatch<T, R>> matched);
     }
 
     /**
@@ -197,10 +179,8 @@ public final class PendingRouteMatch<T, R> {
         /**
          * @param request The request
          * @param match   The chosen match
-         * @param next    Given the matches of the target that depend on the body
-         * @return The match to use, or {@code null} if none or it depends on the body
+         * @return The resolution of the match
          */
-        @Nullable UriRouteMatch<T, R> resolve(HttpRequest<?> request, UriRouteMatch<T, R> match,
-                                              Consumer<? super PendingRouteMatch<T, R>> next);
+        RouteResolution<T, R> resolve(HttpRequest<?> request, UriRouteMatch<T, R> match);
     }
 }

@@ -45,6 +45,7 @@ import static io.micronaut.web.router.builder.RouteCondition.header;
 import static io.micronaut.web.router.builder.RouteCondition.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -71,12 +72,26 @@ class RouteBodyConditionsTest {
         assertFalse(router.hasBodyConditions());
         MutableHttpRequest<?> request = HttpRequest.POST("/orders", "{}");
         List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
-        UriRouteMatch<Object, Object> match = router.findClosest(request, pending::add);
+        UriRouteMatch<Object, Object> match = Resolutions.resolve(router, request, pending::add);
         assertTrue(pending.isEmpty());
         assertEquals("orders", target(match));
         assertSame(router.findClosest(request).getRouteInfo(), match.getRouteInfo());
-        assertNull(router.findClosest(HttpRequest.POST("/missing", "{}"), pending::add));
+        assertNull(Resolutions.resolve(router, HttpRequest.POST("/missing", "{}"), pending::add));
         assertTrue(pending.isEmpty());
+    }
+
+    @Test
+    void theResolutionIsAMatchNoRouteOrPendingOnTheBody() {
+        Router router = router(routes -> {
+            routes.POST("/orders").where(EXPRESS).handle(handler("express"));
+            routes.POST("/payments", handler("payments"));
+        });
+
+        assertEquals("payments", target((UriRouteMatch<Object, Object>) assertInstanceOf(RouteResolution.Matched.class, router.resolve(HttpRequest.POST("/payments", "x"))).match()));
+        assertInstanceOf(RouteResolution.NotFound.class, router.resolve(HttpRequest.POST("/missing", "x")));
+        RouteResolution.Pending<?, ?> pending = assertInstanceOf(RouteResolution.Pending.class, router.resolve(HttpRequest.POST("/orders", "express")));
+        assertEquals(1, pending.pending().getRanks().size());
+        assertNull(RouteResolution.notFound().matchOrNull());
     }
 
     @Test
@@ -88,10 +103,10 @@ class RouteBodyConditionsTest {
 
         assertTrue(router.hasBodyConditions());
         List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
-        UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.POST("/payments", "{}"), pending::add);
+        UriRouteMatch<Object, Object> match = Resolutions.resolve(router, HttpRequest.POST("/payments", "{}"), pending::add);
         assertEquals("payments", target(match));
         assertTrue(pending.isEmpty());
-        assertNull(router.findClosest(HttpRequest.POST("/missing", "{}"), pending::add));
+        assertNull(Resolutions.resolve(router, HttpRequest.POST("/missing", "{}"), pending::add));
         assertTrue(pending.isEmpty());
     }
 
@@ -118,7 +133,7 @@ class RouteBodyConditionsTest {
         PendingRouteMatch<Object, Object> pending = pending(router, HttpRequest.POST("/items/special", "x"));
         assertEquals(List.of(List.of("special"), List.of("by name")), names(pending));
         // another path: the body does not decide
-        assertEquals("by name", target(router.findClosest(HttpRequest.POST("/items/lamp", "x"), ignored -> { })));
+        assertEquals("by name", target(Resolutions.resolve(router, HttpRequest.POST("/items/lamp", "x"), ignored -> { })));
     }
 
     @Test
@@ -129,7 +144,7 @@ class RouteBodyConditionsTest {
         });
 
         List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
-        assertEquals("special", target(router.findClosest(HttpRequest.POST("/items/special", "x"), pending::add)));
+        assertEquals("special", target(Resolutions.resolve(router, HttpRequest.POST("/items/special", "x"), pending::add)));
         assertTrue(pending.isEmpty());
 
         Router ambiguous = router(routes -> {
@@ -137,7 +152,7 @@ class RouteBodyConditionsTest {
             routes.POST("/items", handler("b"));
             routes.POST("/items").where(EXPRESS).order(1).handle(handler("c"));
         });
-        assertThrows(DuplicateRouteException.class, () -> ambiguous.findClosest(HttpRequest.POST("/items", "x"), ignored -> { }));
+        assertThrows(DuplicateRouteException.class, () -> Resolutions.resolve(ambiguous, HttpRequest.POST("/items", "x"), ignored -> { }));
     }
 
     @Test
@@ -151,9 +166,9 @@ class RouteBodyConditionsTest {
         PendingRouteMatch<Object, Object> pending = pending(router, request);
         List<UriRouteMatch<Object, Object>> rank = pending.getRanks().get(0);
         assertEquals(2, rank.size());
-        assertEquals("express", target(pending.choose(request, List.of(rank.get(0)))));
-        assertThrows(DuplicateRouteException.class, () -> pending.choose(request, rank));
-        assertNull(pending.choose(request, List.of()));
+        assertEquals("express", target(Resolutions.choose(pending, request, List.of(rank.get(0)))));
+        assertThrows(DuplicateRouteException.class, () -> Resolutions.choose(pending, request, rank));
+        assertNull(Resolutions.choose(pending, request, List.of()));
     }
 
     @Test
@@ -175,7 +190,7 @@ class RouteBodyConditionsTest {
         assertEquals(List.of(outer, inner, route), info.getBodyConditions());
         assertEquals(List.of(header("X-Shop"), outer, inner, route), info.getConditions(), "the body conditions are evaluated last");
         // the other conditions are met without the body
-        assertNull(router.findClosest(HttpRequest.POST("/shops/orders", "x"), ignored -> {
+        assertNull(Resolutions.resolve(router, HttpRequest.POST("/shops/orders", "x"), ignored -> {
             throw new AssertionError("pending");
         }));
     }
@@ -216,7 +231,7 @@ class RouteBodyConditionsTest {
     void theMethodsAllowedForA405AreFoundWithoutTheBody() {
         Router router = router(routes -> routes.POST("/orders").where(EXPRESS).handle(handler("express")));
 
-        assertNull(router.findClosest(HttpRequest.PUT("/orders", "x"), pending -> {
+        assertNull(Resolutions.resolve(router, HttpRequest.PUT("/orders", "x"), pending -> {
             throw new AssertionError("pending");
         }));
         assertEquals(1, router.findAny(HttpRequest.PUT("/orders", "x")).size());
@@ -262,7 +277,7 @@ class RouteBodyConditionsTest {
 
     private static PendingRouteMatch<Object, Object> pending(Router router, MutableHttpRequest<?> request) {
         List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
-        assertNull(router.findClosest(request, pending::add));
+        assertNull(Resolutions.resolve(router, request, pending::add));
         assertEquals(1, pending.size());
         return pending.get(0);
     }

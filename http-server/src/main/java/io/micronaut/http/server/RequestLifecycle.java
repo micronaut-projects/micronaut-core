@@ -59,6 +59,7 @@ import io.micronaut.web.router.PendingRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteLocator;
+import io.micronaut.web.router.RouteResolution;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
@@ -618,7 +619,13 @@ public class RequestLifecycle {
         if (!router.hasBodyConditions()) {
             return routeExecutor.findRouteMatch(request);
         }
-        return router.findClosest(request, (PendingRouteMatch<Object, Object> pending) -> pendingMatch = pending);
+        RouteResolution<Object, Object> resolution = router.resolve(request);
+        if (resolution instanceof RouteResolution.Pending<Object, Object> pending) {
+            // chosen once the body is read, see doRouteMatchAsync
+            pendingMatch = pending.pending();
+            return null;
+        }
+        return resolution.matchOrNull();
     }
 
     /**

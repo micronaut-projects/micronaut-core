@@ -35,6 +35,7 @@ import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.server.binding.ServerRequestBody;
 import io.micronaut.web.router.PendingRouteMatch;
 import io.micronaut.web.router.RouteLocator;
+import io.micronaut.web.router.RouteResolution;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.builder.RouteCondition;
@@ -185,10 +186,9 @@ final class BodyRouteSelector {
      * waited for, like the router does without body conditions.
      */
     private <T, R> ExecutionFlow<Choice<T, R>> chosen(Selection<T, R> selection, List<UriRouteMatch<T, R>> matched) {
-        List<PendingRouteMatch<T, R>> next = new ArrayList<>(1);
-        UriRouteMatch<T, R> match;
+        RouteResolution<T, R> resolution;
         try {
-            match = selection.pending.choose(selection.request, matched, next::add);
+            resolution = selection.pending.choose(selection.request, matched);
         } catch (RuntimeException e) {
             CompletionStage<?> location = RouteLocator.pendingLocation(e);
             if (location == null) {
@@ -199,12 +199,14 @@ final class BodyRouteSelector {
             return CompletableFutureExecutionFlow.just(location)
                 .flatMap(located -> selection.propagate(() -> chosen(selection, matched)));
         }
-        if (!next.isEmpty()) {
-            return select(selection.request, next.getFirst(), selection.context, selection.waits);
-        }
         // the body met the conditions of a route, which may still resolve to no route, e.g. a
         // located target without a route for the method: answered as without body conditions
-        return ExecutionFlow.just(new Choice<>(match, true));
+        return switch (resolution) {
+            case RouteResolution.Matched<T, R> m -> ExecutionFlow.just(new Choice<>(m.match(), true));
+            case RouteResolution.NotFound<T, R> _ -> ExecutionFlow.just(new Choice<>(null, true));
+            // the routes of a located target depend on the body too
+            case RouteResolution.Pending<T, R> p -> select(selection.request, p.pending(), selection.context, selection.waits);
+        };
     }
 
     /**
@@ -399,6 +401,16 @@ final class BodyRouteSelector {
     }
 
     /**
+     * @return Whether the body decoded to one argument is the body decoded to another: the same
+     * argument, or the same type without annotations, which may change the decoding, e.g. a
+     * {@code @JsonView}
+     */
+    private static boolean sameDecoding(Argument<?> decoded, Argument<?> type) {
+        return decoded == type || decoded.equalsType(type)
+            && decoded.getAnnotationMetadata().isEmpty() && type.getAnnotationMetadata().isEmpty();
+    }
+
+    /**
      * The body of the request, as the conditions read it, each decoded form once.
      */
     private final class RequestBody {
@@ -490,16 +502,6 @@ final class BodyRouteSelector {
         private Charset charset() {
             return request.getContentType().flatMap(MediaType::getCharset).orElse(configuration.getDefaultCharset());
         }
-    }
-
-    /**
-     * @return Whether the body decoded to one argument is the body decoded to another: the same
-     * argument, or the same type without annotations, which may change the decoding, e.g. a
-     * {@code @JsonView}
-     */
-    private static boolean sameDecoding(Argument<?> decoded, Argument<?> type) {
-        return decoded == type || decoded.equalsType(type)
-            && decoded.getAnnotationMetadata().isEmpty() && type.getAnnotationMetadata().isEmpty();
     }
 
     /**

@@ -19,7 +19,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.filter.GenericHttpFilter;
-import io.micronaut.web.router.PendingRouteMatch;
+import io.micronaut.web.router.RouteResolution;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteInfo;
@@ -28,7 +28,6 @@ import io.micronaut.web.router.UriRouteMatch;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -101,13 +100,12 @@ public class FilteredRouter implements Router {
     }
 
     @Override
-    public <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request,
-                                                            @Nullable Predicate<UriRouteMatch<T, R>> filter,
-                                                            Consumer<? super PendingRouteMatch<T, R>> pending) {
+    public <T, R> RouteResolution<T, R> resolve(HttpRequest<?> request,
+                                                @Nullable Predicate<UriRouteMatch<T, R>> filter) {
         // filter before resolving the ambiguity, like findAllClosest, and the routes of located
         // targets too; the filter of an enclosing filtered router as well
         Predicate<UriRouteMatch<T, R>> own = routeFilter.filter(request);
-        return router.findClosest(request, filter == null ? own : own.and(filter), pending);
+        return router.resolve(request, filter == null ? own : own.and(filter));
     }
 
     @Override
