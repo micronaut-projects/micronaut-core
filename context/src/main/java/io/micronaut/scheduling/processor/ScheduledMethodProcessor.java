@@ -206,7 +206,14 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     @PostConstruct
     void watchIfStarted() {
         if (beanContext.isRunning()) {
-            watchMethods();
+            try {
+                watchMethods();
+            } catch (RuntimeException e) {
+                // the creation fails, and no pre-destroy method is called on an instance whose creation failed: the
+                // watches and the timers of the methods scheduled before the failure would outlive it
+                close();
+                throw e;
+            }
         }
     }
 
@@ -438,7 +445,12 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
         if (!beanContext.containsBean(type, Qualifiers.byName(name))) {
             return Optional.empty();
         }
-        return Optional.of(resolver.getBean(type, Qualifiers.byName(name)));
+        try {
+            // a nullable factory may produce no bean, as findBean tells
+            return Optional.ofNullable(resolver.getBean(type, Qualifiers.byName(name)));
+        } catch (NoSuchBeanException e) {
+            return Optional.empty();
+        }
     }
 
     private void scheduleTask(BeanExecutableMethod<Scheduled> entry) {
