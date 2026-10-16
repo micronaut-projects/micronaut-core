@@ -292,7 +292,7 @@ class HttpGetSpec extends Specification {
             Thread.sleep(3000)
             body = res.getBody(String).orElse(null)
         })
-        def conditions = new PollingConditions(timeout: 4)
+        PollingConditions conditions = new PollingConditions(timeout: 4)
 
         then:
         conditions.eventually {
