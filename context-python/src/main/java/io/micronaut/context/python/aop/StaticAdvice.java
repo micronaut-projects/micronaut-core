@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python.aop;
 
+import io.micronaut.aop.Adapter;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.aop.runtime.RuntimeProxyDefinition;
@@ -38,7 +39,8 @@ import java.util.function.Supplier;
  * the generated class runs its body as Java; when the bean is advised, the proxy the context hands
  * out binds this advice, and the method runs its interceptors in Java before the body, the way a
  * proxy compiled for a Java bean does. The chain ends on the target bean, whose own generated
- * class runs the body; the target binds no advice, so the body runs once.
+ * class runs the body; the target binds no advice, so the body runs once. The abstract methods
+ * of an introduction run the introduction's interceptors alone, on the proxy itself.
  *
  * @param <T> The bean type
  * @since 5.3.0
@@ -56,9 +58,18 @@ public final class StaticAdvice<T> {
      * @param target          The target bean of the proxy
      */
     public StaticAdvice(RuntimeProxyDefinition<T> proxyDefinition, Supplier<T> target) {
+        this(proxyDefinition, proxyDefinition.interceptedMethods(), target);
+    }
+
+    /**
+     * @param proxyDefinition    The proxy definition
+     * @param interceptedMethods The intercepted methods and their interceptors, as the proxy runs them
+     * @param target             The target bean of the proxy: the proxy itself for an introduction
+     */
+    public StaticAdvice(RuntimeProxyDefinition<T> proxyDefinition, List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods, Supplier<T> target) {
         this.proxyDefinition = proxyDefinition;
         this.target = target;
-        for (RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod : proxyDefinition.interceptedMethods()) {
+        for (RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod : interceptedMethods) {
             interceptedByName.computeIfAbsent(interceptedMethod.executableMethod().getMethodName(), ignored -> new ArrayList<>())
                 .add(interceptedMethod);
         }
@@ -85,6 +96,14 @@ public final class StaticAdvice<T> {
         }
         ExecutableMethod<T, Object> executableMethod = intercepted.executableMethod();
         Interceptor<T, Object>[] interceptors = intercepted.interceptors();
+        if (executableMethod.isAbstract()) {
+            // an introduced method: the introduction answers the call, nothing runs after the interceptors
+            if (executableMethod.hasStereotype(Adapter.class) && interceptors.length > 1) {
+                // as the Python proxy: the adapter introduction alone, the around interceptors advise the target method
+                interceptors = Arrays.copyOfRange(interceptors, interceptors.length - 1, interceptors.length);
+            }
+            return new MethodInterceptorChain<>(interceptors, targetBean, executableMethod, arguments).proceed();
+        }
         Interceptor<T, Object>[] chain = Arrays.copyOf(interceptors, interceptors.length + 1, Interceptor[].class);
         chain[interceptors.length] = context -> executableMethod.invoke(targetBean, context.getParameterValues());
         return new MethodInterceptorChain<>(chain, targetBean, executableMethod, arguments).proceed();

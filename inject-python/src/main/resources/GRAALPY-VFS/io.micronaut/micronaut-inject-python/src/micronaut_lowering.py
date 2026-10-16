@@ -94,6 +94,27 @@ def _rank(argument_type, parameter_type):
     return 1
 
 
+def stub_type_name(typed):
+    """The Java type the stub declares for a hinted value, or None when the hint has no static type."""
+    if typed is None:
+        return None
+    if typed.kind == BUILTIN:
+        if typed.name in COLLECTION_TYPES:
+            return COLLECTION_TYPES[typed.name]
+        return STUB_TYPES.get(typed.name)
+    if typed.kind == JAVA:
+        return typed.name
+    if typed.kind == PY:
+        return typed.name.qualifiedName()
+    return None
+
+
+def _abstract_class(class_def):
+    """Whether the class is a protocol or declares an abstract method: its generated type is an interface or abstract."""
+    return (any(base.name() in ("Protocol", "typing.Protocol") for base in class_def.bases())
+            or any(function.isAbstract() for function in class_def.functions()))
+
+
 def _plain_receiver(node):
     """Whether the receiver is a name or a chain of attributes of a name, whose evaluation a static call can skip."""
     while isinstance(node, ast.Attribute):
@@ -265,8 +286,9 @@ class Refused(Exception):
 class Lowering:
     """Lowers one function body; see the module documentation."""
 
-    def __init__(self, checker, module, class_def, function_def, node, rules, class_model=None, advised=None, advised_method=False):
+    def __init__(self, checker, module, class_def, function_def, node, rules, class_model=None, advised=None, advised_method=False, java_layout=None):
         self.checker = checker
+        self.java_layout = java_layout  # (parameter types, return type) of the Java method this one implements, which fix the stub's signature
         self.advised = advised or (lambda function_def: False)  # whether a method of the class is advised
         self.advised_method = advised_method  # whether this method is advised: its Java method runs the interceptor chain first
         self.module = module
@@ -356,8 +378,14 @@ class Lowering:
             # from the hint itself: the checker's pass forgets a parameter the body reassigns
             hint = argument.typeAnnotation()
             typed = self.bindings.of_hint(hint) if hint is not None else None
-            stub_type = self._stub_type(typed, hint, self.node)
-            self.parameters[name] = (self._value_type(typed, self.node), stub_type)
+            stub_type = self.java_layout[0][len(names)] if self.java_layout is not None else self._stub_type(typed, hint, self.node)
+            used = self._value_type(typed, self.node)
+            if self.java_layout is not None and _erased(used) != _erased(stub_type) and used not in (LONG, DOUBLE, BOOLEAN, STRING):
+                # the Java method takes the layout's type (a Throwable) while the hint names the subtype the
+                # body works on (a ConstraintViolationException): the parameter is cast where it is read
+                if not self.checker.facts.isAssignable(_erased(used), _erased(stub_type)):
+                    self._refuse("unknown-type", f"the hint of [{name}] is a [{_erased(used)}], which is not a [{_erased(stub_type)}] as the Java method declares", self.node)
+            self.parameters[name] = (used, stub_type)
             if typed is not None and typed.kind == BUILTIN and typed.name in COLLECTION_TYPES:
                 # the bridge hands Python a copy of a Java collection given to a list, set or dict
                 # parameter: the body works on a copy too, so the caller's collection is untouched
@@ -367,6 +395,9 @@ class Lowering:
         return names, types
 
     def _return_type(self):
+        if self.java_layout is not None:
+            # the Java method fixes the return type: a value is returned at it, boxed when it is an Object
+            return VOID if self.java_layout[1] == "void" else self.java_layout[1]
         return_def = self.function_def.returnType()
         hint = return_def.typeAnnotation() if return_def is not None else None
         if hint is None:
@@ -1490,9 +1521,6 @@ class Lowering:
         class_def = model.class_def
         if class_def.isEnum():
             self._refuse("unsupported-expression", f"[{model.name}] is an enum; its members are constants", node)
-        for base in class_def.bases():
-            if base.name() in ("Protocol", "typing.Protocol"):
-                self._refuse("unsupported-expression", f"[{model.name}] is a protocol", node)
         for decorator in class_def.decorators():
             if decorator.annotationName().rsplit(".", 1)[-1] == "ContextPooled":
                 self._refuse("unsupported-expression", f"[{model.name}] is served by a context pool; its objects have no Java class of their own", node)
@@ -1612,6 +1640,8 @@ class Lowering:
         """A construction of an object of the compilation: the generated class's constructor, which mirrors the hinted __init__."""
         model = self.checker.python_classes.of(class_def)
         owner = self._generated_class(model, node)
+        if _abstract_class(class_def):
+            self._refuse("unsupported-expression", f"[{model.name}] is a protocol or an abstract class; the generated type cannot be constructed", node)
         constructor = model.constructor_of()
         if constructor is UNKNOWN:
             self._refuse("unsupported-expression", f"the constructor of [{model.name}] is not the compilation's own", node)
