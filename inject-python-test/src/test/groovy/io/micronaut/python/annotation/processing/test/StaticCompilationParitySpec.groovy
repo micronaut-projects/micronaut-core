@@ -20,6 +20,7 @@ class StaticCompilationParitySpec extends AbstractPythonTypeElementSpec {
     }
 
     static final String SOURCE = '''
+from dataclasses import dataclass, field
 from jakarta.inject import Singleton
 from java.lang import Math, StringBuilder
 from java.lang import IllegalArgumentException
@@ -48,6 +49,11 @@ class Calc:
     @property
     def factor(self) -> float:
         return self.rate * 2
+
+    def bagged(self, n: int) -> str:
+        bag = Bag(n)
+        bag.rename("sack" + str(n))
+        return str(bag.doubled() + bag.count + bag._secret()) + "|" + bag.label
 
     def chained(self, n: int) -> str:
         return str(self.helper(n) * 2 + self._hidden(n)) + "|" + str(self.factor * n) + "|" + self.label(n, "z")
@@ -218,6 +224,19 @@ class Calc:
     def unicode(self, text: str) -> str:
         return text[0] + "|" + str(len(text)) + "|" + text[-1] + "|" + text.upper() + "|" + text.lower() + "|" + str("a" in text)
 
+    def picked(self, n: int, fallback: str) -> str:
+        bag = Bag(n)
+        bag.rename("" if n == 0 else "named")
+        return bag.label or fallback
+
+    def formed(self, name: str) -> str:
+        form = Form(name=name)
+        form.count = 4
+        return form.name + str(form.count) + str(len(form.tags)) + str(Form("q", 2).count)
+
+    def maybe_name(self, flag: bool) -> str | None:
+        return "x" if flag else None
+
     def maybe_count(self, n: int) -> int | None:
         return n if n > 0 else None
 
@@ -270,20 +289,48 @@ class Calc:
                 break
         return count
 
+@dataclass
+class Form:
+    name: str = ""
+    count: int = 0
+    tags: list[str] = field(default_factory=list)
+
 @Singleton
 class Pair:
     def __init__(self, calc: Calc):
         self.calc = calc
+        self.builder = StringBuilder("x")
 
     def has_partner(self) -> bool:
         return self.calc is not None
+
+    def built(self) -> str:
+        return self.builder.append("y").toString()
+
+class Bag:
+    label: str = "bag"
+
+    def __init__(self, count: int):
+        self.count = count
+
+    def doubled(self) -> int:
+        return self.count * 2
+
+    def _secret(self) -> int:
+        return 7
+
+    def rename(self, label: str) -> None:
+        self.label = label
 '''
 
     static final List<List> CASES = [
         ["total", 3, 2.5d], ["total", 50, 2.5d],
         ["label", 2, "pen"],
         ["chained", 3], ["chained", 0],
+        ["bagged", 3], ["bagged", -1],
         ["described", "ab"],
+        ["formed", "f"],
+        ["picked", 0, "fb"], ["picked", 1, "fb"],
         ["ratio", 1, 4], ["ratio", 1, 0],
         ["parity", 3], ["parity", 8],
         ["unicode", "\uD83D\uDE00ab"], ["unicode", "i\u00DF"],
@@ -310,6 +357,7 @@ class Pair:
         ["relooped", 3], ["relooped", 0],
         ["safe_host", "http://example.com/x"], ["safe_host", "not a url"],
         ["strict_host", ""], ["strict_host", "http://example.com/x"],
+        ["maybe_name", true], ["maybe_name", false],
         ["maybe_count", 3], ["maybe_count", 0],
         ["branch_local", true], ["branch_local", false],
         ["guarded", 3], ["guarded", 0],
@@ -327,6 +375,7 @@ class Pair:
                 def pair = getBean(context, 'python.Pair')
                 results[m] = CASES.collectEntries { List row -> [(row.toString()): invoke(calc, row)] }
                 results[m]['pair'] = pair.has_partner()
+                results[m]['built'] = pair.built()
                 results[m]['words'] = calc.words(new ArrayList<>(['a', 'skip', 'b']))
                 results[m]['keyed'] = calc.keyed(new LinkedHashMap<>([bb: 2, a: 1]))
                 results[m]['edge'] = calc.edge(0)
@@ -343,7 +392,7 @@ class Pair:
                 results[m]['copied'] = calc.copied(new ArrayList<>(['a'])).collect { it.toString() }
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
-                    assert compiled.containsAll(CASES*.get(0).unique().collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name']), decisions.toString()
+                    assert compiled.containsAll(CASES*.get(0).unique().collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled']), decisions.toString()
                 }
             } finally {
                 context.close()
@@ -358,6 +407,10 @@ class Pair:
         results[StaticCompilationMode.OFF][["host", "not a url"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["entry", "k", 3].toString()] == "k=3"
         results[StaticCompilationMode.OFF]['pair'] == true
+        results[StaticCompilationMode.OFF]['built'] == 'xy'
+        results[StaticCompilationMode.OFF][["formed", "f"].toString()] == 'f402'
+        results[StaticCompilationMode.OFF][["picked", 0, "fb"].toString()] == 'fb'
+        results[StaticCompilationMode.OFF][["picked", 1, "fb"].toString()] == 'named'
         results[StaticCompilationMode.OFF]['words'] == 'a;b;'
         results[StaticCompilationMode.OFF]['keyed'] == 3
         results[StaticCompilationMode.OFF]['collected'] == ['B', 'A']

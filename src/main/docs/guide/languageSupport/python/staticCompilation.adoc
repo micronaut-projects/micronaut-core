@@ -88,13 +88,16 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |Reason |Given when
 
 |`class-not-eligible`
-|The class generates no ordinary Java class to compile into: a module-level function, an enum, a protocol, an interface, a class served by a context pool, a class declaring `__slots__` or `__getattr__`.
+|The function has no ordinary Java class to compile into: a module-level function without a route, `@Executable`, scope or bean decorator (the others are methods of the module's generated class), an enum, a protocol, an interface, a class served by a context pool, a class declaring `__slots__` or `__getattr__`.
+
+|`pooled-module`
+|The function belongs to a module without a module-level annotation, which the runtime serves from a pool of Python contexts, and its body reaches a Python object (an attribute of a class of the compilation, a method the generated class does not declare), which no context is leased for. A pooled route that only calls Java and the generated classes of the compilation is compiled and runs without leasing a context at all.
 
 |`special-method`, `async-function`, `generator-function`, `static-method`
 |The method is a dunder (`__init__` runs in Python so the instance keeps its Python semantics), an `async def`, a generator, or a static or class method.
 
 |`overriding-java-method`, `intercepted-method`
-|The method implements a method of a Java base or interface, whose bridge keeps the Java signature, or is advised (an around or introduction binding, or a validation constraint): its interceptor chain runs on the Python object, which a Java body would bypass.
+|The method implements a method of a Java base or interface, whose bridge keeps the Java signature; or it is an advised method of an introduction, whose chain runs on the Python object. Other advised methods (an around binding or a validation constraint on a method, its class or a parameter) are compiled: the Java method of a class runs the interceptor chain the bean's proxy binds before the body, as a proxy compiled for a Java bean does, and a module's generated class is proxied by Micronaut like any Java bean; so validation and around advice cost no crossing into Python.
 
 |`varargs-signature`, `unhinted-parameter`, `unhinted-return`, `java-reserved-name`
 |The signature has no fixed Java layout: `*args`, `**kwargs` or keyword-only parameters, a parameter without a hint, a parameter or return hint resolving to no Java type or class of the compilation, a method, parameter or local named with a Java keyword or a method of `Object`. A missing return hint is not a reason: the method returns `Object`, as its stub declares.
@@ -103,7 +106,7 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |An expression has no static type (a value of a third-party module, a local assigned values of different types, a local assigned on some paths only and read after them), or `self.x` names nothing the class declares.
 
 |`dynamic-call`, `ambiguous-overload`, `kwargs-to-java`, `sibling-call`
-|A call resolves to no Java method or constructor, more than one overload fits the argument types equally well, keyword arguments are given to a Java method, or a static, class, async or generator method of the class is called on `self`.
+|A call resolves to no Java method or constructor, more than one overload fits the argument types equally well, keyword arguments are given to a Java method or a builtin, or a static, class, async or generator method of the class is called on `self`.
 
 |`python-builtin-not-lowered`, `unsupported-statement`, `unsupported-expression`
 |A builtin, a method of a Python value, a statement kind or an expression kind outside the supported subset below.
@@ -123,8 +126,8 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 |Locals, `+=` and friends, `if`/`elif`/`else`, `return`, `pass`, docstrings, `assert`
 |Java locals declared once, with the type of the values assigned. A local first assigned inside a branch is declared at the top of the body when every path assigns it, and inside the branch when it is read there only; a local assigned in a `try` block whose handlers all return or raise is declared before the statement, so it can be read after it. `assert` raises `IllegalStateException`.
 
-|`while`, `for x in range(...)`, `for x in iterable`, `break`, `continue`
-|Java loops; a range with any step, a Java `Iterable` or a typed Python collection, a dict yielding its keys. A local first assigned inside a loop (or a try block) is not visible after it.
+|`while`, `for x in range(...)`, `for x in iterable`, `for k, v in mapping.items()`, `break`, `continue`
+|Java loops; a range with any step, a Java `Iterable` or a typed Python collection, a dict yielding its keys, the entries of a dict or a Java `Map` unpacked into the two loop variables. A local first assigned inside a loop (or a try block) is not visible after it.
 
 |`raise JavaException(...)`, `try`/`except JavaType as e`/`finally`
 |`throw` and `try` with typed catches. A checked exception a Java call declares reaches the caller wrapped in `IllegalStateException`, as it does through the bridge.
@@ -148,7 +151,16 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 |`Object`, as the stub declares, every returned value boxed. A call of such a sibling has the one static type its body returns when the checker infers one, cast from the `Object` the Java method returns; a number or a boolean stays an `Object`.
 
 |Java calls, constructors, static fields, enum constants, nested types
-|Direct Java calls with the parameter types of the chosen overload, so the generated code never depends on javac's overload pick; an integer argument to an `int` parameter narrows exactly.
+|Direct Java calls with the parameter types of the chosen overload, so the generated code never depends on javac's overload pick; an integer argument to an `int` parameter narrows exactly. A returned `List<String>` or `Map<String, Integer>` keeps its element types, so its elements are iterated, joined and compared with their static types.
+
+|Injected attributes of a module
+|A module-level function of the module's generated class reads an attribute the module injects (`repository: Annotated[BookRepository, Inject]`) from a field of that class, set when the bean is injected, and calls the bean as a Java object.
+
+|`Item(...)`, `item.title`, `item.title = v`, `item.method(...)`
+|The generated class of a class of the compilation: its constructor, which mirrors the hinted `__init__` or the fields of a dataclass, with keyword arguments matched by name and an omitted parameter filled with its literal default, `None`, or an empty `field(default_factory=list)`, `dict` or `set`; the accessor of a hinted attribute, else the attribute of the Python object; the setter of a hinted attribute, refused on a frozen dataclass; the Java method the generated class declares for the call (keywords and defaults matched the same way), else the method of the Python object.
+
+|Module-level constants (`ROLE_USER = "user"`)
+|Inlined as literals, including a constant imported from another module of the compilation.
 
 |`self.x`, `self.x = v`
 |The Java field of an introspected class, else the attribute of the Python object; a `@property` always runs its Python getter or setter. An attribute `__init__` assigns a hinted parameter or a Java call or construction (`self._encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder()`) has that type in every method.
