@@ -244,11 +244,14 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                                boolean shouldProceedNormally,
                                HttpResponse<?> actualResponse,
                                OutboundAccess outboundAccess) {
+        // the upgrade does not read the body of its request. It is not empty when the request
+        // went through the h2c upgrade handler, which aggregates every request with an Upgrade
+        // header into a FullHttpRequest
+        body.close();
         if (cancelUpgrade) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Cancelling websocket upgrade, handler was removed while request was processing");
             }
-            body.close();
             return;
         }
 
@@ -269,10 +272,6 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
             installCompressionHandler(ctx, msg.getNativeRequest());
             handleHandshake(ctx, msg, webSocketBean, actualResponse);
-            // the upgrade does not read the body of its request. It is not empty when the
-            // request went through the h2c upgrade handler, which aggregates every request with
-            // an Upgrade header into a FullHttpRequest
-            body.close();
 
             try {
                 // re-configure the pipeline
