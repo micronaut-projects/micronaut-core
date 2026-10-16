@@ -409,7 +409,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             .filter(rm -> rm.getHttpMethod() == HttpMethod.GET && isFunctionalWebSocketRoute(rm))
             .toList();
         if (!functionalRoutes.isEmpty()) {
-            return DefaultRouter.resolveAmbiguity(request, functionalRoutes).stream()
+            // a route selector of the routes selects among them, as for the route of any other request
+            return DefaultRouter.selectClosest(request, functionalRoutes).stream()
                 .min(Comparator.comparingInt(rm -> rm.getRouteInfo().getOrder()));
         }
         return router.<Object, Object>find(HttpMethod.GET, request.getPath(), request)
