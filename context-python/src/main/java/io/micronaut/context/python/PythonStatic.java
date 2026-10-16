@@ -317,6 +317,21 @@ public final class PythonStatic {
     }
 
     /**
+     * Invokes a method of the Python object of a compiled body and converts its result: the call a
+     * compiled body makes to a method of its class that the stub does not declare, or that runs
+     * its interceptors on the Python object.
+     *
+     * @param self      The Python object
+     * @param name      The method
+     * @param arguments The arguments
+     * @param converter The conversion of the result to the Java type the body uses
+     * @return The converted result
+     */
+    public static @Nullable Object invoke(org.graalvm.polyglot.Value self, String name, Object[] arguments, PolyglotValueConverter<?> converter) {
+        return converter.convert(PythonInvocation.invokePythonMethod(self, name, arguments));
+    }
+
+    /**
      * Binds a Python object to the delegate of its stub: the compiled methods of the object run as
      * Java from then on, see {@code apply_delegation}.
      *
