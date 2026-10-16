@@ -25,6 +25,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.ServerHttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
@@ -33,9 +35,12 @@ import io.micronaut.http.server.exceptions.UnsupportedMediaException;
 import io.micronaut.http.simple.SimpleHttpRequest;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.Router;
+import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.HttpRoutes;
+import io.micronaut.http.PathVariables;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.io.InputStream;
 import java.time.Duration;
@@ -163,45 +168,55 @@ class AsyncRequestBodyWithoutNettyTest {
 
     @Test
     void aRequestWithoutAContentTypeIsReadAsTheRouteConsumes() throws Exception {
-        assertEquals(Map.of("a", 1), readBody(null, List.of(MediaType.APPLICATION_JSON_TYPE)));
+        assertEquals(Map.of("a", 1), readBody(null, "/consumes-json"));
+    }
+
+    @Test
+    void aRequestWithoutAContentTypeIsReadAsJsonByARouteThatDeclaresNone() throws Exception {
+        assertEquals(Map.of("a", 1), readBody(null, "/consumes-nothing"));
     }
 
     @Test
     void theContentTypeOfTheRequestIsNotReplacedByTheRoute() {
         // the route consumes JSON, the request says it is text: the JSON reader is not used
-        assertThrows(ExecutionException.class, () -> readBody(MediaType.TEXT_PLAIN_TYPE, List.of(MediaType.APPLICATION_JSON_TYPE)));
+        assertThrows(ExecutionException.class, () -> readBody(MediaType.TEXT_PLAIN_TYPE, "/consumes-json"));
     }
 
     @Test
     void aRouteThatConsumesSeveralTypesDoesNotChooseOne() {
-        assertThrows(ExecutionException.class, () -> readBody(null, List.of(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_PLAIN_TYPE)));
+        assertThrows(ExecutionException.class, () -> readBody(null, "/consumes-several"));
     }
 
     @Test
     void aRouteThatConsumesAnyTypeDoesNotChooseOne() {
-        assertThrows(ExecutionException.class, () -> readBody(null, List.of(MediaType.ALL_TYPE)));
+        assertThrows(ExecutionException.class, () -> readBody(null, "/consumes-any"));
     }
 
-    private static Object readBody(MediaType contentType, List<MediaType> consumes) throws Exception {
-        try (ApplicationContext ctx = ApplicationContext.run();
+    /**
+     * Handler routes whose handler takes an {@link io.micronaut.http.body.AsyncRequestBody}: the route has no
+     * reader for the type that is read later.
+     */
+    @jakarta.inject.Singleton
+    @io.micronaut.context.annotation.Requires(property = "spec.name", value = "async-body-routes")
+    static class Routes implements HttpRoutes {
+        @Override
+        public void routes(HttpRouteBuilder routes) {
+            routes.POST("/consumes-json").consumes(MediaType.APPLICATION_JSON_TYPE).body().handleAsync(AsyncRequestBodyWithoutNettyTest::answer);
+            routes.POST("/consumes-nothing").body().handleAsync(AsyncRequestBodyWithoutNettyTest::answer);
+            routes.POST("/consumes-several").consumes(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_PLAIN_TYPE).body().handleAsync(AsyncRequestBodyWithoutNettyTest::answer);
+            routes.POST("/consumes-any").consumes(MediaType.ALL_TYPE).body().handleAsync(AsyncRequestBodyWithoutNettyTest::answer);
+        }
+    }
+
+    private static CompletableFuture<HttpResponse<?>> answer(HttpRequest<?> request, PathVariables pathVariables, AsyncRequestBody body) {
+        return CompletableFuture.<HttpResponse<?>>completedFuture(HttpResponse.ok());
+    }
+
+    private static Object readBody(MediaType contentType, String uri) throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", "async-body-routes"));
              OtherServerRequest server = request("{\"a\":1}", contentType)) {
-            // a route whose handler takes an AsyncRequestBody: it has no reader for the type read later
-            RouteInfo<?> route = (RouteInfo<?>) Proxy.newProxyInstance(AsyncRequestBodyWithoutNettyTest.class.getClassLoader(), new Class<?>[]{RouteInfo.class}, (proxy, method, args) -> {
-                switch (method.getName()) {
-                    case "getConsumes":
-                        return consumes;
-                    case "getMessageBodyReader":
-                        return null;
-                    case "toString":
-                        return "route";
-                    case "hashCode":
-                        return 1;
-                    case "equals":
-                        return proxy == args[0];
-                    default:
-                        throw new UnsupportedOperationException(method.getName());
-                }
-            });
+            // the route the router matched, as the server does before it binds the body
+            RouteInfo<?> route = ctx.getBean(Router.class).findClosest(HttpRequest.POST(uri, null)).getRouteInfo();
             RouteAttributes.setRouteInfo(server, route);
             DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyArgumentBinder.class));
             try {
