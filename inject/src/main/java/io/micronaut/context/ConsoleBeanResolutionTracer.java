@@ -170,8 +170,13 @@ abstract sealed class ConsoleBeanResolutionTracer
 
     @Override
     public void traceBeanCreation(
-        BeanResolutionContext resolutionContext,
+        Resolution resolution,
         BeanDefinition<?> beanDefinition, Argument<?> beanType) {
+        BeanResolutionContext resolutionContext = TracedResolution.resolutionContext(resolution);
+        if (!resolutionContext.getPath().isEmpty()) {
+            // a bean created for an injection point is shown by the injection point
+            return;
+        }
         resolutionContext.setAttribute(START_TIME, System.currentTimeMillis());
         List<StackWalker.StackFrame> createdAt = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
             .walk(s ->
@@ -210,7 +215,8 @@ abstract sealed class ConsoleBeanResolutionTracer
     }
 
     @Override
-    public <T> void traceBeanResolved(BeanResolutionContext resolutionContext, Argument<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable T bean) {
+    public <T> void traceBeanResolved(Resolution resolution, Argument<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable T bean) {
+        BeanResolutionContext resolutionContext = TracedResolution.resolutionContext(resolution);
         String prefix = padLeft(resolutionContext, 1) + RIGHT_ARROW;
         StringWriter sw = new StringWriter();
         try (BufferedWriter writer = new BufferedWriter(sw)) {
@@ -244,7 +250,8 @@ abstract sealed class ConsoleBeanResolutionTracer
     }
 
     @Override
-    public <T> void traceBeanDisabled(BeanResolutionContext resolutionContext, Argument<T> beanType, @Nullable Qualifier<T> qualifier, String disabledBeanMessage) {
+    public <T> void traceBeanDisabled(Resolution resolution, Argument<T> beanType, @Nullable Qualifier<T> qualifier, String disabledBeanMessage) {
+        BeanResolutionContext resolutionContext = TracedResolution.resolutionContext(resolution);
         String[] lines = disabledBeanMessage.split("\\r?\\n");
         String prefix = padLeft(resolutionContext, 3);
         StringWriter sw = new StringWriter();
@@ -270,7 +277,8 @@ abstract sealed class ConsoleBeanResolutionTracer
     }
 
     @Override
-    public <T> void traceValueResolved(BeanResolutionContext resolutionContext, Argument<T> argument, String property, @Nullable T value) {
+    public <T> void traceValueResolved(Resolution resolution, Argument<T> argument, String property, @Nullable T value) {
+        BeanResolutionContext resolutionContext = TracedResolution.resolutionContext(resolution);
         BeanContext context = resolutionContext.getContext();
         if (context instanceof ApplicationContext applicationContext) {
             Environment environment = applicationContext.getEnvironment();
@@ -297,15 +305,27 @@ abstract sealed class ConsoleBeanResolutionTracer
     }
 
     @Override
-    public <T> void traceBeanCreated(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition) {
-        Object v = resolutionContext.getAttribute(START_TIME);
+    public <T> void traceBeanCreated(Resolution resolution, BeanDefinition<T> beanDefinition) {
+        traceCreationEnd(TracedResolution.resolutionContext(resolution), beanDefinition, "✅ Created ");
+    }
+
+    @Override
+    public <T> void traceBeanCreationFailed(Resolution resolution, BeanDefinition<T> beanDefinition, Throwable failure) {
+        traceCreationEnd(TracedResolution.resolutionContext(resolution), beanDefinition, "❌ Failed to create ");
+    }
+
+    private void traceCreationEnd(BeanResolutionContext resolutionContext, BeanDefinition<?> beanDefinition, String outcome) {
+        if (!resolutionContext.getPath().isEmpty()) {
+            return;
+        }
+        Object v = resolutionContext.removeAttribute(START_TIME);
         if (v instanceof Long start) {
             StringWriter sw = new StringWriter();
             try (BufferedWriter writer = new BufferedWriter(sw)) {
                 writer.newLine();
                 String beanName = beanDefinition.getBeanDescription(TypeInformation.TypeFormat.ANSI_SIMPLE, false);
                 long now = System.currentTimeMillis();
-                writer.write("✅ Created " + beanName + " in " + (now - start) + "ms");
+                writer.write(outcome + beanName + " in " + (now - start) + "ms");
                 writer.newLine();
                 writer.write("------------");
                 writer.newLine();
@@ -317,7 +337,9 @@ abstract sealed class ConsoleBeanResolutionTracer
     }
 
     @Override
-    public <B, T> void traceInjectBean(BeanResolutionContext resolutionContext, BeanResolutionContext.Segment<B, T> segment) {
+    public void traceInjectBean(Resolution resolution, Injection injection) {
+        BeanResolutionContext resolutionContext = TracedResolution.resolutionContext(resolution);
+        BeanResolutionContext.Segment<?, ?> segment = (BeanResolutionContext.Segment<?, ?>) injection;
         BeanResolutionContext.Path path = resolutionContext.getPath();
         if (segment.getDeclaringType() != null &&
             segment.getDeclaringType().getBeanType().isSynthetic() &&
