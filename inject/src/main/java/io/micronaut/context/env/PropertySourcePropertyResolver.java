@@ -843,7 +843,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     @SuppressWarnings("MagicNumber")
     protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
         synchronized (catalogLock) {
+            Set<String> updatedProperties = new HashSet<>();
             for (String property : properties) {
+                updatedProperties.add(property);
 
                 log.trace("Processing property key {}", property);
 
@@ -852,6 +854,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 populateRawCatalog(property, value, convention, properties.getOrigin());
 
                 List<String> resolvedProperties = resolvePropertiesForConvention(property, convention);
+                updatedProperties.addAll(resolvedProperties);
                 boolean first = true;
                 for (String resolvedProperty : resolvedProperties) {
                     int i = resolvedProperty.indexOf('[');
@@ -915,10 +918,33 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 }
 
             }
+            // Keep already resolved random placeholders when processing unrelated sources.
+            // Other cached values, including misses and placeholders referencing changed
+            // properties, must be invalidated when the catalog changes.
+            ResolverState currentState = readState();
+            Map<String, Object> stableRandomValues = new HashMap<>();
+            currentState.placeholderResolutionCache.forEach((name, cachedValue) -> {
+                if (!updatedProperties.contains(name) && isStandaloneRandomPlaceholder(currentState, name)) {
+                    stableRandomValues.put(name, cachedValue);
+                }
+            });
             // A lookup can cache a miss between reset() and catalog reinitialization.
             // Clear those entries after the rebuilt catalog becomes visible.
             resetCaches();
+            currentState.placeholderResolutionCache.putAll(stableRandomValues);
         }
+    }
+
+    private boolean isStandaloneRandomPlaceholder(ResolverState resolverState, String name) {
+        Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(resolverState, name, PropertyCatalog.GENERATED);
+        DefaultPropertyEntry entry = entries == null ? null : entries.get(name);
+        if (entry == null) {
+            entries = resolveEntriesForKey(resolverState, name, PropertyCatalog.RAW);
+            entry = entries == null ? null : entries.get(name);
+        }
+        return entry != null && entry.value() instanceof String expression
+            && expression.startsWith("${random.") && expression.endsWith("}")
+            && expression.indexOf("${", 2) < 0;
     }
 
     /**
