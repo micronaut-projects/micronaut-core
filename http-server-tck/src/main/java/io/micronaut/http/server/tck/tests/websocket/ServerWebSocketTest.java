@@ -34,6 +34,7 @@ import io.micronaut.websocket.annotation.OnError;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -43,6 +44,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -52,7 +55,10 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static io.micronaut.http.server.tck.WebSocketTckTags.WEBSOCKET;
@@ -352,8 +358,30 @@ public class ServerWebSocketTest {
 
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
-    static class Events {
+    static class Events implements AutoCloseable {
         final BlockingQueue<String> events = new LinkedBlockingQueue<>();
+        /**
+         * The thread of the delays, owned by this test: Reactor's shared parallel scheduler and
+         * the common fork join pool would start their threads here, and they would keep the
+         * leak detection resource scope of this test class for every later test that runs on them.
+         */
+        private final ScheduledExecutorService delays = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread thread = new Thread(r, SPEC_NAME + "-delays");
+            thread.setDaemon(true);
+            return thread;
+        });
+        final Scheduler delayScheduler = Schedulers.fromExecutorService(delays);
+
+        Executor delayed(long millis) {
+            return CompletableFuture.delayedExecutor(millis, TimeUnit.MILLISECONDS, delays);
+        }
+
+        @PreDestroy
+        @Override
+        public void close() {
+            delayScheduler.dispose();
+            delays.shutdownNow();
+        }
     }
 
     @Requires(property = "spec.name", value = SPEC_NAME)
@@ -444,7 +472,7 @@ public class ServerWebSocketTest {
         @OnMessage
         CompletionStage<Void> onMessage(String message, WebSocketSession session) {
             return CompletableFuture
-                .supplyAsync(() -> message.toUpperCase(Locale.ROOT), CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS))
+                .supplyAsync(() -> message.toUpperCase(Locale.ROOT), events.delayed(50))
                 .thenCompose(session::sendAsync)
                 .thenRun(() -> events.events.add("handled " + message));
         }
@@ -473,16 +501,22 @@ public class ServerWebSocketTest {
         CompletionStage<Void> onClose(CloseReason reason) {
             return CompletableFuture.runAsync(
                 () -> events.events.add("closed " + reason.getCode()),
-                CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS));
+                events.delayed(50));
         }
     }
 
     @Requires(property = "spec.name", value = SPEC_NAME)
     @ServerWebSocket("/ws/tck/publisher")
     static class PublisherSocket {
+        private final Events events;
+
+        PublisherSocket(Events events) {
+            this.events = events;
+        }
+
         @OnMessage
         Publisher<Void> onMessage(String message, WebSocketSession session) {
-            return Mono.delay(Duration.ofMillis(20))
+            return Mono.delay(Duration.ofMillis(20), events.delayScheduler)
                 .then(Mono.fromCompletionStage(session.sendAsync(message.toUpperCase(Locale.ROOT))))
                 .then();
         }
