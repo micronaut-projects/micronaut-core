@@ -19,6 +19,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.filter.GenericHttpFilter;
+import io.micronaut.web.router.RouteResolution;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteInfo;
@@ -91,6 +92,20 @@ public class FilteredRouter implements Router {
             return matchStream.filter(routeFilter.filter(context));
         }
         return matchStream;
+    }
+
+    @Override
+    public boolean hasBodyConditions() {
+        return router.hasBodyConditions();
+    }
+
+    @Override
+    public <T, R> RouteResolution<T, R> resolve(HttpRequest<?> request,
+                                                @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        // filter before resolving the ambiguity, like findAllClosest, and the routes of located
+        // targets too; the filter of an enclosing filtered router as well
+        Predicate<UriRouteMatch<T, R>> own = routeFilter.filter(request);
+        return router.resolve(request, filter == null ? own : own.and(filter));
     }
 
     @Override
