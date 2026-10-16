@@ -36,6 +36,7 @@ import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.TypeDef;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
@@ -123,6 +124,7 @@ public final class TypeHierarchyWriter {
     }
 
     private static ClassDef build(ClassElement type, String recordName, Element origin) {
+        refuseInnerClassesOfGenericClasses(type, origin);
         String recordPackage = recordName.substring(0, Math.max(0, recordName.lastIndexOf('.')));
         ClassTypeDef recordType = ClassTypeDef.of(recordName);
         Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
@@ -180,6 +182,45 @@ public final class TypeHierarchyWriter {
                 ))));
         loadTypeMethods.values().forEach(builder::addMethod);
         return builder.build();
+    }
+
+    /**
+     * Refuses a type that is, or has a super type that is, an inner class of a generic class, {@code Outer<T>.Inner}:
+     * the arguments of the enclosing class bind the variables of the inner one, and a record keeps the arguments of
+     * the class alone, so it would leave those variables unbound.
+     */
+    private static void refuseInnerClassesOfGenericClasses(ClassElement type, Element origin) {
+        List<ClassElement> types = new ArrayList<>();
+        types.add(type);
+        types.addAll(type.getAllSuperTypes());
+        for (ClassElement aType : types) {
+            ClassElement genericOwner = genericOwner(aType);
+            if (genericOwner != null) {
+                String which = aType.getName().equals(type.getName()) ? "it" : "its super type [" + aType.getName() + "]";
+                throw new ProcessingException(origin, "The hierarchy of [" + type.getName() + "] cannot be recorded: " + which
+                    + " is an inner class of the generic class [" + genericOwner.getName() + "], whose type arguments a record does not keep");
+            }
+        }
+    }
+
+    private static @Nullable ClassElement genericOwner(ClassElement type) {
+        ClassElement current = type;
+        for (int i = 0; i < MAX_DEPTH && isInnerClass(current); i++) {
+            ClassElement owner = current.getEnclosingType().orElse(null);
+            if (owner == null) {
+                return null;
+            }
+            if (!owner.getDeclaredGenericPlaceholders().isEmpty()) {
+                return owner;
+            }
+            current = owner;
+        }
+        return null;
+    }
+
+    private static boolean isInnerClass(ClassElement type) {
+        // a nested interface, annotation, enum or record is static, whatever a compiler reports
+        return type.getEnclosingType().isPresent() && !type.isStatic() && !type.isInterface() && !type.isEnum() && !type.isRecord();
     }
 
     private static ExpressionDef argument(MutableAnnotationMetadata defaults,

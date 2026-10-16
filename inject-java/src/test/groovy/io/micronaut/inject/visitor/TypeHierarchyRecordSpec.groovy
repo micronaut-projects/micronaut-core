@@ -355,6 +355,62 @@ public class Holder {
         e.message.contains('The hierarchy of [b.Bounded] cannot be recorded: the bounds of its variable T name a type that is not public and not of the package c')
     }
 
+    void "a type with an inner class of a generic class among its super types is refused"() {
+        when: "the T of Outer<T>.Inner implements Supplier<T> is bound by the arguments of Outer, which a record does not keep"
+        buildClassLoader(new JavaFiles()
+            .add('p.Outer', '''
+package p;
+
+public class Outer<T> {
+    public class Inner implements java.util.function.Supplier<T> {
+        public T get() { return null; }
+    }
+}
+''')
+            .add('p.Sub', '''
+package p;
+
+public class Sub extends Outer<String>.Inner {
+    public Sub(Outer<String> outer) { outer.super(); }
+}
+''')
+            .add('q.Holder', '''
+package q;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = p.Sub.class)
+public class Holder {
+}
+'''))
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains('The hierarchy of [p.Sub] cannot be recorded: its super type [p.Outer$Inner] is an inner class of the generic class [p.Outer]')
+    }
+
+    void "a static nested class of a generic class is recorded"() {
+        given:
+        def classLoader = buildClassLoader(new JavaFiles()
+            .add('p.Outer', '''
+package p;
+
+public class Outer<T> {
+    public static class Nested<U> implements java.util.function.Supplier<U> {
+        public U get() { return null; }
+    }
+}
+''')
+            .add('q.Holder', '''
+package q;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = p.Outer.Nested.class)
+public class Holder {
+}
+'''))
+
+        expect:
+        strings(record(classLoader, 'p.Outer$Nested', 'q').superTypes) == ['Supplier<U>', 'Object']
+    }
+
     void "a generic type met twice is checked with the arguments of each use"() {
         given:
         def classLoader = buildClassLoader(new JavaFiles()
