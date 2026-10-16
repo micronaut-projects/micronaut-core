@@ -83,7 +83,8 @@ class PyronautCompilerStaticCompilationTest {
         assertEquals(Outcome.NOT_CANDIDATE, byName.get("PricingService.__init__").outcome());
         assertEquals(Outcome.COMPILED, byName.get("PricingService.total").outcome());
         assertEquals(Outcome.SKIPPED, byName.get("PricingService.names").outcome());
-        assertEquals("unsupported-expression", byName.get("PricingService.names").reasons().get(0).rule());
+        // the comprehension is lowered; the elements of a raw ArrayList have no type
+        assertEquals("unknown-type", byName.get("PricingService.names").reasons().get(0).rule());
         assertEquals(Outcome.SKIPPED, byName.get("PricingService.describe").outcome());
         assertEquals(Outcome.EXCLUDED, byName.get("PricingService.legacy").outcome());
         assertNotNull(byName.get("PricingService.total").span());
@@ -101,7 +102,7 @@ class PyronautCompilerStaticCompilationTest {
         assertTrue(lines.get(1).startsWith("{\"record\":\"decision\",\"name\":\"PricingService.__init__\""), lines.get(1));
         String summary = Files.readString(directory.resolve(StaticCompilationReport.SUMMARY_FILE));
         assertTrue(summary.contains("COMPILED      PricingService.total"), summary);
-        assertTrue(summary.contains("[unsupported-expression]"), summary);
+        assertTrue(summary.contains("[unknown-type]"), summary);
         assertTrue(summary.contains("EXCLUDED      1"), summary);
     }
 

@@ -27,6 +27,23 @@ from java.lang import IllegalArgumentException
 from java.net import URL, MalformedURLException
 from java.util import AbstractMap, Objects
 
+
+def module_twice(n: int) -> int:
+    return n * 2
+
+
+def module_upper(values: list[str]) -> list[str]:
+    return [v.upper() for v in values if v]
+
+
+def module_lengths(values: list[str]) -> dict[str, int]:
+    return {v: len(v) for v in values}
+
+
+def module_any(values: list[int], limit: int) -> bool:
+    return any(v > limit for v in values)
+
+
 @Singleton
 class Calc:
     rate: float = 1.5
@@ -281,6 +298,24 @@ class Calc:
             raise IllegalArgumentException("zero")
         return n * 2
 
+    def via_module(self, n: int) -> str:
+        names = module_upper(["a", "", "b"])
+        return str(module_twice(n)) + "|" + ",".join(names) + "|" + str(Calc.twice(n)) + "|" + str(self.twice(n)) + "|" + str(module_any([1, 5], n)) + "|" + str(module_lengths(names)["A"])
+
+    @staticmethod
+    def twice(n: int) -> int:
+        return n * 2
+
+    def via_python(self, n: int) -> str:
+        return ",".join(sorted([str(module_twice(n)), str(Calc.twice(n))], key=lambda s: s))
+
+    def comprehended(self, values: list[int]) -> str:
+        doubled = [v * 2 for v in values if v > 1]
+        total = 0
+        for v in doubled:
+            total += v
+        return str(total) + "|" + str(len({v for v in values})) + "|" + str(all(v > 0 for v in values))
+
     def edge(self, broken0: int) -> int:
         count = 0
         for stop0 in range(9223372036854775805, 9223372036854775807, 2):
@@ -329,6 +364,8 @@ class Bag:
         ["chained", 3], ["chained", 0],
         ["bagged", 3], ["bagged", -1],
         ["described", "ab"],
+        ["via_module", 3], ["via_module", 0],
+        ["comprehended", [1, 2, 3]], ["comprehended", [-1]],
         ["formed", "f"],
         ["picked", 0, "fb"], ["picked", 1, "fb"],
         ["ratio", 1, 4], ["ratio", 1, 0],
@@ -376,6 +413,7 @@ class Bag:
                 results[m] = CASES.collectEntries { List row -> [(row.toString()): invoke(calc, row)] }
                 results[m]['pair'] = pair.has_partner()
                 results[m]['built'] = pair.built()
+                results[m]['via_python'] = calc.via_python(4)
                 results[m]['words'] = calc.words(new ArrayList<>(['a', 'skip', 'b']))
                 results[m]['keyed'] = calc.keyed(new LinkedHashMap<>([bb: 2, a: 1]))
                 results[m]['edge'] = calc.edge(0)
@@ -392,7 +430,8 @@ class Bag:
                 results[m]['copied'] = calc.copied(new ArrayList<>(['a'])).collect { it.toString() }
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
-                    assert compiled.containsAll(CASES*.get(0).unique().collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled']), decisions.toString()
+                    assert !compiled.contains('Calc.via_python'), 'the lambda keeps via_python in Python, where module_twice delegates to its static Java method'
+                    assert compiled.containsAll(CASES*.get(0).unique().collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled', 'Calc.twice', 'module_twice', 'module_upper', 'module_lengths', 'module_any']), decisions.toString()
                 }
             } finally {
                 context.close()
@@ -425,6 +464,9 @@ class Bag:
         results[StaticCompilationMode.OFF][["parsed", "1, 2,3"].toString()] == '6 6 6 3.0'
         results[StaticCompilationMode.OFF][["parsed", "x"].toString()] == 'raised'
         results[StaticCompilationMode.OFF][["described", "ab"].toString()] == '<ab>!'
+        results[StaticCompilationMode.OFF][["via_module", 3].toString()] == '6|A,B|6|6|True|1'
+        results[StaticCompilationMode.OFF]['via_python'] == '8,8'
+        results[StaticCompilationMode.OFF][["comprehended", [1, 2, 3]].toString()] == '10|3|True'
         results[StaticCompilationMode.OFF]['edge'] == 1
         results[StaticCompilationMode.OFF][["guarded", 0].toString()] == -1
         results[StaticCompilationMode.OFF][["branch_local", true].toString()] == 'tTrue'

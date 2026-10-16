@@ -61,7 +61,7 @@ def plain(name: str) -> str:
         decisions.find { it.qualifiedName() == 'Greeter.greet' }.outcome() == StaticCompilationDecision.Outcome.COMPILED
         decisions.find { it.qualifiedName() == 'quiet' }.outcome() == StaticCompilationDecision.Outcome.SKIPPED
         decisions.find { it.qualifiedName() == 'quiet' }.reasons()*.rule() == ['pooled-module']
-        decisions.find { it.qualifiedName() == 'plain' }.outcome() == StaticCompilationDecision.Outcome.NOT_CANDIDATE
+        decisions.find { it.qualifiedName() == 'plain' }.outcome() == StaticCompilationDecision.Outcome.COMPILED  // a static method of the generated class, reading no injected bean
 
         when:
         def hello = client.toBlocking().retrieve("/routes/hello/Ann")

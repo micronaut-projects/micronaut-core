@@ -88,13 +88,13 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |Reason |Given when
 
 |`class-not-eligible`
-|The function has no ordinary Java class to compile into: a module-level function without a route, `@Executable`, scope or bean decorator (the others are methods of the module's generated class), an enum, a protocol, an interface, a class served by a context pool, a class declaring `__slots__` or `__getattr__`.
+|The function has no ordinary Java class to compile into: a function of a `MicronautTest` module (its tests), an enum, a protocol, an interface, a class served by a context pool, a class declaring `__slots__` or `__getattr__`.
 
 |`pooled-module`
 |The function belongs to a module without a module-level annotation, which the runtime serves from a pool of Python contexts, and its body reaches a Python object (an attribute of a class of the compilation, a method the generated class does not declare), which no context is leased for. A pooled route that only calls Java and the generated classes of the compilation is compiled and runs without leasing a context at all.
 
 |`special-method`, `async-function`, `generator-function`, `static-method`
-|The method is a dunder (`__init__` runs in Python so the instance keeps its Python semantics), an `async def`, a generator, or a static or class method.
+|The method is a dunder (`__init__` runs in Python so the instance keeps its Python semantics), an `async def`, a generator, or a class method (a `@staticmethod` is compiled, into the static Java method the stub declares for it).
 
 |`overriding-java-method`, `intercepted-method`
 |The method implements a method of a Java base or interface whose signature the hints do not spell (a method implementing a Java method is compiled when each parameter is hinted with the Java parameter type, or a subtype of it the body reads the parameter as (`exception: ConstraintViolationException` where `ExceptionHandler.handle` takes a `Throwable`), and the return is unhinted, hinted `object`, or hinted with a type the Java method returns: `def intercept(self, context: MethodInvocationContext) -> object` compiles into `Object intercept(MethodInvocationContext)`); or it is a concrete advised method of an introduction class, whose chain runs on the Python object. Other advised methods (an around binding or a validation constraint on a method, its class or a parameter) are compiled: the Java method of a class runs the interceptor chain the bean's proxy binds before the body, as a proxy compiled for a Java bean does, and a module's generated class is proxied by Micronaut like any Java bean; so validation and around advice cost no crossing into Python.
@@ -106,7 +106,7 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |An expression has no static type (a value of a third-party module, a local assigned values of different types, a local assigned on some paths only and read after them), or `self.x` names nothing the class declares.
 
 |`dynamic-call`, `ambiguous-overload`, `kwargs-to-java`, `sibling-call`
-|A call resolves to no Java method or constructor, more than one overload fits the argument types equally well, keyword arguments are given to a Java method or a builtin, or a static, class, async or generator method of the class is called on `self`.
+|A call resolves to no Java method or constructor (a module-level function that is not compiled, or one in a cycle of calls with its caller), more than one overload fits the argument types equally well, keyword arguments are given to a Java method or a builtin, or a class, async or generator method of the class is called on `self`.
 
 |`python-builtin-not-lowered`, `unsupported-statement`, `unsupported-expression`
 |A builtin, a method of a Python value, a statement kind or an expression kind outside the supported subset below.
@@ -156,6 +156,15 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 |Calls on an introduction (`self.repository.find(...)`)
 |A Java call on the generated type of the introduction: a protocol compiles to a Java interface whose proxy Micronaut generates, and the abstract methods of an abstract introduction class run the introduction's interceptors in the generated class, bound by the proxy. With the interceptor's own body compiled, a repository declared in Python, as Micronaut Data declares one, runs as Java from the caller to the interceptor.
 
+|Module-level functions, `helper(x)`, `from .mappers import user_public`
+|A plain function of a module (no route, `@Executable`, scope or bean decorator) compiles into a `public static` method of the module's generated class, which a module gets when one of its functions compiles; a call of it from a compiled body, of the same module or importing it, is a static Java call, so a controller's helpers run as Java from the route down. Python callers of the function run the Java method too, through the generated class, as the methods of a class delegate. A call of a function that is not compiled keeps the caller in Python.
+
+|`@staticmethod`
+|Compiled into the static Java method the stub already declares; `self.helper(...)` and `Cls.helper(...)` are static Java calls.
+
+|`[e for x in xs if c]`, `{e for ...}`, `{k: v for ...}`, `any(c for x in xs)`, `all(...)`
+|A loop over the iterable filling a fresh local declared just before the statement, which the expression then reads; `any` and `all` fill a boolean and leave the loop early. One `for` clause, no walrus; a comprehension inside `and`, `or`, `x if c else y` or a `while` condition, or after a call the statement makes before it, is refused, since the hoisted loop would run out of order.
+
 |Injected attributes of a module
 |A module-level function of the module's generated class reads an attribute the module injects (`repository: Annotated[BookRepository, Inject]`) from a field of that class, set when the bean is injected, and calls the bean as a Java object.
 
@@ -172,7 +181,7 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 |The generated class's own Java method when it declares one for the call (a public method with a hinted signature the call fills exactly, that no advice intercepts and no subclass of the compilation overrides), else the method of the Python object, which runs its interceptors, overrides and default arguments as Python would.
 |===
 
-Not compiled: comprehensions, lambdas and nested functions, `with`, `match`, `del`, `global`, `nonlocal`, `yield`, slices, starred arguments, chained comparisons, calls of module-level functions, and `Optional` hints.
+Not compiled: generator expressions outside `any` and `all`, nested comprehensions with several `for` clauses, lambdas and nested functions, `with`, `match`, `del`, `global`, `nonlocal`, `yield`, slices, starred arguments, chained comparisons, class methods, and `Optional` hints.
 
 == One Implementation
 
