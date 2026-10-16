@@ -134,7 +134,7 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     }
 
     @Override
-    public HttpRouteSpec where(RouteCondition condition) {
+    public HttpRouteSpec where(RequestCondition condition) {
         route.where(condition);
         return this;
     }
