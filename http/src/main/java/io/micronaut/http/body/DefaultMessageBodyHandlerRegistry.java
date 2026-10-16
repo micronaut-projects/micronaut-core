@@ -23,7 +23,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecConfiguration;
-import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.QualifiedBeanType;
 import io.micronaut.inject.qualifiers.FilteringQualifier;
@@ -87,20 +86,42 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
         if (codecConfigurations.isEmpty()) {
             return mediaTypes;
         }
-        List<MediaType> resolvedMediaTypes = new ArrayList<>(mediaTypes.size());
-        resolvedMediaTypes.addAll(mediaTypes);
+        List<MediaType> resolvedMediaTypes = null;
         for (MediaType mediaType : mediaTypes) {
             for (CodecConfiguration codecConfiguration : codecConfigurations) {
-                List<MediaType> additionalTypes = codecConfiguration.getAdditionalTypes();
-                if (additionalTypes.contains(mediaType)) {
-                    beanLocator.findBean(MediaTypeCodec.class, Qualifiers.byName(codecConfiguration.getName())).ifPresent(codec ->
-                        resolvedMediaTypes.addAll(codec.getMediaTypes())
-                    );
+                if (codecConfiguration.getAdditionalTypes().contains(mediaType)) {
+                    MediaType codecMediaType = codecMediaType(codecConfiguration.getName());
+                    if (codecMediaType != null) {
+                        if (resolvedMediaTypes == null) {
+                            resolvedMediaTypes = new ArrayList<>(mediaTypes.size() + 1);
+                            resolvedMediaTypes.addAll(mediaTypes);
+                        }
+                        resolvedMediaTypes.add(codecMediaType);
+                    }
                     break;
                 }
             }
         }
-        return resolvedMediaTypes;
+        return resolvedMediaTypes == null ? mediaTypes : resolvedMediaTypes;
+    }
+
+    /**
+     * The media type that the handlers of a {@code micronaut.codec.<name>} configuration are
+     * registered for. A media type listed in its {@code additional-types} is read and written by
+     * the handler of this media type.
+     *
+     * @param codecName The name of the codec configuration
+     * @return The media type, or {@code null} for an unknown name
+     */
+    @Nullable
+    private static MediaType codecMediaType(String codecName) {
+        return switch (codecName) {
+            case "json" -> MediaType.APPLICATION_JSON_TYPE;
+            case "json-stream" -> MediaType.APPLICATION_JSON_STREAM_TYPE;
+            case "text" -> MediaType.TEXT_PLAIN_TYPE;
+            case "text-stream" -> MediaType.TEXT_EVENT_STREAM_TYPE;
+            default -> null;
+        };
     }
 
     @SuppressWarnings({"unchecked"})
