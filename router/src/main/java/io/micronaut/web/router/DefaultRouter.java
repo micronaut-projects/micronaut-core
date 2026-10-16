@@ -249,6 +249,17 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
+    public boolean hasBodyConditions() {
+        return routes.hasBodyConditions();
+    }
+
+    @Override
+    public <T, R> RouteResolution<T, R> resolve(HttpRequest<?> request,
+                                                @Nullable Predicate<UriRouteMatch<T, R>> filter) throws DuplicateRouteException {
+        return routes.resolve(request, ports.get(), filter);
+    }
+
+    @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
         return routes.findAllClosest(request, ports.get());
     }

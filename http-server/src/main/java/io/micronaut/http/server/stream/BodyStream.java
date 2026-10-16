@@ -231,7 +231,7 @@ final class BodyStream implements BufferConsumer.Upstream {
             if (state != State.OPEN) {
                 return false;
             }
-            closeLocked(State.COMPLETED, new IllegalStateException(reason), null, effects);
+            closeLocked(State.COMPLETED, new StreamEnded(reason), null, effects);
             submitLocked(buffer::complete, effects);
         } finally {
             lock.unlock();
@@ -315,7 +315,7 @@ final class BodyStream implements BufferConsumer.Upstream {
             if (state != State.OPEN || !replace.getAsBoolean()) {
                 return false;
             }
-            closeLocked(State.COMPLETED, new IllegalStateException("The stream was answered with another response"), null, effects);
+            closeLocked(State.COMPLETED, new StreamEnded("The stream was answered with another response"), null, effects);
         } finally {
             lock.unlock();
         }
@@ -594,6 +594,21 @@ final class BodyStream implements BufferConsumer.Upstream {
             if (demand != null) {
                 demand.run();
             }
+        }
+    }
+
+    /**
+     * Why a completed stream refuses the writes after it. Created for every stream that ends, and only
+     * read if a write follows, for its message: it has no stack trace to fill.
+     */
+    private static final class StreamEnded extends IllegalStateException {
+        StreamEnded(String message) {
+            super(message);
+        }
+
+        @Override
+        public synchronized Throwable fillInStackTrace() {
+            return this;
         }
     }
 }

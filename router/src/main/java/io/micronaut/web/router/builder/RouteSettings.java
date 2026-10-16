@@ -52,7 +52,7 @@ import java.util.function.Predicate;
 public final class RouteSettings {
     private final IntConsumer exposePort;
     private final @Nullable HandlerMethod<?> handler;
-    private final List<RouteCondition> conditions;
+    private final List<RequestCondition> conditions;
     private final List<Predicate<? super PathVariables>> constraints;
     private final Map<String, Object> attributes;
     private final List<FilterRegistration> filters;
@@ -228,9 +228,9 @@ public final class RouteSettings {
 
     /**
      * @param condition The condition
-     * @see HttpRouteSpec#where(RouteCondition)
+     * @see HttpRouteSpec#where(RequestCondition)
      */
-    public void where(RouteCondition condition) {
+    public void where(RequestCondition condition) {
         conditions.add(Objects.requireNonNull(condition, "condition"));
     }
 
@@ -363,7 +363,7 @@ public final class RouteSettings {
     /**
      * @return The conditions of the route, a read-only view
      */
-    public List<RouteCondition> getConditions() {
+    public List<RequestCondition> getConditions() {
         return Collections.unmodifiableList(conditions);
     }
 
