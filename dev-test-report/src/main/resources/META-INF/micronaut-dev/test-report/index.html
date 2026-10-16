@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test Report</title>
+<style>
+:root {
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --panel-2: #f0f2f5;
+  --text: #1b1f24;
+  --muted: #5d6673;
+  --border: #dde1e6;
+  --brand: #121417;
+  --brand-text: #ffffff;
+  --pass: #1a7f37;
+  --fail: #cf222e;
+  --error: #bc4c00;
+  --skip: #6e7781;
+  --accent: #0969da;
+  --code-bg: #f6f8fa;
+  --fresh: rgba(9, 105, 218, 0.12);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1116;
+    --panel: #161b22;
+    --panel-2: #1c222b;
+    --text: #e6edf3;
+    --muted: #8d96a0;
+    --border: #2d333b;
+    --brand: #05070a;
+    --pass: #3fb950;
+    --fail: #f85149;
+    --error: #db6d28;
+    --skip: #8d96a0;
+    --accent: #4493f8;
+    --code-bg: #0b0f14;
+    --fresh: rgba(68, 147, 248, 0.16);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1116;
+  --panel: #161b22;
+  --panel-2: #1c222b;
+  --text: #e6edf3;
+  --muted: #8d96a0;
+  --border: #2d333b;
+  --brand: #05070a;
+  --pass: #3fb950;
+  --fail: #f85149;
+  --error: #db6d28;
+  --skip: #8d96a0;
+  --accent: #4493f8;
+  --code-bg: #0b0f14;
+  --fresh: rgba(68, 147, 248, 0.16);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+a { color: var(--accent); }
+button, select, input { font: inherit; color: inherit; }
+header {
+  background: var(--brand);
+  color: var(--brand-text);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+header .logo svg { height: 36px; width: auto; display: block; }
+header .title { font-weight: 600; font-size: 15px; opacity: .9; border-left: 1px solid rgba(255,255,255,.25); padding-left: 16px; }
+header .project { opacity: .65; }
+header .spacer { flex: 1; }
+.connection { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; opacity: .85; }
+.connection .dot { width: 8px; height: 8px; border-radius: 50%; background: #8d96a0; }
+.connection.live .dot { background: #3fb950; box-shadow: 0 0 0 3px rgba(63,185,80,.25); }
+.connection.offline .dot { background: #db6d28; }
+.icon-button {
+  background: transparent; border: 1px solid rgba(255,255,255,.25); color: var(--brand-text);
+  border-radius: 6px; padding: 4px 10px; cursor: pointer;
+}
+main { max-width: 1200px; margin: 0 auto; padding: 20px 24px 48px; }
+.summary { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+.card .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.card.passed .value { color: var(--pass); }
+.card.failed .value { color: var(--fail); }
+.card.errored .value { color: var(--error); }
+.card.skipped .value { color: var(--skip); }
+.status-line { margin: 14px 0 6px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; color: var(--muted); }
+.badge { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 12px; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+.badge.ok { border-color: var(--pass); color: var(--pass); }
+.badge.bad { border-color: var(--fail); color: var(--fail); }
+.badge.run { border-color: var(--accent); color: var(--accent); }
+.progress { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 14px; visibility: hidden; }
+.progress.active { visibility: visible; }
+.progress span { display: block; height: 100%; width: 30%; background: var(--accent); animation: slide 1.1s ease-in-out infinite; }
+@keyframes slide { from { margin-left: -30%; } to { margin-left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .progress span { animation: none; width: 100%; opacity: .5; } }
+.banner { border: 1px solid var(--fail); background: color-mix(in srgb, var(--fail) 8%, var(--panel)); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+.banner h2 { margin: 0 0 6px; font-size: 14px; color: var(--fail); }
+.banner p { margin: 0 0 8px; color: var(--muted); }
+.banner ul { margin: 0; padding-left: 18px; }
+.banner li { margin: 3px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0 12px; }
+.chips { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.chips button { border: 0; background: transparent; padding: 5px 11px; cursor: pointer; border-right: 1px solid var(--border); }
+.chips button:last-child { border-right: 0; }
+.chips button[aria-pressed="true"] { background: var(--panel-2); font-weight: 600; }
+.chips .count { color: var(--muted); font-weight: 400; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.search { flex: 1; min-width: 180px; position: relative; }
+.search input { width: 100%; padding: 6px 10px 6px 30px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
+.search::before { content: "⌕"; position: absolute; left: 10px; top: 4px; color: var(--muted); font-size: 16px; }
+.search kbd { position: absolute; right: 8px; top: 6px; }
+kbd { border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: 11px; color: var(--muted); background: var(--panel-2); }
+.toolbar .plain { border: 1px solid var(--border); background: var(--panel); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+.toolbar select { border: 1px solid var(--border); background: var(--panel); border-radius: 8px; padding: 5px 8px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
+.classes { display: flex; flex-direction: column; gap: 8px; }
+details.class { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+details.class > summary {
+  list-style: none; cursor: pointer; padding: 9px 12px; display: flex; gap: 10px; align-items: center;
+}
+details.class > summary::-webkit-details-marker { display: none; }
+details.class > summary::before { content: "▸"; color: var(--muted); width: 10px; transition: transform .12s; }
+details.class[open] > summary::before { transform: rotate(90deg); }
+.class-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.class-name .package { color: var(--muted); }
+.counts { display: inline-flex; gap: 8px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.counts .f { color: var(--fail); }
+.counts .e { color: var(--error); }
+.duration { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mark { width: 16px; text-align: center; font-weight: 700; flex: none; }
+.mark.passed { color: var(--pass); }
+.mark.failed { color: var(--fail); }
+.mark.errored { color: var(--error); }
+.mark.skipped { color: var(--skip); }
+.tests { border-top: 1px solid var(--border); }
+.test { padding: 7px 12px 7px 34px; border-top: 1px solid var(--border); }
+.test:first-child { border-top: 0; }
+.test.fresh { background: var(--fresh); transition: background 2s; }
+.test-head { display: flex; gap: 10px; align-items: baseline; }
+.test-head .name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.test-head .name .method { color: var(--muted); font-size: 12px; margin-left: 6px; }
+.failure-message { margin: 6px 0 0 26px; color: var(--fail); white-space: pre-wrap; overflow-wrap: anywhere; }
+.test.errored .failure-message { color: var(--error); }
+.skip-reason { margin: 4px 0 0 26px; color: var(--muted); }
+pre.stack, pre.output {
+  margin: 6px 0 0 26px; padding: 8px 10px; background: var(--code-bg); border: 1px solid var(--border);
+  border-radius: 6px; overflow: auto; max-height: 360px; white-space: pre;
+}
+pre.stack .frame-own { color: var(--text); }
+pre.stack .frame-lib { color: var(--muted); }
+details.more { margin: 6px 0 0 26px; }
+details.more > summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
+details.more pre { margin-left: 0; }
+aside { position: sticky; top: 12px; }
+aside h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.history li { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+.history .row { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; }
+.history .what { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.bar { display: flex; height: 4px; border-radius: 2px; overflow: hidden; margin-top: 5px; background: var(--border); }
+.bar .p { background: var(--pass); }
+.bar .f { background: var(--fail); }
+.bar .e { background: var(--error); }
+.bar .s { background: var(--skip); }
+.empty { text-align: center; color: var(--muted); padding: 40px 12px; background: var(--panel); border: 1px dashed var(--border); border-radius: 8px; }
+.hidden { display: none !important; }
+footer { color: var(--muted); font-size: 12px; margin-top: 24px; text-align: center; }
+@media (max-width: 860px) {
+  .summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  aside { position: static; }
+  header { padding: 12px 16px; }
+  main { padding: 16px 16px 40px; }
+  .test { padding-left: 16px; }
+  .failure-message, .skip-reason, pre.stack, pre.output, details.more { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo"><!--logo--></span>
+  <span class="title">Tests</span>
+  <span class="project" id="project"></span>
+  <span class="spacer"></span>
+  <span class="connection" id="connection" title="Static report"><span class="dot"></span><span id="connection-text">Static</span></span>
+  <button class="icon-button" id="theme" type="button" title="Switch the theme">Theme</button>
+</header>
+<main>
+  <section class="summary" aria-label="Summary">
+    <div class="card total"><div class="value" id="n-total">0</div><div class="label">Tests</div></div>
+    <div class="card passed"><div class="value" id="n-passed">0</div><div class="label">Passed</div></div>
+    <div class="card failed"><div class="value" id="n-failed">0</div><div class="label">Failed</div></div>
+    <div class="card errored"><div class="value" id="n-errored">0</div><div class="label">Errors</div></div>
+    <div class="card skipped"><div class="value" id="n-skipped">0</div><div class="label">Skipped</div></div>
+    <div class="card"><div class="value" id="n-duration">–</div><div class="label">Last run</div></div>
+  </section>
+  <div class="status-line" id="status-line"></div>
+  <div class="progress" id="progress"><span></span></div>
+  <section class="banner hidden" id="compile" role="alert"></section>
+  <div class="toolbar">
+    <div class="chips" role="group" aria-label="Show">
+      <button type="button" data-filter="all" aria-pressed="true">All<span class="count" id="c-all"></span></button>
+      <button type="button" data-filter="problems" aria-pressed="false">Failed<span class="count" id="c-problems"></span></button>
+      <button type="button" data-filter="skipped" aria-pressed="false">Skipped<span class="count" id="c-skipped"></span></button>
+      <button type="button" data-filter="passed" aria-pressed="false">Passed<span class="count" id="c-passed"></span></button>
+    </div>
+    <label class="search"><input id="search" type="search" placeholder="Filter tests" aria-label="Filter tests" autocomplete="off"><kbd>/</kbd></label>
+    <button class="plain" id="expand" type="button">Expand all</button>
+    <select id="editor" aria-label="Open sources in" title="Open sources in">
+      <option value="file">Open in: file</option>
+      <option value="idea">Open in: IntelliJ IDEA</option>
+      <option value="vscode">Open in: VS Code</option>
+    </select>
+  </div>
+  <div class="layout">
+    <section class="classes" id="classes" aria-label="Test classes"></section>
+    <aside>
+      <h3>Runs</h3>
+      <ul class="history" id="history"></ul>
+    </aside>
+  </div>
+  <footer id="footer"></footer>
+</main>
+<script type="application/json" id="state">/*state*/null</script>
+<script>
+(function () {
+  'use strict';
+  var STATUS_ORDER = { failed: 0, errored: 0, skipped: 2, passed: 3 };
+  var MARKS = { passed: '✓', failed: '✗', errored: '!', skipped: '–' };
+  var state = JSON.parse(document.getElementById('state').textContent) || emptyState();
+  var fresh = {};
+  // how many events came, so a snapshot fetched before the latest of them is not applied over them
+  var seq = 0;
+  var ui = load('micronaut-test-report', { filter: 'all', search: '', open: {}, expandAll: false });
+  var served = /^https?:$/.test(location.protocol);
+  // a page served over HTTP may not open file: URLs, which browsers block: it opens sources in an editor
+  var editor = loadLocal('micronaut-test-report-editor', served ? 'idea' : 'file');
+  if (served && editor === 'file') { editor = 'idea'; }
+
+  function emptyState() {
+    return { project: '', running: null, finished: 0, last: null, history: [], compileFailure: null, classes: [], sources: {} };
+  }
+  function load(key, fallback) {
+    try { var v = JSON.parse(sessionStorage.getItem(key)); return v || fallback; } catch (e) { return fallback; }
+  }
+  function save() {
+    try { sessionStorage.setItem('micronaut-test-report', JSON.stringify(ui)); } catch (e) { /* storage off */ }
+  }
+  function loadLocal(key, fallback) {
+    try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; }
+  }
+  function saveLocal(key, value) {
+    try { localStorage.setItem(key, value); } catch (e) { /* storage off */ }
+  }
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) { node.className = cls; }
+    if (text != null) { node.textContent = text; }
+    return node;
+  }
+  function $(id) { return document.getElementById(id); }
+  function ms(n) {
+    if (n == null) { return '–'; }
+    if (n < 1000) { return n + ' ms'; }
+    if (n < 60000) { return (n / 1000).toFixed(n < 10000 ? 2 : 1) + ' s'; }
+    return Math.floor(n / 60000) + ' m ' + Math.round((n % 60000) / 1000) + ' s';
+  }
+  function time(iso) {
+    if (!iso) { return ''; }
+    var d = new Date(iso);
+    return isNaN(d) ? '' : d.toLocaleTimeString();
+  }
+  function isProblem(status) { return status === 'failed' || status === 'errored'; }
+
+  // ---- theme
+  var theme = loadLocal('micronaut-test-report-theme', '');
+  if (theme) { document.documentElement.setAttribute('data-theme', theme); }
+  $('theme').addEventListener('click', function () {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+      (!document.documentElement.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+    var next = dark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    saveLocal('micronaut-test-report-theme', next);
+  });
+
+  // ---- source links
+  var JAVA_FRAME = /at (?:[\w.$]+\/)*([\w.$]+)\.[\w$<>]+\(([\w$-]+\.(?:java|kt|groovy|kts)):(\d+)\)/;
+  var PY_FRAME = /File "([^"]+)", line (\d+)/;
+  function editorUrl(path, line) {
+    var slashed = path.replace(/\\/g, '/');
+    if (slashed.charAt(0) !== '/') { slashed = '/' + slashed; }
+    if (editor === 'idea') { return 'idea://open?file=' + encodeURIComponent(path) + '&line=' + line; }
+    if (editor === 'vscode') { return 'vscode://file' + encodeURI(slashed) + ':' + line; }
+    return 'file://' + encodeURI(slashed);
+  }
+  function sourceOf(line) {
+    var m = JAVA_FRAME.exec(line);
+    if (m) {
+      var cls = m[1];
+      var dot = cls.lastIndexOf('.');
+      var rel = (dot < 0 ? '' : cls.substring(0, dot).replace(/\./g, '/') + '/') + m[2];
+      var path = state.sources && state.sources[rel];
+      return path ? { path: path, line: m[3] } : null;
+    }
+    m = PY_FRAME.exec(line);
+    if (m && (m[1].charAt(0) === '/' || /^[A-Za-z]:[\\/]/.test(m[1]))) {
+      return { path: m[1], line: m[2] };
+    }
+    return null;
+  }
+  function stack(text) {
+    var pre = el('pre', 'stack');
+    text.split('\n').forEach(function (line, i) {
+      if (i > 0) { pre.appendChild(document.createTextNode('\n')); }
+      var source = sourceOf(line);
+      if (source) {
+        var span = el('span', 'frame-own');
+        var a = el('a', null, line);
+        a.href = editorUrl(source.path, source.line);
+        a.title = source.path + ':' + source.line;
+        span.appendChild(a);
+        pre.appendChild(span);
+      } else {
+        pre.appendChild(el('span', /^\s*at /.test(line) ? 'frame-lib' : null, line));
+      }
+    });
+    return pre;
+  }
+
+  // ---- rendering
+  function counts(tests) {
+    var c = { passed: 0, failed: 0, errored: 0, skipped: 0, total: tests.length, duration: 0 };
+    tests.forEach(function (t) { c[t.status] = (c[t.status] || 0) + 1; c.duration += t.durationMillis || 0; });
+    return c;
+  }
+  function classStatus(c) {
+    if (c.failed) { return 'failed'; }
+    if (c.errored) { return 'errored'; }
+    if (c.passed) { return 'passed'; }
+    return 'skipped';
+  }
+  function matches(test, cls, filter, query) {
+    if (filter === 'problems' && !isProblem(test.status)) { return false; }
+    if (filter === 'skipped' && test.status !== 'skipped') { return false; }
+    if (filter === 'passed' && test.status !== 'passed') { return false; }
+    if (!query) { return true; }
+    var hay = (cls + ' ' + test.displayName + ' ' + test.name + ' ' + (test.message || '')).toLowerCase();
+    return query.split(/\s+/).every(function (word) { return hay.indexOf(word) >= 0; });
+  }
+  function renderTest(test) {
+    var row = el('div', 'test ' + test.status + (fresh[test.id] ? ' fresh' : ''));
+    var head = el('div', 'test-head');
+    head.appendChild(el('span', 'mark ' + test.status, MARKS[test.status] || '?'));
+    var name = el('span', 'name', test.displayName || test.name);
+    if (test.displayName && test.name && test.displayName !== test.name && test.displayName.indexOf(test.name) < 0) {
+      name.appendChild(el('span', 'method mono', test.name));
+    }
+    head.appendChild(name);
+    head.appendChild(el('span', 'duration', ms(test.durationMillis)));
+    row.appendChild(head);
+    if (isProblem(test.status)) {
+      var message = test.message || test.type || 'Failed';
+      row.appendChild(el('div', 'failure-message mono', test.message ? (test.type ? shortType(test.type) + ': ' : '') + message : message));
+      if (test.stackTrace) { row.appendChild(stack(test.stackTrace)); }
+    } else if (test.status === 'skipped' && test.skipReason) {
+      row.appendChild(el('div', 'skip-reason', test.skipReason));
+    }
+    [['out', 'Standard output'], ['err', 'Standard error']].forEach(function (pair) {
+      if (test[pair[0]]) {
+        var more = el('details', 'more');
+        more.open = isProblem(test.status);
+        more.appendChild(el('summary', null, pair[1]));
+        more.appendChild(el('pre', 'output', test[pair[0]]));
+        row.appendChild(more);
+      }
+    });
+    return row;
+  }
+  function shortType(type) {
+    var i = type.lastIndexOf('.');
+    return i < 0 ? type : type.substring(i + 1);
+  }
+  function renderClasses() {
+    var host = $('classes');
+    var query = (ui.search || '').trim().toLowerCase();
+    var list = state.classes.map(function (cls) { return { cls: cls, c: counts(cls.tests) }; });
+    list.sort(function (a, b) {
+      var sa = STATUS_ORDER[classStatus(a.c)], sb = STATUS_ORDER[classStatus(b.c)];
+      return sa !== sb ? sa - sb : a.cls.name.localeCompare(b.cls.name);
+    });
+    var fragment = document.createDocumentFragment();
+    var shown = 0;
+    list.forEach(function (entry) {
+      var cls = entry.cls, c = entry.c;
+      var tests = cls.tests.filter(function (t) { return matches(t, cls.name, ui.filter, query); });
+      if (!tests.length) { return; }
+      tests.sort(function (a, b) { return STATUS_ORDER[a.status] - STATUS_ORDER[b.status]; });
+      shown++;
+      var details = el('details', 'class');
+      var status = classStatus(c);
+      var open = ui.open[cls.name];
+      details.open = ui.expandAll || open === true || (open !== false && (isProblem(status) || !!query));
+      details.addEventListener('toggle', function () { ui.open[cls.name] = details.open; save(); });
+      var summary = el('summary');
+      summary.appendChild(el('span', 'mark ' + status, MARKS[status]));
+      var name = el('span', 'class-name mono');
+      var dot = cls.name.lastIndexOf('.');
+      if (dot > 0 && cls.name.indexOf('/') < 0) {
+        name.appendChild(el('span', 'package', cls.name.substring(0, dot + 1)));
+        name.appendChild(document.createTextNode(cls.name.substring(dot + 1)));
+      } else {
+        name.textContent = cls.name;
+      }
+      summary.appendChild(name);
+      var cs = el('span', 'counts');
+      cs.appendChild(el('span', null, c.passed + '/' + c.total));
+      if (c.failed) { cs.appendChild(el('span', 'f', c.failed + ' failed')); }
+      if (c.errored) { cs.appendChild(el('span', 'e', c.errored + ' errors')); }
+      if (c.skipped) { cs.appendChild(el('span', null, c.skipped + ' skipped')); }
+      summary.appendChild(cs);
+      summary.appendChild(el('span', 'duration', ms(c.duration)));
+      details.appendChild(summary);
+      var body = el('div', 'tests');
+      tests.forEach(function (t) { body.appendChild(renderTest(t)); });
+      details.appendChild(body);
+      fragment.appendChild(details);
+    });
+    host.replaceChildren(fragment);
+    if (!shown) {
+      var text = state.classes.length ? 'No test matches the filter.' :
+        state.running ? 'The first tests are running…' : 'No test has run yet.';
+      host.appendChild(el('div', 'empty', text));
+    }
+  }
+  function renderSummary() {
+    var all = [];
+    state.classes.forEach(function (cls) { all = all.concat(cls.tests); });
+    var c = counts(all);
+    $('n-total').textContent = c.total;
+    $('n-passed').textContent = c.passed;
+    $('n-failed').textContent = c.failed;
+    $('n-errored').textContent = c.errored;
+    $('n-skipped').textContent = c.skipped;
+    $('n-duration').textContent = state.last ? ms(state.last.durationMillis) : '–';
+    $('c-all').textContent = c.total;
+    $('c-problems').textContent = c.failed + c.errored;
+    $('c-skipped').textContent = c.skipped;
+    $('c-passed').textContent = c.passed;
+    var line = $('status-line');
+    line.replaceChildren();
+    if (state.running) {
+      line.appendChild(el('span', 'badge run', 'Running'));
+      line.appendChild(el('span', null, (state.running.everything ? 'every test' : state.running.selection) +
+        ' · ' + state.finished + ' finished'));
+    } else if (state.last) {
+      var bad = state.last.failed + state.last.errored;
+      line.appendChild(el('span', 'badge ' + (bad ? 'bad' : 'ok'), bad ? bad + ' failing' : 'Passing'));
+      line.appendChild(el('span', null, 'Last run ' + time(state.last.startedAt) + ' · ' + state.last.selection +
+        (state.last.cancelled ? ' · cancelled' : '')));
+    }
+    if (state.compileFailure) {
+      line.appendChild(el('span', 'badge bad', 'Does not compile'));
+    }
+    $('progress').classList.toggle('active', !!state.running);
+    document.title = (state.running ? '⟳ ' : c.failed + c.errored ? '✗ ' : c.total ? '✓ ' : '') + 'Tests' +
+      (state.project ? ' · ' + state.project : '');
+    $('project').textContent = state.project || '';
+    $('footer').textContent = state.generatedAt ? 'Updated ' + new Date(state.generatedAt).toLocaleString() : '';
+  }
+  function renderCompile() {
+    var banner = $('compile');
+    var failure = state.compileFailure;
+    banner.classList.toggle('hidden', !failure);
+    banner.replaceChildren();
+    if (!failure) { return; }
+    banner.appendChild(el('h2', null, 'The ' + failure.kind + ' sources do not compile'));
+    banner.appendChild(el('p', null, 'No test ran for the change: the results below are those of the last run.'));
+    var ul = el('ul', 'mono');
+    failure.diagnostics.forEach(function (d) {
+      var li = el('li');
+      if (d.file) {
+        var a = el('a', null, d.file.split(/[\\/]/).pop() + (d.line > 0 ? ':' + d.line : ''));
+        a.href = editorUrl(d.file, d.line > 0 ? d.line : 1);
+        a.title = d.file;
+        li.appendChild(a);
+        li.appendChild(document.createTextNode(' '));
+      }
+      li.appendChild(document.createTextNode(d.severity + ': ' + d.message));
+      ul.appendChild(li);
+    });
+    banner.appendChild(ul);
+  }
+  function renderHistory() {
+    var ul = $('history');
+    ul.replaceChildren();
+    (state.history || []).forEach(function (run) {
+      var total = run.passed + run.failed + run.errored + run.skipped;
+      var li = el('li');
+      var row = el('div', 'row');
+      var bad = run.failed + run.errored;
+      row.appendChild(el('span', null, (bad ? '✗ ' : '✓ ') + time(run.startedAt)));
+      row.appendChild(el('span', 'duration', ms(run.durationMillis)));
+      li.appendChild(row);
+      li.appendChild(el('div', 'what', run.passed + '/' + total + ' passed · ' + run.selection + (run.cancelled ? ' · cancelled' : '')));
+      var bar = el('div', 'bar');
+      [['p', run.passed], ['f', run.failed], ['e', run.errored], ['s', run.skipped]].forEach(function (part) {
+        if (part[1] && total) { var s = el('span', part[0]); s.style.flex = String(part[1]); bar.appendChild(s); }
+      });
+      li.appendChild(bar);
+      ul.appendChild(li);
+    });
+    if (!ul.children.length) { ul.appendChild(el('li', 'what', 'No run yet.')); }
+  }
+  var scheduled = false;
+  function render() {
+    if (scheduled) { return; }
+    scheduled = true;
+    requestAnimationFrame(function () {
+      scheduled = false;
+      renderSummary();
+      renderCompile();
+      renderClasses();
+      renderHistory();
+    });
+  }
+
+  // ---- controls
+  function setFilter(filter) {
+    ui.filter = filter;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-filter]'), function (b) {
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-filter') === filter));
+    });
+    save();
+    render();
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-filter]'), function (b) {
+    b.addEventListener('click', function () { setFilter(b.getAttribute('data-filter')); });
+  });
+  var search = $('search');
+  search.value = ui.search || '';
+  search.addEventListener('input', function () { ui.search = search.value; save(); render(); });
+  $('expand').textContent = ui.expandAll ? 'Collapse all' : 'Expand all';
+  $('expand').addEventListener('click', function () {
+    ui.expandAll = !ui.expandAll;
+    ui.open = {};
+    $('expand').textContent = ui.expandAll ? 'Collapse all' : 'Expand all';
+    if (!ui.expandAll) {
+      state.classes.forEach(function (cls) { ui.open[cls.name] = false; });
+    }
+    save();
+    render();
+  });
+  var select = $('editor');
+  if (served) { select.querySelector('option[value="file"]').remove(); }
+  select.value = editor;
+  select.addEventListener('change', function () { editor = select.value; saveLocal('micronaut-test-report-editor', editor); render(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '/' && document.activeElement !== search && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      search.focus();
+      search.select();
+    } else if (e.key === 'Escape' && document.activeElement === search) {
+      search.value = '';
+      ui.search = '';
+      save();
+      search.blur();
+      render();
+    }
+  });
+  setFilter(ui.filter || 'all');
+
+  // ---- live updates
+  function upsert(className, test) {
+    var cls = null;
+    for (var i = 0; i < state.classes.length; i++) {
+      if (state.classes[i].name === className) { cls = state.classes[i]; break; }
+    }
+    if (!cls) { cls = { name: className, tests: [] }; state.classes.push(cls); }
+    for (var j = 0; j < cls.tests.length; j++) {
+      if (cls.tests[j].id === test.id) { cls.tests[j] = test; return; }
+    }
+    cls.tests.push(test);
+  }
+  // a snapshot taken during a run holds the tests that finished so far, which the run has not applied yet
+  function adopt(snapshot) {
+    state = snapshot;
+    (state.current || []).forEach(function (entry) { upsert(entry.className, entry.test); });
+  }
+  function onEvent(event) {
+    seq++;
+    if (event.type === 'run-started') {
+      state.running = event.run;
+      state.finished = 0;
+      fresh = {};
+    } else if (event.type === 'test-finished') {
+      upsert(event.className, event.test);
+      state.finished = (state.finished || 0) + 1;
+      fresh[event.test.id] = true;
+      if (event.sources) {
+        state.sources = state.sources || {};
+        Object.keys(event.sources).forEach(function (k) { state.sources[k] = event.sources[k]; });
+      }
+    } else if (event.type === 'state') {
+      adopt(event.state);
+      if (!state.running) { setTimeout(function () { fresh = {}; render(); }, 2500); }
+    } else {
+      return;
+    }
+    render();
+  }
+  function connection(kind, text) {
+    var node = $('connection');
+    node.className = 'connection ' + kind;
+    $('connection-text').textContent = text;
+    node.title = text;
+  }
+  function connect(delay) {
+    var ws;
+    try {
+      ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/micronaut-dev/events?topic=tests');
+    } catch (e) {
+      connection('offline', 'Offline');
+      return;
+    }
+    ws.onopen = function () {
+      delay = 500;
+      connection('live', 'Live');
+      // what happened while the page was away
+      var asked = seq;
+      fetch('state.json', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (s) { if (s && seq === asked) { adopt(s); render(); } }).catch(function () { /* the next event brings it */ });
+    };
+    ws.onmessage = function (m) {
+      try { onEvent(JSON.parse(m.data)); } catch (e) { /* not an event of this page */ }
+    };
+    ws.onclose = function () {
+      connection('offline', 'Reconnecting');
+      setTimeout(function () { connect(Math.min(delay * 2, 10000)); }, delay);
+    };
+  }
+  if (served) {
+    connect(500);
+  } else {
+    connection('', 'Static');
+  }
+  adopt(state);
+  render();
+})();
+</script>
+</body>
+</html>
