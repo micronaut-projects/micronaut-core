@@ -111,6 +111,56 @@ class PropertySourcePropertyResolverSpec extends Specification {
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13914")
+    void "an in-progress refresh does not leak an indexed override into the published catalog"() {
+        given:
+        List<Object> sourceList = new ArrayList<>(['a', 'b'])
+        def base = PropertySource.of('base', ['app.list': sourceList, 'app.scalar': 'old'])
+        def resolver = new PropertySourcePropertyResolver(base)
+        CountDownLatch entered = new CountDownLatch(1)
+        CountDownLatch release = new CountDownLatch(1)
+        def backgroundFailure = new java.util.concurrent.atomic.AtomicReference<Throwable>()
+        Thread thread = Thread.start {
+            try {
+                resolver.refresh({
+                    resolver.reset()
+                    resolver.addPropertySource(base)
+                    resolver.addPropertySource(PropertySource.of('override', [
+                        'app.list[0]': 'z',
+                        'app.scalar': 'new'
+                    ]))
+                    entered.countDown()
+                    assert release.await(10, TimeUnit.SECONDS)
+                } as Runnable)
+            } catch (Throwable failure) {
+                backgroundFailure.set(failure)
+                entered.countDown()
+            }
+        }
+
+        when: "a refresh has built but not published the replacement catalog"
+        String duringScalar
+        List duringList
+        try {
+            assert entered.await(10, TimeUnit.SECONDS)
+            assert backgroundFailure.get() == null
+            duringScalar = resolver.getRequiredProperty('app.scalar', String)
+            duringList = resolver.getRequiredProperty('app.list', List)
+        } finally {
+            release.countDown()
+            thread.join(10_000)
+        }
+
+        then: "both values come from the same previously published state"
+        !thread.alive
+        backgroundFailure.get() == null
+        duringScalar == 'old'
+        duringList == ['a', 'b']
+        sourceList == ['a', 'b']
+        resolver.getRequiredProperty('app.scalar', String) == 'new'
+        resolver.getRequiredProperty('app.list', List) == ['z', 'b']
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13914")
     void "removing an indexed override and refreshing restores the declaring list"() {
         given:
         List<Object> sourceList = new ArrayList<>(['a', 'b'])
