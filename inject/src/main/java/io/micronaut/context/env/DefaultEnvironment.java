@@ -206,20 +206,24 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
-        internalAddPropertySource(propertySource);
-        if (isRunning() && !reading.get()) {
-            propertyPlaceholderResolver.resetCaches();
-            internalProcessPropertySource(propertySource);
-        }
+        propertyPlaceholderResolver.withCatalogLock(() -> {
+            internalAddPropertySource(propertySource);
+            if (isRunning() && !reading.get()) {
+                propertyPlaceholderResolver.resetCaches();
+                internalProcessPropertySource(propertySource);
+            }
+        });
         return this;
     }
 
     @Override
     public Environment removePropertySource(PropertySource propertySource) {
-        propertySources.remove(propertySource.getName());
-        if (isRunning() && !reading.get()) {
-            propertyPlaceholderResolver.resetCaches();
-        }
+        propertyPlaceholderResolver.withCatalogLock(() -> {
+            propertySources.remove(propertySource.getName());
+            if (isRunning() && !reading.get()) {
+                propertyPlaceholderResolver.resetCaches();
+            }
+        });
         return this;
     }
 
@@ -264,17 +268,22 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public Environment start() {
-        if (running.compareAndSet(false, true)) {
-            LOG.debug("Starting environment {} for active names {}", this, getActiveNames());
-            readProperties();
-        }
+        propertyPlaceholderResolver.withCatalogLock(() -> {
+            if (running.compareAndSet(false, true)) {
+                LOG.debug("Starting environment {} for active names {}", this, getActiveNames());
+                readProperties();
+            }
+        });
         return this;
     }
 
     private void readProperties() {
         if (reading.compareAndSet(false, true)) {
-            loadProperties();
-            reading.set(false);
+            try {
+                loadProperties();
+            } finally {
+                reading.set(false);
+            }
         }
     }
 
@@ -289,8 +298,19 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         // Rebuild into a replacement catalog and publish it in one step, so a concurrent lookup
         // sees the properties either as they were before the refresh or as they are after it.
         propertyPlaceholderResolver.refresh(() -> {
-            dropProperties();
-            readProperties();
+            Map<String, PropertySource> previousSources = new LinkedHashMap<>(propertySources);
+            List<PropertySource> previousRefreshableSources = new ArrayList<>(refreshablePropertySources);
+            try {
+                dropProperties();
+                readProperties();
+            } catch (RuntimeException | Error e) {
+                // The replacement catalog is discarded by refresh(). Restore its source registry too.
+                propertySources.clear();
+                propertySources.putAll(previousSources);
+                refreshablePropertySources.clear();
+                refreshablePropertySources.addAll(previousRefreshableSources);
+                throw e;
+            }
         });
     }
 
@@ -301,12 +321,14 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public Environment stop() {
-        running.set(false);
-        reading.set(false);
-        dropProperties();
-        if (mutableConversionService instanceof DefaultMutableConversionService defaultMutableConversionService) {
-            defaultMutableConversionService.reset();
-        }
+        propertyPlaceholderResolver.withCatalogLock(() -> {
+            running.set(false);
+            reading.set(false);
+            dropProperties();
+            if (mutableConversionService instanceof DefaultMutableConversionService defaultMutableConversionService) {
+                defaultMutableConversionService.reset();
+            }
+        });
         return this;
     }
 
