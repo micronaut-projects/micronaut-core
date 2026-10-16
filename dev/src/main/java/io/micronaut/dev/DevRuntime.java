@@ -16,25 +16,21 @@
 package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.BeanDependencyGraph;
 import io.micronaut.context.reload.RetentionCriteria;
 import io.micronaut.context.BeanRegistration;
-import io.micronaut.context.ConfigurableBeanContext;
 import io.micronaut.context.DefaultBeanContext;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.reload.AnnotatedBeanRetentionPolicy;
 import io.micronaut.context.reload.BeanRetentionPolicy;
 import io.micronaut.context.reload.ClassChangeEvent;
+import io.micronaut.context.reload.InPlaceResourceReloader;
 import io.micronaut.context.reload.ReloadCompletedEvent;
 import io.micronaut.context.reload.ReloadStrategy;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.context.watch.ResourceChange;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.OrderUtil;
-import io.micronaut.core.type.Argument;
 import io.micronaut.context.reload.ClassChange;
 import io.micronaut.dev.agent.DynamicAttach;
 import io.micronaut.dev.change.ChangeSet;
@@ -56,10 +52,6 @@ import io.micronaut.dev.manifest.DevReloadStrategy;
 import io.micronaut.dev.manifest.ResourceRoot;
 import io.micronaut.dev.test.TestRunSummary;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.FieldInjectionPoint;
-import io.micronaut.inject.MethodInjectionPoint;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher;
 import io.micronaut.runtime.context.scope.refresh.RefreshResult;
 import io.micronaut.runtime.EmbeddedApplication;
@@ -116,7 +108,10 @@ import java.util.stream.Stream;
  * finds it from any context the application builds. A change is handled as one batch on the
  * runtime's own thread: sources are compiled per language, the class output is compared with the
  * previous snapshot, and a difference in classes restarts the application while a difference in
- * resources only reaches the resource watches of the running context. A configuration file
+ * resources only reaches the resource watches of the running context. A difference in the class output
+ * that holds no class, such as a Python module whose generated classes stayed the same, is first offered to
+ * the running context's {@link io.micronaut.context.reload.InPlaceResourceReloader}s, which patch it into the
+ * running application without a restart. A configuration file
  * change is refreshed in place, and restarts only when the refresh cannot apply it. A failed
  * compilation leaves the running generation as it is and is reported until the next success.</p>
  *
@@ -170,6 +165,7 @@ public final class DevRuntime implements Closeable {
     private volatile @Nullable LiveReloadServer liveReload; // NOSONAR java:S3077 thread-safe server, replaced whole
     private @Nullable Instrumentation instrumentation;
     private final AtomicInteger redefinitions = new AtomicInteger();
+    private final AtomicInteger inPlacePatches = new AtomicInteger();
     private final Map<Path, FileWatcherRegistration> pinnedWatches = new ConcurrentHashMap<>();
     private volatile @Nullable Thread worker; // NOSONAR java:S3077 only the reference is published
     private OutputSnapshot snapshot = OutputSnapshot.empty();
@@ -195,7 +191,7 @@ public final class DevRuntime implements Closeable {
         this.launcher = launcher;
         this.compilers = new EnumMap<>(SourceKind.class);
         this.compilers.putAll(compilers);
-        this.jointOwners = jointOwners(manifest, this.compilers);
+        this.jointOwners = Compilations.jointOwners(manifest, this.compilers);
         for (ResourceRoot root : manifest.resourceRoots()) {
             resourceRootKinds.put(root.path().toAbsolutePath().normalize(), root.kind());
         }
@@ -350,6 +346,14 @@ public final class DevRuntime implements Closeable {
      */
     public int redefinitions() {
         return redefinitions.get();
+    }
+
+    /**
+     * @return How many times a change of resources alone was patched into the running application by an
+     *         {@link InPlaceResourceReloader}, without a restart, since the start
+     */
+    public int inPlacePatches() {
+        return inPlacePatches.get();
     }
 
     /**
@@ -834,68 +838,6 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
-     * The roots a compilation of a language reads: its own, and for Kotlin the Java roots too, since kotlinc
-     * resolves the Java sources of a mixed module and KSP processes them, and those of the languages it compiles
-     * jointly; the index of a request takes only the roots of its own language as its sources.
-     */
-    private static List<SourceRoot> compilationRoots(DevManifest manifest, SourceKind kind, Map<SourceKind, SourceKind> jointOwners) {
-        List<SourceRoot> roots = new ArrayList<>(manifest.sourceRoots(kind));
-        if (kind == SourceKind.KOTLIN) {
-            roots.addAll(manifest.sourceRoots(SourceKind.JAVA));
-        }
-        jointOwners.forEach((joint, owner) -> {
-            if (owner == kind) {
-                roots.addAll(manifest.sourceRoots(joint));
-            }
-        });
-        return roots;
-    }
-
-    /**
-     * The options of a compilation of a language: its own, then those of each language it compiles jointly,
-     * since one compiler run compiles them all. A language's options are kept whole, a flag with its value,
-     * and are not repeated when they are the same as the owner's.
-     */
-    private static List<String> compileOptions(DevManifest manifest, SourceKind kind, Map<SourceKind, SourceKind> jointOwners) {
-        List<String> own = manifest.compileOptions(kind);
-        List<String> options = new ArrayList<>(own);
-        jointOwners.forEach((joint, owner) -> {
-            List<String> jointOptions = manifest.compileOptions(joint);
-            if (owner == kind && !jointOptions.equals(own)) {
-                options.addAll(jointOptions);
-            }
-        });
-        return options;
-    }
-
-    /**
-     * The languages a compiler of another language compiles jointly (see {@link SourceCompiler#jointKinds()}):
-     * those it names that have sources, are compiled in this JVM and share its class output.
-     *
-     * @param manifest The manifest
-     * @param compilers The compilers by language
-     * @return The owning language, by jointly compiled language
-     */
-    static Map<SourceKind, SourceKind> jointOwners(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
-        Map<SourceKind, SourceKind> owners = new EnumMap<>(SourceKind.class);
-        compilers.forEach((kind, compiler) -> {
-            if (!embedded(manifest, kind)) {
-                return;
-            }
-            for (SourceKind joint : compiler.jointKinds()) {
-                if (joint != kind && embedded(manifest, joint) && manifest.classOutput(joint).equals(manifest.classOutput(kind))) {
-                    owners.putIfAbsent(joint, kind);
-                }
-            }
-        });
-        return owners;
-    }
-
-    private static boolean embedded(DevManifest manifest, SourceKind kind) {
-        return !manifest.sourceRoots(kind).isEmpty() && manifest.compileMode(kind) != CompileMode.BUILD_TOOL;
-    }
-
-    /**
      * Compiles in full every language whose class output does not exist yet, so that the launcher
      * works from a clean checkout as well as after a build. Runs before the loader takes its first
      * snapshot.
@@ -905,11 +847,11 @@ public final class DevRuntime implements Closeable {
      * @throws IllegalStateException if a compilation fails
      */
     static void compileMissingOutputs(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
-        Map<SourceKind, SourceKind> jointOwners = jointOwners(manifest, compilers);
+        Map<SourceKind, SourceKind> jointOwners = Compilations.jointOwners(manifest, compilers);
         // decided before anything is compiled: two languages sharing one output are both missing, or neither
         Set<SourceKind> missing = new LinkedHashSet<>();
         for (SourceKind kind : compilers.keySet()) {
-            if (!jointOwners.containsKey(kind) && embedded(manifest, kind) && !Files.isDirectory(manifest.classOutput(kind))) {
+            if (!jointOwners.containsKey(kind) && Compilations.embedded(manifest, kind) && !Files.isDirectory(manifest.classOutput(kind))) {
                 missing.add(kind);
             }
         }
@@ -918,8 +860,8 @@ public final class DevRuntime implements Closeable {
             if (!missing.contains(kind)) {
                 continue;
             }
-            CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind, jointOwners), Set.of(), Set.of(), true, manifest.compileClasspath(),
-                manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), compileOptions(manifest, kind, jointOwners)).asFull();
+            CompilationRequest request = new CompilationRequest(kind, Compilations.compilationRoots(manifest, kind, jointOwners), Set.of(), Set.of(), true, manifest.compileClasspath(),
+                manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), Compilations.compileOptions(manifest, kind, jointOwners)).asFull();
             CompilationResult result = entry.getValue().compile(request);
             if (!result.isSuccess()) {
                 CompileFailure failure = new CompileFailure(kind, result.diagnostics(), Instant.now());
@@ -1203,7 +1145,7 @@ public final class DevRuntime implements Closeable {
     private int compiledLanguages(DevManifest target, Map<SourceKind, SourceKind> jointOwners) {
         int languages = 0;
         for (SourceKind kind : compilers.keySet()) {
-            if (!jointOwners.containsKey(kind) && embedded(target, kind)) {
+            if (!jointOwners.containsKey(kind) && Compilations.embedded(target, kind)) {
                 languages++;
             }
         }
@@ -1235,13 +1177,13 @@ public final class DevRuntime implements Closeable {
         Map<SourceKind, Set<String>> known = new EnumMap<>(SourceKind.class);
         for (SourceKind kind : kinds) {
             SourceCompiler compiler = compilers.get(kind);
-            if (compiler == null || joint.containsKey(kind) || !embedded(target, kind)) {
+            if (compiler == null || joint.containsKey(kind) || !Compilations.embedded(target, kind)) {
                 continue;
             }
             SourceChanges change = sources.getOrDefault(kind, SourceChanges.NONE);
-            CompilationRequest request = new CompilationRequest(kind, compilationRoots(target, kind, joint), change.changed(), change.deleted(),
+            CompilationRequest request = new CompilationRequest(kind, Compilations.compilationRoots(target, kind, joint), change.changed(), change.deleted(),
                 full || !target.isIncremental(), target.compileClasspath(), target.processorPath(),
-                target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint));
+                target.classOutput(kind), target.generatedSources(kind), Compilations.compileOptions(target, kind, joint));
             if (!seed.isEmpty()) {
                 request = request.withAffectedClasses(seed);
             }
@@ -1267,7 +1209,7 @@ public final class DevRuntime implements Closeable {
                 // a language compiled in this batch for its own changes is visited again: an unchanged source of
                 // it that references what another language changed was not selected the first time. It is told
                 // only what it does not know yet, so it does not recompile the dependents of its own classes
-                if (joint.containsKey(kind) || !embedded(target, kind)) {
+                if (joint.containsKey(kind) || !Compilations.embedded(target, kind)) {
                     continue;
                 }
                 Set<String> knownToKind = known.computeIfAbsent(kind, k -> new LinkedHashSet<>());
@@ -1277,8 +1219,8 @@ public final class DevRuntime implements Closeable {
                     continue;
                 }
                 knownToKind.addAll(fresh);
-                CompilationRequest request = new CompilationRequest(kind, compilationRoots(target, kind, joint), Set.of(), Set.of(), false, target.compileClasspath(),
-                    target.processorPath(), target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint)).withAffectedClasses(fresh);
+                CompilationRequest request = new CompilationRequest(kind, Compilations.compilationRoots(target, kind, joint), Set.of(), Set.of(), false, target.compileClasspath(),
+                    target.processorPath(), target.classOutput(kind), target.generatedSources(kind), Compilations.compileOptions(target, kind, joint)).withAffectedClasses(fresh);
                 CompilationResult result = entry.getValue().compile(request);
                 if (!result.isSuccess()) {
                     return CompileRound.failed(new CompileFailure(kind, result.diagnostics(), Instant.now()));
@@ -1339,8 +1281,9 @@ public final class DevRuntime implements Closeable {
         // a configuration file changed also refreshes the configuration
         ApplicationContext current = context;
         boolean configurationChanged = ResourceNotifier.notify(current, batch.resources, this::rootsOf, this::refreshBrowsers);
+        OutputSnapshot previous = snapshot;
         OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
-        ChangeSet changeSet = snapshot.diff(latest);
+        ChangeSet changeSet = previous.diff(latest);
         snapshot = latest;
         ConfigurationChange configurationChange = null;
         if (configurationChanged) {
@@ -1353,7 +1296,7 @@ public final class DevRuntime implements Closeable {
                 configurationChange = ConfigurationChange.ofAll();
             } else {
                 configurationChange = refresh.change();
-                String stale = staleAfterRefresh(current, refresh.change());
+                String stale = ConfigurationStaleness.afterRefresh(current, refresh.change());
                 if (stale != null) {
                     LOG.info("Restarting for the configuration change: {}", stale);
                 } else if (!refresh.requiresRestart() && changeSet.isEmpty() && !batch.forcesRestart() && !startFailed) {
@@ -1374,71 +1317,13 @@ public final class DevRuntime implements Closeable {
             }
             return;
         }
+        if (configurationChange == null && !batch.forcesRestart() && !startFailed && patchInPlace(changeSet, previous, start)) {
+            return;
+        }
         if (configurationChange == null && !batch.forcesRestart() && !startFailed && redefine(changeSet, start)) {
             return;
         }
         restart(changeSet, configurationChange, start);
-    }
-
-    /**
-     * What a refresh cannot update: a singleton that received a changed property through {@code @Value}
-     * or {@code @Property} rather than a configuration bean, and a definition whose {@code @Requires} names a
-     * changed property, whose presence the change may have flipped. Either one makes the batch restart.
-     *
-     * @return Why a restart is needed, or null when the refresh covered the change
-     */
-    @Nullable
-    private static String staleAfterRefresh(@Nullable ApplicationContext current, ConfigurationChange change) {
-        if (current == null || change.all()) {
-            return current == null ? null : "every property may have changed";
-        }
-        // the singletons, and through the graph what they hold: a prototype a singleton received and keeps
-        // is as stale as the singleton would be
-        Set<BeanDefinition<?>> definitions = new LinkedHashSet<>();
-        Optional<BeanDependencyGraph> graph = current instanceof ConfigurableBeanContext configurable ? configurable.findDependencyGraph() : Optional.empty();
-        for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(Qualifiers.any())) {
-            BeanDefinition<?> definition = registration.getBeanDefinition();
-            definitions.add(definition);
-            graph.ifPresent(g -> definitions.addAll(g.transitiveDependenciesOf(definition)));
-        }
-        for (BeanDefinition<?> definition : definitions) {
-            if (definition.isConfigurationProperties()) {
-                continue;
-            }
-            if (injectsChangedProperty(definition, change)) {
-                return definition.getBeanType().getName() + " injects a changed property directly";
-            }
-        }
-        for (BeanDefinitionReference<?> reference : current.getBeanDefinitionReferences()) {
-            for (AnnotationValue<Requires> requires : reference.getAnnotationMetadata().getAnnotationValuesByType(Requires.class)) {
-                String property = requires.stringValue("property").orElse(null);
-                if (property != null && change.touches(property)) {
-                    return reference.getBeanDefinitionName() + " requires a changed property";
-                }
-            }
-        }
-        return null;
-    }
-
-    private static boolean injectsChangedProperty(BeanDefinition<?> definition, ConfigurationChange change) {
-        for (Argument<?> argument : definition.getConstructor().getArguments()) {
-            if (PropertyMentions.mentions(change, argument.getAnnotationMetadata())) {
-                return true;
-            }
-        }
-        for (FieldInjectionPoint<?, ?> field : definition.getInjectedFields()) {
-            if (PropertyMentions.mentions(change, field.getAnnotationMetadata())) {
-                return true;
-            }
-        }
-        for (MethodInjectionPoint<?, ?> method : definition.getInjectedMethods()) {
-            for (Argument<?> argument : method.getArguments()) {
-                if (PropertyMentions.mentions(change, argument.getAnnotationMetadata())) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     /**
@@ -1535,8 +1420,85 @@ public final class DevRuntime implements Closeable {
         return true;
     }
 
+    /**
+     * Tier one: a change of resources alone, none added or removed and no class changed, is offered to the running
+     * context's {@link InPlaceResourceReloader}s; the first that takes the whole change gets the new contents in the
+     * generation's snapshot, then applies them to the running application. A Python module whose generated classes
+     * stayed byte for byte the same is such a change. Anything a reloader refuses, by answering no or by throwing,
+     * restarts as before, and the restart's new generation discards a half-applied patch.
+     *
+     * @return Whether the change was applied this way
+     */
+    private boolean patchInPlace(ChangeSet changeSet, OutputSnapshot previous, long startNanos) {
+        Set<String> changed = changeSet.changedResources();
+        if (!manifest.patchInPlace() || changeSet.hasClassChanges() || changed.isEmpty() || !changeSet.removedResources().isEmpty()) {
+            return false;
+        }
+        Set<String> before = previous.resourcePaths();
+        if (!before.containsAll(changed)) {
+            // a resource added: a reloader reads an index of the resources it knows, a Python file system its file list
+            return false;
+        }
+        ApplicationContext current = context;
+        if (current == null || !current.isRunning()) {
+            return false;
+        }
+        GenerationClassLoader generation = classLoader.current();
+        InPlaceResourceReloader reloader = null;
+        try {
+            List<InPlaceResourceReloader> reloaders = new ArrayList<>(current.getBeansOfType(InPlaceResourceReloader.class));
+            OrderUtil.sort(reloaders);
+            for (InPlaceResourceReloader candidate : reloaders) {
+                if (candidate.canReload(changed, Set.of())) {
+                    reloader = candidate;
+                    break;
+                }
+            }
+        } catch (RuntimeException e) {
+            LOG.debug("Cannot look up the in-place reloaders: restarting instead", e);
+            return false;
+        }
+        if (reloader == null) {
+            return false;
+        }
+        InPlaceResourceReloader.Result result;
+        try {
+            // the snapshot first: the reloader reads the new contents through the generation's loader
+            for (String resource : changed) {
+                byte[] contents = resourceFile(manifest.reloadableRoots(), resource);
+                if (contents == null || !generation.replaceResource(resource, contents)) {
+                    LOG.info("Cannot patch {} in place, the generation does not hold it: restarting instead", resource);
+                    return false;
+                }
+            }
+            result = reloader.reload(changed);
+        } catch (Exception | LinkageError e) {
+            LOG.info("Cannot patch {} resource(s) in place ({}): restarting instead", changed.size(), e.getMessage());
+            LOG.debug("The in-place patch failed", e);
+            return false;
+        }
+        inPlacePatches.incrementAndGet();
+        Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
+        ClassChangeEvent event = new ClassChangeEvent(this, Set.of(), generation, List.of(), ReloadStrategy.RELOAD);
+        try {
+            current.publishEvent(event);
+            current.publishEvent(new ReloadCompletedEvent(this, event, List.of(), List.of(), elapsed));
+        } catch (RuntimeException e) {
+            LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
+        }
+        LOG.info("Patched {} {} in place in {} ms: generation {} keeps running", result.count(), result.unit(), elapsed.toMillis(), generation.generation());
+        LiveReloadServer server = liveReload;
+        if (server != null) {
+            server.reload("/", false);
+        }
+        return true;
+    }
+
     static byte @Nullable [] classFile(List<Path> roots, String className) {
-        String relative = className.replace('.', '/') + ".class";
+        return resourceFile(roots, className.replace('.', '/') + ".class");
+    }
+
+    private static byte @Nullable [] resourceFile(List<Path> roots, String relative) {
         for (Path root : roots) {
             Path file = root.resolve(relative);
             if (Files.isRegularFile(file)) {

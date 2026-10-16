@@ -52,6 +52,7 @@ import java.util.Properties;
  * micronaut.dev.main-class=example.Application
  * micronaut.dev.project-dir=.
  * micronaut.dev.strategy=auto
+ * micronaut.dev.patch-in-place=true
  * micronaut.dev.runtime-classpath=@runtime.argfile
  * micronaut.dev.reloadable=build/classes/java/main,build/resources/main
  * micronaut.dev.compile-classpath=@compile.argfile
@@ -100,6 +101,7 @@ public final class DevManifest {
     private final String mainClass;
     private final Path projectDir;
     private final DevReloadStrategy strategy;
+    private final boolean patchInPlace;
     private final List<Path> runtimeClasspath;
     private final List<Path> reloadableRoots;
     private final List<Path> compileClasspath;
@@ -133,6 +135,7 @@ public final class DevManifest {
         this.mainClass = mode == DevMode.TEST ? properties.getProperty(PREFIX + MAIN_CLASS, "").trim() : require(properties, MAIN_CLASS);
         this.projectDir = path(directory, properties.getProperty(PREFIX + "project-dir", "."));
         this.strategy = DevReloadStrategy.valueOf(properties.getProperty(PREFIX + "strategy", "auto").trim().toUpperCase(Locale.ROOT));
+        this.patchInPlace = Boolean.parseBoolean(properties.getProperty(PREFIX + "patch-in-place", "true").trim());
         this.runtimeClasspath = paths(directory, properties.getProperty(PREFIX + "runtime-classpath", ""));
         List<Path> reloadable = paths(directory, require(properties, "reloadable"));
         this.compileClasspath = paths(directory, properties.getProperty(PREFIX + COMPILE_CLASSPATH, ""));
@@ -266,6 +269,19 @@ public final class DevManifest {
      */
     public DevReloadStrategy strategy() {
         return strategy;
+    }
+
+    /**
+     * Whether a change of resources alone is offered to the running application's
+     * {@link io.micronaut.context.reload.InPlaceResourceReloader}s before a restart, so that, for example, a Python
+     * module whose generated classes did not change is patched into the running interpreters instead of starting a new
+     * generation. On by default, under every strategy: patching defines no class, so it needs no agent and is not what
+     * {@code restart} opts out of. {@code micronaut.dev.patch-in-place=false} turns it off.
+     *
+     * @return Whether resources may be patched in place
+     */
+    public boolean patchInPlace() {
+        return patchInPlace;
     }
 
     /**

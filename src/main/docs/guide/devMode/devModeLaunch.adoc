@@ -20,6 +20,7 @@ micronaut.dev.resources.views=src/main/resources/views
 micronaut.dev.resources.static=src/main/resources/static
 micronaut.dev.compile.java.output=build/classes/java/main
 micronaut.dev.retain=javax.sql.DataSource
+micronaut.dev.patch-in-place=true
 ----
 
 The launcher reads the entries as follows:
