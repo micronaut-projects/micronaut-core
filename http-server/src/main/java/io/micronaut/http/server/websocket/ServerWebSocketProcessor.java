@@ -33,7 +33,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.web.router.DefaultRouteBuilder;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.UriRoute;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
@@ -114,7 +114,7 @@ public class ServerWebSocketProcessor extends DefaultRouteBuilder implements Bea
         UriRoute route = buildRoute(HttpMethod.GET, uri, handle);
         WebSocketUpgradeCondition.registered();
         if (route instanceof RouteAssembly.DefaultUriRoute defaultRoute) {
-            defaultRoute.settings().where(RouteCondition.custom(WebSocketUpgradeCondition.INSTANCE));
+            defaultRoute.settings().where(RequestCondition.custom(WebSocketUpgradeCondition.INSTANCE));
         } else {
             route = route.where(WebSocketUpgradeCondition.INSTANCE);
         }

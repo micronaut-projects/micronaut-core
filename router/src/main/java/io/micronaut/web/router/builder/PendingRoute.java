@@ -292,7 +292,7 @@ final class PendingRoute {
         addSetting(added -> added.order(order));
     }
 
-    void where(RouteCondition condition) {
+    void where(RequestCondition condition) {
         Objects.requireNonNull(condition, "condition");
         addSetting(added -> added.where(condition));
     }

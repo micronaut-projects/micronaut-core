@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpClient
@@ -47,6 +48,39 @@ class ConditionRoutesSpec extends Specification {
         http.retrieve(HttpRequest.GET("/items/5")) == "item 5"
         http.retrieve(HttpRequest.GET("/items/lamp")) == "item named lamp"
         http.retrieve(HttpRequest.GET("/items/-1")) == "item named -1"
+    }
+
+    void "a condition on the body selects the route"() {
+        given:
+        BlockingHttpClient http = client.toBlocking()
+
+        expect:
+        http.retrieve(HttpRequest.POST("/orders", [kind: "express", id: 1])) == "express order 1"
+        http.retrieve(HttpRequest.POST("/orders", [kind: "standard", id: 2])) == "order 2"
+        http.retrieve(HttpRequest.POST("/imports", "id,name\n1,lamp").contentType(MediaType.TEXT_PLAIN_TYPE)) == "csv import"
+
+        when:
+        http.retrieve(HttpRequest.POST("/imports", "name,id").contentType(MediaType.TEXT_PLAIN_TYPE))
+
+        then:
+        HttpClientResponseException notCsv = thrown()
+        notCsv.status == HttpStatus.NOT_FOUND
+
+        when:
+        http.retrieve(HttpRequest.POST("/imports", "id," + "x" * 2048).contentType(MediaType.TEXT_PLAIN_TYPE))
+
+        then:
+        HttpClientResponseException tooLarge = thrown()
+        tooLarge.status == HttpStatus.NOT_FOUND
+
+        when:
+        String paid = http.retrieve(HttpRequest.POST("/payments", [customer: "alice"]))
+        http.retrieve(HttpRequest.POST("/payments", [customer: "bob"]))
+
+        then:
+        paid == "payment of alice"
+        HttpClientResponseException unknown = thrown()
+        unknown.status == HttpStatus.NOT_FOUND
     }
 
     void "a filter reads the attributes of the route"() {
