@@ -70,10 +70,7 @@ abstract class Test : JavaBase(), AutoCloseable {
                 genericPlaceholder = generic.length == 1 && generic[0] instanceof GenericPlaceholderElement
                         ? ((GenericPlaceholderElement) generic[0]).variableName
                         : null
-                ce.beanProperties.each { p ->
-                    p.readMethod.ifPresent { m -> thrown['get.' + p.name] = m.thrownTypes*.name }
-                    p.writeMethod.ifPresent { m -> thrown['set.' + p.name] = m.thrownTypes*.name }
-                }
+                thrown.putAll(accessorThrownTypes(ce))
                 def inputStream = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named('inputStream')).get().genericReturnType
                 inputStream.getEnclosedElements(ElementQuery.ALL_METHODS.named('read')).each { MethodElement m ->
                     thrown['InputStream.read' + m.parameters.length] = m.thrownTypes*.name
@@ -100,5 +97,14 @@ abstract class Test : JavaBase(), AutoCloseable {
         thrown['InputStream.read0'] == ['java.io.IOException']
         thrown['InputStream.read1'] == ['java.io.IOException']
         thrown['InputStream.read3'] == ['java.io.IOException']
+    }
+
+    private static Map<String, List<String>> accessorThrownTypes(ClassElement ce) {
+        Map<String, List<String>> thrown = [:]
+        for (p in ce.beanProperties) {
+            p.readMethod.ifPresent { m -> thrown['get.' + p.name] = m.thrownTypes*.name }
+            p.writeMethod.ifPresent { m -> thrown['set.' + p.name] = m.thrownTypes*.name }
+        }
+        return thrown
     }
 }
