@@ -31,7 +31,7 @@ class DevGateFilterTest {
 
     @Test
     void aClientThatIsNotABrowserReceivesTheDiagnosticsAsJson() {
-        HttpResponse<?> response = DevGateFilter.respond(HttpRequest.GET("/greet").accept(MediaType.APPLICATION_JSON_TYPE), FAILURE, null);
+        HttpResponse<?> response = DevGateFilter.respond(HttpRequest.GET("/greet").accept(MediaType.APPLICATION_JSON_TYPE), FAILURE, null, true);
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatus());
         assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getContentType().orElseThrow());
         Map<?, ?> body = (Map<?, ?>) response.body();
@@ -53,7 +53,7 @@ class DevGateFilterTest {
 
     @Test
     void aBrowserWithoutTheServersErrorPageReceivesTheBuiltInPage() {
-        HttpResponse<?> response = DevGateFilter.respond(HttpRequest.GET("/greet").accept(MediaType.TEXT_HTML_TYPE), FAILURE, null);
+        HttpResponse<?> response = DevGateFilter.respond(HttpRequest.GET("/greet").accept(MediaType.TEXT_HTML_TYPE), FAILURE, null, true);
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatus());
         assertEquals(MediaType.TEXT_HTML_TYPE, response.getContentType().orElseThrow());
         String page = (String) response.body();
@@ -70,12 +70,33 @@ class DevGateFilterTest {
         HtmlErrorResponseBodyProvider provider = (context, response) -> response.getStatus().getCode() + "\n"
             + context.getErrors().stream().map(Error::getMessage).collect(Collectors.joining("\n"));
         DevErrorPage errorPage = new DevErrorPage(provider);
-        HttpResponse<?> response = DevGateFilter.respond(HttpRequest.GET("/greet").accept(MediaType.TEXT_HTML_TYPE), FAILURE, errorPage);
+        HttpResponse<?> response = DevGateFilter.respond(HttpRequest.GET("/greet").accept(MediaType.TEXT_HTML_TYPE), FAILURE, errorPage, true);
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatus());
         assertEquals("""
             503
             The java sources do not compile; the previous version keeps running until they do.
             ERROR: %s:3: incompatible types: <String> & int
             ERROR: compilation aborted""".formatted(Path.of("src/main/java/app/Greeter.java")), response.body());
+    }
+
+    @Test
+    void aRequestThatMayNotSeeTheDiagnosticsIsToldToLookAtTheConsole() {
+        HttpResponse<?> json = DevGateFilter.respond(HttpRequest.GET("/greet").accept(MediaType.APPLICATION_JSON_TYPE), FAILURE, null, false);
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, json.getStatus());
+        Map<?, ?> body = (Map<?, ?>) json.body();
+        assertEquals(DevGateFilter.GENERIC_MESSAGE, body.get(DevGateFilter.KEY_MESSAGE));
+        assertFalse(body.containsKey(DevGateFilter.KEY_DIAGNOSTICS));
+        assertFalse(body.toString().contains("Greeter.java"), body.toString());
+
+        HttpResponse<?> page = DevGateFilter.respond(HttpRequest.GET("/greet").accept(MediaType.TEXT_HTML_TYPE), FAILURE, null, false);
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, page.getStatus());
+        String html = (String) page.body();
+        assertTrue(html.contains("see the console"), html);
+        assertFalse(html.contains("Greeter.java"), html);
+        assertFalse(html.contains("incompatible types"), html);
+
+        HtmlErrorResponseBodyProvider provider = (context, response) -> context.getErrors().stream().map(Error::getMessage).collect(Collectors.joining("\n"));
+        String rendered = (String) DevGateFilter.respond(HttpRequest.GET("/greet").accept(MediaType.TEXT_HTML_TYPE), FAILURE, new DevErrorPage(provider), false).body();
+        assertEquals(DevGateFilter.GENERIC_MESSAGE, rendered);
     }
 }

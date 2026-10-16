@@ -57,7 +57,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The request coordination of a restart, against generations whose servers are stand-ins: how long a restart waits for
- * a stopping generation's requests, what a failed start answers, and how a started generation's servers are awaited.
+ * a stopping generation's requests, that a failed start answers, and how a started generation's servers are awaited.
  */
 class RestartRequestsTest {
 
@@ -146,18 +146,18 @@ class RestartRequestsTest {
     }
 
     @Test
-    void aFailedStartAnswersWithTheFailureUntilTheSocketsClose() throws IOException {
+    void aFailedStartAnswers503UntilTheSocketsClose() throws IOException {
         RestartRequests requests = new RestartRequests(manifest("1m"), true);
         DevServerSockets sockets = requests.serverSockets().orElseThrow();
         int port = freePort();
         ServerSocketChannel socket = sockets.serverSocket(null, port);
         assertNotNull(socket);
 
-        // a failure without a message is named by its type
-        requests.startFailed(new IllegalStateException());
+        // why it failed is in the console, not in the response
+        requests.startFailed();
         String response = get(port);
         assertTrue(response.startsWith("HTTP/1.1 503 "), response);
-        assertTrue(response.endsWith("The application is not running: java.lang.IllegalStateException\n"), response);
+        assertTrue(response.contains("The application is not running"), response);
 
         requests.close();
         assertFalse(socket.isOpen());
