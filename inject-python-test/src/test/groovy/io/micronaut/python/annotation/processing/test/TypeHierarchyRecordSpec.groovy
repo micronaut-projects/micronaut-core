@@ -139,6 +139,35 @@ class Diamond(Left[str], Right[str]):
                                                                  'Iterable<Integer>', 'List<Integer>', 'RandomAccess', 'Cloneable', 'Serializable', 'Object']
     }
 
+    void "a JDK class with a package-private ancestor is recorded in the package of the origin"() {
+        given:
+        def classLoader = compile('''
+from java.lang import StringBuilder
+from java.util import ArrayList
+from java.util.jar import JarEntry
+from micronaut.core.annotation import TypeHierarchyImport
+
+@TypeHierarchyImport(classes=[StringBuilder, ArrayList, JarEntry])
+class Hierarchies:
+    pass
+''')
+        def stringBuilder = record(classLoader, 'java.lang.StringBuilder', 'python')
+        def jarEntry = record(classLoader, 'java.util.jar.JarEntry', 'python')
+
+        expect: "AbstractStringBuilder is left out by name, the interfaces above it are kept"
+        record(classLoader, 'java.util.ArrayList', 'python').type == ArrayList
+        stringBuilder.type == StringBuilder
+        stringBuilder.genericSuperclass.empty
+        stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
+        !strings(stringBuilder.superTypes).contains('AbstractStringBuilder')
+        strings(stringBuilder.superTypes).containsAll(['Appendable', 'CharSequence', 'Comparable<StringBuilder>', 'Serializable'])
+        strings(stringBuilder.superTypes).last() == 'Object'
+
+        and: "an ancestor of a third package is left out the same way"
+        jarEntry.omittedSuperTypeNames == ['java.util.zip.ZipConstants']
+        strings(jarEntry.superTypes) == ['ZipEntry', 'Cloneable', 'Object']
+    }
+
     void "a multidimensional array has the super types of the arrays it is an array of"() {
         given: "Python has no array types, so the arrays are made from the elements of a Python class and of what its methods return"
         Map<String, List<String>> closures = buildClassElement('''

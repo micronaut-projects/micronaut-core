@@ -331,6 +331,34 @@ class Holder {
         ((Map<String, byte[]>) classLoader.generatedClasses).containsKey(TypeHierarchies.recordClassName('test.Sub', 'test'))
     }
 
+    void "a JDK class with a package-private ancestor is recorded in the package of the origin"() {
+        given:
+        def classLoader = buildClassLoader('''
+package probe
+
+import io.micronaut.core.annotation.TypeHierarchyImport
+
+@TypeHierarchyImport(classes = [StringBuilder, ArrayList, java.util.jar.JarEntry])
+class Hierarchies {
+}
+''')
+        def stringBuilder = record(classLoader, 'java.lang.StringBuilder', 'probe')
+        def jarEntry = record(classLoader, 'java.util.jar.JarEntry', 'probe')
+
+        expect: "AbstractStringBuilder is left out by name, the interfaces above it are kept"
+        record(classLoader, 'java.util.ArrayList', 'probe').type == ArrayList
+        stringBuilder.type == StringBuilder
+        stringBuilder.genericSuperclass.empty
+        stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
+        !strings(stringBuilder.superTypes).contains('AbstractStringBuilder')
+        strings(stringBuilder.superTypes).containsAll(['Appendable', 'CharSequence', 'Comparable<StringBuilder>', 'Serializable'])
+        strings(stringBuilder.superTypes).last() == 'Object'
+
+        and: "an ancestor of a third package is left out the same way"
+        jarEntry.omittedSuperTypeNames == ['java.util.zip.ZipConstants']
+        strings(jarEntry.superTypes) == ['ZipEntry', 'Cloneable', 'Object']
+    }
+
     void "the same type is recorded once"() {
         given:
         def classLoader = buildClassLoader('''
