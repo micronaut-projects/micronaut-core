@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.ServerHttpRequest;
@@ -29,9 +30,9 @@ import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.server.multipart.FormFactory;
 import jakarta.inject.Singleton;
-import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * Binds the {@link AsyncRequestBody} of an asynchronous handler: the body of the request,
@@ -49,22 +50,19 @@ final class AsyncRequestBodyArgumentBinder implements TypedRequestArgumentBinder
     private static final Argument<AsyncRequestBody> ARGUMENT = Argument.of(AsyncRequestBody.class);
 
     final ConversionService conversionService;
-    private final BeanProvider<RequestArgumentSatisfier> argumentSatisfier;
-    private final BeanProvider<MessageBodyHandlerRegistry> bodyHandlerRegistry;
-    private final BeanProvider<FormFactory> formFactory;
     // the beans are looked up on first use, as the providers break a dependency cycle, and then kept:
     // a provider resolves the bean again at every call, which allocates for each body read
-    private volatile @Nullable RequestBinderRegistry binderRegistry;
-    private volatile @Nullable MessageBodyHandlerRegistry messageBodyHandlerRegistry;
-    private volatile @Nullable FormFactory resolvedFormFactory;
+    private final Supplier<RequestBinderRegistry> binderRegistry;
+    private final Supplier<MessageBodyHandlerRegistry> bodyHandlerRegistry;
+    private final Supplier<FormFactory> formFactory;
 
     AsyncRequestBodyArgumentBinder(BeanProvider<RequestArgumentSatisfier> argumentSatisfier,
                                    BeanProvider<MessageBodyHandlerRegistry> bodyHandlerRegistry,
                                    BeanProvider<FormFactory> formFactory,
                                    ConversionService conversionService) {
-        this.argumentSatisfier = argumentSatisfier;
-        this.bodyHandlerRegistry = bodyHandlerRegistry;
-        this.formFactory = formFactory;
+        this.binderRegistry = SupplierUtil.memoized(() -> argumentSatisfier.get().getBinderRegistry());
+        this.bodyHandlerRegistry = SupplierUtil.memoized(bodyHandlerRegistry::get);
+        this.formFactory = SupplierUtil.memoized(formFactory::get);
         this.conversionService = conversionService;
     }
 
@@ -94,35 +92,20 @@ final class AsyncRequestBodyArgumentBinder implements TypedRequestArgumentBinder
      * @return The binders of the arguments of the routes, which bind the {@code @Body} arguments
      */
     RequestBinderRegistry binderRegistry() {
-        RequestBinderRegistry registry = binderRegistry;
-        if (registry == null) {
-            registry = argumentSatisfier.get().getBinderRegistry();
-            binderRegistry = registry;
-        }
-        return registry;
+        return binderRegistry.get();
     }
 
     /**
      * @return The message body readers
      */
     MessageBodyHandlerRegistry bodyHandlerRegistry() {
-        MessageBodyHandlerRegistry registry = messageBodyHandlerRegistry;
-        if (registry == null) {
-            registry = bodyHandlerRegistry.get();
-            messageBodyHandlerRegistry = registry;
-        }
-        return registry;
+        return bodyHandlerRegistry.get();
     }
 
     /**
      * @return The form factory
      */
     FormFactory formFactory() {
-        FormFactory factory = resolvedFormFactory;
-        if (factory == null) {
-            factory = formFactory.get();
-            resolvedFormFactory = factory;
-        }
-        return factory;
+        return formFactory.get();
     }
 }
