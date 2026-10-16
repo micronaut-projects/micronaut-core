@@ -17,6 +17,7 @@ package io.micronaut.dev.http;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.DevelopmentActive;
+import io.micronaut.context.reload.RequestAdmission;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.CompileFailure;
 import io.micronaut.dev.DevRuntime;
@@ -43,7 +44,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 /**
- * Holds requests while a reload is in progress, up to {@link io.micronaut.dev.manifest.DevManifest#requestHoldTimeout()}
+ * Holds requests while a reload is in progress, through the runtime's {@link RequestAdmission}, which server runtimes
+ * holding requests at their own level follow too, up to its {@link RequestAdmission#holdTimeout()}
  * and then answers them with a 503 and a {@code Retry-After}; answers them with the diagnostics while the last
  * compilation failed: a page for a browser, a structured 503 for anything else. The stale generation
  * keeps serving what compiles. The development endpoint is never answered with the failure: reloading through it is
@@ -93,8 +95,12 @@ public final class DevGateFilter {
      */
     @RequestFilter
     public CompletableFuture<@Nullable HttpResponse<?>> gate(HttpRequest<?> request) {
-        return hold(runtime.whenAdmitted(), runtime.manifest().requestHoldTimeout(),
-            () -> answer(request, runtime.lastFailure().orElse(null), errorPage));
+        RequestAdmission admission = runtime.requestAdmission();
+        Supplier<@Nullable HttpResponse<?>> then = () -> answer(request, runtime.lastFailure().orElse(null), errorPage);
+        if (admission.isAdmitted()) {
+            return CompletableFuture.completedFuture(then.get());
+        }
+        return hold(admission.whenAdmitted().toCompletableFuture(), admission.holdTimeout(), then);
     }
 
     /**
