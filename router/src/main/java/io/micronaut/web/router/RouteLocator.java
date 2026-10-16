@@ -268,6 +268,29 @@ public final class RouteLocator implements DynamicRouteTarget {
     }
 
     @Override
+    public <T, R> RouteResolution<T, R> resolve(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                                @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        Located located = locate(request, match);
+        if (located == null) {
+            return RouteResolution.notFound();
+        }
+        RouteResolution<T, R> target;
+        try {
+            // the routes of the target are pending on the body like the routes of the router
+            target = located.routes().resolve(located.request(), null,
+                // the filter sees the match of the request, as it does for the other routes
+                filter == null ? null : targetMatch -> filter.test(located.wrap(targetMatch)));
+        } catch (RuntimeException e) {
+            throw located.failed(e);
+        }
+        return switch (target) {
+            case RouteResolution.Matched<T, R> m -> new RouteResolution.Matched<>(located.wrap(m.match()));
+            case RouteResolution.Pending<T, R> p -> new RouteResolution.Pending<>(p.pending().located(located.request(), located::wrap, located::failed));
+            case RouteResolution.NotFound<T, R> n -> n;
+        };
+    }
+
+    @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, UriRouteMatch<T, R> match,
                                                            @Nullable Predicate<UriRouteMatch<T, R>> filter) {
         Located located = locate(request, match);
@@ -280,6 +303,24 @@ public final class RouteLocator implements DynamicRouteTarget {
                 ? located.routes().findAllClosest(located.request(), null, null)
                 // the filter sees the match of the request, as it does for the other routes
                 : located.routes().findAllClosest(located.request(), targetMatch -> filter.test(located.wrap(targetMatch)), null);
+        } catch (RuntimeException e) {
+            throw located.failed(e);
+        }
+        return located.wrap(targetMatches);
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAll(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                                    @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        Located located = locate(request, match);
+        if (located == null) {
+            return List.of();
+        }
+        List<UriRouteMatch<T, R>> targetMatches;
+        try {
+            targetMatches = located.routes().findAllCandidates(located.request(),
+                // the filter sees the match of the request, as it does for the other routes
+                filter == null ? null : targetMatch -> filter.test(located.wrap(targetMatch)), null);
         } catch (RuntimeException e) {
             throw located.failed(e);
         }

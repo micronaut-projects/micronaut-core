@@ -37,6 +37,9 @@ tasks.withType(PublishGuideTask).configureEach {
     inputs.files(languageSnippetSources)
             .withPropertyName("languageSnippetSources")
             .withPathSensitivity(PathSensitivity.RELATIVE)
+    // versions the guide shows in build examples, from the version catalog
+    properties.put("kotlinVersion", libs.versions.managed.kotlin.asProvider())
+    properties.put("kspVersion", libs.versions.managed.ksp)
 }
 
 tasks.named("updateVersionCatalogs") {

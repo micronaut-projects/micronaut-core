@@ -117,7 +117,7 @@ abstract sealed class AbstractHttpRouteGroup<G extends RouteSpec<G>> extends Abs
         return self();
     }
 
-    public G where(RouteCondition condition) {
+    public G where(RequestCondition condition) {
         settings.where(condition);
         return self();
     }

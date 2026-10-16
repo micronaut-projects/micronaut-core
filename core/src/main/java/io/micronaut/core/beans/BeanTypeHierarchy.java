@@ -16,7 +16,11 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.TypeHierarchies;
+import io.micronaut.core.type.TypeHierarchy;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,7 +33,9 @@ import java.util.Optional;
  * super classes and interfaces of that, then its interfaces and theirs, each once. {@link Object} is reported
  * as a super class, it is not described itself.</p>
  *
- * <p>The types are raw: the type arguments a type passes to its super class and interfaces are not described.</p>
+ * <p>The types are raw: the type arguments a type passes to its super class and interfaces are not described here.
+ * The generic hierarchy of the introspected type is recorded beside the introspection as a {@link TypeHierarchy},
+ * see {@link #getGenericHierarchy()} and {@link #getTypeClosure()}.</p>
  *
  * <p>Each {@link BeanIntrospection#getBeanMethods() bean method} of the introspection knows its declaring levels:
  * the type declaring it and every type of the hierarchy declaring a method it overrides, whether or not that
@@ -112,5 +118,39 @@ public interface BeanTypeHierarchy {
     default boolean isDeclared(BeanMethod<?, ?> method) {
         List<Class<?>> levels = getDeclaringTypes(method);
         return !levels.isEmpty() && levels.get(0) == getBeanType();
+    }
+
+    /**
+     * The generic hierarchy of the introspected type: its type variables with their bounds, its generic super class and
+     * its generic interfaces as declared, recorded at compile time with the introspection. It is empty when the
+     * introspection was compiled without the record, or the record is not on the class path.
+     *
+     * @return The generic hierarchy of the introspected type
+     * @since 5.3.0
+     */
+    default Optional<TypeHierarchy> getGenericHierarchy() {
+        return TypeHierarchies.find(getBeanType());
+    }
+
+    /**
+     * The type closure of the introspected type with its type arguments: the type parameterized by its own variables,
+     * then every super type with the arguments substituted along the path, each once, {@link Object} last, see
+     * {@link TypeHierarchy#getTypeClosure(Argument)}. Without a {@link #getGenericHierarchy() generic hierarchy} the
+     * closure is {@link #getTypes() the raw types} as arguments, followed by {@link Object}.
+     *
+     * @return The type closure
+     * @since 5.3.0
+     */
+    default List<Argument<?>> getTypeClosure() {
+        Optional<TypeHierarchy> hierarchy = getGenericHierarchy();
+        if (hierarchy.isPresent()) {
+            return hierarchy.get().getTypeClosure(hierarchy.get().getDeclaration());
+        }
+        List<Argument<?>> closure = new ArrayList<>(getTypes().size() + 1);
+        for (Class<?> type : getTypes()) {
+            closure.add(Argument.of(type));
+        }
+        closure.add(Argument.OBJECT_ARGUMENT);
+        return closure;
     }
 }
