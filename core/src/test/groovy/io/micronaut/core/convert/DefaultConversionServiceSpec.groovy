@@ -181,4 +181,26 @@ class DefaultConversionServiceSpec extends Specification {
         conversionService.convert(new StringBuilder("value"), String).get() == "value"
         conversionService.convert(new StringBuilder(""), String).get() == ""
     }
+
+    void "test a map conversion keeps null values where the target map may hold them"() {
+        given:
+        ConversionService conversionService = new DefaultMutableConversionService()
+        Map<String, Object> source = new LinkedHashMap<>()
+        source.put("present", "1")
+        source.put("absent", null)
+
+        when:
+        Map objects = conversionService.convert(source, Map, ConversionContext.of([K: Argument.of(String, 'K'), V: Argument.of(Object, 'V')])).get()
+        Map integers = conversionService.convert(source, Map, ConversionContext.of([K: Argument.of(String, 'K'), V: Argument.of(Integer, 'V')])).get()
+        Map untyped = conversionService.convert(source, Map).get()
+        Properties properties = conversionService.convert(source, Properties).get()
+
+        then:
+        objects.containsKey("absent")
+        objects.get("absent") == null
+        objects.get("present") == "1"
+        integers == [present: 1]
+        untyped.containsKey("absent")
+        properties == [present: "1"] as Properties
+    }
 }
