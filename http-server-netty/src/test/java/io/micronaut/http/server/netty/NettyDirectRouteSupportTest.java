@@ -20,6 +20,7 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.junit.jupiter.api.Test;
@@ -93,6 +94,28 @@ class NettyDirectRouteSupportTest {
         assertNotNull(support.prepare(HttpResponse.noContent()));
         // a body a message body writer writes is written for each request
         assertNull(support.prepare(HttpResponse.ok(new Object())));
+        support.close();
+    }
+
+    @Test
+    void aPreparedResponseIsNeverChangedThroughItsAccessors() {
+        MutableHttpResponse<byte[]> response = HttpResponse.ok("prepared".getBytes(StandardCharsets.UTF_8));
+        response.setAttribute("route", "version");
+        PreparedDirectResponse prepared = (PreparedDirectResponse) support.prepare(response);
+        assertNotNull(prepared);
+        // the array of the response is copied when it is prepared, and by each read
+        response.body()[0] = 'X';
+        prepared.body()[1] = 'X';
+        assertEquals("prepared", new String(prepared.body(), StandardCharsets.UTF_8));
+        assertEquals("prepared", new String(prepared.getBody().orElseThrow(), StandardCharsets.UTF_8));
+        // the attributes are kept, and read as copies
+        assertEquals("version", prepared.getAttributes().get("route", String.class).orElse(null));
+        prepared.getAttributes().put("route", "other");
+        assertEquals("version", prepared.getAttributes().get("route", String.class).orElse(null));
+        // the body the server writes is the one prepared
+        ByteBuf content = prepared.content();
+        assertEquals("prepared", content.toString(StandardCharsets.UTF_8));
+        content.release();
         support.close();
     }
 }

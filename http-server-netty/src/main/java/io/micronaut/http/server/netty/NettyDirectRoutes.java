@@ -254,6 +254,12 @@ final class NettyDirectRoutes {
                 onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, error, null));
                 return;
             }
+            if (response instanceof PreparedDirectResponse prepared) {
+                // validated and buffered once: nothing to write
+                onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, null,
+                    new Prepared(prepared.head(), prepared.content())));
+                return;
+            }
             MutableHttpResponse<?> mutable;
             ResolvedWriter writer;
             try {

@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.PathVariables;
+import io.micronaut.web.router.direct.DirectMatch;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -43,7 +44,7 @@ final class DirectRouteDeclaration {
     /**
      * The response given as a value, copied for each request, or {@code null} if a function creates it.
      */
-    final @Nullable ResponseTemplate constant;
+    final DirectMatch.@Nullable Sync constant;
     /**
      * Creates the response of a request from its path variables, or {@code null}.
      */
@@ -67,13 +68,13 @@ final class DirectRouteDeclaration {
     /**
      * @param httpMethodName The name of the method
      * @param uriTemplate    The URI template, with the prefix and the context path
-     * @param constant       The response given as a value, or {@code null}
+     * @param constant       The match of a response given as a value, the same for every request, or {@code null}
      * @param response       Creates the response of a request, or {@code null}
      * @param asyncResponse  Creates the stage of the response of a request, or {@code null}
      */
     DirectRouteDeclaration(String httpMethodName,
                            String uriTemplate,
-                           @Nullable ResponseTemplate constant,
+                           DirectMatch.@Nullable Sync constant,
                            @Nullable Function<DirectContext, ? extends @Nullable HttpResponse<?>> response,
                            @Nullable Function<DirectContext, ? extends CompletionStage<? extends @Nullable HttpResponse<?>>> asyncResponse) {
         this.httpMethodName = Objects.requireNonNull(httpMethodName, "httpMethodName");

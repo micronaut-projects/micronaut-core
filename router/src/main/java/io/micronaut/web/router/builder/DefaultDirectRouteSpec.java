@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.PathVariables;
+import io.micronaut.web.router.direct.DirectMatch;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -119,8 +120,7 @@ final class DefaultDirectRouteSpec implements DirectRouteSpec {
                 + "which is copied on the thread that received the request: remove executeOn(\"" + executorName + "\"), "
                 + "or compose the response on the executor with respond(Function)");
         }
-        ResponseTemplate constant = ResponseTemplate.direct(checked, builder.shareableBody());
-        end(constant, null, null);
+        end(builder.constant(checked), null, null);
     }
 
     @Override
@@ -149,7 +149,7 @@ final class DefaultDirectRouteSpec implements DirectRouteSpec {
         return response;
     }
 
-    private void end(@Nullable ResponseTemplate constant,
+    private void end(DirectMatch.@Nullable Sync constant,
                      @Nullable Function<DirectContext, ? extends @Nullable HttpResponse<?>> response,
                      @Nullable Function<DirectContext, ? extends CompletionStage<? extends @Nullable HttpResponse<?>>> asyncResponse) {
         ended = true;

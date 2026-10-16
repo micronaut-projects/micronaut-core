@@ -58,12 +58,17 @@ public interface DirectRouteSupport {
     /**
      * Prepare the response given as a value to a direct route, see
      * {@link io.micronaut.web.router.builder.DirectRouteSpec#respond(io.micronaut.http.HttpResponse)},
-     * once, when the routes are built: the route then answers every request with the response
+     * or prepared for the functions of the routes, see
+     * {@link io.micronaut.web.router.builder.DirectRouteBuilder#prepare(io.micronaut.http.HttpResponse)},
+     * once, when the routes are declared: the route then answers the requests with the response
      * this returns, the same instance, which the runtime writes without creating a response for
      * the request, e.g. with its headers validated, and its body in a buffer, once. The response
-     * is never changed: neither by the route, nor by the runtime when it writes it.
+     * is never changed: neither by the route, nor by the runtime when it writes it, and its
+     * accessors return copies. It is written by a synchronous route, and by an asynchronous one.
      *
-     * <p>It is called only when the application has a single runtime that answers direct routes.</p>
+     * <p>It is called only when the application has a single runtime that answers direct routes:
+     * a response a runtime prepared may hold a resource that runtime releases, e.g. a buffer, so
+     * with several runtimes each request gets a copy of the response.</p>
      *
      * @param response The response, whose body is the body {@link #shareableBody(Object)} prepared,
      *                 the bytes of a text, or a copy of a {@code byte[]}

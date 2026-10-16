@@ -31,13 +31,15 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
  * The response a direct route gives as a value, prepared once, when the routes are built, see
  * {@link NettyDirectRouteSupport#prepare(HttpResponse)}: its headers are validated once, and its
  * body is a buffer every request writes a duplicate of. The route answers every request with this
- * instance, which is never changed: {@link #getHeaders()} and {@link #getAttributes()} are copies.
+ * instance, which is never changed: {@link #getHeaders()}, {@link #getAttributes()} and
+ * {@link #body()} are copies.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -48,6 +50,7 @@ final class PreparedDirectResponse implements HttpResponse<byte[]> {
     private final HttpResponseStatus status;
     private final io.netty.handler.codec.http.HttpHeaders headers;
     private final byte @Nullable [] body;
+    private final Map<String, Object> attributes;
     /**
      * The buffer of the body, released when the server is shut down, see {@link #release()}.
      */
@@ -57,10 +60,14 @@ final class PreparedDirectResponse implements HttpResponse<byte[]> {
      */
     private final ByteBuf content;
 
-    private PreparedDirectResponse(HttpResponseStatus status, io.netty.handler.codec.http.HttpHeaders headers, byte @Nullable [] body) {
+    private PreparedDirectResponse(HttpResponseStatus status,
+                                   io.netty.handler.codec.http.HttpHeaders headers,
+                                   byte @Nullable [] body,
+                                   Map<String, Object> attributes) {
         this.status = status;
         this.headers = headers;
         this.body = body;
+        this.attributes = attributes;
         this.buffer = body == null || body.length == 0
             ? Unpooled.EMPTY_BUFFER
             : Unpooled.directBuffer(body.length).writeBytes(body);
@@ -80,7 +87,14 @@ final class PreparedDirectResponse implements HttpResponse<byte[]> {
         // validated here, once
         DefaultHttpHeaders headers = new DefaultHttpHeaders();
         response.getHeaders().forEach((String name, List<String> values) -> headers.add(name, values));
-        return new PreparedDirectResponse(HttpResponseStatus.valueOf(response.code(), response.reason()), headers, (byte[]) body);
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        response.getAttributes().forEach((name, value) -> {
+            if (value != null) {
+                attributes.put(name, value);
+            }
+        });
+        return new PreparedDirectResponse(HttpResponseStatus.valueOf(response.code(), response.reason()), headers,
+            body == null ? null : ((byte[]) body).clone(), Map.copyOf(attributes));
     }
 
     /**
@@ -125,16 +139,22 @@ final class PreparedDirectResponse implements HttpResponse<byte[]> {
 
     @Override
     public MutableConvertibleValues<Object> getAttributes() {
-        return MutableConvertibleValues.of(new LinkedHashMap<>());
+        return MutableConvertibleValues.of(new LinkedHashMap<>(attributes));
     }
 
+    /**
+     * @return A copy of the body
+     */
     @Override
     public Optional<byte[]> getBody() {
-        return Optional.ofNullable(body);
+        return Optional.ofNullable(body());
     }
 
+    /**
+     * @return A copy of the body
+     */
     @Override
     public byte @Nullable [] body() {
-        return body;
+        return body == null ? null : body.clone();
     }
 }

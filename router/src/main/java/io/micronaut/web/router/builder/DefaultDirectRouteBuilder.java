@@ -17,6 +17,8 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.web.router.direct.DirectMatch;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -25,6 +27,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 /**
@@ -41,6 +44,7 @@ final class DefaultDirectRouteBuilder implements DirectRouteBuilder {
     private final List<DirectRouteDeclaration> declarations;
     private final UnaryOperator<String> routeUri;
     private final UnaryOperator<Object> shareableBody;
+    private final Function<HttpResponse<?>, @Nullable HttpResponse<?>> prepare;
     private final @Nullable RoutePrefix prefix;
     private final boolean[] closed;
     /**
@@ -56,19 +60,26 @@ final class DefaultDirectRouteBuilder implements DirectRouteBuilder {
      * @param routeUri      The URI template of a route, e.g. under the context path
      * @param shareableBody Prepares the body of a response given as a value, which the requests
      *                      of the route share, see {@link ResponseTemplate#direct}
+     * @param prepare       Prepares a response given as a value, which the runtime writes for
+     *                      every request, or returns {@code null}, see
+     *                      {@link io.micronaut.web.router.direct.DirectRouteSupport#prepare(HttpResponse)}
      */
-    DefaultDirectRouteBuilder(UnaryOperator<String> routeUri, UnaryOperator<Object> shareableBody) {
-        this(new ArrayList<>(), routeUri, shareableBody, null, new boolean[1]);
+    DefaultDirectRouteBuilder(UnaryOperator<String> routeUri,
+                              UnaryOperator<Object> shareableBody,
+                              Function<HttpResponse<?>, @Nullable HttpResponse<?>> prepare) {
+        this(new ArrayList<>(), routeUri, shareableBody, prepare, null, new boolean[1]);
     }
 
     private DefaultDirectRouteBuilder(List<DirectRouteDeclaration> declarations,
                                       UnaryOperator<String> routeUri,
                                       UnaryOperator<Object> shareableBody,
+                                      Function<HttpResponse<?>, @Nullable HttpResponse<?>> prepare,
                                       @Nullable RoutePrefix prefix,
                                       boolean[] closed) {
         this.declarations = declarations;
         this.routeUri = routeUri;
         this.shareableBody = shareableBody;
+        this.prepare = prepare;
         this.prefix = prefix;
         this.closed = closed;
     }
@@ -103,10 +114,32 @@ final class DefaultDirectRouteBuilder implements DirectRouteBuilder {
     }
 
     @Override
+    public HttpResponse<?> prepare(HttpResponse<?> response) {
+        Objects.requireNonNull(response, "response");
+        checkOpen();
+        ResponseTemplate template = ResponseTemplate.direct(response, shareableBody);
+        HttpResponse<?> prepared = prepare.apply(template.get());
+        return prepared == null ? new SharedDirectResponse(template) : prepared;
+    }
+
+    /**
+     * The match of a route that answers with a value: the response the runtime prepared, the
+     * same for every request, or else a new copy of the value for each request.
+     *
+     * @param response The value
+     * @return The match
+     */
+    DirectMatch.Sync constant(HttpResponse<?> response) {
+        ResponseTemplate template = ResponseTemplate.direct(response, shareableBody);
+        HttpResponse<?> prepared = prepare.apply(template.get());
+        return prepared == null ? template::create : responses -> prepared;
+    }
+
+    @Override
     public void path(String prefix, Consumer<DirectRouteBuilder> routes) {
         Objects.requireNonNull(routes, "routes");
         checkOpen();
-        DefaultDirectRouteBuilder nested = new DefaultDirectRouteBuilder(declarations, routeUri, shareableBody, RoutePrefix.of(prefix, this.prefix), closed);
+        DefaultDirectRouteBuilder nested = new DefaultDirectRouteBuilder(declarations, routeUri, shareableBody, prepare, RoutePrefix.of(prefix, this.prefix), closed);
         nested.declaringBean = declaringBean;
         routes.accept(nested);
         // the routes under the prefix are ended in its lambda
@@ -131,12 +164,6 @@ final class DefaultDirectRouteBuilder implements DirectRouteBuilder {
         return bean == null ? null : beanName(bean);
     }
 
-    /**
-     * @return Prepares the body of a response given as a value, see {@link ResponseTemplate#direct}
-     */
-    UnaryOperator<Object> shareableBody() {
-        return shareableBody;
-    }
 
     /**
      * Add the routes of a pending route that its terminal ended.

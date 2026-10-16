@@ -3,6 +3,7 @@ package io.micronaut.http.server.stack;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.server.netty.NettyHttpServer;
@@ -59,7 +60,7 @@ public class DirectRouteBenchmark {
 
     @State(Scope.Thread)
     public static class Holder {
-        @Param({"RAW_NETTY", "DIRECT_CONSTANT", "DIRECT_FUNCTION", "DIRECT_FUNCTION_TEXT", "DIRECT_JSON", "ORDINARY"})
+        @Param({"RAW_NETTY", "DIRECT_CONSTANT", "DIRECT_SELECT", "DIRECT_FUNCTION", "DIRECT_FUNCTION_TEXT", "DIRECT_JSON", "ORDINARY"})
         Variant variant = Variant.DIRECT_FUNCTION;
 
         AutoCloseable ctx;
@@ -116,6 +117,7 @@ public class DirectRouteBenchmark {
     public enum Variant {
         RAW_NETTY("/plaintext"),
         DIRECT_CONSTANT("/constant"),
+        DIRECT_SELECT("/select"),
         DIRECT_FUNCTION("/plaintext"),
         DIRECT_FUNCTION_TEXT("/text"),
         DIRECT_JSON("/json"),
@@ -156,6 +158,10 @@ public class DirectRouteBenchmark {
         @Override
         public void routes(DirectRouteBuilder builder) {
             builder.GET("/constant").respond(HttpResponse.ok(HELLO).contentType(MediaType.TEXT_PLAIN_TYPE));
+            // a function that chooses between prepared responses
+            HttpResponse<?> hello = builder.prepare(HttpResponse.ok(HELLO).contentType(MediaType.TEXT_PLAIN_TYPE).header(HttpHeaders.ETAG, "v1"));
+            HttpResponse<?> notModified = builder.prepare(HttpResponse.notModified().header(HttpHeaders.ETAG, "v1"));
+            builder.GET("/select").respond(direct -> "v1".equals(direct.request().header(HttpHeaders.IF_NONE_MATCH)) ? notModified : hello);
             builder.GET("/plaintext").respond(direct -> HttpResponse.ok(HELLO).contentType(MediaType.TEXT_PLAIN_TYPE));
             builder.GET("/text").respond(direct -> HttpResponse.ok("Hello, World!").contentType(MediaType.TEXT_PLAIN_TYPE));
             builder.GET("/json").respond(direct -> HttpResponse.ok(new Message("Hello, World!")));

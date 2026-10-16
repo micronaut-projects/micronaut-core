@@ -76,7 +76,8 @@ final class DirectRoutesAssembly implements DirectRouteLookup {
                          @Nullable @Value("${micronaut.server.context-path}") String contextPath,
                          List<DirectRouteSupport> directRouteSupport) {
         DefaultDirectRouteBuilder builder = new DefaultDirectRouteBuilder(uri -> RouteAssembly.underContextPath(contextPath, uri),
-            body -> shareableBody(directRouteSupport, body));
+            body -> shareableBody(directRouteSupport, body),
+            response -> prepare(directRouteSupport, response));
         List<HttpDirectRoutes> ordered = new ArrayList<>(routes);
         OrderUtil.sort(ordered);
         try {
@@ -97,8 +98,7 @@ final class DirectRoutesAssembly implements DirectRouteLookup {
             .orElse(RouteConditionContext.fallback()));
         DirectRouteTable table = DirectRouteTable.build(declarations, conversionService, conditionContext,
             (executorName, route) -> executor(beanLocator, executorName, route),
-            response -> discard(directRouteSupport, response),
-            response -> prepare(directRouteSupport, response));
+            response -> discard(directRouteSupport, response));
         if (!table.isEmpty() && directRouteSupport.isEmpty()) {
             // never served as ordinary routes, which the filters they skip would see
             throw new ConfigurationException("The application declares direct routes, see HttpDirectRoutes, "

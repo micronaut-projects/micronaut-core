@@ -113,8 +113,6 @@ final class DirectRouteTable implements DirectRouteLookup {
      * @param executors         The executor of a name
      * @param discard           Releases a response an asynchronous route completed after its
      *                          response was cancelled, which the runtime never writes
-     * @param prepare           Prepares the response of a route that answers with a value, which
-     *                          the route then gives to every request, or returns {@code null}
      * @return The routes
      * @throws ConfigurationException if two routes would make every request of their URI template ambiguous
      */
@@ -122,12 +120,11 @@ final class DirectRouteTable implements DirectRouteLookup {
                                   ConversionService conversionService,
                                   RouteConditionContext conditionContext,
                                   ExecutorLookup executors,
-                                  Consumer<HttpResponse<?>> discard,
-                                  Function<HttpResponse<?>, @Nullable HttpResponse<?>> prepare) {
+                                  Consumer<HttpResponse<?>> discard) {
         Map<String, List<Route>> byMethod = new HashMap<>();
         Map<Unconditional, DirectRouteDeclaration> unconditional = new HashMap<>();
         for (DirectRouteDeclaration declaration : declarations) {
-            Route route = route(declaration, executors, discard, prepare);
+            Route route = route(declaration, executors, discard);
             if (route.unconditional && route.constraints.length == 0) {
                 DirectRouteDeclaration same = unconditional.putIfAbsent(
                     new Unconditional(declaration.httpMethodName, declaration.uriTemplate, declaration.order), declaration);
@@ -153,14 +150,13 @@ final class DirectRouteTable implements DirectRouteLookup {
         return new DirectRouteTable(routesByMethod, conversionService, conditionContext);
     }
 
-    private static Route route(DirectRouteDeclaration declaration, ExecutorLookup executors, Consumer<HttpResponse<?>> discard,
-                               Function<HttpResponse<?>, @Nullable HttpResponse<?>> prepare) {
+    private static Route route(DirectRouteDeclaration declaration, ExecutorLookup executors, Consumer<HttpResponse<?>> discard) {
         // checked when they were given to the route
         RouteCondition condition = RouteConditions.normalizeAll(declaration.conditions);
         String executorName = declaration.executorName;
         Executor executor = executorName == null ? null : executors.executor(executorName, declaration);
         return new Route(declaration, new UriTemplateMatcher(declaration.uriTemplate), condition,
-            declaration.constraints.toArray(new Predicate[0]), declaration.order, executor, discard, prepare);
+            declaration.constraints.toArray(new Predicate[0]), declaration.order, executor, discard);
     }
 
     @Override
@@ -367,7 +363,7 @@ final class DirectRouteTable implements DirectRouteLookup {
 
         Route(DirectRouteDeclaration declaration, UriTemplateMatcher matcher, RouteCondition condition,
               Predicate<? super PathVariables>[] constraints, int order, @Nullable Executor executor,
-              Consumer<HttpResponse<?>> discard, Function<HttpResponse<?>, @Nullable HttpResponse<?>> prepare) {
+              Consumer<HttpResponse<?>> discard) {
             this.declaration = declaration;
             this.matcher = matcher;
             this.condition = condition;
@@ -379,20 +375,10 @@ final class DirectRouteTable implements DirectRouteLookup {
             this.unconditional = condition.equals(RouteConditions.ALWAYS);
             this.executor = executor;
             this.async = declaration.isAsync();
-            ResponseTemplate template = declaration.constant;
             // a value is never on an executor, see DefaultDirectRouteSpec#respond(HttpResponse)
-            this.constant = template == null ? null : constant(template, prepare);
+            this.constant = declaration.constant;
             this.discard = discard;
             this.implicitHead = false;
-        }
-
-        /**
-         * The match of a route that answers with a value: the response the runtime prepared,
-         * given to every request, or else a copy of the value for each request.
-         */
-        private static DirectMatch.Sync constant(ResponseTemplate template, Function<HttpResponse<?>, @Nullable HttpResponse<?>> prepare) {
-            HttpResponse<?> prepared = prepare.apply(template.get());
-            return prepared == null ? template::create : responses -> prepared;
         }
 
         private Route(Route get) {
