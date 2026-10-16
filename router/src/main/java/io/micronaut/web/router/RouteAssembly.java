@@ -32,8 +32,8 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Get;
-import io.micronaut.web.router.builder.RouteCondition;
-import io.micronaut.web.router.builder.RouteConditions;
+import io.micronaut.web.router.builder.RequestCondition;
+import io.micronaut.web.router.builder.RequestConditions;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.GenericHttpFilter;
@@ -965,7 +965,7 @@ public final class RouteAssembly {
     @Internal
     public final class RouteGroup {
         private final @Nullable RouteGroup enclosing;
-        private final List<RouteCondition> conditions = new ArrayList<>(0);
+        private final List<RequestCondition> conditions = new ArrayList<>(0);
         private final List<Predicate<? super PathVariables>> constraints = new ArrayList<>(0);
         private final Map<String, Object> attributes = new LinkedHashMap<>(0);
         private final DefaultRouteAnnotations annotations;
@@ -1134,7 +1134,7 @@ public final class RouteAssembly {
          *
          * @param condition The condition
          */
-        public void where(RouteCondition condition) {
+        public void where(RequestCondition condition) {
             Objects.requireNonNull(condition, "condition");
             checkOpen();
             conditions.add(condition);
@@ -1201,7 +1201,7 @@ public final class RouteAssembly {
          *
          * @param routeConditions The conditions to add to
          */
-        void addConditions(List<RouteCondition> routeConditions) {
+        void addConditions(List<RequestCondition> routeConditions) {
             RouteGroup group = enclosing;
             if (group != null) {
                 group.addConditions(routeConditions);
@@ -1444,7 +1444,7 @@ public final class RouteAssembly {
 
         /**
          * The conditions of the route info: the conditions of the groups of the route, outer group
-         * first, and of the route, see {@link RouteSettings#where(RouteCondition)}, as one
+         * first, and of the route, see {@link RouteSettings#where(RequestCondition)}, as one
          * normalized condition, the {@code @RouteCondition} of the target method, the conditions
          * of the route given as predicates, and a request on the port of the route if it has one.
          * They are read when the route info is built: the annotations of a handler route may be
@@ -1455,17 +1455,17 @@ public final class RouteAssembly {
          */
         private List<Predicate<HttpRequest<?>>> predicates(@Nullable Integer effectivePort) {
             List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(conditions.size() + 3);
-            List<RouteCondition> declared = settings.getConditions();
+            List<RequestCondition> declared = settings.getConditions();
             RouteGroup routeGroup = settings.getGroup();
             if (routeGroup != null) {
-                List<RouteCondition> all = new ArrayList<>();
+                List<RequestCondition> all = new ArrayList<>();
                 routeGroup.addConditions(all);
                 all.addAll(declared);
                 declared = all;
             }
-            RouteCondition condition = RouteConditions.normalizeAll(declared);
-            if (!condition.equals(RouteConditions.ALWAYS)) {
-                predicates.add(RouteConditions.predicate(condition, conditionContext));
+            RequestCondition condition = RequestConditions.normalizeAll(declared);
+            if (!condition.equals(RequestConditions.ALWAYS)) {
+                predicates.add(RequestConditions.predicate(condition, conditionContext));
             }
             if (targetMethod.isPresent(io.micronaut.http.annotation.RouteCondition.class, AnnotationMetadata.VALUE_MEMBER)) {
                 // every @RouteCondition of the target: the annotations of a target may combine

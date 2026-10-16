@@ -22,7 +22,7 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.LocatedRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import io.micronaut.web.router.filter.FilteredRouter;
 import io.micronaut.web.router.filter.RouteMatchFilter;
 import org.junit.jupiter.api.Test;
@@ -44,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class LocatedRouteBodyConditionsTest {
 
-    private static final RouteCondition.Body<String> EXPRESS = RouteCondition.bodyText(text -> text.contains("express"));
+    private static final RequestCondition.Body<String> EXPRESS = RequestCondition.bodyText(text -> text.contains("express"));
 
     @Test
     void theRoutesOfALocatedTargetArePendingOnTheBody() {
@@ -146,7 +146,7 @@ class LocatedRouteBodyConditionsTest {
     @Test
     void aFilteredRouterKeepsTheFallbackRoutesOfALocatedTargetForTheBody() {
         LocatedRoutes<?> review = TestLocatedRoutes.of(located -> {
-            located.POST("/items/special").where(RouteCondition.bodyText("express"::equals)).handle((request, pathVariables) -> HttpResponse.ok("special"));
+            located.POST("/items/special").where(RequestCondition.bodyText("express"::equals)).handle((request, pathVariables) -> HttpResponse.ok("special"));
             located.POST("/items/{name}", (request, pathVariables) -> HttpResponse.ok("by name"));
         });
         Router base = router(routes -> routes.locate("/review", (request, pathVariables) -> "review", target -> review));

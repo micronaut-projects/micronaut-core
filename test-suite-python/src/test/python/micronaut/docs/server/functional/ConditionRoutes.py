@@ -8,7 +8,7 @@ from micronaut.context.annotation import Value
 from micronaut.core.type import Argument
 from micronaut.http import HttpResponse, HttpStatus, MediaType
 from micronaut.web.router import RouteAttributes
-from micronaut.web.router.builder import HttpRouteBuilder, HttpRoutes, RouteCondition, ValueMatcher
+from micronaut.web.router.builder import HttpRouteBuilder, HttpRoutes, RequestCondition, ValueMatcher
 
 Instant = java.type("java.time.Instant")
 CompletableFuture = java.type("java.util.concurrent.CompletableFuture")
@@ -41,9 +41,9 @@ class ConditionRoutes(HttpRoutes):
     def routes(self, routes: HttpRouteBuilder) -> None:
         # tag::where[]
         (routes.GET("/search")
-            .where(RouteCondition.any(  # <1>
-                RouteCondition.header("X-Beta"),
-                RouteCondition.query("beta", "true")))
+            .where(RequestCondition.any(  # <1>
+                RequestCondition.header("X-Beta"),
+                RequestCondition.query("beta", "true")))
             .order(-1)  # <2>
             .handle(lambda request, path_variables: text("beta search")))
         routes.GET("/search", lambda request, path_variables: text("search"))  # <3>
@@ -62,26 +62,26 @@ class ConditionRoutes(HttpRoutes):
         # end::constrain[]
         # tag::matchers[]
         (routes.GET("/downloads/{file}")
-            .where(RouteCondition.header("X-Channel", ValueMatcher.oneOf("beta", "canary").ignoringCase())  # <1>
-                .or_(RouteCondition.cookie("channel", ValueMatcher.equalTo("beta"))))
-            .where(RouteCondition.peerAddress("127.0.0.0/8", "::1"))  # <2>
-            .where(RouteCondition.after(Instant.parse("2026-01-01T00:00:00Z")))  # <3>
+            .where(RequestCondition.header("X-Channel", ValueMatcher.oneOf("beta", "canary").ignoringCase())  # <1>
+                .or_(RequestCondition.cookie("channel", ValueMatcher.equalTo("beta"))))
+            .where(RequestCondition.peerAddress("127.0.0.0/8", "::1"))  # <2>
+            .where(RequestCondition.after(Instant.parse("2026-01-01T00:00:00Z")))  # <3>
             .constrain("file", ValueMatcher.endsWith(".zip"))  # <4>
             .handle(lambda request, path_variables: text("download " + path_variables.getString("file"))))
         # end::matchers[]
         # tag::body[]
         (routes.POST("/orders")
-            .where(RouteCondition.body(ORDER, lambda order: order.get("kind") == "express"))  # <1>
+            .where(RequestCondition.body(ORDER, lambda order: order.get("kind") == "express"))  # <1>
             .order(-1)  # <2>
             .body(ORDER)
             .handle(lambda request, path_variables, order: text(f"express order {order.get('id')}")))
         routes.POST("/orders").body(ORDER).handle(lambda request, path_variables, order: text(f"order {order.get('id')}"))  # <3>
         (routes.POST("/imports")
-            .where(RouteCondition.bodyText(lambda body: body.startswith("id,")).maxBytes(1024))  # <4>
+            .where(RequestCondition.bodyText(lambda body: body.startswith("id,")).maxBytes(1024))  # <4>
             .consumesAll()
             .handle(lambda request, path_variables: text("csv import")))
         (routes.POST("/payments")
-            .where(RouteCondition.bodyAsync(ORDER, lambda order: is_known_customer(order.get("customer"))))  # <5>
+            .where(RequestCondition.bodyAsync(ORDER, lambda order: is_known_customer(order.get("customer"))))  # <5>
             .body(ORDER)
             .handle(lambda request, path_variables, order: text(f"payment of {order.get('customer')}")))
         # end::body[]

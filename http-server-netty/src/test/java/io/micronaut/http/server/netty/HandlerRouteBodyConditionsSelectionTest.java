@@ -30,7 +30,7 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.LocatedRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -169,29 +169,29 @@ class HandlerRouteBodyConditionsSelectionTest {
 
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.POST("/sel/orders").where(RouteCondition.body(ORDER, order -> "express".equals(order.kind()))).order(-2)
+            routes.POST("/sel/orders").where(RequestCondition.body(ORDER, order -> "express".equals(order.kind()))).order(-2)
                 .body(ORDER).handle((request, pathVariables, order) -> text("express " + order.id()));
-            routes.POST("/sel/orders").where(RouteCondition.body(ORDER, order -> "bulk".equals(order.kind()))).order(-1)
+            routes.POST("/sel/orders").where(RequestCondition.body(ORDER, order -> "bulk".equals(order.kind()))).order(-1)
                 .body(ORDER).handle((request, pathVariables, order) -> text("bulk " + order.id()));
             routes.POST("/sel/orders").handle((request, pathVariables) -> text("other"));
 
-            routes.POST("/sel/number").where(RouteCondition.body(Integer.class, number -> number == 42)).order(-1).consumesAll()
+            routes.POST("/sel/number").where(RequestCondition.body(Integer.class, number -> number == 42)).order(-1).consumesAll()
                 .handle((request, pathVariables) -> text("number"));
             routes.POST("/sel/number").consumesAll().handle((request, pathVariables) -> text("other"));
 
             routes.POST("/sel/later")
-                .where(RouteCondition.bodyAsync(String.class, text -> later(executor, text.startsWith("vip"))))
-                .where(RouteCondition.bodyAsync(String.class, text -> later(executor, text.contains("express"))))
+                .where(RequestCondition.bodyAsync(String.class, text -> later(executor, text.startsWith("vip"))))
+                .where(RequestCondition.bodyAsync(String.class, text -> later(executor, text.contains("express"))))
                 .order(-2).consumesAll()
                 .handle((request, pathVariables) -> text("later both"));
             routes.POST("/sel/later")
-                .where(RouteCondition.bodyAsync(String.class, text -> later(executor, text.startsWith("vip"))))
+                .where(RequestCondition.bodyAsync(String.class, text -> later(executor, text.startsWith("vip"))))
                 .order(-1).consumesAll()
                 .handle((request, pathVariables) -> text("later vip"));
             routes.POST("/sel/later").consumesAll().handle((request, pathVariables) -> text("other"));
 
             routes.POST("/sel/failing")
-                .where(RouteCondition.bodyAsync(String.class, text -> switch (text) {
+                .where(RequestCondition.bodyAsync(String.class, text -> switch (text) {
                     case "stage" -> CompletableFuture.failedFuture(new IllegalStateException("lookup failed"));
                     case "throw" -> throw new IllegalStateException("condition failed");
                     default -> null;
@@ -206,15 +206,15 @@ class HandlerRouteBodyConditionsSelectionTest {
                 case "order" -> request.body(new Order("set", 5));
                 case null, default -> null;
             });
-            routes.POST("/sel/set").where(RouteCondition.bodyText("text body"::equals)).order(-3).consumesAll()
+            routes.POST("/sel/set").where(RequestCondition.bodyText("text body"::equals)).order(-3).consumesAll()
                 .handle((request, pathVariables) -> text("text"));
-            routes.POST("/sel/set").where(RouteCondition.bodyBytes(bytes -> bytes.length == 2)).order(-2).consumesAll()
+            routes.POST("/sel/set").where(RequestCondition.bodyBytes(bytes -> bytes.length == 2)).order(-2).consumesAll()
                 .handle((request, pathVariables) -> text("bytes"));
-            routes.POST("/sel/set").where(RouteCondition.body(ORDER, order -> "set".equals(order.kind()))).order(-1).consumesAll()
+            routes.POST("/sel/set").where(RequestCondition.body(ORDER, order -> "set".equals(order.kind()))).order(-1).consumesAll()
                 .handle((request, pathVariables) -> text("order"));
             routes.POST("/sel/set").consumesAll().handle((request, pathVariables) -> text("other"));
 
-            routes.POST("/sel/empty").where(RouteCondition.bodyText(String::isEmpty)).consumesAll()
+            routes.POST("/sel/empty").where(RequestCondition.bodyText(String::isEmpty)).consumesAll()
                 .handle((request, pathVariables) -> text("empty"));
 
             LocatedRoutes<String> shops = new LocatedRoutes<>() {
@@ -225,16 +225,16 @@ class HandlerRouteBodyConditionsSelectionTest {
 
                 @Override
                 public void routes(io.micronaut.web.router.builder.LocatedHttpRouteBuilder<String> shop) {
-                    shop.POST("/orders").where(RouteCondition.bodyText(text -> text.contains("express"))).consumesAll()
+                    shop.POST("/orders").where(RequestCondition.bodyText(text -> text.contains("express"))).consumesAll()
                         .handle((request, pathVariables, id) -> text("vip shop " + id + " express"));
                 }
             };
             routes.path("/sel/vip", vip -> {
-                vip.where(RouteCondition.bodyText(text -> text.startsWith("vip")));
+                vip.where(RequestCondition.bodyText(text -> text.startsWith("vip")));
                 vip.locate("/shops/{id}", (request, pathVariables) -> pathVariables.getString("id"), shop -> shops);
             });
             routes.path("/sel/vip-async", vip -> {
-                vip.where(RouteCondition.bodyText(text -> text.startsWith("vip")));
+                vip.where(RequestCondition.bodyText(text -> text.startsWith("vip")));
                 vip.locateAsync("/shops/{id}", (request, pathVariables) ->
                     later(executor, pathVariables.getString("id")), shop -> shops);
             });

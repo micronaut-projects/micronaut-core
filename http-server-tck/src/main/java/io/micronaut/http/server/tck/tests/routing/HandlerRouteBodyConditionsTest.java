@@ -44,15 +44,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.micronaut.web.router.builder.RouteCondition.body;
-import static io.micronaut.web.router.builder.RouteCondition.bodyAsync;
-import static io.micronaut.web.router.builder.RouteCondition.bodyBytes;
-import static io.micronaut.web.router.builder.RouteCondition.bodyText;
-import static io.micronaut.web.router.builder.RouteCondition.header;
+import static io.micronaut.web.router.builder.RequestCondition.body;
+import static io.micronaut.web.router.builder.RequestCondition.bodyAsync;
+import static io.micronaut.web.router.builder.RequestCondition.bodyBytes;
+import static io.micronaut.web.router.builder.RequestCondition.bodyText;
+import static io.micronaut.web.router.builder.RequestCondition.header;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * The body conditions of handler routes, {@code RouteCondition.body(...)}: routes on the same
+ * The body conditions of handler routes, {@code RequestCondition.body(...)}: routes on the same
  * path chosen by the body of the request, which the chosen route still reads. A request whose
  * body meets no condition falls through, or is not found, and releases the body it read.
  */

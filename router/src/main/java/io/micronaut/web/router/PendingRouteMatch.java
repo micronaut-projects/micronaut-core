@@ -17,7 +17,7 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import org.jspecify.annotations.Nullable;
 
@@ -110,7 +110,7 @@ public final class PendingRouteMatch<T, R> {
 
     /**
      * The number of bytes of the body the conditions of the routes read: the largest limit of
-     * the body conditions of the routes, see {@link RouteCondition.Body#maxBytes(int)}.
+     * the body conditions of the routes, see {@link RequestCondition.Body#maxBytes(int)}.
      *
      * @param serverLimit The limit of the server, {@code micronaut.server.max-request-buffer-size}
      * @return The limit
@@ -119,7 +119,7 @@ public final class PendingRouteMatch<T, R> {
         int max = 0;
         for (List<UriRouteMatch<T, R>> rank : ranks) {
             for (UriRouteMatch<T, R> match : rank) {
-                for (RouteCondition.Body<?> condition : match.getRouteInfo().getBodyConditions()) {
+                for (RequestCondition.Body<?> condition : match.getRouteInfo().getBodyConditions()) {
                     max = Math.max(max, condition.effectiveMaxBytes(serverLimit));
                 }
             }

@@ -137,23 +137,23 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
 
     /**
      * The declarative conditions of the route, of its groups and its own, see
-     * {@link io.micronaut.web.router.builder.RouteSpec#where(io.micronaut.web.router.builder.RouteCondition)}:
+     * {@link io.micronaut.web.router.builder.RouteSpec#where(io.micronaut.web.router.builder.RequestCondition)}:
      * normalized, the parts a request must all meet in the order the router evaluates them, e.g.
      * for the routes endpoint. A condition of a lambda is a
-     * {@link io.micronaut.web.router.builder.RouteCondition.Custom} part.
+     * {@link io.micronaut.web.router.builder.RequestCondition.Custom} part.
      *
      * @return The conditions, empty if the route has none
      * @since 5.3.0
      */
     @Internal
     @Experimental
-    default List<io.micronaut.web.router.builder.RouteCondition> getConditions() {
+    default List<io.micronaut.web.router.builder.RequestCondition> getConditions() {
         return List.of();
     }
 
     /**
      * The conditions on the body among the {@link #getConditions() conditions} of the route, see
-     * {@link io.micronaut.web.router.builder.RouteCondition.Body}. The router matches a request
+     * {@link io.micronaut.web.router.builder.RequestCondition.Body}. The router matches a request
      * without its body: the routes whose body conditions decide the match are left pending, see
      * {@link Router#findClosest(io.micronaut.http.HttpRequest, java.util.function.Consumer)}, and
      * the server chooses among them once it read the body.
@@ -163,7 +163,7 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
      */
     @Internal
     @Experimental
-    default List<io.micronaut.web.router.builder.RouteCondition.Body<?>> getBodyConditions() {
+    default List<io.micronaut.web.router.builder.RequestCondition.Body<?>> getBodyConditions() {
         return List.of();
     }
 }

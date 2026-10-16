@@ -25,7 +25,7 @@ import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.RequestHandler;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.filter.FilteredRouter;
 import io.micronaut.web.router.filter.RouteMatchFilter;
@@ -36,13 +36,13 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import static io.micronaut.web.router.builder.RouteCondition.all;
-import static io.micronaut.web.router.builder.RouteCondition.any;
-import static io.micronaut.web.router.builder.RouteCondition.body;
-import static io.micronaut.web.router.builder.RouteCondition.bodyBytes;
-import static io.micronaut.web.router.builder.RouteCondition.bodyText;
-import static io.micronaut.web.router.builder.RouteCondition.header;
-import static io.micronaut.web.router.builder.RouteCondition.not;
+import static io.micronaut.web.router.builder.RequestCondition.all;
+import static io.micronaut.web.router.builder.RequestCondition.any;
+import static io.micronaut.web.router.builder.RequestCondition.body;
+import static io.micronaut.web.router.builder.RequestCondition.bodyBytes;
+import static io.micronaut.web.router.builder.RequestCondition.bodyText;
+import static io.micronaut.web.router.builder.RequestCondition.header;
+import static io.micronaut.web.router.builder.RequestCondition.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -53,14 +53,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The router side of the body conditions of handler routes, {@link RouteCondition.Body}: the
+ * The router side of the body conditions of handler routes, {@link RequestCondition.Body}: the
  * routes a request matches without its body, ranked, pending on the body when a route of the
  * first rank has body conditions.
  */
 class RouteBodyConditionsTest {
 
-    private static final RouteCondition.Body<String> EXPRESS = bodyText(text -> text.contains("express"));
-    private static final RouteCondition.Body<String> BULK = bodyText(text -> text.contains("bulk"));
+    private static final RequestCondition.Body<String> EXPRESS = bodyText(text -> text.contains("express"));
+    private static final RequestCondition.Body<String> BULK = bodyText(text -> text.contains("bulk"));
 
     @Test
     void aRouterWithoutBodyConditionsMatchesAsBefore() {
@@ -173,9 +173,9 @@ class RouteBodyConditionsTest {
 
     @Test
     void theBodyConditionsOfTheGroupsAndOfTheRouteAreAllMetOuterGroupFirstAndLast() {
-        RouteCondition.Body<String> route = bodyText(text -> true);
-        RouteCondition.Body<byte[]> inner = bodyBytes(bytes -> true);
-        RouteCondition.Body<Integer> outer = body(Integer.class, number -> true);
+        RequestCondition.Body<String> route = bodyText(text -> true);
+        RequestCondition.Body<byte[]> inner = bodyBytes(bytes -> true);
+        RequestCondition.Body<Integer> outer = body(Integer.class, number -> true);
         Router router = router(routes -> routes.path("/shops", shop -> {
             shop.path("/orders", orders -> {
                 orders.POST("/").where(route.and(header("X-Shop"))).handle(handler("order"));
@@ -204,13 +204,13 @@ class RouteBodyConditionsTest {
         assertThrows(IllegalArgumentException.class, () -> not(all(header("X-Express"), EXPRESS)));
         assertThrows(IllegalArgumentException.class, () -> any(header("X-A"), EXPRESS.and(BULK)));
         // a part every request meets
-        assertEquals(List.of(EXPRESS, BULK), ((RouteCondition.AllOf) all(EXPRESS, BULK)).conditions());
+        assertEquals(List.of(EXPRESS, BULK), ((RequestCondition.AllOf) all(EXPRESS, BULK)).conditions());
     }
 
     @Test
     void aBodyConditionLimitIsNotNegative() {
         assertThrows(IllegalArgumentException.class, () -> EXPRESS.maxBytes(-2));
-        assertEquals(RouteCondition.Body.SERVER_LIMIT, EXPRESS.maxBytes(10).maxBytes(RouteCondition.Body.SERVER_LIMIT).maxBytes());
+        assertEquals(RequestCondition.Body.SERVER_LIMIT, EXPRESS.maxBytes(10).maxBytes(RequestCondition.Body.SERVER_LIMIT).maxBytes());
         assertEquals(10, EXPRESS.maxBytes(10).effectiveMaxBytes(100));
         assertEquals(100, EXPRESS.maxBytes(1000).effectiveMaxBytes(100), "a limit cannot raise the limit of the server");
         assertEquals(100, EXPRESS.effectiveMaxBytes(100));

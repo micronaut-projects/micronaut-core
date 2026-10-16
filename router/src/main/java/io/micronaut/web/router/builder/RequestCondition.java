@@ -34,14 +34,14 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
- * A declarative condition on a request, for {@link RouteSpec#where(RouteCondition)}: on its
+ * A declarative condition on a request, for {@link RouteSpec#where(RequestCondition)}: on its
  * headers, query parameters, cookies, method, host, client and peer addresses and the time it arrives, and
  * their combinations. A condition is data: the router reads it, flattens and orders it
  * cheapest first when the route is built, and shows it in the route info, which a lambda does
  * not allow. {@link #custom(Predicate)} takes a lambda for what the others do not express.
  *
  * <pre>{@code
- * import static io.micronaut.web.router.builder.RouteCondition.*;
+ * import static io.micronaut.web.router.builder.RequestCondition.*;
  * import static io.micronaut.web.router.builder.ValueMatcher.*;
  *
  * routes.GET("/search")
@@ -53,23 +53,23 @@ import java.util.function.Predicate;
  *
  * <p>A condition is data, not a predicate: only the router evaluates it, with the host and the
  * client address as the server resolves them, see {@link Host} and {@link RemoteAddress}, and
- * the clock of the application. Conditions combine with {@link #and(RouteCondition)},
- * {@link #or(RouteCondition)} and {@link #negate()}; a lambda is a {@link #custom(Predicate)}
+ * the clock of the application. Conditions combine with {@link #and(RequestCondition)},
+ * {@link #or(RequestCondition)} and {@link #negate()}; a lambda is a {@link #custom(Predicate)}
  * condition.</p>
  *
  * <p>A {@link Body} condition, see {@link #body(Class, Predicate)}, is met by the body of the
  * request: the server reads the body, from a copy, for the routes the request matched without
  * it, and evaluates the body conditions last, see {@link Body}. A body condition is a part every
  * request of the route meets: a condition of a route or a group, or a part of
- * {@link #all(RouteCondition...)} or {@link #and(RouteCondition)}. It cannot be a part of
- * {@link #any(RouteCondition...)}, {@link #or(RouteCondition)} or {@link #negate()}, which fail
+ * {@link #all(RequestCondition...)} or {@link #and(RequestCondition)}. It cannot be a part of
+ * {@link #any(RequestCondition...)}, {@link #or(RequestCondition)} or {@link #negate()}, which fail
  * with an {@link IllegalArgumentException}.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
-public sealed interface RouteCondition {
+public sealed interface RequestCondition {
 
     /**
      * A request with a header of the name, e.g. {@code header("X-Beta")}.
@@ -77,7 +77,7 @@ public sealed interface RouteCondition {
      * @param name The name of the header, case-insensitive
      * @return The condition
      */
-    static RouteCondition header(String name) {
+    static RequestCondition header(String name) {
         return new Header(name, ValueMatcher.present());
     }
 
@@ -89,7 +89,7 @@ public sealed interface RouteCondition {
      * @param value The value, case-sensitive
      * @return The condition
      */
-    static RouteCondition header(String name, String value) {
+    static RequestCondition header(String name, String value) {
         return new Header(name, ValueMatcher.equalTo(value));
     }
 
@@ -102,7 +102,7 @@ public sealed interface RouteCondition {
      * @param value The matcher of the value
      * @return The condition
      */
-    static RouteCondition header(String name, ValueMatcher value) {
+    static RequestCondition header(String name, ValueMatcher value) {
         return new Header(name, value);
     }
 
@@ -113,7 +113,7 @@ public sealed interface RouteCondition {
      * @param name The name of the query parameter, case-sensitive
      * @return The condition
      */
-    static RouteCondition query(String name) {
+    static RequestCondition query(String name) {
         return new Query(name, ValueMatcher.present());
     }
 
@@ -125,7 +125,7 @@ public sealed interface RouteCondition {
      * @param value The decoded value, case-sensitive
      * @return The condition
      */
-    static RouteCondition query(String name, String value) {
+    static RequestCondition query(String name, String value) {
         return new Query(name, ValueMatcher.equalTo(value));
     }
 
@@ -137,7 +137,7 @@ public sealed interface RouteCondition {
      * @param value The matcher of the value
      * @return The condition
      */
-    static RouteCondition query(String name, ValueMatcher value) {
+    static RequestCondition query(String name, ValueMatcher value) {
         return new Query(name, value);
     }
 
@@ -147,7 +147,7 @@ public sealed interface RouteCondition {
      * @param name The name of the cookie, case-sensitive
      * @return The condition
      */
-    static RouteCondition cookie(String name) {
+    static RequestCondition cookie(String name) {
         return new Cookie(name, ValueMatcher.present());
     }
 
@@ -159,7 +159,7 @@ public sealed interface RouteCondition {
      * @param value The matcher of the value, without the quotes of a quoted value
      * @return The condition
      */
-    static RouteCondition cookie(String name, ValueMatcher value) {
+    static RequestCondition cookie(String name, ValueMatcher value) {
         return new Cookie(name, value);
     }
 
@@ -171,7 +171,7 @@ public sealed interface RouteCondition {
      * @param methods The methods, at least one
      * @return The condition
      */
-    static RouteCondition method(HttpMethod... methods) {
+    static RequestCondition method(HttpMethod... methods) {
         Objects.requireNonNull(methods, "methods");
         String[] names = new String[methods.length];
         for (int i = 0; i < methods.length; i++) {
@@ -186,7 +186,7 @@ public sealed interface RouteCondition {
      * @param methods The names of the methods, case-sensitive, at least one
      * @return The condition
      */
-    static RouteCondition method(String... methods) {
+    static RequestCondition method(String... methods) {
         Objects.requireNonNull(methods, "methods");
         if (methods.length == 0) {
             throw new IllegalArgumentException("A method is required");
@@ -202,7 +202,7 @@ public sealed interface RouteCondition {
      * @param host The matcher of the host, made to ignore case
      * @return The condition
      */
-    static RouteCondition host(ValueMatcher host) {
+    static RequestCondition host(ValueMatcher host) {
         return new Host(host);
     }
 
@@ -213,7 +213,7 @@ public sealed interface RouteCondition {
      * @param hosts The hosts, at least one, without a port
      * @return The condition
      */
-    static RouteCondition host(String... hosts) {
+    static RequestCondition host(String... hosts) {
         Objects.requireNonNull(hosts, "hosts");
         return new Host(hosts.length == 1 ? ValueMatcher.equalTo(hosts[0]) : ValueMatcher.oneOf(hosts));
     }
@@ -234,7 +234,7 @@ public sealed interface RouteCondition {
      * @return The condition
      * @throws IllegalArgumentException if a range is not a range of addresses
      */
-    static RouteCondition remoteAddress(String... cidrs) {
+    static RequestCondition remoteAddress(String... cidrs) {
         return new RemoteAddress(ranges(cidrs));
     }
 
@@ -252,7 +252,7 @@ public sealed interface RouteCondition {
      * @return The condition
      * @throws IllegalArgumentException if a range is not a range of addresses
      */
-    static RouteCondition peerAddress(String... cidrs) {
+    static RequestCondition peerAddress(String... cidrs) {
         return new PeerAddress(ranges(cidrs));
     }
 
@@ -271,7 +271,7 @@ public sealed interface RouteCondition {
      * @param instant The instant, excluded
      * @return The condition
      */
-    static RouteCondition before(Instant instant) {
+    static RequestCondition before(Instant instant) {
         return new TimeWindow(null, Objects.requireNonNull(instant, "instant"));
     }
 
@@ -281,7 +281,7 @@ public sealed interface RouteCondition {
      * @param instant The instant, included
      * @return The condition
      */
-    static RouteCondition after(Instant instant) {
+    static RequestCondition after(Instant instant) {
         return new TimeWindow(Objects.requireNonNull(instant, "instant"), null);
     }
 
@@ -293,7 +293,7 @@ public sealed interface RouteCondition {
      * @return The condition
      * @throws IllegalArgumentException if the end is before the start
      */
-    static RouteCondition between(Instant start, Instant end) {
+    static RequestCondition between(Instant start, Instant end) {
         return new TimeWindow(Objects.requireNonNull(start, "start"), Objects.requireNonNull(end, "end"));
     }
 
@@ -303,7 +303,7 @@ public sealed interface RouteCondition {
      * @param conditions The conditions
      * @return The condition, met by every request if there are none
      */
-    static RouteCondition all(RouteCondition... conditions) {
+    static RequestCondition all(RequestCondition... conditions) {
         return new AllOf(List.of(conditions));
     }
 
@@ -313,7 +313,7 @@ public sealed interface RouteCondition {
      * @param conditions The conditions
      * @return The condition, met by no request if there are none
      */
-    static RouteCondition any(RouteCondition... conditions) {
+    static RequestCondition any(RequestCondition... conditions) {
         return new AnyOf(List.of(conditions));
     }
 
@@ -323,7 +323,7 @@ public sealed interface RouteCondition {
      * @param condition The condition
      * @return The condition
      */
-    static RouteCondition not(RouteCondition condition) {
+    static RequestCondition not(RequestCondition condition) {
         return condition.negate();
     }
 
@@ -334,7 +334,7 @@ public sealed interface RouteCondition {
      * @param predicate The predicate, which must be fast, must not block and must not read the body
      * @return The condition
      */
-    static RouteCondition custom(Predicate<? super HttpRequest<?>> predicate) {
+    static RequestCondition custom(Predicate<? super HttpRequest<?>> predicate) {
         return new Custom(Objects.requireNonNull(predicate, "predicate"));
     }
 
@@ -419,7 +419,7 @@ public sealed interface RouteCondition {
      * @param other Another condition, see {@link #custom(Predicate)} for a lambda
      * @return A condition met when both are
      */
-    default RouteCondition and(RouteCondition other) {
+    default RequestCondition and(RequestCondition other) {
         return new AllOf(List.of(this, Objects.requireNonNull(other, "other")));
     }
 
@@ -427,14 +427,14 @@ public sealed interface RouteCondition {
      * @param other Another condition, see {@link #custom(Predicate)} for a lambda
      * @return A condition met when one of them is
      */
-    default RouteCondition or(RouteCondition other) {
+    default RequestCondition or(RequestCondition other) {
         return new AnyOf(List.of(this, Objects.requireNonNull(other, "other")));
     }
 
     /**
      * @return A condition met when this one is not
      */
-    default RouteCondition negate() {
+    default RequestCondition negate() {
         return this instanceof Not not ? not.condition() : new Not(this);
     }
 
@@ -450,13 +450,13 @@ public sealed interface RouteCondition {
      * @param condition   The part
      * @param combination The combination, for the message
      */
-    private static void requireNoBody(RouteCondition condition, String combination) {
+    private static void requireNoBody(RequestCondition condition, String combination) {
         if (condition instanceof Body<?>) {
             throw new IllegalArgumentException("A body condition is met by every request of its route: it can be a part of "
                 + "all(...) or and(...), not of " + combination + ": " + condition);
         }
         if (condition instanceof AllOf allOf) {
-            for (RouteCondition part : allOf.conditions()) {
+            for (RequestCondition part : allOf.conditions()) {
                 requireNoBody(part, combination);
             }
         }
@@ -475,7 +475,7 @@ public sealed interface RouteCondition {
      * @param name  The name of the header, case-insensitive
      * @param value The matcher of the value
      */
-    record Header(String name, ValueMatcher value) implements RouteCondition {
+    record Header(String name, ValueMatcher value) implements RequestCondition {
         public Header {
             requireNameAndValue(name, value);
         }
@@ -489,7 +489,7 @@ public sealed interface RouteCondition {
      * @param name  The name of the query parameter, case-sensitive
      * @param value The matcher of the value
      */
-    record Query(String name, ValueMatcher value) implements RouteCondition {
+    record Query(String name, ValueMatcher value) implements RequestCondition {
         public Query {
             requireNameAndValue(name, value);
         }
@@ -502,7 +502,7 @@ public sealed interface RouteCondition {
      * @param name  The name of the cookie, case-sensitive
      * @param value The matcher of the value, without the quotes of a quoted value
      */
-    record Cookie(String name, ValueMatcher value) implements RouteCondition {
+    record Cookie(String name, ValueMatcher value) implements RequestCondition {
         public Cookie {
             requireNameAndValue(name, value);
         }
@@ -513,7 +513,7 @@ public sealed interface RouteCondition {
      *
      * @param methods The names of the methods, copied; {@code CUSTOM} stands for every custom method
      */
-    record Method(Set<String> methods) implements RouteCondition {
+    record Method(Set<String> methods) implements RequestCondition {
         public Method {
             methods = Set.copyOf(methods);
         }
@@ -527,7 +527,7 @@ public sealed interface RouteCondition {
      *
      * @param host The matcher of the host, made to ignore case
      */
-    record Host(ValueMatcher host) implements RouteCondition {
+    record Host(ValueMatcher host) implements RequestCondition {
         public Host {
             host = Objects.requireNonNull(host, "host").ignoringCase();
         }
@@ -548,7 +548,7 @@ public sealed interface RouteCondition {
      *
      * @param ranges The ranges, copied, at least one
      */
-    record RemoteAddress(List<Cidr> ranges) implements RouteCondition {
+    record RemoteAddress(List<Cidr> ranges) implements RequestCondition {
         public RemoteAddress {
             ranges = List.copyOf(ranges);
             if (ranges.isEmpty()) {
@@ -565,7 +565,7 @@ public sealed interface RouteCondition {
      *
      * @param ranges The ranges, copied, at least one
      */
-    record PeerAddress(List<Cidr> ranges) implements RouteCondition {
+    record PeerAddress(List<Cidr> ranges) implements RequestCondition {
         public PeerAddress {
             ranges = List.copyOf(ranges);
             if (ranges.isEmpty()) {
@@ -581,7 +581,7 @@ public sealed interface RouteCondition {
      * @param after  The start, included, or {@code null} for none
      * @param before The end, excluded, or {@code null} for none
      */
-    record TimeWindow(@Nullable Instant after, @Nullable Instant before) implements RouteCondition {
+    record TimeWindow(@Nullable Instant after, @Nullable Instant before) implements RequestCondition {
         public TimeWindow {
             if (after == null && before == null) {
                 throw new IllegalArgumentException("A start or an end is required");
@@ -597,7 +597,7 @@ public sealed interface RouteCondition {
      *
      * @param conditions The conditions, copied
      */
-    record AllOf(List<RouteCondition> conditions) implements RouteCondition {
+    record AllOf(List<RequestCondition> conditions) implements RequestCondition {
         public AllOf {
             conditions = List.copyOf(conditions);
         }
@@ -608,10 +608,10 @@ public sealed interface RouteCondition {
      *
      * @param conditions The conditions, copied
      */
-    record AnyOf(List<RouteCondition> conditions) implements RouteCondition {
+    record AnyOf(List<RequestCondition> conditions) implements RequestCondition {
         public AnyOf {
             conditions = List.copyOf(conditions);
-            for (RouteCondition condition : conditions) {
+            for (RequestCondition condition : conditions) {
                 requireNoBody(condition, "any(...) or or(...)");
             }
         }
@@ -622,7 +622,7 @@ public sealed interface RouteCondition {
      *
      * @param condition The negated condition
      */
-    record Not(RouteCondition condition) implements RouteCondition {
+    record Not(RequestCondition condition) implements RequestCondition {
         public Not {
             Objects.requireNonNull(condition, "condition");
             requireNoBody(condition, "not(...) or negate()");
@@ -635,7 +635,7 @@ public sealed interface RouteCondition {
      *
      * @param predicate The predicate
      */
-    record Custom(Predicate<? super HttpRequest<?>> predicate) implements RouteCondition {
+    record Custom(Predicate<? super HttpRequest<?>> predicate) implements RequestCondition {
         public Custom {
             Objects.requireNonNull(predicate, "predicate");
         }
@@ -664,7 +664,7 @@ public sealed interface RouteCondition {
      * @param maxBytes  The limit of the body, or {@link #SERVER_LIMIT} for the limit of the server
      * @param <T>       The type
      */
-    record Body<T>(Argument<T> type, Function<? super T, ? extends CompletionStage<Boolean>> condition, int maxBytes) implements RouteCondition {
+    record Body<T>(Argument<T> type, Function<? super T, ? extends CompletionStage<Boolean>> condition, int maxBytes) implements RequestCondition {
 
         /**
          * The limit of the server for buffered request content, {@code micronaut.server.max-request-buffer-size}.

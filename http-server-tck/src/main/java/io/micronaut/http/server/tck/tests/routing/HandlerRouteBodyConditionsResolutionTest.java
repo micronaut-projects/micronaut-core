@@ -50,8 +50,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static io.micronaut.web.router.builder.RouteCondition.bodyAsync;
-import static io.micronaut.web.router.builder.RouteCondition.bodyText;
+import static io.micronaut.web.router.builder.RequestCondition.bodyAsync;
+import static io.micronaut.web.router.builder.RequestCondition.bodyText;
 
 /**
  * How the route chosen by the body of a request is resolved: a route locator chosen by the

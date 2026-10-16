@@ -38,7 +38,7 @@ import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteResolution;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,7 +57,7 @@ import java.util.function.Supplier;
 
 /**
  * The asynchronous step of the request lifecycle that chooses a route by the body of the request,
- * see {@link RouteCondition.Body}: it reads the body once, without blocking, up to the largest
+ * see {@link RequestCondition.Body}: it reads the body once, without blocking, up to the largest
  * limit of the body conditions of the routes the request matched, evaluates the conditions rank
  * by rank, see {@link PendingRouteMatch}, and chooses the route.
  *
@@ -104,7 +104,7 @@ final class BodyRouteSelector {
 
     /**
      * Check that no body condition of a route has a limit, see
-     * {@link RouteCondition.Body#maxBytes(int)}, above the number of bytes of a request the
+     * {@link RequestCondition.Body#maxBytes(int)}, above the number of bytes of a request the
      * server may buffer: a limit lowers the limit of the server, and cannot raise it.
      *
      * @param router               The router
@@ -116,9 +116,9 @@ final class BodyRouteSelector {
             // an implicit HEAD route has the conditions of its GET route, which names them
             .filter(route -> !route.isImplicitHead())
             .forEach(route -> {
-                for (RouteCondition.Body<?> condition : route.getBodyConditions()) {
+                for (RequestCondition.Body<?> condition : route.getBodyConditions()) {
                     int maxBytes = condition.maxBytes();
-                    if (maxBytes != RouteCondition.Body.SERVER_LIMIT && maxBytes > maxRequestBufferSize) {
+                    if (maxBytes != RequestCondition.Body.SERVER_LIMIT && maxBytes > maxRequestBufferSize) {
                         throw new ConfigurationException("A body condition of the route " + route + " reads up to "
                             + maxBytes + " bytes, maxBytes(" + maxBytes + "), more than the " + maxRequestBufferSize
                             + " bytes of micronaut.server.max-request-buffer-size that the server may buffer: lower the maxBytes of the condition, "
@@ -239,7 +239,7 @@ final class BodyRouteSelector {
     /**
      * Whether the body meets the conditions of a route, from one on: all of them, in order.
      */
-    private ExecutionFlow<Boolean> meets(Selection<?, ?> selection, List<RouteCondition.Body<?>> conditions, int from) {
+    private ExecutionFlow<Boolean> meets(Selection<?, ?> selection, List<RequestCondition.Body<?>> conditions, int from) {
         for (int i = from; i < conditions.size(); i++) {
             ExecutionFlow<Boolean> flow = meets(selection, conditions.get(i));
             Boolean meets = flow.tryCompleteValue();
@@ -254,7 +254,7 @@ final class BodyRouteSelector {
         return ExecutionFlow.just(true);
     }
 
-    private <V> ExecutionFlow<Boolean> meets(Selection<?, ?> selection, RouteCondition.Body<V> condition) {
+    private <V> ExecutionFlow<Boolean> meets(Selection<?, ?> selection, RequestCondition.Body<V> condition) {
         RequestBody body = selection.body;
         if (body.length() > condition.effectiveMaxBytes(selection.serverLimit)) {
             return ExecutionFlow.just(false);

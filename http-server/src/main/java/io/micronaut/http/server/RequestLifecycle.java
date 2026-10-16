@@ -606,7 +606,7 @@ public class RequestLifecycle {
      * like a failure of the route.
      *
      * <p>When the route depends on the body of the request, see
-     * {@link io.micronaut.web.router.builder.RouteCondition.Body}, no match is returned, and the
+     * {@link io.micronaut.web.router.builder.RequestCondition.Body}, no match is returned, and the
      * route is chosen once the body is read.</p>
      *
      * @param request The request, after the pre-matching filters
@@ -843,7 +843,7 @@ public class RequestLifecycle {
 
     /**
      * Run an action when the client abandons the request, e.g. closes the connection, while its
-     * route is chosen by its body, see {@link io.micronaut.web.router.builder.RouteCondition.Body}:
+     * route is chosen by its body, see {@link io.micronaut.web.router.builder.RequestCondition.Body}:
      * the request stops waiting for an asynchronous body condition then.
      *
      * @param request The request

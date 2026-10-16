@@ -27,7 +27,7 @@ import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.LocatedHttpRouteBuilder;
 import io.micronaut.web.router.builder.LocatedRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
@@ -69,7 +69,7 @@ class HandlerRouteBodyConditionsVersioningTest {
 
                 @Override
                 public void routes(LocatedHttpRouteBuilder<String> located) {
-                    located.POST("/items/special").where(RouteCondition.bodyText("express"::equals)).consumesAll()
+                    located.POST("/items/special").where(RequestCondition.bodyText("express"::equals)).consumesAll()
                         .handle((request, pathVariables, target) -> HttpResponse.ok("special").contentType(MediaType.TEXT_PLAIN_TYPE));
                     located.POST("/items/{name}").consumesAll()
                         .handle((request, pathVariables, target) -> HttpResponse.ok("by name").contentType(MediaType.TEXT_PLAIN_TYPE));

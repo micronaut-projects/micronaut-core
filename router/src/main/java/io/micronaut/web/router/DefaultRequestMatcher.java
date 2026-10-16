@@ -22,8 +22,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.web.router.builder.RouteCondition;
-import io.micronaut.web.router.builder.RouteConditions;
+import io.micronaut.web.router.builder.RequestCondition;
+import io.micronaut.web.router.builder.RequestConditions;
 
 import java.util.List;
 import java.util.function.Predicate;
@@ -44,7 +44,7 @@ public sealed class DefaultRequestMatcher<T, R> extends DefaultMethodBasedRouteI
     /**
      * The body conditions among the declarative conditions of the route, empty for most routes.
      */
-    private final List<RouteCondition.Body<?>> bodyConditions;
+    private final List<RequestCondition.Body<?>> bodyConditions;
 
     public DefaultRequestMatcher(MethodExecutionHandle<T, R> targetMethod,
                                  @Nullable Argument<?> bodyArgument,
@@ -77,19 +77,19 @@ public sealed class DefaultRequestMatcher<T, R> extends DefaultMethodBasedRouteI
      * @return The declarative conditions of the route, normalized, in the order they are evaluated
      * @see UriRouteInfo#getConditions()
      */
-    public List<RouteCondition> getConditions() {
+    public List<RequestCondition> getConditions() {
         for (Predicate<HttpRequest<?>> predicate : predicates) {
-            if (predicate instanceof RouteConditions.RoutePredicate routePredicate) {
-                return RouteConditions.conjuncts(routePredicate.condition());
+            if (predicate instanceof RequestConditions.RoutePredicate routePredicate) {
+                return RequestConditions.conjuncts(routePredicate.condition());
             }
         }
         return List.of();
     }
 
-    private static List<RouteCondition.Body<?>> bodyConditions(List<Predicate<HttpRequest<?>>> predicates) {
+    private static List<RequestCondition.Body<?>> bodyConditions(List<Predicate<HttpRequest<?>>> predicates) {
         for (Predicate<HttpRequest<?>> predicate : predicates) {
-            if (predicate instanceof RouteConditions.RoutePredicate routePredicate) {
-                return RouteConditions.bodyConditions(routePredicate.condition());
+            if (predicate instanceof RequestConditions.RoutePredicate routePredicate) {
+                return RequestConditions.bodyConditions(routePredicate.condition());
             }
         }
         return List.of();
@@ -98,7 +98,7 @@ public sealed class DefaultRequestMatcher<T, R> extends DefaultMethodBasedRouteI
     /**
      * @return The body conditions of the route, see {@link UriRouteInfo#getBodyConditions()}
      */
-    public List<RouteCondition.Body<?>> getBodyConditions() {
+    public List<RequestCondition.Body<?>> getBodyConditions() {
         return bodyConditions;
     }
 }

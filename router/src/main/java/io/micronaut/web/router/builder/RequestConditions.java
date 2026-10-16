@@ -20,17 +20,17 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.RouteConditionContext;
-import io.micronaut.web.router.builder.RouteCondition.AllOf;
-import io.micronaut.web.router.builder.RouteCondition.AnyOf;
-import io.micronaut.web.router.builder.RouteCondition.Custom;
-import io.micronaut.web.router.builder.RouteCondition.Header;
-import io.micronaut.web.router.builder.RouteCondition.Host;
-import io.micronaut.web.router.builder.RouteCondition.Method;
-import io.micronaut.web.router.builder.RouteCondition.Not;
-import io.micronaut.web.router.builder.RouteCondition.Query;
-import io.micronaut.web.router.builder.RouteCondition.PeerAddress;
-import io.micronaut.web.router.builder.RouteCondition.RemoteAddress;
-import io.micronaut.web.router.builder.RouteCondition.TimeWindow;
+import io.micronaut.web.router.builder.RequestCondition.AllOf;
+import io.micronaut.web.router.builder.RequestCondition.AnyOf;
+import io.micronaut.web.router.builder.RequestCondition.Custom;
+import io.micronaut.web.router.builder.RequestCondition.Header;
+import io.micronaut.web.router.builder.RequestCondition.Host;
+import io.micronaut.web.router.builder.RequestCondition.Method;
+import io.micronaut.web.router.builder.RequestCondition.Not;
+import io.micronaut.web.router.builder.RequestCondition.Query;
+import io.micronaut.web.router.builder.RequestCondition.PeerAddress;
+import io.micronaut.web.router.builder.RequestCondition.RemoteAddress;
+import io.micronaut.web.router.builder.RequestCondition.TimeWindow;
 import org.jspecify.annotations.Nullable;
 
 import java.net.InetSocketAddress;
@@ -43,7 +43,7 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
- * Normalizes and evaluates {@link RouteCondition route conditions} and {@link ValueMatcher value
+ * Normalizes and evaluates {@link RequestCondition route conditions} and {@link ValueMatcher value
  * matchers}.
  *
  * <p>A condition is normalized when its route is built: nested {@link AllOf} and {@link AnyOf}
@@ -59,16 +59,16 @@ import java.util.function.Predicate;
  * @since 5.3.0
  */
 @Internal
-public final class RouteConditions {
+public final class RequestConditions {
 
     /**
      * The condition every request meets.
      */
-    public static final RouteCondition ALWAYS = new AllOf(List.of());
+    public static final RequestCondition ALWAYS = new AllOf(List.of());
     /**
      * The condition no request meets.
      */
-    public static final RouteCondition NEVER = new AnyOf(List.of());
+    public static final RequestCondition NEVER = new AnyOf(List.of());
 
     private static final int COST_METHOD = 0;
     private static final int COST_LOOKUP = 1;
@@ -79,20 +79,20 @@ public final class RouteConditions {
     // evaluated by the server once it read the body, after the conditions of every route
     private static final int COST_BODY = 5;
 
-    private static final Comparator<RouteCondition> BY_COST = Comparator.comparingInt(RouteConditions::cost);
-    private static final Comparator<ValueMatcher> MATCHERS_BY_COST = Comparator.comparingInt(RouteConditions::cost);
+    private static final Comparator<RequestCondition> BY_COST = Comparator.comparingInt(RequestConditions::cost);
+    private static final Comparator<ValueMatcher> MATCHERS_BY_COST = Comparator.comparingInt(RequestConditions::cost);
 
-    private RouteConditions() {
+    private RequestConditions() {
     }
 
     /**
      * The conditions of a route: the conditions every request of the route must meet, flattened
-     * and ordered, see {@link #normalize(RouteCondition)}.
+     * and ordered, see {@link #normalize(RequestCondition)}.
      *
      * @param conditions The conditions, of the groups, outer group first, then of the route
      * @return The normalized condition, {@link #ALWAYS} if there is none
      */
-    public static RouteCondition normalizeAll(List<RouteCondition> conditions) {
+    public static RequestCondition normalizeAll(List<RequestCondition> conditions) {
         if (conditions.isEmpty()) {
             return ALWAYS;
         }
@@ -103,7 +103,7 @@ public final class RouteConditions {
      * @param condition A condition
      * @return The parts of the condition that must all be met, in the order they are evaluated
      */
-    public static List<RouteCondition> conjuncts(RouteCondition condition) {
+    public static List<RequestCondition> conjuncts(RequestCondition condition) {
         return condition instanceof AllOf allOf ? allOf.conditions() : List.of(condition);
     }
 
@@ -112,10 +112,10 @@ public final class RouteConditions {
      * @return The body conditions among the parts of the condition that must all be met, in
      * the order they are evaluated, empty if it has none
      */
-    public static List<RouteCondition.Body<?>> bodyConditions(RouteCondition condition) {
-        List<RouteCondition.Body<?>> bodyConditions = null;
-        for (RouteCondition part : conjuncts(condition)) {
-            if (part instanceof RouteCondition.Body<?> body) {
+    public static List<RequestCondition.Body<?>> bodyConditions(RequestCondition condition) {
+        List<RequestCondition.Body<?>> bodyConditions = null;
+        for (RequestCondition part : conjuncts(condition)) {
+            if (part instanceof RequestCondition.Body<?> body) {
                 if (bodyConditions == null) {
                     bodyConditions = new ArrayList<>(2);
                 }
@@ -132,12 +132,12 @@ public final class RouteConditions {
      * @param condition The condition
      * @return The normalized condition
      */
-    public static RouteCondition normalize(RouteCondition condition) {
+    public static RequestCondition normalize(RequestCondition condition) {
         return switch (condition) {
             case AllOf allOf -> normalizeAll(allOf);
             case AnyOf anyOf -> normalizeAny(anyOf);
             case Not not -> {
-                RouteCondition inner = normalize(not.condition());
+                RequestCondition inner = normalize(not.condition());
                 if (inner instanceof Not doubled) {
                     yield doubled.condition();
                 }
@@ -151,21 +151,21 @@ public final class RouteConditions {
             }
             case Header header -> new Header(header.name(), normalize(header.value()));
             case Query query -> new Query(query.name(), normalize(query.value()));
-            case RouteCondition.Cookie cookie -> new RouteCondition.Cookie(cookie.name(), normalize(cookie.value()));
+            case RequestCondition.Cookie cookie -> new RequestCondition.Cookie(cookie.name(), normalize(cookie.value()));
             case Host host -> new Host(normalize(host.host()));
             case Method method -> method;
             case RemoteAddress remoteAddress -> remoteAddress;
             case PeerAddress peerAddress -> peerAddress;
             case TimeWindow timeWindow -> timeWindow;
             case Custom custom -> custom;
-            case RouteCondition.Body<?> body -> body;
+            case RequestCondition.Body<?> body -> body;
         };
     }
 
-    private static RouteCondition normalizeAll(AllOf allOf) {
-        LinkedHashSet<RouteCondition> parts = new LinkedHashSet<>();
-        for (RouteCondition part : allOf.conditions()) {
-            RouteCondition normalized = normalize(part);
+    private static RequestCondition normalizeAll(AllOf allOf) {
+        LinkedHashSet<RequestCondition> parts = new LinkedHashSet<>();
+        for (RequestCondition part : allOf.conditions()) {
+            RequestCondition normalized = normalize(part);
             if (normalized.equals(NEVER)) {
                 return NEVER;
             }
@@ -179,10 +179,10 @@ public final class RouteConditions {
         return combination(parts, true);
     }
 
-    private static RouteCondition normalizeAny(AnyOf anyOf) {
-        LinkedHashSet<RouteCondition> parts = new LinkedHashSet<>();
-        for (RouteCondition part : anyOf.conditions()) {
-            RouteCondition normalized = normalize(part);
+    private static RequestCondition normalizeAny(AnyOf anyOf) {
+        LinkedHashSet<RequestCondition> parts = new LinkedHashSet<>();
+        for (RequestCondition part : anyOf.conditions()) {
+            RequestCondition normalized = normalize(part);
             if (normalized.equals(ALWAYS)) {
                 return ALWAYS;
             }
@@ -196,11 +196,11 @@ public final class RouteConditions {
         return combination(parts, false);
     }
 
-    private static RouteCondition combination(LinkedHashSet<RouteCondition> parts, boolean all) {
+    private static RequestCondition combination(LinkedHashSet<RequestCondition> parts, boolean all) {
         if (parts.size() == 1) {
             return parts.iterator().next();
         }
-        List<RouteCondition> ordered = new ArrayList<>(parts);
+        List<RequestCondition> ordered = new ArrayList<>(parts);
         // a stable sort: the parts of the same cost keep the order they were declared in
         ordered.sort(BY_COST);
         return all ? new AllOf(ordered) : new AnyOf(ordered);
@@ -257,13 +257,13 @@ public final class RouteConditions {
      * @param condition A condition
      * @return Its cost: a cheaper condition is evaluated first
      */
-    static int cost(RouteCondition condition) {
+    static int cost(RequestCondition condition) {
         return switch (condition) {
             case Method _ -> COST_METHOD;
             case TimeWindow _ -> COST_LOOKUP;
             case Header header -> cost(header.value());
             case Query query -> cost(query.value());
-            case RouteCondition.Cookie cookie -> cost(cookie.value());
+            case RequestCondition.Cookie cookie -> cost(cookie.value());
             case Host host -> Math.max(COST_RESOLVED, cost(host.host()));
             case RemoteAddress _ -> COST_RESOLVED;
             case PeerAddress _ -> COST_RESOLVED;
@@ -271,13 +271,13 @@ public final class RouteConditions {
             case AllOf allOf -> maxCost(allOf.conditions());
             case AnyOf anyOf -> maxCost(anyOf.conditions());
             case Custom _ -> COST_CUSTOM;
-            case RouteCondition.Body<?> _ -> COST_BODY;
+            case RequestCondition.Body<?> _ -> COST_BODY;
         };
     }
 
-    private static int maxCost(List<RouteCondition> conditions) {
+    private static int maxCost(List<RequestCondition> conditions) {
         int max = COST_METHOD;
-        for (RouteCondition condition : conditions) {
+        for (RequestCondition condition : conditions) {
             max = Math.max(max, cost(condition));
         }
         return max;
@@ -318,32 +318,32 @@ public final class RouteConditions {
      * @param context   The context
      * @return The predicate
      */
-    public static RoutePredicate predicate(RouteCondition condition, RouteConditionContext context) {
+    public static RoutePredicate predicate(RequestCondition condition, RouteConditionContext context) {
         return new RoutePredicate(condition, context);
     }
 
     /**
      * Whether a request meets a condition.
-     * A {@link RouteCondition.Body body condition} is met: the server evaluates it once it
-     * read the body, see {@link #bodyConditions(RouteCondition)}.
+     * A {@link RequestCondition.Body body condition} is met: the server evaluates it once it
+     * read the body, see {@link #bodyConditions(RequestCondition)}.
      *
      * @param condition The condition
      * @param request   The request
      * @param context   What the server resolves for the request
      * @return Whether it meets the condition
      */
-    public static boolean matches(RouteCondition condition, HttpRequest<?> request, RouteConditionContext context) {
+    public static boolean matches(RequestCondition condition, HttpRequest<?> request, RouteConditionContext context) {
         return switch (condition) {
             case Method method -> method(method, request);
             case Header header -> anyValue(header.value(), request.getHeaders().getAll(header.name()));
             case Query query -> anyValue(query.value(), request.getParameters().getAll(query.name()));
-            case RouteCondition.Cookie cookie -> cookie(cookie, request);
+            case RequestCondition.Cookie cookie -> cookie(cookie, request);
             case Host host -> host(host.host(), context.host(request));
             case RemoteAddress remoteAddress -> inRanges(remoteAddress.ranges(), Cidr.address(context.clientAddress(request)));
             case PeerAddress peerAddress -> peerAddress(peerAddress, request);
             case TimeWindow timeWindow -> timeWindow(timeWindow, context.clock().instant());
             case AllOf allOf -> {
-                for (RouteCondition part : allOf.conditions()) {
+                for (RequestCondition part : allOf.conditions()) {
                     if (!matches(part, request, context)) {
                         yield false;
                     }
@@ -351,7 +351,7 @@ public final class RouteConditions {
                 yield true;
             }
             case AnyOf anyOf -> {
-                for (RouteCondition part : anyOf.conditions()) {
+                for (RequestCondition part : anyOf.conditions()) {
                     if (matches(part, request, context)) {
                         yield true;
                     }
@@ -361,7 +361,7 @@ public final class RouteConditions {
             case Not not -> !matches(not.condition(), request, context);
             case Custom custom -> custom.predicate().test(request);
             // met by the body, which the server reads for the routes left after the other conditions
-            case RouteCondition.Body<?> _ -> true;
+            case RequestCondition.Body<?> _ -> true;
         };
     }
 
@@ -387,7 +387,7 @@ public final class RouteConditions {
      * decoded. A request without a {@code Cookie} header, e.g. one built in code, is read from
      * its cookies.
      */
-    private static boolean cookie(RouteCondition.Cookie cookie, HttpRequest<?> request) {
+    private static boolean cookie(RequestCondition.Cookie cookie, HttpRequest<?> request) {
         List<String> headers = request.getHeaders().getAll(HttpHeaders.COOKIE);
         String name = cookie.name();
         ValueMatcher matcher = cookie.value();
@@ -640,7 +640,7 @@ public final class RouteConditions {
      * @param condition The normalized condition
      * @param context   The context
      */
-    public record RoutePredicate(RouteCondition condition, RouteConditionContext context) implements Predicate<HttpRequest<?>> {
+    public record RoutePredicate(RequestCondition condition, RouteConditionContext context) implements Predicate<HttpRequest<?>> {
         @Override
         public boolean test(HttpRequest<?> request) {
             return matches(condition, request, context);

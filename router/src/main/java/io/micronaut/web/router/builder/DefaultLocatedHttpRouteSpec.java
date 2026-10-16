@@ -93,7 +93,7 @@ final class DefaultLocatedHttpRouteSpec<T> implements LocatedHttpRouteSpec<T> {
     }
 
     @Override
-    public LocatedHttpRouteSpec<T> where(RouteCondition condition) {
+    public LocatedHttpRouteSpec<T> where(RequestCondition condition) {
         route.where(condition);
         return this;
     }

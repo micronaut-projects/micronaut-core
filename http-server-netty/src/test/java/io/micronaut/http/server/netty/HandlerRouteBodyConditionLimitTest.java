@@ -21,7 +21,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
@@ -78,9 +78,9 @@ class HandlerRouteBodyConditionLimitTest {
         public void routes(HttpRouteBuilder routes) {
             routes.path("/limits", limits -> {
                 // the default limit is the limit of the server
-                limits.where(RouteCondition.bodyText(text -> true));
+                limits.where(RequestCondition.bodyText(text -> true));
                 limits.POST("/imports")
-                    .where(RouteCondition.bodyBytes(bytes -> true).maxBytes(4096))
+                    .where(RequestCondition.bodyBytes(bytes -> true).maxBytes(4096))
                     .handle((request, pathVariables) -> HttpResponse.ok());
             });
         }

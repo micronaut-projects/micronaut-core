@@ -23,7 +23,7 @@ import java.util.List;
 
 /**
  * Where a request goes when the body conditions of its best routes fail, see
- * {@link io.micronaut.web.router.builder.RouteCondition.Body}:
+ * {@link io.micronaut.web.router.builder.RequestCondition.Body}:
  * it ranks the routes a request matched without its body into the {@link PendingRouteMatch#getRanks()
  * ranks} the server tries in order. The server takes the first rank with a route the body
  * matches, and two routes of that rank the body both matches make the request ambiguous.

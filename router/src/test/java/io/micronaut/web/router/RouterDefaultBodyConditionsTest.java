@@ -25,7 +25,7 @@ import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.LocatedRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -51,7 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class RouterDefaultBodyConditionsTest {
 
-    private static final RouteCondition.Body<String> VIP = RouteCondition.bodyText(text -> text.startsWith("vip"));
+    private static final RequestCondition.Body<String> VIP = RequestCondition.bodyText(text -> text.startsWith("vip"));
 
     @Test
     void aRouterWithoutBodyConditionsFindsTheClosestRoute() {

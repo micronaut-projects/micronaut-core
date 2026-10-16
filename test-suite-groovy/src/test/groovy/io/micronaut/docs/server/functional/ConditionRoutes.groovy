@@ -10,7 +10,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.web.router.RouteAttributes
 import io.micronaut.web.router.builder.HttpRouteBuilder
 import io.micronaut.web.router.builder.HttpRoutes
-import io.micronaut.web.router.builder.RouteCondition
+import io.micronaut.web.router.builder.RequestCondition
 import io.micronaut.web.router.builder.ValueMatcher
 import jakarta.inject.Singleton
 
@@ -36,9 +36,9 @@ class ConditionRoutes implements HttpRoutes {
     void routes(HttpRouteBuilder routes) {
         // tag::where[]
         routes.GET("/search")
-            .where(RouteCondition.any( // <1>
-                RouteCondition.header("X-Beta"),
-                RouteCondition.query("beta", "true")))
+            .where(RequestCondition.any( // <1>
+                RequestCondition.header("X-Beta"),
+                RequestCondition.query("beta", "true")))
             .order(-1) // <2>
             .handle { request, pathVariables -> text("beta search") }
         routes.GET("/search") { request, pathVariables -> text("search") } // <3>
@@ -56,27 +56,27 @@ class ConditionRoutes implements HttpRoutes {
         // end::constrain[]
         // tag::matchers[]
         routes.GET("/downloads/{file}")
-            .where(RouteCondition.header("X-Channel", ValueMatcher.oneOf("beta", "canary").ignoringCase()) // <1>
-                .or(RouteCondition.cookie("channel", ValueMatcher.equalTo("beta"))))
-            .where(RouteCondition.peerAddress("127.0.0.0/8", "::1")) // <2>
-            .where(RouteCondition.after(Instant.parse("2026-01-01T00:00:00Z"))) // <3>
+            .where(RequestCondition.header("X-Channel", ValueMatcher.oneOf("beta", "canary").ignoringCase()) // <1>
+                .or(RequestCondition.cookie("channel", ValueMatcher.equalTo("beta"))))
+            .where(RequestCondition.peerAddress("127.0.0.0/8", "::1")) // <2>
+            .where(RequestCondition.after(Instant.parse("2026-01-01T00:00:00Z"))) // <3>
             .constrain("file", ValueMatcher.endsWith(".zip")) // <4>
             .handle { request, pathVariables -> text("download " + pathVariables.getString("file")) }
         // end::matchers[]
 
         // tag::body[]
         routes.POST("/orders")
-            .where(RouteCondition.body(ORDER) { Map<String, Object> order -> order.kind == "express" }) // <1>
+            .where(RequestCondition.body(ORDER) { Map<String, Object> order -> order.kind == "express" }) // <1>
             .order(-1) // <2>
             .body(ORDER)
             .handle { request, pathVariables, Map<String, Object> order -> text("express order " + order.id) }
         routes.POST("/orders").body(ORDER).handle { request, pathVariables, Map<String, Object> order -> text("order " + order.id) } // <3>
         routes.POST("/imports")
-            .where(RouteCondition.bodyText { String text -> text.startsWith("id,") }.maxBytes(1024)) // <4>
+            .where(RequestCondition.bodyText { String text -> text.startsWith("id,") }.maxBytes(1024)) // <4>
             .consumesAll()
             .handle { request, pathVariables -> text("csv import") }
         routes.POST("/payments")
-            .where(RouteCondition.bodyAsync(ORDER) { Map<String, Object> order -> isKnownCustomer(order.customer) }) // <5>
+            .where(RequestCondition.bodyAsync(ORDER) { Map<String, Object> order -> isKnownCustomer(order.customer) }) // <5>
             .body(ORDER)
             .handle { request, pathVariables, Map<String, Object> order -> text("payment of " + order.customer) }
         // end::body[]

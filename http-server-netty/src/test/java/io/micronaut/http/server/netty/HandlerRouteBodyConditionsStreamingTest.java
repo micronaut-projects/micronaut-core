@@ -22,7 +22,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -221,7 +221,7 @@ class HandlerRouteBodyConditionsStreamingTest {
                 FILTERED.incrementAndGet();
             });
             routes.POST("/bcs/items")
-                .where(RouteCondition.bodyText(text -> {
+                .where(RequestCondition.bodyText(text -> {
                     EVALUATED.incrementAndGet();
                     return text.startsWith("match");
                 }).maxBytes(64))
@@ -234,14 +234,14 @@ class HandlerRouteBodyConditionsStreamingTest {
                 .body(String.class)
                 .handle((request, pathVariables, body) -> text("fallback " + body.length()));
             routes.POST("/bcs/only")
-                .where(RouteCondition.bodyText(text -> {
+                .where(RequestCondition.bodyText(text -> {
                     EVALUATED.incrementAndGet();
                     return true;
                 }).maxBytes(64))
                 .consumes(MediaType.TEXT_PLAIN_TYPE)
                 .handle((request, pathVariables) -> text("only"));
             routes.POST("/bcs/held")
-                .where(RouteCondition.bodyAsync(String.class, text -> {
+                .where(RequestCondition.bodyAsync(String.class, text -> {
                     HOLDING.countDown();
                     return HELD;
                 }))
@@ -251,7 +251,7 @@ class HandlerRouteBodyConditionsStreamingTest {
                     return text("held");
                 });
             routes.path("/bcs/large", large -> {
-                large.where(RouteCondition.bodyBytes(bytes -> EVALUATED.incrementAndGet() > 0).maxBytes(1024 * 1024));
+                large.where(RequestCondition.bodyBytes(bytes -> EVALUATED.incrementAndGet() > 0).maxBytes(1024 * 1024));
                 large.POST("/")
                     .consumes(MediaType.TEXT_PLAIN_TYPE)
                     .handle((request, pathVariables) -> text("large"));
