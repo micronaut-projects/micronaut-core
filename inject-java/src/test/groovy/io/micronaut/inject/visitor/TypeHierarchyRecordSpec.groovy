@@ -6,6 +6,7 @@ import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.core.type.TypeHierarchies
 import io.micronaut.core.type.TypeHierarchy
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.test.hierarchy.TypeHierarchyFuzz
 
 
 import static io.micronaut.inject.test.hierarchy.TypeStrings.string
@@ -409,6 +410,96 @@ public class Holder {
 
         expect:
         strings(record(classLoader, 'p.Outer$Nested', 'q').superTypes) == ['Supplier<U>', 'Object']
+    }
+
+    void "declarations naming package-private classes agree with reflection from the package of the type and from another (#typeName from #origin)"() {
+        given:
+        def classLoader = buildClassLoader(new JavaFiles()
+            .add('p.Base', '''
+package p;
+
+class Base {
+}
+''')
+            .add('p.Hidden', '''
+package p;
+
+class Hidden {
+}
+''')
+            .add('p.HiddenOuter', '''
+package p;
+
+class HiddenOuter {
+    public static class Nested {
+    }
+}
+''')
+            .add('p.Parent', '''
+package p;
+
+public class Parent<X> implements java.util.function.Consumer<X> {
+    public void accept(X x) { }
+}
+''')
+            .add('p.Cases', '''
+package p;
+
+import java.util.*;
+import java.util.function.*;
+
+public class Cases {
+    public static class Repeated extends Base implements Supplier<Map<List<String>, List<Hidden>>> {
+        public Map<List<String>, List<Hidden>> get() { return null; }
+    }
+    public static class HiddenArgument extends ArrayList<Hidden> {
+    }
+    public static class HiddenArray<T> extends Parent<Hidden[]> implements Supplier<T> {
+        public T get() { return null; }
+    }
+    public static class HiddenWildcard<T> implements Supplier<List<? extends Hidden>>, Comparable<T> {
+        public List<? extends Hidden> get() { return null; }
+        public int compareTo(T other) { return 0; }
+    }
+    public static class HiddenEnclosing implements Supplier<HiddenOuter.Nested> {
+        public HiddenOuter.Nested get() { return null; }
+    }
+}
+''')
+            .add('p.Local', '''
+package p;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = {Cases.Repeated.class, Cases.HiddenArgument.class, Cases.HiddenArray.class, Cases.HiddenWildcard.class, Cases.HiddenEnclosing.class})
+public class Local {
+}
+''')
+            .add('q.Foreign', '''
+package q;
+
+import p.Cases;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = {Cases.Repeated.class, Cases.HiddenArgument.class, Cases.HiddenArray.class, Cases.HiddenWildcard.class, Cases.HiddenEnclosing.class})
+public class Foreign {
+}
+'''))
+        def type = classLoader.loadClass(typeName)
+        def hierarchy = record(classLoader, typeName, origin)
+        Set<String> omitted = new LinkedHashSet<>()
+        def reflected = TypeHierarchyFuzz.Oracle.closure(type, TypeHierarchyFuzz.Oracle.identity(type), false, { false }, TypeHierarchyFuzz.Oracle.recordPackage(hierarchy.class), omitted)
+
+        expect:
+        TypeHierarchyFuzz.Oracle.recordPackage(hierarchy.class) == origin
+        strings(hierarchy.getTypeClosure(hierarchy.declaration)) - [sequenced(hierarchy)] == reflected - [sequenced(hierarchy)]
+        hierarchy.inaccessibleSuperTypes == omitted as List
+        (origin == 'p') == omitted.empty
+
+        where:
+        [typeName, origin] << [['p.Cases$Repeated', 'p.Cases$HiddenArgument', 'p.Cases$HiddenArray', 'p.Cases$HiddenWildcard', 'p.Cases$HiddenEnclosing'], ['p', 'q']].combinations()
+    }
+
+    private static String sequenced(TypeHierarchy hierarchy) {
+        // the interface List adds in later JDKs, which reflection and the record agree on but a JDK can lack
+        'SequencedCollection' + (hierarchy.type.simpleName == 'HiddenArgument' ? '<Hidden>' : '')
     }
 
     void "a generic type met twice is checked with the arguments of each use"() {
