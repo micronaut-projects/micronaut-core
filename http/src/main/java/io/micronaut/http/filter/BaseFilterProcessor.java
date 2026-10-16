@@ -93,25 +93,19 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements BeanD
                     return Optional.of((AsyncBodyBinder<T>) (context, source) -> {
                         ServerHttpRequest<?> fullHttpRequest = serverRequestWithBytes(source);
                         if (fullHttpRequest != null) {
-                            return InternalByteBody.bufferFlow(fullHttpRequest.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)).map(imm -> {
-                                Argument<T> t = context.getArgument();
-                                if (t.isAssignableFrom(ByteBuffer.class)) {
-                                    return () -> Optional.of((T) imm.toByteBuffer());
-                                } else if (t.isAssignableFrom(byte[].class)) {
-                                    byte[] bytes = imm.toByteArray();
-                                    return () -> Optional.of((T) bytes);
-                                } else if (t.isAssignableFrom(String.class)) {
-                                    String str = imm.toString(StandardCharsets.UTF_8);
-                                    return () -> Optional.of((T) str);
-                                } else {
-                                    imm.close();
-                                    return ArgumentBinder.BindingResult.unsatisfied();
-                                }
-                            });
+                            return bindBytes(context, fullHttpRequest.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST));
                         }
                         // e.g. a wrapper that replaced the body: bind that body, like a route argument
                         Argument<T> t = context.getArgument();
-                        Optional<T> body = source.getBody().flatMap(b -> ConversionService.SHARED.convert(b, t));
+                        Optional<?> replaced = source.getBody();
+                        if (replaced.isEmpty()) {
+                            ServerHttpRequest<?> server = serverRequest(source);
+                            if (server != null) {
+                                // a server request whose body an earlier filter cleared: bind no bytes
+                                return bindBytes(context, server.byteBodyFactory().createEmpty());
+                            }
+                        }
+                        Optional<T> body = replaced.flatMap(b -> ConversionService.SHARED.convert(b, t));
                         return ExecutionFlow.just(body.isPresent() ? () -> body : ArgumentBinder.BindingResult.unsatisfied());
                     });
                 } else {
@@ -119,6 +113,48 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements BeanD
                 }
             }
         };
+    }
+
+    /**
+     * Bind the given bytes as a {@link ByteBuffer}, a {@code byte[]} or a {@link String}.
+     *
+     * @param context The context of the argument
+     * @param bytes The bytes
+     * @param <T> The type of the argument
+     * @return The binding result
+     */
+    @SuppressWarnings("unchecked")
+    private static <T> ExecutionFlow<ArgumentBinder.BindingResult<T>> bindBytes(ArgumentConversionContext<T> context, ByteBody bytes) {
+        return InternalByteBody.bufferFlow(bytes).map(imm -> {
+            Argument<T> t = context.getArgument();
+            if (t.isAssignableFrom(ByteBuffer.class)) {
+                return () -> Optional.of((T) imm.toByteBuffer());
+            } else if (t.isAssignableFrom(byte[].class)) {
+                byte[] array = imm.toByteArray();
+                return () -> Optional.of((T) array);
+            } else if (t.isAssignableFrom(String.class)) {
+                String str = imm.toString(StandardCharsets.UTF_8);
+                return () -> Optional.of((T) str);
+            } else {
+                imm.close();
+                return ArgumentBinder.BindingResult.unsatisfied();
+            }
+        });
+    }
+
+    /**
+     * The server request a request is or wraps, whatever body a wrapper or a copy set.
+     *
+     * @param request The request
+     * @return The server request, or {@code null} if the request is not a server request
+     */
+    private static @Nullable ServerHttpRequest<?> serverRequest(HttpRequest<?> request) {
+        for (HttpRequest<?> current : HttpRequestWrapper.unwrap(request)) {
+            if (current instanceof ServerHttpRequest<?> server) {
+                return server;
+            }
+        }
+        return null;
     }
 
     /**
