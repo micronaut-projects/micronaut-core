@@ -140,9 +140,9 @@ final class WebSocketTestClient implements AutoCloseable {
         final BlockingQueue<Object> messages = new LinkedBlockingQueue<>();
         final BlockingQueue<String> pongs = new LinkedBlockingQueue<>();
         final CompletableFuture<Closed> closed = new CompletableFuture<>();
+        WebSocket ws;
         private final StringBuilder text = new StringBuilder();
         private final ByteArrayOutputStream binary = new ByteArrayOutputStream();
-        WebSocket ws;
 
         @Override
         public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
