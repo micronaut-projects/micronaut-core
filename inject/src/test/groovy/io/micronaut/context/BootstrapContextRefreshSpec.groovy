@@ -16,6 +16,7 @@ class BootstrapContextRefreshSpec extends Specification {
     def setup() {
         CountingLocator.instances.clear()
         CountingLocator.failure = null
+        CountingLocator.remoteValue = null
     }
 
     void "a refresh closes the bootstrap context it replaces, and closing the context closes the last one"() {
@@ -70,6 +71,40 @@ class BootstrapContextRefreshSpec extends Specification {
         new IOException("cannot be read")           | IOException
     }
 
+    void "a refresh after a refresh that failed to read the bootstrap configuration reads it again: #failureType.simpleName"() {
+        given:
+        CountingLocator.remoteValue = 'one'
+        ApplicationContext ctx = startContext()
+
+        expect:
+        ctx.getProperty('app.remote', String).get() == 'one'
+
+        when: "the bootstrap configuration changes, and the refresh fails to read it"
+        CountingLocator.remoteValue = 'two'
+        CountingLocator.failure = failure
+        ctx.environment.refresh()
+
+        then: "the properties read at the start stay"
+        thrown(failureType)
+        ctx.getProperty('app.remote', String).get() == 'one'
+
+        when: "the next refresh succeeds"
+        CountingLocator.failure = null
+        ctx.environment.refresh()
+
+        then: "it reads the bootstrap configuration again, with one bootstrap context running"
+        ctx.getProperty('app.remote', String).get() == 'two'
+        CountingLocator.running() == 1
+
+        cleanup:
+        ctx.close()
+
+        where:
+        failure                                    | failureType
+        new IllegalStateException("cannot be read") | IllegalStateException
+        new IOException("cannot be read")           | IOException
+    }
+
     void "a refresh keeps the order of the builder properties"() {
         given: "a property source of higher order than the builder properties, which sets the same key"
         ApplicationContext ctx = ApplicationContext.builder()
@@ -110,6 +145,7 @@ class BootstrapContextRefreshSpec extends Specification {
     static class CountingLocator implements BootstrapPropertySourceLocator {
         static final List<CountingLocator> instances = new CopyOnWriteArrayList<>()
         static volatile Throwable failure
+        static volatile String remoteValue
 
         volatile boolean destroyed
 
@@ -134,6 +170,9 @@ class BootstrapContextRefreshSpec extends Specification {
         Iterable<PropertySource> findPropertySources(Environment environment) {
             if (failure != null) {
                 throw failure
+            }
+            if (remoteValue != null) {
+                return List.of(PropertySource.of('remote', ['app.remote': remoteValue]))
             }
             return List.of()
         }
