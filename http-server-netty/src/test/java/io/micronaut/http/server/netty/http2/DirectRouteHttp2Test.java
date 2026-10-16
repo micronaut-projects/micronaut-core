@@ -33,7 +33,7 @@ import io.micronaut.web.router.builder.DirectRouteBuilder;
 import io.micronaut.web.router.builder.HttpDirectRoutes;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
@@ -111,8 +111,8 @@ class DirectRouteHttp2Test {
         @Override
         public void routes(DirectRouteBuilder routes) {
             routes.GET("/h2-direct/health", HttpResponse.ok("UP").contentType(MediaType.TEXT_PLAIN_TYPE));
-            routes.GET("/h2-direct/host").where(RouteCondition.host("localhost", "127.0.0.1")).respond(HttpResponse.ok("local"));
-            routes.GET("/h2-direct/other-host").where(RouteCondition.host("example.com")).respond(HttpResponse.ok("other"));
+            routes.GET("/h2-direct/host").where(RequestCondition.host("localhost", "127.0.0.1")).respond(HttpResponse.ok("local"));
+            routes.GET("/h2-direct/other-host").where(RequestCondition.host("example.com")).respond(HttpResponse.ok("other"));
             routes.GET("/h2-async/later").respondAsync(direct -> CompletableFuture.supplyAsync(() -> HttpResponse.ok("later"),
                 CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS)));
             routes.GET("/h2-async/executor").executeOn(TaskExecutors.BLOCKING).respond(direct -> HttpResponse.ok("executor"));

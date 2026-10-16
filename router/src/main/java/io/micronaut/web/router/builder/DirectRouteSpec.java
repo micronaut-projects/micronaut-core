@@ -48,17 +48,17 @@ import java.util.function.Predicate;
 public sealed interface DirectRouteSpec extends MatchSpec<DirectRouteSpec>, ExecutionSpec<DirectRouteSpec> permits DefaultDirectRouteSpec {
 
     /**
-     * Match only the requests that meet a condition, like {@link RouteSpec#where(RouteCondition)}.
+     * Match only the requests that meet a condition, like {@link RouteSpec#where(RequestCondition)}.
      * A direct route takes only the conditions the server decides from the request it received:
-     * {@link RouteCondition#method}, {@link RouteCondition#header}, {@link RouteCondition#cookie},
-     * {@link RouteCondition#query}, decoded from the URI like the parameters of a request, only
-     * when a route with a query condition is tried, {@link RouteCondition#host}, which reads the
+     * {@link RequestCondition#method}, {@link RequestCondition#header}, {@link RequestCondition#cookie},
+     * {@link RequestCondition#query}, decoded from the URI like the parameters of a request, only
+     * when a route with a query condition is tried, {@link RequestCondition#host}, which reads the
      * {@code Host} header, or the authority of an HTTP/2 request, and never a forwarded header,
-     * {@link RouteCondition#peerAddress}, the time conditions {@link RouteCondition#before},
-     * {@link RouteCondition#after} and {@link RouteCondition#between}, which read the
+     * {@link RequestCondition#peerAddress}, the time conditions {@link RequestCondition#before},
+     * {@link RequestCondition#after} and {@link RequestCondition#between}, which read the
      * {@code java.time.Clock} bean if there is one, otherwise the system clock, and their
      * combinations with {@code all}, {@code any} and {@code not}. A condition of a lambda, which
-     * needs the {@link io.micronaut.http.HttpRequest}, and {@link RouteCondition#remoteAddress},
+     * needs the {@link io.micronaut.http.HttpRequest}, and {@link RequestCondition#remoteAddress},
      * which resolves the client address from the request and its forwarded headers, are
      * rejected with an {@link IllegalArgumentException}.
      *
@@ -66,7 +66,7 @@ public sealed interface DirectRouteSpec extends MatchSpec<DirectRouteSpec>, Exec
      * @return This route
      */
     @Override
-    DirectRouteSpec where(RouteCondition condition);
+    DirectRouteSpec where(RequestCondition condition);
 
     /**
      * Match only the requests whose path variables the constraint accepts, like

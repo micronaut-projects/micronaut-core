@@ -7,7 +7,7 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.web.router.builder.DirectRouteBuilder
 import io.micronaut.web.router.builder.HttpDirectRoutes
-import io.micronaut.web.router.builder.RouteCondition
+import io.micronaut.web.router.builder.RequestCondition
 import io.micronaut.web.router.builder.ValueMatcher
 import jakarta.inject.Singleton
 // end::imports[]
@@ -20,7 +20,7 @@ private const val VERSION = "\"2026.10\""
 class NotModifiedRoutes : HttpDirectRoutes {
     override fun routes(routes: DirectRouteBuilder) {
         routes.GET("/release")
-            .where(RouteCondition.header(HttpHeaders.IF_NONE_MATCH, ValueMatcher.entityTag(VERSION))) // <1>
+            .where(RequestCondition.header(HttpHeaders.IF_NONE_MATCH, ValueMatcher.entityTag(VERSION))) // <1>
             .order(-1) // <2>
             .respond(HttpResponse.notModified<Any>().header(HttpHeaders.ETAG, VERSION))
         routes.GET("/release", HttpResponse.ok("release 2026.10") // <3>

@@ -23,7 +23,7 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.builder.DirectRouteBuilder;
 import io.micronaut.web.router.builder.HttpDirectRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -132,7 +132,7 @@ class DirectRouteRequestValidationTest {
         public void routes(DirectRouteBuilder routes) {
             routes.GET("/validation/greet/{name}").respond(direct -> HttpResponse.ok("hello " + direct.pathVariables().getString("name"))
                 .contentType(MediaType.TEXT_PLAIN_TYPE));
-            routes.GET("/validation/q").where(RouteCondition.query("mode", "debug")).respond(HttpResponse.ok("debug"));
+            routes.GET("/validation/q").where(RequestCondition.query("mode", "debug")).respond(HttpResponse.ok("debug"));
             routes.GET("/validation/error").respond(direct -> {
                 throw new AssertionError("failed");
             });

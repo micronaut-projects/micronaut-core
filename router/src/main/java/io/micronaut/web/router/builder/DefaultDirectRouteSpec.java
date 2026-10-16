@@ -43,7 +43,7 @@ final class DefaultDirectRouteSpec implements DirectRouteSpec {
     private final List<HttpMethod> methods;
     private final String uriTemplate;
     private final String description;
-    private final List<RouteCondition> conditions = new ArrayList<>(0);
+    private final List<RequestCondition> conditions = new ArrayList<>(0);
     private final List<Predicate<? super PathVariables>> constraints = new ArrayList<>(0);
     private int order;
     private @Nullable String executorName;
@@ -70,7 +70,7 @@ final class DefaultDirectRouteSpec implements DirectRouteSpec {
     }
 
     @Override
-    public DirectRouteSpec where(RouteCondition condition) {
+    public DirectRouteSpec where(RequestCondition condition) {
         Objects.requireNonNull(condition, "condition");
         checkPending();
         // rejected now, so that the application fails to start naming the route: the routes are built without checking again

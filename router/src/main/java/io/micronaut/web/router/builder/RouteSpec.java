@@ -179,8 +179,8 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * {@code @ExecuteOn} or a security annotation, but a feature that looks up a stereotype of
      * the annotation needs the stereotype in the annotation value, see
      * {@link AnnotationValueBuilder#stereotype(AnnotationValue)}. The expressions of an
-     * annotation, e.g. of {@code @RouteCondition}, are compiled with the annotated code: a route
-     * condition is declared with {@link #where(RouteCondition)}.</p>
+     * annotation, e.g. of {@code @RequestCondition}, are compiled with the annotated code: a route
+     * condition is declared with {@link #where(RequestCondition)}.</p>
      *
      * @param annotationValue The annotation
      * @param <T>             The annotation type
@@ -275,7 +275,7 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
     S attribute(String name, Object value);
 
     /**
-     * Match the requests that meet a condition only, like {@code @RouteCondition} on a controller
+     * Match the requests that meet a condition only, like {@code @RequestCondition} on a controller
      * method: a request the condition rejects is answered as if the route did not exist, by
      * another route of the same URI and method, e.g. one with another condition, or by
      * {@code 404}, never by a {@code 405}, {@code 415} or {@code 406} of this route. The
@@ -284,23 +284,23 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      *
      * <pre>{@code
      * routes.GET("/reports/{id}")
-     *     .where(RouteCondition.header("X-Export", "csv"))
+     *     .where(RequestCondition.header("X-Export", "csv"))
      *     .handle((request, pathVariables) -> HttpResponse.ok(reports.csv(pathVariables.getLong("id"))));
      * routes.GET("/reports/{id}", (request, pathVariables) -> HttpResponse.ok(reports.find(pathVariables.getLong("id"))));
      * }</pre>
      *
      * <p>A request both routes of the example match, with the header, is ambiguous: the most
      * specific route answers it, and the two routes are equally specific, so it is answered with
-     * {@code 400}. {@link RouteCondition} builds conditions on the headers, query parameters,
+     * {@code 400}. {@link RequestCondition} builds conditions on the headers, query parameters,
      * cookies, method, host, client address and time of the request, and
      * {@link RequestPredicates} on its media types too.</p>
      *
      * <p>On a group, the condition applies to the routes of the group, including its locator
      * routes and the routes of its nested groups: a route matches a request that meets the
      * conditions of its groups and its own, which must all be met, as one
-     * {@link RouteCondition#all all} condition. Several
+     * {@link RequestCondition#all all} condition. Several
      * conditions of a route or a group must all be met too. The router evaluates them cheapest
-     * first, the {@link RouteCondition#custom custom} conditions last, in the order they were
+     * first, the {@link RequestCondition#custom custom} conditions last, in the order they were
      * declared, outer group first.</p>
      *
      * @param condition The condition
@@ -308,14 +308,14 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * @since 5.3.0
      */
     @Override
-    S where(RouteCondition condition);
+    S where(RequestCondition condition);
 
     /**
      * Match the requests that meet a condition of a lambda only, see
-     * {@link #where(RouteCondition)}: a {@link RouteCondition#custom custom} condition, which the
+     * {@link #where(RequestCondition)}: a {@link RequestCondition#custom custom} condition, which the
      * router cannot read and evaluates after the others. The lambda is given the request as it
      * is: it reads the {@code Host} header and the peer of the connection, not the host and the
-     * client address the server resolves, which only the conditions of {@link RouteCondition}
+     * client address the server resolves, which only the conditions of {@link RequestCondition}
      * read.
      *
      * @param condition The condition
@@ -323,7 +323,7 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      */
     default S where(Predicate<HttpRequest<?>> condition) {
         Objects.requireNonNull(condition, "condition");
-        return where(RouteCondition.custom(condition));
+        return where(RequestCondition.custom(condition));
     }
 
     /**
@@ -343,7 +343,7 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      *
      * <p>A constraint runs while the request is matched, after the URI template of the route
      * matched and bound the variables, before the media types, the conditions, see
-     * {@link #where(RouteCondition)}, and the ambiguity between the routes are considered. It is given
+     * {@link #where(RequestCondition)}, and the ambiguity between the routes are considered. It is given
      * the same {@link PathVariables} the handler is given. Since a rejected route is not a match,
      * the methods allowed on a path for a {@code 405}, the media types for a {@code 415} or
      * {@code 406}, a CORS preflight request and the implicit {@code HEAD} route consider only
@@ -375,7 +375,7 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * {@code HEAD} route over an implicit one; only the routes still left after that are compared
      * by their order. So the order never makes a less specific route, or a route of any method
      * over a route of the request's method, win: it chooses among routes of the
-     * same URI template whose {@link #where(RouteCondition) conditions} a request both meets, e.g. a
+     * same URI template whose {@link #where(RequestCondition) conditions} a request both meets, e.g. a
      * specialized route and a fallback. Two routes left with the same order still make the
      * request ambiguous, answered with {@code 400}.
      *

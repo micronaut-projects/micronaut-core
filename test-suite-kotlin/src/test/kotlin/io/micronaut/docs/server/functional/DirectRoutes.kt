@@ -9,7 +9,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.web.router.builder.DirectRouteBuilder
 import io.micronaut.web.router.builder.HttpDirectRoutes
-import io.micronaut.web.router.builder.RouteCondition
+import io.micronaut.web.router.builder.RequestCondition
 import io.micronaut.web.router.builder.ValueMatcher
 import jakarta.inject.Singleton
 import java.util.EnumSet
@@ -37,9 +37,9 @@ class DirectRoutes : HttpDirectRoutes {
             else HttpResponse.ok("1.0.0").header(HttpHeaders.ETAG, VERSION)
         }
         routes.route(EnumSet.of(HttpMethod.GET, HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE), "/{+path}") // <6>
-            .where(RouteCondition.any(
-                RouteCondition.header("User-Agent", ValueMatcher.contains("badbot").ignoringCase()),
-                RouteCondition.peerAddress("203.0.113.0/24")))
+            .where(RequestCondition.any(
+                RequestCondition.header("User-Agent", ValueMatcher.contains("badbot").ignoringCase()),
+                RequestCondition.peerAddress("203.0.113.0/24")))
                 .respond(HttpResponse.status<Any>(HttpStatus.FORBIDDEN)) // <7>
     }
 }

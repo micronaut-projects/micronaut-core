@@ -12,7 +12,7 @@ import io.micronaut.web.router.builder.DirectRouteBuilder;
 import io.micronaut.web.router.builder.HttpDirectRoutes;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import io.micronaut.web.router.builder.ValueMatcher;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -162,7 +162,7 @@ public class DirectRouteBenchmark {
             builder.GET("/constant").respond(HttpResponse.ok(HELLO).contentType(MediaType.TEXT_PLAIN_TYPE));
             // a 304 route with a condition, tried first, then the 200 route
             builder.GET("/conditional")
-                .where(RouteCondition.header(HttpHeaders.IF_NONE_MATCH, ValueMatcher.entityTag("\"v1\"")))
+                .where(RequestCondition.header(HttpHeaders.IF_NONE_MATCH, ValueMatcher.entityTag("\"v1\"")))
                 .order(-1)
                 .respond(HttpResponse.notModified().header(HttpHeaders.ETAG, "\"v1\""));
             builder.GET("/conditional", HttpResponse.ok(HELLO).contentType(MediaType.TEXT_PLAIN_TYPE).header(HttpHeaders.ETAG, "\"v1\""));

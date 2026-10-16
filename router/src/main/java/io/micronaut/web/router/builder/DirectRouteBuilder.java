@@ -145,7 +145,7 @@ public sealed interface DirectRouteBuilder permits DefaultDirectRouteBuilder {
      *
      * <pre>{@code
      * routes.OPTIONS("/api/{+path}")
-     *     .where(RouteCondition.not(RouteCondition.header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD)))
+     *     .where(RequestCondition.not(RequestCondition.header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD)))
      *     .respond(HttpResponse.ok().header(HttpHeaders.ALLOW, "GET, POST, OPTIONS"));
      * }</pre>
      *

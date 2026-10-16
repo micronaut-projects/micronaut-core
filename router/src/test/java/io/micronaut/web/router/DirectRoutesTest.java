@@ -30,7 +30,7 @@ import io.micronaut.web.router.builder.DirectRouteSpec;
 import io.micronaut.web.router.builder.HttpDirectRoutes;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import io.micronaut.web.router.builder.ValueMatcher;
 import io.micronaut.web.router.builder.DirectContext;
 import io.micronaut.web.router.direct.DirectMatch;
@@ -320,11 +320,20 @@ class DirectRoutesTest {
 
     @Test
     void aConditionThatNeedsTheRequestIsRejected() {
-        assertRejected(routes -> routes.GET("/lambda").where(RouteCondition.custom(request -> true)).respond(HttpResponse.ok()), "a condition of a lambda");
-        assertRejected(routes -> routes.GET("/client").where(RouteCondition.remoteAddress("10.0.0.0/8")).respond(HttpResponse.ok()), "a client address condition");
+        assertRejected(routes -> routes.GET("/lambda").where(RequestCondition.custom(request -> true)).respond(HttpResponse.ok()), "a condition of a lambda");
+        assertRejected(routes -> routes.GET("/client").where(RequestCondition.remoteAddress("10.0.0.0/8")).respond(HttpResponse.ok()), "a client address condition");
         assertRejected(routes -> routes.GET("/nested")
-            .where(RouteCondition.header("X-A").or(RouteCondition.remoteAddress("10.0.0.0/8")))
+            .where(RequestCondition.header("X-A").or(RequestCondition.remoteAddress("10.0.0.0/8")))
             .respond(HttpResponse.ok()), "a client address condition");
+    }
+
+    @Test
+    void aBodyConditionIsRejected() {
+        // a direct route is matched before the body of the request is read
+        assertRejected(routes -> routes.POST("/body").where(RequestCondition.bodyText(text -> text.isEmpty())).respond(HttpResponse.ok()), "a body condition");
+        assertRejected(routes -> routes.POST("/nested-body")
+            .where(RequestCondition.header("X-A").and(RequestCondition.bodyText(text -> text.isEmpty())))
+            .respond(HttpResponse.ok()), "a body condition");
     }
 
     @Test
@@ -794,8 +803,8 @@ class DirectRoutesTest {
             routes.GET("/files/special", HttpResponse.ok("special"));
             routes.GET("/ordered").order(2).respond(HttpResponse.ok("second"));
             routes.GET("/ordered").order(1).respond(HttpResponse.ok("first"));
-            routes.GET("/ambiguous-conditions").where(RouteCondition.header("X-One")).respond(HttpResponse.ok("one"));
-            routes.GET("/ambiguous-conditions").where(RouteCondition.header("X-Two")).respond(HttpResponse.ok("two"));
+            routes.GET("/ambiguous-conditions").where(RequestCondition.header("X-One")).respond(HttpResponse.ok("one"));
+            routes.GET("/ambiguous-conditions").where(RequestCondition.header("X-Two")).respond(HttpResponse.ok("two"));
             routes.GET("/ambiguous-constraints/{id}").constrain("id", List.of("1", "2")).respond(HttpResponse.ok("one"));
             routes.GET("/ambiguous-constraints/{id}").constrain("id", List.of("2", "3")).respond(HttpResponse.ok("two"));
 
@@ -839,20 +848,20 @@ class DirectRoutesTest {
             // a minimal stage: cancelling its CompletableFuture copy does not reach it
             routes.GET("/late/stage").respondAsync(direct -> lateStage.minimalCompletionStage());
 
-            routes.GET("/beta").where(RouteCondition.any(
-                RouteCondition.header("X-Channel", ValueMatcher.equalTo("beta").ignoringCase()),
-                RouteCondition.cookie("channel", ValueMatcher.equalTo("beta"))))
+            routes.GET("/beta").where(RequestCondition.any(
+                RequestCondition.header("X-Channel", ValueMatcher.equalTo("beta").ignoringCase()),
+                RequestCondition.cookie("channel", ValueMatcher.equalTo("beta"))))
                 .respond(HttpResponse.ok("beta"));
             routes.GET("/internal")
-                .where(RouteCondition.peerAddress("10.0.0.0/8"))
-                .where(RouteCondition.host("admin.local"))
+                .where(RequestCondition.peerAddress("10.0.0.0/8"))
+                .where(RequestCondition.host("admin.local"))
                 .respond(HttpResponse.ok("internal"));
             routes.GET("/{+path}")
-                .where(RouteCondition.peerAddress("203.0.113.0/24"))
+                .where(RequestCondition.peerAddress("203.0.113.0/24"))
                 .respond(HttpResponse.status(HttpStatus.FORBIDDEN).body("blocked"));
 
             routes.route(EnumSet.of(HttpMethod.GET, HttpMethod.POST), "/blocked/{+path}")
-                .where(RouteCondition.header("X-Block"))
+                .where(RequestCondition.header("X-Block"))
                 .respond(HttpResponse.status(HttpStatus.FORBIDDEN));
 
             routes.GET("/shops/{shop}")
@@ -874,12 +883,12 @@ class DirectRoutesTest {
             routes.GET("/pair/{a}/{b}").constrain(Map.of("a", ValueMatcher.equalTo("x"), "b", ValueMatcher.equalTo("y"))).respond(HttpResponse.ok("pair"));
             // a response of another factory
             routes.GET("/foreign").respond(direct -> HttpResponse.accepted().body("foreign"));
-            routes.GET("/search").where(RouteCondition.query("mode", "debug")).order(-1).respond(HttpResponse.ok("debug search"));
+            routes.GET("/search").where(RequestCondition.query("mode", "debug")).order(-1).respond(HttpResponse.ok("debug search"));
             routes.GET("/search", HttpResponse.ok("search"));
             routes.GET("/window")
-                .where(RouteCondition.between(Instant.now().minusSeconds(3600), Instant.now().plusSeconds(3600)))
+                .where(RequestCondition.between(Instant.now().minusSeconds(3600), Instant.now().plusSeconds(3600)))
                 .respond(HttpResponse.ok("open"));
-            routes.GET("/closed").where(RouteCondition.after(Instant.now().plusSeconds(3600))).respond(HttpResponse.ok("closed"));
+            routes.GET("/closed").where(RequestCondition.after(Instant.now().plusSeconds(3600))).respond(HttpResponse.ok("closed"));
             routes.GET("/failing").respond(direct -> {
                 throw new IllegalStateException("failed");
             });

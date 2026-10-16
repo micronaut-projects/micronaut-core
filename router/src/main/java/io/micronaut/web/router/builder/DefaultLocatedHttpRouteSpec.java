@@ -24,9 +24,11 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.form.FormData;
+import io.micronaut.web.router.websocket.WebSocketEndpointSpec;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -91,7 +93,7 @@ final class DefaultLocatedHttpRouteSpec<T> implements LocatedHttpRouteSpec<T> {
     }
 
     @Override
-    public LocatedHttpRouteSpec<T> where(RouteCondition condition) {
+    public LocatedHttpRouteSpec<T> where(RequestCondition condition) {
         route.where(condition);
         return this;
     }
@@ -271,6 +273,12 @@ final class DefaultLocatedHttpRouteSpec<T> implements LocatedHttpRouteSpec<T> {
     @Override
     public void respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response) {
         route.respond(response);
+    }
+
+    @Override
+    public void webSocket(Consumer<WebSocketEndpointSpec> endpoint) {
+        // fails: a located route is not a WebSocket route
+        route.webSocket(endpoint);
     }
 
     @Override

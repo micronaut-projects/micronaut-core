@@ -1740,7 +1740,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 return;
             }
         }
-        T beanToDestroy = registration.getBean();
+        T beanToDestroy = registration.beanOrNull();
         BeanDefinition<T> definition = registration.getBeanDefinition();
         if (beanToDestroy != null) {
             purgeCacheForBeanInstance(beanToDestroy);
@@ -1753,6 +1753,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             // what a destroyed bean held is released with it; what held the bean stays recorded until that is destroyed.
             // A singleton definition may have a fresh registration beside the scoped instance, and both record under it
             dependencyGraph.destroyed(registration, definition.isSingleton() && singletonScope.findBeanRegistration(definition) != null);
+        }
+        if (beanToDestroy == null) {
+            // A @Nullable factory method produced no bean, so there is no instance for the pre-destroy listeners
+            // or a @PreDestroy method to see. What the factory method resolved to produce it is still released.
+            releaseDependents(registration, null);
+            return;
         }
         try {
             beanToDestroy = triggerPreDestroyListeners(resolutionContext, definition, beanToDestroy);
@@ -1887,7 +1893,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 try {
                     bean = (T) Objects.requireNonNull(
                         listener.bean.onPreDestroy(event),
-                        "PreDestroy event listener illegally returned null: " + listener.getClass()
+                        "PreDestroy event listener illegally returned null: " + listener.bean.getClass()
                     );
                 } catch (Exception e) {
                     throw new BeanDestructionException(beanDefinition, e);
@@ -4090,7 +4096,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             return scoped;
         }
         // Unknown scope, prototype scope etc
-        BeanRegistration<T> prototype = createRegistration(resolutionContext, beanType, qualifier, definition, true);
+        BeanRegistration<T> prototype = createRegistration(resolutionContext, beanType, qualifier, definition, true, false, true);
         // a prototype belongs to the bean that received it, and what the prototype received is recorded
         // under the prototype's definition, so a path through it is not lost
         recordDependency(resolutionContext, prototype.beanDefinition, qualifier);
@@ -4237,13 +4243,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                                                      @Nullable Qualifier<T> qualifier,
                                                      BeanDefinition<T> definition,
                                                      boolean dependent) {
-        return createRegistration(resolutionContext, beanType, qualifier, definition, dependent, false);
+        return createRegistration(resolutionContext, beanType, qualifier, definition, dependent, false, false);
     }
 
     final <T> BeanRegistration<T> createFreshRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                          BeanDefinition<T> definition) {
         BeanRegistration<T> registration = createRegistration(resolutionContext, definition.asArgument(), definition.getDeclaredQualifier(),
-            definition, resolutionContext != null, true);
+            definition, resolutionContext != null, true, true);
         if (dependencyGraph != null) {
             // what the fresh instance received is recorded under its definition as it is created; a singleton's
             // fresh instance shares those edges with the scoped one, so destroying either must not forget them
@@ -4326,7 +4332,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                                                       @Nullable Qualifier<T> qualifier,
                                                       BeanDefinition<T> definition,
                                                       boolean dependent,
-                                                      boolean customizeNull) {
+                                                      boolean customizeNull,
+                                                      boolean ownLifecycle) {
         if (resolutionContext instanceof AbstractBeanResolutionContext abstractContext && abstractContext.isLazyProxyTarget()) {
             // The context is retained by a lazy proxy, which resolves its target through it on every call. Create
             // the bean in a copy, so that the created bean is not recorded as a dependent of the retained context
@@ -4396,7 +4403,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                         BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
                         List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
                         BeanDisposingRegistration<T> disposing = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
-                            dependentBeans, interceptorCandidates, creation.dependencies);
+                            dependentBeans, interceptorCandidates, creation.dependencies, ownLifecycle);
                         if (dependencyGraph != null && created != bean) {
                             // a listener replaced the instance: a development context retains the one it received
                             disposing.setBeforeListeners(created);
@@ -4567,70 +4574,30 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return Optional.ofNullable(definition);
     }
 
+    @Override
+    public final <T> List<BeanDefinition<T>> selectAmong(@Nullable Argument<T> beanType, Collection<BeanDefinition<T>> candidates) {
+        Objects.requireNonNull(candidates, "Candidates cannot be null");
+        return BeanSelection.select(beanType, null, candidates, beanResolutionCustomizer);
+    }
+
     @Nullable
     private <T> BeanDefinition<T> lastChanceResolve(Argument<T> beanType,
                                                     @Nullable Qualifier<T> qualifier,
                                                     boolean throwNonUnique,
                                                     Collection<BeanDefinition<T>> candidates) {
-        if (candidates.size() > 1) {
-            List<BeanDefinition<T>> primary = candidates.stream()
-                .filter(BeanDefinition::isPrimary)
-                .toList();
-            if (!primary.isEmpty()) {
-                candidates = primary;
-            }
-        }
-        if (candidates.size() == 1) {
-            return candidates.iterator().next();
-        }
-        Optional<BeanDefinition<T>> customResolved = beanResolutionCustomizer.resolveNonUniqueBean(beanType, qualifier, candidates);
-        if (customResolved.isPresent()) {
-            return customResolved.get();
-        }
-        Collection<BeanDefinition<T>> originalCandidates = candidates;
-        candidates = candidates.stream().filter(candidate -> !candidate.hasDeclaredStereotype(Secondary.class)).toList();
-        if (candidates.size() == 1) {
-            return candidates.iterator().next();
-        }
-        // When every candidate is @Secondary none of them is preferable to another, but lowering the
-        // precedence of all of them shouldn't remove the ability to decide between them: carry on with
-        // the original candidates so that the order and @DefaultImplementation still get a say.
-        boolean allSecondary = candidates.isEmpty();
-        if (allSecondary) {
-            candidates = originalCandidates;
-        }
-        // pick the bean with the highest priority
-        ArrayList<BeanDefinition<T>> listCandidates = new ArrayList<>(candidates);
-        listCandidates.sort(OrderUtil.ORDERED_COMPARATOR);
-        Iterator<BeanDefinition<T>> iterator = listCandidates.iterator();
-        final BeanDefinition<T> bean = iterator.next();
-        final BeanDefinition<T> next = iterator.next();
-        // We should have at least two beans - no need for next checks
-        // Check there are not 2 beans with the same order
-        if (bean.getOrder() != next.getOrder()) {
-            LOG.debug("Picked bean {} with the highest precedence for type {} and qualifier {}", bean, beanType, null);
+        List<BeanDefinition<T>> remaining = BeanSelection.select(beanType, qualifier, candidates, beanResolutionCustomizer);
+        if (remaining.size() == 1) {
+            BeanDefinition<T> bean = remaining.get(0);
+            LOG.debug("Picked bean {} with the highest precedence for type {} and qualifier {}", bean, beanType, qualifier);
             return bean;
         }
-
-        // try resolve @DefaultImplementation
-        BeanDefinition<T> first = candidates.iterator().next();
-        Class<?> defaultImplementation = first.getDefaultImplementation();
-        if (defaultImplementation != null) {
-            for (BeanDefinition<T> bd : candidates) {
-                if (bd.getBeanType().equals(defaultImplementation)) {
-                    return bd;
-                }
-            }
-        }
-        Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType.getType(), candidates);
-        if (exactMatches.size() == 1) {
-            return exactMatches.iterator().next();
-        }
+        List<BeanDefinition<T>> considered = BeanSelection.primaryCandidates(candidates);
+        boolean allSecondary = considered.stream().allMatch(candidate -> candidate.hasDeclaredStereotype(Secondary.class));
         if (allSecondary) {
-            throw new NonUniqueBeanException(beanType.getType(), originalCandidates.iterator());
+            throw new NonUniqueBeanException(beanType.getType(), considered.iterator());
         }
         if (throwNonUnique) {
-            return findConcreteCandidate(beanType.getType(), qualifier, candidates);
+            return findConcreteCandidate(beanType.getType(), qualifier, remaining);
         }
         return null;
     }
@@ -4642,16 +4609,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 registerConfiguration(beanConfiguration);
             }
         }
-    }
-
-    private <T> Collection<BeanDefinition<T>> filterExactMatch(final Class<T> beanType, Collection<BeanDefinition<T>> candidates) {
-        List<BeanDefinition<T>> list = new ArrayList<>(candidates.size());
-        for (BeanDefinition<T> candidate : candidates) {
-            if (candidate.getBeanType() == beanType) {
-                list.add(candidate);
-            }
-        }
-        return list;
     }
 
     private void configureAndStartContext() {

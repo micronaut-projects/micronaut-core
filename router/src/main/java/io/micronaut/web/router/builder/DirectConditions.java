@@ -18,18 +18,19 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
-import io.micronaut.web.router.builder.RouteCondition.AllOf;
-import io.micronaut.web.router.builder.RouteCondition.AnyOf;
-import io.micronaut.web.router.builder.RouteCondition.Cookie;
-import io.micronaut.web.router.builder.RouteCondition.Custom;
-import io.micronaut.web.router.builder.RouteCondition.Header;
-import io.micronaut.web.router.builder.RouteCondition.Host;
-import io.micronaut.web.router.builder.RouteCondition.Method;
-import io.micronaut.web.router.builder.RouteCondition.Not;
-import io.micronaut.web.router.builder.RouteCondition.PeerAddress;
-import io.micronaut.web.router.builder.RouteCondition.Query;
-import io.micronaut.web.router.builder.RouteCondition.RemoteAddress;
-import io.micronaut.web.router.builder.RouteCondition.TimeWindow;
+import io.micronaut.web.router.builder.RequestCondition.AllOf;
+import io.micronaut.web.router.builder.RequestCondition.AnyOf;
+import io.micronaut.web.router.builder.RequestCondition.Body;
+import io.micronaut.web.router.builder.RequestCondition.Cookie;
+import io.micronaut.web.router.builder.RequestCondition.Custom;
+import io.micronaut.web.router.builder.RequestCondition.Header;
+import io.micronaut.web.router.builder.RequestCondition.Host;
+import io.micronaut.web.router.builder.RequestCondition.Method;
+import io.micronaut.web.router.builder.RequestCondition.Not;
+import io.micronaut.web.router.builder.RequestCondition.PeerAddress;
+import io.micronaut.web.router.builder.RequestCondition.Query;
+import io.micronaut.web.router.builder.RequestCondition.RemoteAddress;
+import io.micronaut.web.router.builder.RequestCondition.TimeWindow;
 import io.micronaut.web.router.RouteConditionContext;
 import io.micronaut.web.router.direct.DirectRequest;
 import org.jspecify.annotations.Nullable;
@@ -41,8 +42,8 @@ import java.util.List;
 /**
  * The conditions of direct routes: the conditions a server decides from the request it
  * received, before it creates the {@link io.micronaut.http.HttpRequest}, see
- * {@link DirectRouteSpec#where(RouteCondition)}. They are evaluated against a
- * {@link DirectRequest}, with the matchers of {@link RouteConditions}.
+ * {@link DirectRouteSpec#where(RequestCondition)}. They are evaluated against a
+ * {@link DirectRequest}, with the matchers of {@link RequestConditions}.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -60,7 +61,7 @@ final class DirectConditions {
      * @param route     The route, for the message
      * @throws IllegalArgumentException if the condition, or a part of it, needs the request
      */
-    static void check(RouteCondition condition, Object route) {
+    static void check(RequestCondition condition, Object route) {
         String unsupported = unsupported(condition);
         if (unsupported != null) {
             throw new IllegalArgumentException("The " + route + " cannot have the condition " + condition
@@ -73,7 +74,7 @@ final class DirectConditions {
     /**
      * @return A description of the first part of the condition a direct route cannot decide, or {@code null}
      */
-    private static @Nullable String unsupported(RouteCondition condition) {
+    private static @Nullable String unsupported(RequestCondition condition) {
         return switch (condition) {
             case Method method -> null;
             case Header header -> null;
@@ -84,14 +85,15 @@ final class DirectConditions {
             case TimeWindow timeWindow -> null;
             case RemoteAddress remoteAddress -> "a client address condition, resolved from the request and its forwarded headers";
             case Custom custom -> "a condition of a lambda";
+            case Body<?> body -> "a body condition, which reads the body of the request";
             case Not not -> unsupported(not.condition());
             case AllOf allOf -> firstUnsupported(allOf.conditions());
             case AnyOf anyOf -> firstUnsupported(anyOf.conditions());
         };
     }
 
-    private static @Nullable String firstUnsupported(List<RouteCondition> conditions) {
-        for (RouteCondition part : conditions) {
+    private static @Nullable String firstUnsupported(List<RequestCondition> conditions) {
+        for (RequestCondition part : conditions) {
             String unsupported = unsupported(part);
             if (unsupported != null) {
                 return unsupported;
@@ -108,22 +110,22 @@ final class DirectConditions {
      * @param context   Gives the clock of the time conditions
      * @return Whether it meets the condition
      */
-    static boolean matches(RouteCondition condition, DirectRequest request, RouteConditionContext context) {
+    static boolean matches(RequestCondition condition, DirectRequest request, RouteConditionContext context) {
         return switch (condition) {
             case Method method -> method.methods().contains(request.methodName())
                 || HttpMethod.parse(request.methodName()) == HttpMethod.CUSTOM && method.methods().contains(HttpMethod.CUSTOM.name());
-            case Header header -> RouteConditions.anyValue(header.value(), request.headers(header.name()));
-            case Query query -> RouteConditions.anyValue(query.value(), request.queryParameters(query.name()));
-            case TimeWindow timeWindow -> RouteConditions.timeWindow(timeWindow, context.clock().instant());
-            case Cookie cookie -> RouteConditions.cookie(cookie, request.headers(HttpHeaders.COOKIE));
-            case Host host -> RouteConditions.host(host.host(), host(request));
+            case Header header -> RequestConditions.anyValue(header.value(), request.headers(header.name()));
+            case Query query -> RequestConditions.anyValue(query.value(), request.queryParameters(query.name()));
+            case TimeWindow timeWindow -> RequestConditions.timeWindow(timeWindow, context.clock().instant());
+            case Cookie cookie -> RequestConditions.cookie(cookie, request.headers(HttpHeaders.COOKIE));
+            case Host host -> RequestConditions.host(host.host(), host(request));
             case PeerAddress peerAddress -> {
                 InetSocketAddress peer = request.peerAddress();
                 InetAddress address = peer == null ? null : peer.getAddress();
-                yield address != null && RouteConditions.inRanges(peerAddress.ranges(), Cidr.address(address));
+                yield address != null && RequestConditions.inRanges(peerAddress.ranges(), Cidr.address(address));
             }
             case AllOf allOf -> {
-                for (RouteCondition part : allOf.conditions()) {
+                for (RequestCondition part : allOf.conditions()) {
                     if (!matches(part, request, context)) {
                         yield false;
                     }
@@ -131,7 +133,7 @@ final class DirectConditions {
                 yield true;
             }
             case AnyOf anyOf -> {
-                for (RouteCondition part : anyOf.conditions()) {
+                for (RequestCondition part : anyOf.conditions()) {
                     if (matches(part, request, context)) {
                         yield true;
                     }
@@ -142,6 +144,7 @@ final class DirectConditions {
             // rejected when the route is built
             case Custom custom -> throw new IllegalStateException("Unsupported condition of a direct route: " + custom);
             case RemoteAddress remoteAddress -> throw new IllegalStateException("Unsupported condition of a direct route: " + remoteAddress);
+            case Body<?> body -> throw new IllegalStateException("Unsupported condition of a direct route: " + body);
         };
     }
 

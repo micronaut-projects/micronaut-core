@@ -53,7 +53,7 @@ final class DirectRouteDeclaration {
      * Creates the stage of the response of a request, or {@code null}.
      */
     final @Nullable Function<DirectContext, ? extends CompletionStage<? extends @Nullable HttpResponse<?>>> asyncResponse;
-    final List<RouteCondition> conditions = new ArrayList<>(0);
+    final List<RequestCondition> conditions = new ArrayList<>(0);
     final List<Predicate<? super PathVariables>> constraints = new ArrayList<>(0);
     int order;
     /**

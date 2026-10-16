@@ -1185,7 +1185,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // code is 1xx or 204, also a status code 304 may not have a Content-Length or Transfer-Encoding set.
             // A kept HTTP/1.0 connection has a known length: a HEAD response without Content-Length
             // has no body either
-            if (!http10KeptAlive && !HttpUtil.isContentLengthSet(message) && !HttpUtil.isTransferEncodingChunked(message) && canHaveBody(message.status())) {
+            // A HEAD response never has a body, so its end is known without a length either
+            if (!http10KeptAlive && !HttpMethod.HEAD.equals(request.method()) && !HttpUtil.isContentLengthSet(message) && !HttpUtil.isTransferEncodingChunked(message) && canHaveBody(message.status())) {
                 HttpUtil.setKeepAlive(message, false);
                 closeAfterWrite();
             }

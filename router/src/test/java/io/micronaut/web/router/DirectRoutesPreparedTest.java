@@ -22,7 +22,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.web.router.builder.DirectRouteBuilder;
 import io.micronaut.web.router.builder.HttpDirectRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import io.micronaut.web.router.builder.ValueMatcher;
 import io.micronaut.web.router.direct.DirectMatch;
 import io.micronaut.web.router.direct.DirectRouteLookup;
@@ -98,7 +98,7 @@ class DirectRoutesPreparedTest {
         @Override
         public void routes(DirectRouteBuilder routes) {
             routes.GET("/version")
-                .where(RouteCondition.header(HttpHeaders.IF_NONE_MATCH, ValueMatcher.entityTag("\"v1\"")))
+                .where(RequestCondition.header(HttpHeaders.IF_NONE_MATCH, ValueMatcher.entityTag("\"v1\"")))
                 .order(-1)
                 .respond(HttpResponse.notModified().header(HttpHeaders.ETAG, "\"v1\""));
             routes.GET("/version", HttpResponse.ok("current").header(HttpHeaders.ETAG, "\"v1\""));

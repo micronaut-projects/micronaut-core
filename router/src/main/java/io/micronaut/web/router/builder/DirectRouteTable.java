@@ -152,7 +152,7 @@ final class DirectRouteTable implements DirectRouteLookup {
 
     private static Route route(DirectRouteDeclaration declaration, ExecutorLookup executors, Consumer<HttpResponse<?>> discard) {
         // checked when they were given to the route
-        RouteCondition condition = RouteConditions.normalizeAll(declaration.conditions);
+        RequestCondition condition = RequestConditions.normalizeAll(declaration.conditions);
         String executorName = declaration.executorName;
         Executor executor = executorName == null ? null : executors.executor(executorName, declaration);
         return new Route(declaration, new UriTemplateMatcher(declaration.uriTemplate), condition,
@@ -339,7 +339,7 @@ final class DirectRouteTable implements DirectRouteLookup {
     private static final class Route {
         final DirectRouteDeclaration declaration;
         final UriTemplateMatcher matcher;
-        final RouteCondition condition;
+        final RequestCondition condition;
         final Predicate<? super PathVariables>[] constraints;
         final int order;
         final int rawLength;
@@ -361,7 +361,7 @@ final class DirectRouteTable implements DirectRouteLookup {
          */
         final boolean implicitHead;
 
-        Route(DirectRouteDeclaration declaration, UriTemplateMatcher matcher, RouteCondition condition,
+        Route(DirectRouteDeclaration declaration, UriTemplateMatcher matcher, RequestCondition condition,
               Predicate<? super PathVariables>[] constraints, int order, @Nullable Executor executor,
               Consumer<HttpResponse<?>> discard) {
             this.declaration = declaration;
@@ -372,7 +372,7 @@ final class DirectRouteTable implements DirectRouteLookup {
             this.rawLength = matcher.getRawLength();
             this.variableCount = matcher.getPathVariableCount();
             this.patternVariableCount = matcher.getPatternVariableCount();
-            this.unconditional = condition.equals(RouteConditions.ALWAYS);
+            this.unconditional = condition.equals(RequestConditions.ALWAYS);
             this.executor = executor;
             this.async = declaration.isAsync();
             // a value is never on an executor, see DefaultDirectRouteSpec#respond(HttpResponse)

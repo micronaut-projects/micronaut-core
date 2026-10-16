@@ -29,7 +29,7 @@ import io.micronaut.web.router.builder.DirectRouteBuilder;
 import io.micronaut.web.router.builder.HttpDirectRoutes;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -132,14 +132,14 @@ class DirectRouteConditionsTest {
 
         @Override
         public void routes(DirectRouteBuilder builder) {
-            builder.GET("/dc/search").where(RouteCondition.query("mode", "debug")).respond(HttpResponse.ok("debug"));
-            builder.GET("/dc/search").where(RouteCondition.query("q", "hello world!")).respond(HttpResponse.ok("spaced"));
+            builder.GET("/dc/search").where(RequestCondition.query("mode", "debug")).respond(HttpResponse.ok("debug"));
+            builder.GET("/dc/search").where(RequestCondition.query("q", "hello world!")).respond(HttpResponse.ok("spaced"));
 
             // the fixed clock is inside the window, the system clock is not
             builder.GET("/dc/sale")
-                .where(RouteCondition.between(NOW.minusSeconds(60), NOW.plusSeconds(60)))
+                .where(RequestCondition.between(NOW.minusSeconds(60), NOW.plusSeconds(60)))
                 .respond(HttpResponse.ok("open"));
-            builder.GET("/dc/future").where(RouteCondition.after(NOW.plusSeconds(60))).respond(HttpResponse.ok("future"));
+            builder.GET("/dc/future").where(RequestCondition.after(NOW.plusSeconds(60))).respond(HttpResponse.ok("future"));
 
             builder.POST("/dc/items/{id}").respond(direct ->
                 direct.pathVariables().getLong("id") < 5 ? HttpResponse.ok("cached " + direct.pathVariables().getLong("id")) : null);

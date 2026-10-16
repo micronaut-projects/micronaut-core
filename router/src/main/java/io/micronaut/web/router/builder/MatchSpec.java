@@ -34,16 +34,16 @@ import java.util.function.Predicate;
  *
  * <pre>{@code
  * routes.GET("/orders/{id}")
- *     .where(RouteCondition.header("X-Export", "csv"))
+ *     .where(RequestCondition.header("X-Export", "csv"))
  *     .constrain("id", Long.class, id -> id > 0)
  *     .order(-1)
  *     .handle(csvHandler);
  * }</pre>
  *
  * <p>Each kind of route documents what it adds: an ordinary route, or a group, see
- * {@link RouteSpec#where(RouteCondition)}, {@link RouteSpec#constrain(Predicate)} and
+ * {@link RouteSpec#where(RequestCondition)}, {@link RouteSpec#constrain(Predicate)} and
  * {@link RouteSpec#order(int)}, and a direct route, which takes only the conditions the server
- * decides before it creates the request, see {@link DirectRouteSpec#where(RouteCondition)}.</p>
+ * decides before it creates the request, see {@link DirectRouteSpec#where(RequestCondition)}.</p>
  *
  * @param <S> The type of the route or the group
  * @author Denis Stepanov
@@ -54,14 +54,14 @@ public sealed interface MatchSpec<S extends MatchSpec<S>> permits RouteSpec, Dir
 
     /**
      * Match the requests that meet a condition only: a request the condition rejects is answered
-     * as if the route did not exist. {@link RouteCondition} builds conditions on the headers, the
+     * as if the route did not exist. {@link RequestCondition} builds conditions on the headers, the
      * query parameters, the cookies, the method, the host, the address and the time of the
      * request. Several conditions must all be met.
      *
      * @param condition The condition
      * @return The route or the group
      */
-    S where(RouteCondition condition);
+    S where(RequestCondition condition);
 
     /**
      * Constrain the path variables of the route: the route matches a request only when the
@@ -162,7 +162,7 @@ public sealed interface MatchSpec<S extends MatchSpec<S>> permits RouteSpec, Dir
      */
     default S constrain(String variable, ValueMatcher matcher) {
         Objects.requireNonNull(variable, "variable");
-        ValueMatcher normalized = RouteConditions.normalize(Objects.requireNonNull(matcher, "matcher"));
+        ValueMatcher normalized = RequestConditions.normalize(Objects.requireNonNull(matcher, "matcher"));
         return constrain(variables -> normalized.matches(variables.findString(variable).orElse(null)));
     }
 
@@ -177,7 +177,7 @@ public sealed interface MatchSpec<S extends MatchSpec<S>> permits RouteSpec, Dir
         Objects.requireNonNull(matchers, "matchers");
         Map<String, ValueMatcher> normalized = new LinkedHashMap<>(matchers.size());
         matchers.forEach((variable, matcher) -> normalized.put(Objects.requireNonNull(variable, "variable"),
-            RouteConditions.normalize(Objects.requireNonNull(matcher, "matcher"))));
+            RequestConditions.normalize(Objects.requireNonNull(matcher, "matcher"))));
         return constrain(variables -> {
             for (Map.Entry<String, ValueMatcher> entry : normalized.entrySet()) {
                 if (!entry.getValue().matches(variables.findString(entry.getKey()).orElse(null))) {

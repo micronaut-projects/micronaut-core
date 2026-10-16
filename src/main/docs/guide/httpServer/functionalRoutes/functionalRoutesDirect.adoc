@@ -16,7 +16,7 @@ snippet::io.micronaut.docs.server.functional.DirectRoutes[tags="imports,clazz", 
 
 A direct route is declared in stages, like an ordinary route: a creator of the builder, `GET(uri)`, `POST(uri)`, `PUT(uri)`, `PATCH(uri)`, `DELETE(uri)`, `HEAD(uri)` or `OPTIONS(uri)`, `route(HttpMethod, uri)` for a method given as a value, or `route(Set<HttpMethod>, uri)` for several methods, returns the pending route, a api:web.router.builder.DirectRouteSpec[]; its settings come next; one terminal ends it: `respond(HttpResponse)` with a response given as a value, `respond(Function<DirectContext, HttpResponse>)` with a function, or `respondAsync(...)` with a function that completes the response later. A route with no settings that answers with a value has a shortcut per method, e.g. `GET(uri, HttpResponse)`: unlike the shortcut `GET(uri, handler)` of an `HttpRoutes` bean, it takes the response, not a function. A pending route without a terminal fails the startup, with a message that names it and its `HttpDirectRoutes` bean.
 
-WARNING: An `OPTIONS(uri)` direct route also answers the CORS preflight requests of its paths, as no filter runs for it, the CORS filter neither: without the CORS headers, a browser rejects the cross-origin requests it covers. A route that leaves them to the CORS filter excludes them with a condition, e.g. `where(RouteCondition.not(RouteCondition.header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD)))`.
+WARNING: An `OPTIONS(uri)` direct route also answers the CORS preflight requests of its paths, as no filter runs for it, the CORS filter neither: without the CORS headers, a browser rejects the cross-origin requests it covers. A route that leaves them to the CORS filter excludes them with a condition, e.g. `where(RequestCondition.not(RequestCondition.header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD)))`.
 
 The function creates its response with the static methods of `HttpResponse`, e.g. `HttpResponse.ok(...)`, which create the response type of the server runtime: the server writes it as it is, without converting it. A response of another type, e.g. one a library returns, still works: the server converts it. The function reads the request with `request()`, a api:web.router.direct.DirectRequest[]: its method, its path, its headers, its query parameters and the address of its peer, each read when the function asks for it. A route of several methods reads the method of the request there, as does a `GET` route that answers a `HEAD` request. A function that reads a query that is not valid declines the request, which the server answers with `400` on its ordinary path. To test a function without a server, `DirectContext.of(request, pathVariables)` creates its context.
 
@@ -81,7 +81,7 @@ snippet::io.micronaut.docs.server.functional.BenchmarkRoutes[tags="imports,clazz
 
 The URI template of a direct route, under its prefix and the context path, is matched like the URI template of an ordinary route, and the direct routes rank among themselves like the router ranks its routes: the most specific template first, then the constraints and the conditions, then the lowest order. A `HEAD` request is matched against the `HEAD` direct routes and the `GET` direct routes together, and an explicit `HEAD` route wins over a `GET` route only when they are equally specific, whatever their order, as in the router. Direct routes of the same specificity and order that both match a request make it ambiguous, answered with `400`. Two routes of the same method, URI template and order, without a condition or a constraint, would make every request they match ambiguous: they fail the startup, with a message that names both.
 
-The order only breaks ties between equally specific routes: a guard route on a catch-all template, like the block list above, never comes before a more specific direct route. A route that the guard must cover too takes the guard's condition itself, e.g. `where(RouteCondition.not(blocked))`.
+The order only breaks ties between equally specific routes: a guard route on a catch-all template, like the block list above, never comes before a more specific direct route. A route that the guard must cover too takes the guard's condition itself, e.g. `where(RequestCondition.not(blocked))`.
 
 A direct route is not a route of the router. It answers the requests it matches before any ordinary route, whatever their specificity: a direct route `/{+path}` answers every request its conditions accept, even one to a more specific controller route.
 
@@ -100,18 +100,19 @@ snippet::io.micronaut.docs.server.functional.DeclineRoutes[tags="clazz", indent=
 
 A direct route takes the conditions the server decides from the request it received:
 
-* `RouteCondition.method(...)`;
-* `RouteCondition.header(...)` and `RouteCondition.cookie(...)`, read from the headers as they were received;
-* `RouteCondition.query(...)`, decoded from the URI like the parameters of an ordinary request, with the charset of the content type of the request or the default charset of the server and its limits. The query is decoded only when a route with a query condition is tried, once per request;
-* `RouteCondition.host(...)`, which reads the `Host` header, or the authority of an HTTP/2 request, and never a forwarded header or the host resolver of the server;
-* `RouteCondition.peerAddress(...)`, the address of the peer of the connection;
-* `RouteCondition.before(...)`, `after(...)` and `between(...)`, which read the `java.time.Clock` bean if there is one, otherwise the system clock, like the conditions of the ordinary routes;
+* `RequestCondition.method(...)`;
+* `RequestCondition.header(...)` and `RequestCondition.cookie(...)`, read from the headers as they were received;
+* `RequestCondition.query(...)`, decoded from the URI like the parameters of an ordinary request, with the charset of the content type of the request or the default charset of the server and its limits. The query is decoded only when a route with a query condition is tried, once per request;
+* `RequestCondition.host(...)`, which reads the `Host` header, or the authority of an HTTP/2 request, and never a forwarded header or the host resolver of the server;
+* `RequestCondition.peerAddress(...)`, the address of the peer of the connection;
+* `RequestCondition.before(...)`, `after(...)` and `between(...)`, which read the `java.time.Clock` bean if there is one, otherwise the system clock, like the conditions of the ordinary routes;
 * their combinations with `all`, `any`, `not`, `and`, `or` and `negate`.
 
 Two conditions are rejected, with an `IllegalArgumentException` when they are given to the route, so that the application fails to start with a message that names the route and the condition:
 
-* a condition of a lambda, `RouteCondition.custom(...)` or `where(Predicate<HttpRequest>)`, as it receives the api:http.HttpRequest[], which a direct route never creates;
-* `RouteCondition.remoteAddress(...)`, as it resolves the client address with the api:http.server.util.HttpClientAddressResolver[] of the server, from the request and its forwarded headers. `peerAddress(...)`, which reads the connection only, is the condition for a direct route.
+* a condition of a lambda, `RequestCondition.custom(...)` or `where(Predicate<HttpRequest>)`, as it receives the api:http.HttpRequest[], which a direct route never creates;
+* a condition on the body, `RequestCondition.body(...)`, `bodyAsync(...)`, `bodyText(...)` or `bodyBytes(...)`, as a direct route is matched before the body of the request is read;
+* `RequestCondition.remoteAddress(...)`, as it resolves the client address with the api:http.server.util.HttpClientAddressResolver[] of the server, from the request and its forwarded headers. `peerAddress(...)`, which reads the connection only, is the condition for a direct route.
 
 === Runtimes
 

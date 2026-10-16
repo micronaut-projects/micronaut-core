@@ -3,7 +3,7 @@ from micronaut.context.annotation import Requires
 import java
 from jakarta.inject import Singleton
 from micronaut.http import HttpHeaders, HttpMethod, HttpResponse, HttpStatus, MediaType
-from micronaut.web.router.builder import DirectRouteBuilder, HttpDirectRoutes, RouteCondition, ValueMatcher
+from micronaut.web.router.builder import DirectRouteBuilder, HttpDirectRoutes, RequestCondition, ValueMatcher
 
 EnumSet = java.type("java.util.EnumSet")
 List = java.type("java.util.List")
@@ -27,9 +27,9 @@ class DirectRoutes(HttpDirectRoutes):
                    HttpResponse.notModified() if direct.request().header(HttpHeaders.IF_NONE_MATCH) == VERSION  # <5>
                    else HttpResponse.ok("1.0.0").header(HttpHeaders.ETAG, VERSION))
         (routes.route(EnumSet.of(HttpMethod.GET, HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE), "/{+path}")  # <6>
-            .where(RouteCondition.any(
-                RouteCondition.header("User-Agent", ValueMatcher.contains("badbot").ignoringCase()),
-                RouteCondition.peerAddress("203.0.113.0/24")))
+            .where(RequestCondition.any(
+                RequestCondition.header("User-Agent", ValueMatcher.contains("badbot").ignoringCase()),
+                RequestCondition.peerAddress("203.0.113.0/24")))
                 .respond(HttpResponse.status(HttpStatus.FORBIDDEN)))  # <7>
 
     def probes(self, probe: DirectRouteBuilder) -> None:

@@ -15,7 +15,7 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.web.router.builder.RouteConditions;
+import io.micronaut.web.router.builder.RequestConditions;
 import io.micronaut.web.router.builder.ValueMatcher;
 import org.junit.jupiter.api.Test;
 
@@ -145,10 +145,10 @@ class ValueMatcherTest {
         // a region of a value, e.g. of a cookie in the Cookie header
         String header = "a=1; variant=beta; z=9";
         int start = header.indexOf("beta");
-        assertTrue(RouteConditions.matches(equalTo("beta"), header, start, start + 4));
-        assertTrue(RouteConditions.matches(oneOf("alpha", "beta"), header, start, start + 4));
-        assertTrue(RouteConditions.matches(regex("b\\w+"), header, start, start + 4), "the region bounds the expression");
-        assertFalse(RouteConditions.matches(endsWith("9"), header, start, start + 4));
+        assertTrue(RequestConditions.matches(equalTo("beta"), header, start, start + 4));
+        assertTrue(RequestConditions.matches(oneOf("alpha", "beta"), header, start, start + 4));
+        assertTrue(RequestConditions.matches(regex("b\\w+"), header, start, start + 4), "the region bounds the expression");
+        assertFalse(RequestConditions.matches(endsWith("9"), header, start, start + 4));
     }
 
     @Test

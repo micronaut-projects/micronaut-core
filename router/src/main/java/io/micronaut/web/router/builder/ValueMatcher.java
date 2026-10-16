@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
 
 /**
  * A declarative matcher of a value: of a header, a query parameter, a cookie or the host of a
- * request, see {@link RouteCondition}, or of a path variable, see
+ * request, see {@link RequestCondition}, or of a path variable, see
  * {@link RouteSpec#constrain(String, ValueMatcher)}. A matcher is data: the router can read,
  * combine, reorder and index it, which a lambda does not allow.
  *
@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
  * import static io.micronaut.web.router.builder.ValueMatcher.*;
  *
  * routes.GET("/search")
- *     .where(RouteCondition.header("X-Channel", oneOf("beta", "canary").ignoringCase()))
+ *     .where(RequestCondition.header("X-Channel", oneOf("beta", "canary").ignoringCase()))
  *     .handle(betaHandler);
  * routes.GET("/files/{name}")
  *     .constrain("name", startsWith(".").negate())
@@ -154,7 +154,7 @@ public sealed interface ValueMatcher {
      * <a href="https://www.rfc-editor.org/rfc/rfc9110#section-13.1.2">RFC 9110</a>: one of the
      * listed tags is the tag, weak or strong, or the value is {@code *}. A route that answers
      * {@code 304} for the current version is declared with the condition
-     * {@code RouteCondition.header(HttpHeaders.IF_NONE_MATCH, ValueMatcher.entityTag(VERSION))}.
+     * {@code RequestCondition.header(HttpHeaders.IF_NONE_MATCH, ValueMatcher.entityTag(VERSION))}.
      * A malformed list matches up to the first tag that cannot be read.
      *
      * @param entityTag The entity tag with its quotes, e.g. {@code "v1"}, the Java string
@@ -207,7 +207,7 @@ public sealed interface ValueMatcher {
      * @return Whether it matches
      */
     default boolean matches(@Nullable CharSequence value) {
-        return RouteConditions.matches(this, value);
+        return RequestConditions.matches(this, value);
     }
 
     /**

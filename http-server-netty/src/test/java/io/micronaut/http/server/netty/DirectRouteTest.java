@@ -38,7 +38,7 @@ import io.micronaut.web.router.builder.DirectRouteBuilder;
 import io.micronaut.web.router.builder.HttpDirectRoutes;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -365,14 +365,14 @@ class DirectRouteTest {
                 .body("foreign")
                 .header("X-Foreign", "yes"));
 
-            routes.GET("/direct/guarded").where(RouteCondition.header("X-Direct")).respond(HttpResponse.ok("guarded direct"));
+            routes.GET("/direct/guarded").where(RequestCondition.header("X-Direct")).respond(HttpResponse.ok("guarded direct"));
 
             routes.GET("/direct/files/{name}").respond(direct -> HttpResponse.ok("file " + direct.pathVariables().getString("name")));
             routes.GET("/direct/files/special", HttpResponse.ok("special"));
 
             // the test client connects from the loopback address
             routes.GET("/direct/admin")
-                .where(RouteCondition.peerAddress("127.0.0.0/8", "::1"))
+                .where(RequestCondition.peerAddress("127.0.0.0/8", "::1"))
                 .respond(HttpResponse.status(HttpStatus.FORBIDDEN));
 
             routes.POST("/direct/legacy", HttpResponse.status(HttpStatus.GONE));

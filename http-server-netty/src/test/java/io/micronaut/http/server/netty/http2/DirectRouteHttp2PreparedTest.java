@@ -27,7 +27,7 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import io.micronaut.web.router.builder.DirectRouteBuilder;
 import io.micronaut.web.router.builder.HttpDirectRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import io.micronaut.web.router.builder.ValueMatcher;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -76,7 +76,7 @@ class DirectRouteHttp2PreparedTest {
         @Override
         public void routes(DirectRouteBuilder routes) {
             routes.GET("/h2-prepared/version")
-                .where(RouteCondition.header(HttpHeaders.IF_NONE_MATCH, ValueMatcher.entityTag("\"v1\"")))
+                .where(RequestCondition.header(HttpHeaders.IF_NONE_MATCH, ValueMatcher.entityTag("\"v1\"")))
                 .order(-1)
                 .respond(HttpResponse.notModified().header("ETag", "\"v1\""));
             routes.GET("/h2-prepared/version", HttpResponse.ok("current")
