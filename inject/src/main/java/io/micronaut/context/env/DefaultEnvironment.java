@@ -116,6 +116,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
     private final Map<String, Boolean> presenceCache = new ConcurrentHashMap<>();
     private final AtomicBoolean reading = new AtomicBoolean(false);
+    /**
+     * The property sources given to {@link #addPropertySource(PropertySource)} while the property
+     * sources are read, which the read processes before it stops reading, unless it has processed
+     * them itself. Its monitor guards the list and the end of a read, so that a property source is
+     * either left to the read or processed by the thread that adds it. It is taken with or without
+     * the lock of the catalogs held, and no other lock is taken while it is held.
+     */
+    private final List<PropertySource> addedWhileReading = new ArrayList<>(2);
     private final Boolean deduceEnvironments;
     private final ApplicationContextConfiguration configuration;
     private final Collection<String> configLocations;
@@ -210,12 +218,34 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
-        propertySources.put(propertySource.getName(), propertySource);
-        if (isRunning() && !reading.get()) {
+        String name = propertySource.getName();
+        synchronized (addedWhileReading) {
+            propertySources.put(name, propertySource);
+            if (reading.get()) {
+                // The read may have collected the property sources it processes before this one
+                // was added, so it is handed to the read, which processes it after them.
+                addedWhileReading.add(propertySource);
+                return this;
+            }
+        }
+        if (isRunning()) {
             resetCaches();
             processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
         }
         return this;
+    }
+
+    @Override
+    protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
+        if (reading.get()) {
+            synchronized (addedWhileReading) {
+                // Processed now, so it is not processed again when the read ends. A subclass that
+                // adds property sources before it reads them, as the bootstrap of the application
+                // context does, has them processed once by the read, in their order.
+                addedWhileReading.removeIf(added -> added == properties);
+            }
+        }
+        super.processPropertySource(properties, convention);
     }
 
     @Override
@@ -280,16 +310,51 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             if (running.compareAndSet(false, true)) {
                 log.debug("Starting environment {} for active names {}", this, getActiveNames());
                 if (reading.compareAndSet(false, true)) {
+                    boolean completed = false;
                     try {
                         readPropertySources(getPropertySourceRootName());
+                        processAddedWhileReading();
+                        completed = true;
                     } finally {
-                        // also when the read fails, or a property source added later is never processed
-                        reading.set(false);
+                        if (!completed) {
+                            synchronized (addedWhileReading) {
+                                // also when the read fails, or a property source added later is never
+                                // processed; what was added meanwhile stays registered for the next read
+                                addedWhileReading.clear();
+                                reading.set(false);
+                            }
+                        }
                     }
                 }
             }
         }
         return this;
+    }
+
+    /**
+     * Processes the property sources added while the property sources were read, after those the
+     * read has processed, and stops reading once none is left. Within a refresh they are published
+     * with the rest of what the refresh has read. A property source that has been replaced or
+     * removed since it was added is skipped: what replaced it is processed on its own.
+     */
+    private void processAddedWhileReading() {
+        while (true) {
+            List<PropertySource> added;
+            synchronized (addedWhileReading) {
+                if (addedWhileReading.isEmpty()) {
+                    reading.set(false);
+                    return;
+                }
+                added = new ArrayList<>(addedWhileReading);
+                addedWhileReading.clear();
+            }
+            for (PropertySource propertySource : added) {
+                if (propertySources.get(propertySource.getName()) == propertySource) {
+                    // the convention that addPropertySource processes it with outside a read
+                    processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
+                }
+            }
+        }
     }
 
     @Override
