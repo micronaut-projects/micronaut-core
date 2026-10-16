@@ -4762,7 +4762,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * retained bean, or under one: the configuration bean is not retained, the next context creates its own, and the
      * retained bean keeps what it copied from it, which stays valid until a change under that prefix releases the
      * bean. A retained bean must therefore not keep its configuration bean, only its values. A configuration bean
-     * under another prefix is treated as any other bean the retained bean holds.
+     * under another prefix, held by the retained bean or by any singleton or prototype of its closure, such as the
+     * factory that produced it, is observed: it is left out of the closure as well, and the bean is released when the
+     * criteria say the change behind the restart {@link RetentionCriteria#touches(String) touched} its prefix, the
+     * entry's own for an {@link io.micronaut.context.annotation.EachProperty} entry. The prefixes the criteria name
+     * thus only need to cover what the bean reads outside configuration beans, such as a raw property value.
      *
      * @param criteria Which singleton registrations to keep alive
      * @return The retained registrations, in no particular order
@@ -5781,14 +5785,22 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             }
             // a retained bean keeps the singletons it holds, so they are retained with it; one of them bound to
             // this context (a provider, a proxy, the context itself) keeps the whole closure from being retained,
-            // except configuration a change of which releases the bean: it is not retained, but made again by the next context
+            // except configuration: it is not retained, but made again by the next context
             List<BeanRegistration<?>> closure = new ArrayList<>();
-            Set<String> invalidatedBy = criteria.observedConfigurationPrefixes(registration);
-            BeanRegistration<?> bound = collectRetentionClosure(registration, invalidatedBy, closure, Collections.newSetFromMap(new IdentityHashMap<>()));
+            ClosureConfiguration configuration = new ClosureConfiguration(criteria.observedConfigurationPrefixes(registration), !(criteria instanceof PredicateRetentionCriteria));
+            BeanRegistration<?> bound = collectRetentionClosure(registration, configuration, closure, Collections.newSetFromMap(new IdentityHashMap<>()));
             if (bound != null) {
                 if (LOG_LIFECYCLE.isWarnEnabled()) {
                     LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: {} holds a provider, a proxy, a scope or the context, which are bound to this context",
                         registration.bean, bound == registration ? "it" : theBean(bound) + " it holds");
+                }
+                continue;
+            }
+            // the configuration it was made from, under a prefix its criteria do not name, released it when the change touched it
+            String touched = configuration.touchedBy(criteria);
+            if (touched != null) {
+                if (LOG_LIFECYCLE.isDebugEnabled()) {
+                    LOG_LIFECYCLE.debug("Bean [{}] is not retained across the restart: the configuration under [{}] it was made from changed", registration.bean, touched);
                 }
                 continue;
             }
@@ -5802,7 +5814,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             BeanRegistration<?> replacing = null;
             Class<?> replaced = null;
             for (BeanRegistration<?> member : closure) {
-                replaced = replacedClassOf(member, criteria, invalidatedBy, examined);
+                replaced = replacedClassOf(member, criteria, configuration, examined);
                 if (replaced != null) {
                     replacing = member;
                     break;
@@ -5907,28 +5919,28 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * the closure that is retained with it. Known only when the dependency graph is recorded; without it
      * the closure is the bean alone and the caller answers for what it holds.
      *
-     * @param invalidatedBy The prefixes a change under which releases the retained bean: a configuration bean under one
-     * of them is left out of the closure rather than examined
+     * @param configuration The configuration of the retained bean: a configuration bean is left out of the closure
+     * rather than examined, and its prefix observed when the criteria do not name it
      * @return The first member bound to this context, which keeps the closure from being retained, or null
      */
     @Nullable
-    private BeanRegistration<?> collectRetentionClosure(BeanRegistration<?> registration, Set<String> invalidatedBy,
+    private BeanRegistration<?> collectRetentionClosure(BeanRegistration<?> registration, ClosureConfiguration configuration,
                                                        List<BeanRegistration<?>> closure, Set<Object> visited) {
         if (!visited.add(registration)) {
             return null;
         }
-        if (!closure.isEmpty() && isCoveredConfiguration(registration.beanDefinition, invalidatedBy)) {
+        if (!closure.isEmpty() && configuration.leavesOut(registration.beanDefinition, true)) {
             // the next context binds it again; the retained bean holds only what it copied, valid until a change releases it
             return null;
         }
-        if (holdsContextBoundState(registration, invalidatedBy)) {
+        if (holdsContextBoundState(registration, configuration)) {
             return registration;
         }
         closure.add(registration);
         if (dependencyGraph == null) {
             return null;
         }
-        return collectRetentionClosure(registration.beanDefinition, invalidatedBy, closure, visited);
+        return collectRetentionClosure(registration.beanDefinition, configuration, closure, visited);
     }
 
     /**
@@ -5936,7 +5948,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * its owner and contributes what it received in turn.
      */
     @Nullable
-    private BeanRegistration<?> collectRetentionClosure(BeanDefinition<?> definition, Set<String> invalidatedBy,
+    private BeanRegistration<?> collectRetentionClosure(BeanDefinition<?> definition, ClosureConfiguration configuration,
                                                        List<BeanRegistration<?>> closure, Set<Object> visited) {
         if (dependencyGraph == null) {
             return null;
@@ -5948,11 +5960,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             BeanRegistration<?> bound;
             if (edge.dependency().isSingleton()) {
                 BeanRegistration<?> dependency = singletonScope.findBeanRegistration(edge.dependency());
-                bound = dependency == null ? null : collectRetentionClosure(dependency, invalidatedBy, closure, visited);
-            } else if (isCoveredConfiguration(edge.dependency(), invalidatedBy)) {
+                bound = dependency == null ? null : collectRetentionClosure(dependency, configuration, closure, visited);
+            } else if (configuration.leavesOut(edge.dependency(), true)) {
                 bound = null;
             } else if (visited.add(edge.dependency())) {
-                bound = collectRetentionClosure(edge.dependency(), invalidatedBy, closure, visited);
+                bound = collectRetentionClosure(edge.dependency(), configuration, closure, visited);
             } else {
                 bound = null;
             }
@@ -5968,11 +5980,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * instance, the instance the bean created listeners received, and the prototypes it owns or received.
      */
     @Nullable
-    private Class<?> replacedClassOf(BeanRegistration<?> registration, RetentionCriteria criteria, Set<String> invalidatedBy, Set<Object> examined) {
+    private Class<?> replacedClassOf(BeanRegistration<?> registration, RetentionCriteria criteria, ClosureConfiguration configuration, Set<Object> examined) {
         if (!examined.add(registration)) {
             return null;
         }
-        Class<?> replaced = replacedClassOf(registration.beanDefinition, criteria, invalidatedBy, examined);
+        Class<?> replaced = replacedClassOf(registration.beanDefinition, criteria, configuration, examined);
         if (replaced != null) {
             return replaced;
         }
@@ -5984,10 +5996,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
         if (registration instanceof BeanDisposingRegistration<?> disposing) {
             for (BeanRegistration<?> dependent : disposing.dependentBeans()) {
-                if (isCoveredConfiguration(dependent.beanDefinition, invalidatedBy)) {
+                if (configuration.leavesOut(dependent.beanDefinition, false)) {
                     continue;
                 }
-                replaced = replacedClassOf(dependent, criteria, invalidatedBy, examined);
+                replaced = replacedClassOf(dependent, criteria, configuration, examined);
                 if (replaced != null) {
                     return replaced;
                 }
@@ -5997,7 +6009,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Nullable
-    private Class<?> replacedClassOf(BeanDefinition<?> definition, RetentionCriteria criteria, Set<String> invalidatedBy, Set<Object> examined) {
+    private Class<?> replacedClassOf(BeanDefinition<?> definition, RetentionCriteria criteria, ClosureConfiguration configuration, Set<Object> examined) {
         if (!examined.add(definition)) {
             return null;
         }
@@ -6014,10 +6026,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (dependencyGraph != null) {
             for (BeanDependencyGraph.BeanDependency edge : dependencyGraph.dependenciesOf(definition)) {
                 // a singleton it received is a member of the closure, examined as such
-                if (edge.lazy() || edge.dependency().isSingleton() || isCoveredConfiguration(edge.dependency(), invalidatedBy)) {
+                if (edge.lazy() || edge.dependency().isSingleton() || configuration.leavesOut(edge.dependency(), false)) {
                     continue;
                 }
-                Class<?> replaced = replacedClassOf(edge.dependency(), criteria, invalidatedBy, examined);
+                Class<?> replaced = replacedClassOf(edge.dependency(), criteria, configuration, examined);
                 if (replaced != null) {
                     return replaced;
                 }
@@ -6026,35 +6038,118 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return null;
     }
 
-    private boolean holdsContextBoundState(BeanRegistration<?> registration, Set<String> invalidatedBy) {
-        return holdsContextBoundState(registration, invalidatedBy, Collections.newSetFromMap(new IdentityHashMap<>()));
+    private boolean holdsContextBoundState(BeanRegistration<?> registration, ClosureConfiguration configuration) {
+        return holdsContextBoundState(registration, configuration, Collections.newSetFromMap(new IdentityHashMap<>()));
     }
 
     /**
-     * Whether a definition is of configuration, {@link io.micronaut.context.annotation.ConfigurationProperties},
-     * {@link io.micronaut.context.annotation.EachProperty} or another {@link ConfigurationReader}, whose prefix is one
-     * of the given prefixes or under one: a change of it is a change under that prefix. The prefix of an
-     * {@code @EachProperty} entry is the entry's own.
+     * The prefix of a configuration bean's definition, {@link io.micronaut.context.annotation.ConfigurationProperties},
+     * {@link io.micronaut.context.annotation.EachProperty} or another {@link ConfigurationReader}: the entry's own for an
+     * {@code @EachProperty} entry, and for its definition the prefix up to the first wildcard, which holds every entry.
+     *
+     * @return The prefix, or null when the definition is not of configuration or reads under no prefix
      */
-    private static boolean isCoveredConfiguration(BeanDefinition<?> definition, Set<String> invalidatedBy) {
-        if (invalidatedBy.isEmpty() || !definition.hasStereotype(ConfigurationReader.class)) {
-            return false;
+    @Nullable
+    static String configurationPrefixOf(BeanDefinition<?> definition) {
+        if (!definition.hasStereotype(ConfigurationReader.class)) {
+            return null;
         }
         String prefix = definition instanceof BeanDefinitionDelegate<?> delegate
             ? delegate.getConfigurationPath().map(ConfigurationPath::prefix).orElse(null) : null;
         if (prefix == null) {
             prefix = definition.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse(null);
         }
-        if (prefix == null || prefix.isEmpty()) {
-            return false;
+        if (prefix == null) {
+            return null;
         }
-        for (String covering : invalidatedBy) {
-            if (prefix.equals(covering) || prefix.length() > covering.length() && prefix.startsWith(covering)
-                && (prefix.charAt(covering.length()) == '.' || prefix.charAt(covering.length()) == '[')) {
+        int wildcard = prefix.indexOf('*');
+        if (wildcard >= 0) {
+            int end = wildcard;
+            while (end > 0 && (prefix.charAt(end - 1) == '.' || prefix.charAt(end - 1) == '[')) {
+                end--;
+            }
+            prefix = prefix.substring(0, end);
+        }
+        return prefix.isEmpty() ? null : prefix;
+    }
+
+    /**
+     * Whether a prefix is one of the given prefixes, or under one of them.
+     */
+    private static boolean isCovered(String prefix, Set<String> covering) {
+        for (String candidate : covering) {
+            if (prefix.equals(candidate) || prefix.length() > candidate.length() && prefix.startsWith(candidate)
+                && (prefix.charAt(candidate.length()) == '.' || prefix.charAt(candidate.length()) == '[')) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * The configuration of a retained bean's closure: the configuration beans a member of it holds are left out of it,
+     * since the next context binds them again, and the prefixes of those the criteria do not
+     * {@link RetentionCriteria#observedConfigurationPrefixes(BeanRegistration) name} are observed, so that a change under one releases
+     * the bean. Criteria that know of no configuration change, those of {@link #stopRetaining(Predicate)}, leave out only
+     * what they name, and the closure keeps the rest as any other bean.
+     */
+    private static final class ClosureConfiguration {
+        private final Set<String> invalidatedBy;
+        private final boolean observing;
+        private Set<String> observed = Set.of();
+
+        ClosureConfiguration(Set<String> invalidatedBy, boolean observing) {
+            this.invalidatedBy = invalidatedBy;
+            this.observing = observing;
+        }
+
+        /**
+         * Whether a definition is of configuration left out of the closure: under one of the prefixes the criteria
+         * name, or under another one, which is then observed.
+         *
+         * @param definition The definition
+         * @param observe Whether to observe its prefix: false where the definition stands for a bean found otherwise,
+         * whose own definition, an entry's, is observed instead
+         * @return True when it is left out
+         */
+        boolean leavesOut(BeanDefinition<?> definition, boolean observe) {
+            if (!observing && invalidatedBy.isEmpty()) {
+                return false;
+            }
+            String prefix = configurationPrefixOf(definition);
+            if (prefix == null) {
+                return false;
+            }
+            if (isCovered(prefix, invalidatedBy)) {
+                return true;
+            }
+            if (!observing) {
+                return false;
+            }
+            if (observe) {
+                if (observed.isEmpty()) {
+                    observed = new LinkedHashSet<>();
+                }
+                observed.add(prefix);
+            }
+            return true;
+        }
+
+        /**
+         * The first observed prefix the change behind the restart touched.
+         *
+         * @param criteria The criteria, which know the change
+         * @return The prefix, or null when the change touched none
+         */
+        @Nullable
+        String touchedBy(RetentionCriteria criteria) {
+            for (String prefix : observed) {
+                if (criteria.touches(prefix)) {
+                    return prefix;
+                }
+            }
+            return null;
+        }
     }
 
     /**
@@ -6082,7 +6177,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             || bean instanceof BeanResolutionContext;
     }
 
-    private boolean holdsContextBoundState(BeanRegistration<?> registration, Set<String> invalidatedBy, Set<Object> visited) {
+    private boolean holdsContextBoundState(BeanRegistration<?> registration, ClosureConfiguration configuration, Set<Object> visited) {
         if (!visited.add(registration)) {
             return false;
         }
@@ -6100,18 +6195,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
         if (dependencyGraph != null) {
             for (BeanDependencyGraph.BeanDependency dependency : dependencyGraph.dependenciesOf(registration.beanDefinition)) {
-                if (isCoveredConfiguration(dependency.dependency(), invalidatedBy)) {
-                    continue;
-                }
+                // a provider or a proxy resolves through this context whatever it resolves, configuration included
                 if (dependency.lazy() || dependency.dependency().isProxy()) {
                     return true;
                 }
+                // a singleton is observed under its own registration's definition, an entry's, as the closure finds it
+                configuration.leavesOut(dependency.dependency(), !dependency.dependency().isSingleton());
             }
         }
         // what an owned prototype holds, the bean holds through it
         if (registration instanceof BeanDisposingRegistration<?> disposing && !disposing.dependentBeans().isEmpty()) {
             for (BeanRegistration<?> dependent : disposing.dependentBeans()) {
-                if (!isCoveredConfiguration(dependent.beanDefinition, invalidatedBy) && holdsContextBoundState(dependent, invalidatedBy, visited)) {
+                if (!configuration.leavesOut(dependent.beanDefinition, true) && holdsContextBoundState(dependent, configuration, visited)) {
                     return true;
                 }
             }

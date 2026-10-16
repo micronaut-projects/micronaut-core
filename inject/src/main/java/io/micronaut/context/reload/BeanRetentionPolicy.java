@@ -41,7 +41,9 @@ import java.util.Set;
  * {@link BeanDependencyGraph}, nothing it received is stale either, and the context refuses a bean
  * that holds state bound to it; a policy cannot override these checks. A retained bean is dropped,
  * and created again by the new context, when configuration under one of the prefixes a policy that
- * retains it {@link #observedConfigurationPrefixes(BeanRegistration) declares} changed.</p>
+ * retains it {@link #observedConfigurationPrefixes(BeanRegistration) declares} changed, or under the prefix of a
+ * configuration bean in its closure: a {@code @ConfigurationProperties}, an {@code @EachProperty} entry or another
+ * configuration reader that it, the factory that produced it or any bean it holds received.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -60,10 +62,12 @@ public interface BeanRetentionPolicy extends Ordered {
 
     /**
      * The configuration prefixes a change under which invalidates a retained bean this policy
-     * {@link Decision#RETAIN retains}, so that a changed connection URL produces a new pool.
+     * {@link Decision#RETAIN retains}, so that a changed connection URL produces a new pool. The prefixes of the
+     * configuration beans in the bean's closure are observed without being declared, so these only need to cover what
+     * the bean reads outside configuration beans, such as a raw property value.
      *
      * @param registration The retained bean's registration
-     * @return The prefixes, empty if no configuration change invalidates the bean
+     * @return The prefixes, empty if only the configuration beans of its closure invalidate the bean
      */
     default Set<String> observedConfigurationPrefixes(BeanRegistration<?> registration) {
         return Set.of();
