@@ -64,7 +64,7 @@ import java.util.function.Predicate;
  * a type that is itself not public is recorded in its own package, the one package that can name it. A super type that
  * the record cannot name, a class that is not public and of another package than the record or one whose arguments
  * name such a class, is left out of the recorded closure with the types above it kept, and is recorded by the name of
- * its class instead ({@link TypeHierarchy#getInaccessibleSuperTypes()}); a type whose variables are bounded by such a
+ * its class instead ({@link TypeHierarchy#getOmittedSuperTypeNames()}); a type whose variables are bounded by such a
  * class is refused.</p>
  *
  * @author Denis Stepanov
@@ -152,7 +152,7 @@ public final class TypeHierarchyWriter {
         // the closure the compiler walked, the type itself left out: the record is of the type. A super type the record
         // cannot name is left out with the types above it kept, and is recorded by the name of its class
         List<ExpressionDef> superTypes = new ArrayList<>();
-        Set<String> inaccessibleSuperTypes = new LinkedHashSet<>();
+        Set<String> omittedSuperTypeNames = new LinkedHashSet<>();
         for (ClassElement superType : type.getAllSuperTypes()) {
             if (superType.getName().equals(type.getName())) {
                 continue;
@@ -160,11 +160,11 @@ public final class TypeHierarchyWriter {
             if (isNameableFrom(superType, recordPackage)) {
                 superTypes.add(argument(defaults, type, recordType, superType.getSimpleName(), superType, loadClassValueExpressionFn));
             } else {
-                inaccessibleSuperTypes.add(superType.getName());
+                omittedSuperTypeNames.add(superType.getName());
             }
         }
-        ExpressionDef inaccessible = inaccessibleSuperTypes.isEmpty() ? ExpressionDef.nullValue()
-            : TypeDef.STRING.array().instantiate(inaccessibleSuperTypes.stream().<ExpressionDef>map(ExpressionDef::constant).toList());
+        ExpressionDef inaccessible = omittedSuperTypeNames.isEmpty() ? ExpressionDef.nullValue()
+            : TypeDef.STRING.array().instantiate(omittedSuperTypeNames.stream().<ExpressionDef>map(ExpressionDef::constant).toList());
 
         ClassDef.ClassDefBuilder builder = ClassDef.builder(recordName)
             .synthetic()

@@ -283,14 +283,14 @@ class Hierarchies
         record(classLoader, 'java.util.ArrayList').type == ArrayList
         stringBuilder.type == StringBuilder
         stringBuilder.genericSuperclass.empty
-        stringBuilder.inaccessibleSuperTypes == ['java.lang.AbstractStringBuilder']
+        stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
         !strings(stringBuilder.superTypes).contains('AbstractStringBuilder')
         strings(stringBuilder.superTypes).containsAll(['Appendable', 'CharSequence', 'Comparable<StringBuilder>', 'Serializable'])
         strings(stringBuilder.superTypes).last() == 'Object'
 
         and: "an ancestor of a third package is left out the same way"
         classLoader.loadClass(TypeHierarchies.recordClassName('java.util.jar.JarEntry', 'probe'))
-        jarEntry.inaccessibleSuperTypes == ['java.util.zip.ZipConstants']
+        jarEntry.omittedSuperTypeNames == ['java.util.zip.ZipConstants']
         strings(jarEntry.superTypes) as Set == ['ZipEntry', 'Cloneable', 'Object'] as Set
     }
 

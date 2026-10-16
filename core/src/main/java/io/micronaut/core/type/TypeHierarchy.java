@@ -22,7 +22,7 @@ import java.util.Optional;
 
 /**
  * The generic hierarchy of a type as it was declared: its type variables with their bounds, its generic superclass
- * and generic interfaces, and every super type it has, transitively, with their type arguments written in terms of
+ * and generic interfaces, and the super types it has, transitively, with their type arguments written in terms of
  * those variables.
  *
  * <p>A hierarchy is recorded at compile time, by the Micronaut processors, for the types a compilation asks for with
@@ -40,6 +40,12 @@ import java.util.Optional;
  * type used without its type arguments is a raw type ({@link Argument#isRawType()}) and so are its super types, and
  * an array of a variable is a placeholder whose type is the array of the erasure of the variable.
  * {@link #getTypeClosure(Argument)} substitutes the actual arguments of a parameterization into each entry.</p>
+ *
+ * <p>A record names only the classes that are public or of the package it is written for, the package of the class
+ * that imported the type. A super type whose declaration names another class is left out of the record, with the
+ * types above it kept: of {@link #getSuperTypes()}, of {@link #getGenericSuperclass()} or
+ * {@link #getGenericInterfaces()} when it is a direct super type, and so of {@link #getTypeClosure(Argument)}. It is
+ * listed by name in {@link #getOmittedSuperTypeNames()} instead.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -65,35 +71,37 @@ public sealed interface TypeHierarchy permits GeneratedTypeHierarchy {
      * {@link #getTypeVariables() type variables}. A raw {@code extends} is a raw argument.
      *
      * @return The superclass, or empty for an interface, for a type that extends {@link Object} and for a superclass
-     * the record could not name, which is then one of the {@link #getInaccessibleSuperTypes() inaccessible super types}
+     * the record could not name, which is then one of the {@link #getOmittedSuperTypeNames() omitted super types}
      */
     Optional<Argument<?>> getGenericSuperclass();
 
     /**
      * The generic interfaces the type implements, or an interface extends, with their type arguments as declared.
      *
-     * @return The interfaces, in the order declared
+     * @return The interfaces, in the order declared, without those the record could not name, which are then
+     * {@link #getOmittedSuperTypeNames() omitted super types}
      */
     List<Argument<?>> getGenericInterfaces();
 
     /**
-     * Every super type of the type, transitively, with its type arguments written in the
-     * {@link #getTypeVariables() type variables} of the type along the path that reaches it: the super class and its
+     * The super types of the type, transitively, with their type arguments written in the
+     * {@link #getTypeVariables() type variables} of the type along the path that reaches them: the super class and its
      * super types first, then each interface and its super types, each type once, {@link Object} last. A super type
-     * that could not be named from the record, a class that is not public and of another package than the record, is
-     * left out with the types above it kept, and is listed by name in {@link #getInaccessibleSuperTypes()}.
+     * the record could not name is left out with the types above it kept, and is listed by name in
+     * {@link #getOmittedSuperTypeNames()}.
      *
-     * @return The super types, in declaration order and with {@link Object} last
+     * @return The super types the record names, in declaration order and with {@link Object} last
      */
     List<Argument<?>> getSuperTypes();
 
     /**
      * The names of the super types left out of the {@link #getSuperTypes() super types} because the record could not
-     * name them: a class that is not public and of another package than the record, such as the package-private
-     * {@code java.lang.AbstractStringBuilder} of {@code StringBuilder}, or a super type whose type arguments name
-     * such a class. Each is the {@link Class#getName() name} of the class, its type arguments erased, in the order of
-     * the super types and once, so that a consumer that knows the class by name, in its own package, can still tell it
-     * is a super type of the type.
+     * name their declaration: one whose class is not public and of another package than the record, such as the
+     * package-private {@code java.lang.AbstractStringBuilder} of {@code StringBuilder}, or a public one whose type
+     * arguments name such a class at any depth, such as {@code Supplier<List<Hidden>>}. Each is the
+     * {@link Class#getName() name} of the class of the super type, without its type arguments, in the order of the
+     * super types and once, so that a consumer that knows the class by name, in its own package, can still tell it is
+     * a super type of the type.
      *
      * <p>The names are erased evidence of membership only, not generic metadata: a super type {@code Base<String>}
      * and a super type {@code Base<Integer>} are both {@code p.Base}, and nothing says what the type arguments of the
@@ -108,7 +116,7 @@ public sealed interface TypeHierarchy permits GeneratedTypeHierarchy {
      *
      * @return The names of the super types left out, empty when the record names them all or was written without them
      */
-    List<String> getInaccessibleSuperTypes();
+    List<String> getOmittedSuperTypeNames();
 
     /**
      * The type parameterized by its own type variables, {@code Foo<T>} for {@code class Foo<T>}, or the plain type

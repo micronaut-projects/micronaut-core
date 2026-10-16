@@ -42,7 +42,7 @@ import java.util.WeakHashMap;
  * which the service index of a packaged application already holds, and loads the record of the type asked for: no
  * record of another type is loaded, and the class asked about is not read reflectively. A type recorded from several
  * packages has a record in each, and a record written outside the package of the type can have left out super types
- * it could not name ({@link TypeHierarchy#getInaccessibleSuperTypes()}): the record in the package of the type is
+ * it could not name ({@link TypeHierarchy#getOmittedSuperTypeNames()}): the record in the package of the type is
  * preferred, otherwise the one that left out the fewest, the first by name among those, whatever order the class path
  * lists them in. Each lookup instantiates the record anew, which is a handful of {@link Argument}s; a caller that
  * asks for a hierarchy repeatedly keeps it.</p>
@@ -133,7 +133,7 @@ public final class TypeHierarchies {
             }
             // records written from other packages can each have left out other super types: the one that left out
             // the fewest, the first by name among those, so that the choice does not depend on the class path order
-            if (preferred == null || hierarchy.get().getInaccessibleSuperTypes().size() < preferred.getInaccessibleSuperTypes().size()) {
+            if (preferred == null || hierarchy.get().getOmittedSuperTypeNames().size() < preferred.getOmittedSuperTypeNames().size()) {
                 preferred = hierarchy.get();
             }
         }

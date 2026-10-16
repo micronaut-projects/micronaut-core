@@ -190,7 +190,7 @@ public class Holder {
         classLoader.loadClass(TypeHierarchies.recordClassName('java.util.ArrayList', 'test'))
         sub.genericSuperclass.empty
         strings(sub.superTypes) == ['Supplier<String>', 'Object']
-        sub.inaccessibleSuperTypes == ['other.Base']
+        sub.omittedSuperTypeNames == ['other.Base']
         strings(sub.getTypeClosure(Argument.of(sub.type))) == ['Sub', 'Supplier<String>', 'Object']
     }
 
@@ -210,13 +210,13 @@ public class Hierarchies {}
         record(classLoader, 'java.util.ArrayList', 'probe').type == ArrayList
         stringBuilder.type == StringBuilder
         stringBuilder.genericSuperclass.empty
-        stringBuilder.inaccessibleSuperTypes == ['java.lang.AbstractStringBuilder']
+        stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
         !strings(stringBuilder.superTypes).contains('AbstractStringBuilder')
         strings(stringBuilder.superTypes).containsAll(['Appendable', 'CharSequence', 'Comparable<StringBuilder>', 'Serializable'])
         strings(stringBuilder.superTypes).last() == 'Object'
 
         and: "an ancestor of a third package is left out the same way"
-        jarEntry.inaccessibleSuperTypes == ['java.util.zip.ZipConstants']
+        jarEntry.omittedSuperTypeNames == ['java.util.zip.ZipConstants']
         strings(jarEntry.superTypes) == ['ZipEntry', 'Cloneable', 'Object']
     }
 
@@ -257,14 +257,14 @@ public class Holder {
         expect: "both records are written into the package of the origin and name the base they leave out"
         string(mid.genericSuperclass.get()) == 'PublicMid<Integer>'
         strings(mid.superTypes) == ['PublicMid<Integer>', 'Supplier<List<Integer>>', 'Object']
-        mid.inaccessibleSuperTypes == ['b.HiddenBase']
+        mid.omittedSuperTypeNames == ['b.HiddenBase']
         publicMid.genericSuperclass.empty
         strings(publicMid.superTypes) == ['Supplier<List<T>>', 'Object']
-        publicMid.inaccessibleSuperTypes == ['b.HiddenBase']
+        publicMid.omittedSuperTypeNames == ['b.HiddenBase']
         strings(publicMid.getTypeClosure(Argument.of(publicMid.type, String))) == ['PublicMid<String>', 'Supplier<List<String>>', 'Object']
     }
 
-    void "a record of a type of the package of the origin names no inaccessible super type"() {
+    void "a record of a type of the package of the origin names no omitted super type"() {
         given:
         def classLoader = buildClassLoader('test.Payload', '''
 package test;
@@ -283,7 +283,7 @@ public class Payload extends Base<String> {
 
         expect:
         string(payload.genericSuperclass.get()) == 'Base<String>'
-        payload.inaccessibleSuperTypes.empty
+        payload.omittedSuperTypeNames.empty
     }
 
     void "a type recorded from its own package and from another is found in the record of its own package"() {
@@ -321,9 +321,9 @@ public class Foreign {
 
         expect: "each record names what its package can"
         strings(local.superTypes) == ['Base<T>', 'Supplier<T>', 'Object']
-        local.inaccessibleSuperTypes.empty
+        local.omittedSuperTypeNames.empty
         strings(foreign.superTypes) == ['Supplier<T>', 'Object']
-        foreign.inaccessibleSuperTypes == ['p.Base']
+        foreign.omittedSuperTypeNames == ['p.Base']
         // the in-memory class loader of the test lists no service entries: which record a lookup prefers is the
         // subject of TypeHierarchySpec in core
     }
@@ -490,7 +490,7 @@ public class Foreign {
         expect:
         TypeHierarchyFuzz.Oracle.recordPackage(hierarchy.class) == origin
         strings(hierarchy.getTypeClosure(hierarchy.declaration)) - [sequenced(hierarchy)] == reflected - [sequenced(hierarchy)]
-        hierarchy.inaccessibleSuperTypes == omitted as List
+        hierarchy.omittedSuperTypeNames == omitted as List
         (origin == 'p') == omitted.empty
 
         where:
@@ -543,7 +543,7 @@ public class Holder {
         then: "the Supplier naming Hidden in the second List is left out with Base"
         sub.genericInterfaces.empty
         strings(sub.superTypes) == ['Object']
-        sub.inaccessibleSuperTypes == ['p.Base', 'java.util.function.Supplier']
+        sub.omittedSuperTypeNames == ['p.Base', 'java.util.function.Supplier']
     }
 
     void "the same type is recorded once"() {

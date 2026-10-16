@@ -438,7 +438,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      *
      * <p>The record is named after the type and written into the package of the first originating element, or into
      * the package of the type when the type itself is not public. A super type the record cannot name from its package
-     * is left out of it and named in {@link io.micronaut.core.type.TypeHierarchy#getInaccessibleSuperTypes()}. Every originating element is
+     * is left out of it and named in {@link io.micronaut.core.type.TypeHierarchy#getOmittedSuperTypeNames()}. Every originating element is
      * reported to the compiler, as for {@link #registerBean(ClassElement, Element...)}, and the same rule applies: the
      * record is written with the round, and recording from {@link TypeElementVisitor#finish(VisitorContext)} is not
      * portable.</p>

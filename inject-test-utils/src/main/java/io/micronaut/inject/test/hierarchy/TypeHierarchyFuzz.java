@@ -162,7 +162,7 @@ public final class TypeHierarchyFuzz {
         compare(mismatches, g, g.declaration() + " declaration", TypeStrings.strings(hierarchy.getTypeClosure(hierarchy.getDeclaration())),
             Oracle.closure(type, Oracle.identity(type), false, ignoreInterface, Oracle.recordPackage(hierarchy.getClass()), omitted));
         // a super type the record cannot name, LongAdder's Striped64, is named by the record instead
-        compare(mismatches, g, g.declaration() + " omitted", hierarchy.getInaccessibleSuperTypes(), new ArrayList<>(omitted));
+        compare(mismatches, g, g.declaration() + " omitted", hierarchy.getOmittedSuperTypeNames(), new ArrayList<>(omitted));
         if (type.getTypeParameters().length > 0) {
             compare(mismatches, g, g.declaration() + " raw", TypeStrings.strings(hierarchy.getTypeClosure(Argument.of(type))),
                 Oracle.closure(type, Map.of(), true, ignoreInterface));

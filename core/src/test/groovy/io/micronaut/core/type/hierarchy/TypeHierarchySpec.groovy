@@ -169,8 +169,8 @@ class TypeHierarchySpec extends Specification {
 
     void "a record written without the names of what it left out has none"() {
         expect: "the constructor without the names, which carries no information on what was left out"
-        new $Records$Payload$TypeHierarchy().inaccessibleSuperTypes.empty
-        new io.micronaut.core.type.$$java.util.$ArrayList$TypeHierarchy().inaccessibleSuperTypes == ['java.util.AbstractList']
+        new $Records$Payload$TypeHierarchy().omittedSuperTypeNames.empty
+        new io.micronaut.core.type.$$java.util.$ArrayList$TypeHierarchy().omittedSuperTypeNames == ['java.util.AbstractList']
     }
 
     void "a type recorded from several packages is found in the record that names the most, whatever the order (#order)"() {
@@ -197,7 +197,7 @@ class TypeHierarchySpec extends Specification {
 
         and: "of two records written outside the package of the type, the one that left nothing out, which sorts after the other"
         arrayList.class == $ArrayList$TypeHierarchy
-        arrayList.inaccessibleSuperTypes.empty
+        arrayList.omittedSuperTypeNames.empty
 
         cleanup:
         TypeHierarchies.invalidate()
