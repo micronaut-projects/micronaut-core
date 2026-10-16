@@ -267,9 +267,11 @@ final class UriRouteSet {
                 // as findAllClosest: the targets resolve their routes, which the filter sees, before
                 // the ambiguity is resolved, e.g. a route of each version under the same prefix
                 List<UriRouteMatch<T, R>> resolved = findAllClosest(request, filter, ports);
-                return PendingRouteMatch.anyHasBodyConditions(resolved)
-                    ? pendingOrClosest(path, request, resolved, null, pending)
-                    : closest(path, resolved);
+                if (!PendingRouteMatch.anyHasBodyConditions(resolved)) {
+                    return closest(path, resolved);
+                }
+                // the body decides: all the candidates, with the less specific routes it falls through to
+                return pendingOrClosest(path, request, findAllCandidates(request, filter, ports), null, pending);
             }
             return resolveDynamic(request, closestRoute(path, request, matches), filter, pending);
         }
@@ -281,6 +283,44 @@ final class UriRouteSet {
         pending.accept(new PendingRouteMatch<>(path, ranks,
             hasDynamicTargets ? (chosenRequest, chosen, next) -> resolveDynamic(chosenRequest, chosen, filter, next) : null));
         return null;
+    }
+
+    /**
+     * All the matches of the request among the candidates a filter accepts, with the matches the
+     * targets of the routes with a dynamic target resolve instead of them, see
+     * {@link DynamicRouteTarget#findAll}, without resolving their ambiguity: the candidates of a
+     * choice by the body.
+     *
+     * @param request The request
+     * @param filter  The filter of the candidates, or {@code null}
+     * @param ports   The default ports, or {@code null}
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The matches
+     */
+    <T, R> List<UriRouteMatch<T, R>> findAllCandidates(HttpRequest<?> request,
+                                                       @Nullable Predicate<UriRouteMatch<T, R>> filter,
+                                                       @Nullable Set<Integer> ports) {
+        List<UriRouteMatch<T, R>> matches = filter(findMatches(request, request.getPath(), ports), filter);
+        return hasDynamicTargets ? resolveAll(request, matches, filter) : matches;
+    }
+
+    /**
+     * @return The matches, with the matches their targets resolve instead of the matches of
+     * routes with a dynamic target
+     */
+    static <T, R> List<UriRouteMatch<T, R>> resolveAll(HttpRequest<?> request, List<UriRouteMatch<T, R>> matches,
+                                                       @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        List<UriRouteMatch<T, R>> result = new ArrayList<>(matches.size());
+        for (UriRouteMatch<T, R> match : matches) {
+            DynamicRouteTarget target = DynamicRouteTarget.of(match.getRouteInfo());
+            if (target == null) {
+                result.add(match);
+            } else {
+                result.addAll(target.findAll(request, match, filter));
+            }
+        }
+        return result;
     }
 
     /**

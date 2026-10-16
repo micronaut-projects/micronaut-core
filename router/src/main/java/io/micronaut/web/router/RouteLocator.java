@@ -309,6 +309,24 @@ public final class RouteLocator implements DynamicRouteTarget {
     }
 
     @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAll(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                                    @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        Located located = locate(request, match);
+        if (located == null) {
+            return List.of();
+        }
+        List<UriRouteMatch<T, R>> targetMatches;
+        try {
+            targetMatches = located.routes().findAllCandidates(located.request(),
+                // the filter sees the match of the request, as it does for the other routes
+                filter == null ? null : targetMatch -> filter.test(located.wrap(targetMatch)), null);
+        } catch (RuntimeException e) {
+            throw located.failed(e);
+        }
+        return located.wrap(targetMatches);
+    }
+
+    @Override
     public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request, UriRouteMatch<T, R> match) {
         Located located;
         try {

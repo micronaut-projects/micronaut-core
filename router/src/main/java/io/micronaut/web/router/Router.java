@@ -261,9 +261,11 @@ public interface Router {
         }
         // the targets of the dynamic routes resolve their routes, which may depend on the body
         List<UriRouteMatch<T, R>> resolved = filter == null ? findAllClosest(request) : findAllClosest(request, filter);
-        return PendingRouteMatch.anyHasBodyConditions(resolved)
-            ? UriRouteSet.pendingOrClosest(path, request, resolved, null, pending)
-            : UriRouteSet.closest(path, resolved);
+        if (!PendingRouteMatch.anyHasBodyConditions(resolved)) {
+            return UriRouteSet.closest(path, resolved);
+        }
+        // the body decides: all the candidates, with the less specific routes it falls through to
+        return UriRouteSet.pendingOrClosest(path, request, UriRouteSet.resolveAll(request, matches, filter), null, pending);
     }
 
     /**

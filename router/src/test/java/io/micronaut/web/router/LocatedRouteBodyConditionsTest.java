@@ -143,6 +143,26 @@ class LocatedRouteBodyConditionsTest {
         }
     }
 
+    @Test
+    void aFilteredRouterKeepsTheFallbackRoutesOfALocatedTargetForTheBody() {
+        LocatedRoutes<?> review = TestLocatedRoutes.of(located -> {
+            located.POST("/items/special").where(RouteCondition.bodyText("express"::equals)).handle((request, pathVariables) -> HttpResponse.ok("special"));
+            located.POST("/items/{name}", (request, pathVariables) -> HttpResponse.ok("by name"));
+        });
+        Router base = router(routes -> routes.locate("/review", (request, pathVariables) -> "review", target -> review));
+        RouteMatchFilter all = new RouteMatchFilter() {
+            @Override
+            public <T, R> Predicate<UriRouteMatch<T, R>> filter(HttpRequest<?> request) {
+                return match -> true;
+            }
+        };
+        for (Router router : List.of(base, new FilteredRouter(base, all), new RouterDefaultBodyConditionsTest.DelegatingRouter(base))) {
+            List<PendingRouteMatch<Object, Object>> pending = new ArrayList<>();
+            assertNull(router.findClosest(HttpRequest.POST("/review/items/special", "ordinary"), pending::add), router.toString());
+            assertEquals(2, pending.getFirst().getRanks().size(), "the literal route, then its fallback: " + router);
+        }
+    }
+
     private static Router router(Consumer<HttpRouteBuilder> routes) {
         RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
         routes.accept(new DefaultHttpRouteBuilder(assembly));

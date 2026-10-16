@@ -106,6 +106,22 @@ interface DynamicRouteTarget {
                                                     @Nullable Predicate<UriRouteMatch<T, R>> filter);
 
     /**
+     * All the matches of the routes of the target that accept the request, among those the
+     * filter accepts, to use instead of a match of the route, without resolving their ambiguity:
+     * the candidates of a choice by the body, see {@link PendingRouteMatch}, which keeps the
+     * less specific routes the body falls through to.
+     *
+     * @param request The request
+     * @param match   The match of the route
+     * @param filter  The filter of the candidates, or {@code null}
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The matches
+     */
+    <T, R> List<UriRouteMatch<T, R>> findAll(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                             @Nullable Predicate<UriRouteMatch<T, R>> filter);
+
+    /**
      * The matches of any method to use instead of a match of the route, see
      * {@link Router#findAny(HttpRequest)}, e.g. to find the allowed methods of a path. The route
      * set asks the most specific dynamic route of the request only.

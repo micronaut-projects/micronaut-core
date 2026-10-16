@@ -147,7 +147,7 @@ class RouterDefaultBodyConditionsTest {
     /**
      * A router that is not a {@link DefaultRouter}: it takes the default pending lookup.
      */
-    private record DelegatingRouter(Router router) implements Router {
+    record DelegatingRouter(Router router) implements Router {
 
         @Override
         public boolean hasBodyConditions() {
