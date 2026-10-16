@@ -536,7 +536,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                         if (value != null) {
                             if (value instanceof List<?> list) {
                                 try {
-                                    value = list.get(Integer.parseInt(index));
+                                    int number = Integer.parseInt(index);
+                                    // an index past the end of the list, e.g. one a refresh removed, has no value
+                                    value = number >= 0 && number < list.size() ? list.get(number) : null;
                                 } catch (NumberFormatException e) {
                                     // ignore
                                 }
