@@ -49,6 +49,8 @@ import io.micronaut.http.form.FormPart;
 import io.micronaut.http.form.FormParts;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.server.exceptions.UnsupportedMediaException;
+import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -99,6 +101,16 @@ import java.util.function.Supplier;
  */
 @Internal
 final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBody {
+    /**
+     * The arguments of the classes the handlers read, created once: a handler reads a body of the same
+     * class at every request.
+     */
+    private static final ClassValue<Argument<?>> ARGUMENTS = new ClassValue<>() {
+        @Override
+        protected Argument<?> computeValue(Class<?> type) {
+            return Argument.of(type);
+        }
+    };
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultAsyncRequestBody.class);
     private static final List<String> ELEMENT_MEDIA_TYPES = List.of(MediaType.APPLICATION_JSON, MediaType.APPLICATION_JSON_STREAM);
@@ -170,6 +182,11 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         return cleared == null ? server.byteBody() : cleared;
     }
 
+    @SuppressWarnings("unchecked")
+    private static <T> Argument<T> argumentOf(Class<T> type) {
+        return (Argument<T>) ARGUMENTS.get(type);
+    }
+
     @Override
     public boolean hasBody() {
         if (decoded) {
@@ -186,7 +203,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
     @Override
     public <T> CompletionStage<@Nullable T> body(Class<T> type) {
-        return body(Argument.of(type));
+        return body(argumentOf(type));
     }
 
     @Override
@@ -309,7 +326,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
     @Override
     public <T> BodyElements<T> elements(Class<T> type) {
-        return elements(Argument.of(type));
+        return elements(argumentOf(type));
     }
 
     @Override
@@ -820,7 +837,17 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
         @Override
         public Optional<MediaType> getContentType() {
-            return getDelegate().getContentType();
+            Optional<MediaType> contentType = getDelegate().getContentType();
+            if (contentType.isPresent()) {
+                return contentType;
+            }
+            // A request without a content type is read as the route consumes, like the body of a
+            // controller route, whose reader the route has resolved for the type of its body: the
+            // type of the body of this route is not known before the handler reads it
+            return RouteAttributes.getRouteInfo(getDelegate())
+                .map(RouteInfo::getConsumes)
+                .filter(consumes -> consumes.size() == 1 && !MediaType.ALL_TYPE.equals(consumes.get(0)))
+                .map(consumes -> consumes.get(0));
         }
 
         @Override
