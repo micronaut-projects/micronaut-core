@@ -75,6 +75,39 @@ public interface RouteTemplate {
     @Nullable RouteCaptures match(String rawPath);
 
     /**
+     * Match a prefix of a path, as the prefix of a locator route matches: the longest prefix of
+     * the path that ends before a slash of the path or at its end, or the root {@code /}, that the
+     * template matches as it {@link #match(String) matches} a complete path. The input is the raw
+     * path of a request, without its query.
+     *
+     * <p>By default, the template matches the path, then the prefixes before each of its slashes,
+     * from the longest. A language that finds where a match of the template ends in one pass
+     * overrides it, e.g. by matching segment by segment.</p>
+     *
+     * @param rawPath The path of the request
+     * @return The captures of the variables, whose {@link RouteCaptures#path() path} is the matched
+     * prefix of the path, exactly as given: the rest of the path follows it after a slash. Or
+     * {@code null} if no prefix matches
+     */
+    default @Nullable RouteCaptures matchPrefix(String rawPath) {
+        int end = rawPath.length();
+        while (true) {
+            String prefix = end == 0 ? "/" : rawPath.substring(0, end);
+            RouteCaptures captures = match(prefix);
+            if (captures != null) {
+                return prefix.equals(captures.path()) ? captures : RouteCaptures.of(prefix, captures.variables(), captures.values());
+            }
+            if (end == 0) {
+                return null;
+            }
+            end = rawPath.lastIndexOf('/', end - 1);
+            if (end < 0) {
+                return null;
+            }
+        }
+    }
+
+    /**
      * Mount this template under a literal path, e.g. the context path of the server or the prefix
      * of a route group. The prefix is literal text, not an expression of the language. The router
      * mounts a declared template once, and an implementation should reuse what it already

@@ -1244,22 +1244,27 @@ public final class RouteLocator implements DynamicRouteTarget {
             if (normalized.isEmpty()) {
                 normalized = "/";
             }
-            int end = normalized.length();
-            while (true) {
-                RouteCaptures captures = prefix.match(end == 0 ? "/" : normalized.substring(0, end));
-                if (captures != null) {
-                    List<@Nullable String> values = new ArrayList<>(captures.values());
-                    values.add(end >= normalized.length() ? null : normalized.substring(end + 1));
-                    return RouteCaptures.of(normalized, variables, values);
-                }
-                if (end == 0) {
-                    return null;
-                }
-                end = normalized.lastIndexOf('/', end - 1);
-                if (end < 0) {
-                    return null;
-                }
+            RouteCaptures captures = prefix.matchPrefix(normalized);
+            if (captures == null) {
+                return null;
             }
+            String matched = captures.path();
+            int length = matched.length();
+            String rest;
+            if (length >= normalized.length() && matched.equals(normalized)) {
+                rest = null;
+            } else if ("/".equals(matched)) {
+                // the root: the rest is all of the path
+                rest = normalized.substring(1);
+            } else if (normalized.startsWith(matched) && normalized.charAt(length) == '/') {
+                rest = normalized.substring(length + 1);
+            } else {
+                throw new IllegalStateException("The prefix template " + prefix.expression() + " matched '" + matched
+                    + "', which is not a prefix of the path '" + normalized + "' that ends before a slash");
+            }
+            List<@Nullable String> values = new ArrayList<>(captures.values());
+            values.add(rest);
+            return RouteCaptures.of(normalized, variables, values);
         }
 
         @Override

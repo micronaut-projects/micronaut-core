@@ -274,6 +274,33 @@ class RouteTemplateTest {
     }
 
     @Test
+    void aTemplateMatchesTheLongestPrefixThatEndsBeforeASlash() {
+        RouteTemplate orders = new StubTemplate("/orders/5");
+        RouteCaptures captures = orders.matchPrefix("/orders/5/items/3");
+        assertNotNull(captures);
+        assertEquals("/orders/5", captures.path());
+        // the whole path, with a trailing slash too
+        assertEquals("/orders/5", orders.matchPrefix("/orders/5").path());
+        // not a prefix that ends in the middle of a segment
+        assertNull(orders.matchPrefix("/orders/55/items"));
+        assertNull(orders.matchPrefix("/orders"));
+        // the root matches the root of every path
+        assertEquals("/", new StubTemplate("/").matchPrefix("/a/b").path());
+        assertEquals("/", new StubTemplate("/").matchPrefix("/").path());
+        // a long path of short segments that does not match
+        assertNull(orders.matchPrefix("/x" + "/s".repeat(5_000)));
+    }
+
+    @Test
+    void thePathOfAPrefixMatchIsThePrefixAsGiven() {
+        // a template that gives the captures another path, e.g. without the matrix parameters
+        RouteTemplate matrix = new MatrixTemplate("/orders");
+        RouteCaptures captures = matrix.matchPrefix("/orders;v=1/items");
+        assertNotNull(captures);
+        assertEquals("/orders;v=1", captures.path());
+    }
+
+    @Test
     void theUriTemplatesOfBothFactoriesThatMatchTheSamePathsAreEqual() {
         RouteTemplate expression = UriRouteTemplate.of("/items/");
         RouteTemplate matchTemplate = UriRouteTemplate.of(new UriMatchTemplate("/items/"));
@@ -338,6 +365,34 @@ class RouteTemplateTest {
         @Override
         public int patternVariableCount() {
             return 0;
+        }
+    }
+
+    /**
+     * A template that ignores the matrix parameter {@code ;v=1}: its captures have the path without it.
+     *
+     * @param expression The expression, matched literally
+     */
+    private record MatrixTemplate(String expression) implements RouteTemplate {
+        @Override
+        public List<RouteTemplateVariable> variables() {
+            return List.of();
+        }
+
+        @Override
+        public @Nullable RouteCaptures match(String path) {
+            String withoutMatrix = path.replace(";v=1", "");
+            return withoutMatrix.equals(expression) ? RouteCaptures.copyOf(withoutMatrix, List.of(), List.of()) : null;
+        }
+
+        @Override
+        public RouteTemplate mount(String prefix) {
+            return new MatrixTemplate(prefix + expression);
+        }
+
+        @Override
+        public int rawLength() {
+            return expression.length();
         }
     }
 }

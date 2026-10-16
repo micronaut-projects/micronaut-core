@@ -18,7 +18,10 @@ package io.micronaut.web.router;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.uri.RouteCaptures;
 import io.micronaut.http.uri.RouteTemplate;
+import io.micronaut.http.uri.RouteTemplateParser;
+import io.micronaut.http.uri.RouteTemplateVariable;
 import io.micronaut.http.uri.UriRouteTemplate;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -26,10 +29,12 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Locator routes whose prefix is a template of another engine, and located tables with routes of
@@ -44,6 +49,41 @@ class RouteTemplateEngineLocatorTest {
         routes.GET("/", (request, variables) -> HttpResponse.ok());
         routes.GET("/{+rest}", (request, variables) -> HttpResponse.ok());
     });
+
+    @Test
+    void aLanguageThatMatchesAPrefixInOnePassIsMatchedOncePerLocatorRoute() {
+        AtomicInteger matches = new AtomicInteger();
+        AtomicInteger prefixMatches = new AtomicInteger();
+        RouteTemplateParser parser = expression -> new OnePassPrefix(ColonRouteTemplateEngine.template(expression), matches, prefixMatches);
+        TestLocatedRoutes<Object> items = TestLocatedRoutes.of(routes ->
+            routes.route(HttpMethod.GET, ColonRouteTemplateEngine.template("/items/:item")).handle((request, variables) -> HttpResponse.ok()));
+        Router router = RouteTemplateEngineOrderTest.router(null, routes -> routes.group(group ->
+            group.templates(parser).locate("/:tenant/orders/:id", (request, variables) -> "order", target -> items)));
+
+        UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.GET("/acme/orders/5/items/3"));
+        assertNotNull(match);
+        assertEquals("acme", match.getVariableValues().get("tenant"));
+        assertEquals("3", match.getVariableValues().get("item"));
+        // the prefix found where its match ends: the template matched once, not at every slash
+        assertEquals(prefixMatches.get(), matches.get());
+
+        // a long path of short segments that the prefix does not match
+        matches.set(0);
+        prefixMatches.set(0);
+        assertNull(router.findClosest(HttpRequest.GET("/acme" + "/s".repeat(5_000))));
+        assertTrue(matches.get() <= prefixMatches.get(), matches + " matches for " + prefixMatches + " prefix matches");
+    }
+
+    @Test
+    void theDefaultPrefixMatchOfALanguageFindsTheLocatorRouteOfALongPath() {
+        TestLocatedRoutes<Object> rest = TestLocatedRoutes.of(routes ->
+            routes.route(HttpMethod.GET, ColonRouteTemplateEngine.template("/:a/:b")).handle((request, variables) -> HttpResponse.ok()));
+        Router router = RouteTemplateEngineOrderTest.router(null, routes -> routes.group(group ->
+            group.templates(ColonRouteTemplateEngine.INSTANCE).locate("/:tenant/orders", (request, variables) -> "order", target -> rest)));
+        assertNotNull(router.findClosest(HttpRequest.GET("/acme/orders/1/2")));
+        // the default tries the prefixes before each slash: a long unmatched path is not found
+        assertNull(router.findClosest(HttpRequest.GET("/acme" + "/s".repeat(5_000))));
+    }
 
     @Test
     void aPrefixOfAnotherEngineLocatesTheRestOfThePath() {
@@ -164,5 +204,64 @@ class RouteTemplateEngineLocatorTest {
         });
         assertNotNull(router.findClosest(HttpRequest.GET("/o/1/items/2")));
         assertEquals("pattern", target[0]);
+    }
+
+    /**
+     * A template of the colon language that finds where a match of it ends in one pass: after as
+     * many segments as it has.
+     */
+    private record OnePassPrefix(RouteTemplate delegate, AtomicInteger matches, AtomicInteger prefixMatches) implements RouteTemplate {
+        @Override
+        public String expression() {
+            return delegate.expression();
+        }
+
+        @Override
+        public List<RouteTemplateVariable> variables() {
+            return delegate.variables();
+        }
+
+        @Override
+        public @Nullable RouteCaptures match(String rawPath) {
+            matches.incrementAndGet();
+            return delegate.match(rawPath);
+        }
+
+        @Override
+        public @Nullable RouteCaptures matchPrefix(String rawPath) {
+            prefixMatches.incrementAndGet();
+            int segments = 0;
+            for (String part : delegate.expression().split("/")) {
+                if (!part.isEmpty()) {
+                    segments++;
+                }
+            }
+            int end = 0;
+            for (int i = 0; i < segments; i++) {
+                if (end >= rawPath.length()) {
+                    return null;
+                }
+                int next = rawPath.indexOf('/', end + 1);
+                end = next < 0 ? rawPath.length() : next;
+            }
+            String prefix = rawPath.substring(0, end);
+            RouteCaptures captures = match(prefix);
+            return captures == null ? null : RouteCaptures.of(prefix, captures.variables(), captures.values());
+        }
+
+        @Override
+        public RouteTemplate mount(String prefix) {
+            return new OnePassPrefix(delegate.mount(prefix), matches, prefixMatches);
+        }
+
+        @Override
+        public String requiredPrefix() {
+            return delegate.requiredPrefix();
+        }
+
+        @Override
+        public int rawLength() {
+            return delegate.rawLength();
+        }
     }
 }
