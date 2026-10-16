@@ -209,6 +209,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private final CloseableByteBody body;
     @Nullable
     private Object legacyBody;
+    @Nullable
+    private NettyByteBodyFactory byteBodyFactory;
     private final RequestResourceScope disposalResources = new RequestResourceScope();
     @Nullable
     private ParsedFormType parsedFormType;
@@ -254,7 +256,13 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public ByteBodyFactory byteBodyFactory() {
-        return new NettyByteBodyFactory(channelHandlerContext.channel());
+        // one for the request, not one for each read of its body: a benign race at worst creates two
+        NettyByteBodyFactory factory = this.byteBodyFactory;
+        if (factory == null) {
+            factory = new NettyByteBodyFactory(channelHandlerContext.channel());
+            this.byteBodyFactory = factory;
+        }
+        return factory;
     }
 
     public void setLegacyBody(@Nullable Object legacyBody) {

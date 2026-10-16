@@ -1,7 +1,0 @@
-{
-  "resources": [
-    {
-      "glob": "META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/**"
-    }
-  ]
-}

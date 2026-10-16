@@ -110,7 +110,7 @@ record HandlerRoutes(List<RouteSettings> routes, RouteGroupDefaults.@Nullable In
         }
     }
 
-    void where(RouteCondition condition) {
+    void where(RequestCondition condition) {
         for (RouteSettings route : routes) {
             route.where(condition);
         }

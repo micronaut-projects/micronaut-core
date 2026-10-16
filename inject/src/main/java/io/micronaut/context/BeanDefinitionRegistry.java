@@ -27,6 +27,7 @@ import io.micronaut.inject.ProxyBeanDefinition;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -181,6 +182,49 @@ public interface BeanDefinitionRegistry {
      */
     default <T> Optional<BeanDefinition<T>> findBeanDefinition(Argument<T> beanType) {
         return findBeanDefinition(beanType, null);
+    }
+
+    /**
+     * Select among candidate bean definitions the caller has already chosen, with the rules a lookup by type
+     * applies once it has collected its candidates, so that a selection made by other rules and an injection
+     * point agree on the bean they pick. The candidates are not looked up, filtered or checked against the
+     * bean type, and nothing is cached: the caller chose them, and this method only picks among them.
+     *
+     * <p>The first rule that singles out one candidate decides, in this precedence:</p>
+     * <ol>
+     *     <li>The {@link io.micronaut.context.annotation.Primary} candidates, where there are any: the
+     *     later rules apply to them alone.</li>
+     *     <li>The choice of the {@link BeanResolutionCustomizer#resolveNonUniqueBean} of the context.</li>
+     *     <li>The candidates that are not {@link io.micronaut.context.annotation.Secondary}. Where every
+     *     candidate is secondary they all stay in.</li>
+     *     <li>The candidate of the highest precedence by {@link io.micronaut.core.order.Ordered} order, unless
+     *     it shares its order with the next one.</li>
+     *     <li>The candidate that is the {@link io.micronaut.context.annotation.DefaultImplementation} the
+     *     first remaining candidate declares.</li>
+     *     <li>The one candidate whose bean type is exactly the requested type.</li>
+     * </ol>
+     *
+     * <p>The result is one definition when a rule decides, and otherwise the candidates the rules left,
+     * so that the caller can tell ambiguity from a choice without an exception. One candidate or none is
+     * returned as it is. When the requested type is not known the customizer and the exact type are not
+     * consulted, and the customizer is told of no qualifier.</p>
+     *
+     * <p>A lookup by type applies these rules to the candidates its qualifier left and then decides what is
+     * still left in ways this method does not: candidates that are all secondary are a
+     * {@link io.micronaut.context.exceptions.NonUniqueBeanException} whatever the qualifier, otherwise
+     * {@link io.micronaut.context.annotation.Any} takes the first, a {@link io.micronaut.context.annotation.EachProperty}
+     * bean is matched by its name, and anything else is a {@code NonUniqueBeanException}. A caller of this
+     * method decides those for itself.</p>
+     *
+     * @param beanType   The requested bean type, or {@code null} when it is not known
+     * @param candidates The candidate definitions to choose among
+     * @param <T>        The bean type
+     * @return The one definition the rules picked, or the candidates they left
+     * @since 5.3.0
+     */
+    @Experimental
+    default <T> List<BeanDefinition<T>> selectAmong(@Nullable Argument<T> beanType, Collection<BeanDefinition<T>> candidates) {
+        return BeanSelection.select(beanType, null, candidates, BeanResolutionCustomizer.DEFAULT);
     }
 
     /**
