@@ -4,6 +4,8 @@ Unit tests for micronaut_processor.py, run inside GraalPy by PythonSourceUnitTes
 import ast
 import unittest
 
+import java
+
 import micronaut_processor as processor
 from micronaut_processor import MicronautAstVisitor
 
@@ -265,6 +267,73 @@ class DecoratorToFunctionTest(unittest.TestCase):
         visitor, _ = visit("x = 1\n")
         node = ast.parse("@plain\ndef f(): pass").body[0].decorator_list[0]
         self.assertIsNone(processor.decorator_to_function(visitor, node))
+
+
+class _Found:
+    """The Optional the visitor context answers with."""
+
+    def __init__(self, value):
+        self.value = value
+
+    def orElse(self, default):
+        return default if self.value is None else self.value
+
+
+class _ClassPath:
+    """A visitor context knowing a fixed set of classes, recording the names it is asked for."""
+
+    def __init__(self, classes):
+        self.classes = classes
+        self.asked = []
+
+    def getClassElement(self, name):
+        self.asked.append(name)
+        return _Found(self.classes.get(name))
+
+    def getClassElements(self, package, pattern):
+        return [element for name, element in self.classes.items() if name.rsplit(".", 1)[0] == package]
+
+
+def _java_class():
+    return java.type("io.micronaut.inject.ast.ClassElement").of(java.type("io.micronaut.context.annotation.Executable"))
+
+
+def _python_class():
+    metadata = java.type("io.micronaut.inject.annotation.MutableAnnotationMetadata")()
+    metadata.addDeclaredAnnotation("io.micronaut.context.python.annotation.PythonClass", {})
+    return java.type("io.micronaut.inject.ast.ClassElement").of(java.type("io.micronaut.context.annotation.Executable"), metadata, {})
+
+
+class CompiledPythonClassImportTest(unittest.TestCase):
+    def resolve(self, classes, module_name, imported_name):
+        class_path = _ClassPath(classes)
+        visitor = MicronautAstVisitor(CollectingCallback(), "app", "module.py", class_path, None)
+        return visitor._resolve_compiled_python_class(module_name, imported_name), class_path.asked
+
+    def test_module_form_and_package_form_of_a_compiled_python_class(self):
+        self.assertEqual(
+            ("lib.greeting.Greeter", ["lib.greeting.Greeter"]),
+            self.resolve({"lib.greeting.Greeter": _python_class()}, "lib.greeting", "Greeter"))
+        self.assertEqual(
+            ("lib.Greeter", ["lib.greeting.Greeter", "lib.Greeter"]),
+            self.resolve({"lib.Greeter": _python_class()}, "lib.greeting", "Greeter"))
+
+    def test_top_level_module_classes_live_in_the_python_package(self):
+        resolved, _ = self.resolve({"python.GreetingService": _python_class()}, "greeting_service", "GreetingService")
+        self.assertEqual("python.GreetingService", resolved)
+
+    def test_a_java_class_under_the_imported_name_stops_the_search(self):
+        # from java.util import ArrayList: a Java import, so the package form (java.ArrayList) is never tried,
+        # even when a compiled Python class of that name exists
+        resolved, asked = self.resolve(
+            {"java.util.ArrayList": _java_class(), "java.ArrayList": _python_class()}, "java.util", "ArrayList")
+        self.assertIsNone(resolved)
+        self.assertEqual(["java.util.ArrayList"], asked)
+
+    def test_nothing_on_the_class_path(self):
+        resolved, asked = self.resolve({}, "lib.greeting", "Greeter")
+        self.assertIsNone(resolved)
+        self.assertEqual(["lib.greeting.Greeter", "lib.Greeter"], asked)
 
 
 if __name__ == "__main__":
