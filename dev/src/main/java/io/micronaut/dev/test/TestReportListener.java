@@ -18,6 +18,7 @@ package io.micronaut.dev.test;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.dev.CompileFailure;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Set;
 
@@ -52,5 +53,14 @@ public interface TestReportListener extends TestEventListener, Ordered {
      * @param classNames The classes, by binary name
      */
     default void testClassesRemoved(Set<String> classNames) {
+    }
+
+    /**
+     * Where a person opens the report, such as the URL of a page, which the test console shows after every run.
+     *
+     * @return The location, or null when the report has none to open
+     */
+    default @Nullable String location() {
+        return null;
     }
 }
