@@ -34,6 +34,7 @@ import spock.lang.Unroll
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import java.util.function.Function
 
 /**
@@ -41,6 +42,131 @@ import java.util.function.Function
  * @since 1.0
  */
 class PropertySourcePropertyResolverSpec extends Specification {
+
+    void "diff excludes a property source added while the result is compared"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("initial", ["flag.value": "old"])
+        )
+        CountDownLatch comparing = new CountDownLatch(1)
+        CountDownLatch releaseComparison = new CountDownLatch(1)
+        Object changedValue = new Object() {
+            @Override
+            boolean equals(Object other) {
+                comparing.countDown()
+                if (!releaseComparison.await(10, TimeUnit.SECONDS)) {
+                    throw new AssertionError("Timed out waiting for comparison")
+                }
+                return false
+            }
+        }
+        AtomicReference<Object> result = new AtomicReference<>()
+        Thread refresher = Thread.start {
+            try {
+                result.set(resolver.diff({
+                    resolver.refresh({
+                        resolver.reset()
+                        resolver.addPropertySource(PropertySource.of("refreshed", ["flag.value": changedValue]))
+                    } as Runnable)
+                } as Runnable))
+            } catch (Throwable t) {
+                result.set(t)
+            }
+        }
+
+        when:
+        boolean comparingStarted = comparing.await(10, TimeUnit.SECONDS)
+        CountDownLatch addFinished = new CountDownLatch(1)
+        Thread adder = Thread.start {
+            try {
+                resolver.addPropertySource(PropertySource.of("late", ["flag.other": "late"]))
+            } finally {
+                addFinished.countDown()
+            }
+        }
+        boolean addedWithoutWaiting = addFinished.await(10, TimeUnit.SECONDS)
+
+        then:
+        comparingStarted
+        addedWithoutWaiting
+
+        cleanup:
+        releaseComparison.countDown()
+        refresher.join(10_000)
+        adder.join(10_000)
+        assert !refresher.alive
+        assert !adder.alive
+        assert result.get() instanceof Map
+        assert result.get().keySet() == ["flag.value"] as Set
+        assert resolver.getProperty("flag.other", String).orElse(null) == "late"
+    }
+
+    void "overlapping diffs each capture their own refresh baseline"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("initial", ["flag.value": "a"])
+        )
+        CountDownLatch firstRefreshEntered = new CountDownLatch(1)
+        CountDownLatch releaseFirstRefresh = new CountDownLatch(1)
+        CountDownLatch secondDiffStarted = new CountDownLatch(1)
+        AtomicReference<Object> firstResult = new AtomicReference<>()
+        AtomicReference<Object> secondResult = new AtomicReference<>()
+        Thread first = Thread.start {
+            try {
+                firstResult.set(resolver.diff({
+                    resolver.refresh({
+                        resolver.reset()
+                        resolver.addPropertySource(PropertySource.of("first", ["flag.value": "b"]))
+                        firstRefreshEntered.countDown()
+                        if (!releaseFirstRefresh.await(10, TimeUnit.SECONDS)) {
+                            throw new AssertionError("Timed out waiting for first refresh")
+                        }
+                    } as Runnable)
+                } as Runnable))
+            } catch (Throwable t) {
+                firstResult.set(t)
+            }
+        }
+
+        when:
+        boolean firstEntered = firstRefreshEntered.await(10, TimeUnit.SECONDS)
+        Thread second = Thread.start {
+            secondDiffStarted.countDown()
+            try {
+                secondResult.set(resolver.diff({
+                    resolver.refresh({
+                        resolver.reset()
+                        resolver.addPropertySource(PropertySource.of("second", ["flag.value": "a"]))
+                    } as Runnable)
+                } as Runnable))
+            } catch (Throwable t) {
+                secondResult.set(t)
+            }
+        }
+        boolean secondStarted = secondDiffStarted.await(10, TimeUnit.SECONDS)
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (second.state != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+            Thread.sleep(1)
+        }
+        boolean secondBlockedOnRefresh = second.state == Thread.State.BLOCKED
+
+        then:
+        firstEntered
+        secondStarted
+        secondBlockedOnRefresh
+
+        cleanup:
+        releaseFirstRefresh.countDown()
+        first.join(10_000)
+        second.join(10_000)
+        assert !first.alive
+        assert !second.alive
+        assert firstResult.get() instanceof Map
+        assert secondResult.get() instanceof Map
+        assert firstResult.get()["flag.value"] == "a"
+        assert secondResult.get()["flag.value"] == "b"
+        assert resolver.getProperty("flag.value", String).orElse(null) == "a"
+    }
 
     void "placeholder lookup does not retain a missing value observed during catalog reinitialization"() {
         given:

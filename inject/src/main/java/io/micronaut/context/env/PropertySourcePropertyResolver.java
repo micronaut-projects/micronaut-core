@@ -211,11 +211,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     public Map<String, Object> diff(Runnable change) {
-        ResolverState before = state;
-        Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(before.catalog);
-        change.run();
-        ResolverState after = state;
-        return diffCatalog(copiedCatalog, after.catalog);
+        Map<String, DefaultPropertyEntry>[] before;
+        Map<String, DefaultPropertyEntry>[] after;
+        synchronized (catalogLock) {
+            // Capture both states for this change while no other catalog writer can intervene.
+            before = copyCatalog(state.catalog);
+            change.run();
+            after = copyCatalog(state.catalog);
+        }
+        // Values may invoke user code during comparison. Do not hold the catalog lock here:
+        // unrelated property source updates must not wait for equals() or placeholder checks.
+        return diffCatalog(before, after);
     }
 
 
