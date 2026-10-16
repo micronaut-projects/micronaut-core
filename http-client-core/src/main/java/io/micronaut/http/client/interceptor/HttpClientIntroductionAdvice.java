@@ -36,6 +36,7 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.propagation.ThreadBoundPropagation;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
@@ -62,8 +63,8 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientRegistry;
 import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.AsyncStreamingHttpClient;
-import io.micronaut.http.client.ElementsResponse;
-import io.micronaut.http.client.ElementsStages;
+import io.micronaut.http.client.internal.ElementsResponse;
+import io.micronaut.http.client.internal.ElementsStages;
 import io.micronaut.http.client.MappedBodyElements;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
@@ -1168,7 +1169,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             if (fromCoroutine == null || fromCoroutine.isEmpty() || fromCoroutine.isBound()) {
                 return null;
             }
-            return fromCoroutine.propagate();
+            return ThreadBoundPropagation.bind(fromCoroutine);
         }
     }
 }

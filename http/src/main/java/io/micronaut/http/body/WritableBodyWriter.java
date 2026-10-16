@@ -27,12 +27,13 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.stream.BodyPublishers;
+import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -92,7 +93,12 @@ public final class WritableBodyWriter implements TypedMessageBodyHandler<Writabl
 
     @Override
     public Publisher<? extends Writable> readChunked(Argument<Writable> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        return Flux.from(input).map(this::read0);
+        return BodyPublishers.map(input, this::read0);
+    }
+
+    @Override
+    public PieceReader<Writable> openPieceReader(Argument<Writable> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
+        return PieceReaders.eachPiece(this::read0);
     }
 
     @Override

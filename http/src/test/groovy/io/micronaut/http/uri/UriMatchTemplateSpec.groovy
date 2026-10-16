@@ -211,4 +211,62 @@ class UriMatchTemplateSpec extends Specification {
         "/{+someId}"    | '/username%2B1@company.com'   | true      | [someId: 'username%2B1@company.com']
         "/{+someId}"    | '/username+1@company.com'     | true      | [someId: 'username+1@company.com']
     }
+
+    void "toPathString() excludes the query variables of #template and is computed once"() {
+        given:
+        UriMatchTemplate uriTemplate = new UriMatchTemplate(template)
+
+        when:
+        String first = uriTemplate.toPathString()
+        String second = uriTemplate.toPathString()
+
+        then:
+        first == result
+        second.is(first)
+        uriTemplate.toString() == template
+
+        where:
+        template                         | result
+        '/books'                         | '/books'
+        '/books/{id}'                    | '/books/{id}'
+        '/books/{id}{?max,offset}'       | '/books/{id}'
+        '/books{?max}'                   | '/books'
+        '/books/{id}{/rest*}{?q}'        | '/books/{id}{/rest*}'
+        '/regex/{color:^blue|orange$}'   | '/regex/{color:^blue|orange$}'
+        '/{+path}'                       | '/{+path}'
+        '{var}{#hash}'                   | '{var}'
+    }
+
+    void "toPathString() of a nested template is its own and the outer one is unchanged"() {
+        given:
+        UriMatchTemplate outer = new UriMatchTemplate('/book{/id}{?q}')
+        String outerPath = outer.toPathString()
+
+        when:
+        UriMatchTemplate nested = outer.nest('/author{/authorId}{?max}')
+
+        then:
+        nested.toPathString() == '/book{/id}/author{/authorId}'
+        nested.toPathString().is(nested.toPathString())
+        outer.toPathString().is(outerPath)
+        outer.toPathString() == '/book{/id}'
+        new UriMatchTemplate('/book{/id}{?q}').toPathString() == outerPath
+
+        when: 'the outer template is nested again'
+        UriMatchTemplate other = outer.nest('{?page}')
+
+        then:
+        other.toPathString() == '/book{/id}'
+        outer.toPathString() == '/book{/id}'
+    }
+
+    void "toPathString() of a typed template is computed once"() {
+        given:
+        UriTypeMatchTemplate uriTemplate = new UriTypeMatchTemplate('/books/{id}{?max}', Long, Integer)
+
+        expect:
+        uriTemplate.toPathString() == '/books/{id}'
+        uriTemplate.toPathString().is(uriTemplate.toPathString())
+        uriTemplate.nest('/pages{/page}', Integer).toPathString() == '/books/{id}/pages{/page}'
+    }
 }

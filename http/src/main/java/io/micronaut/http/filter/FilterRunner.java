@@ -112,8 +112,11 @@ public class FilterRunner {
     }
 
     private static void checkOrdered(List<? extends GenericHttpFilter> filters) {
-        if (!filters.stream().allMatch(f -> f instanceof Ordered)) {
-            throw new IllegalStateException("Some filters cannot be ordered: " + filters);
+        // a loop by index, not a stream: this runs for every request that has filters to sort
+        for (int i = 0, size = filters.size(); i < size; i++) {
+            if (!(filters.get(i) instanceof Ordered)) {
+                throw new IllegalStateException("Some filters cannot be ordered: " + filters);
+            }
         }
     }
 

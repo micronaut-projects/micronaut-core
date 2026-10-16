@@ -75,6 +75,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /** The owner of the proxy whose lazy target this context creates, so that the target is released with the proxy. */
     @Nullable
     DefaultBeanDependencies lazyProxyDependencies;
+    /** The interceptor being created for an intercepted bean at the moment, or null; see {@link InterceptionTarget}. */
+    @Nullable
+    InterceptorCreation interceptorCreation;
     /** The attribute a {@link ProxyInterceptors} waits under between {@link #prepareProxyTarget} and the creation of the target. */
     private static final String PROXY_INTERCEPTORS = "io.micronaut.proxyInterceptors";
 
@@ -86,6 +89,56 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      * @param registrations The interceptor registrations of the proxy
      */
     record ProxyInterceptors(BeanDefinition<?> definition, List<BeanRegistration<?>> registrations) {
+    }
+
+    /**
+     * An interceptor the container is creating for an intercepted bean.
+     *
+     * @param interceptor The definition of the interceptor; only its own injection points receive the bean
+     * @param target The definition of the bean it is created for
+     */
+    record InterceptorCreation(BeanDefinition<?> interceptor, BeanDefinition<?> target) {
+
+        /**
+         * Whether an injection point is one of the interceptor's own. A qualified interceptor, one of an
+         * {@code @EachBean} for example, is a delegate, and its injection points are declared by the definition it
+         * delegates to.
+         *
+         * @param declaringType The definition that declares the injection point
+         * @return True if it is the definition of the interceptor
+         */
+        boolean isInterceptorDefinition(BeanDefinition<?> declaringType) {
+            return declaringType.equals(interceptor)
+                || interceptor instanceof BeanDefinitionDelegate<?> delegate && declaringType.equals(delegate.getDelegate());
+        }
+    }
+
+    /**
+     * @return The bean the interceptors resolved through this context are created for: the bean being created, or
+     * the bean a resolution on behalf of an existing bean is rooted at; null when there is none
+     */
+    @Nullable
+    BeanDefinition<?> interceptedDefinition() {
+        if (creationState != null) {
+            return creationState.definition;
+        }
+        return path.isEmpty() ? rootDefinition : null;
+    }
+
+    /**
+     * Finds the intercepted bean for an injection point of the bean being created now.
+     *
+     * @return The definition of the bean, or null when the bean being created is not an interceptor created for an
+     * intercepted bean
+     */
+    @Nullable
+    BeanDefinition<?> findInterceptionTarget() {
+        InterceptorCreation creation = interceptorCreation;
+        if (creation == null) {
+            return null;
+        }
+        Segment<?, ?> segment = path.peek();
+        return segment != null && creation.isInterceptorDefinition(segment.getDeclaringType()) ? creation.target() : null;
     }
 
     /**
@@ -372,8 +425,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
+    public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType) {
+        return context.getBeanRegistration(this, definition, beanType);
+    }
+
+    @Override
     public <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType) {
-        T bean = context.getBeanRegistration(this, definition, beanType).getBean();
+        T bean = getBeanRegistration(definition, beanType).getBean();
         if (tracer != null) {
             tracer.traceBeanResolved(
                 this,
@@ -647,6 +705,30 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 context.destroyBean(beanRegistration);
             }
             dependentBeansToDestroyAfterResolution = null;
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Only a context that records a {@link BeanDependencyGraph} attributes the lookup to the produced definition,
+     * by pushing a segment for it; any other context looks the factory up as generated code used to, with no
+     * segment, allocation or circular dependency check of its own.</p>
+     */
+    @Override
+    public <F> F getFactoryBean(BeanDefinition<?> producedDefinition, Class<F> factoryType, @Nullable Qualifier<F> qualifier) {
+        if (!context.isTrackingBeanDependencies()) {
+            F factory = getBean(factoryType, qualifier);
+            markDependentAsFactory();
+            return factory;
+        }
+        path.push(new FactorySegment(producedDefinition, getCurrentQualifier(), factoryType));
+        try {
+            F factory = getBean(factoryType, qualifier);
+            markDependentAsFactory();
+            return factory;
+        } finally {
+            path.pop();
         }
     }
 
@@ -1655,6 +1737,50 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @Override
         @Nullable
         public Qualifier<B> getDeclaringBeanQualifier() {
+            return getDeclaringTypeQualifier();
+        }
+    }
+
+    /**
+     * The lookup of the factory a produced bean is created from, which the dependency graph records as a constructor
+     * dependency of the produced bean. Pushed only while the graph is recorded, and never checked for circularity:
+     * the factory's own construction is.
+     */
+    static final class FactorySegment extends AbstractSegment<Object, Object> implements InjectionPoint<Object> {
+
+        /**
+         * @param producedDefinition The definition of the produced bean
+         * @param qualifier          The qualifier the produced bean is resolved under
+         * @param factoryType        The factory type
+         */
+        @SuppressWarnings("unchecked")
+        FactorySegment(BeanDefinition<?> producedDefinition, @Nullable Qualifier<?> qualifier, Class<?> factoryType) {
+            super((BeanDefinition<Object>) producedDefinition, (Qualifier<Object>) qualifier, "factory", (Argument<Object>) Argument.of(factoryType, "factory"));
+        }
+
+        @Override
+        public String toString() {
+            return getTypeName(getDeclaringType().getBeanType()) + " from factory " + getTypeName(getArgument().getType());
+        }
+
+        @Override
+        public InjectionPoint<Object> getInjectionPoint() {
+            return this;
+        }
+
+        @Override
+        public BeanDefinition<Object> getDeclaringBean() {
+            return getDeclaringType();
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return AnnotationMetadata.EMPTY_METADATA;
+        }
+
+        @Override
+        @Nullable
+        public Qualifier<Object> getDeclaringBeanQualifier() {
             return getDeclaringTypeQualifier();
         }
     }

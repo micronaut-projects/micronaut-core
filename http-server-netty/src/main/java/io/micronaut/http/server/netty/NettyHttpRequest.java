@@ -46,6 +46,7 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.DirectByteBodyAccess;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
+import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
@@ -208,6 +209,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private final CloseableByteBody body;
     @Nullable
     private Object legacyBody;
+    @Nullable
+    private NettyByteBodyFactory byteBodyFactory;
     private final RequestResourceScope disposalResources = new RequestResourceScope();
     @Nullable
     private ParsedFormType parsedFormType;
@@ -253,7 +256,13 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public ByteBodyFactory byteBodyFactory() {
-        return new NettyByteBodyFactory(channelHandlerContext.channel());
+        // one for the request, not one for each read of its body: a benign race at worst creates two
+        NettyByteBodyFactory factory = this.byteBodyFactory;
+        if (factory == null) {
+            factory = new NettyByteBodyFactory(channelHandlerContext.channel());
+            this.byteBodyFactory = factory;
+        }
+        return factory;
     }
 
     public void setLegacyBody(@Nullable Object legacyBody) {
@@ -772,7 +781,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public Optional<io.netty.handler.codec.http.HttpRequest> toHttpRequestDirect() {
-        return Optional.of(new DelegateStreamedHttpRequest(nettyRequest, NettyByteBodyFactory.toByteBufs(byteBody()).map(DefaultHttpContent::new)));
+        return Optional.of(new DelegateStreamedHttpRequest(nettyRequest, BodyPublishers.map(NettyByteBodyFactory.toByteBufs(byteBody()), DefaultHttpContent::new)));
     }
 
     @Override

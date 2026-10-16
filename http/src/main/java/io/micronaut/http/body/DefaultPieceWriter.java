@@ -21,9 +21,9 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.codec.CodecException;
 import org.jspecify.annotations.Nullable;
-import reactor.core.publisher.Flux;
 
 import java.util.List;
 
@@ -72,7 +72,10 @@ final class DefaultPieceWriter<T> implements PieceWriter<T> {
         if (piece instanceof AvailableByteBody available) {
             return bodyFactory.adapt(bodyFactory.readBufferFactory().compose(List.of(separator.duplicate(), available.toReadBuffer())));
         }
-        return ConcatenatingSubscriber.concatenate(bodyFactory, Flux.just(bodyFactory.adapt(separator.duplicate()), piece), ConcatenatingSubscriber.Separators.NONE);
+        CloseableByteBody prefix = bodyFactory.adapt(separator.duplicate());
+        return ConcatenatingSubscriber.concatenate(bodyFactory,
+            BodyPublishers.append(BodyPublishers.<ByteBody>just(prefix, ignored -> prefix.close()), piece, ignored -> piece.close()),
+            ConcatenatingSubscriber.Separators.NONE);
     }
 
     @Override

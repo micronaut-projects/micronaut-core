@@ -41,9 +41,12 @@ import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.processing.ProcessingException
+import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory
 import io.micronaut.inject.visitor.TypeElementQuery
 import io.micronaut.inject.visitor.TypeElementVisitor
+import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.visitor.util.ProcessorOptionsSystemProperties
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessor
 
 internal open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnvironment) :
@@ -141,8 +144,44 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                     }
                 }
             }
+
+            for (loadedVisitor in loadedVisitors) {
+                visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
+                try {
+                    loadedVisitor.visitor.finishRound(visitorContext)
+                } catch (e: ProcessingException) {
+                    BeanDefinitionProcessor.handleProcessingException(environment, e)
+                } catch (e: Exception) {
+                    environment.logger.error("Error finishing the round of type visitor [${loadedVisitor.visitor}]: ${e.message}")
+                    environment.logger.exception(e)
+                }
+            }
+            writeBeanElementBuilders()
         }
         return emptyList()
+    }
+
+    /**
+     * Writes the beans the visitors added with [ClassElement.addAssociatedBean] or [VisitorContext.registerBean].
+     */
+    private fun writeBeanElementBuilders() {
+        val beanDefinitionBuilders = visitorContext.takeBeanElementBuilders()
+        if (beanDefinitionBuilders.isEmpty()) {
+            return
+        }
+        // only isolating visitors add beans, and their definitions are written as such, with their originating files
+        visitorContext.aggregating = false
+        try {
+            val beanDefinitionBuilderFactory = DefaultElementBeanDefinitionBuilderFactory(visitorContext)
+            for (outputObjectDef in AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory)) {
+                BeanDefinitionProcessor.write(outputObjectDef, visitorContext, environment)
+            }
+        } catch (e: ProcessingException) {
+            BeanDefinitionProcessor.handleProcessingException(environment, e)
+        } catch (e: Exception) {
+            environment.logger.error("Unexpected error writing bean definitions: ${e.message ?: e.javaClass.simpleName}")
+            environment.logger.exception(e)
+        }
     }
 
     private fun acceptClass(declaration: KSClassDeclaration) =
@@ -163,6 +202,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
     }
 
     override fun finish() {
+        visitorContext.finishing = true
         try {
             for (loadedVisitor in loadedVisitors) {
                 visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING

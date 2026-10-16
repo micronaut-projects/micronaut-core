@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.http.client.internal.ResponseSubscriberElements;
+
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
@@ -56,7 +58,7 @@ final class DefaultAsyncOverReactiveStreamingHttpClient extends DefaultAsyncOver
     /**
      * @param streamingHttpClient The delegate client
      */
-    DefaultAsyncOverReactiveStreamingHttpClient(StreamingHttpClient streamingHttpClient) {
+    public DefaultAsyncOverReactiveStreamingHttpClient(StreamingHttpClient streamingHttpClient) {
         super(streamingHttpClient);
         this.streamingHttpClient = streamingHttpClient;
     }

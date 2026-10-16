@@ -39,7 +39,7 @@ import java.lang.annotation.Target;
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-@AnnotationExpressionContext(RequestConditionContext.class)
+@AnnotationExpressionContext(value = RequestConditionContext.class, methodArguments = false)
 @Experimental
 public @interface RouteCondition {
     /**

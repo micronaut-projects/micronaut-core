@@ -1,5 +1,7 @@
 package io.micronaut.http.client
 
+import io.micronaut.http.client.internal.RawResponseFuture
+
 import io.micronaut.core.execution.DelayedExecutionFlow
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory
 import io.micronaut.http.ByteBodyHttpResponse
