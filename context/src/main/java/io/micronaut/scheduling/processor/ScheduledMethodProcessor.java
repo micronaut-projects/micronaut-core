@@ -224,8 +224,9 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             BeanWatch registered = watchable.methods(Scheduled.class).watch(this);
             watch = registered;
             if (closed) {
-                // closed while the watch was being registered, before it could be read
-                registered.close();
+                // closed while the watch was being registered, before it could be read: the close may also have
+                // cancelled the timers before the first batch scheduled its own, so close again now that it has
+                close();
             }
             RuntimeException failure = startupFailure;
             if (failure != null) {
