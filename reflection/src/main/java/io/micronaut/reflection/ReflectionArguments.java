@@ -881,12 +881,12 @@ public final class ReflectionArguments {
             if (resolving.contains(tv)) {
                 // a bound naming the variable it bounds - `T extends Comparable<T>` - would be converted for
                 // ever: inside its own bound the variable stands for the erasure of that bound
-                return Argument.ofTypeVariable(getRawType(tv.getBounds()[0]), name, tv.getName(), declared, Argument.ZERO_ARGUMENTS, null);
+                return Argument.ofTypeVariable(getRawType(tv), name, tv.getName(), declared, Argument.ZERO_ARGUMENTS, null);
             }
             Set<TypeVariable<?>> nested = new HashSet<>(resolving);
             nested.add(tv);
             // an unresolved variable is a placeholder of its bound, as the processors generate it
-            AnnotatedType[] annotatedBounds = tv.getAnnotatedBounds();
+            AnnotatedType[] annotatedBounds = annotatedBoundsOf(tv);
             Argument<?>[] bounds = new Argument[annotatedBounds.length];
             for (int i = 0; i < annotatedBounds.length; i++) {
                 bounds[i] = toArgument(null, annotatedBounds[i], Map.of(), nested, exact);
@@ -923,6 +923,27 @@ public final class ReflectionArguments {
     }
 
     /**
+     * The annotated bounds of a type variable. The variables of the JDK always report at least {@code Object},
+     * but an implementation of {@link TypeVariable} from elsewhere may report its bounds only through
+     * {@link TypeVariable#getBounds()}, or none at all: a variable with no bound is bounded by {@code Object}.
+     */
+    private static AnnotatedType[] annotatedBoundsOf(TypeVariable<?> tv) {
+        AnnotatedType[] annotatedBounds = tv.getAnnotatedBounds();
+        if (annotatedBounds != null && annotatedBounds.length > 0) {
+            return annotatedBounds;
+        }
+        Type[] bounds = tv.getBounds();
+        if (bounds == null || bounds.length == 0) {
+            return new AnnotatedType[]{new SimpleAnnotatedType(Object.class)};
+        }
+        AnnotatedType[] annotated = new AnnotatedType[bounds.length];
+        for (int i = 0; i < bounds.length; i++) {
+            annotated[i] = new SimpleAnnotatedType(bounds[i]);
+        }
+        return annotated;
+    }
+
+    /**
      * Get the raw type of a given complex type.
      */
     private static Class<?> getRawType(Type type) {
@@ -931,7 +952,8 @@ public final class ReflectionArguments {
         } else if (type instanceof ParameterizedType ptype) {
             return getRawType(ptype.getRawType());
         } else if (type instanceof TypeVariable<?> tv) {
-            return getRawType(tv.getBounds()[0]);
+            Type[] bounds = tv.getBounds();
+            return bounds.length == 0 ? Object.class : getRawType(bounds[0]);
         } else if (type instanceof WildcardType wt) {
             Type[] lowerBounds = wt.getLowerBounds();
             return getRawType(lowerBounds.length == 0 ? wt.getUpperBounds()[0] : lowerBounds[0]);

@@ -436,12 +436,6 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     @Override
-    public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement, byte @Nullable [] content) {
-        checkForPostponedOriginalElement(originatingElement);
-        outputVisitor.visitServiceDescriptor(type, classname, originatingElement, content);
-    }
-
-    @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path, io.micronaut.inject.ast.Element... originatingElements) {
         checkForPostponedOriginalElements(originatingElements);
         return outputVisitor.visitMetaInfFile(path, originatingElements);

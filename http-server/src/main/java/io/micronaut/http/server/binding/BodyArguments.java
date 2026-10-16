@@ -62,6 +62,23 @@ final class BodyArguments {
         false
     );
 
+    /**
+     * The body arguments of plain types, shared since they are immutable.
+     */
+    private static final ClassValue<Argument<?>> PLAIN = new ClassValue<>() {
+        @Override
+        protected Argument<?> computeValue(Class<?> type) {
+            return Argument.of(type, BODY_ARGUMENT, BODY, Argument.ZERO_ARGUMENTS);
+        }
+    };
+
+    private static final ClassValue<Argument<?>> NULLABLE_PLAIN = new ClassValue<>() {
+        @Override
+        protected Argument<?> computeValue(Class<?> type) {
+            return Argument.of(type, BODY_ARGUMENT, NULLABLE_BODY, Argument.ZERO_ARGUMENTS);
+        }
+    };
+
     private BodyArguments() {
     }
 
@@ -75,7 +92,11 @@ final class BodyArguments {
      * @param <T>      The type
      * @return The argument
      */
+    @SuppressWarnings("unchecked")
     public static <T> Argument<T> bodyArgument(Argument<T> bodyType) {
+        if (bodyType.getTypeParameters().length == 0 && bodyType.getAnnotationMetadata().isEmpty()) {
+            return (Argument<T>) (bodyType.isNullable() ? NULLABLE_PLAIN : PLAIN).get(bodyType.getType());
+        }
         return Argument.of(bodyType.getType(), BODY_ARGUMENT, bodyMetadata(bodyType), bodyType.getTypeParameters());
     }
 
