@@ -157,8 +157,11 @@ public final class TypeHierarchyFuzz {
     public static List<String> check(Generated g, Class<?> type, TypeHierarchy hierarchy, Predicate<Class<?>> ignoreInterface) {
         List<String> mismatches = new ArrayList<>();
         // a Python type variable is named after its class as well, T0 for the T of Fuzz0: reflection and the record agree on it
+        Set<String> inaccessible = new LinkedHashSet<>();
         compare(mismatches, g, g.declaration() + " declaration", TypeStrings.strings(hierarchy.getTypeClosure(hierarchy.getDeclaration())),
-            Oracle.closure(type, Oracle.identity(type), false, ignoreInterface));
+            Oracle.closure(type, Oracle.identity(type), false, ignoreInterface, inaccessible));
+        // a super type the record cannot name, LongAdder's Striped64, is named by the record instead
+        compare(mismatches, g, g.declaration() + " inaccessible", hierarchy.getInaccessibleSuperTypes(), new ArrayList<>(inaccessible));
         if (type.getTypeParameters().length > 0) {
             compare(mismatches, g, g.declaration() + " raw", TypeStrings.strings(hierarchy.getTypeClosure(Argument.of(type))),
                 Oracle.closure(type, Map.of(), true, ignoreInterface));

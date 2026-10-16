@@ -46,6 +46,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -58,10 +59,12 @@ import java.util.function.Predicate;
  *
  * <p>A record is a class with a constructor and nothing else, which passes the type, its variables, its direct super
  * types and {@link ClassElement#getAllSuperTypes() all its super types}, built with the argument factories from class
- * constants, to {@link GeneratedTypeHierarchy}. It is written into the package of the first originating element, or
- * into the package of the type when the type, a bound or a super type of it is a non-public class of that package,
- * so that the class constants of the record resolve. A super type that is not public and of another package, which no
- * record could name, is left out of the record; a type whose own declaration names such a class is refused.</p>
+ * constants, to {@link GeneratedTypeHierarchy}. It is written into the package of the first originating element; only
+ * a type that is itself not public is recorded in its own package, the one package that can name it. A super type that
+ * the record cannot name, a class that is not public and of another package than the record or one whose arguments
+ * name such a class, is left out of the recorded closure with the types above it kept, and is recorded by the name of
+ * its class instead ({@link TypeHierarchy#getInaccessibleSuperTypes()}); a type whose variables are bounded by such a
+ * class is refused.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -70,7 +73,7 @@ import java.util.function.Predicate;
 public final class TypeHierarchyWriter {
 
     private static final Constructor<?> SUPER_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
-        GeneratedTypeHierarchy.class, Class.class, Argument[].class, Argument.class, Argument[].class, Argument[].class);
+        GeneratedTypeHierarchy.class, Class.class, Argument[].class, Argument.class, Argument[].class, Argument[].class, String[].class);
     // the exceptions of javac and of KSP for a class written twice, by name: neither compiler is a dependency here
     private static final Set<String> ALREADY_WRITTEN = Set.of("javax.annotation.processing.FilerException", "kotlin.io.FileAlreadyExistsException");
     private static final int MAX_DEPTH = 16;
@@ -143,13 +146,22 @@ public final class TypeHierarchyWriter {
                 interfaces.add(argument(defaults, type, recordType, anInterface.getSimpleName(), anInterface, loadClassValueExpressionFn));
             }
         }
-        // the closure the compiler walked, the type itself left out: the record is of the type
+        // the closure the compiler walked, the type itself left out: the record is of the type. A super type the record
+        // cannot name is left out with the types above it kept, and is recorded by the name of its class
         List<ExpressionDef> superTypes = new ArrayList<>();
+        Set<String> inaccessibleSuperTypes = new LinkedHashSet<>();
         for (ClassElement superType : type.getAllSuperTypes()) {
-            if (!superType.getName().equals(type.getName()) && isNameableFrom(superType, recordPackage)) {
+            if (superType.getName().equals(type.getName())) {
+                continue;
+            }
+            if (isNameableFrom(superType, recordPackage)) {
                 superTypes.add(argument(defaults, type, recordType, superType.getSimpleName(), superType, loadClassValueExpressionFn));
+            } else {
+                inaccessibleSuperTypes.add(superType.getName());
             }
         }
+        ExpressionDef inaccessible = inaccessibleSuperTypes.isEmpty() ? ExpressionDef.nullValue()
+            : TypeDef.STRING.array().instantiate(inaccessibleSuperTypes.stream().<ExpressionDef>map(ExpressionDef::constant).toList());
 
         ClassDef.ClassDefBuilder builder = ClassDef.builder(recordName)
             .synthetic()
@@ -162,7 +174,8 @@ public final class TypeHierarchyWriter {
                     arrayOrNull(variables),
                     superclass,
                     arrayOrNull(interfaces),
-                    arrayOrNull(superTypes)
+                    arrayOrNull(superTypes),
+                    inaccessible
                 ))));
         loadTypeMethods.values().forEach(builder::addMethod);
         return builder.build();
@@ -184,22 +197,19 @@ public final class TypeHierarchyWriter {
     }
 
     /**
-     * The package the record is written into: that of the origin, unless the record names a class of the package of
-     * the type that is not public, which only a class of that package can name. A type of a package of the JDK that
-     * is itself not public has no package a record can be written into.
+     * The package the record is written into: that of the origin. A super type the record cannot name from there is
+     * left out of it, by name; moving the record into the package of the type would put it, for a class of the JDK,
+     * into a package no compilation can write into. Only a type that is itself not public is recorded in its own
+     * package, the one package that can name it, and a type of a package of the JDK that is not public cannot be
+     * recorded.
      */
     private static String recordPackage(ClassElement type, Element origin) {
         String typePackage = type.getPackageName();
         String originPackage = packageOf(origin);
-        if (typePackage.equals(originPackage)) {
-            return typePackage;
+        if (typePackage.equals(originPackage) || isPublic(type, new HashSet<>())) {
+            return originPackage;
         }
-        Set<String> visited = new HashSet<>();
-        if (isPublic(type, visited)) {
-            if (!namesNonPublicTypeOf(type, typePackage)) {
-                return originPackage;
-            }
-        } else if (typePackage.startsWith("java.")) {
+        if (typePackage.startsWith("java.")) {
             throw new ProcessingException(origin, "The hierarchy of [" + type.getName() + "] cannot be recorded: the type is not public, and a record cannot be written into a package of the JDK");
         }
         return typePackage;
@@ -220,35 +230,12 @@ public final class TypeHierarchyWriter {
     }
 
     /**
-     * Whether the declaration of a type names a class of the given package that is not public: in the bounds of its
-     * variables, in its direct super types or anywhere in its closure.
-     */
-    private static boolean namesNonPublicTypeOf(ClassElement type, String packageName) {
-        Set<String> visited = new HashSet<>();
-        for (GenericPlaceholderElement variable : type.getDeclaredGenericPlaceholders()) {
-            if (namesNonPublicTypeOf(variable, packageName, visited, 0)) {
-                return true;
-            }
-        }
-        for (ClassElement superType : type.getAllSuperTypes()) {
-            if (!superType.getName().equals(type.getName()) && namesNonPublicTypeOf(superType, packageName, visited, 0)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
      * Whether every class a type names, itself, its type arguments and the bounds of its variables and wildcards, can
      * be named from a package: it is public, or of that package.
      */
     private static boolean isNameableFrom(ClassElement element, String packageName) {
         // a non-public class is nameable from its own package only
         return !namesNonPublicTypeMatching(element, aClass -> !aClass.getPackageName().equals(packageName), new HashSet<>(), 0);
-    }
-
-    private static boolean namesNonPublicTypeOf(ClassElement element, String packageName, Set<String> visited, int depth) {
-        return namesNonPublicTypeMatching(element, aClass -> aClass.getPackageName().equals(packageName), visited, depth);
     }
 
     private static boolean namesNonPublicTypeMatching(ClassElement element, Predicate<ClassElement> matches, Set<String> visited, int depth) {

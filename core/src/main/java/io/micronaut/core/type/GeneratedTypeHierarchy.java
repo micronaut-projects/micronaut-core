@@ -41,6 +41,7 @@ public non-sealed class GeneratedTypeHierarchy implements TypeHierarchy {
     private final Argument<?> superclass;
     private final List<Argument<?>> interfaces;
     private final List<Argument<?>> superTypes;
+    private final List<String> inaccessibleSuperTypes;
 
     /**
      * @param type          The type
@@ -55,11 +56,30 @@ public non-sealed class GeneratedTypeHierarchy implements TypeHierarchy {
                                      @Nullable Argument<?> superclass,
                                      Argument<?> @Nullable [] interfaces,
                                      Argument<?> @Nullable [] superTypes) {
+        this(type, typeVariables, superclass, interfaces, superTypes, null);
+    }
+
+    /**
+     * @param type                   The type
+     * @param typeVariables          The type variables, or {@code null} for none
+     * @param superclass             The generic superclass, or {@code null} for none or one the record cannot name
+     * @param interfaces             The generic interfaces, or {@code null} for none
+     * @param superTypes             All the super types the record can name, {@link Object} last, or {@code null} for {@link Object} alone
+     * @param inaccessibleSuperTypes The names of the super types the record cannot name, or {@code null} for none
+     */
+    @UsedByGeneratedCode
+    protected GeneratedTypeHierarchy(Class<?> type,
+                                     Argument<?> @Nullable [] typeVariables,
+                                     @Nullable Argument<?> superclass,
+                                     Argument<?> @Nullable [] interfaces,
+                                     Argument<?> @Nullable [] superTypes,
+                                     String @Nullable [] inaccessibleSuperTypes) {
         this.type = type;
         this.typeVariables = typeVariables == null ? List.of() : List.of(typeVariables);
         this.superclass = superclass;
         this.interfaces = interfaces == null ? List.of() : List.of(interfaces);
         this.superTypes = superTypes == null ? List.of(Argument.OBJECT_ARGUMENT) : List.of(superTypes);
+        this.inaccessibleSuperTypes = inaccessibleSuperTypes == null ? List.of() : List.of(inaccessibleSuperTypes);
     }
 
     @Override
@@ -85,6 +105,11 @@ public non-sealed class GeneratedTypeHierarchy implements TypeHierarchy {
     @Override
     public final List<Argument<?>> getSuperTypes() {
         return superTypes;
+    }
+
+    @Override
+    public final List<String> getInaccessibleSuperTypes() {
+        return inaccessibleSuperTypes;
     }
 
     @Override

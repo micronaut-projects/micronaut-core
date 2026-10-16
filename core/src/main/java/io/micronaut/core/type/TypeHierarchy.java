@@ -64,7 +64,8 @@ public sealed interface TypeHierarchy permits GeneratedTypeHierarchy {
      * The generic superclass, with its type arguments as declared, which can name the
      * {@link #getTypeVariables() type variables}. A raw {@code extends} is a raw argument.
      *
-     * @return The superclass, or empty for an interface and for a type that extends {@link Object}
+     * @return The superclass, or empty for an interface, for a type that extends {@link Object} and for a superclass
+     * the record could not name, which is then one of the {@link #getInaccessibleSuperTypes() inaccessible super types}
      */
     Optional<Argument<?>> getGenericSuperclass();
 
@@ -79,11 +80,24 @@ public sealed interface TypeHierarchy permits GeneratedTypeHierarchy {
      * Every super type of the type, transitively, with its type arguments written in the
      * {@link #getTypeVariables() type variables} of the type along the path that reaches it: the super class and its
      * super types first, then each interface and its super types, each type once, {@link Object} last. A super type
-     * that could not be named from the record, a package-private class of another package, is left out.
+     * that could not be named from the record, a class that is not public and of another package than the record, is
+     * left out with the types above it kept, and is listed by name in {@link #getInaccessibleSuperTypes()}.
      *
      * @return The super types, in declaration order and with {@link Object} last
      */
     List<Argument<?>> getSuperTypes();
+
+    /**
+     * The names of the super types left out of the {@link #getSuperTypes() super types} because the record could not
+     * name them: a class that is not public and of another package than the record, such as the package-private
+     * {@code java.lang.AbstractStringBuilder} of {@code StringBuilder}, or a super type whose type arguments name
+     * such a class. Each is the {@link Class#getName() name} of the class, its type arguments erased, in the order of
+     * the super types and once, so that a consumer that knows the class by name, in its own package, can still tell it
+     * is a super type of the type.
+     *
+     * @return The names of the super types left out, empty when the record names them all
+     */
+    List<String> getInaccessibleSuperTypes();
 
     /**
      * The type parameterized by its own type variables, {@code Foo<T>} for {@code class Foo<T>}, or the plain type
