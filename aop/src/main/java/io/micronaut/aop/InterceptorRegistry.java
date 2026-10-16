@@ -26,6 +26,10 @@ import java.util.Collection;
 /**
  * Strategy interface for looking up interceptors from the bean context.
  *
+ * <p>An implementation returns the interceptors of an interception point in the order they run in. The default
+ * implementation orders them by {@link io.micronaut.core.order.Ordered}, letting an {@link InterceptionPointOrdered}
+ * interceptor report its order for the point.</p>
+ *
  * @author graemerocher
  * @since 3.0.0
  */
