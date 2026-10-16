@@ -1,0 +1,199 @@
+The compiler can compile the body of a Python method to Java, inside the generated class the method is bridged on, when the type checker proves that every call, attribute read and operation in it resolves to a known target. A Java caller of such a method, which is every HTTP route, every injected service and every executable method, runs Java instead of entering the Python runtime to run the method; the body itself still crosses into Python where it must (an attribute of a class whose state lives in Python, a `@property`, a sibling the generated class cannot call directly), and the report counts those crossings. Python callers of an object the generated class created run the same Java body, so there is one implementation of the method, not two. The feature is experimental and off by default.
+
+Static compilation builds on <<typeChecking, type checking>>: the checker's inference decides what is statically dispatched, whether or not its diagnostics are reported. A body the checker flags is a body that will not compile.
+
+== Enabling Static Compilation
+
+The annotation processor option `micronaut.python.compile.static` selects the mode:
+
+[cols="1,3"]
+|===
+|Mode |Effect
+
+|`off`
+|Nothing is compiled unless switched on by a decorator (the default).
+
+|`annotated`
+|The scopes carrying `CompileStatic` are compiled.
+
+|`all`
+|Every eligible method is compiled unless a decorator excludes it.
+|===
+
+[cols="1,3"]
+|===
+|Option |Purpose
+
+|`micronaut.python.compile.static.report`
+|A directory `decisions.jsonl` and `summary.txt` are written to, one record per method, see <<staticCompilationReport, the report>>. Unset, no files are written; the callback still receives every decision.
+
+|`micronaut.python.compile.static.strict`
+|`true` makes an explicit `CompileStatic` that cannot be honoured an error instead of a warning.
+
+|`micronaut.python.compile.static.annotations`
+|The qualified names of the decorators accepted as the switch, comma separated; the default accepts `io.micronaut.context.python.annotation.CompileStatic` and `pyronaut.build.CompileStatic`.
+
+|`micronaut.python.compile.static.trace`
+|`true` makes every compiled body count its entries in `PythonStatic.entries("package.Class#method")`, for tests and for anyone diagnosing what runs as Java.
+|===
+
+Pass the options to `javac` as `-Amicronaut.python.compile.static=all`, or set them on the compiler API:
+
+[source,java]
+----
+PyronautCompiler.builder()
+    .pythonSrc("src/main/python")
+    .typeCheck(TypeCheckMode.WARN)
+    .staticCompilation(StaticCompilationMode.ANNOTATED)
+    .staticCompilationReport(new File("build/reports/pyronaut/static-compilation"))
+    .staticCompilationDecisionCallback(decision -> log.info(decision.toString()))
+    .build()
+    .compile();
+----
+
+== Switching Compilation On or Off for a Scope
+
+The `CompileStatic` annotation switches compilation for a class, a function or, applied as a bare statement, a module, with the scope rules of `TypeChecked`: the nearest declaration wins.
+
+[source,python]
+----
+from jakarta.inject import Singleton
+from micronaut.context.python.annotation import CompileStatic
+
+@Singleton
+@CompileStatic                  # <1>
+class PricingService:
+    def __init__(self, rate: float):
+        self.rate = rate
+
+    def total(self, quantity: int, unit_price: float) -> float:
+        return quantity * unit_price * self.rate
+
+    @CompileStatic(False)       # <2>
+    def describe(self, sku: str) -> str:
+        return inflect.engine().plural(sku)
+----
+
+<1> Every eligible method of the class is compiled, in mode `annotated` as in mode `all`
+<2> The method stays in Python: it uses a third-party library
+
+A function carrying `CompileStatic` that is skipped, and a class carrying it whose candidate methods are all skipped, get a warning naming the first reason. Methods that are never candidates (a constructor, a dunder, a static method, a method of an ineligible class) are recorded as `NOT_CANDIDATE` in the report without a warning, so a class opt-in covering only such methods is silent: the report is the place to look. The annotation is kept in the source only.
+
+== What Is Compiled
+
+A method is compiled when it is a candidate, its signature has a Java layout, and every statement and expression of its body has a lowering with Python's semantics. Each failing condition is a reason with a stable identifier in the report. The signature and the statement kinds are checked completely, so all of their reasons are listed; the lowering of the body stops at its first refusal, so a body can carry one lowering reason at a time.
+
+[cols="1,3"]
+|===
+|Reason |Given when
+
+|`class-not-eligible`
+|The class generates no ordinary Java class to compile into: a module-level function, an enum, a protocol, an interface, a class served by a context pool, a class declaring `__slots__` or `__getattr__`.
+
+|`special-method`, `async-function`, `generator-function`, `static-method`
+|The method is a dunder (`__init__` runs in Python so the instance keeps its Python semantics), an `async def`, a generator, or a static or class method.
+
+|`overriding-java-method`, `intercepted-method`
+|The method implements a method of a Java base or interface, whose bridge keeps the Java signature, or is advised (an around or introduction binding, or a validation constraint): its interceptor chain runs on the Python object, which a Java body would bypass.
+
+|`varargs-signature`, `unhinted-parameter`, `unhinted-return`, `java-reserved-name`
+|The signature has no fixed Java layout: `*args`, `**kwargs` or keyword-only parameters, a parameter without a hint, a parameter or return hint resolving to no Java type or class of the compilation, a method, parameter or local named with a Java keyword or a method of `Object`. A missing return hint is not a reason: the method returns `Object`, as its stub declares.
+
+|`unknown-type`, `unknown-self-attribute`
+|An expression has no static type (a value of a third-party module, a local assigned values of different types, a local assigned on some paths only and read after them), or `self.x` names nothing the class declares.
+
+|`dynamic-call`, `ambiguous-overload`, `kwargs-to-java`, `sibling-call`
+|A call resolves to no Java method or constructor, more than one overload fits the argument types equally well, keyword arguments are given to a Java method, or a static, class, async or generator method of the class is called on `self`.
+
+|`python-builtin-not-lowered`, `unsupported-statement`, `unsupported-expression`
+|A builtin, a method of a Python value, a statement kind or an expression kind outside the supported subset below.
+
+|`unbounded-integer-op`, `equality-on-object`, `truthiness-of-java-object`, `python-exception`
+|An operation whose Python semantics the lowering does not reproduce: `**` on integers or an integer literal outside `long`, `==` between Java objects, `if x:` on a Java object that is not a collection or a string, raising or catching a Python exception.
+|===
+
+=== The Supported Subset
+
+Python integers are compiled as `long`, floats as `double`, strings as `String`, booleans as `boolean` and `None` as `null`. Where Python and Java differ, the generated code calls a helper of `io.micronaut.context.python.PythonStatic` instead of approximating: `//` and `%` floor, `/` always divides as floats, `str()` spells floats, booleans and `None` as Python does, a string is indexed by code point, `len()`, `in`, negative indexes and a missing key behave as in Python.
+
+[cols="1,2"]
+|===
+|Python |Compiled as
+
+|Locals, `+=` and friends, `if`/`elif`/`else`, `return`, `pass`, docstrings, `assert`
+|Java locals declared once, with the type of the values assigned. A local first assigned inside a branch is declared at the top of the body when every path assigns it, and inside the branch when it is read there only; a local assigned in a `try` block whose handlers all return or raise is declared before the statement, so it can be read after it. `assert` raises `IllegalStateException`.
+
+|`while`, `for x in range(...)`, `for x in iterable`, `break`, `continue`
+|Java loops; a range with any step, a Java `Iterable` or a typed Python collection, a dict yielding its keys. A local first assigned inside a loop (or a try block) is not visible after it.
+
+|`raise JavaException(...)`, `try`/`except JavaType as e`/`finally`
+|`throw` and `try` with typed catches. A checked exception a Java call declares reaches the caller wrapped in `IllegalStateException`, as it does through the bridge.
+
+|`+`, `-`, `*` on integers
+|`Math.addExact` and friends: an overflow raises `ArithmeticException` where Python would promote to a big integer. This is the one accepted difference.
+
+|`==`, `!=`, `<` and the rest, `is None`, `not`, `and`, `or`, `x if c else y`
+|Numeric comparisons, `equals` on strings, null checks, boolean operators; `and`/`or` yield a value when both sides share a type, or when they are two objects one of whose types takes the other (`pet.owner or self.find_owner(id)`), the left operand being a name, a literal or an attribute of a name, since it is evaluated twice.
+
+|f-strings, `str(x)`, `"a" + b`
+|Concatenation through `PythonStatic.str`. A `UUID`, `LocalDate` or `LocalTime` is spelled as Java spells it, which is Python's spelling too; another standard Java value (an `Instant`, a `BigDecimal`) is refused, since Python spells it differently. Format specifications are not compiled.
+
+|`[...]`, `(...)`, `{...}`, `{k: v}`, `xs[i]`, `m[k]`, `xs[i] = v`, `m[k] = v`, `x in xs`
+|`ArrayList`, immutable `List`, `LinkedHashSet` and `LinkedHashMap` with the element types of the literal (an empty literal takes them from the hint of the local); a literal mixing strings, numbers and objects holds `Object` elements; `{k: v, **other}` builds the map in source order, later keys winning; helpers for the reads, stores and membership tests. A collection given to a parameter hinted `list`, `set` or `dict` is worked on as a copy, as the bridge hands Python a copy.
+
+|`len`, `int`, `float`, `bool`, `abs`, `min`, `max`, `list(xs)`, `set(xs)`, `tuple(xs)`, `str.strip/split/join/upper/lower/startswith/endswith/replace`, `list.append/clear`, `set.add/clear`, `dict.get/keys/values`
+|The builtin table: each entry names a Java equivalent or a helper. `list(xs)`, `set(xs)` and `tuple(xs)` copy a Java collection or a typed Python one, a dict yielding its keys. `dict.get` without a default is refused when the values are numbers or booleans, since it may answer `None`.
+
+|Unhinted returns
+|`Object`, as the stub declares, every returned value boxed. A call of such a sibling has the one static type its body returns when the checker infers one, cast from the `Object` the Java method returns; a number or a boolean stays an `Object`.
+
+|Java calls, constructors, static fields, enum constants, nested types
+|Direct Java calls with the parameter types of the chosen overload, so the generated code never depends on javac's overload pick; an integer argument to an `int` parameter narrows exactly.
+
+|`self.x`, `self.x = v`
+|The Java field of an introspected class, else the attribute of the Python object; a `@property` always runs its Python getter or setter. An attribute `__init__` assigns a hinted parameter or a Java call or construction (`self._encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder()`) has that type in every method.
+
+|`self.method(...)`
+|The generated class's own Java method when it declares one for the call (a public method with a hinted signature the call fills exactly, that no advice intercepts and no subclass of the compilation overrides), else the method of the Python object, which runs its interceptors, overrides and default arguments as Python would.
+|===
+
+Not compiled: comprehensions, lambdas and nested functions, `with`, `match`, `del`, `global`, `nonlocal`, `yield`, slices, starred arguments, chained comparisons, calls of module-level functions, and `Optional` hints.
+
+== One Implementation
+
+The Python object of a compiled class still exists: the generated class creates it, and Python code, the interceptor chains and the event loop call the Python class's own functions. So that a Python caller runs the same code as a Java caller, the generated class binds every Python object it creates or wraps to a delegate holding the compiled bodies, and the runtime tree of the module is rewritten before its bytecode is compiled: a compiled function first looks for the delegate on its object and runs the Java body when it finds one; otherwise it runs its original body, which keeps objects created in Python (`Calc().label(...)`) on the Python implementation.
+
+Introspected classes keep their ownership model: their state lives in Java fields, and a compiled body reads and writes those fields, which is what a Java caller of the accessors sees. Other classes keep their state in the Python object, and a compiled body reaches it through the same member access the generated accessors use; each such access crosses into the Python runtime, which the report counts as a bridge call, so a compiled body that touches many attributes of a plain class may not be faster than the bridge it replaces.
+
+[[staticCompilationReport]]
+== The Report
+
+One record per candidate method, delivered to the builder callback as `StaticCompilationDecision` and, when a report directory is configured, written to `decisions.jsonl` (one JSON object per line, stable field names, merged incrementally across rounds) and `summary.txt`, with `decisions.properties` alongside them: the state an incremental build reads back to keep both files complete:
+
+[source]
+----
+COMPILED      shop.OrderController.summary  shop/OrderController.py:11:5
+              statements 8 · java calls 4 · bridge calls 1 · helpers 2
+SKIPPED       shop.PricingService.describe  shop/PricingService.py:19:5
+              [unknown-type] shop/PricingService.py:20:16  [inflect] is a third-party Python module; its members have no static type
+EXCLUDED      shop.LegacyAdapter.convert  shop/LegacyAdapter.py:8:5
+
+COMPILED      1
+SKIPPED       1
+EXCLUDED      1
+
+unknown-type                     1
+----
+
+The outcomes are `COMPILED`, `SKIPPED` (a candidate with reasons), `CANDIDATE` (a body that would compile, in mode `off`), `EXCLUDED` (switched off by a decorator) and `NOT_CANDIDATE`. The totals per reason at the end put the most common blocker one glance away.
+
+== Running the Existing Tests with Compilation On
+
+The tests of a project are the measure of semantic drift. `inject-python-test` runs its whole suite with every eligible body compiled:
+
+[source,bash]
+----
+./gradlew :micronaut-inject-python-test:test -Ppython-ci -Dmicronaut.python.compile.static=all
+----
+
+`StaticCompilationParitySpec` compiles a fixture twice, in modes `off` and `all`, and calls every method through the generated class with a table of inputs: the results, and whether an exception was thrown, must agree.
