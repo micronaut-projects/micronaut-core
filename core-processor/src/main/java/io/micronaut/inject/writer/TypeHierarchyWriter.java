@@ -86,7 +86,7 @@ public final class TypeHierarchyWriter {
      * @return The name of the record
      */
     public static String recordClassName(ClassElement type, Element... originatingElements) {
-        if (originatingElements == null || originatingElements.length == 0) {
+        if (originatingElements.length == 0) {
             throw new IllegalArgumentException("The hierarchy of [" + type.getName() + "] cannot be recorded without an originating element");
         }
         return TypeHierarchies.recordClassName(type.getName(), recordPackage(type, originatingElements[0]));

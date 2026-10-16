@@ -18,7 +18,10 @@ import org.junit.platform.suite.api.SuiteDisplayName;
     "io.micronaut.http.server.tck.tests.forms.FormsJacksonAnnotationsTest", // it seems application/x-www-form-urlencoded is not yet supported by the JDK client
     "io.micronaut.http.server.tck.tests.forms.UploadTest" // multipart
 })
-@ExcludeTags("multipart") // Multipart not supported by HttpClient
+@ExcludeTags({
+    "multipart", // Multipart not supported by HttpClient
+    "publisher-request-body" // the JDK client cannot send a Publisher request body (UnsupportedOperationException)
+})
 @ConfigurationParameter(key = "junit.jupiter.extensions.autodetection.enabled", value = "true")
 public class JdkHttpServerTestSuite {
 }
