@@ -309,9 +309,30 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * Dependent can be missing which means it's a singleton or scoped bean.
      *
      * @since 3.5.0
+     * @deprecated Since 5.2.1 use {@link #markDependentAsFactory(Object)}, which identifies the factory by the
+     * instance that was looked up instead of by its position. A bean definition generated before 5.2.1 still calls
+     * this method, so it cannot be removed; a definition generated since then does not.
      */
     @UsedByGeneratedCode
+    @Deprecated(since = "5.2.1", forRemoval = false)
     default void markDependentAsFactory() {
+    }
+
+    /**
+     * Marks the dependent registration of the given factory bean as the factory of the bean being created, so that a
+     * factory that only exists to produce this bean is destroyed once the bean has been built.
+     *
+     * <p>The factory is identified by the instance rather than by its position in the dependent list: by the time a
+     * bean with constructor advice looks its factory up, the factory method arguments and the bean's interceptors
+     * have already been recorded as dependents, and a {@code @Singleton} factory is recorded as a dependent of
+     * nothing at all. Nothing is marked when the factory is not one of the dependents, which is the normal case for
+     * a singleton or scoped factory.</p>
+     *
+     * @param factoryBean The factory bean that was just looked up, or {@code null} for a static factory member
+     * @since 5.2.1
+     */
+    @UsedByGeneratedCode
+    default void markDependentAsFactory(@Nullable Object factoryBean) {
     }
 
     /**
