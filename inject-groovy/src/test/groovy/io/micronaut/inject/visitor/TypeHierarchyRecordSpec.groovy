@@ -5,6 +5,8 @@ import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.core.type.TypeHierarchies
 import io.micronaut.core.type.TypeHierarchy
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ElementQuery
 
 
 import static io.micronaut.inject.test.hierarchy.TypeStrings.string
@@ -148,6 +150,66 @@ class Payload<T> implements Supplier<T[]> {
         then:
         strings(closure) == ['Payload<String>', 'Supplier<String[]>', 'Object']
         closure[1].typeParameters[0].type == String[]
+    }
+
+    void "a multidimensional array has the super types of the arrays it is an array of, and a record argument keeps its dimensions"() {
+        given:
+        def source = '''
+package test
+
+import io.micronaut.core.annotation.TypeHierarchyImport
+import java.util.function.Function
+
+@TypeHierarchyImport
+abstract class Matrix<T> implements Function<T[][], int[][]> {
+    String string
+    String[][] strings
+    int[][] ints
+}
+'''
+        ClassElement matrix = buildClassElement('test.Matrix', source)
+        def string = elementStrings(fieldType(matrix, 'string'))
+        def hierarchy = record(buildClassLoader(source), 'test.Matrix')
+
+        expect: "String[][] is an array of the super types of String, then of those String[] has as an array"
+        string.last() == 'Object'
+        string.contains('Comparable<String>')
+        elementStrings(fieldType(matrix, 'strings')) == ['String[][]'] + string.tail().collect { it + '[][]' } +
+            ['Object[]', 'Cloneable[]', 'Serializable[]', 'Cloneable', 'Serializable', 'Object']
+
+        and: "int[][] is an array of the super types of int[]"
+        elementStrings(fieldType(matrix, 'ints')) == ['int[][]', 'Object[]', 'Cloneable[]', 'Serializable[]', 'Cloneable', 'Serializable', 'Object']
+
+        when:
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, String))
+        def ofArrays = hierarchy.getTypeClosure(Argument.of(hierarchy.type, String[]))
+
+        then:
+        strings(hierarchy.genericInterfaces) == ['Function<T[][], int[][]>']
+        strings(closure) == ['Matrix<String>', 'Function<String[][], int[][]>', 'Object']
+        closure[1].typeParameters*.type == [String[][], int[][]]
+        strings(ofArrays) == ['Matrix<String[]>', 'Function<String[][][], int[][]>', 'Object']
+        ofArrays[1].typeParameters*.type == [String[][][], int[][]]
+    }
+
+    private static ClassElement fieldType(ClassElement owner, String name) {
+        owner.getEnclosedElements(ElementQuery.ALL_FIELDS).find { it.name == name }.genericType
+    }
+
+    /**
+     * The super types of an element by simple name, arguments and dimensions, as the strings of a record read.
+     */
+    private static List<String> elementStrings(ClassElement type) {
+        type.getAllSuperTypes().collect { elementString(it) }
+    }
+
+    private static String elementString(ClassElement type) {
+        String name = type.name.substring(type.name.lastIndexOf('.') + 1)
+        String dimensions = "[]" * type.arrayDimensions
+        if (type.rawType || type.typeArguments.isEmpty()) {
+            return name + dimensions
+        }
+        return name + "<" + type.typeArguments.values().collect { elementString(it) }.join(", ") + ">" + dimensions
     }
 
     void "wildcards of every kind are kept through the substitution and erased for a raw parameterization"() {

@@ -45,9 +45,10 @@ import java.util.stream.Collectors;
  * closure of the declaration, of a raw parameterization and of a concrete one.
  *
  * <p>The grammar covers type variables with simple, recursive and intersection bounds, nested type arguments,
- * arrays, the three kinds of wildcard, raw and parameterized super classes, and diamonds. A language that lacks a
- * feature (Kotlin has no raw types, Python has neither wildcards nor arrays) leaves it out. A type naming the class
- * being declared is never produced: the javac element resolves the arguments of such a self reference to Object.</p>
+ * arrays and arrays of arrays, of a primitive among them, the three kinds of wildcard, raw and parameterized super
+ * classes, and diamonds. A language that lacks a feature (Kotlin has no raw types, Python has neither wildcards nor
+ * arrays) leaves it out. A type naming the class being declared is never produced: the javac element resolves the
+ * arguments of such a self reference to Object.</p>
  */
 public final class TypeHierarchyFuzz {
 
@@ -489,14 +490,19 @@ public final class TypeHierarchyFuzz {
             return args;
         }
 
-        /** A type argument: a variable, a class, a nested generic with a wildcard inside, an array. */
+        /** A type argument: a variable, a class, a nested generic with a wildcard inside, an array, an array of arrays. */
         private TypeExpr typeArgument(List<String> variables, int depth) {
             List<TypeExpr> choices = new ArrayList<>(List.of(new Cls("String"), new Cls("Integer")));
+            if (!python()) {
+                choices.add(new Arr(new Arr(new Cls("String"))));
+                choices.add(new Arr(new Arr(new Cls("int"))));
+            }
             if (!variables.isEmpty()) {
                 choices.add(new Var(variables.get(random.nextInt(variables.size()))));
                 if (!python() && !(language == Language.GROOVY && depth > 0)) {
                     // Groovy: an array of a variable only outside wildcard bounds, see Language.GROOVY
                     choices.add(new Arr(new Var(variables.get(0))));
+                    choices.add(new Arr(new Arr(new Var(variables.get(0)))));
                 }
             }
             if (depth < 3) {
@@ -529,6 +535,7 @@ public final class TypeHierarchyFuzz {
                 choices.add(new Var(variables.get(random.nextInt(variables.size()))));
                 if (language != Language.GROOVY) {
                     choices.add(new Arr(new Var(variables.get(0))));
+                    choices.add(new Arr(new Arr(new Var(variables.get(0)))));
                 }
             }
             if (depth < 3) {
@@ -644,7 +651,8 @@ public final class TypeHierarchyFuzz {
                 return name + "<" + p.args().stream().map(this::kotlin).collect(Collectors.joining(", ")) + ">";
             }
             if (t instanceof Arr a) {
-                return "Array<" + kotlin(a.component()) + ">";
+                // an array of int is a primitive array in Kotlin, an Array<Int> being an Integer[]
+                return a.component() instanceof Cls c && c.name().equals("int") ? "IntArray" : "Array<" + kotlin(a.component()) + ">";
             }
             Wild w = (Wild) t;
             if (w.lower() != null) {

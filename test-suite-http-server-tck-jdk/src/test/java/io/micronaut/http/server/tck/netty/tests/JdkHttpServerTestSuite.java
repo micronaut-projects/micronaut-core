@@ -20,7 +20,8 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 })
 @ExcludeTags({
     "multipart", // Multipart not supported by HttpClient
-    "publisher-request-body" // the JDK client cannot send a Publisher request body (UnsupportedOperationException)
+    "publisher-request-body", // the JDK client cannot send a Publisher request body (UnsupportedOperationException)
+    "fuzz" // the fuzz suite talks raw HTTP to the Netty server, which the Netty suite already runs
 })
 @ConfigurationParameter(key = "junit.jupiter.extensions.autodetection.enabled", value = "true")
 public class JdkHttpServerTestSuite {

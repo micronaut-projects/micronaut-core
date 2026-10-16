@@ -33,6 +33,7 @@ import io.micronaut.http.filter.HttpServerFilterResolver;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.RoutingException;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
@@ -40,9 +41,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -249,6 +252,17 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
+    public boolean hasBodyConditions() {
+        return routes.hasBodyConditions();
+    }
+
+    @Override
+    public <T, R> RouteResolution<T, R> resolve(HttpRequest<?> request,
+                                                @Nullable Predicate<UriRouteMatch<T, R>> filter) throws DuplicateRouteException {
+        return routes.resolve(request, ports.get(), filter);
+    }
+
+    @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
         return routes.findAllClosest(request, ports.get());
     }
@@ -271,8 +285,101 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     @Internal
     public static <T, R> List<UriRouteMatch<T, R>> resolveAmbiguity(HttpRequest<?> request,
                                                                     List<UriRouteMatch<T, R>> uriRoutes) {
-        // if there are multiple routes, try to resolve the ambiguity
+        // the matches may have a selector with its own order, see RouteMatchSelector#order()
+        return resolveAmbiguity(request, uriRoutes, hasSelectorOrder(request, uriRoutes));
+    }
 
+    /**
+     * Narrows the given route matches for a request down to the closest ones, as when the
+     * request is routed: when the matches all have a route selector, it selects among them,
+     * otherwise their ambiguity is resolved, see {@link #resolveAmbiguity(HttpRequest, List)}.
+     *
+     * @param request   The request
+     * @param uriRoutes The route matches of the request, e.g. of the WebSocket routes of a path
+     * @param <T>       The target type
+     * @param <R>       The result type
+     * @return The closest matches
+     * @since 5.3.0
+     */
+    @Internal
+    public static <T, R> List<UriRouteMatch<T, R>> selectClosest(HttpRequest<?> request, List<UriRouteMatch<T, R>> uriRoutes) {
+        return UriRouteSet.selectClosest(request, uriRoutes);
+    }
+
+    /**
+     * Narrows the given route matches for a request down to the closest ones.
+     *
+     * @param request     The request
+     * @param uriRoutes   The route matches of the request
+     * @param selectorOrders Whether a match may have a route selector with its own order
+     * @param <T>         The target type
+     * @param <R>         The result type
+     * @return The closest matches
+     */
+    static <T, R> List<UriRouteMatch<T, R>> resolveAmbiguity(HttpRequest<?> request,
+                                                             List<UriRouteMatch<T, R>> uriRoutes,
+                                                             boolean selectorOrders) {
+        // if there are multiple routes, try to resolve the ambiguity
+        if (selectorOrders && uriRoutes.size() > 1) {
+            // the routes of one selector, e.g. locator routes: its order instead of the Micronaut
+            // policy, then the media types narrow the routes it orders equally
+            Comparator<UriRouteInfo<?, ?>> selectorOrder = sameSelectorOrder(request, uriRoutes);
+            if (selectorOrder != null) {
+                List<UriRouteMatch<T, R>> ordered = mostSpecific(request, uriRoutes, selectorOrder);
+                return ordered.size() > 1 ? byMediaTypes(request, ordered) : ordered;
+            }
+        }
+        uriRoutes = byMediaTypes(request, uriRoutes);
+
+        /*
+         * Any changes to the logic below may also need changes to {@link io.micronaut.http.uri.UriTemplate#compareTo(UriTemplate)}
+         */
+        int routeCount = uriRoutes.size();
+        if (routeCount > 1) {
+            long variableCount = 0;
+            long rawLength = 0;
+
+            var closestMatches = new ArrayList<UriRouteMatch<T, R>>(routeCount);
+
+            for (int i = 0; i < routeCount; i++) {
+                UriRouteMatch<T, R> match = uriRoutes.get(i);
+                UriRouteInfo<T, R> routeInfo = match.getRouteInfo();
+                long variable;
+                long raw;
+                if (routeInfo instanceof DefaultUrlRouteInfo<?, ?> info && !info.isMicronautTemplate()) {
+                    // the facts the template describes for this policy
+                    variable = info.getPathVariableCount();
+                    raw = info.getRawLength();
+                } else {
+                    UriMatchTemplate template = routeInfo.getUriMatchTemplate();
+                    variable = template.getPathVariableSegmentCount();
+                    raw = template.getRawSegmentLength();
+                }
+                if (i == 0) {
+                    variableCount = variable;
+                    rawLength = raw;
+                }
+                if (variable > variableCount || raw < rawLength) {
+                    break;
+                }
+                closestMatches.add(match);
+            }
+            uriRoutes = closestMatches;
+        }
+        return uriRoutes;
+    }
+
+    /**
+     * Narrows matches by the media types: the routes that explicitly produce the most preferred
+     * accepted type, then, for a request with a body, the routes that explicitly consume its type.
+     *
+     * @param request   The request
+     * @param uriRoutes The matches
+     * @param <T>       The target type
+     * @param <R>       The result type
+     * @return The narrowed matches
+     */
+    private static <T, R> List<UriRouteMatch<T, R>> byMediaTypes(HttpRequest<?> request, List<UriRouteMatch<T, R>> uriRoutes) {
         final Collection<MediaType> acceptedProducedTypes = request.accept();
         if (CollectionUtils.isNotEmpty(acceptedProducedTypes)) {
             // take the highest priority accepted type
@@ -305,34 +412,106 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
             uriRoutes = explicitlyConsumedRoutes.isEmpty() ? consumesRoutes : explicitlyConsumedRoutes;
         }
-
-        /*
-         * Any changes to the logic below may also need changes to {@link io.micronaut.http.uri.UriTemplate#compareTo(UriTemplate)}
-         */
-        routeCount = uriRoutes.size();
-        if (routeCount > 1) {
-            long variableCount = 0;
-            long rawLength = 0;
-
-            var closestMatches = new ArrayList<UriRouteMatch<T, R>>(routeCount);
-
-            for (int i = 0; i < routeCount; i++) {
-                UriRouteMatch<T, R> match = uriRoutes.get(i);
-                UriMatchTemplate template = match.getRouteInfo().getUriMatchTemplate();
-                long variable = template.getPathVariableSegmentCount();
-                long raw = template.getRawSegmentLength();
-                if (i == 0) {
-                    variableCount = variable;
-                    rawLength = raw;
-                }
-                if (variable > variableCount || raw < rawLength) {
-                    break;
-                }
-                closestMatches.add(match);
-            }
-            uriRoutes = closestMatches;
-        }
         return uriRoutes;
+    }
+
+    /**
+     * @param request The request
+     * @param matches The matches of a path
+     * @return Whether a match has a route selector with its own order
+     */
+    static boolean hasSelectorOrder(HttpRequest<?> request, List<? extends UriRouteMatch<?, ?>> matches) {
+        for (UriRouteMatch<?, ?> match : matches) {
+            if (selectorOrder(request, match.getRouteInfo()) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param request The request
+     * @param matches The matches of a path
+     * @return The order of the route selector of all the matches, or {@code null} if they have
+     * different selectors, none, or a selector without an order of its own
+     */
+    static @Nullable Comparator<UriRouteInfo<?, ?>> sameSelectorOrder(HttpRequest<?> request, List<? extends UriRouteMatch<?, ?>> matches) {
+        RouteMatchSelector selector = null;
+        Comparator<UriRouteInfo<?, ?>> order = null;
+        for (UriRouteMatch<?, ?> match : matches) {
+            UriRouteInfo<?, ?> route = RouteLocator.atLocationOf(request, match.getRouteInfo());
+            RouteMatchSelector own = selector(route);
+            if (own == null || selector != null && own != selector) {
+                return null;
+            }
+            selector = own;
+            order = selectorOrder(route);
+        }
+        return order;
+    }
+
+    /**
+     * The matches whose routes are the most specific by the order of their selector, which
+     * compares the routes with the settings they inherit at the location of the request.
+     *
+     * @param request The request
+     * @param matches The matches, of the routes of one selector
+     * @param order   The order of the selector
+     * @return The most specific matches, in their order
+     */
+    static <T, R> List<UriRouteMatch<T, R>> mostSpecific(HttpRequest<?> request, List<UriRouteMatch<T, R>> matches, Comparator<UriRouteInfo<?, ?>> order) {
+        int count = matches.size();
+        var routes = new UriRouteInfo<?, ?>[count];
+        UriRouteInfo<?, ?> best = null;
+        for (int i = 0; i < count; i++) {
+            UriRouteInfo<?, ?> route = RouteLocator.atLocationOf(request, matches.get(i).getRouteInfo());
+            routes[i] = route;
+            if (best == null || order.compare(route, best) < 0) {
+                best = route;
+            }
+        }
+        var result = new ArrayList<UriRouteMatch<T, R>>(count);
+        for (int i = 0; i < count; i++) {
+            if (order.compare(routes[i], Objects.requireNonNull(best)) == 0) {
+                result.add(matches.get(i));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * @param route A route
+     * @return The route selector of the route, or {@code null}
+     */
+    static @Nullable RouteMatchSelector selector(UriRouteInfo<?, ?> route) {
+        return route instanceof DefaultUrlRouteInfo<?, ?> info ? info.routeMatchSelector() : null;
+    }
+
+    /**
+     * @param request The request
+     * @param route   A route
+     * @return The route selector of the route at the location of the request, see
+     * {@link RouteLocator#atLocation}, or {@code null}
+     */
+    static @Nullable RouteMatchSelector selector(HttpRequest<?> request, UriRouteInfo<?, ?> route) {
+        return selector(RouteLocator.atLocationOf(request, route));
+    }
+
+    /**
+     * @param route A route
+     * @return The order of the route selector of the route, read once when it was built, or {@code null}
+     */
+    static @Nullable Comparator<UriRouteInfo<?, ?>> selectorOrder(UriRouteInfo<?, ?> route) {
+        return route instanceof DefaultUrlRouteInfo<?, ?> info ? info.routeMatchSelectorOrder() : null;
+    }
+
+    /**
+     * @param request The request
+     * @param route   A route
+     * @return The order of the route selector of the route at the location of the request, or {@code null}
+     */
+    static @Nullable Comparator<UriRouteInfo<?, ?>> selectorOrder(HttpRequest<?> request, UriRouteInfo<?, ?> route) {
+        return selectorOrder(RouteLocator.atLocationOf(request, route));
     }
 
     @Override
@@ -652,7 +831,12 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
-        return routes.findAny(request, ports.get());
+        return routes.findAny(request, null, ports.get());
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
+        return routes.findAny(request, filter, ports.get());
     }
 
     private static <T> Optional<RouteMatch<T>> findRouteMatch(List<RouteMatch<T>> matchedRoutes, Throwable error) {
