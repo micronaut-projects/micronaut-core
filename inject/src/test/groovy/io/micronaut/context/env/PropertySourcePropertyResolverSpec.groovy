@@ -42,6 +42,66 @@ import java.util.function.Function
  */
 class PropertySourcePropertyResolverSpec extends Specification {
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13913")
+    void "random placeholders remain stable when unrelated property sources are added"() {
+        given:
+        def resolver = new PropertySourcePropertyResolver(
+            PropertySource.of("base", [
+                "app.id": '${random.uuid}',
+                "service.host": "old",
+                "service.url": '${service.host}'
+            ])
+        )
+        String id = resolver.getRequiredProperty("app.id", String)
+        assert resolver.getRequiredProperty("service.url", String) == "old"
+
+        when:
+        resolver.addPropertySource(PropertySource.of("unrelated", ["other.value": "present"]))
+
+        then:
+        resolver.getRequiredProperty("app.id", String) == id
+
+        when: "a regular placeholder's dependency is overridden"
+        resolver.addPropertySource(PropertySource.of("host", ["service.host": "new"]))
+
+        then:
+        resolver.getRequiredProperty("app.id", String) == id
+        resolver.getRequiredProperty("service.url", String) == "new"
+
+        when: "the random property itself is replaced by a different expression"
+        resolver.addPropertySource(PropertySource.of("override", ["app.id": '${random.shortuuid}']))
+
+        then:
+        resolver.getRequiredProperty("app.id", String).length() == 10
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13913")
+    void "the first random lookup during source processing remains stable"() {
+        given:
+        def resolver = new PropertySourcePropertyResolver(
+            PropertySource.of("base", ["app.id": '${random.uuid}'])
+        )
+
+        when: "a derived source resolves app.id for the very first time"
+        resolver.addPropertySource(new PropertySource() {
+            @Override
+            String getName() { "derived" }
+
+            @Override
+            Object get(String key) {
+                key == "derived.id" ? resolver.getRequiredProperty("app.id", String) : null
+            }
+
+            @Override
+            Iterator<String> iterator() { ["derived.id"].iterator() }
+        })
+
+        then:
+        String id = resolver.getRequiredProperty("app.id", String)
+        id.length() == 36
+        resolver.getRequiredProperty("derived.id", String) == id
+    }
+
     void "placeholder lookup does not retain a missing value observed during catalog reinitialization"() {
         given:
         PropertySource source = PropertySource.of("test", ["test.value": "resolved"])
