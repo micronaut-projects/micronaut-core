@@ -224,7 +224,7 @@ internal class KotlinAnnotationMetadataBuilder(
         ksType: KSType,
         annotationMetadata: MutableAnnotationMetadata
     ) {
-        if (ksType.isMarkedNullable) {
+        if (visitorContext.expandTypeAlias(ksType).isMarkedNullable) {
             // explicitly allowed to be null so add nullable
             annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
         } else {

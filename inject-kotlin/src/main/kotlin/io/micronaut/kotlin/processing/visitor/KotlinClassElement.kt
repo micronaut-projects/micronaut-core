@@ -98,7 +98,7 @@ internal open class KotlinClassElement(
     }
 
     val kotlinType: KSType by lazy {
-        definedType ?: declaration.asStarProjectedType()
+        definedType?.let { visitorContext.expandTypeAlias(it) } ?: declaration.asStarProjectedType()
     }
 
     val plainKotlinType: KSType by lazy {
