@@ -63,6 +63,7 @@ import io.micronaut.web.router.RouteResolution;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -618,6 +619,16 @@ public class RequestLifecycle {
         Router router = routeExecutor.router;
         if (!router.hasBodyConditions()) {
             return routeExecutor.findRouteMatch(request);
+        }
+        try {
+            // the closest match as if every body condition were met: when it has none, the body
+            // does not decide, e.g. for the routes of a route locator without body conditions
+            UriRouteMatch<Object, Object> match = routeExecutor.findRouteMatch(request);
+            if (match == null || match.getRouteInfo().getBodyConditions().isEmpty()) {
+                return match;
+            }
+        } catch (DuplicateRouteException e) {
+            // routes of the same rank, which the body may tell apart
         }
         RouteResolution<Object, Object> resolution = router.resolve(request);
         if (resolution instanceof RouteResolution.Pending<Object, Object> pending) {
