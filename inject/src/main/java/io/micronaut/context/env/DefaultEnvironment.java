@@ -304,7 +304,10 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 completed = true;
             } finally {
                 if (!completed) {
-                    // Restore the inputs as well as the catalog retained by the resolver on failure.
+                    // The resolver keeps the catalog it published when the rebuild fails. Put back the
+                    // property sources and the refreshable list that catalog was built from, so the
+                    // next refresh drops and reads the same sources again. This also undoes a property
+                    // source that another thread added or removed while the failed refresh ran.
                     synchronized (propertySources) {
                         propertySources.clear();
                         propertySources.putAll(previousSources);
