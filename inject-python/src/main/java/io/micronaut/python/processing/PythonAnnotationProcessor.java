@@ -736,12 +736,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                          String[] srcDirs,
                                          ClassElement originatingElement) {
         try (var _ = CompilationProfiler.span(profiler, "python.model")) {
-            List<Source> sourceList = transformedList
-                .stream()
-                .map(PythonAstParser.TransformResult::transformedSource)
-                .toList();
-            PythonEnvironment environment = parser.parse(
-                sourceList,
+            PythonEnvironment environment = parser.parseTransformed(
+                transformedList,
                 Arrays.asList(srcDirs),
                 javaVisitorContext
             );
