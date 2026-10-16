@@ -28,10 +28,14 @@ import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.CharBuffer;
 import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
 
 /**
  * The body reader for {@link String}.
@@ -78,7 +82,59 @@ public final class StringBodyReader implements TypedMessageBodyReader<String>, C
 
     @Override
     public Publisher<String> readChunked(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        return Flux.from(input).map(byteBuffer -> read0(byteBuffer, getCharset(mediaType)));
+        Charset charset = getCharset(mediaType);
+        return Flux.defer(() -> {
+            // A multi-byte character can span buffers, so all buffers share one decoder
+            ChunkDecoder decoder = new ChunkDecoder(charset);
+            return Flux.from(input)
+                .map(decoder::decode)
+                .concatWith(Mono.fromSupplier(decoder::finish))
+                .filter(s -> !s.isEmpty());
+        });
+    }
+
+    /**
+     * Decodes consecutive buffers, carrying an incomplete trailing character over to the next one.
+     */
+    private static final class ChunkDecoder {
+        private static final java.nio.ByteBuffer EMPTY = java.nio.ByteBuffer.allocate(0);
+
+        private final CharsetDecoder decoder;
+        private java.nio.ByteBuffer leftover = EMPTY;
+
+        ChunkDecoder(Charset charset) {
+            decoder = charset.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPLACE)
+                .onUnmappableCharacter(CodingErrorAction.REPLACE);
+        }
+
+        String decode(ByteBuffer<?> byteBuffer) {
+            try {
+                return decode(java.nio.ByteBuffer.wrap(byteBuffer.toByteArray()), false);
+            } finally {
+                if (byteBuffer instanceof ReferenceCounted rc) {
+                    rc.release();
+                }
+            }
+        }
+
+        String finish() {
+            return decode(EMPTY, true);
+        }
+
+        private String decode(java.nio.ByteBuffer chunk, boolean endOfInput) {
+            java.nio.ByteBuffer in = chunk;
+            if (leftover.hasRemaining()) {
+                in = java.nio.ByteBuffer.allocate(leftover.remaining() + chunk.remaining()).put(leftover).put(chunk).flip();
+            }
+            CharBuffer out = CharBuffer.allocate((int) Math.ceil(in.remaining() * (double) decoder.maxCharsPerByte()) + 2);
+            decoder.decode(in, out, endOfInput);
+            if (endOfInput) {
+                decoder.flush(out);
+            }
+            leftover = in.hasRemaining() ? java.nio.ByteBuffer.allocate(in.remaining()).put(in).flip() : EMPTY;
+            return out.flip().toString();
+        }
     }
 
     /**
