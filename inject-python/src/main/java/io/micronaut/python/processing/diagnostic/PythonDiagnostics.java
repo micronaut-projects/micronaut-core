@@ -30,9 +30,9 @@ import java.util.regex.Pattern;
  * <pre>
  * [python:unknown-method] Java type [java.util.ArrayList] has no method named [ad]; did you mean [add]?
  *   --&gt; src/main/python/shop/service.py:14:16
- *      |
- *   14 |         values.ad(item.title)
- *      |                ^^
+ *    |
+ *  14 |         values.ad(item.title)
+ *    |                ^^
  * </pre>
  *
  * @since 5.3.0
