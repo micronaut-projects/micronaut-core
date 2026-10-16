@@ -619,6 +619,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     @Nullable
     private List<ReadBuffer> add0(ReadBuffer rb, boolean completeAfter) {
         List<ReadBuffer> deferred = null;
+        List<DelayedExecutionFlow<ReadBuffer>> failedFullSubscribers = null;
         try (rb) {
             assert !working;
 
@@ -690,12 +691,10 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                         discardBuffer();
                         // new subscribers will recognize that the limit has been exceeded. Streaming
                         // subscribers can proceed normally. Need to notify buffering subscribers
-                        if (fullSubscribers != null) {
-                            for (DelayedExecutionFlow<?> fullSubscriber : fullSubscribers) {
-                                fullSubscriber.completeExceptionally(bufferSizeExceeded);
-                            }
-                            fullSubscribers = null;
-                        }
+                        // failed once this buffer is done working: the failure of a buffering
+                        // subscriber can close the body reentrantly, which subscribes a split
+                        failedFullSubscribers = fullSubscribers;
+                        fullSubscribers = null;
                     }
                 }
                 if (bufferSizeExceeded == null) {
@@ -706,6 +705,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 }
             }
             working = false;
+            if (failedFullSubscribers != null) {
+                for (DelayedExecutionFlow<?> fullSubscriber : failedFullSubscribers) {
+                    fullSubscriber.completeExceptionally(Objects.requireNonNull(bufferSizeExceeded));
+                }
+            }
             if (single != null) {
                 Objects.requireNonNull(targets).get(0).add(single);
             } else if (copies != null) {

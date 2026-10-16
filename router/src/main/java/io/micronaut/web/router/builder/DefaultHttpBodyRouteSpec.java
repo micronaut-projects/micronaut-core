@@ -128,7 +128,7 @@ final class DefaultHttpBodyRouteSpec<B extends @Nullable Object> implements Http
     }
 
     @Override
-    public HttpBodyRouteSpec<B> where(RouteCondition condition) {
+    public HttpBodyRouteSpec<B> where(RequestCondition condition) {
         route.where(condition);
         return this;
     }
