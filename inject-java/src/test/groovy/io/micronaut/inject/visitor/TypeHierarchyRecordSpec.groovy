@@ -327,6 +327,34 @@ public class Foreign {
         // subject of TypeHierarchySpec in core
     }
 
+    void "a type whose variable is bounded by a package-private class cannot be recorded from another package"() {
+        when: "leaving the bound out would change what the variable is bounded by and erases to"
+        buildClassLoader(new JavaFiles()
+            .add('b.Hidden', '''
+package b;
+
+class Hidden {
+}
+''')
+            .add('b.Bounded', '''
+package b;
+
+public class Bounded<T extends Hidden> {
+}
+''')
+            .add('c.Holder', '''
+package c;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = b.Bounded.class)
+public class Holder {
+}
+'''))
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains('The hierarchy of [b.Bounded] cannot be recorded: the bounds of its variable T name a type that is not public and not of the package c')
+    }
+
     void "a generic type met twice is checked with the arguments of each use"() {
         given:
         def classLoader = buildClassLoader(new JavaFiles()

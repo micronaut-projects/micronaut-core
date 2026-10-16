@@ -95,6 +95,13 @@ public sealed interface TypeHierarchy permits GeneratedTypeHierarchy {
      * the super types and once, so that a consumer that knows the class by name, in its own package, can still tell it
      * is a super type of the type.
      *
+     * <p>The names are erased evidence of membership only, not generic metadata: a super type {@code Base<String>}
+     * and a super type {@code Base<Integer>} are both {@code p.Base}, and nothing says what the type arguments of the
+     * super type left out were. A consumer that needs them reads them from a record of its own, written in the package
+     * of the class. A type variable bounded by such a class is not widened: leaving the bound out would change what
+     * the variable is bounded by and erases to, so a type whose variables are bounded by a class the record cannot name
+     * is not recorded from another package.</p>
+     *
      * @return The names of the super types left out, empty when the record names them all
      */
     List<String> getInaccessibleSuperTypes();
