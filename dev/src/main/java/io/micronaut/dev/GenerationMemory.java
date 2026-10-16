@@ -52,10 +52,16 @@ final class GenerationMemory {
      * {@code UniversalConnectionPoolManagerBase} registers a shutdown hook as it initializes, a thread that is never
      * started until the JVM exits and so has the context class loader of the thread that first used a pool; it is not
      * among the live threads a restart gives the parent tier's loader. It reads {@code oracle.ucp.*} system properties
-     * then, such as whether to register the hook at all.
+     * then, such as whether to register the hook at all. Micronaut's {@code PrivateLoomSupport} keeps the exception that
+     * tells why it cannot reach the JDK's virtual thread internals, without {@code --add-opens}, whose stack trace holds
+     * the classes on the stack of the thread that first checked, such as the generation's declarative clients. Netty's
+     * {@code OpenSsl} keeps, the same way, the exception that tells why netty-tcnative is not available, which an HTTP
+     * client's SSL support first asks for as the client is created.
      */
     private static final List<String> PARENT_TIER_STATICS = List.of(
         "io.netty.util.internal.PlatformDependent",
+        "io.micronaut.http.netty.channel.loom.PrivateLoomSupport",
+        "io.netty.handler.ssl.OpenSsl",
         "org.h2.message.DbException",
         "oracle.ucp.admin.UniversalConnectionPoolManagerBase"
     );
