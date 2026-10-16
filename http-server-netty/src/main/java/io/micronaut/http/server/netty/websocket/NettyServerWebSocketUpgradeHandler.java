@@ -210,6 +210,10 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                     .propagate(() -> requestLifecycle.handle(msg))
             );
             responseFlow.onComplete((r, throwable) -> {
+                // the upgrade does not read the body of its request, which is not empty when the
+                // request went through the h2c upgrade handler: that aggregates every request
+                // with an Upgrade header into a FullHttpRequest
+                body.close();
                 HttpResponse<?> response = r;
                 if (response == null) {
                     // the lifecycle answers failures itself, this is a last resort so that the
@@ -218,9 +222,9 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 }
                 HttpResponse<?> actualResponse = response;
                 if (ctx.executor().inEventLoop()) {
-                    writeResponse(ctx, msg, body, requestLifecycle.shouldProceedNormally, actualResponse, outboundAccess);
+                    writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, actualResponse, outboundAccess);
                 } else {
-                    ctx.executor().execute(() -> writeResponse(ctx, msg, body, requestLifecycle.shouldProceedNormally, actualResponse, outboundAccess));
+                    ctx.executor().execute(() -> writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, actualResponse, outboundAccess));
                 }
             });
         } else {
@@ -240,14 +244,9 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
     private void writeResponse(ChannelHandlerContext ctx,
                                NettyHttpRequest<?> msg,
-                               CloseableByteBody body,
                                boolean shouldProceedNormally,
                                HttpResponse<?> actualResponse,
                                OutboundAccess outboundAccess) {
-        // the upgrade does not read the body of its request. It is not empty when the request
-        // went through the h2c upgrade handler, which aggregates every request with an Upgrade
-        // header into a FullHttpRequest
-        body.close();
         if (cancelUpgrade) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Cancelling websocket upgrade, handler was removed while request was processing");
