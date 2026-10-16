@@ -25,6 +25,7 @@ import io.micronaut.http.uri.RouteTemplateParser;
 import io.micronaut.http.uri.RouteTemplateVariable;
 import io.micronaut.http.uri.UriRouteTemplate;
 import io.micronaut.http.uri.UriTypeMatchTemplate;
+import io.micronaut.web.router.builder.RequestCondition;
 import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -191,6 +193,47 @@ class RouteTemplateSelectionTest {
         assertNotNull(router.findClosest(HttpRequest.PUT("/o/1/items/2", "")));
         // the allowed methods agree with routing, method by method
         assertEquals(Set.of("POST", "PUT"), methods(router.findAny(HttpRequest.GET("/o/1/items/2"))));
+    }
+
+    @Test
+    void aRouteWithConditionsOnTheBodyCannotHaveARouteSelector() {
+        RouteMatchSelector first = (request, matches) -> List.of(RouteMatchSelector.Selection.of(matches.get(0)));
+        // its own selector
+        IllegalStateException own = assertThrows(IllegalStateException.class, () -> RouteTemplateEngineOrderTest.router(null, routes ->
+            routes.POST("/express").selectedBy(first).where(RequestCondition.bodyText("express"::equals)).handle((request, variables) -> HttpResponse.ok())));
+        assertTrue(own.getMessage().contains("POST /express has conditions on the body and a route selector"), own.getMessage());
+        // the selector of its group
+        IllegalStateException inherited = assertThrows(IllegalStateException.class, () -> RouteTemplateEngineOrderTest.router(null, routes ->
+            routes.group(group -> {
+                group.selectedBy(first);
+                group.POST("/express").where(RequestCondition.bodyText("express"::equals)).handle((request, variables) -> HttpResponse.ok());
+            })));
+        assertTrue(inherited.getMessage().contains("selectedBy(null)"), inherited.getMessage());
+        // the route removes the selector of its group
+        Router router = RouteTemplateEngineOrderTest.router(null, routes -> routes.group(group -> {
+            group.selectedBy(first);
+            group.POST("/express").selectedBy(null).where(RequestCondition.bodyText("express"::equals)).handle((request, variables) -> HttpResponse.ok());
+        }));
+        assertNotNull(router);
+    }
+
+    @Test
+    void aLocatedRouteWithConditionsOnTheBodyCannotInheritARouteSelectorAtItsLocation() {
+        RouteMatchSelector first = (request, matches) -> List.of(RouteMatchSelector.Selection.of(matches.get(0)));
+        TestLocatedRoutes<Object> table = TestLocatedRoutes.of(routes ->
+            routes.POST("/express").where(RequestCondition.bodyText("express"::equals)).handle((request, variables) -> HttpResponse.ok()));
+        Router router = RouteTemplateEngineOrderTest.router(null, routes -> routes.group(group -> {
+            group.selectedBy(first);
+            group.locate("/o/{id}", (request, variables) -> "o", target -> table);
+        }));
+        // the route inherits the selector when a request reaches the location
+        RuntimeException error = assertThrows(RuntimeException.class, () -> router.resolve(HttpRequest.POST("/o/1/express", "express")));
+        Throwable cause = error;
+        while (cause != null && !(cause instanceof IllegalStateException)) {
+            cause = cause.getCause();
+        }
+        assertNotNull(cause, error.toString());
+        assertTrue(cause.getMessage().contains("has conditions on the body and a route selector"), cause.getMessage());
     }
 
     @Test

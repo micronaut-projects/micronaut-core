@@ -398,6 +398,12 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         this.errorScope = errorScope;
         this.anyMethod = anyMethod;
         this.constraints = List.copyOf(constraints);
+        if (routeMatchSelector != null && !getBodyConditions().isEmpty()) {
+            // which of the two chooses first, and what an empty selection falls through to, is not defined
+            throw new IllegalStateException("The route " + httpMethodName + " " + template.expression()
+                + " has conditions on the body and a route selector, its own or inherited: a route selector does not select among routes"
+                + " chosen by their body. Declare the route with selectedBy(null), or without conditions on the body");
+        }
         this.routeMatchSelector = routeMatchSelector;
         this.routeMatchSelectorOrder = routeMatchSelector == null ? null : routeMatchSelector.order().orElse(null);
         this.dynamicTarget = targetMethod instanceof HandlerMethod<?> handler && handler.getTarget() instanceof DynamicRouteTarget;

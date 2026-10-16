@@ -532,7 +532,9 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * {@link RouteMatchSelector}: the selector selects when every route that matches a request has
      * the same selector, the same instance. On a group, the selector is the default of the
      * routes of the group, and of its nested groups, unless they or a nested group have their
-     * own; {@code null} removes the selector of the enclosing groups.
+     * own; {@code null} removes the selector of the enclosing groups. A route with conditions on
+     * the body, see {@link RequestCondition#body(Class, java.util.function.Predicate)}, cannot have a
+     * selector, its own or inherited, also at a location: building it fails.
      *
      * @param selector The selector, or {@code null} for the Micronaut policy
      * @return The route or the group
