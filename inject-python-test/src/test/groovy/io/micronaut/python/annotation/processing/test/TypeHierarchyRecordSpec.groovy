@@ -19,6 +19,9 @@ import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.core.type.TypeHierarchies
 import io.micronaut.core.type.TypeHierarchy
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ElementQuery
+import io.micronaut.inject.ast.MethodElement
 import io.micronaut.python.compiler.PyronautCompiler
 
 
@@ -134,5 +137,62 @@ class Diamond(Left[str], Right[str]):
         then: "the interfaces List adds in later JDKs aside"
         strings(closure) - ['SequencedCollection<Integer>'] == ['ArrayList<Integer>', 'AbstractList<Integer>', 'AbstractCollection<Integer>', 'Collection<Integer>',
                                                                  'Iterable<Integer>', 'List<Integer>', 'RandomAccess', 'Cloneable', 'Serializable', 'Object']
+    }
+
+    void "a multidimensional array has the super types of the arrays it is an array of"() {
+        given: "Python has no array types, so the arrays are made from the elements of a Python class and of what its methods return"
+        Map<String, List<String>> closures = buildClassElement('''
+from java.util.function import Supplier
+
+class Matrix(Supplier[str]):
+    def get(self) -> str:
+        return "matrix"
+
+    def size(self) -> int:
+        return 0
+''', 'Matrix') { ClassElement matrix ->
+            ClassElement string = method(matrix, 'get').genericReturnType
+            ClassElement size = method(matrix, 'size').genericReturnType
+            [matrix  : elementStrings(matrix),
+             matrices: elementStrings(matrix.toArray().toArray()),
+             string  : elementStrings(string),
+             strings : elementStrings(string.toArray().toArray()),
+             size    : elementStrings(size),
+             sizes   : elementStrings(size.toArray().toArray())]
+        }
+
+        expect: "Matrix[][] is an array of the super types of Matrix, then of those Matrix[] has as an array"
+        closures.matrix == ['Matrix', 'Supplier<String>', 'Object']
+        closures.matrices == ['Matrix[][]', 'Supplier<String>[][]', 'Object[][]', 'Object[]', 'Cloneable[]', 'Serializable[]', 'Cloneable', 'Serializable', 'Object']
+
+        and: "String[][] the same way"
+        closures.string.last() == 'Object'
+        closures.string.contains('Comparable<String>')
+        closures.strings == ['String[][]'] + closures.string.tail().collect { it + '[][]' } +
+            ['Object[]', 'Cloneable[]', 'Serializable[]', 'Cloneable', 'Serializable', 'Object']
+
+        and: "an array of arrays of a primitive has the super types of an array of a primitive as an array"
+        closures.size == ['int']
+        closures.sizes == ['int[][]', 'Object[]', 'Cloneable[]', 'Serializable[]', 'Cloneable', 'Serializable', 'Object']
+    }
+
+    private static MethodElement method(ClassElement owner, String name) {
+        owner.getEnclosedElements(ElementQuery.ALL_METHODS).find { it.name == name }
+    }
+
+    /**
+     * The super types of an element by simple name, arguments and dimensions, as the strings of a record read.
+     */
+    private static List<String> elementStrings(ClassElement type) {
+        type.getAllSuperTypes().collect { elementString(it) }
+    }
+
+    private static String elementString(ClassElement type) {
+        String name = type.name.substring(type.name.lastIndexOf('.') + 1)
+        String dimensions = "[]" * type.arrayDimensions
+        if (type.rawType || type.typeArguments.isEmpty()) {
+            return name + dimensions
+        }
+        return name + "<" + type.typeArguments.values().collect { elementString(it) }.join(", ") + ">" + dimensions
     }
 }

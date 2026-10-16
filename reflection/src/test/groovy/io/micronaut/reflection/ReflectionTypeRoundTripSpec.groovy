@@ -302,4 +302,26 @@ class Shelf {
         variable[0] instanceof GenericPlaceholder
         variable*.type == [Comparable, Object]
     }
+
+    void "the closure of an array of arrays holds the arrays of the super types of each array it is an array of"() {
+        given:
+        def string = ReflectionArguments.typeClosureOf(Argument.of(String))
+        def strings = ReflectionArguments.typeClosureOf(Argument.of(String[][]))
+        def matrix = ReflectionArguments.typeClosureOf(ReflectionArguments.ofExact(typeOf("matrix")))
+
+        expect: "String[][] is an array of the super types of String, then of those String[] has as an array"
+        strings*.type == [String[][]] + string.tail().collect { it.type.arrayType().arrayType() } +
+            [Object[], Cloneable[], Serializable[], Cloneable, Serializable, Object]
+        ReflectionArguments.toExactType(strings.find { it.type == Comparable[][] }).typeName == "java.lang.Comparable<java.lang.String>[][]"
+
+        and: "a primitive component has no super types of its own"
+        ReflectionArguments.typeClosureOf(Argument.of(int[][]))*.type == [int[][], Object[], Cloneable[], Serializable[], Cloneable, Serializable, Object]
+        ReflectionArguments.typeClosureOf(Argument.of(int[]))*.type == [int[], Cloneable, Serializable, Object]
+
+        and: "the arguments of the component are carried into the arrays of its super types"
+        matrix[0].type == List[][]
+        ReflectionArguments.toExactType(matrix.find { it.type == Collection[][] }).typeName == "java.util.Collection<java.lang.String>[][]"
+        matrix*.type.containsAll([Iterable[][], Object[][], Object[], Cloneable[], Serializable[], Cloneable, Serializable])
+        matrix.last().type == Object
+    }
 }
