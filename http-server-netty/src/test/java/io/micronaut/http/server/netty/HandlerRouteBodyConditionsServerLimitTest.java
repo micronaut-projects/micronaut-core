@@ -22,7 +22,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -131,7 +131,7 @@ class HandlerRouteBodyConditionsServerLimitTest {
      */
     private static String rejected(String path, String body) throws Exception {
         SocketException last = null;
-        for (int attempt = 0; attempt < 5; attempt++) {
+        for (int attempt = 0; attempt < 10; attempt++) {
             try (Socket socket = new Socket(server.getHost(), server.getPort())) {
                 socket.setSoTimeout(30_000);
                 ByteArrayOutputStream request = new ByteArrayOutputStream();
@@ -150,7 +150,7 @@ class HandlerRouteBodyConditionsServerLimitTest {
 
     private static String retried(java.util.concurrent.Callable<String> exchange) throws Exception {
         SocketException last = null;
-        for (int attempt = 0; attempt < 5; attempt++) {
+        for (int attempt = 0; attempt < 10; attempt++) {
             try {
                 return exchange.call();
             } catch (SocketException e) {
@@ -210,7 +210,7 @@ class HandlerRouteBodyConditionsServerLimitTest {
         @Override
         public void routes(HttpRouteBuilder routes) {
             routes.POST("/cap/items")
-                .where(RouteCondition.bodyText(text -> text.startsWith("match")))
+                .where(RequestCondition.bodyText(text -> text.startsWith("match")))
                 .order(-1)
                 .consumes(MediaType.TEXT_PLAIN_TYPE)
                 .handle((request, pathVariables) -> text("matched"));
@@ -219,7 +219,7 @@ class HandlerRouteBodyConditionsServerLimitTest {
                 // reads the body: a body left unread is reset when the connection closes
                 .body().handleAsync((request, pathVariables, body) -> body.discardBody().thenApply(done -> text("fallback")));
             routes.POST("/cap/limited")
-                .where(RouteCondition.bodyText(text -> true).maxBytes(64))
+                .where(RequestCondition.bodyText(text -> true).maxBytes(64))
                 .order(-1)
                 .consumes(MediaType.TEXT_PLAIN_TYPE)
                 .handle((request, pathVariables) -> text("matched"));
@@ -228,7 +228,7 @@ class HandlerRouteBodyConditionsServerLimitTest {
                 .body(String.class)
                 .handle((request, pathVariables, body) -> text("fallback " + body.length()));
             routes.POST("/static/index.html")
-                .where(RouteCondition.bodyText("static"::equals))
+                .where(RequestCondition.bodyText("static"::equals))
                 .consumes(MediaType.TEXT_PLAIN_TYPE)
                 .handle((request, pathVariables) -> text("matched static"));
         }
