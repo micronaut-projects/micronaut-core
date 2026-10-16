@@ -42,6 +42,7 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.body.BodyElements;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
@@ -91,6 +92,7 @@ import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -139,6 +141,10 @@ public final class RouteExecutor {
      * closed on an event loop.
      */
     private final Supplier<@Nullable ExecutorService> blockingExecutor;
+    /**
+     * Chooses a route by the body of a request, {@code null} if no route has body conditions.
+     */
+    private final @Nullable BodyRouteSelector bodyRouteSelector;
 
     /**
      * Default constructor.
@@ -166,6 +172,14 @@ public final class RouteExecutor {
         this.suspendedRoutesNeedReactorContext = coroutineHelper.isPresent() && coroutineHelper.get().isReactorContextPropagated();
         this.conversionService = beanContext.getConversionService();
         this.blockingExecutor = SupplierUtil.memoized(() -> executorSelector.select(TaskExecutors.BLOCKING).orElse(null));
+        if (router.hasBodyConditions()) {
+            // a body condition reads at most what the server may buffer
+            BodyRouteSelector.checkMaxBytes(router, serverConfiguration.getMaxRequestBufferSize());
+            this.bodyRouteSelector = new BodyRouteSelector(serverConfiguration, beanContext.getBean(MessageBodyHandlerRegistry.class),
+                requestArgumentSatisfier.getBinderRegistry(), conversionService);
+        } else {
+            this.bodyRouteSelector = null;
+        }
     }
 
     /**
@@ -207,6 +221,13 @@ public final class RouteExecutor {
     @Nullable
     UriRouteMatch<Object, Object> findRouteMatch(HttpRequest<?> httpRequest) {
         return router.findClosest(httpRequest);
+    }
+
+    /**
+     * @return The step that chooses a route by the body of a request
+     */
+    BodyRouteSelector bodyRouteSelector() {
+        return Objects.requireNonNull(bodyRouteSelector, "No route has body conditions");
     }
 
     static void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {

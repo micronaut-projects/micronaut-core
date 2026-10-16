@@ -15,7 +15,7 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -105,7 +105,7 @@ class RequestPredicatesTest {
         assertTrue(meets(all(header("X-A"), method(HttpMethod.GET)), request));
         assertFalse(meets(all(header("X-A"), header("X-B")), request));
         assertTrue(meets(any(header("X-B"), header("X-A")), request));
-        RouteCondition composed = header("X-A").and(header("X-B").negate()).or(queryParam("force"));
+        RequestCondition composed = header("X-A").and(header("X-B").negate()).or(queryParam("force"));
         assertTrue(meets(composed, request));
     }
 
@@ -124,7 +124,7 @@ class RequestPredicatesTest {
         assertNull(router.findClosest(HttpRequest.GET("/reports").accept(MediaType.TEXT_CSV_TYPE)));
     }
 
-    private static boolean meets(io.micronaut.web.router.builder.RouteCondition condition, io.micronaut.http.HttpRequest<?> request) {
-        return io.micronaut.web.router.builder.RouteConditions.matches(condition, request, RouteConditionContext.fallback());
+    private static boolean meets(io.micronaut.web.router.builder.RequestCondition condition, io.micronaut.http.HttpRequest<?> request) {
+        return io.micronaut.web.router.builder.RequestConditions.matches(condition, request, RouteConditionContext.fallback());
     }
 }

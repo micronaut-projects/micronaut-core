@@ -33,12 +33,15 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.ServerHttpRequest;
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.ServerRequestBinderRegistry;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.DirectByteBodyAccess;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.inject.BeanDefinition;
@@ -88,7 +91,8 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements BeanD
             public <T> Optional<ArgumentBinder<T, HttpRequest<?>>> findArgumentBinder(Argument<T> argument) {
                 if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
                     return Optional.of((AsyncBodyBinder<T>) (context, source) -> {
-                        if (source instanceof ServerHttpRequest<?> fullHttpRequest) {
+                        ServerHttpRequest<?> fullHttpRequest = serverRequestWithBytes(source);
+                        if (fullHttpRequest != null) {
                             return InternalByteBody.bufferFlow(fullHttpRequest.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)).map(imm -> {
                                 Argument<T> t = context.getArgument();
                                 if (t.isAssignableFrom(ByteBuffer.class)) {
@@ -105,13 +109,39 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements BeanD
                                 }
                             });
                         }
-                        return ExecutionFlow.just(ArgumentBinder.BindingResult.unsatisfied());
+                        // e.g. a wrapper that replaced the body: bind that body, like a route argument
+                        Argument<T> t = context.getArgument();
+                        Optional<T> body = source.getBody().flatMap(b -> ConversionService.SHARED.convert(b, t));
+                        return ExecutionFlow.just(body.isPresent() ? () -> body : ArgumentBinder.BindingResult.unsatisfied());
                     });
                 } else {
                     return requestBinderRegistry.flatMap(registry -> registry.findArgumentBinder(argument));
                 }
             }
         };
+    }
+
+    /**
+     * The server request whose bytes are the body of the given request, seeing through the
+     * {@link HttpRequestWrapper wrappers} a filter continued with, like the body of a route
+     * argument.
+     *
+     * @param request The request
+     * @return The server request, or {@code null} if a wrapper or a copy replaced the body
+     */
+    private static @Nullable ServerHttpRequest<?> serverRequestWithBytes(HttpRequest<?> request) {
+        for (HttpRequest<?> current : HttpRequestWrapper.unwrap(request)) {
+            if (current instanceof DirectByteBodyAccess access && access.byteBodyDirect() == null) {
+                return null;
+            }
+            if (current instanceof ServerHttpRequest<?> server) {
+                return server;
+            }
+            if (HttpRequestWrapper.replacesBody(current)) {
+                return null;
+            }
+        }
+        return null;
     }
 
     /**
