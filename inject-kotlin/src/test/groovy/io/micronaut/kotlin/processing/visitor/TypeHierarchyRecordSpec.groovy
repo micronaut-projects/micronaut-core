@@ -265,6 +265,35 @@ private class Hidden<T> : java.util.function.Supplier<T> {
         strings(hidden.genericInterfaces) == ['Supplier<T>']
     }
 
+    void "a JDK class with a package-private ancestor is recorded in the package of the origin"() {
+        given:
+        def classLoader = buildClassLoader('probe.Hierarchies', '''
+package probe
+
+import io.micronaut.core.annotation.TypeHierarchyImport
+
+@TypeHierarchyImport(classes = [java.lang.StringBuilder::class, java.util.ArrayList::class, java.util.jar.JarEntry::class])
+class Hierarchies
+''')
+        def stringBuilder = record(classLoader, 'java.lang.StringBuilder')
+        def jarEntry = record(classLoader, 'java.util.jar.JarEntry')
+
+        expect: "AbstractStringBuilder is left out by name, the interfaces above it are kept"
+        classLoader.loadClass(TypeHierarchies.recordClassName('java.lang.StringBuilder', 'probe'))
+        record(classLoader, 'java.util.ArrayList').type == ArrayList
+        stringBuilder.type == StringBuilder
+        stringBuilder.genericSuperclass.empty
+        stringBuilder.inaccessibleSuperTypes == ['java.lang.AbstractStringBuilder']
+        !strings(stringBuilder.superTypes).contains('AbstractStringBuilder')
+        strings(stringBuilder.superTypes).containsAll(['Appendable', 'CharSequence', 'Comparable<StringBuilder>', 'Serializable'])
+        strings(stringBuilder.superTypes).last() == 'Object'
+
+        and: "an ancestor of a third package is left out the same way"
+        classLoader.loadClass(TypeHierarchies.recordClassName('java.util.jar.JarEntry', 'probe'))
+        jarEntry.inaccessibleSuperTypes == ['java.util.zip.ZipConstants']
+        strings(jarEntry.superTypes) as Set == ['ZipEntry', 'Cloneable', 'Object'] as Set
+    }
+
     void "the same type is recorded once"() {
         given:
         def classLoader = buildClassLoader('test.One', '''

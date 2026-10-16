@@ -20,6 +20,7 @@ import io.micronaut.core.type.TypeHierarchy;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.GenericArrayType;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -67,6 +68,7 @@ public final class TypeHierarchyFuzz {
         import java.io.Serializable;
         import java.util.*;
         import java.util.function.*;
+        import java.util.concurrent.atomic.LongAdder;
 
         interface Top<A> {}
         interface Left<A> extends Top<A> {}
@@ -85,6 +87,7 @@ public final class TypeHierarchyFuzz {
         import java.util.function.BiFunction
         import java.util.function.Consumer
         import java.util.function.Supplier
+        import java.util.concurrent.atomic.LongAdder
 
         interface Top<A>
         interface Left<A> : Top<A>
@@ -417,7 +420,8 @@ public final class TypeHierarchyFuzz {
 
             List<String> superPool = new ArrayList<>(List.of("", "", "Base1", "Base2", "Base3"));
             if (!python()) {
-                superPool.addAll(List.of("ArrayList", "HashMap", "AbstractList"));
+                // LongAdder extends the package-private Striped64, which the record leaves out
+                superPool.addAll(List.of("ArrayList", "HashMap", "AbstractList", "LongAdder"));
             }
             String superName = pick(superPool);
             SuperType superclass = null;
@@ -466,7 +470,7 @@ public final class TypeHierarchyFuzz {
 
         private static int arity(String name) {
             return switch (name) {
-                case "Serializable" -> 0;
+                case "Serializable", "LongAdder" -> 0;
                 case "Base2", "HashMap", "Function" -> 2;
                 case "Base3", "BiFunction" -> 3;
                 default -> 1;
@@ -755,7 +759,7 @@ public final class TypeHierarchyFuzz {
                     for (int i = 0; i < variables.length; i++) {
                         bindings.put(variables[i], args.get(i));
                     }
-                    Oracle.walkSuperTypes(jdk, bindings, false, closure, c -> false);
+                    Oracle.walkSuperTypes(jdk, bindings, false, closure, c -> false, "", new LinkedHashSet<>());
                 }
             }
         }
@@ -804,9 +808,21 @@ public final class TypeHierarchyFuzz {
          * @return The closure, rendered
          */
         public static List<String> closure(Class<?> type, Map<TypeVariable<?>, String> substitutions, boolean raw, Predicate<Class<?>> ignoreInterface) {
+            return closure(type, substitutions, raw, ignoreInterface, new LinkedHashSet<>());
+        }
+
+        /**
+         * @param type            The type
+         * @param substitutions   What each type variable of the type stands for
+         * @param raw             Whether the parameterization is raw
+         * @param ignoreInterface Interfaces to leave out
+         * @param inaccessible    Receives the names of the super types left out: not public and of another package than the type, which the record cannot name
+         * @return The closure, rendered, without the super types left out
+         */
+        public static List<String> closure(Class<?> type, Map<TypeVariable<?>, String> substitutions, boolean raw, Predicate<Class<?>> ignoreInterface, Set<String> inaccessible) {
             Set<String> closure = new LinkedHashSet<>();
             closure.add(raw ? type.getSimpleName() : renderClass(type, substitutions));
-            walkSuperTypes(type, substitutions, raw, closure, ignoreInterface);
+            walkSuperTypes(type, substitutions, raw, closure, ignoreInterface, type.getPackageName(), inaccessible);
             closure.remove("Object");
             closure.add("Object");
             return new ArrayList<>(closure);
@@ -820,7 +836,8 @@ public final class TypeHierarchyFuzz {
                 .map(variable -> substitutions.getOrDefault(variable, variable.getName())).collect(Collectors.joining(", ")) + ">";
         }
 
-        static void walkSuperTypes(Class<?> type, Map<TypeVariable<?>, String> substitutions, boolean raw, Set<String> closure, Predicate<Class<?>> ignoreInterface) {
+        static void walkSuperTypes(Class<?> type, Map<TypeVariable<?>, String> substitutions, boolean raw, Set<String> closure, Predicate<Class<?>> ignoreInterface,
+                                   String recordPackage, Set<String> inaccessible) {
             List<Type> parents = new ArrayList<>();
             if (type.getGenericSuperclass() != null) {
                 parents.add(type.getGenericSuperclass());
@@ -842,8 +859,13 @@ public final class TypeHierarchyFuzz {
                     }
                 }
                 String rendering = parentRaw ? erasure.getSimpleName() : render(parent, substitutions);
-                if (closure.add(rendering)) {
-                    walkSuperTypes(erasure, parentSubstitutions, parentRaw, closure, ignoreInterface);
+                if (!Modifier.isPublic(erasure.getModifiers()) && !erasure.getPackageName().equals(recordPackage)) {
+                    // left out of the record by name, the types above it kept
+                    if (inaccessible.add(erasure.getName())) {
+                        walkSuperTypes(erasure, parentSubstitutions, parentRaw, closure, ignoreInterface, recordPackage, inaccessible);
+                    }
+                } else if (closure.add(rendering)) {
+                    walkSuperTypes(erasure, parentSubstitutions, parentRaw, closure, ignoreInterface, recordPackage, inaccessible);
                 }
             }
         }

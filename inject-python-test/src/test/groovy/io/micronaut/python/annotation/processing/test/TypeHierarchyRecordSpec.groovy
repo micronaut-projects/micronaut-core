@@ -135,4 +135,33 @@ class Diamond(Left[str], Right[str]):
         strings(closure) - ['SequencedCollection<Integer>'] == ['ArrayList<Integer>', 'AbstractList<Integer>', 'AbstractCollection<Integer>', 'Collection<Integer>',
                                                                  'Iterable<Integer>', 'List<Integer>', 'RandomAccess', 'Cloneable', 'Serializable', 'Object']
     }
+
+    void "a JDK class with a package-private ancestor is recorded in the package of the origin"() {
+        given:
+        def classLoader = compile('''
+from java.lang import StringBuilder
+from java.util import ArrayList
+from java.util.jar import JarEntry
+from micronaut.core.annotation import TypeHierarchyImport
+
+@TypeHierarchyImport(classes=[StringBuilder, ArrayList, JarEntry])
+class Hierarchies:
+    pass
+''')
+        def stringBuilder = record(classLoader, 'java.lang.StringBuilder', 'python')
+        def jarEntry = record(classLoader, 'java.util.jar.JarEntry', 'python')
+
+        expect: "AbstractStringBuilder is left out by name, the interfaces above it are kept"
+        record(classLoader, 'java.util.ArrayList', 'python').type == ArrayList
+        stringBuilder.type == StringBuilder
+        stringBuilder.genericSuperclass.empty
+        stringBuilder.inaccessibleSuperTypes == ['java.lang.AbstractStringBuilder']
+        !strings(stringBuilder.superTypes).contains('AbstractStringBuilder')
+        strings(stringBuilder.superTypes).containsAll(['Appendable', 'CharSequence', 'Comparable<StringBuilder>', 'Serializable'])
+        strings(stringBuilder.superTypes).last() == 'Object'
+
+        and: "an ancestor of a third package is left out the same way"
+        jarEntry.inaccessibleSuperTypes == ['java.util.zip.ZipConstants']
+        strings(jarEntry.superTypes) == ['ZipEntry', 'Cloneable', 'Object']
+    }
 }
