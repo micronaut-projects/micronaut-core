@@ -55,10 +55,11 @@ def pythonTestProjects = [
         ":micronaut-inject-python",
         ":micronaut-inject-python-test",
         ":micronaut-context-python",
-        ":micronaut-context-python-netty"
+        ":micronaut-context-python-netty",
+        ":test-suite-dev-python"
 ]
 // Projects whose tests all run in the first Python CI job instead of being split across the jobs
-def pythonUnshardedProjects = []
+def pythonUnshardedProjects = [":test-suite-dev-python"]
 def pythonProjects = pythonTestProjects + [":test-suite-python"]
 
 if (System.getenv("SONAR_TOKEN") != null) {
