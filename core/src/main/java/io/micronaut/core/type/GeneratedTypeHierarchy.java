@@ -44,6 +44,11 @@ public non-sealed class GeneratedTypeHierarchy implements TypeHierarchy {
     private final List<String> inaccessibleSuperTypes;
 
     /**
+     * The constructor of the records written before the names of the super types a record leaves out were recorded.
+     * Such a record could have left super types out as well: its empty
+     * {@link TypeHierarchy#getInaccessibleSuperTypes() list of them} means that it carries no information on what it
+     * left out, not that it left nothing out.
+     *
      * @param type          The type
      * @param typeVariables The type variables, or {@code null} for none
      * @param superclass    The generic superclass, or {@code null} for none

@@ -167,6 +167,12 @@ class TypeHierarchySpec extends Specification {
         TypeHierarchies.invalidate()
     }
 
+    void "a record written without the names of what it left out has none"() {
+        expect: "the constructor without the names, which carries no information on what was left out"
+        new $Records$Payload$TypeHierarchy().inaccessibleSuperTypes.empty
+        new io.micronaut.core.type.$$java.util.$ArrayList$TypeHierarchy().inaccessibleSuperTypes == ['java.util.AbstractList']
+    }
+
     void "a type recorded from several packages is found in the record that names the most, whatever the order (#order)"() {
         given: "the records of Payload and ArrayList written from two packages each, listed in the given order"
         def serviceDir = tempDir.resolve("META-INF/micronaut/" + TypeHierarchy.name)

@@ -102,7 +102,11 @@ public sealed interface TypeHierarchy permits GeneratedTypeHierarchy {
      * the variable is bounded by and erases to, so a type whose variables are bounded by a class the record cannot name
      * is not recorded from another package.</p>
      *
-     * @return The names of the super types left out, empty when the record names them all
+     * <p>A record written by a processor that predates this list, with the constructor of
+     * {@link GeneratedTypeHierarchy} that takes no names, has an empty list too: for such a record it carries no
+     * information on what was left out.</p>
+     *
+     * @return The names of the super types left out, empty when the record names them all or was written without them
      */
     List<String> getInaccessibleSuperTypes();
 
