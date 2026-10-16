@@ -568,6 +568,40 @@ public class PythonAstParserTest {
         assertTrue(interfaceResult.runtimeCode().contains("def _micronaut_java_interface_defaults(*interface_names):"));
         assertTrue(interfaceResult.runtimeCode().contains("@_micronaut_java_interface_defaults('java.lang.Runnable')\nclass Worker:"));
         assertTrue(parser.requiresRuntimeBytecode(interfaceResult));
+        assertTrue(result.validationWarnings().isEmpty());
+        assertTrue(interfaceResult.validationWarnings().isEmpty());
+
+        // a class defined inside a function has no generated Java class: GraalPy adapts it, which
+        // only a JVM supports, so the compilation warns (micronaut-projects/pyronaut#125)
+        PythonAstParser.TransformResult localResult = parser.transform(visitorContext, """
+            from java.lang import Runnable, Thread
+
+            def start():
+                class LocalWorker(Thread):
+                    pass
+
+                class LocalTask(Runnable):
+                    def run(self):
+                        pass
+
+                class StrippedTask(Runnable):
+                    def __init__(self, name):
+                        self.name = name
+
+                    def run(self):
+                        pass
+
+                return LocalWorker(), LocalTask(), StrippedTask("x")
+            """);
+
+        assertEquals(2, localResult.validationWarnings().size(), localResult.validationWarnings().toString());
+        assertTrue(localResult.validationWarnings().get(0).startsWith(
+            "Python class [LocalWorker] (line 4) is defined inside a function and extends the Java class [java.lang.Thread]"));
+        assertTrue(localResult.validationWarnings().get(0).contains("Java Class can be extended only in JVM mode"));
+        // an interface adapter is a host adapter too; the class with constructor parameters is stripped of the interface
+        assertTrue(localResult.validationWarnings().get(1).startsWith(
+            "Python class [LocalTask] (line 7) is defined inside a function and implements the Java interface [java.lang.Runnable]"));
+        assertTrue(localResult.validationErrors().isEmpty());
     }
 
     @Test
