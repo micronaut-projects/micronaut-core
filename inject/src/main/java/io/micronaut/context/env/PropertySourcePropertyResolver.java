@@ -210,6 +210,18 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         }
     }
 
+    /**
+     * Serializes changes to the environment's property source registry with catalog refreshes.
+     * A property source must not be registered while a refresh is building a source snapshot.
+     *
+     * @param change The registry change
+     */
+    void withCatalogLock(Runnable change) {
+        synchronized (catalogLock) {
+            change.run();
+        }
+    }
+
     public Map<String, Object> diff(Runnable change) {
         ResolverState before = state;
         Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(before.catalog);
