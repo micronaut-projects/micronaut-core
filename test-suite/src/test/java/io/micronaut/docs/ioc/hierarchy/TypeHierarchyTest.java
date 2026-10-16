@@ -28,7 +28,7 @@ import java.util.function.Supplier;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class TypeHierarchySpec {
+class TypeHierarchyTest {
 
     @Test
     void readsTheRecordedHierarchy() {
