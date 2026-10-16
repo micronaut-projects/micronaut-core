@@ -12,6 +12,8 @@ dependencies {
     compileOnly(projects.micronautHttpServer)
     // the listening sockets kept across generations exist only when the Netty server is present
     compileOnly(projects.micronautHttpServerNetty)
+    // the client connections kept across generations exist only when the Netty client is present
+    compileOnly(projects.micronautHttpClient)
     // the /dev endpoint exists only when the management module is present
     compileOnly(projects.micronautManagement)
     // the embedded Groovy compiler exists when the project's own Groovy is on the launch classpath

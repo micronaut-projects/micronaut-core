@@ -371,6 +371,12 @@ final class Pool40 implements Pool {
     }
 
     @Override
+    public boolean openConnection(EventLoop eventLoop) {
+        // this pool picks the loop of a connection itself
+        return false;
+    }
+
+    @Override
     public void forEachConnection(Consumer<Pool.ResizerConnection> c) {
         http1Connections.forEach(c);
         http2Connections.forEach(c);
