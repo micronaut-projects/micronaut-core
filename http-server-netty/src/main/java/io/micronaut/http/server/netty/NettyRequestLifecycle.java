@@ -149,6 +149,11 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
         located.whenComplete((ignored, error) -> remove.run());
     }
 
+    @Override
+    protected @Nullable Runnable whenAbandoned(HttpRequest<?> request, Runnable action) {
+        return this.nettyRequest == null ? null : outboundAccess.whenAbandoned(action);
+    }
+
     @Nullable
     @Override
     protected FileCustomizableResponseType findFile(HttpRequest<?> request) {

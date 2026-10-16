@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.web.router;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -184,6 +185,82 @@ public interface Router {
             return uriRoutes.get(0);
         }
         return null;
+    }
+
+    /**
+     * Whether a route of the router has conditions on the body, see
+     * {@link UriRouteInfo#getBodyConditions()}: then the route of a request may depend on its
+     * body, see {@link #resolve(HttpRequest)}.
+     *
+     * @return Whether a route has conditions on the body
+     * @since 5.3.0
+     */
+    @Internal
+    default boolean hasBodyConditions() {
+        return false;
+    }
+
+    /**
+     * Resolves the route of the given request, like {@link #findClosest(HttpRequest)}, or the
+     * matches that depend on its body: when the closest routes of the request without its body
+     * have {@link UriRouteInfo#getBodyConditions() body conditions}, the resolution is
+     * {@link RouteResolution.Pending pending} with the ranked matches of the request. The server
+     * reads the body and chooses the match, see {@link PendingRouteMatch}.
+     *
+     * @param request The request
+     * @param <T>     The target type
+     * @param <R>     The type
+     * @return The resolution: the closest match, none, or the matches that depend on the body
+     * @throws DuplicateRouteException if several routes match equally closely
+     * @since 5.3.0
+     */
+    @Internal
+    default <T, R> RouteResolution<T, R> resolve(HttpRequest<?> request) throws DuplicateRouteException {
+        return resolve(request, null);
+    }
+
+    /**
+     * Resolves the route of the given request among the candidates a filter accepts, see
+     * {@link #resolve(HttpRequest)} and {@link #findAllClosest(HttpRequest, Predicate)}. A
+     * {@link io.micronaut.web.router.filter.FilteredRouter} passes its
+     * {@link io.micronaut.web.router.filter.RouteMatchFilter} here.
+     *
+     * <p>The default implementation finds the routes with {@link #find(HttpRequest, CharSequence)},
+     * resolves a chosen route with a dynamic target, e.g. of a route locator, and otherwise
+     * resolves the routes with {@link #findAllClosest(HttpRequest, Predicate)}.</p>
+     *
+     * @param request The request
+     * @param filter  The filter of the candidate matches, or {@code null}
+     * @param <T>     The target type
+     * @param <R>     The type
+     * @return The resolution: the closest match, none, or the matches that depend on the body
+     * @throws DuplicateRouteException if several routes match equally closely
+     * @since 5.3.0
+     */
+    @Internal
+    default <T, R> RouteResolution<T, R> resolve(HttpRequest<?> request,
+                                                 @Nullable Predicate<UriRouteMatch<T, R>> filter) throws DuplicateRouteException {
+        String path = request.getPath();
+        if (!hasBodyConditions()) {
+            return RouteResolution.of(filter == null ? findClosest(request) : UriRouteSet.closest(path, findAllClosest(request, filter)));
+        }
+        // a route with a dynamic target is no candidate itself: the filter applies to the routes of its target
+        Stream<UriRouteMatch<T, R>> found = this.<T, R>find(request, path);
+        List<UriRouteMatch<T, R>> matches = (filter == null ? found
+            : found.filter(match -> DynamicRouteTarget.of(match.getRouteInfo()) != null || filter.test(match))).toList();
+        if (PendingRouteMatch.anyHasBodyConditions(matches)) {
+            return UriRouteSet.pendingOrClosest(path, request, matches, (chosenRequest, chosen) -> {
+                DynamicRouteTarget target = DynamicRouteTarget.of(chosen.getRouteInfo());
+                return target == null ? new RouteResolution.Matched<>(chosen) : target.resolve(chosenRequest, chosen, filter);
+            });
+        }
+        // the targets of the dynamic routes resolve their routes, which may depend on the body
+        List<UriRouteMatch<T, R>> resolved = filter == null ? findAllClosest(request) : findAllClosest(request, filter);
+        if (!PendingRouteMatch.anyHasBodyConditions(resolved)) {
+            return RouteResolution.of(UriRouteSet.closest(path, resolved));
+        }
+        // the body decides: all the candidates, with the less specific routes it falls through to
+        return UriRouteSet.pendingOrClosest(path, request, UriRouteSet.resolveAll(request, matches, filter), null);
     }
 
     /**

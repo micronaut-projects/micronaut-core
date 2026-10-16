@@ -64,7 +64,7 @@ public sealed interface LocatedHttpBodyRouteSpec<T, B extends @Nullable Object> 
     LocatedHttpBodyRouteSpec<T, B> attribute(String name, Object value);
 
     @Override
-    LocatedHttpBodyRouteSpec<T, B> where(RouteCondition condition);
+    LocatedHttpBodyRouteSpec<T, B> where(RequestCondition condition);
 
     @Override
     LocatedHttpBodyRouteSpec<T, B> constrain(Predicate<? super PathVariables> accepted);
