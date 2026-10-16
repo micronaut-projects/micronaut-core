@@ -51,8 +51,10 @@ import io.micronaut.dev.livereload.LiveReloadServerFactory;
 import io.micronaut.dev.loader.DevClassLoader;
 import io.micronaut.dev.loader.GenerationClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
+import io.micronaut.dev.manifest.DevMode;
 import io.micronaut.dev.manifest.DevReloadStrategy;
 import io.micronaut.dev.manifest.ResourceRoot;
+import io.micronaut.dev.test.TestRunSummary;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.FieldInjectionPoint;
@@ -93,6 +95,7 @@ import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -145,6 +148,7 @@ public final class DevRuntime implements Closeable {
     private final AtomicLong submitted = new AtomicLong();
     private final AtomicLong completed = new AtomicLong();
     private final Object lifecycle = new Object();
+    private final CountDownLatch closedLatch = new CountDownLatch(1);
     private volatile CompletableFuture<ApplicationContext> started = new CompletableFuture<>(); // NOSONAR java:S3077 swapped whole per generation; the future is thread-safe
     private volatile CompletableFuture<Void> ready = CompletableFuture.completedFuture(null); // NOSONAR java:S3077 swapped whole per generation; the future is thread-safe
     private volatile @Nullable ApplicationContext context; // NOSONAR java:S3077 only the reference is published; the context is thread-safe
@@ -174,6 +178,7 @@ public final class DevRuntime implements Closeable {
      * may touch another file only, which an incremental compilation would compile alone.
      */
     private @Nullable Pending failedBatch;
+    private final @Nullable TestSession tests;
 
     /**
      * Creates the runtime; {@link #start(String[])} runs it.
@@ -194,6 +199,7 @@ public final class DevRuntime implements Closeable {
         for (ResourceRoot root : manifest.resourceRoots()) {
             resourceRootKinds.put(root.path().toAbsolutePath().normalize(), root.kind());
         }
+        this.tests = manifest.mode() == DevMode.TEST ? new TestSession(this, manifest, this.compilers) : null;
     }
 
     /**
@@ -244,6 +250,9 @@ public final class DevRuntime implements Closeable {
      * @throws IllegalStateException if another runtime runs the process or the application failed to start
      */
     public ApplicationContext start(String[] args) {
+        if (tests != null) {
+            throw new IllegalStateException("The manifest is in test mode: startTests() runs the tests");
+        }
         if (!CURRENT.compareAndSet(null, this)) {
             throw new IllegalStateException("A development runtime already runs this process");
         }
@@ -436,13 +445,16 @@ public final class DevRuntime implements Closeable {
     @Internal
     public void changed(Collection<Path> changed, Collection<Path> deleted) {
         Map<SourceKind, SourceChanges> sources = new EnumMap<>(SourceKind.class);
+        Map<SourceKind, SourceChanges> testSources = new EnumMap<>(SourceKind.class);
         Map<ResourceKind, SourceChanges> resources = new EnumMap<>(ResourceKind.class);
-        sort(changed, false, sources, resources);
-        sort(deleted, true, sources, resources);
-        awaitBatch(enqueue(new Pending(sources, resources, false)));
+        sort(changed, false, sources, testSources, resources);
+        sort(deleted, true, sources, testSources, resources);
+        RuntimeThreads.refuseOwnThreads(worker, applicationThread);
+        awaitBatch(enqueue(new Pending(sources, testSources, resources, false, null)));
     }
 
-    private void sort(Collection<Path> files, boolean deleted, Map<SourceKind, SourceChanges> sources, Map<ResourceKind, SourceChanges> resources) {
+    private void sort(Collection<Path> files, boolean deleted, Map<SourceKind, SourceChanges> sources, Map<SourceKind, SourceChanges> testSources,
+                      Map<ResourceKind, SourceChanges> resources) {
         for (Path file : files) {
             Path absolute = file.toAbsolutePath().normalize();
             SourceRoot sourceRoot = null;
@@ -455,6 +467,17 @@ public final class DevRuntime implements Closeable {
             SourceChanges change = deleted ? new SourceChanges(Set.of(), Set.of(absolute)) : new SourceChanges(Set.of(absolute), Set.of());
             if (sourceRoot != null) {
                 sources.merge(sourceRoot.kind(), change, SourceChanges::merge);
+                continue;
+            }
+            SourceRoot testRoot = null;
+            for (SourceRoot root : manifest.testSourceRoots()) {
+                if (absolute.startsWith(root.path()) && root.kind().matches(absolute)) {
+                    testRoot = root;
+                    break;
+                }
+            }
+            if (testRoot != null) {
+                testSources.merge(testRoot.kind(), change, SourceChanges::merge);
                 continue;
             }
             Path resourceRoot = mostSpecificRoot(absolute);
@@ -537,6 +560,11 @@ public final class DevRuntime implements Closeable {
                 // the main of a generation launched as the runtime closed: nothing would stop its context
                 throw new IllegalStateException("The development runtime is closed: no new generation starts");
             }
+            if (tests != null) {
+                // test mode: every test context reports itself, the one created last is the one running
+                this.context = applicationContext;
+                return;
+            }
             if (contextClaimed) {
                 // a further context of the generation, such as a client's built in main: not the application's
                 return;
@@ -582,6 +610,157 @@ public final class DevRuntime implements Closeable {
         return retained;
     }
 
+    /**
+     * Runs the runtime in test mode: watches, compiles what changes, and runs the tests it affects on a new
+     * generation each time. Returns once the first run, of every test, finished, or at once when the settings ask for
+     * no first run.
+     *
+     * @return The first run, or null when there was none
+     * @throws IllegalStateException if the manifest is not in test mode or another runtime runs the process
+     */
+    public @Nullable TestRunSummary startTests() {
+        TestSession session = tests;
+        if (session == null) {
+            throw new IllegalStateException("The manifest is not in test mode: start(String[]) runs the application");
+        }
+        if (!CURRENT.compareAndSet(null, this)) {
+            throw new IllegalStateException("A development runtime already runs this process");
+        }
+        try {
+            snapshot = OutputSnapshot.of(manifest.reloadableRoots());
+            // what the class files depend on and which are tests, before any change comes: a first change that removes a
+            // constant, or deletes a test, needs to know the state it changes
+            session.prime();
+            startLiveReload();
+            startWatching();
+            Thread thread = new Thread(this::processBatches, "micronaut-dev-reload");
+            thread.setDaemon(true);
+            thread.start();
+            worker = thread;
+        } catch (RuntimeException e) {
+            close();
+            throw e;
+        }
+        LOG.info("Test mode: {} compiler(s), runner {}, watching {} root(s), reports in {}",
+            compilers.keySet(), session.settings().runner(), watchedRoots().size(), session.settings().reports());
+        if (!session.settings().initialRun() && !session.settings().once()) {
+            return null;
+        }
+        awaitBatch(enqueue(new Pending(Map.of(), Map.of(), Map.of(), false, TestRequest.ALL)));
+        return session.lastRun();
+    }
+
+    /**
+     * Runs tests a person or a tool asked for, in test mode, behind any change pending, and waits for the run.
+     *
+     * @param request Which tests
+     * @return The run, or null when nothing ran
+     */
+    public @Nullable TestRunSummary requestTests(TestRequest request) {
+        TestSession session = requireTests();
+        int before = session.runs();
+        RuntimeThreads.refuseOwnThreads(worker, applicationThread);
+        awaitBatch(enqueue(new Pending(Map.of(), Map.of(), Map.of(), false, request)));
+        return session.runs() > before ? session.lastRun() : null;
+    }
+
+    /**
+     * Turns watching on or off, in test mode: while it is off, changes compile but run no test until one is asked for.
+     *
+     * @param watching Whether a change runs the tests it affects
+     */
+    public void watchTests(boolean watching) {
+        requireTests().watching(watching);
+    }
+
+    /**
+     * @return Whether a change runs the tests it affects, in test mode
+     */
+    public boolean isWatchingTests() {
+        return requireTests().isWatching();
+    }
+
+    /**
+     * @return The last test run, in test mode
+     */
+    public Optional<TestRunSummary> lastTestRun() {
+        return Optional.ofNullable(requireTests().lastRun());
+    }
+
+    /**
+     * @return How many test runs finished, in test mode
+     */
+    public int testRuns() {
+        return requireTests().runs();
+    }
+
+    /**
+     * @return The test classes that failed in their last run, in test mode
+     */
+    public Set<String> failedTestClasses() {
+        return requireTests().failedClasses();
+    }
+
+    /**
+     * Waits for a test run to finish, in test mode.
+     *
+     * @param run The run, counted from one
+     * @param timeout How long to wait
+     * @return The run
+     * @throws TimeoutException if it did not finish in time
+     */
+    public TestRunSummary awaitTestRun(int run, Duration timeout) throws TimeoutException {
+        return requireTests().awaitRun(run, timeout);
+    }
+
+    private TestSession requireTests() {
+        TestSession session = tests;
+        if (session == null) {
+            throw new IllegalStateException("The manifest is not in test mode");
+        }
+        return session;
+    }
+
+    /**
+     * @return The languages compiled jointly, by owner
+     */
+    Map<SourceKind, SourceKind> jointOwners() {
+        return jointOwners;
+    }
+
+    /**
+     * What changed in the reloadable roots since the last time this was asked, which a new generation will see.
+     *
+     * @return The changes
+     */
+    ChangeSet takeOutputChanges() {
+        OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
+        ChangeSet changes = snapshot.diff(latest);
+        snapshot = latest;
+        return changes;
+    }
+
+    /**
+     * Retires the current generation for a new one over the roots as they are now.
+     *
+     * @return The new generation's loader
+     */
+    ClassLoader newGeneration() {
+        classLoader.swap();
+        return classLoader.current();
+    }
+
+    void compilationFailed(CompileFailure failure) {
+        lastFailure = failure;
+        if (LOG.isErrorEnabled()) {
+            LOG.error("{}", failure.describe().strip());
+        }
+    }
+
+    void compilationRecovered() {
+        lastFailure = null;
+    }
+
     @Override
     public void close() {
         synchronized (lifecycle) {
@@ -589,6 +768,10 @@ public final class DevRuntime implements Closeable {
                 return;
             }
             closed = true;
+        }
+        TestSession session = tests;
+        if (session != null) {
+            session.cancelRun();
         }
         Thread thread = worker;
         if (thread != null) {
@@ -618,6 +801,17 @@ public final class DevRuntime implements Closeable {
             compiler.close();
         }
         CURRENT.compareAndSet(this, null);
+        closedLatch.countDown();
+    }
+
+    /**
+     * Waits until the runtime is closed, by a shutdown hook, a key, or a tool. Test mode runs no application thread to
+     * keep the JVM alive, so its launcher waits here.
+     *
+     * @throws InterruptedException if the waiting thread is interrupted
+     */
+    public void awaitClose() throws InterruptedException {
+        closedLatch.await();
     }
 
     /**
@@ -775,16 +969,32 @@ public final class DevRuntime implements Closeable {
             directoryWatcher.directory(root.path()).include(globs).watch(batch -> enqueue(sourceBatch(root, batch)));
             roots.add(root.path().toAbsolutePath().normalize());
         }
+        for (SourceRoot root : manifest.testSourceRoots()) {
+            if (tests != null && Files.isDirectory(root.path())) {
+                String[] globs = root.kind().extensions().stream().flatMap(extension -> Stream.of("*." + extension, "**/*." + extension)).toArray(String[]::new);
+                directoryWatcher.directory(root.path()).include(globs).watch(batch -> {
+                    Pending sources = sourceBatch(root, batch);
+                    enqueue(new Pending(Map.of(), sources.sources, Map.of(), false, null));
+                });
+            }
+        }
         for (ResourceRoot root : manifest.resourceRoots()) {
             if (Files.isDirectory(root.path())) {
                 directoryWatcher.directory(root.path()).watch(batch -> enqueue(resourceBatch(root, batch)));
                 roots.add(root.path().toAbsolutePath().normalize());
             }
         }
+        // the languages the build tool compiles, the tests' included in test mode: the dev JVM only sees their class output
+        List<DevManifest> targets = new ArrayList<>(List.of(manifest));
+        if (tests != null) {
+            targets.add(tests.tests());
+        }
         boolean external = false;
-        for (SourceKind kind : SourceKind.values()) {
-            external |= !manifest.sourceRoots(kind).isEmpty()
-                && (manifest.compileMode(kind) == CompileMode.BUILD_TOOL || !compilers.containsKey(kind));
+        for (DevManifest target : targets) {
+            for (SourceKind kind : SourceKind.values()) {
+                external |= !target.sourceRoots(kind).isEmpty()
+                    && (target.compileMode(kind) == CompileMode.BUILD_TOOL || !compilers.containsKey(kind));
+            }
         }
         if (external) {
             Path trigger = manifest.buildToolTrigger();
@@ -798,23 +1008,38 @@ public final class DevRuntime implements Closeable {
                         throw new UncheckedIOException("Cannot create the trigger directory " + directory, e);
                     }
                     String name = trigger.getFileName().toString();
-                    directoryWatcher.directory(directory).recursive(false).include(name).watch(batch -> enqueue(new Pending(Map.of(), Map.of(), false)));
+                    directoryWatcher.directory(directory).recursive(false).include(name).watch(batch -> enqueue(outputsChanged()));
                     roots.add(directory.normalize());
                 }
             } else {
                 // without a trigger the class output itself is watched, which may see a compilation half written
                 LOG.warn("No micronaut.dev.build-tool.trigger configured: the class output is watched directly and a restart may see a compilation in progress");
-                for (SourceKind kind : SourceKind.values()) {
-                    Path output = manifest.classOutput(kind);
-                    if (!manifest.sourceRoots(kind).isEmpty() && Files.isDirectory(output) && !directoryWatcher.isWatching(output)) {
-                        directoryWatcher.directory(output).watch(batch -> enqueue(new Pending(Map.of(), Map.of(), false)));
-                        roots.add(output.toAbsolutePath().normalize());
+                for (DevManifest target : targets) {
+                    for (SourceKind kind : SourceKind.values()) {
+                        Path output = target.classOutput(kind);
+                        if (!target.sourceRoots(kind).isEmpty() && Files.isDirectory(output) && !directoryWatcher.isWatching(output)) {
+                            directoryWatcher.directory(output).watch(batch -> enqueue(outputsChanged()));
+                            roots.add(output.toAbsolutePath().normalize());
+                        }
                     }
                 }
             }
         }
         watcher = directoryWatcher;
         watchedRoots = List.copyOf(roots);
+    }
+
+    /**
+     * A batch for outputs the build tool wrote: no source to compile, yet never empty, since what it changed is found
+     * in the class output when the batch is handled.
+     */
+    private static Pending outputsChanged() {
+        return new Pending(Map.of(), Map.of(), false) {
+            @Override
+            boolean isEmpty() {
+                return false;
+            }
+        };
     }
 
     private static Pending sourceBatch(SourceRoot root, FileChangeBatch batch) {
@@ -900,6 +1125,11 @@ public final class DevRuntime implements Closeable {
         long sequence = submitted.incrementAndGet();
         batch.sequence = sequence;
         pending.add(batch);
+        TestSession session = tests;
+        if (session != null) {
+            // the next run covers what the run under way covers and this change too
+            session.cancelRun();
+        }
         return sequence;
     }
 
@@ -965,35 +1195,38 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
+     * @param target The manifest whose languages are compiled
      * @param jointOwners The languages compiled jointly with another, by that other one
      * @return How many languages the launcher compiles itself: those with a compiler, sources and the embedded mode,
      * not compiled jointly with another
      */
-    private int compiledLanguages(Map<SourceKind, SourceKind> jointOwners) {
+    private int compiledLanguages(DevManifest target, Map<SourceKind, SourceKind> jointOwners) {
         int languages = 0;
         for (SourceKind kind : compilers.keySet()) {
-            if (!jointOwners.containsKey(kind) && embedded(manifest, kind)) {
+            if (!jointOwners.containsKey(kind) && embedded(target, kind)) {
                 languages++;
             }
         }
         return languages;
     }
 
-    private void handle(Pending next) {
-        long start = System.nanoTime();
-        Pending failed = failedBatch;
-        Pending batch = next;
-        if (failed != null && (next.full || !next.sources.isEmpty())) {
-            // a batch that compiles takes the failed sources with it; a restart or a resource change alone compiles
-            // nothing and runs the last output that compiled, the failed sources waiting for the next compilation
-            failedBatch = null;
-            batch = Pending.merge(List.of(failed, next));
-        }
-        // compile what changed, or everything on the manual trigger; a failure leaves the generation as it is
-        // the changes of a language compiled jointly come with those of the language compiling it
+    /**
+     * Compiles a batch's changes for the languages of a manifest, the application's or its tests' view, and
+     * what depends on them: the changed sources of each language, then, until nothing new is produced, the
+     * sources of every language that reference a class another one changed.
+     *
+     * @param target The manifest whose roots, outputs and classpaths are compiled
+     * @param joint The languages compiled jointly, by owner
+     * @param changes The changed sources, by language
+     * @param full Whether everything is compiled
+     * @param seed The classes changed by an earlier compilation, whose dependents among these sources are compiled too
+     * @return What was compiled, or the failure
+     */
+    CompileRound compileRound(DevManifest target, Map<SourceKind, SourceKind> joint, Map<SourceKind, SourceChanges> changes, boolean full, Set<String> seed) {
         Map<SourceKind, SourceChanges> sources = new EnumMap<>(SourceKind.class);
-        batch.sources.forEach((kind, changes) -> sources.merge(jointOwners.getOrDefault(kind, kind), changes, SourceChanges::merge));
-        Set<SourceKind> kinds = batch.full ? compilers.keySet() : sources.keySet();
+        changes.forEach((kind, change) -> sources.merge(joint.getOrDefault(kind, kind), change, SourceChanges::merge));
+        // what another compilation changed reaches every language, as the changes of this batch do
+        Set<SourceKind> kinds = full || !seed.isEmpty() ? compilers.keySet() : sources.keySet();
         boolean compiled = false;
         Set<SourceKind> compiledKinds = new LinkedHashSet<>();
         Set<String> affectedClasses = new LinkedHashSet<>();
@@ -1002,33 +1235,19 @@ public final class DevRuntime implements Closeable {
         Map<SourceKind, Set<String>> known = new EnumMap<>(SourceKind.class);
         for (SourceKind kind : kinds) {
             SourceCompiler compiler = compilers.get(kind);
-            if (compiler == null || jointOwners.containsKey(kind) || !embedded(manifest, kind)) {
+            if (compiler == null || joint.containsKey(kind) || !embedded(target, kind)) {
                 continue;
             }
-            SourceChanges changes = sources.getOrDefault(kind, SourceChanges.NONE);
-            CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind, jointOwners), changes.changed(), changes.deleted(),
-                batch.full || !manifest.isIncremental(), manifest.compileClasspath(), manifest.processorPath(),
-                manifest.classOutput(kind), manifest.generatedSources(kind), compileOptions(manifest, kind, jointOwners));
+            SourceChanges change = sources.getOrDefault(kind, SourceChanges.NONE);
+            CompilationRequest request = new CompilationRequest(kind, compilationRoots(target, kind, joint), change.changed(), change.deleted(),
+                full || !target.isIncremental(), target.compileClasspath(), target.processorPath(),
+                target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint));
+            if (!seed.isEmpty()) {
+                request = request.withAffectedClasses(seed);
+            }
             CompilationResult result = compiler.compile(request);
             if (!result.isSuccess()) {
-                CompileFailure failure = new CompileFailure(kind, result.diagnostics(), Instant.now());
-                lastFailure = failure;
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("{}", failure.describe().strip());
-                }
-                // nothing of the batch reached the application: its sources compile again with the next one
-                Pending remaining = withoutSources(batch, compiledKinds);
-                failedBatch = remaining;
-                if (batch.forcesRestart()) {
-                    // a restart asked for runs the output that compiled last, as it does alone, though a watcher's late
-                    // report of the broken source came with it; the failed changes wait for the next compilation without it
-                    failedBatch = new Pending(remaining.sources, remaining.resources, remaining.full);
-                    OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
-                    ChangeSet changeSet = snapshot.diff(latest);
-                    snapshot = latest;
-                    restart(changeSet, null, start);
-                }
-                return;
+                return CompileRound.failed(new CompileFailure(kind, result.diagnostics(), Instant.now()));
             }
             compiled = true;
             compiledKinds.add(kind);
@@ -1040,7 +1259,7 @@ public final class DevRuntime implements Closeable {
         // recompiled too, and fail rather than keep bytecode linked against what is gone
         // until nothing new is produced: a Groovy class recompiled for a Java change may itself be what a
         // Java source depends on, and Java was visited first
-        boolean produced = compiledLanguages(jointOwners) > 1;
+        boolean produced = compiledLanguages(target, joint) > 1;
         for (int pass = 0; pass < MAX_PROPAGATION_PASSES && produced; pass++) {
             produced = false;
             for (Map.Entry<SourceKind, SourceCompiler> entry : compilers.entrySet()) {
@@ -1048,7 +1267,7 @@ public final class DevRuntime implements Closeable {
                 // a language compiled in this batch for its own changes is visited again: an unchanged source of
                 // it that references what another language changed was not selected the first time. It is told
                 // only what it does not know yet, so it does not recompile the dependents of its own classes
-                if (jointOwners.containsKey(kind) || !embedded(manifest, kind)) {
+                if (joint.containsKey(kind) || !embedded(target, kind)) {
                     continue;
                 }
                 Set<String> knownToKind = known.computeIfAbsent(kind, k -> new LinkedHashSet<>());
@@ -1058,14 +1277,11 @@ public final class DevRuntime implements Closeable {
                     continue;
                 }
                 knownToKind.addAll(fresh);
-                CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind, jointOwners), Set.of(), Set.of(), false, manifest.compileClasspath(),
-                    manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), compileOptions(manifest, kind, jointOwners)).withAffectedClasses(fresh);
+                CompilationRequest request = new CompilationRequest(kind, compilationRoots(target, kind, joint), Set.of(), Set.of(), false, target.compileClasspath(),
+                    target.processorPath(), target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint)).withAffectedClasses(fresh);
                 CompilationResult result = entry.getValue().compile(request);
                 if (!result.isSuccess()) {
-                    CompileFailure failure = new CompileFailure(kind, result.diagnostics(), Instant.now());
-                    lastFailure = failure;
-                    LOG.error("{}", failure.describe().strip());
-                    return;
+                    return CompileRound.failed(new CompileFailure(kind, result.diagnostics(), Instant.now()));
                 }
                 if (result.status() == CompilationResult.Status.SUCCESS) {
                     compiledKinds.add(kind);
@@ -1076,6 +1292,44 @@ public final class DevRuntime implements Closeable {
                 }
             }
         }
+        return new CompileRound(null, compiled, compiledKinds, affectedClasses);
+    }
+
+    private void handle(Pending next) {
+        TestSession session = tests;
+        if (session != null) {
+            session.handle(next.sources, next.testSources, next.resources, next.full, next.requested);
+            return;
+        }
+        long start = System.nanoTime();
+        Pending failed = failedBatch;
+        Pending batch = next;
+        if (failed != null && (next.full || !next.sources.isEmpty())) {
+            // a batch that compiles takes the failed sources with it; a restart or a resource change alone compiles
+            // nothing and runs the last output that compiled, the failed sources waiting for the next compilation
+            failedBatch = null;
+            batch = Pending.merge(List.of(failed, next));
+        }
+        // compile what changed, or everything on the manual trigger; a failure leaves the generation as it is
+        CompileRound round = compileRound(manifest, jointOwners, batch.sources, batch.full, Set.of());
+        if (round.failure() != null) {
+            lastFailure = round.failure();
+            LOG.error("{}", round.failure().describe().strip());
+            // nothing of the batch reached the application: its changes come again with the next one that compiles
+            failedBatch = batch;
+            if (batch.forcesRestart()) {
+                // a restart asked for runs the output that compiled last, as it does alone, though a late report of
+                // the broken source came with it; the failed changes wait for the next compilation without it
+                failedBatch = new Pending(batch.sources, batch.testSources, batch.resources, batch.full, batch.requested);
+                OutputSnapshot latest = OutputSnapshot.of(manifest.reloadableRoots());
+                ChangeSet changeSet = snapshot.diff(latest);
+                snapshot = latest;
+                restart(changeSet, null, start);
+            }
+            return;
+        }
+        boolean compiled = round.compiled();
+        Set<SourceKind> compiledKinds = round.compiledKinds();
         CompileFailure failure = lastFailure;
         if (failure != null && compiledKinds.contains(failure.kind())) {
             // the broken language compiles again; a batch that did not touch it leaves the failure shown
@@ -1203,25 +1457,6 @@ public final class DevRuntime implements Closeable {
             LOG.warn("The configuration could not be refreshed in place ({}): restarting instead", e.getMessage());
             return null;
         }
-    }
-
-    /**
-     * The batch less the sources of the languages that compiled: their output is written, and the next snapshot
-     * sees it.
-     */
-    private static Pending withoutSources(Pending batch, Set<SourceKind> compiledKinds) {
-        Map<SourceKind, SourceChanges> sources = new EnumMap<>(SourceKind.class);
-        batch.sources.forEach((kind, changes) -> {
-            if (!compiledKinds.contains(kind)) {
-                sources.put(kind, changes);
-            }
-        });
-        return new Pending(sources, batch.resources, batch.full) {
-            @Override
-            boolean forcesRestart() {
-                return batch.forcesRestart();
-            }
-        };
     }
 
     /**
@@ -1565,7 +1800,7 @@ public final class DevRuntime implements Closeable {
         return definitions;
     }
 
-    private void detectLeaks() {
+    void detectLeaks() {
         if (oldRetiredGenerations().isEmpty() || !leakCheckPending.compareAndSet(false, true)) {
             // nothing older than the tolerance is reachable even before a collection, or a check pending covers this reload
             return;
@@ -1622,6 +1857,20 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
+     * What a compile round did.
+     *
+     * @param failure The compilation that failed, if one did: nothing after it was compiled
+     * @param compiled Whether anything was compiled
+     * @param compiledKinds The languages compiled
+     * @param affectedClasses The classes the round changed, for the dependents in other languages and the tests
+     */
+    record CompileRound(@Nullable CompileFailure failure, boolean compiled, Set<SourceKind> compiledKinds, Set<String> affectedClasses) {
+        static CompileRound failed(CompileFailure failure) {
+            return new CompileRound(failure, false, Set.of(), Set.of());
+        }
+    }
+
+    /**
      * The changed and deleted files of one language or resource kind.
      *
      * @param changed The files added or modified
@@ -1647,14 +1896,23 @@ public final class DevRuntime implements Closeable {
      */
     private static class Pending {
         final Map<SourceKind, SourceChanges> sources;
+        final Map<SourceKind, SourceChanges> testSources;
         final Map<ResourceKind, SourceChanges> resources;
         final boolean full;
+        final @Nullable TestRequest requested;
         long sequence;
 
         Pending(Map<SourceKind, SourceChanges> sources, Map<ResourceKind, SourceChanges> resources, boolean full) {
+            this(sources, Map.of(), resources, full, null);
+        }
+
+        Pending(Map<SourceKind, SourceChanges> sources, Map<SourceKind, SourceChanges> testSources, Map<ResourceKind, SourceChanges> resources,
+                boolean full, @Nullable TestRequest requested) {
             this.sources = sources;
+            this.testSources = testSources;
             this.resources = resources;
             this.full = full;
+            this.requested = requested;
         }
 
         boolean forcesRestart() {
@@ -1662,24 +1920,43 @@ public final class DevRuntime implements Closeable {
         }
 
         boolean isEmpty() {
-            return !full && !forcesRestart()
+            return !full && !forcesRestart() && requested == null
                 && sources.values().stream().allMatch(changes -> changes.changed().isEmpty() && changes.deleted().isEmpty())
+                && testSources.values().stream().allMatch(changes -> changes.changed().isEmpty() && changes.deleted().isEmpty())
                 && resources.values().stream().allMatch(changes -> changes.changed().isEmpty() && changes.deleted().isEmpty());
+        }
+
+        /**
+         * How many tests a request runs, for merging two of them: the widest wins, every test, then the last run's
+         * again, which holds the failures, then the failures alone.
+         */
+        private static int breadth(TestRequest request) {
+            return switch (request) {
+                case ALL -> 2;
+                case RERUN -> 1;
+                case FAILED -> 0;
+            };
         }
 
         static Pending merge(List<Pending> batches) {
             Map<SourceKind, SourceChanges> sources = new EnumMap<>(SourceKind.class);
+            Map<SourceKind, SourceChanges> testSources = new EnumMap<>(SourceKind.class);
             Map<ResourceKind, SourceChanges> resources = new EnumMap<>(ResourceKind.class);
             boolean full = false;
             boolean restart = false;
+            TestRequest requested = null;
             for (Pending batch : batches) {
                 batch.sources.forEach((kind, changes) -> sources.merge(kind, changes, SourceChanges::merge));
+                batch.testSources.forEach((kind, changes) -> testSources.merge(kind, changes, SourceChanges::merge));
                 batch.resources.forEach((kind, changes) -> resources.merge(kind, changes, SourceChanges::merge));
                 full |= batch.full;
                 restart |= batch.forcesRestart();
+                if (batch.requested != null && (requested == null || breadth(batch.requested) > breadth(requested))) {
+                    requested = batch.requested;
+                }
             }
             boolean forced = restart;
-            return new Pending(sources, resources, full) {
+            return new Pending(sources, testSources, resources, full, requested) {
                 @Override
                 boolean forcesRestart() {
                     return forced;
