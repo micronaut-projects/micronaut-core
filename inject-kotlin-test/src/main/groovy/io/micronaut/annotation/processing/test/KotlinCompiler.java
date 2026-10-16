@@ -135,6 +135,17 @@ public class KotlinCompiler {
         return SourceFile.Companion.kotlin(name, source, true);
     }
 
+    /**
+     * Creates a Java source file for use with {@link #compile(List, Consumer, List)}.
+     *
+     * @param name source file name
+     * @param source Java source content
+     * @return Java source file
+     */
+    public static SourceFile javaSource(String name, @Language("java") String source) {
+        return SourceFile.Companion.java(name, source, true);
+    }
+
     @NotNull
     private static URLClassLoader toClassLoader(Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> resultPair) {
         try {
