@@ -16,6 +16,8 @@
 package io.micronaut.web.router;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.type.Argument;
+import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.inject.ExecutableMethod;
@@ -61,6 +63,25 @@ public interface MethodBasedRouteInfo<T, R> extends RouteInfo<R> {
             return Optional.ofNullable(handlerMethod.getAnnotationMetadataProvider());
         }
         return Optional.of(targetMethod.getExecutableMethod());
+    }
+
+    /**
+     * Whether the route takes the request body as an {@link AsyncRequestBody}: a handler route
+     * that declares its body with {@link io.micronaut.web.router.builder.HttpRouteSpec#body()}, or a
+     * controller method with an {@link AsyncRequestBody} argument. Such a route
+     * reads the body itself, so a runtime does not decode it into the request. The routes of the
+     * router compute it once, when the route is built.
+     *
+     * @return Whether an argument of the target method is an {@link AsyncRequestBody}
+     * @since 5.3.0
+     */
+    default boolean isAsyncRequestBody() {
+        for (Argument<?> argument : getTargetMethod().getArguments()) {
+            if (AsyncRequestBody.class.isAssignableFrom(argument.getType())) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }
