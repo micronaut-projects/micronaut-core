@@ -4,7 +4,7 @@ from micronaut.test.extensions.junit5.annotation import MicronautTest
 import java
 
 @MicronautTest
-class TypeHierarchySpec:
+class TypeHierarchyTest:
     @Test
     def test_reads_the_recorded_hierarchy(self):
         # tag::usage[]
