@@ -144,10 +144,16 @@ class PropertySourcePropertyResolverSpec extends Specification {
             }
         }
         boolean secondStarted = secondDiffStarted.await(10, TimeUnit.SECONDS)
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (second.state != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+            Thread.sleep(1)
+        }
+        boolean secondBlockedOnRefresh = second.state == Thread.State.BLOCKED
 
         then:
         firstEntered
         secondStarted
+        secondBlockedOnRefresh
 
         cleanup:
         releaseFirstRefresh.countDown()
