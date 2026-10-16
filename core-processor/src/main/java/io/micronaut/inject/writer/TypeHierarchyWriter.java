@@ -238,16 +238,29 @@ public final class TypeHierarchyWriter {
         return !namesNonPublicTypeMatching(element, aClass -> !aClass.getPackageName().equals(packageName), new HashSet<>(), 0);
     }
 
-    private static boolean namesNonPublicTypeMatching(ClassElement element, Predicate<ClassElement> matches, Set<String> visited, int depth) {
+    /**
+     * Whether a type names a class that is not public and matches. A variable on the path being walked is not walked
+     * again, which ends the walk at the T within the bounds of {@code T extends Comparable<T>}; any other type is
+     * walked wherever it is met, the second {@code List} of {@code Map<List<String>, List<Hidden>>} with its own
+     * arguments.
+     */
+    private static boolean namesNonPublicTypeMatching(ClassElement element, Predicate<ClassElement> matches, Set<String> path, int depth) {
         if (depth > MAX_DEPTH) {
             return false;
         }
         if (element instanceof WildcardElement wildcard) {
-            return namesNonPublicTypeMatching(wildcard.getUpperBounds(), matches, visited, depth) || namesNonPublicTypeMatching(wildcard.getLowerBounds(), matches, visited, depth);
+            return namesNonPublicTypeMatching(wildcard.getUpperBounds(), matches, path, depth) || namesNonPublicTypeMatching(wildcard.getLowerBounds(), matches, path, depth);
         }
         if (element instanceof GenericPlaceholderElement placeholder) {
-            // the bounds of a variable within its own bounds are not visited again
-            return visited.add("<" + placeholder.getVariableName() + ">") && namesNonPublicTypeMatching(placeholder.getBounds(), matches, visited, depth);
+            String key = "<" + placeholder.getVariableName() + ">";
+            if (!path.add(key)) {
+                return false;
+            }
+            try {
+                return namesNonPublicTypeMatching(placeholder.getBounds(), matches, path, depth);
+            } finally {
+                path.remove(key);
+            }
         }
         ClassElement type = element;
         while (type.isArray()) {
@@ -256,10 +269,8 @@ public final class TypeHierarchyWriter {
         if (!type.isPrimitive() && !isPublic(type, new HashSet<>()) && matches.test(type)) {
             return true;
         }
-        if (!visited.add(type.getName())) {
-            return false;
-        }
-        return namesNonPublicTypeMatching(type.getTypeArguments().values(), matches, visited, depth + 1);
+        // the arguments of a class are a finite tree: only a variable can lead back to where the walk was
+        return namesNonPublicTypeMatching(type.getTypeArguments().values(), matches, path, depth + 1);
     }
 
     private static boolean namesNonPublicTypeMatching(Collection<? extends ClassElement> elements, Predicate<ClassElement> matches, Set<String> visited, int depth) {

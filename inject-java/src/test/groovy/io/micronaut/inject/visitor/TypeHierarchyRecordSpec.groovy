@@ -285,6 +285,50 @@ public class Payload extends Base<String> {
         payload.inaccessibleSuperTypes.empty
     }
 
+    void "a generic type met twice is checked with the arguments of each use"() {
+        given:
+        def classLoader = buildClassLoader(new JavaFiles()
+            .add('p.Base', '''
+package p;
+
+class Base {
+}
+''')
+            .add('p.Hidden', '''
+package p;
+
+class Hidden {
+}
+''')
+            .add('p.Sub', '''
+package p;
+
+import java.util.*;
+import java.util.function.Supplier;
+
+public class Sub extends Base implements Supplier<Map<List<String>, List<Hidden>>> {
+    public Map<List<String>, List<Hidden>> get() { return null; }
+}
+''')
+            .add('q.Holder', '''
+package q;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+
+@TypeHierarchyImport(classes = p.Sub.class)
+public class Holder {
+}
+'''))
+
+        when: "the record is instantiated: a class constant of p.Hidden would fail with an IllegalAccessError"
+        def sub = record(classLoader, 'p.Sub', 'q')
+
+        then: "the Supplier naming Hidden in the second List is left out with Base"
+        sub.genericInterfaces.empty
+        strings(sub.superTypes) == ['Object']
+        sub.inaccessibleSuperTypes == ['p.Base', 'java.util.function.Supplier']
+    }
+
     void "the same type is recorded once"() {
         given:
         def classLoader = buildClassLoader('test.One', '''
