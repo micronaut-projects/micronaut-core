@@ -16,16 +16,24 @@
 package io.micronaut.dev;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.dev.compile.CompilationRequest;
+import io.micronaut.dev.compile.CompilationResult;
 import io.micronaut.dev.compile.CompileMode;
 import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
 import io.micronaut.dev.manifest.DevManifest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.nio.file.Files;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * What a compilation of a language of a {@link DevRuntime}'s manifest reads: its roots and options, with those of the
@@ -33,6 +41,9 @@ import java.util.Map;
  */
 @Internal
 final class Compilations {
+
+    // the runtime's logger: what is logged here is logged as the runtime's
+    private static final Logger LOG = LoggerFactory.getLogger(DevRuntime.class);
 
     private Compilations() {
     }
@@ -97,5 +108,38 @@ final class Compilations {
 
     static boolean embedded(DevManifest manifest, SourceKind kind) {
         return !manifest.sourceRoots(kind).isEmpty() && manifest.compileMode(kind) != CompileMode.BUILD_TOOL;
+    }
+
+    /**
+     * Compiles in full every language whose class output does not exist yet: see
+     * {@link DevRuntime#compileMissingOutputs(DevManifest, Map)}.
+     *
+     * @param manifest The manifest
+     * @param compilers The compilers by language
+     * @throws IllegalStateException if a compilation fails
+     */
+    static void compileMissingOutputs(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
+        Map<SourceKind, SourceKind> jointOwners = jointOwners(manifest, compilers);
+        // decided before anything is compiled: two languages sharing one output are both missing, or neither
+        Set<SourceKind> missing = new LinkedHashSet<>();
+        for (SourceKind kind : compilers.keySet()) {
+            if (!jointOwners.containsKey(kind) && embedded(manifest, kind) && !Files.isDirectory(manifest.classOutput(kind))) {
+                missing.add(kind);
+            }
+        }
+        for (Map.Entry<SourceKind, SourceCompiler> entry : compilers.entrySet()) {
+            SourceKind kind = entry.getKey();
+            if (!missing.contains(kind)) {
+                continue;
+            }
+            CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind, jointOwners), Set.of(), Set.of(), true, manifest.compileClasspath(),
+                manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), compileOptions(manifest, kind, jointOwners)).asFull();
+            CompilationResult result = entry.getValue().compile(request);
+            if (!result.isSuccess()) {
+                CompileFailure failure = new CompileFailure(kind, result.diagnostics(), Instant.now());
+                throw new IllegalStateException(failure.describe());
+            }
+            LOG.info("Compiled {} {} source(s) in {} ms", result.compiledSources().size(), kind, result.duration().toMillis());
+        }
     }
 }
