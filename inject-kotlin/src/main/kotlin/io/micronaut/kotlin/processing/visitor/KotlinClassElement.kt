@@ -420,33 +420,9 @@ internal open class KotlinClassElement(
         }
 
         val eq = ElementQuery.of(PropertyElement::class.java)
-            .filter { el ->
-                val kotlinNativeElement = el.nativeType as KotlinNativeElement
-                val nativeEl = kotlinNativeElement.element
-                val excludedAnnotations = propertyElementQuery.excludedAnnotations
-                if (hasAnnotation(nativeEl, JvmField::class.java) || excludedAnnotations.any { hasAnnotation(nativeEl, it) }) {
-                    false
-                } else if (nativeEl is KSPropertyDeclaration && nativeEl.getter == null && nativeEl.setter == null) {
-                    // KSP models a Java field as a property without accessors. It cannot be read or
-                    // written as a bean property, so leave it to the field handling below, which
-                    // applies the configured access kinds and visibility.
-                    false
-                } else {
-                    !propertyElementQuery.excludes.contains(el.name)
-                            && (propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(el.name))
-                }
-            }
-            .modifiers {
-                if (!propertyElementQuery.isAllowStaticProperties && it.contains(ElementModifier.STATIC)) {
-                    return@modifiers false
-                }
-                val visibility = propertyElementQuery.visibility
-                if (visibility == BeanProperties.Visibility.PUBLIC) {
-                    it.contains(ElementModifier.PUBLIC)
-                } else {
-                    !it.contains(ElementModifier.PRIVATE)
-                }
-            }.annotated { prop ->
+            .filter { el -> isQueriedProperty(el, propertyElementQuery) }
+            .modifiers { hasQueriedModifiers(it, propertyElementQuery) }
+            .annotated { prop ->
                 val excludedAnnotations = propertyElementQuery.excludedAnnotations
                 excludedAnnotations.isEmpty() || !excludedAnnotations.any {
                     prop.hasAnnotation(
@@ -519,6 +495,37 @@ internal open class KotlinClassElement(
         resolvedProperties.addAll(methodProperties)
         resolvedProperties.addAll(allProperties.values)
         return resolvedProperties
+    }
+
+    private fun isQueriedProperty(el: PropertyElement, propertyElementQuery: PropertyElementQuery): Boolean {
+        val kotlinNativeElement = el.nativeType as KotlinNativeElement
+        val nativeEl = kotlinNativeElement.element
+        val excludedAnnotations = propertyElementQuery.excludedAnnotations
+        return when {
+            hasAnnotation(nativeEl, JvmField::class.java) || excludedAnnotations.any { hasAnnotation(nativeEl, it) } -> false
+            // KSP models a Java field as a property without accessors. It cannot be read or
+            // written as a bean property, so leave it to the field handling below, which
+            // applies the configured access kinds and visibility.
+            nativeEl is KSPropertyDeclaration && nativeEl.getter == null && nativeEl.setter == null -> false
+            // The getter of a property with context parameters takes them as arguments, so like
+            // any other getter with arguments it is not a bean property. KSP does not report them,
+            // so the property would otherwise be read without them.
+            nativeEl is KSPropertyDeclaration && visitorContext.hasContextParameters(nativeEl) -> false
+            else -> !propertyElementQuery.excludes.contains(el.name)
+                    && (propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(el.name))
+        }
+    }
+
+    private fun hasQueriedModifiers(modifiers: Set<ElementModifier>, propertyElementQuery: PropertyElementQuery): Boolean {
+        if (!propertyElementQuery.isAllowStaticProperties && modifiers.contains(ElementModifier.STATIC)) {
+            return false
+        }
+        val visibility = propertyElementQuery.visibility
+        return if (visibility == BeanProperties.Visibility.PUBLIC) {
+            modifiers.contains(ElementModifier.PUBLIC)
+        } else {
+            !modifiers.contains(ElementModifier.PRIVATE)
+        }
     }
 
     /**

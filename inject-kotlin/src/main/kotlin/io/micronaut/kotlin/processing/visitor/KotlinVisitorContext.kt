@@ -148,6 +148,18 @@ internal class KotlinVisitorContext(
     private val jvmNameCache: MutableMap<KSAnnotated, String?> = HashMap()
     private val classByNameCache: MutableMap<String, KSClassDeclaration?> = HashMap()
 
+    // The source files read to find context parameters, which KSP does not expose
+    private val contextParameters = KotlinContextParameters()
+
+    /**
+     * Whether a function or property declares Kotlin context parameters. KSP leaves them out of the
+     * parameters it reports, see [KotlinContextParameters].
+     *
+     * @param declaration The function or property
+     * @return `true` if its source declares context parameters
+     */
+    fun hasContextParameters(declaration: KSDeclaration) = contextParameters.declares(declaration)
+
     fun getBinaryName(function: KSFunctionDeclaration): String {
         val binaryName = jvmNameCache.getOrCache(function) {
             resolver.getJvmName(function)
