@@ -17,6 +17,7 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSModifierListOwner
+import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.Modifier
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.util.ArrayUtils
@@ -160,14 +161,16 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
         } + ")"
     }
 
-    override fun getThrownTypes() = stringValues(Throws::class.java, "exceptionClasses")
-        .flatMap {
-            val ce = visitorContext.getClassElement(it).orElse(null)
-            if (ce != null) {
-                listOf(ce)
-            } else {
-                emptyList()
-            }
-        }.toTypedArray()
+    /**
+     * The checked exceptions of the JVM method: the Kotlin `@Throws` classes, or the `throws`
+     * clause of a Java method, in source or compiled.
+     */
+    protected abstract fun resolveThrownTypes(): Sequence<KSType>
+
+    override fun getThrownTypes(): Array<ClassElement> =
+        resolveThrownTypes()
+            .map { newClassElement(nativeType, it, declaringType.typeArguments) }
+            .toList()
+            .toTypedArray()
 
 }
