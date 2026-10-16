@@ -1520,6 +1520,14 @@ public abstract class HttpClientConfiguration {
         @SuppressWarnings("WeakerAccess")
         public static final int DEFAULT_MAX_HEADER_LIST_SIZE = 8192;
 
+        /**
+         * The default initial flow-control window size of a stream, in bytes.
+         *
+         * @since 5.2.17
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final int DEFAULT_INITIAL_WINDOW_SIZE = 1024 * 1024;
+
         @Nullable
         private Duration pingIntervalRead = null;
 
@@ -1530,6 +1538,8 @@ public abstract class HttpClientConfiguration {
         private Duration pingIntervalIdle = null;
 
         private int maxHeaderListSize = DEFAULT_MAX_HEADER_LIST_SIZE;
+
+        private int initialWindowSize = DEFAULT_INITIAL_WINDOW_SIZE;
 
         /**
          * Default constructor.
@@ -1548,6 +1558,7 @@ public abstract class HttpClientConfiguration {
                 this.pingIntervalWrite = copy.pingIntervalWrite;
                 this.pingIntervalIdle = copy.pingIntervalIdle;
                 this.maxHeaderListSize = copy.maxHeaderListSize;
+                this.initialWindowSize = copy.initialWindowSize;
             }
         }
 
@@ -1631,6 +1642,39 @@ public abstract class HttpClientConfiguration {
          */
         public void setMaxHeaderListSize(@ReadableBytes int maxHeaderListSize) {
             this.maxHeaderListSize = maxHeaderListSize;
+        }
+
+        /**
+         * [available in the Netty HTTP client].
+         *
+         * @return The {@code SETTINGS_INITIAL_WINDOW_SIZE} the client advertises, i.e. how many
+         * response body bytes a server may send on one stream before the client has to
+         * acknowledge them with a {@code WINDOW_UPDATE}.
+         * @since 5.2.17
+         */
+        public int getInitialWindowSize() {
+            return initialWindowSize;
+        }
+
+        /**
+         * Sets the {@code SETTINGS_INITIAL_WINDOW_SIZE} the client advertises. Default value
+         * ({@value io.micronaut.http.client.HttpClientConfiguration.Http2ClientConfiguration#DEFAULT_INITIAL_WINDOW_SIZE}).
+         * <p>
+         * The receive window of the connection as a whole follows: netty raises it by twice the
+         * amount by which this value exceeds the protocol default of 65535 bytes, so that a single
+         * stream cannot use up the whole connection window. Both windows are only refilled as the
+         * response body is consumed, so a client that holds on to unread response data can buffer
+         * that much per connection. The protocol default is restored by setting this to 65535.
+         *
+         * @param initialWindowSize The initial flow-control window size of a stream, in bytes
+         * @throws IllegalArgumentException if the value is negative
+         * @since 5.2.17
+         */
+        public void setInitialWindowSize(@ReadableBytes int initialWindowSize) {
+            if (initialWindowSize < 0) {
+                throw new IllegalArgumentException("initial-window-size must not be negative but was " + initialWindowSize);
+            }
+            this.initialWindowSize = initialWindowSize;
         }
     }
 
