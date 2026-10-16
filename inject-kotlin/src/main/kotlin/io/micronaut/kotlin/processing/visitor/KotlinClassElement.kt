@@ -55,6 +55,7 @@ import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.PropertyElementQuery
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
@@ -679,12 +680,15 @@ internal open class KotlinClassElement(
         val args = typeArguments.iterator()
         while (variableNames.hasNext() && args.hasNext()) {
             var next = args.next()
-            val nativeType = next.nativeType
-            if (nativeType is Class<*>) {
-                next = visitorContext.getClassElement(nativeType).orElse(next)
-            }
-            if (nativeType is String) {
-                next = visitorContext.getClassElement(nativeType).orElse(next)
+            // a primitive array, the IntArray of a List<IntArray>, has no native type to look up
+            if (next !is PrimitiveElement) {
+                val nativeType = next.nativeType
+                if (nativeType is Class<*>) {
+                    next = visitorContext.getClassElement(nativeType).orElse(next)
+                }
+                if (nativeType is String) {
+                    next = visitorContext.getClassElement(nativeType).orElse(next)
+                }
             }
             boundByName[variableNames.next()] = next
         }
