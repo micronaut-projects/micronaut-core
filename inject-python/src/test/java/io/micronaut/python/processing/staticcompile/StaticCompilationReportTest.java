@@ -53,9 +53,25 @@ class StaticCompilationReportTest {
         assertEquals("src/shop/pricing.py", read.sourcePath());
         assertEquals("src/shop/pricing.py:16:9", read.reasons().get(0).span().location());
         assertNull(StaticCompilationDecision.fromProperties(properties, "decision.1."));
-        assertEquals("{\"record\":\"decision\",\"name\":\"shop.Pricing.total\",\"source\":\"src/shop/pricing.py\",\"line\":14,\"column\":5,\"outcome\":\"SKIPPED\",\"scope\":\"MODE\","
-            + "\"reasons\":[{\"rule\":\"unsupported-statement\",\"message\":\"a \\\"with\\\" statement\\nhas no static lowering\",\"location\":\"src/shop/pricing.py:16:9\"}],"
-            + "\"stats\":{\"statements\":3,\"javaCalls\":0,\"bridgeCalls\":0,\"helperCalls\":0}}", decision.toJson());
+        String json = decision.toJson();
+        assertTrue(json.startsWith("{\"record\":\"decision\",\"name\":\"shop.Pricing.total\",\"source\":\"src/shop/pricing.py\",\"line\":14,\"column\":5,\"outcome\":\"SKIPPED\",\"scope\":\"MODE\","
+            + "\"reasons\":[{\"rule\":\"unsupported-statement\",\"message\":\"a \\\"with\\\" statement\\nhas no static lowering\",\"location\":\"src/shop/pricing.py:16:9\",\"hint\":\"Rewrite with the compiled statements: "), json);
+        assertTrue(json.endsWith("\"}],\"stats\":{\"statements\":3,\"javaCalls\":0,\"bridgeCalls\":0,\"helperCalls\":0}}"), json);
+    }
+
+    @Test
+    void everyReasonOfTheSummaryCarriesItsFix(@TempDir Path directory) throws IOException {
+        StaticCompilationReport.write(directory, StaticCompilationMode.ALL, List.of(
+            decision("shop.Orders.place", "src/shop/orders.py", 8, Outcome.SKIPPED,
+                new Reason("unhinted-parameter", "parameter [order] has no type hint", SourceSpan.at("src/shop/orders.py", 8, 22)),
+                new Reason("unsupported-statement", "a With statement has no static lowering", SourceSpan.at("src/shop/orders.py", 10, 9)))
+        ), null);
+
+        String summary = Files.readString(directory.resolve(StaticCompilationReport.SUMMARY_FILE));
+        assertTrue(summary.contains("              [unhinted-parameter] src/shop/orders.py:8:22  parameter [order] has no type hint\n"
+            + "              fix: Hint the parameter with a Java type"), summary);
+        assertTrue(summary.contains("              [unsupported-statement] src/shop/orders.py:10:9  a With statement has no static lowering\n"
+            + "              fix: Rewrite with the compiled statements"), summary);
     }
 
     @Test
@@ -72,7 +88,7 @@ class StaticCompilationReportTest {
 
         assertEquals(List.of("shop.Pricing.total", "shop.Orders.place"), all.stream().map(StaticCompilationDecision::qualifiedName).toList());
         List<String> lines = Files.readAllLines(directory.resolve(StaticCompilationReport.DECISIONS_FILE));
-        assertEquals("{\"record\":\"plan\",\"mode\":\"all\",\"coverage\":\"incremental\"}", lines.get(0));
+        assertTrue(lines.get(0).startsWith("{\"record\":\"plan\",\"mode\":\"all\",\"coverage\":\"incremental\",\"written\":\"20"), lines.get(0));
         assertEquals(3, lines.size());
         assertEquals(all, StaticCompilationReport.readState(directory.resolve(StaticCompilationReport.STATE_FILE)));
         String summary = Files.readString(directory.resolve(StaticCompilationReport.SUMMARY_FILE));
