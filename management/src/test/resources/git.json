@@ -1,0 +1,11 @@
+{
+  "git": {
+    "branch": "main",
+    "commit": {
+      "id": "abc",
+      "message": {
+        "short": "héllo ✓"
+      }
+    }
+  }
+}
