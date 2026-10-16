@@ -238,6 +238,8 @@ class DevRestartRequestsTest {
                 .toList();
             assertEquals(1, failures.size(), messages.toString());
             assertTrue(failures.get(0).getFormattedMessage().contains(String.valueOf(port)), failures.get(0).getFormattedMessage());
+            // the development mode note waits for a generation that runs
+            assertEquals(0, notices());
 
             // once the port is free, the next change starts a generation that serves
             Files.writeString(src.resolve("Greeter.java"), greeter(1));
@@ -245,6 +247,7 @@ class DevRestartRequestsTest {
             assertTrue(runtime.awaitGeneration(2, Duration.ofMinutes(2)).isRunning());
             assertEquals("200 greeting-1", get("/hello"));
             assertFalse(runtime.isStartFailed());
+            assertEquals(1, notices());
         } finally {
             runtime.close();
         }
@@ -270,6 +273,10 @@ class DevRestartRequestsTest {
         } finally {
             runtime.close();
         }
+    }
+
+    private long notices() {
+        return logged.list.stream().filter(event -> event.getFormattedMessage().contains(DevModeNotice.HEADLINE)).count();
     }
 
     private DevRuntime launch() throws IOException {
