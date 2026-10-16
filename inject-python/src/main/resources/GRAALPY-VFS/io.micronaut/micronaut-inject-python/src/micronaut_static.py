@@ -222,10 +222,34 @@ class StaticPlanner:
         implemented = self._java_method_implemented(class_def, name) if class_def is not None else None
         if implemented is not None and java_layout is None:
             reasons.append(("overriding-java-method", f"the method implements [{implemented}], whose bridge keeps the Java signature; the hints must spell that signature (a parameter hinted with its Java type, a return hinted with a type the Java method returns or left unhinted)", span))
+        overriding = self._overridden_without_java_override(class_def, function_def) if class_def is not None else None
+        if overriding is not None:
+            reasons.append(("overridden-method", f"[{overriding}] overrides the method with a signature its generated class cannot declare in Java; the bridge of this class dispatches to the Python object for both", span))
         advice = self._advice(class_def, function_def)
         if advice is not None and class_def is not None and self._introduced(class_def, function_def):
             reasons.append(("intercepted-method", f"the method is advised by [{advice}] of an introduction; the introduction proxy runs its chain on the Python object; not compiled yet", span))
         return reasons
+
+    def _overridden_without_java_override(self, class_def, function_def):
+        """
+        The subclass of the compilation overriding the method with a signature the subclass's generated
+        class cannot declare as a Java override (another return hint, or another parameter list), or None.
+        A compiled body in this class would then serve the subclass's instances too, where the bridge,
+        dispatching on the Python object, runs the override.
+        """
+        classes = getattr(self.checker, "python_classes", None)
+        model = classes.of(class_def) if classes is not None else None
+        if model is None:
+            return None
+        name = function_def.name()
+        own = _signature_shape(function_def)
+        for subclass in model.subclasses:
+            found = subclass.find(name)
+            if found is None or found[0] != "method" or found[1] is function_def:
+                continue
+            if _signature_shape(found[1]) != own:
+                return subclass.name
+        return None
 
     def _introduced(self, class_def, function_def):
         """Whether the method or its class carries an introduction binding."""
@@ -479,6 +503,17 @@ if hasattr(ast, "Match"):
     _NAMES[ast.Match] = "a match statement"
 if hasattr(ast, "TryStar"):
     _NAMES[ast.TryStar] = "a try statement with except*"
+
+
+def _signature_shape(function_def):
+    """The hints a Java override must repeat: the return hint and the parameter hints, as spelled."""
+    return_def = function_def.returnType()
+    return_hint = return_def.typeAnnotation() if return_def is not None else None
+    parameters = tuple(
+        (argument.name(), argument.typeAnnotation().name() if argument.typeAnnotation() is not None else None, bool(argument.variadic()))
+        for argument in function_def.arguments().arguments() if argument.name() not in ("self", "cls")
+    )
+    return (return_hint.name() if return_hint is not None else None, parameters)
 
 
 def _unpacks_items(node):

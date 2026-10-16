@@ -21,14 +21,18 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.RandomAccess;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
@@ -161,7 +165,130 @@ public final class PythonStatic {
         if (value instanceof Double || value instanceof Float) {
             return str(((Number) value).doubleValue());
         }
+        if (value instanceof Collection<?> || value instanceof Map<?, ?> || value instanceof Object[]) {
+            return repr(value);
+        }
         return String.valueOf(value);
+    }
+
+    /**
+     * @param value A value
+     * @return {@code repr(value)} for the values a compiled body renders: a string quoted as Python
+     * quotes it, a list, tuple, set or dict with its elements rendered the same way, and {@code str(value)} otherwise
+     */
+    public static String repr(@Nullable Object value) {
+        return repr(value, null);
+    }
+
+    /**
+     * @param value  A value
+     * @param active The containers being rendered, or {@code null} before the first one: a container reached
+     *               again within itself renders as Python's recursion marker, {@code [...]} or {@code {...}}
+     */
+    private static String repr(@Nullable Object value, @Nullable Set<Object> active) {
+        if (value instanceof String string) {
+            return quote(string);
+        }
+        if (value instanceof Map<?, ?> map) {
+            if (active != null && active.contains(map)) {
+                return "{...}";
+            }
+            Set<Object> entered = enter(active, map);
+            try {
+                StringBuilder out = new StringBuilder("{");
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    if (out.length() > 1) {
+                        out.append(", ");
+                    }
+                    out.append(repr(entry.getKey(), entered)).append(": ").append(repr(entry.getValue(), entered));
+                }
+                return out.append('}').toString();
+            } finally {
+                entered.remove(map);
+            }
+        }
+        if (value instanceof java.util.Set<?> set) {
+            if (set.isEmpty()) {
+                return "set()";
+            }
+            return join(set, "{", "}", active);
+        }
+        if (value instanceof Tuple tuple) {
+            if (active != null && active.contains(tuple)) {
+                return "(...)";
+            }
+            if (tuple.size() == 1) {
+                Set<Object> entered = enter(active, tuple);
+                try {
+                    return "(" + repr(tuple.get(0), entered) + ",)";
+                } finally {
+                    entered.remove(tuple);
+                }
+            }
+            return join(tuple, "(", ")", active);
+        }
+        if (value instanceof Collection<?> collection) {
+            return join(collection, "[", "]", active);
+        }
+        if (value instanceof Object[] array) {
+            return join(java.util.Arrays.asList(array), "[", "]", active);
+        }
+        return str(value);
+    }
+
+    private static Set<Object> enter(@Nullable Set<Object> active, Object container) {
+        Set<Object> entered = active != null ? active : Collections.newSetFromMap(new IdentityHashMap<>());
+        entered.add(container);
+        return entered;
+    }
+
+    private static String join(Iterable<?> elements, String open, String close, @Nullable Set<Object> active) {
+        if (active != null && active.contains(elements)) {
+            return open + "..." + close;
+        }
+        Set<Object> entered = enter(active, elements);
+        try {
+            StringBuilder out = new StringBuilder(open);
+            boolean first = true;
+            for (Object element : elements) {
+                if (!first) {
+                    out.append(", ");
+                }
+                out.append(repr(element, entered));
+                first = false;
+            }
+            return out.append(close).toString();
+        } finally {
+            entered.remove(elements);
+        }
+    }
+
+    /**
+     * A string as Python's repr spells it: single quotes unless the string contains a single quote and
+     * no double quote, backslash escapes for the quote, the backslash and the control characters.
+     */
+    private static String quote(String string) {
+        char quote = string.indexOf('\'') >= 0 && string.indexOf('"') < 0 ? '"' : '\'';
+        StringBuilder out = new StringBuilder().append(quote);
+        for (int i = 0; i < string.length(); i++) {
+            char c = string.charAt(i);
+            switch (c) {
+                case '\\' -> out.append("\\\\");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '\t' -> out.append("\\t");
+                default -> {
+                    if (c == quote) {
+                        out.append('\\').append(c);
+                    } else if (c < 0x20 || c == 0x7f) {
+                        out.append(String.format("\\x%02x", (int) c));
+                    } else {
+                        out.append(c);
+                    }
+                }
+            }
+        }
+        return out.append(quote).toString();
     }
 
     /**
@@ -535,11 +662,21 @@ public final class PythonStatic {
     /**
      * @param elements The elements
      * @param <T> The element type the caller expects
-     * @return A Python tuple: an immutable list of the elements
+     * @return A Python tuple: an immutable list of the elements that {@link #repr(Object)} renders as a tuple
      */
     @SuppressWarnings("unchecked")
     public static <T> List<T> tuple(Object... elements) {
-        return (List<T>) List.of(elements);
+        return (List<T>) new Tuple(elements.clone());
+    }
+
+    /**
+     * @param values The values, a Java collection or any other iterable
+     * @param <T> The element type
+     * @return A Python tuple of the values: {@code tuple(values)}
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> List<T> copyOfTuple(Iterable<? extends T> values) {
+        return (List<T>) new Tuple(copyOfList(values).toArray());
     }
 
     /**
@@ -645,6 +782,9 @@ public final class PythonStatic {
      */
     @SuppressWarnings("unchecked")
     public static <T> T copy(T value) {
+        if (value instanceof Tuple) {
+            return value;
+        }
         if (value instanceof List<?> list) {
             return (T) new ArrayList<>(list);
         }
@@ -800,10 +940,34 @@ public final class PythonStatic {
 
     /**
      * @param text A string
-     * @return {@code text.strip()}: the string without leading and trailing whitespace
+     * @return {@code text.strip()}: the string without leading and trailing whitespace, as Python classifies it
      */
     public static String strip(String text) {
-        return text.strip();
+        int start = 0;
+        int end = text.length();
+        while (start < end) {
+            int codePoint = text.codePointAt(start);
+            if (!isSpace(codePoint)) {
+                break;
+            }
+            start += Character.charCount(codePoint);
+        }
+        while (end > start) {
+            int codePoint = text.codePointBefore(end);
+            if (!isSpace(codePoint)) {
+                break;
+            }
+            end -= Character.charCount(codePoint);
+        }
+        return start == 0 && end == text.length() ? text : text.substring(start, end);
+    }
+
+    /**
+     * Python's {@code str.isspace} for one character: the Unicode separators (including the no-break spaces Java's
+     * {@link Character#isWhitespace(int)} leaves out), the ASCII controls Python counts, and the next line.
+     */
+    private static boolean isSpace(int codePoint) {
+        return Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint) || codePoint == 0x85;
     }
 
     /**
@@ -814,10 +978,22 @@ public final class PythonStatic {
     @SuppressWarnings("unchecked")
     public static <T> List<T> split(String text) {
         List<Object> parts = new ArrayList<>();
-        for (String part : text.strip().split("\\s+")) {
-            if (!part.isEmpty()) {
-                parts.add(part);
+        int start = -1;
+        int i = 0;
+        while (i < text.length()) {
+            int codePoint = text.codePointAt(i);
+            if (isSpace(codePoint)) {
+                if (start >= 0) {
+                    parts.add(text.substring(start, i));
+                    start = -1;
+                }
+            } else if (start < 0) {
+                start = i;
             }
+            i += Character.charCount(codePoint);
+        }
+        if (start >= 0) {
+            parts.add(text.substring(start));
         }
         return (List<T>) parts;
     }
@@ -881,23 +1057,39 @@ public final class PythonStatic {
             return bool.booleanValue() ? 1 : 0;
         }
         if (value instanceof Double || value instanceof Float) {
-            double d = ((Number) value).doubleValue();
-            if (Double.isNaN(d) || Double.isInfinite(d)) {
-                throw new IllegalArgumentException("cannot convert float " + str(d) + " to integer");
-            }
-            return (long) d;
+            return toInt(((Number) value).doubleValue());
         }
         if (value instanceof Number number) {
             return number.longValue();
         }
         if (value instanceof CharSequence text) {
             try {
-                return Long.parseLong(text.toString().strip());
+                return Long.parseLong(strip(text.toString()));
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException("invalid literal for int() with base 10: '" + text + "'", e);
             }
         }
         throw new ClassCastException("int() argument must be a string or a number, not " + typeName(value));
+    }
+
+    /**
+     * @param value A float
+     * @return {@code int(value)}: the float truncated towards zero
+     * @throws IllegalArgumentException On a NaN, as Python raises ValueError
+     * @throws ArithmeticException On an infinity or a value outside the range of a long, where Python would
+     * raise OverflowError or answer an integer no long holds
+     */
+    public static long toInt(double value) {
+        if (Double.isNaN(value)) {
+            throw new IllegalArgumentException("cannot convert float NaN to integer");
+        }
+        if (Double.isInfinite(value)) {
+            throw new ArithmeticException("cannot convert float infinity to integer");
+        }
+        if (value >= 0x1p63 || value < -0x1p63) {
+            throw new ArithmeticException("int(" + str(value) + ") is outside the range of a long");
+        }
+        return (long) value;
     }
 
     /**
@@ -913,7 +1105,7 @@ public final class PythonStatic {
             return number.doubleValue();
         }
         if (value instanceof CharSequence text) {
-            String trimmed = text.toString().strip();
+            String trimmed = strip(text.toString());
             try {
                 return switch (trimmed.toLowerCase(java.util.Locale.ROOT)) {
                     case "inf", "+inf", "infinity" -> Double.POSITIVE_INFINITY;
@@ -961,5 +1153,27 @@ public final class PythonStatic {
             return number.doubleValue() != 0;
         }
         return true;
+    }
+
+    /**
+     * A Python tuple: an immutable list whose rendering keeps the parentheses. Equal to any list of the same
+     * elements, as the List contract requires; a compiled body never compares a tuple with a list.
+     */
+    private static final class Tuple extends AbstractList<Object> implements RandomAccess {
+        private final Object[] elements;
+
+        private Tuple(Object[] elements) {
+            this.elements = elements;
+        }
+
+        @Override
+        public Object get(int index) {
+            return elements[index];
+        }
+
+        @Override
+        public int size() {
+            return elements.length;
+        }
     }
 }

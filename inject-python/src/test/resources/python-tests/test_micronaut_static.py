@@ -59,7 +59,6 @@ def rules(decision):
     return [reason.rule() for reason in decision.reasons()]
 
 
-
 CORPUS = '''
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -1156,6 +1155,137 @@ class Calc:
         self.assertIn("return __mn_java_1.echo(__mn_java)", source)
         self.assertIn("return __mn_java_1.marked()", source)
         compile(tree, "delegated.py", "exec")
+
+
+OVERRIDES = '''
+from typing import TypeVar, Generic
+
+T = TypeVar("T")
+
+class Holder(Generic[T]):
+    def value(self) -> T:
+        raise NotImplementedError()
+
+    def describe(self):
+        return "holder"
+
+    def label(self) -> str:
+        return "holder"
+
+    def ratio(self, scale: int) -> int:
+        return scale
+
+class IntHolder(Holder[int]):
+    def value(self) -> int:
+        return 42
+
+    def describe(self) -> int:
+        return 1
+
+    def label(self) -> str:
+        return "int holder"
+
+    def ratio(self, scale: int, offset: int = 0) -> int:
+        return scale + offset
+'''
+
+
+class OverriddenMethodTest(unittest.TestCase):
+    """A method the subclass overrides with a signature Java cannot repeat stays on the Python object."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.decisions, _ = plan(OVERRIDES, MODE_ALL, facts=FakeFacts())
+
+    def test_an_override_with_another_return_hint_keeps_the_base_method_dynamic(self):
+        for name in ("Holder.value", "Holder.describe"):
+            decision = self.decisions[name]
+            self.assertEqual("NOT_CANDIDATE", decision.outcome().name(), name)
+            self.assertIn("overridden-method", rules(decision), name)
+            self.assertIn("[IntHolder] overrides the method", decision.reasons()[rules(decision).index("overridden-method")].message())
+
+    def test_an_override_with_another_parameter_list_keeps_the_base_method_dynamic(self):
+        self.assertIn("overridden-method", rules(self.decisions["Holder.ratio"]))
+
+    def test_an_override_repeating_the_signature_leaves_the_base_method_compilable(self):
+        self.assertEqual("COMPILED", self.decisions["Holder.label"].outcome().name())
+        self.assertEqual("COMPILED", self.decisions["IntHolder.label"].outcome().name())
+
+    def test_the_override_itself_is_judged_on_its_own_signature(self):
+        self.assertNotIn("overridden-method", rules(self.decisions["IntHolder.describe"]))
+        self.assertNotIn("overridden-method", rules(self.decisions["IntHolder.value"]))
+
+
+SEMANTICS = '''
+class Numbers:
+    def truncated(self, value: float) -> int:
+        return int(value)
+
+    def widened(self, value: int) -> float:
+        return float(value)
+
+    def mixed(self) -> str:
+        return str([1, 2.5])
+
+    def pair(self) -> str:
+        return str((1, 2))
+
+    def frozen(self, values: list[int]) -> str:
+        return str(tuple(values))
+'''
+
+
+class PythonSemanticsTest(unittest.TestCase):
+    """Where a Java operation would answer something Python does not, the lowering calls a helper instead."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.decisions, cls.planner = plan(SEMANTICS, MODE_ALL, facts=FakeFacts())
+        cls.bodies = {body.methodName(): body for body in cls.planner.bodies}
+
+    def _returned(self, name):
+        self.assertEqual("COMPILED", self.decisions[f"Numbers.{name}"].outcome().name(), rules(self.decisions[f"Numbers.{name}"]))
+        return _uncast(list(self.bodies[name].body().statements())[-1].value())  # the return, after any parameter copy
+
+    def _helper(self, expression, name):
+        """The helper call of the given name within the expression, through casts, receivers and arguments."""
+        expression = _uncast(expression)
+        if expression.getClass().getSimpleName() == "Helper" and expression.name() == name:
+            return expression
+        for accessor in ("receiver", "operand", "left", "right"):
+            if hasattr(expression, accessor):
+                nested = getattr(expression, accessor)()
+                if nested is not None:
+                    found = self._helper(nested, name)
+                    if found is not None:
+                        return found
+        for accessor in ("arguments", "parts"):
+            if hasattr(expression, accessor):
+                for nested in getattr(expression, accessor)():
+                    found = self._helper(nested, name)
+                    if found is not None:
+                        return found
+        return None
+
+    def test_int_of_a_float_raises_on_nan_and_infinity_through_the_helper(self):
+        returned = self._returned("truncated")
+        self.assertEqual("Helper", returned.getClass().getSimpleName(), returned)
+        self.assertEqual("toInt", returned.name())
+        self.assertEqual("double", list(returned.arguments())[0].type())
+
+    def test_float_of_an_int_is_a_cast(self):
+        returned = list(self.bodies["widened"].body().statements())[0].value()
+        self.assertEqual("Cast", returned.getClass().getSimpleName(), returned)
+        self.assertEqual("double", returned.type())
+
+    def test_a_literal_mixing_ints_and_floats_keeps_each_element_boxed(self):
+        literal = self._helper(self._returned("mixed"), "list")
+        self.assertIsNotNone(literal, self._returned("mixed"))
+        self.assertEqual("java.util.List<java.lang.Object>", literal.type())
+
+    def test_a_tuple_literal_and_a_tuple_copy_build_tuples(self):
+        self.assertIsNotNone(self._helper(self._returned("pair"), "tuple"), self._returned("pair"))
+        self.assertIsNotNone(self._helper(self._returned("frozen"), "copyOfTuple"), self._returned("frozen"))
 
 
 if __name__ == "__main__":
