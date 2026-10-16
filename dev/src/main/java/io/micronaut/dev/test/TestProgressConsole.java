@@ -62,8 +62,8 @@ public final class TestProgressConsole implements TestReportListener {
     private static final int MAX_STACK_FRAMES = 6;
     private static final int DEFAULT_WIDTH = 80;
     private static final long STTY_TIMEOUT_SECONDS = 2;
-    private static final String ERROR = " error";
-    private static final String ERRORS = " errors";
+    private static final String ONE_ERROR = " error";
+    private static final String MANY_ERRORS = " errors";
     private static final int MIN_WIDTH = 40;
     // the indent of the lines under a test or a summary line
     private static final String DETAIL_INDENT = "      ";
@@ -479,7 +479,7 @@ public final class TestProgressConsole implements TestReportListener {
      * @return {@code 1 error} or {@code 2 errors}
      */
     private static String errorCount(int count) {
-        return count + (count == 1 ? ERROR : ERRORS);
+        return count + (count == 1 ? ONE_ERROR : MANY_ERRORS);
     }
 
     private LiveRegion.Glyphs glyphs() {
