@@ -188,7 +188,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         if (reference == null) {
             return;
         }
-        Objects.requireNonNull(beans).all.add(producer);
+        requireBeans().all.add(producer);
         Class<?> beanType = reference.getBeanType();
         boolean beanTypeIndexAdded = false;
         Set<Class<?>> exposedTypes = reference.getExposedTypes();
@@ -355,7 +355,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
             @Override
             public Iterator<BeanDefinitionReference<Object>> iterator() {
-                Iterator<BeanDefinitionProducer> iterator = Objects.requireNonNull(beans).all.iterator();
+                Iterator<BeanDefinitionProducer> iterator = requireBeans().all.iterator();
                 return new Iterator<>() {
 
                     @Nullable
@@ -390,7 +390,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
     private List<BeanDefinitionProducer> resolveProducersForBeanType(Argument<?> beanType) {
         Class<?> type = beanType.getType();
-        Beans beansNotNull = Objects.requireNonNull(beans);
+        Beans beansNotNull = requireBeans();
         if (type == Object.class) {
             return beansNotNull.all;
         }
@@ -399,6 +399,18 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             return List.of();
         }
         return producers;
+    }
+
+    /**
+     * The loaded definitions, which a {@link #reset()} drops when the context stops: a lookup that races the
+     * stop, such as a request still in flight, gets the same lifecycle error as a bean lookup, not a null pointer.
+     */
+    private Beans requireBeans() {
+        Beans current = beans;
+        if (current == null) {
+            throw new IllegalStateException("Cannot resolve bean definitions until the context is running");
+        }
+        return current;
     }
 
     @Override
@@ -429,13 +441,14 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     @Override
     public void removeBeanDefinition(RuntimeBeanDefinition<?> definition) {
         Class<?> beanType = definition.getBeanType();
-        for (Class<?> indexedType : Objects.requireNonNull(beans).beanIndex.keySet()) {
+        Beans loaded = requireBeans();
+        for (Class<?> indexedType : loaded.beanIndex.keySet()) {
             if (indexedType == beanType || indexedType.isAssignableFrom(beanType)) {
                 resolveTypeIndex(indexedType).forEach(p -> p.disableIfMatch(definition));
                 break;
             }
         }
-        beans.all.forEach(p -> p.disableIfMatch(definition));
+        loaded.all.forEach(p -> p.disableIfMatch(definition));
     }
 
     @Override
@@ -458,22 +471,22 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
     @Override
     public Iterable<BeanDefinition<Object>> getEagerInitBeans(BeanContext beanContext) {
-        return getBeanDefinitions(Objects.requireNonNull(beans).eagerInitBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+        return getBeanDefinitions(requireBeans().eagerInitBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
     }
 
     @Override
     public Iterable<BeanDefinition<Object>> getProcessedBeans(BeanContext beanContext) {
-        return getBeanDefinitions(Objects.requireNonNull(beans).processedBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+        return getBeanDefinitions(requireBeans().processedBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
     }
 
     @Override
     public Iterable<BeanDefinition<Object>> getParallelBeans(BeanContext beanContext) {
-        return getBeanDefinitions(Objects.requireNonNull(beans).parallelBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+        return getBeanDefinitions(requireBeans().parallelBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
     }
 
     @Override
     public Iterable<BeanDefinition<Object>> getTargetProxyBeans(BeanContext beanContext) {
-        return getBeanDefinitions(Objects.requireNonNull(beans).proxyTargetBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+        return getBeanDefinitions(requireBeans().proxyTargetBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
     }
 
     @Override
@@ -485,7 +498,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     private Collection<BeanDefinitionProducer> resolveTypeIndex(Class<?> indexedType) {
-        return Objects.requireNonNull(beans).beanIndex.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN);
+        return requireBeans().beanIndex.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN);
     }
 
     @Override
