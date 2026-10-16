@@ -27,6 +27,7 @@ import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.util.AsciiString;
 import org.jspecify.annotations.Nullable;
 
 import java.util.LinkedHashMap;
@@ -84,9 +85,14 @@ final class PreparedDirectResponse implements HttpResponse<byte[]> {
         if (body != null && !(body instanceof byte[])) {
             return null;
         }
-        // validated here, once
+        // validated here, once, and encoded once: the encoder copies the bytes of an AsciiString
         DefaultHttpHeaders headers = new DefaultHttpHeaders();
-        response.getHeaders().forEach((String name, List<String> values) -> headers.add(name, values));
+        response.getHeaders().forEach((String name, List<String> values) -> {
+            CharSequence encodedName = ascii(name);
+            for (String value : values) {
+                headers.add(encodedName, ascii(value));
+            }
+        });
         Map<String, Object> attributes = new LinkedHashMap<>();
         response.getAttributes().forEach((name, value) -> {
             if (value != null) {
@@ -95,6 +101,20 @@ final class PreparedDirectResponse implements HttpResponse<byte[]> {
         });
         return new PreparedDirectResponse(HttpResponseStatus.valueOf(response.code(), response.reason()), headers,
             body == null ? null : ((byte[]) body).clone(), Map.copyOf(attributes));
+    }
+
+    /**
+     * @param text A header name or value
+     * @return The text as an {@link AsciiString} if it is ASCII, otherwise the text itself, which
+     *         the encoder encodes like the header of any other response
+     */
+    private static CharSequence ascii(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) > 127) {
+                return text;
+            }
+        }
+        return new AsciiString(text);
     }
 
     /**
