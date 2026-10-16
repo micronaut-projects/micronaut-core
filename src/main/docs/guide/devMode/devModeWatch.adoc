@@ -88,6 +88,8 @@ When a change cannot be applied to a bean in place, the watcher asks the context
 
 This is more than destroying the bean and getting it again, which would leave its dependents holding the destroyed instance.
 
+A controller, a server filter or a `LocatedRoutes` bean that is recreated serves the next request: the development router rebuilds its route table, whose routes would otherwise hold the destroyed instance.
+
 Both methods return whether anything was recreated, which a prototype, a bean of a custom scope or a singleton registered at runtime never is.
 
 They are meant for development-time watches. The dependents are known only when the context tracks bean dependencies, which by default only a context in development mode does; `ApplicationContextBuilder.beanDependencyTrackingEnabled(true)` turns it on elsewhere. A context that does not track them recreates nothing and returns false.
