@@ -212,3 +212,18 @@ The tests of a project are the measure of semantic drift. `inject-python-test` r
 ----
 
 `StaticCompilationParitySpec` compiles a fixture twice, in modes `off` and `all`, and calls every method through the generated class with a table of inputs: the results, and whether an exception was thrown, must agree.
+
+== Measuring the Pipeline
+
+The cost of type checking and static compilation is measured, not assumed. `PythonPipelineBenchmark` in the `benchmarks` module compiles a Python application in memory in three modes (`OFF`, `TYPECHECK`, `STATIC`), cold (a GraalPy context per compilation, as a build runs) and warm (a processing session reusing the context, as a watch or a daemon runs), and reports the time of every stage of the pipeline next to the whole compilation:
+
+[source,bash]
+----
+./gradlew :benchmarks:jmh -Pjmh.includes=io.micronaut.python.compiler.PythonPipelineBenchmark \
+    -Pjmh.benchmarkParameters='mode=OFF|STATIC;warm=false|true;fixture=shop' \
+    -Pjmh.warmupIterations=3 -Pjmh.iterations=8
+----
+
+The stages (`context`, `transform`, `parse`, `typecheck`, `plan`, `bytecode`, `stubs`, `processor`) are recorded by `PipelineTimings` when the system property `micronaut.python.timings` is set, which the benchmark does; JMH reports each as its sum over the measured iterations. To see where the Python side of a stage spends its time, `-Pjmh.pythonSampler=/path/to/histogram.txt` (the system property `micronaut.python.cpusampler`) turns on the Truffle CPU sampler of the parser's context and writes a histogram of the Python functions when the context closes.
+
+On the `shop` fixture (five modules, thirty-odd functions, every one compiled), type checking and planning add about 150 ms to a cold compilation of one second and about 75 ms to a warm one of six hundred, most of it the inference and the lowering themselves; the caches of the Java lookups, one inference per function shared by the checker and the planner, and two stdlib imports fewer per context were the first savings the profile pointed at.
