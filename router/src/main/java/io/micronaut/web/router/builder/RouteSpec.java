@@ -23,6 +23,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.web.router.spi.RouteMatchSelector;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Objects;
@@ -400,6 +402,22 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      */
     @Override
     S order(int order);
+
+    /**
+     * Select among the routes that match a request with a route selector instead of the
+     * Micronaut route selection policy, e.g. the routes of a JAX-RS application, see
+     * {@link RouteMatchSelector}: the selector selects when every route that matches a request has
+     * the same selector, the same instance. On a group, the selector is the default of the
+     * routes of the group, and of its nested groups, unless they or a nested group have their
+     * own; {@code null} removes the selector of the enclosing groups. A route with conditions on
+     * the body, see {@link RequestCondition#body(Class, java.util.function.Predicate)}, cannot have a
+     * selector, its own or inherited, also at a location: building it fails.
+     *
+     * @param selector The selector, or {@code null} for the Micronaut policy
+     * @return The route or the group
+     * @since 5.3.0
+     */
+    S selectedBy(@Nullable RouteMatchSelector selector);
 
     /**
      * Route the requests on this port only, like {@code @Controller(port = ...)}: the server opens

@@ -22,6 +22,9 @@ import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.filter.GenericHttpFilter;
+import io.micronaut.http.uri.RouteCaptures;
+import io.micronaut.http.uri.RouteTemplate;
+import io.micronaut.http.uri.RouteTemplateVariable;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -31,11 +34,13 @@ import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.web.router.builder.LocatorHandler;
 import io.micronaut.web.router.builder.RouteSettings;
 import io.micronaut.http.PathVariables;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -207,7 +212,9 @@ public final class RouteLocator implements DynamicRouteTarget {
      * @since 5.3.0
      */
     public static String uriTemplate(UriRouteMatch<?, ?> match) {
-        String template = match.getRouteInfo().getUriMatchTemplate().toString();
+        UriRouteInfo<?, ?> route = match.getRouteInfo();
+        // the URI match template of a route of another implementation, which keeps it: no template is built per request
+        String template = route instanceof DefaultUrlRouteInfo<?, ?> ? route.getRouteTemplate().expression() : route.getUriMatchTemplate().toString();
         if (match instanceof DefaultUriRouteMatch<?, ?> defaultMatch && defaultMatch.matchInfo() instanceof LocatedUriMatchInfo located) {
             return joinTemplates(located.prefixTemplate, template);
         }
@@ -240,6 +247,32 @@ public final class RouteLocator implements DynamicRouteTarget {
         return template.charAt(0) == '/' && prefix.charAt(prefix.length() - 1) == '/'
             ? prefix + template.substring(1)
             : prefix + template;
+    }
+
+    /**
+     * The template a locator route was declared with, see
+     * {@link io.micronaut.web.router.spi.RouteMatchSelector#locatorPrefix(UriRouteInfo)}: the prefix
+     * of a locator route whose prefix is not a URI template.
+     *
+     * @param route A route
+     * @return The prefix, nested or mounted, or {@code null} if the route is not such a locator route
+     * @since 5.3.0
+     */
+    public static @Nullable RouteTemplate locatorPrefix(UriRouteInfo<?, ?> route) {
+        return route.getRouteTemplate() instanceof PrefixTemplate prefixTemplate ? prefixTemplate.prefix() : null;
+    }
+
+    /**
+     * The template of a locator route whose prefix is not a URI template: the prefix, and
+     * optionally a slash followed by the rest of the path. The router composes it, since the
+     * language of the prefix may have no variable for the rest of a path. It has the facts of the
+     * prefix, and the variable of the rest of the path.
+     *
+     * @param prefix The prefix, nested or mounted
+     * @return The template of the locator route
+     */
+    static RouteTemplate prefixTemplate(RouteTemplate prefix) {
+        return new PrefixTemplate(prefix);
     }
 
     /**
@@ -328,7 +361,8 @@ public final class RouteLocator implements DynamicRouteTarget {
     }
 
     @Override
-    public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request, UriRouteMatch<T, R> match) {
+    public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                                    @Nullable Predicate<UriRouteMatch<T, R>> filter) {
         Located located;
         try {
             located = locate(request, match);
@@ -344,7 +378,10 @@ public final class RouteLocator implements DynamicRouteTarget {
         }
         List<UriRouteMatch<T, R>> targetMatches;
         try {
-            targetMatches = located.routes().findAny(located.request(), null);
+            targetMatches = filter == null
+                ? located.routes().findAny(located.request(), null, null)
+                // the filter sees the match of the request, as it does for the other routes
+                : located.routes().findAny(located.request(), targetMatch -> filter.test(located.wrap(targetMatch)), null);
         } catch (RuntimeException e) {
             if (pendingLocation(e) == null) {
                 throw located.failed(e);
@@ -668,6 +705,44 @@ public final class RouteLocator implements DynamicRouteTarget {
      * @param route   A route of the table the request is matched with
      * @return The route at the location of the request, or the route for any other request
      */
+    /**
+     * @param request A request
+     * @return Whether it is a request a locator route located: its routes have the settings of the location
+     */
+    static boolean isLocated(HttpRequest<?> request) {
+        return request instanceof LocatedRequest<?>;
+    }
+
+    /**
+     * @param request A request
+     * @return The route selector the routes of the location of a located request inherit, or
+     * {@code null} for any other request
+     */
+    static @Nullable RouteMatchSelector locatedSelector(HttpRequest<?> request) {
+        return request instanceof LocatedRequest<?> located ? located.location().inheritance().selector() : null;
+    }
+
+    /**
+     * @param request A request
+     * @return The order of the route selector the routes of the location of a located request
+     * inherit, or {@code null}
+     */
+    static @Nullable Comparator<UriRouteInfo<?, ?>> locatedSelectorOrder(HttpRequest<?> request) {
+        return request instanceof LocatedRequest<?> located ? located.location().inheritance().selectorOrder() : null;
+    }
+
+    /**
+     * The route the media type checks of a request see, see the other overload.
+     *
+     * @param request The request
+     * @param route   A route
+     * @return The route at the location of the request, or the route for any other request
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    static UriRouteInfo<?, ?> atLocationOf(HttpRequest<?> request, UriRouteInfo<?, ?> route) {
+        return atLocation(request, (UriRouteInfo) route);
+    }
+
     static UriRouteInfo<Object, Object> atLocation(HttpRequest<?> request, UriRouteInfo<Object, Object> route) {
         if (request instanceof LocatedRequest<?> located && route instanceof DefaultUrlRouteInfo<Object, Object> info) {
             return info.inheriting(located.location.inheritance);
@@ -817,7 +892,6 @@ public final class RouteLocator implements DynamicRouteTarget {
          * @param <R>   The return type
          * @return The match of the request
          */
-        @SuppressWarnings("unchecked")
         <T, R> UriRouteMatch<T, R> wrap(UriRouteMatch<T, R> match) {
             if (!(match instanceof DefaultUriRouteMatch<T, R> innerMatch) || !(match.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> route)) {
                 return match;
@@ -836,7 +910,8 @@ public final class RouteLocator implements DynamicRouteTarget {
             LocatedUriMatchInfo info = new LocatedUriMatchInfo(location.original().getPath(), values, variables, target,
                 location.filters(), location.errorScopes(),
                 located == route ? location.inheritance().annotationMetadata() : AnnotationMetadata.EMPTY_METADATA, location.prefixTemplate());
-            return (UriRouteMatch<T, R>) located.resolvedMatch(info);
+            // the media type a route selector of the target's table negotiated is kept
+            return (UriRouteMatch<T, R>) located.resolvedMatch(info, innerMatch.selectedMediaType());
         }
 
         /**
@@ -918,7 +993,7 @@ public final class RouteLocator implements DynamicRouteTarget {
             List<RouteAssembly.RouteGroup> errorScopes = new ArrayList<>(1);
             // what the located routes inherit from the locator routes that located this one, overridden by this locator route
             LocationInheritance inheritance = inheritance(parent, locatorMatch);
-            String prefixTemplate = RouteLocator.prefixTemplate(locatorMatch.getRouteInfo().getUriMatchTemplate().toString());
+            String prefixTemplate = RouteLocator.prefixTemplate(locatorMatch.getRouteInfo().getRouteTemplate().expression());
             if (locatorMatch.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> locatorRoute) {
                 filters.addAll(locatorRoute.routeFilters);
                 RouteAssembly.RouteGroup errorScope = locatorRoute.errorScope;
@@ -1112,6 +1187,124 @@ public final class RouteLocator implements DynamicRouteTarget {
         @Override
         public Map<String, UriMatchVariable> getVariableMap() {
             return variableMap;
+        }
+    }
+
+    /**
+     * The template of a locator route whose prefix is not a URI template, see
+     * {@link #prefixTemplate(RouteTemplate)}.
+     */
+    static final class PrefixTemplate implements RouteTemplate {
+        private final RouteTemplate prefix;
+        private final String expression;
+        private final List<RouteTemplateVariable> variables;
+
+        PrefixTemplate(RouteTemplate prefix) {
+            this.prefix = prefix;
+            String prefixExpression = prefix.expression();
+            while (prefixExpression.endsWith("/")) {
+                prefixExpression = prefixExpression.substring(0, prefixExpression.length() - 1);
+            }
+            // for display only: it is not parsed again
+            this.expression = prefixExpression + TEMPLATE_SUFFIX;
+            List<RouteTemplateVariable> all = new ArrayList<>(prefix.variables());
+            all.add(RouteTemplateVariable.of(REMAINDER, true, RouteTemplateVariable.Location.PATH, false, false));
+            this.variables = List.copyOf(all);
+        }
+
+        /**
+         * @return The prefix as it was declared, nested or mounted
+         */
+        RouteTemplate prefix() {
+            return prefix;
+        }
+
+        @Override
+        public String expression() {
+            return expression;
+        }
+
+        @Override
+        public List<RouteTemplateVariable> variables() {
+            return variables;
+        }
+
+        /**
+         * Match the prefix with the longest part of the path it matches that ends before a slash
+         * or at the end.
+         *
+         * @param path The path
+         * @return The captures of the prefix and the rest of the path, or {@code null}
+         */
+        @Override
+        public @Nullable RouteCaptures match(String path) {
+            // the raw path without the query: the prefix applies the rules of its language
+            int query = path.indexOf('?');
+            String normalized = query < 0 ? path : path.substring(0, query);
+            if (normalized.isEmpty()) {
+                normalized = "/";
+            }
+            RouteCaptures captures = prefix.matchPrefix(normalized);
+            if (captures == null) {
+                return null;
+            }
+            String matched = captures.path();
+            int length = matched.length();
+            String rest;
+            if (length >= normalized.length() && matched.equals(normalized)) {
+                rest = null;
+            } else if ("/".equals(matched)) {
+                // the root: the rest is all of the path
+                rest = normalized.substring(1);
+            } else if (normalized.startsWith(matched) && normalized.charAt(length) == '/') {
+                rest = normalized.substring(length + 1);
+            } else {
+                throw new IllegalStateException("The prefix template " + prefix.expression() + " matched '" + matched
+                    + "', which is not a prefix of the path '" + normalized + "' that ends before a slash");
+            }
+            List<@Nullable String> values = new ArrayList<>(captures.values());
+            values.add(rest);
+            return RouteCaptures.of(normalized, variables, values);
+        }
+
+        @Override
+        public RouteTemplate mount(String mountPrefix) {
+            return new PrefixTemplate(prefix.mount(mountPrefix));
+        }
+
+        @Override
+        public String requiredPrefix() {
+            return prefix.requiredPrefix();
+        }
+
+        @Override
+        public int rawLength() {
+            return prefix.rawLength();
+        }
+
+        @Override
+        public int pathVariableCount() {
+            return prefix.pathVariableCount();
+        }
+
+        @Override
+        public int patternVariableCount() {
+            return prefix.patternVariableCount();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof PrefixTemplate other && prefix.equals(other.prefix);
+        }
+
+        @Override
+        public int hashCode() {
+            return prefix.hashCode();
+        }
+
+        @Override
+        public String toString() {
+            return expression;
         }
     }
 }

@@ -38,6 +38,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Stream;
 
 /**
@@ -71,6 +73,9 @@ public final class GenerationClassLoader extends URLClassLoader {
     private final List<String> live;
     // the resources known to belong to the live directories, whose build copies stay hidden while the live file is absent
     private final LiveResources liveResources;
+    // read by every class load through the generation, written by a replacement of its class files; taken before the
+    // class's own loading lock, so that a load waiting for a replacement holds nothing the replacement may need
+    private final ReentrantReadWriteLock classFiles = new ReentrantReadWriteLock();
 
     private GenerationClassLoader(int generation, List<Path> sources, List<Path> roots, int liveCount, LiveResources liveResources, @Nullable Path snapshot, @Nullable ClassLoader parent) {
         super("micronaut-dev-generation-" + generation, toUrls(roots), parent);
@@ -230,10 +235,40 @@ public final class GenerationClassLoader extends URLClassLoader {
      * @throws ClassNotFoundException if the directories do not hold it
      */
     Class<?> findInGeneration(String name) throws ClassNotFoundException {
-        synchronized (getClassLoadingLock(name)) {
-            Class<?> loaded = findLoadedClass(name);
-            return loaded != null ? loaded : findClass(name);
+        Lock lock = classFiles.readLock();
+        lock.lock();
+        try {
+            synchronized (getClassLoadingLock(name)) {
+                Class<?> loaded = findLoadedClass(name);
+                return loaded != null ? loaded : findClass(name);
+            }
+        } finally {
+            lock.unlock();
         }
+    }
+
+    @Override
+    protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+        Lock lock = classFiles.readLock();
+        lock.lock();
+        try {
+            return super.loadClass(name, resolve);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * The lock a change of the snapshot's class files holds from the first file it writes until it is applied or
+     * rolled back: no class loads through the generation meanwhile, so that none is defined from a file the change
+     * restores. A load in progress when it is taken finishes first, and a load that waited for it reads the files the
+     * change left. The holder may load classes itself, as the JVM does when it verifies a redefinition.
+     *
+     * @return The lock
+     * @since 5.3.0
+     */
+    public Lock classFileLock() {
+        return classFiles.writeLock();
     }
 
     /**

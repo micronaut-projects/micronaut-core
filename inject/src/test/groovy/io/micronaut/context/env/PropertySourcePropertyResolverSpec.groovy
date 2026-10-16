@@ -657,6 +657,18 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
     }
 
+    void "test an index past the end of a list property has no value"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", [foo: ['a', 'b']])
+        )
+
+        expect:
+        resolver.getProperty('foo[1]', String).get() == 'b'
+        !resolver.getProperty('foo[2]', String).isPresent()
+        !resolver.getProperty('foo[5]', Object).isPresent()
+    }
+
     void "test getProperties"() {
         given:
         def values = [

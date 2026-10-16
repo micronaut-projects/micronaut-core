@@ -18,9 +18,11 @@ package io.micronaut.dev;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.ApplicationContextConfigurer;
+import io.micronaut.context.BeanContextConfiguration;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.dev.manifest.DevMode;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 import io.micronaut.scheduling.io.watch.FileWatcher;
@@ -44,6 +46,15 @@ public final class DevApplicationContextConfigurer implements ApplicationContext
     public void configure(ApplicationContextBuilder builder) {
         DevRuntime runtime = DevRuntime.current();
         if (runtime == null) {
+            return;
+        }
+        if (runtime.manifest().mode() == DevMode.TEST) {
+            // in test mode the tests start their own contexts, as they would in the build, on the generation that
+            // loaded them: a context built without a class of the tests, ApplicationContext.run(), would otherwise
+            // load the beans of the launcher's loader, which holds none of the project's; a loader the test chose stays
+            if (builder instanceof BeanContextConfiguration configuration && configuration.getClassLoader() == runtime.classLoader().getParent()) {
+                builder.classLoader(runtime.classLoader().current());
+            }
             return;
         }
         // the generation loader itself, never the facade: the JVM records the loader Class.forName was called
@@ -72,7 +83,7 @@ public final class DevApplicationContextConfigurer implements ApplicationContext
         if (watcher != null) {
             // the context's own watch thread is off: modules register with the engine's one watcher instead, through a
             // view that closes their registrations when this context stops
-            applicationContext.registerSingleton(FileWatcher.class, new DevFileWatcher(watcher, runtime.pinnedWatches(), applicationContext.getClassLoader()));
+            applicationContext.registerSingleton(FileWatcher.class, new DevFileWatcher(watcher, runtime.pinnedWatches(), DevFileWatcher.runtimeTrees(runtime), applicationContext.getClassLoader()));
         }
     }
 
