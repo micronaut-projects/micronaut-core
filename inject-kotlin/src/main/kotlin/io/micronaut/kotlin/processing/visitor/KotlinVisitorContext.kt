@@ -323,23 +323,24 @@ internal class KotlinVisitorContext(
         if (type.arguments.isEmpty()) {
             return type
         }
-        val arguments = type.arguments.map { argument ->
-            val argumentType = argument.type?.resolve() ?: return@map argument
-            val argumentDeclaration = argumentType.declaration
-            val substitution = if (argumentDeclaration is KSTypeParameter) substitutions[argumentDeclaration.name.asString()] else null
-            if (substitution != null && (substitution.variance == Variance.STAR || substitution.type == null)) {
-                // The alias is used with a star projection: List<*> for an alias of List<T>
-                return@map substitution
-            }
-            val variance = if (substitution != null && argument.variance == Variance.INVARIANT) substitution.variance else argument.variance
-            val substituted = substituteTypeArguments(argumentType, substitutions)
-            if (substituted === argumentType && variance == argument.variance) {
-                argument
-            } else {
-                resolver.getTypeArgument(resolver.createKSTypeReferenceFromKSType(substituted), variance)
-            }
+        return type.replace(type.arguments.map { substituteTypeArgument(it, substitutions) })
+    }
+
+    private fun substituteTypeArgument(argument: KSTypeArgument, substitutions: Map<String, KSTypeArgument>): KSTypeArgument {
+        val argumentType = argument.type?.resolve() ?: return argument
+        val argumentDeclaration = argumentType.declaration
+        val substitution = if (argumentDeclaration is KSTypeParameter) substitutions[argumentDeclaration.name.asString()] else null
+        if (substitution != null && (substitution.variance == Variance.STAR || substitution.type == null)) {
+            // The alias is used with a star projection: List<*> for an alias of List<T>
+            return substitution
         }
-        return type.replace(arguments)
+        val variance = if (substitution != null && argument.variance == Variance.INVARIANT) substitution.variance else argument.variance
+        val substituted = substituteTypeArguments(argumentType, substitutions)
+        return if (substituted === argumentType && variance == argument.variance) {
+            argument
+        } else {
+            resolver.getTypeArgument(resolver.createKSTypeReferenceFromKSType(substituted), variance)
+        }
     }
 
     @OptIn(KspExperimental::class)
