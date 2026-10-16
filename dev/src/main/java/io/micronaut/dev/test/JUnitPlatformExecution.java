@@ -36,7 +36,6 @@ import org.junit.platform.launcher.TestPlan;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -219,8 +218,21 @@ final class JUnitPlatformExecution {
                 continue;
             }
             Path base = root.path().toAbsolutePath().normalize();
-            // relative to the root, or to the directory holding it, as a file's results are named
-            List<Path> candidates = given.isAbsolute() ? List.of(given) : base.getParent() == null ? List.of(base.resolve(given)) : List.of(base.resolve(given), base.getParent().resolve(given));
+            // relative to the root, to the directory holding it, or, for a file whose relative path another root holds
+            // too, to the directory the roots share, as a file's results are named
+            List<Path> candidates = new ArrayList<>();
+            if (given.isAbsolute()) {
+                candidates.add(given);
+            } else {
+                candidates.add(base.resolve(given));
+                if (base.getParent() != null) {
+                    candidates.add(base.getParent().resolve(given));
+                }
+                Path common = TestFileNames.base(request.testSources(), base, false);
+                if (common != null) {
+                    candidates.add(common.resolve(given));
+                }
+            }
             for (Path candidate : candidates) {
                 Path file = candidate.normalize();
                 if (file.startsWith(base) && Files.isRegularFile(file)) {
@@ -315,13 +327,16 @@ final class JUnitPlatformExecution {
 
     /**
      * A test file's path relative to the test source root that holds it, so reports read the same on every machine.
+     * When another test source root holds a file at the same relative path, as two Python roots each with a
+     * {@code test_app.py}, the name is prefixed with the root's path relative to the directory the roots share, so the
+     * two files' results do not merge under one name.
      */
     private String relativeFile(Path file) {
         Path absolute = file.toAbsolutePath().normalize();
         for (var root : request.testSources()) {
             Path rootPath = root.path().toAbsolutePath().normalize();
             if (absolute.startsWith(rootPath)) {
-                return rootPath.relativize(absolute).toString().replace('\\', '/');
+                return disambiguated(rootPath, rootPath.relativize(absolute), false);
             }
         }
         // an engine may name the file by its real path, through the links the root's path goes through, as /var on macOS
@@ -329,18 +344,42 @@ final class JUnitPlatformExecution {
         for (var root : request.testSources()) {
             Path rootPath = realPath(root.path().toAbsolutePath().normalize());
             if (real.startsWith(rootPath)) {
-                return rootPath.relativize(real).toString().replace('\\', '/');
+                return disambiguated(rootPath, rootPath.relativize(real), true);
             }
         }
         return absolute.toString();
     }
 
-    private static Path realPath(Path path) {
-        try {
-            return path.toRealPath();
-        } catch (IOException e) {
-            return path;
+    /**
+     * The relative name of a file of a root, or, when another root of a language whose tests are discovered from their
+     * files holds a file at the same relative path, that name under the root's path relative to the directory the
+     * roots share.
+     */
+    private String disambiguated(Path rootPath, Path relative, boolean real) {
+        String name = TestFileNames.slashed(relative);
+        boolean collides = false;
+        for (SourceRoot other : request.testSources()) {
+            if (!TestFileNames.isFileKind(other.kind())) {
+                continue;
+            }
+            Path otherPath = other.path().toAbsolutePath().normalize();
+            if (real) {
+                otherPath = TestFileNames.realPath(otherPath);
+            }
+            if (!otherPath.equals(rootPath) && Files.isRegularFile(otherPath.resolve(relative.toString()))) {
+                collides = true;
+                break;
+            }
         }
+        if (!collides) {
+            return name;
+        }
+        Path base = TestFileNames.base(request.testSources(), rootPath, real);
+        return (base == null ? TestFileNames.slashed(rootPath) : TestFileNames.slashed(base.relativize(rootPath))) + "/" + name;
+    }
+
+    private static Path realPath(Path path) {
+        return TestFileNames.realPath(path);
     }
 
     private static TestOutcome outcome(TestExecutionResult result, Duration duration) {
