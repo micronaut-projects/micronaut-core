@@ -123,13 +123,12 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
         return startsWithBase(filePath) && Files.exists(filePath) && Files.isReadable(filePath) && !Files.isDirectory(filePath);
     }
 
-    @SuppressWarnings("MagicNumber")
     private static String normalize(String path) {
         if (path == null) {
             return "";
         }
-        if (path.startsWith("file:")) {
-            path = path.substring(5);
+        if (path.startsWith(PREFIX)) {
+            path = path.substring(PREFIX.length());
         }
         return path;
     }
