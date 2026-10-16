@@ -113,15 +113,6 @@ final class DefaultDirectRouteBuilder implements DirectRouteBuilder {
         return declare(methods, uri);
     }
 
-    @Override
-    public HttpResponse<?> prepare(HttpResponse<?> response) {
-        Objects.requireNonNull(response, "response");
-        checkOpen();
-        ResponseTemplate template = ResponseTemplate.direct(response, shareableBody);
-        HttpResponse<?> prepared = prepare.apply(template.get());
-        return prepared == null ? new SharedDirectResponse(template) : prepared;
-    }
-
     /**
      * The match of a route that answers with a value: the response the runtime prepared, the
      * same for every request, or else a new copy of the value for each request.

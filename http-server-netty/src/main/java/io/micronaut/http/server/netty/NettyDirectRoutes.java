@@ -53,6 +53,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.QueryStringDecoder;
+import io.netty.util.AsciiString;
 import io.netty.util.concurrent.FastThreadLocalThread;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -120,7 +121,11 @@ final class NettyDirectRoutes {
     /**
      * The {@code Server} header to add, see {@code micronaut.server.server-header}, or {@code null}.
      */
-    private final @Nullable String serverHeader;
+    private final @Nullable CharSequence serverHeader;
+    /**
+     * The {@code Date} header of the current second, encoded once.
+     */
+    private volatile @Nullable EncodedDate date;
     /**
      * The message body writers of the bodies that are neither bytes nor text, looked up once per
      * type and media type.
@@ -138,7 +143,9 @@ final class NettyDirectRoutes {
         this.ioExecutor = ioExecutor;
         this.ordinary = ordinary;
         this.dateHeader = configuration.isDateHeader();
-        this.serverHeader = configuration.getServerHeader().orElse(null);
+        String server = configuration.getServerHeader().orElse(null);
+        // encoded once: the encoder copies the bytes of an AsciiString
+        this.serverHeader = server == null ? null : ascii(server);
     }
 
     /**
@@ -252,12 +259,6 @@ final class NettyDirectRoutes {
             // on the thread that completed the stage
             if (error != null || response == null) {
                 onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, error, null));
-                return;
-            }
-            if (response instanceof PreparedDirectResponse prepared) {
-                // validated and buffered once: nothing to write
-                onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, null,
-                    new Prepared(prepared.head(), prepared.content())));
                 return;
             }
             MutableHttpResponse<?> mutable;
@@ -416,12 +417,39 @@ final class NettyDirectRoutes {
      */
     private void addConfiguredHeaders(HttpHeaders headers) {
         if (dateHeader && !headers.contains(HttpHeaderNames.DATE)) {
-            headers.set(HttpHeaderNames.DATE, HttpDateHeader.now());
+            headers.set(HttpHeaderNames.DATE, date());
         }
-        String server = serverHeader;
+        CharSequence server = serverHeader;
         if (server != null && !headers.contains(HttpHeaderNames.SERVER)) {
             headers.set(HttpHeaderNames.SERVER, server);
         }
+    }
+
+    /**
+     * @return The {@code Date} header of the current second, encoded once per second
+     */
+    private CharSequence date() {
+        long millis = System.currentTimeMillis();
+        long second = Math.floorDiv(millis, 1000);
+        EncodedDate encoded = date;
+        if (encoded == null || encoded.second() != second) {
+            encoded = new EncodedDate(second, new AsciiString(HttpDateHeader.get(millis)));
+            date = encoded;
+        }
+        return encoded.ascii();
+    }
+
+    /**
+     * @param text A header value
+     * @return The value as an {@link AsciiString} if it is ASCII, otherwise the value itself
+     */
+    private static CharSequence ascii(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) > 127) {
+                return text;
+            }
+        }
+        return new AsciiString(text);
     }
 
     /**
@@ -521,6 +549,15 @@ final class NettyDirectRoutes {
      * @param head    Its status and headers
      * @param content Its body
      */
+    /**
+     * The {@code Date} header of a second.
+     *
+     * @param second The epoch second
+     * @param ascii  The header, encoded
+     */
+    private record EncodedDate(long second, AsciiString ascii) {
+    }
+
     private record Prepared(HttpResponse head, ByteBuf content) {
     }
 

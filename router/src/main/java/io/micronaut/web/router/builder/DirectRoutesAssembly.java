@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.builder;
 
+import io.micronaut.context.BeanDefinitionRegistry;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
@@ -24,6 +25,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.annotation.Filter;
+import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.RouteConditionContext;
@@ -39,6 +44,8 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.Executor;
 
 /**
@@ -69,12 +76,14 @@ final class DirectRoutesAssembly implements DirectRouteLookup {
      * @param routes             The beans that declare the direct routes
      * @param contextPath        The context path of the server
      * @param directRouteSupport The server runtimes that answer direct routes, empty if none does
+     * @param beanDefinitions    Finds the filter beans the direct routes skip, which are logged
      */
     DirectRoutesAssembly(BeanLocator beanLocator,
                          ConversionService conversionService,
                          List<HttpDirectRoutes> routes,
                          @Nullable @Value("${micronaut.server.context-path}") String contextPath,
-                         List<DirectRouteSupport> directRouteSupport) {
+                         List<DirectRouteSupport> directRouteSupport,
+                         BeanDefinitionRegistry beanDefinitions) {
         DefaultDirectRouteBuilder builder = new DefaultDirectRouteBuilder(uri -> RouteAssembly.underContextPath(contextPath, uri),
             body -> shareableBody(directRouteSupport, body),
             response -> prepare(directRouteSupport, response));
@@ -106,7 +115,27 @@ final class DirectRoutesAssembly implements DirectRouteLookup {
                 + "without filters, which only a server that supports it, e.g. the Netty server, can do. "
                 + "Declare the routes with respond(...) of an HttpRoutes bean instead, which the filters see");
         }
+        if (!table.isEmpty() && LOG.isInfoEnabled()) {
+            Set<String> filters = filterBeans(beanDefinitions);
+            if (!filters.isEmpty()) {
+                LOG.info("The direct routes are answered before the request is created: the filters of the application do not see them, {}", filters);
+            }
+        }
         this.routes = table;
+    }
+
+    /**
+     * @return The names of the filter beans of the server, which never see a direct route
+     */
+    private static Set<String> filterBeans(BeanDefinitionRegistry beanDefinitions) {
+        Set<String> names = new TreeSet<>();
+        for (BeanDefinition<?> definition : beanDefinitions.getBeanDefinitions(Qualifiers.byStereotype(ServerFilter.class))) {
+            names.add(definition.getBeanType().getName());
+        }
+        for (BeanDefinition<?> definition : beanDefinitions.getBeanDefinitions(Qualifiers.byStereotype(Filter.class))) {
+            names.add(definition.getBeanType().getName());
+        }
+        return names;
     }
 
     /**

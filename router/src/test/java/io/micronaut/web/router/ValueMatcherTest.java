@@ -157,4 +157,34 @@ class ValueMatcherTest {
         assertThrows(NullPointerException.class, () -> new ValueMatcher.Not(null));
         assertThrows(NullPointerException.class, () -> regex((String) null));
     }
+
+    @Test
+    void entityTags() {
+        ValueMatcher current = ValueMatcher.entityTag("\"v1\"");
+        assertTrue(current.matches("\"v1\""));
+        // the weak comparison: weak or strong, on either side
+        assertTrue(current.matches("W/\"v1\""));
+        assertTrue(ValueMatcher.entityTag("W/\"v1\"").matches("\"v1\""));
+        // one of a list, or any
+        assertTrue(current.matches("\"v0\", \"v1\""));
+        assertTrue(current.matches("\"v0\",W/\"v1\""));
+        assertTrue(current.matches("*"));
+        // a comma inside a tag does not split it
+        assertFalse(current.matches("\"v0,\"v1\"\""));
+        assertTrue(ValueMatcher.entityTag("\"a,b\"").matches("\"x\", \"a,b\""));
+        // compared as they are: no other tag, no case, no prefix
+        assertFalse(current.matches("\"V1\""));
+        assertFalse(current.matches("\"v10\""));
+        assertFalse(current.matches("v1"));
+        assertFalse(current.matches(""));
+        assertFalse(current.matches(null), "an absent value");
+        // a malformed list matches up to the first tag that cannot be read
+        assertTrue(current.matches("\"v1\", junk"));
+        assertFalse(current.matches("junk, \"v1\""));
+        assertFalse(current.matches("\"v1"));
+        assertSame(current, current.ignoringCase());
+        assertThrows(IllegalArgumentException.class, () -> ValueMatcher.entityTag("v1"));
+        assertThrows(IllegalArgumentException.class, () -> ValueMatcher.entityTag("\"v\"1\""));
+        assertThrows(NullPointerException.class, () -> ValueMatcher.entityTag(null));
+    }
 }

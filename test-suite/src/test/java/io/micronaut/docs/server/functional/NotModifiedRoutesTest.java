@@ -14,11 +14,11 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class PreparedRoutesTest {
+class NotModifiedRoutesTest {
 
     @Test
-    void aFunctionAnswersWithAPreparedResponse() {
-        try (EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Map.of("spec.name", "PreparedRoutesTest"));
+    void aRequestWithTheCurrentVersionIsAnsweredWith304() {
+        try (EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Map.of("spec.name", "NotModifiedRoutesTest"));
              HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL())) {
             BlockingHttpClient http = client.toBlocking();
             HttpResponse<String> current = http.exchange(HttpRequest.GET("/release"), String.class);
@@ -26,9 +26,14 @@ class PreparedRoutesTest {
             assertEquals("release 2026.10", current.body());
             assertEquals("\"2026.10\"", current.getHeaders().get(HttpHeaders.ETAG));
 
-            HttpResponse<String> notModified = http.exchange(HttpRequest.GET("/release").header(HttpHeaders.IF_NONE_MATCH, "\"2026.10\""), String.class);
-            assertEquals(HttpStatus.NOT_MODIFIED, notModified.getStatus());
-            assertEquals("\"2026.10\"", notModified.getHeaders().get(HttpHeaders.ETAG));
+            // one of the listed tags, weak or strong
+            for (String ifNoneMatch : new String[]{"\"2026.10\"", "W/\"2026.10\"", "\"2026.09\", \"2026.10\"", "*"}) {
+                HttpResponse<String> notModified = http.exchange(HttpRequest.GET("/release").header(HttpHeaders.IF_NONE_MATCH, ifNoneMatch), String.class);
+                assertEquals(HttpStatus.NOT_MODIFIED, notModified.getStatus(), ifNoneMatch);
+                assertEquals("\"2026.10\"", notModified.getHeaders().get(HttpHeaders.ETAG));
+            }
+            HttpResponse<String> older = http.exchange(HttpRequest.GET("/release").header(HttpHeaders.IF_NONE_MATCH, "\"2026.09\""), String.class);
+            assertEquals(HttpStatus.OK, older.getStatus());
         }
     }
 }

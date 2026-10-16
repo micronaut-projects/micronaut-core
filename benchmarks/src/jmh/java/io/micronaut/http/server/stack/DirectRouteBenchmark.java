@@ -12,6 +12,8 @@ import io.micronaut.web.router.builder.DirectRouteBuilder;
 import io.micronaut.web.router.builder.HttpDirectRoutes;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
+import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.ValueMatcher;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -60,7 +62,7 @@ public class DirectRouteBenchmark {
 
     @State(Scope.Thread)
     public static class Holder {
-        @Param({"RAW_NETTY", "DIRECT_CONSTANT", "DIRECT_SELECT", "DIRECT_FUNCTION", "DIRECT_FUNCTION_TEXT", "DIRECT_JSON", "ORDINARY"})
+        @Param({"RAW_NETTY", "DIRECT_CONSTANT", "DIRECT_CONDITIONAL", "DIRECT_FUNCTION", "DIRECT_FUNCTION_TEXT", "DIRECT_JSON", "ORDINARY"})
         Variant variant = Variant.DIRECT_FUNCTION;
 
         AutoCloseable ctx;
@@ -117,7 +119,7 @@ public class DirectRouteBenchmark {
     public enum Variant {
         RAW_NETTY("/plaintext"),
         DIRECT_CONSTANT("/constant"),
-        DIRECT_SELECT("/select"),
+        DIRECT_CONDITIONAL("/conditional"),
         DIRECT_FUNCTION("/plaintext"),
         DIRECT_FUNCTION_TEXT("/text"),
         DIRECT_JSON("/json"),
@@ -158,10 +160,12 @@ public class DirectRouteBenchmark {
         @Override
         public void routes(DirectRouteBuilder builder) {
             builder.GET("/constant").respond(HttpResponse.ok(HELLO).contentType(MediaType.TEXT_PLAIN_TYPE));
-            // a function that chooses between prepared responses
-            HttpResponse<?> hello = builder.prepare(HttpResponse.ok(HELLO).contentType(MediaType.TEXT_PLAIN_TYPE).header(HttpHeaders.ETAG, "v1"));
-            HttpResponse<?> notModified = builder.prepare(HttpResponse.notModified().header(HttpHeaders.ETAG, "v1"));
-            builder.GET("/select").respond(direct -> "v1".equals(direct.request().header(HttpHeaders.IF_NONE_MATCH)) ? notModified : hello);
+            // a 304 route with a condition, tried first, then the 200 route
+            builder.GET("/conditional")
+                .where(RouteCondition.header(HttpHeaders.IF_NONE_MATCH, ValueMatcher.entityTag("\"v1\"")))
+                .order(-1)
+                .respond(HttpResponse.notModified().header(HttpHeaders.ETAG, "\"v1\""));
+            builder.GET("/conditional", HttpResponse.ok(HELLO).contentType(MediaType.TEXT_PLAIN_TYPE).header(HttpHeaders.ETAG, "\"v1\""));
             builder.GET("/plaintext").respond(direct -> HttpResponse.ok(HELLO).contentType(MediaType.TEXT_PLAIN_TYPE));
             builder.GET("/text").respond(direct -> HttpResponse.ok("Hello, World!").contentType(MediaType.TEXT_PLAIN_TYPE));
             builder.GET("/json").respond(direct -> HttpResponse.ok(new Message("Hello, World!")));

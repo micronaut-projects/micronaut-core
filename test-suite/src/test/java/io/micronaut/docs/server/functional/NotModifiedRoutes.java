@@ -7,25 +7,27 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.web.router.builder.DirectRouteBuilder;
 import io.micronaut.web.router.builder.HttpDirectRoutes;
+import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.ValueMatcher;
 import jakarta.inject.Singleton;
 // end::imports[]
 
-@Requires(property = "spec.name", value = "PreparedRoutesTest")
+@Requires(property = "spec.name", value = "NotModifiedRoutesTest")
 // tag::clazz[]
 @Singleton
-public class PreparedRoutes implements HttpDirectRoutes {
+public class NotModifiedRoutes implements HttpDirectRoutes {
 
     private static final String VERSION = "\"2026.10\"";
 
     @Override
     public void routes(DirectRouteBuilder routes) {
-        HttpResponse<?> current = routes.prepare(HttpResponse.ok("release 2026.10") // <1>
+        routes.GET("/release")
+            .where(RouteCondition.header(HttpHeaders.IF_NONE_MATCH, ValueMatcher.entityTag(VERSION))) // <1>
+            .order(-1) // <2>
+            .respond(HttpResponse.notModified().header(HttpHeaders.ETAG, VERSION));
+        routes.GET("/release", HttpResponse.ok("release 2026.10") // <3>
             .contentType(MediaType.TEXT_PLAIN_TYPE)
             .header(HttpHeaders.ETAG, VERSION));
-        HttpResponse<?> notModified = routes.prepare(HttpResponse.notModified()
-            .header(HttpHeaders.ETAG, VERSION));
-        routes.GET("/release").respond(direct ->
-            VERSION.equals(direct.request().header(HttpHeaders.IF_NONE_MATCH)) ? notModified : current); // <2>
     }
 }
 // end::clazz[]

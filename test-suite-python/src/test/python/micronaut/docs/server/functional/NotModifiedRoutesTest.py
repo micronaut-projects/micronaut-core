@@ -12,19 +12,19 @@ from org.junit.jupiter.api import Test
 String = java.type("java.lang.String")
 
 
-@Property(name="spec.name", value="PreparedRoutesTest")
+@Property(name="spec.name", value="NotModifiedRoutesTest")
 @MicronautTest
-class PreparedRoutesTest:
+class NotModifiedRoutesTest:
     client: Annotated[HttpClient, Inject, Client("/")]
 
     @Test
-    def a_function_answers_with_a_prepared_response(self):
+    def a_request_with_the_current_version_is_answered_with_304(self):
         http = self.client.toBlocking()
         current = http.exchange(HttpRequest.GET("/release"), String)
         assert current.getStatus() == HttpStatus.OK
         assert current.body() == "release 2026.10"
         assert current.getHeaders().get(HttpHeaders.ETAG) == '"2026.10"'
 
-        not_modified = http.exchange(HttpRequest.GET("/release").header(HttpHeaders.IF_NONE_MATCH, '"2026.10"'), String)
+        not_modified = http.exchange(HttpRequest.GET("/release").header(HttpHeaders.IF_NONE_MATCH, 'W/"2026.10"'), String)
         assert not_modified.getStatus() == HttpStatus.NOT_MODIFIED
         assert not_modified.getHeaders().get(HttpHeaders.ETAG) == '"2026.10"'

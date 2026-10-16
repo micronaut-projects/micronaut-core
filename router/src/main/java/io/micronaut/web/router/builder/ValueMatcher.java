@@ -149,6 +149,28 @@ public sealed interface ValueMatcher {
     }
 
     /**
+     * A list of entity tags that matches the entity tag of the current representation, with the
+     * weak comparison of an {@code If-None-Match} header, see
+     * <a href="https://www.rfc-editor.org/rfc/rfc9110#section-13.1.2">RFC 9110</a>: one of the
+     * listed tags is the tag, weak or strong, or the value is {@code *}. A route that answers
+     * {@code 304} for the current version is declared with the condition
+     * {@code RouteCondition.header(HttpHeaders.IF_NONE_MATCH, ValueMatcher.entityTag(VERSION))}.
+     * A malformed list matches up to the first tag that cannot be read.
+     *
+     * @param entityTag The entity tag with its quotes, e.g. {@code "v1"}, the Java string
+     *                  {@code "\"v1\""}, or weak, e.g. {@code W/"v1"}
+     * @return The matcher
+     */
+    static ValueMatcher entityTag(String entityTag) {
+        String tag = Objects.requireNonNull(entityTag, "entityTag").trim();
+        String opaque = tag.startsWith("W/") ? tag.substring(2) : tag;
+        if (opaque.length() < 2 || opaque.charAt(0) != '"' || opaque.indexOf('"', 1) != opaque.length() - 1) {
+            throw new IllegalArgumentException("Not an entity tag, a quoted value, e.g. \"v1\": " + entityTag);
+        }
+        return new EntityTag(opaque);
+    }
+
+    /**
      * A value the matcher does not match: an absent value too, unless the matcher accepts it.
      *
      * @param matcher The matcher
@@ -204,6 +226,8 @@ public sealed interface ValueMatcher {
             case Regex regex -> new Regex(Pattern.compile(regex.pattern().pattern(),
                 regex.pattern().flags() | Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE));
             case Present present -> present;
+            // an entity tag is compared as it is
+            case EntityTag entityTag -> entityTag;
             case Not not -> new Not(not.matcher().ignoringCase());
             case AllOf allOf -> new AllOf(ignoringCase(allOf.matchers()));
             case AnyOf anyOf -> new AnyOf(ignoringCase(anyOf.matchers()));
@@ -328,6 +352,17 @@ public sealed interface ValueMatcher {
      */
     record Present() implements ValueMatcher {
         private static final Present INSTANCE = new Present();
+    }
+
+    /**
+     * A list of entity tags that matches an entity tag, see {@link ValueMatcher#entityTag(String)}.
+     *
+     * @param opaqueTag The opaque tag, with its quotes, without the weakness indicator
+     */
+    record EntityTag(String opaqueTag) implements ValueMatcher {
+        public EntityTag {
+            Objects.requireNonNull(opaqueTag, "opaqueTag");
+        }
     }
 
     /**

@@ -21,9 +21,10 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.builder.DirectRouteBuilder;
 import io.micronaut.web.router.builder.HttpDirectRoutes;
+import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.ValueMatcher;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
@@ -33,29 +34,25 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The responses prepared with {@link DirectRouteBuilder#prepare(HttpResponse)} on the Netty
- * server: a function chooses between them, and the server writes them for each request, with
- * the headers of the request, the framing of a {@code GET}, a {@code HEAD} or a {@code 304},
- * from a synchronous and an asynchronous route, and releases their buffers when it stops.
+ * The responses given as values to direct routes on the Netty server, prepared once: the
+ * conditions of the routes choose between them, e.g. a {@code 304} for the current version, and
+ * the server writes them for each request with its own headers and the framing of a
+ * {@code GET}, a {@code HEAD} or a {@code 304}, and releases their buffers when it stops.
  */
 class DirectRoutePreparedTest {
     private static final String SPEC_NAME = "DirectRoutePreparedTest";
 
     @Test
-    void aFunctionChoosesBetweenThePreparedResponsesWhichTheServerWritesForEachRequest() throws IOException {
+    void theConditionsChooseBetweenThePreparedResponsesWhichTheServerWritesForEachRequest() throws IOException {
         try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", SPEC_NAME, "micronaut.server.server-header", "micronaut-test"));
              EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
              Socket socket = new Socket("localhost", server.getPort())) {
-            assertInstanceOf(PreparedDirectResponse.class, Routes.ok);
-            assertInstanceOf(PreparedDirectResponse.class, Routes.notModified);
             OutputStream out = socket.getOutputStream();
             InputStream in = socket.getInputStream();
             for (int i = 0; i < 3; i++) {
@@ -63,7 +60,7 @@ class DirectRoutePreparedTest {
                 out.write(request("GET", "/version", null));
                 String ok = DirectRouteTest.readResponse(in, false);
                 assertTrue(ok.startsWith("http/1.1 200 ok"), ok);
-                assertTrue(ok.contains("etag: v1"), ok);
+                assertTrue(ok.contains("etag: \"v1\""), ok);
                 assertTrue(ok.contains("content-type: text/plain"), ok);
                 assertTrue(ok.contains("content-length: 7"), ok);
                 assertTrue(ok.contains("date: "), ok);
@@ -71,10 +68,10 @@ class DirectRoutePreparedTest {
                 assertTrue(ok.endsWith("\r\n\r\ncurrent"), ok);
             }
 
-            out.write(request("GET", "/version", "v1"));
+            out.write(request("GET", "/version", "\"v0\", W/\"v1\""));
             String notModified = DirectRouteTest.readResponse(in, false);
             assertTrue(notModified.startsWith("http/1.1 304 not modified"), notModified);
-            assertTrue(notModified.contains("etag: v1"), notModified);
+            assertTrue(notModified.contains("etag: \"v1\""), notModified);
             assertFalse(notModified.contains("content-length"), notModified);
 
             // the length of the GET response, and no body
@@ -83,20 +80,12 @@ class DirectRoutePreparedTest {
             assertTrue(head.startsWith("http/1.1 200 ok"), head);
             assertTrue(head.contains("content-length: 7"), head);
 
-            for (String path : new String[]{"/version-async", "/version-executor"}) {
-                out.write(request("GET", path, null));
-                String response = DirectRouteTest.readResponse(in, false);
-                assertTrue(response.startsWith("http/1.1 200 ok"), path + ": " + response);
-                assertTrue(response.contains("date: "), path + ": " + response);
-                assertTrue(response.endsWith("\r\n\r\ncurrent"), path + ": " + response);
-            }
-
-            // the headers the server added to each response are not in the prepared response
-            PreparedDirectResponse ok = (PreparedDirectResponse) Routes.ok;
-            assertFalse(ok.head().headers().contains(HttpHeaders.DATE));
-            assertFalse(ok.head().headers().contains(HttpHeaders.SERVER));
-            assertFalse(ok.head().headers().contains(HttpHeaders.CONTENT_LENGTH));
-            assertEquals("current", new String(ok.body(), StandardCharsets.UTF_8));
+            // the server added its headers to each response, not to the prepared one
+            out.write(request("GET", "/version", null));
+            String again = DirectRouteTest.readResponse(in, false);
+            assertEquals(1, again.split("date: ", -1).length - 1, again);
+            assertEquals(1, again.split("server: ", -1).length - 1, again);
+            assertEquals(1, again.split("content-length: ", -1).length - 1, again);
         }
     }
 
@@ -108,18 +97,13 @@ class DirectRoutePreparedTest {
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class Routes implements HttpDirectRoutes {
-        static volatile HttpResponse<?> ok;
-        static volatile HttpResponse<?> notModified;
-
         @Override
         public void routes(DirectRouteBuilder routes) {
-            HttpResponse<?> current = routes.prepare(HttpResponse.ok("current").contentType(MediaType.TEXT_PLAIN_TYPE).header(HttpHeaders.ETAG, "v1"));
-            HttpResponse<?> unchanged = routes.prepare(HttpResponse.notModified().header(HttpHeaders.ETAG, "v1"));
-            ok = current;
-            notModified = unchanged;
-            routes.GET("/version").respond(direct -> "v1".equals(direct.request().header(HttpHeaders.IF_NONE_MATCH)) ? unchanged : current);
-            routes.GET("/version-async").respondAsync(direct -> CompletableFuture.supplyAsync(() -> current));
-            routes.GET("/version-executor").executeOn(TaskExecutors.BLOCKING).respond(direct -> current);
+            routes.GET("/version")
+                .where(RouteCondition.header(HttpHeaders.IF_NONE_MATCH, ValueMatcher.entityTag("\"v1\"")))
+                .order(-1)
+                .respond(HttpResponse.notModified().header(HttpHeaders.ETAG, "\"v1\""));
+            routes.GET("/version", HttpResponse.ok("current").contentType(MediaType.TEXT_PLAIN_TYPE).header(HttpHeaders.ETAG, "\"v1\""));
         }
     }
 }

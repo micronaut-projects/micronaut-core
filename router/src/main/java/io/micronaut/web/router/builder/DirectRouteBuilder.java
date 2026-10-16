@@ -266,32 +266,4 @@ public sealed interface DirectRouteBuilder permits DefaultDirectRouteBuilder {
      * @param routes Declares the routes under the prefix
      */
     void path(String prefix, Consumer<DirectRouteBuilder> routes);
-
-    /**
-     * Prepare a response once, when the routes are declared, for the functions of the routes to
-     * answer with: like the response given as a value to {@link DirectRouteSpec#respond(HttpResponse)},
-     * a text body is encoded and a {@code byte[]} body copied now, and the server validates the
-     * headers and buffers the body once, then writes the response for each request it is
-     * returned for, without creating a response for the request. A function chooses between the
-     * prepared responses of a route, e.g. a {@code 304} for a request whose
-     * {@code If-None-Match} header names the current version:
-     *
-     * <pre>{@code
-     * HttpResponse<?> ok = routes.prepare(HttpResponse.ok(BODY).header(HttpHeaders.ETAG, VERSION));
-     * HttpResponse<?> notModified = routes.prepare(HttpResponse.notModified().header(HttpHeaders.ETAG, VERSION));
-     * routes.GET("/version").respond(direct -> VERSION.equals(direct.request().header(HttpHeaders.IF_NONE_MATCH))
-     *     ? notModified
-     *     : ok);
-     * }</pre>
-     *
-     * <p>The prepared response is never changed: its headers, attributes and a {@code byte[]}
-     * body are copies, and it is no {@link io.micronaut.http.MutableHttpResponse}. A body other
-     * than text or bytes, e.g. a record written as JSON, is written for each request. The
-     * prepared response is valid for as long as the application context runs.</p>
-     *
-     * @param response The response, copied
-     * @return The prepared response, the same instance for every request it is returned for
-     * @throws IllegalStateException if the routes were declared already
-     */
-    HttpResponse<?> prepare(HttpResponse<?> response);
 }

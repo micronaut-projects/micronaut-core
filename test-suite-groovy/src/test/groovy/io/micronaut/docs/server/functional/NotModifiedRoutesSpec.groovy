@@ -11,15 +11,15 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-class PreparedRoutesSpec extends Specification {
+class NotModifiedRoutesSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ["spec.name": "PreparedRoutesSpec"])
+    @Shared @AutoCleanup EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ["spec.name": "NotModifiedRoutesSpec"])
     @Shared @AutoCleanup HttpClient client = server.applicationContext.createBean(HttpClient, server.URL)
 
-    void "a function answers with a prepared response"() {
+    void "a request with the current version is answered with 304"() {
         when:
         HttpResponse<String> current = client.toBlocking().exchange(HttpRequest.GET("/release"), String)
-        HttpResponse<String> notModified = client.toBlocking().exchange(HttpRequest.GET("/release").header(HttpHeaders.IF_NONE_MATCH, '"2026.10"'), String)
+        HttpResponse<String> notModified = client.toBlocking().exchange(HttpRequest.GET("/release").header(HttpHeaders.IF_NONE_MATCH, 'W/"2026.10"'), String)
 
         then:
         current.status == HttpStatus.OK

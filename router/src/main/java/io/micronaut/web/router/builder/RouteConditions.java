@@ -273,6 +273,7 @@ public final class RouteConditions {
             case ValueMatcher.StartsWith _ -> COST_AFFIX;
             case ValueMatcher.EndsWith _ -> COST_AFFIX;
             case ValueMatcher.Contains _ -> COST_AFFIX;
+            case ValueMatcher.EntityTag _ -> COST_AFFIX;
             case ValueMatcher.Regex _ -> COST_REGEX;
             case ValueMatcher.Not not -> cost(not.matcher());
             case ValueMatcher.AllOf allOf -> maxMatcherCost(allOf.matchers());
@@ -551,6 +552,7 @@ public final class RouteConditions {
             case ValueMatcher.OneOf oneOf -> oneOf(oneOf, value, from, to);
             case ValueMatcher.Regex regex -> regex.pattern().matcher(value).region(from, to).matches();
             case ValueMatcher.Present _ -> true;
+            case ValueMatcher.EntityTag entityTag -> entityTag(value, from, to, entityTag.opaqueTag());
             case ValueMatcher.Not not -> !matches(not.matcher(), value, from, to);
             case ValueMatcher.AllOf allOf -> {
                 for (ValueMatcher part : allOf.matchers()) {
@@ -569,6 +571,44 @@ public final class RouteConditions {
                 yield false;
             }
         };
+    }
+
+    /**
+     * Read a list of entity tags tag by tag: a quoted opaque tag may contain a comma, so the list
+     * is not split.
+     */
+    private static boolean entityTag(CharSequence value, int from, int to, String opaqueTag) {
+        int i = from;
+        while (i < to) {
+            char c = value.charAt(i);
+            if (c == ' ' || c == '\t' || c == ',') {
+                i++;
+                continue;
+            }
+            if (c == '*') {
+                return true;
+            }
+            int start = i;
+            if (c == 'W' && i + 1 < to && value.charAt(i + 1) == '/') {
+                start += 2;
+            }
+            if (start >= to || value.charAt(start) != '"') {
+                // malformed: nothing after it is read
+                return false;
+            }
+            int end = start + 1;
+            while (end < to && value.charAt(end) != '"') {
+                end++;
+            }
+            if (end >= to) {
+                return false;
+            }
+            if (end + 1 - start == opaqueTag.length() && regionMatches(value, start, opaqueTag, false)) {
+                return true;
+            }
+            i = end + 1;
+        }
+        return false;
     }
 
     private static boolean contains(CharSequence value, int from, int to, String part, boolean ignoreCase) {
