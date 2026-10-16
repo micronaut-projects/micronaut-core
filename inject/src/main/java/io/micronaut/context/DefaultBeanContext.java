@@ -3769,6 +3769,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         // Fast singleton lookup
         BeanRegistration<T> beanRegistration = singletonScope.findCachedSingletonBeanRegistration(beanType, qualifier);
         if (beanRegistration != null) {
+            // the cache holds the members of an @EachBean or @EachProperty set and runtime singletons: a bean that
+            // receives one of them depends on it as on any singleton, or recreating the member would leave it holding
+            // the destroyed instance
+            recordDependency(resolutionContext, beanRegistration.beanDefinition, qualifier);
             return beanRegistration;
         }
 

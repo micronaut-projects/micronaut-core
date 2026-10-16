@@ -4,11 +4,65 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.watch.ConfigurationChange
+import io.micronaut.inject.qualifiers.Qualifiers
+import io.micronaut.scheduling.ScheduledExecutorTaskScheduler
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.TaskScheduler
 import io.micronaut.scheduling.processor.ScheduledMethodProcessor
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
+import java.time.Duration
+import java.util.concurrent.ExecutorService
+
 class ScheduledMethodWatcherSpec extends Specification {
+
+    void "a scheduled method keeps running when the executor of its scheduler is recreated"() {
+        given:
+        def context = ApplicationContext.builder(["spec.name": "ScheduledMethodWatcherSpec"])
+                .beanDependencyTrackingEnabled(true)
+                .start()
+        def task = context.getBean(WatchedTask)
+        def executor = context.getBean(ExecutorService, Qualifiers.byName(TaskExecutors.SCHEDULED))
+        def scheduler = context.getBean(TaskScheduler, Qualifiers.byName(TaskExecutors.SCHEDULED))
+        def processor = context.getBean(ScheduledMethodProcessor)
+        PollingConditions conditions = new PollingConditions(timeout: 5)
+
+        expect:
+        conditions.eventually { task.runs.get() > 2 }
+        processor.scheduledMethods() == 1
+
+        and: "the scheduler is recorded as holding the executor, a member of an @EachBean set looked up after it was created, and the processor as holding the scheduler"
+        def graph = context.findDependencyGraph().get()
+        def executorDefinition = context.getBeanRegistration(ExecutorService, Qualifiers.byName(TaskExecutors.SCHEDULED)).beanDefinition
+        graph.dependentsOf(executorDefinition).any { !it.lazy() && it.dependent().beanType == ScheduledExecutorTaskScheduler }
+        graph.transitiveDependentsOf(executorDefinition)*.beanType.contains(ScheduledMethodProcessor)
+
+        when: "the executor is recreated, as a refresh of its configuration does"
+        boolean recreated = context.recreate(ExecutorService, Qualifiers.byName(TaskExecutors.SCHEDULED))
+        def newExecutor = context.getBean(ExecutorService, Qualifiers.byName(TaskExecutors.SCHEDULED))
+        def newScheduler = context.getBean(TaskScheduler, Qualifiers.byName(TaskExecutors.SCHEDULED))
+        def newProcessor = context.getBean(ScheduledMethodProcessor)
+        int before = task.runs.get()
+
+        then: "the old executor is shut down, the scheduler wrapping it is replaced, and the timer runs on the new one"
+        recreated
+        executor.isShutdown()
+        !newExecutor.isShutdown()
+        !newScheduler.is(scheduler)
+        conditions.eventually { task.runs.get() > before + 2 }
+
+        and: "the processor holding the scheduler was recreated with it, and scheduled the method once on the new one"
+        !newProcessor.is(processor)
+        processor.scheduledMethods() == 0
+        newProcessor.scheduledMethods() == 1
+
+        and: "a new schedule is accepted"
+        newScheduler.schedule(Duration.ofMillis(1), {} as Runnable) != null
+
+        cleanup:
+        context.close()
+    }
 
     void "a scheduled method keeps its timer when it comes back unchanged, and loses it when it goes"() {
         given:
