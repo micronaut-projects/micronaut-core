@@ -166,4 +166,37 @@ class TypeHierarchySpec extends Specification {
         cleanup:
         TypeHierarchies.invalidate()
     }
+
+    void "a type recorded from several packages is found in the record that names the most, whatever the order (#order)"() {
+        given: "the records of Payload and ArrayList written from two packages each, listed in the given order"
+        def serviceDir = tempDir.resolve("META-INF/micronaut/" + TypeHierarchy.name)
+        Files.createDirectories(serviceDir)
+        def records = [
+            $Records$Payload$TypeHierarchy.name,
+            'io.micronaut.core.type.$$io.micronaut.core.type.hierarchy.$Records$Payload$TypeHierarchy',
+            $ArrayList$TypeHierarchy.name,
+            'io.micronaut.core.type.$$java.util.$ArrayList$TypeHierarchy'
+        ]
+        (order == 'forward' ? records : records.reverse()).each { Files.createFile(serviceDir.resolve(it)) }
+        def classLoader = new URLClassLoader([tempDir.toUri().toURL()] as URL[], getClass().classLoader)
+        TypeHierarchies.invalidate()
+
+        when:
+        def payload = TypeHierarchies.find(Payload.name, classLoader).get()
+        def arrayList = TypeHierarchies.find(ArrayList.name, classLoader).get()
+
+        then: "the record in the package of the type, which sorts after the other"
+        payload.class == $Records$Payload$TypeHierarchy
+        string(payload.genericSuperclass.get()) == 'ArrayList<T>'
+
+        and: "of two records written outside the package of the type, the one that left nothing out, which sorts after the other"
+        arrayList.class == $ArrayList$TypeHierarchy
+        arrayList.inaccessibleSuperTypes.empty
+
+        cleanup:
+        TypeHierarchies.invalidate()
+
+        where:
+        order << ['forward', 'reverse']
+    }
 }

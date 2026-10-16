@@ -96,8 +96,9 @@ public final class TypeHierarchyWriter {
     }
 
     /**
-     * Writes the record of a type. A type recorded several times in a compilation is written once: a compiler that
-     * refuses a second write of the same class is taken at its word.
+     * Writes the record of a type. A type recorded several times into the same package is written once: a
+     * compiler that refuses a second write of the same class is taken at its word. A type recorded from several
+     * packages is written into each, see {@link TypeHierarchies#find(String, ClassLoader)}.
      *
      * @param type                The type
      * @param recordName          The name of the record, from {@link #recordClassName(ClassElement, Element...)}

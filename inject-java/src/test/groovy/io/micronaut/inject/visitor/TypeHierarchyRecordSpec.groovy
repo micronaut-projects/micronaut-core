@@ -285,6 +285,48 @@ public class Payload extends Base<String> {
         payload.inaccessibleSuperTypes.empty
     }
 
+    void "a type recorded from its own package and from another is found in the record of its own package"() {
+        given:
+        def classLoader = buildClassLoader(new JavaFiles()
+            .add('p.Base', '''
+package p;
+
+class Base<T> implements java.util.function.Supplier<T> {
+    public T get() { return null; }
+}
+''')
+            .add('p.Sub', '''
+package p;
+
+public class Sub<T> extends Base<T> {
+}
+''')
+            .add('p.Local', '''
+package p;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = Sub.class)
+public class Local {
+}
+''')
+            .add('q.Foreign', '''
+package q;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = p.Sub.class)
+public class Foreign {
+}
+'''))
+        def local = record(classLoader, 'p.Sub')
+        def foreign = record(classLoader, 'p.Sub', 'q')
+
+        expect: "each record names what its package can"
+        strings(local.superTypes) == ['Base<T>', 'Supplier<T>', 'Object']
+        local.inaccessibleSuperTypes.empty
+        strings(foreign.superTypes) == ['Supplier<T>', 'Object']
+        foreign.inaccessibleSuperTypes == ['p.Base']
+        // the in-memory class loader of the test lists no service entries: which record a lookup prefers is the
+        // subject of TypeHierarchySpec in core
+    }
+
     void "a generic type met twice is checked with the arguments of each use"() {
         given:
         def classLoader = buildClassLoader(new JavaFiles()
