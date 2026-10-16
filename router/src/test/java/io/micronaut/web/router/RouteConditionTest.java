@@ -28,8 +28,8 @@ import io.micronaut.web.router.builder.Cidr;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.RequestPredicates;
-import io.micronaut.web.router.builder.RouteCondition;
-import io.micronaut.web.router.builder.RouteConditions;
+import io.micronaut.web.router.builder.RequestCondition;
+import io.micronaut.web.router.builder.RequestConditions;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -41,19 +41,19 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import static io.micronaut.web.router.builder.RouteCondition.after;
-import static io.micronaut.web.router.builder.RouteCondition.all;
-import static io.micronaut.web.router.builder.RouteCondition.any;
-import static io.micronaut.web.router.builder.RouteCondition.before;
-import static io.micronaut.web.router.builder.RouteCondition.between;
-import static io.micronaut.web.router.builder.RouteCondition.cookie;
-import static io.micronaut.web.router.builder.RouteCondition.custom;
-import static io.micronaut.web.router.builder.RouteCondition.header;
-import static io.micronaut.web.router.builder.RouteCondition.host;
-import static io.micronaut.web.router.builder.RouteCondition.method;
-import static io.micronaut.web.router.builder.RouteCondition.not;
-import static io.micronaut.web.router.builder.RouteCondition.query;
-import static io.micronaut.web.router.builder.RouteCondition.remoteAddress;
+import static io.micronaut.web.router.builder.RequestCondition.after;
+import static io.micronaut.web.router.builder.RequestCondition.all;
+import static io.micronaut.web.router.builder.RequestCondition.any;
+import static io.micronaut.web.router.builder.RequestCondition.before;
+import static io.micronaut.web.router.builder.RequestCondition.between;
+import static io.micronaut.web.router.builder.RequestCondition.cookie;
+import static io.micronaut.web.router.builder.RequestCondition.custom;
+import static io.micronaut.web.router.builder.RequestCondition.header;
+import static io.micronaut.web.router.builder.RequestCondition.host;
+import static io.micronaut.web.router.builder.RequestCondition.method;
+import static io.micronaut.web.router.builder.RequestCondition.not;
+import static io.micronaut.web.router.builder.RequestCondition.query;
+import static io.micronaut.web.router.builder.RequestCondition.remoteAddress;
 import static io.micronaut.web.router.builder.ValueMatcher.endsWith;
 import static io.micronaut.web.router.builder.ValueMatcher.equalTo;
 import static io.micronaut.web.router.builder.ValueMatcher.oneOf;
@@ -70,7 +70,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The {@link RouteCondition} conditions: their evaluation, the conditions of the server, and the
+ * The {@link RequestCondition} conditions: their evaluation, the conditions of the server, and the
  * routes they select.
  */
 class RouteConditionTest {
@@ -149,15 +149,15 @@ class RouteConditionTest {
 
         // the server resolves the host, e.g. from a forwarded header, as a URI
         RouteConditionContext resolving = context(request -> "https://API.example.com.:8443", null, null);
-        RouteCondition api = host(equalTo("api.example.com"));
-        assertTrue(RouteConditions.matches(api, withHost("internal.local"), resolving));
-        assertFalse(RouteConditions.matches(api, withHost("internal.local"), RouteConditionContext.fallback()));
-        assertFalse(RouteConditions.matches(api, withHost("api.example.com"), context(request -> null, null, null)), "no resolved host");
+        RequestCondition api = host(equalTo("api.example.com"));
+        assertTrue(RequestConditions.matches(api, withHost("internal.local"), resolving));
+        assertFalse(RequestConditions.matches(api, withHost("internal.local"), RouteConditionContext.fallback()));
+        assertFalse(RequestConditions.matches(api, withHost("api.example.com"), context(request -> null, null, null)), "no resolved host");
     }
 
     @Test
     void remoteAddressConditionsReadTheAddressAsTheServerResolvesIt() {
-        RouteCondition privateNetworks = remoteAddress("10.0.0.0/8", "192.168.0.0/16", "fd00::/8");
+        RequestCondition privateNetworks = remoteAddress("10.0.0.0/8", "192.168.0.0/16", "fd00::/8");
         assertTrue(meets(privateNetworks, from("10.1.2.3")), "the peer of the connection");
         assertFalse(meets(privateNetworks, from("11.0.0.1")));
         assertTrue(meets(privateNetworks, from("fd12:3456::1")));
@@ -165,15 +165,15 @@ class RouteConditionTest {
         assertFalse(meets(privateNetworks, HttpRequest.GET("/x")), "no address");
 
         RouteConditionContext resolving = context(null, request -> request.getHeaders().get("X-Client"), null);
-        assertTrue(RouteConditions.matches(privateNetworks, HttpRequest.GET("/x").header("X-Client", "10.0.0.1:4711"), resolving));
-        assertTrue(RouteConditions.matches(privateNetworks, HttpRequest.GET("/x").header("X-Client", "[fd00::1]:4711"), resolving));
-        assertFalse(RouteConditions.matches(privateNetworks, HttpRequest.GET("/x").header("X-Client", "unknown"), resolving), "not an address");
-        assertFalse(RouteConditions.matches(privateNetworks, HttpRequest.GET("/x").header("X-Client", "localhost"), resolving), "a name is not looked up");
+        assertTrue(RequestConditions.matches(privateNetworks, HttpRequest.GET("/x").header("X-Client", "10.0.0.1:4711"), resolving));
+        assertTrue(RequestConditions.matches(privateNetworks, HttpRequest.GET("/x").header("X-Client", "[fd00::1]:4711"), resolving));
+        assertFalse(RequestConditions.matches(privateNetworks, HttpRequest.GET("/x").header("X-Client", "unknown"), resolving), "not an address");
+        assertFalse(RequestConditions.matches(privateNetworks, HttpRequest.GET("/x").header("X-Client", "localhost"), resolving), "a name is not looked up");
 
         assertEquals("10.0.0.0/8", Cidr.parse("10.1.2.3/8").toString(), "the host bits are cleared");
         assertThrows(IllegalArgumentException.class, () -> remoteAddress("example.com/24"));
         assertThrows(IllegalArgumentException.class, () -> remoteAddress("10.0.0.0/33"));
-        assertThrows(IllegalArgumentException.class, RouteCondition::remoteAddress);
+        assertThrows(IllegalArgumentException.class, RequestCondition::remoteAddress);
     }
 
     @Test
@@ -182,15 +182,15 @@ class RouteConditionTest {
         RouteConditionContext beforeNoon = context(null, null, Clock.fixed(NOON.minusSeconds(1), ZoneOffset.UTC));
         RouteConditionContext atNoon = context(null, null, Clock.fixed(NOON, ZoneOffset.UTC));
 
-        assertTrue(RouteConditions.matches(before(NOON), request, beforeNoon));
-        assertFalse(RouteConditions.matches(before(NOON), request, atNoon), "the end is excluded");
-        assertFalse(RouteConditions.matches(after(NOON), request, beforeNoon));
-        assertTrue(RouteConditions.matches(after(NOON), request, atNoon), "the start is included");
-        assertTrue(RouteConditions.matches(between(NOON, NOON.plusSeconds(60)), request, atNoon));
-        assertFalse(RouteConditions.matches(between(NOON, NOON), request, atNoon), "an empty period");
+        assertTrue(RequestConditions.matches(before(NOON), request, beforeNoon));
+        assertFalse(RequestConditions.matches(before(NOON), request, atNoon), "the end is excluded");
+        assertFalse(RequestConditions.matches(after(NOON), request, beforeNoon));
+        assertTrue(RequestConditions.matches(after(NOON), request, atNoon), "the start is included");
+        assertTrue(RequestConditions.matches(between(NOON, NOON.plusSeconds(60)), request, atNoon));
+        assertFalse(RequestConditions.matches(between(NOON, NOON), request, atNoon), "an empty period");
         Instant inverted = NOON.minusSeconds(1);
         assertThrows(IllegalArgumentException.class, () -> between(NOON, inverted));
-        assertThrows(IllegalArgumentException.class, () -> new RouteCondition.TimeWindow(null, null));
+        assertThrows(IllegalArgumentException.class, () -> new RequestCondition.TimeWindow(null, null));
 
         assertTrue(meets(after(Instant.EPOCH), request), "the system clock");
     }
@@ -206,18 +206,18 @@ class RouteConditionTest {
         assertTrue(meets(not(header("X-B")), request));
         assertTrue(meets(header("X-A").and(custom(r -> r.getPath().equals("/x"))), request), "with a lambda");
         assertTrue(meets(header("X-B").or(custom(r -> true)), request));
-        assertInstanceOf(RouteCondition.AllOf.class, header("X-A").and(header("X-B")));
-        RouteCondition withLambda = header("X-A").or(custom(r -> true));
-        assertInstanceOf(RouteCondition.Custom.class, assertInstanceOf(RouteCondition.AnyOf.class, withLambda).conditions().get(1), "a lambda is a custom condition");
-        RouteCondition condition = header("X-A");
+        assertInstanceOf(RequestCondition.AllOf.class, header("X-A").and(header("X-B")));
+        RequestCondition withLambda = header("X-A").or(custom(r -> true));
+        assertInstanceOf(RequestCondition.Custom.class, assertInstanceOf(RequestCondition.AnyOf.class, withLambda).conditions().get(1), "a lambda is a custom condition");
+        RequestCondition condition = header("X-A");
         assertSame(condition, condition.negate().negate());
 
         // the conditions of RequestPredicates compose as conditions
-        RouteCondition composed = RequestPredicates.header("X-A").and(RequestPredicates.header("X-B").negate())
+        RequestCondition composed = RequestPredicates.header("X-A").and(RequestPredicates.header("X-B").negate())
             .or(RequestPredicates.queryParam("force"));
         assertTrue(meets(composed, request));
-        assertInstanceOf(RouteCondition.class, composed);
-        assertInstanceOf(RouteCondition.Custom.class, RequestPredicates.accept(MediaType.TEXT_CSV_TYPE));
+        assertInstanceOf(RequestCondition.class, composed);
+        assertInstanceOf(RequestCondition.Custom.class, RequestPredicates.accept(MediaType.TEXT_CSV_TYPE));
         assertEquals(header("X-A"), RequestPredicates.header("X-A"));
         assertEquals(query("format", "csv"), RequestPredicates.queryParam("format", "csv"));
     }
@@ -244,7 +244,7 @@ class RouteConditionTest {
     void theRouteInfoShowsTheNormalizedConditions() {
         Predicate<HttpRequest<?>> lambda = request -> true;
         Router router = router(routes -> routes.path("/beta", beta -> {
-            beta.where(RouteCondition.custom(lambda).and(header("X-Beta")));
+            beta.where(RequestCondition.custom(lambda).and(header("X-Beta")));
             beta.GET("/search")
                 .where(method(HttpMethod.GET))
                 .where(query("q", regex("\\w+")))
@@ -256,12 +256,12 @@ class RouteConditionTest {
         search.getParameters().add("q", List.of("abc"));
         UriRouteMatch<Object, Object> match = router.findClosest(search);
         assertNotNull(match);
-        assertEquals(List.of(method(HttpMethod.GET), header("X-Beta"), query("q", regex("\\w+")), new RouteCondition.Custom(lambda)),
+        assertEquals(List.of(method(HttpMethod.GET), header("X-Beta"), query("q", regex("\\w+")), new RequestCondition.Custom(lambda)),
             match.getRouteInfo().getConditions(), "the group's and the route's conditions, cheapest first, the lambda last");
 
         UriRouteMatch<Object, Object> plain = router.findClosest(HttpRequest.GET("/beta/plain").header("X-Beta", "1"));
         assertNotNull(plain);
-        assertEquals(List.of(header("X-Beta"), new RouteCondition.Custom(lambda)), plain.getRouteInfo().getConditions());
+        assertEquals(List.of(header("X-Beta"), new RequestCondition.Custom(lambda)), plain.getRouteInfo().getConditions());
 
         Router unconditioned = router(routes -> routes.GET("/free", (request, pathVariables) -> HttpResponse.ok("free")));
         UriRouteMatch<Object, Object> free = unconditioned.findClosest(HttpRequest.GET("/free"));
@@ -323,7 +323,7 @@ class RouteConditionTest {
         }
     }
 
-    private static boolean meets(io.micronaut.web.router.builder.RouteCondition condition, io.micronaut.http.HttpRequest<?> request) {
-        return io.micronaut.web.router.builder.RouteConditions.matches(condition, request, RouteConditionContext.fallback());
+    private static boolean meets(io.micronaut.web.router.builder.RequestCondition condition, io.micronaut.http.HttpRequest<?> request) {
+        return io.micronaut.web.router.builder.RequestConditions.matches(condition, request, RouteConditionContext.fallback());
     }
 }
