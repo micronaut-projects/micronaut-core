@@ -70,6 +70,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
@@ -125,7 +126,7 @@ final class NettyDirectRoutes {
     /**
      * The {@code Date} header of the current second, encoded once.
      */
-    private volatile @Nullable EncodedDate date;
+    private final AtomicReference<@Nullable EncodedDate> date = new AtomicReference<>();
     /**
      * The message body writers of the bodies that are neither bytes nor text, looked up once per
      * type and media type.
@@ -431,10 +432,10 @@ final class NettyDirectRoutes {
     private CharSequence date() {
         long millis = System.currentTimeMillis();
         long second = Math.floorDiv(millis, 1000);
-        EncodedDate encoded = date;
+        EncodedDate encoded = date.get();
         if (encoded == null || encoded.second() != second) {
             encoded = new EncodedDate(second, new AsciiString(HttpDateHeader.get(millis)));
-            date = encoded;
+            date.set(encoded);
         }
         return encoded.ascii();
     }
