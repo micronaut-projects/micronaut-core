@@ -46,6 +46,11 @@ final class RawHttp implements AutoCloseable {
     final Socket socket;
     final InputStream in;
     final OutputStream out;
+    /**
+     * The thread still writing the previous request, e.g. a body the server answered before it was sent: the next
+     * request is written after it, or the two would interleave on the connection.
+     */
+    private Thread writer;
 
     RawHttp(int port) throws IOException {
         Socket plain = new Socket();
@@ -172,6 +177,7 @@ final class RawHttp implements AutoCloseable {
         sb.append("\r\n");
         // write on a separate thread: a server may answer (and stop reading) before the body is sent
         byte[] head = sb.toString().getBytes(StandardCharsets.ISO_8859_1);
+        awaitWriter();
         Thread t = new Thread(() -> {
             try {
                 out.write(head);
@@ -201,7 +207,24 @@ final class RawHttp implements AutoCloseable {
             }
         }, "raw-writer");
         t.setDaemon(true);
+        writer = t;
         t.start();
+    }
+
+    private void awaitWriter() throws IOException {
+        Thread previous = writer;
+        if (previous == null) {
+            return;
+        }
+        try {
+            previous.join(TIMEOUT_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while the previous request was written", e);
+        }
+        if (previous.isAlive()) {
+            throw new IOException("The previous request is still being written after " + TIMEOUT_MS + "ms");
+        }
     }
 
     private String readLine() throws IOException {
