@@ -29,7 +29,13 @@ import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
+import io.micronaut.runtime.context.scope.refresh.RefreshResult;
+import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -42,6 +48,9 @@ import java.util.Set;
  * @since 5.3.0
  */
 final class ConfigurationStaleness {
+
+    // the runtime's logger: what is logged here is logged as the runtime's
+    private static final Logger LOG = LoggerFactory.getLogger(DevRuntime.class);
 
     private ConfigurationStaleness() {
     }
@@ -105,5 +114,43 @@ final class ConfigurationStaleness {
             }
         }
         return false;
+    }
+
+    /**
+     * Refreshes the configuration of the running context.
+     *
+     * @return The result, or null when the context is not running or has no refresher, which restarts instead
+     */
+    @Nullable
+    static RefreshResult refreshConfiguration(@Nullable ApplicationContext current) {
+        if (current == null || !current.isRunning()) {
+            return null;
+        }
+        try {
+            return current.findBean(ConfigurationRefresher.class).map(ConfigurationRefresher::refresh).orElse(null);
+        } catch (RuntimeException e) {
+            LOG.warn("The configuration could not be refreshed in place ({}): restarting instead", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * The definitions a context has of the given classes.
+     *
+     * @param applicationContext The context
+     * @param classNames The classes, by name
+     * @return Their definitions
+     */
+    static List<BeanDefinition<?>> definitionsNamed(ApplicationContext applicationContext, Set<String> classNames) {
+        List<BeanDefinition<?>> definitions = new ArrayList<>();
+        if (classNames.isEmpty()) {
+            return definitions;
+        }
+        for (BeanDefinition<?> definition : applicationContext.getAllBeanDefinitions()) {
+            if (classNames.contains(definition.getBeanType().getName())) {
+                definitions.add(definition);
+            }
+        }
+        return definitions;
     }
 }

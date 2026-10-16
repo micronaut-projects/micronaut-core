@@ -19,6 +19,7 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.context.reload.InPlaceResourceReloader;
 import io.micronaut.core.annotation.Internal;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
@@ -38,6 +39,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 
 /**
  * Patches edited Python modules into the running application, for development mode.
@@ -70,10 +72,25 @@ final class PythonInPlaceReloader implements InPlaceResourceReloader {
     private static final Duration CONTEXT_TIMEOUT = Duration.ofSeconds(30);
     private static final int MAX_PASSES = 4;
 
-    private final BeanProvider<PythonApplicationRuntime> runtime;
+    private final Supplier<PythonApplicationRuntime> runtime;
 
+    @Inject
     PythonInPlaceReloader(BeanProvider<PythonApplicationRuntime> runtime) {
+        this.runtime = runtime::get;
+    }
+
+    private PythonInPlaceReloader(Supplier<PythonApplicationRuntime> runtime) {
         this.runtime = runtime;
+    }
+
+    /**
+     * A reloader of the application runtime installed when it reloads, rather than of a context's.
+     *
+     * @return The reloader
+     */
+    static PythonInPlaceReloader ofInstalledRuntime() {
+        Supplier<PythonApplicationRuntime> installed = PythonApplicationRuntime::require;
+        return new PythonInPlaceReloader(installed);
     }
 
     @Override
