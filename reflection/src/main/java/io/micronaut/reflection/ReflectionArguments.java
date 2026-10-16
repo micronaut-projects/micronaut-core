@@ -512,7 +512,8 @@ public final class ReflectionArguments {
      * reads one.
      *
      * <p>The super types of a variable or of a wildcard are those of the type it is bounded by, and the closure
-     * of a primitive is the primitive alone.</p>
+     * of a primitive is the primitive alone. The super types of a raw argument, a generic type used without its
+     * type arguments, are raw, and so are those above a super type written raw (JLS 4.8).</p>
      *
      * <p>An array is an array of each super type of its component, with the arguments of the component, then,
      * for an array of arrays, an array of {@code Object}, {@code Cloneable} and {@code Serializable} of each fewer
@@ -538,8 +539,13 @@ public final class ReflectionArguments {
         Set<Class<?>> collected = new HashSet<>();
         collected.add(type);
         Map<TypeVariable<?>, AnnotatedType> substitutions = new HashMap<>();
-        collectTypeSubstitutions(toExactType(argument), substitutions);
-        collectSupertypes(type, substitutions, closure, collected);
+        // a generic type used without its type arguments is raw, and so is every type above it (JLS 4.8)
+        int variables = type.getTypeParameters().length;
+        boolean raw = variables > 0 && (argument.isRawType() || argument.getTypeParameters().length != variables);
+        if (!raw) {
+            collectTypeSubstitutions(toExactType(argument), substitutions);
+        }
+        collectSupertypes(type, substitutions, raw, closure, collected);
         if (collected.add(Object.class)) {
             // an interface has no superclass to reach it through
             closure.add(Argument.OBJECT_ARGUMENT);
@@ -562,7 +568,8 @@ public final class ReflectionArguments {
         Set<Class<?>> collected = new HashSet<>();
         collected.add(array.getType());
         if (!component.isPrimitive()) {
-            // an array carries the type arguments of its component, List<String>[] being a List[] of String
+            // an array carries the type arguments of its component, List<String>[] being a List[] of String, and
+            // the component of a raw array is raw, its super types erased before they are made arrays
             Argument<?>[] typeParameters = array.getTypeParameters();
             Argument<?> componentArgument = !array.isRawType() && typeParameters.length > 0 && typeParameters.length == component.getTypeParameters().length
                 ? Argument.of(component, (String) null, typeParameters)
@@ -594,21 +601,40 @@ public final class ReflectionArguments {
         closure.add(Argument.OBJECT_ARGUMENT);
     }
 
+    /**
+     * Collects the super types of a type, each once; those of a raw type, and of a super type written raw, are
+     * erased, as the processors list them.
+     */
     private static void collectSupertypes(Class<?> type,
                                           Map<TypeVariable<?>, AnnotatedType> substitutions,
+                                          boolean raw,
                                           List<Argument<?>> closure,
                                           Set<Class<?>> collected) {
         for (AnnotatedType supertype : getSupertypes(type).toList()) {
-            Class<?> raw = getRawType(supertype.getType());
-            if (!collected.add(raw)) {
+            Class<?> erasure = getRawType(supertype.getType());
+            if (!collected.add(erasure)) {
                 continue;
             }
             AnnotatedType resolved = substitutions.isEmpty() ? supertype : new LazySubstitutingType(supertype, substitutions);
-            closure.add(toArgument(null, resolved, Map.of(), Set.of(), true));
+            Argument<?> superArgument = toArgument(null, resolved, Map.of(), Set.of(), true);
+            boolean superRaw = raw || (supertype.getType() instanceof Class<?> && erasure.getTypeParameters().length > 0);
+            closure.add(raw ? erase(superArgument) : superArgument);
             Map<TypeVariable<?>, AnnotatedType> own = new HashMap<>();
-            collectTypeSubstitutions(resolved, own);
-            collectSupertypes(raw, own, closure, collected);
+            if (!superRaw) {
+                collectTypeSubstitutions(resolved, own);
+            }
+            collectSupertypes(erasure, own, superRaw, closure, collected);
         }
+    }
+
+    /**
+     * The erasure of a super type of a raw type: the type without its arguments, marked raw when it declares any.
+     */
+    private static Argument<?> erase(Argument<?> superType) {
+        if (superType.isRawType() || superType.getTypeParameters().length == 0) {
+            return superType;
+        }
+        return Argument.ofRawType(superType.getType(), superType.getName(), superType.getAnnotationMetadata(), superType.getTypeParameters());
     }
 
     private static Argument<?> withElementAnnotations(Argument<?> argument, AnnotatedElement element) {

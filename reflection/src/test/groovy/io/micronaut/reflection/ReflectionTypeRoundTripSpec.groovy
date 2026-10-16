@@ -324,4 +324,29 @@ class Shelf {
         matrix*.type.containsAll([Iterable[][], Object[][], Object[], Cloneable[], Serializable[], Cloneable, Serializable])
         matrix.last().type == Object
     }
+
+    void "the super types of a raw type, and the arrays of them for a raw array, are raw"() {
+        given:
+        def raw = ReflectionArguments.ofExact(List)
+        def closures = [raw, raw.arrayType(), raw.arrayType().arrayType()].collect { ReflectionArguments.typeClosureOf(it) }
+
+        expect: "List, List[] and List[][] list Collection and Iterable of as many dimensions, raw, as the processors list them (JLS 4.8)"
+        raw.isRawType()
+        closures.eachWithIndex { closure, dimensions ->
+            def generic = closure.findAll { it.type in [SequencedCollection, Collection, Iterable].collect { type -> dimensions.times { type = type.arrayType() }; type } }
+            assert generic*.type.containsAll([Collection, Iterable].collect { type -> dimensions.times { type = type.arrayType() }; type })
+            assert generic.every { it.isRawType() }
+            assert generic.every { ReflectionArguments.toExactType(it) instanceof Class }
+        }
+
+        and: "a super type written raw erases those above it"
+        def books = ReflectionArguments.typeClosureOf(Argument.of(RawList))
+        books.find { it.type == ArrayList }.isRawType()
+        books.find { it.type == Collection }.isRawType()
+        ReflectionArguments.toExactType(books.find { it.type == Iterable }) == Iterable
+    }
+
+    @SuppressWarnings("rawtypes")
+    static abstract class RawList extends ArrayList {
+    }
 }
