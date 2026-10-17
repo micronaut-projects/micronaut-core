@@ -91,6 +91,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -113,6 +114,8 @@ class ResponseCallbacksTest {
     private static EmbeddedServer server;
     private static ApplicationContext h2Ctx;
     private static EmbeddedServer h2Server;
+    private static ApplicationContext legacyCtx;
+    private static EmbeddedServer legacyServer;
     private static EventLoopGroup group;
 
     @BeforeAll
@@ -129,6 +132,14 @@ class ResponseCallbacksTest {
             "micronaut.server.ssl.enabled", false
         ));
         h2Server = h2Ctx.getBean(EmbeddedServer.class).start();
+        legacyCtx = ApplicationContext.run(Map.of(
+            "spec.name", SPEC_NAME,
+            "micronaut.server.port", -1,
+            "micronaut.server.http-version", "2.0",
+            "micronaut.server.ssl.enabled", false,
+            "micronaut.server.netty.legacy-multiplex-handlers", true
+        ));
+        legacyServer = legacyCtx.getBean(EmbeddedServer.class).start();
         group = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
     }
 
@@ -142,6 +153,9 @@ class ResponseCallbacksTest {
         }
         if (h2Ctx != null) {
             h2Ctx.close();
+        }
+        if (legacyCtx != null) {
+            legacyCtx.close();
         }
     }
 
@@ -332,6 +346,63 @@ class ResponseCallbacksTest {
         } finally {
             channel.close().sync();
         }
+    }
+
+    @Test
+    void successfulHttp2ResponsesCompleteOnceAndAreNotAbandonedByALaterClose() throws Exception {
+        for (ApplicationContext context : new ApplicationContext[]{h2Ctx, legacyCtx}) {
+            String mode = context == h2Ctx ? "h2" : "legacy";
+            Recorder recorder = context.getBean(Recorder.class);
+            String[] ids = {mode + "-full", mode + "-bodyless", mode + "-streamed"};
+            String[] paths = {"/handler/ok?id=" + ids[0], "/handler/no-content?id=" + ids[1], "/callbacks/stream-ok?id=" + ids[2]};
+            H2Client client = new H2Client();
+            Channel channel = connectHttp2(client, context == h2Ctx ? h2Server : legacyServer);
+            for (String path : paths) {
+                request(channel, client, path);
+            }
+            for (String id : ids) {
+                assertNull(failure(context, id), id);
+            }
+            channel.close().sync();
+            Thread.sleep(200);
+            for (String id : ids) {
+                assertEquals(1, recorder.invocations(id).get(), id);
+                assertFalse(recorder.abandoned(id).isDone(), id);
+            }
+        }
+    }
+
+    @Test
+    void anUpgradedWebSocketSessionThatClosesNormallyCompletesWithoutFailure() throws Exception {
+        Recorder recorder = ctx.getBean(Recorder.class);
+        try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+            socket.setSoTimeout((int) TIMEOUT_MILLIS);
+            OutputStream out = socket.getOutputStream();
+            out.write(webSocketUpgrade("/ws-callbacks/ok?id=ws-ok"));
+            out.flush();
+            InputStream in = socket.getInputStream();
+            String response = readUntil(in, "\r\n\r\n");
+            assertTrue(response.startsWith("HTTP/1.1 101"), response);
+            // a masked close frame with status 1000; the server answers with its close frame
+            out.write(new byte[]{(byte) 0x88, (byte) 0x82, 0, 0, 0, 0, 0x03, (byte) 0xE8});
+            out.flush();
+            assertEquals(0x88, in.read());
+        }
+        assertNull(failure(ctx, "ws-ok"));
+        assertFalse(recorder.abandoned("ws-ok").isDone());
+    }
+
+    @Test
+    void anUnhandledErrorOfAReplacedWebSocketRequestIsReported() throws Exception {
+        try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+            socket.setSoTimeout((int) TIMEOUT_MILLIS);
+            OutputStream out = socket.getOutputStream();
+            out.write(webSocketUpgrade("/ws-callbacks/replaced-error?id=ws-replaced"));
+            out.flush();
+            String response = readUntil(socket.getInputStream(), "\r\n\r\n");
+            assertTrue(response.startsWith("HTTP/1.1 500"), response);
+        }
+        assertEquals("ws downstream failed", failure(ctx, "ws-replaced").getMessage());
     }
 
     @Test
@@ -548,10 +619,14 @@ class ResponseCallbacksTest {
     }
 
     private static Channel connectHttp2(H2Client client) throws InterruptedException {
+        return connectHttp2(client, h2Server);
+    }
+
+    private static Channel connectHttp2(H2Client client, EmbeddedServer target) throws InterruptedException {
         return new Bootstrap()
             .group(group)
             .channel(NioSocketChannel.class)
-            .remoteAddress(h2Server.getHost(), h2Server.getPort())
+            .remoteAddress(target.getHost(), target.getPort())
             .handler(new ChannelInitializer<SocketChannel>() {
                 @Override
                 protected void initChannel(SocketChannel ch) {
@@ -603,6 +678,7 @@ class ResponseCallbacksTest {
         final Map<String, CompletableFuture<Void>> abandoned = new ConcurrentHashMap<>();
         final Map<String, CompletableFuture<Boolean>> abandonedAfterFailure = new ConcurrentHashMap<>();
         final Map<String, AtomicBoolean> removedRan = new ConcurrentHashMap<>();
+        final Map<String, AtomicInteger> invocations = new ConcurrentHashMap<>();
         final Map<String, CompletableFuture<Void>> gates = new ConcurrentHashMap<>();
         final Map<String, CompletableFuture<CompletableFuture<HttpResponse<?>>>> pending = new ConcurrentHashMap<>();
 
@@ -616,6 +692,10 @@ class ResponseCallbacksTest {
 
         CompletableFuture<Boolean> abandonedAfterFailure(String id) {
             return abandonedAfterFailure.computeIfAbsent(id, k -> new CompletableFuture<>());
+        }
+
+        AtomicInteger invocations(String id) {
+            return invocations.computeIfAbsent(id, k -> new AtomicInteger());
         }
 
         AtomicBoolean removedRan(String id) {
@@ -639,7 +719,10 @@ class ResponseCallbacksTest {
         String register(HttpRequest<?> request) {
             String id = capture(request);
             ServerHttpRequest<?> serverRequest = (ServerHttpRequest<?>) request;
-            assertTrue(serverRequest.whenResponseCompleted(failure -> completion(id).complete(Optional.ofNullable(failure))));
+            assertTrue(serverRequest.whenResponseCompleted(failure -> {
+                invocations(id).incrementAndGet();
+                completion(id).complete(Optional.ofNullable(failure));
+            }));
             assertNotNull(serverRequest.whenAbandoned(() -> abandoned(id).complete(null)));
             return id;
         }
@@ -679,6 +762,10 @@ class ResponseCallbacksTest {
                 String id = recorder.register(request);
                 recorder.channels.put(id, ((NettyHttpRequest<?>) request).getChannelHandlerContext().channel());
                 return HttpResponse.ok("ok").contentType(MediaType.TEXT_PLAIN_TYPE);
+            });
+            routes.GET("/handler/no-content").handle((request, pathVariables) -> {
+                recorder.register(request);
+                return HttpResponse.noContent();
             });
             routes.GET("/handler/unregistered").handle((request, pathVariables) -> {
                 recorder.capture(request);
@@ -762,6 +849,12 @@ class ResponseCallbacksTest {
                 .then(Mono.error(new IllegalStateException("body failed"))));
         }
 
+        @Get(value = "/stream-ok", produces = MediaType.TEXT_PLAIN)
+        Publisher<String> streamOk(HttpRequest<?> request) {
+            recorder.register(request);
+            return Flux.just("a", "b", "c");
+        }
+
         @Get("/handled")
         String handled(HttpRequest<?> request) {
             recorder.register(request);
@@ -830,6 +923,20 @@ class ResponseCallbacksTest {
     static final class HandledException extends RuntimeException {
     }
 
+    @Filter("/ws-callbacks/replaced-error")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class ThrowingWebSocketFilter implements HttpServerFilter {
+        @Override
+        public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+            throw new IllegalStateException("ws downstream failed");
+        }
+
+        @Override
+        public int getOrder() {
+            return 10;
+        }
+    }
+
     @ServerWebSocket("/ws-callbacks/{name}")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class CallbacksWebSocket {
@@ -853,6 +960,13 @@ class ResponseCallbacksTest {
             String id = recorder.register(request);
             if (request.getPath().endsWith("/rejected")) {
                 return Mono.just(HttpResponse.status(HttpStatus.FORBIDDEN));
+            }
+            if (request.getPath().endsWith("/ok")) {
+                return chain.proceed(request);
+            }
+            if (request.getPath().endsWith("/replaced-error")) {
+                // continues with a request that has nothing to do with the received one
+                return chain.proceed(HttpRequest.GET(request.getPath()));
             }
             // never answers: the client goes away first
             recorder.gate(id).complete(null);

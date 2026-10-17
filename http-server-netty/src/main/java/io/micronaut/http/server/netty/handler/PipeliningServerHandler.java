@@ -1479,6 +1479,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 recorded = requiredCtx().newPromise();
                 outboundAccess.finalWrite = recorded;
             }
+            if (!last) {
+                writeIntermediate(content, flush, close);
+                return;
+            }
             // the recorded promise is the promise of the write, so that it completes before the
             // listeners that the write adds, e.g. the one that closes the connection
             ChannelFuture future = write(content, flush, close, record, recorded);
@@ -1490,6 +1494,23 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                         jfrEvent.populateChannel(requiredCtx().channel());
                         jfrEvent.populateRequest(outboundAccess.request);
                         jfrEvent.commit();
+                    }
+                });
+            }
+        }
+
+        /**
+         * Write a part of the response before its final write. A part of a recorded response, see
+         * {@link OutboundAccess#recordFinalWrite()}, can fail without closing the connection: its
+         * failure is the failure of the response.
+         */
+        final void writeIntermediate(Object content, boolean flush, boolean close) {
+            boolean watch = outboundAccess.recordFinalWrite;
+            ChannelFuture future = write(content, flush, close, watch);
+            if (watch) {
+                future.addListener((ChannelFutureListener) f -> {
+                    if (!f.isSuccess()) {
+                        requestHandler.responseFailed(outboundAccess.attachment, f.cause());
                     }
                 });
             }
@@ -1507,7 +1528,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 compressionSession.fixContentLength(hr);
 
                 // this can happen in FullHttpResponse, just send the full body.
-                write(new DefaultHttpResponse(hr.protocolVersion(), hr.status(), hr.headers()), false, false, false);
+                writeIntermediate(new DefaultHttpResponse(hr.protocolVersion(), hr.status(), hr.headers()), false, false);
             }
             boolean close = shouldCloseAfterContent(last);
             ByteBuf toSend = compressionSession.poll();
@@ -1518,13 +1539,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     writePotentialEnd(trailingHeaders.isEmpty() ? LastHttpContent.EMPTY_LAST_CONTENT : new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER, trailingHeaders), flush, close);
                 } else if (flush || close) {
                     // not sure if this can actually happen, but we need to forward a flush/close
-                    write(new DefaultHttpContent(Unpooled.EMPTY_BUFFER), flush, close, false);
+                    writeIntermediate(new DefaultHttpContent(Unpooled.EMPTY_BUFFER), flush, close);
                 } // else just don't send anything
             } else {
                 if (last) {
                     writePotentialEnd(new DefaultLastHttpContent(toSend, ((LastHttpContent) content).trailingHeaders()), flush, close);
                 } else {
-                    write(new DefaultHttpContent(toSend), flush, close, false);
+                    writeIntermediate(new DefaultHttpContent(toSend), flush, close);
                 }
             }
         }
@@ -1698,7 +1719,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void open() {
-            PipeliningServerHandler.this.write(Objects.requireNonNull(initialMessage), false, false, false);
+            writeIntermediate(Objects.requireNonNull(initialMessage), false, false);
             initialMessage = null;
         }
 

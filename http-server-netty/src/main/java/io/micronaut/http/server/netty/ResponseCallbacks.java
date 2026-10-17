@@ -58,6 +58,10 @@ final class ResponseCallbacks {
      */
     private boolean released;
     private boolean settled;
+    /**
+     * Whether the response switched the protocol of the connection.
+     */
+    private boolean upgraded;
 
     /**
      * @param outboundAccess The connection of the request
@@ -175,6 +179,17 @@ final class ResponseCallbacks {
     }
 
     /**
+     * The response switched the protocol of the connection: remove the abandon callbacks, the
+     * close of the connection ends the new protocol. The completion is settled at cleanup.
+     */
+    void upgraded() {
+        synchronized (this) {
+            upgraded = true;
+        }
+        release();
+    }
+
+    /**
      * The request is cleaned up after its response: once the recorded final write of the
      * response completes, remove the abandon callbacks and settle the completion callbacks.
      */
@@ -184,6 +199,15 @@ final class ResponseCallbacks {
                 return;
             }
             cleanedUp = true;
+        }
+        boolean switched;
+        synchronized (this) {
+            switched = upgraded;
+        }
+        if (switched) {
+            release();
+            settle(null);
+            return;
         }
         ChannelFuture finalWrite = outboundAccess.finalWrite();
         if (finalWrite != null) {

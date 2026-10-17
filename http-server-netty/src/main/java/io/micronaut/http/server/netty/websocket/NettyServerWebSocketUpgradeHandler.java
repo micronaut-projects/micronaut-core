@@ -285,7 +285,14 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
         try {
             installCompressionHandler(ctx, msg.getNativeRequest());
-            handleHandshake(ctx, msg, webSocketBean, actualResponse);
+            handleHandshake(ctx, msg, webSocketBean, actualResponse).addListener(future -> {
+                if (future.isSuccess()) {
+                    // the connection is no longer this request's: its close ends the session
+                    msg.responseUpgraded();
+                } else {
+                    msg.responseFailed(future.cause());
+                }
+            });
         } catch (Throwable e) {
             releaseRequest.run();
             throw e;
@@ -534,6 +541,14 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         WebsocketRequestLifecycle(RouteExecutor routeExecutor, Router router) {
             super(routeExecutor);
             this.router = router;
+        }
+
+        @Override
+        protected void onUnhandledError(Throwable cause) {
+            NettyHttpRequest<?> request = nettyRequest;
+            if (request != null) {
+                request.responseFailed(cause);
+            }
         }
 
         @Override

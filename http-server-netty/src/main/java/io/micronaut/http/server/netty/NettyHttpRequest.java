@@ -225,6 +225,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @SuppressWarnings("java:S3077")
     private volatile @Nullable ResponseCallbacks responseCallbacks;
     private volatile boolean responseCleanedUp;
+    private volatile boolean responseUpgraded;
     /**
      * The first failure of the response, guarded by this request.
      */
@@ -600,6 +601,9 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
                 responseCallbacks = callbacks;
             }
         }
+        if (responseUpgraded) {
+            callbacks.upgraded();
+        }
         // the response may have been cleaned up in the meantime, see responseCleanedUp
         if (responseCleanedUp) {
             callbacks.cleanedUp();
@@ -624,6 +628,19 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
                     callbacks.fail(cause);
                 }
             }
+        }
+    }
+
+    /**
+     * The response switched the protocol of the connection, e.g. a WebSocket handshake: the
+     * connection closing later ends the new protocol, it does not abandon this request.
+     */
+    @Internal
+    public void responseUpgraded() {
+        responseUpgraded = true;
+        ResponseCallbacks callbacks = responseCallbacks;
+        if (callbacks != null) {
+            callbacks.upgraded();
         }
     }
 
