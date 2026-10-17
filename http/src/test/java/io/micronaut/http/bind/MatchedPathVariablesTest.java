@@ -122,4 +122,11 @@ class MatchedPathVariablesTest {
         assertSame(pathVariables.raw().getString("id"), pathVariables.getString("id"));
         assertThrows(RuntimeException.class, () -> variables.rawString("missing"));
     }
+
+    @Test
+    void rawValuesThatAreNotAvailable() {
+        PathVariables variables = new MatchedPathVariables(Map.of("path", "a/b"), null, ConversionService.SHARED);
+        assertEquals("a/b", variables.getString("path"));
+        assertThrows(UnsupportedOperationException.class, variables::raw);
+    }
 }

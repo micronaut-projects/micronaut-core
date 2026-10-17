@@ -207,6 +207,8 @@ public interface PathVariables extends NamedValues {
      * }</pre>
      *
      * @return The raw variables
+     * @throws UnsupportedOperationException if the source of the variables does not have their raw
+     * values, e.g. a route match of another router
      * @since 5.3.0
      */
     PathVariables raw();

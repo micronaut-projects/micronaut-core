@@ -32,6 +32,7 @@ import io.micronaut.web.router.UriRouteMatch;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -63,11 +64,24 @@ final class PathVariablesArgumentBinder implements TypedRequestArgumentBinder<Pa
     public BindingResult<PathVariables> bind(ArgumentConversionContext<PathVariables> context, HttpRequest<?> source) {
         Optional<RouteMatch<?>> match = RouteAttributes.getRouteMatch(source);
         if (match.isPresent() && match.get() instanceof UriRouteMatch<?, ?> uriMatch) {
-            PathVariables pathVariables = new RoutePathVariables(uriMatch.getVariableValues(), uriMatch.getRawVariableValues(), conversionService);
+            PathVariables pathVariables = new RoutePathVariables(uriMatch.getVariableValues(), rawValues(uriMatch), conversionService);
             return () -> Optional.of(pathVariables);
         }
         // e.g. a filter of a request that matched no route: a nullable argument is null
         return context.getArgument().isNullable() ? BindingResult.empty() : BindingResult.unsatisfied();
+    }
+
+    /**
+     * @param match A match
+     * @return The raw values of its variables, or {@code null} if it does not have them, e.g. a
+     * match of another router, whose path variables then fail to give them
+     */
+    private static @Nullable Map<String, Object> rawValues(UriRouteMatch<?, ?> match) {
+        try {
+            return match.getRawVariableValues();
+        } catch (UnsupportedOperationException e) {
+            return null;
+        }
     }
 
     @Override

@@ -46,7 +46,7 @@ import java.util.Set;
 public class MatchedPathVariables implements PathVariables {
 
     private final Map<String, Object> values;
-    private final Map<String, Object> rawValues;
+    private final @Nullable Map<String, Object> rawValues;
     private final ConversionService conversionService;
     // the decoded variables of the raw view, whose exceptions it fails with
     private final @Nullable MatchedPathVariables decoded;
@@ -65,19 +65,24 @@ public class MatchedPathVariables implements PathVariables {
 
     /**
      * @param values            The decoded variable values, viewed read-only
-     * @param rawValues         The values as they appear in the path, not percent-decoded, viewed read-only
+     * @param rawValues         The values as they appear in the path, not percent-decoded, viewed read-only,
+     *                          or {@code null} if the source does not have them: {@link #raw()} then fails
      * @param conversionService The conversion service of the route
      */
-    public MatchedPathVariables(Map<String, Object> values, Map<String, Object> rawValues, ConversionService conversionService) {
+    public MatchedPathVariables(Map<String, Object> values, @Nullable Map<String, Object> rawValues, ConversionService conversionService) {
         this.values = Collections.unmodifiableMap(values);
-        this.rawValues = rawValues == values ? this.values : Collections.unmodifiableMap(rawValues);
+        if (rawValues == null) {
+            this.rawValues = null;
+        } else {
+            this.rawValues = rawValues == values ? this.values : Collections.unmodifiableMap(rawValues);
+        }
         this.conversionService = conversionService;
         this.decoded = null;
     }
 
-    private MatchedPathVariables(MatchedPathVariables decoded) {
-        this.values = decoded.rawValues;
-        this.rawValues = decoded.rawValues;
+    private MatchedPathVariables(MatchedPathVariables decoded, Map<String, Object> rawValues) {
+        this.values = rawValues;
+        this.rawValues = rawValues;
         this.conversionService = decoded.conversionService;
         this.decoded = decoded;
         this.raw = this;
@@ -98,9 +103,10 @@ public class MatchedPathVariables implements PathVariables {
     }
 
     /**
-     * @return The values as they appear in the path, not percent-decoded, read-only
+     * @return The values as they appear in the path, not percent-decoded, read-only, or
+     * {@code null} if the source does not have them
      */
-    public final Map<String, Object> rawValues() {
+    public final @Nullable Map<String, Object> rawValues() {
         return rawValues;
     }
 
@@ -108,7 +114,11 @@ public class MatchedPathVariables implements PathVariables {
     public final PathVariables raw() {
         MatchedPathVariables view = raw;
         if (view == null) {
-            view = new MatchedPathVariables(this);
+            Map<String, Object> raws = rawValues;
+            if (raws == null) {
+                throw new UnsupportedOperationException("The raw values of the path variables are not available");
+            }
+            view = new MatchedPathVariables(this, raws);
             raw = view;
         }
         return view;

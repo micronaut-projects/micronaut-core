@@ -94,9 +94,11 @@ public interface UriRouteMatch<T, R> extends UriMatchInfo, MethodBasedRouteMatch
      * include the raw values of the variables of the prefixes of the locator routes.
      *
      * @return The raw values, read-only
+     * @throws UnsupportedOperationException if this match does not have the raw values, e.g. an
+     * implementation of another router: it does not substitute the decoded ones
      * @since 5.3.0
      */
     default Map<String, Object> getRawVariableValues() {
-        return getVariableValues();
+        throw new UnsupportedOperationException("The match " + this + " does not have the raw values of its variables");
     }
 }

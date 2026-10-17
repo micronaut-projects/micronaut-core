@@ -863,6 +863,15 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public @NonNull Publisher<RawFormField> getRawFormFields(ByteBody byteBody) {
+        return formFields(byteBody, true);
+    }
+
+    @Override
+    public @NonNull Publisher<RawFormField> getEncodedFormFields(ByteBody byteBody) {
+        return formFields(byteBody, false);
+    }
+
+    private Publisher<RawFormField> formFields(ByteBody byteBody, boolean decodeContent) {
         NettyHttpServerConfiguration nhsc = (NettyHttpServerConfiguration) serverConfiguration;
         long undecodedLimit = Math.min(nhsc.getFieldMaxBufferedBytes(), nhsc.getFormMaxBufferedBytes());
         Charset charset = getCharacterEncoding();
@@ -888,7 +897,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             channelHandlerContext.channel(),
             new BodySizeLimits(nhsc.getFieldMaxBytes(), nhsc.getFieldMaxBufferedBytes()),
             new BodySizeLimits(nhsc.getFormMaxBytes(), nhsc.getFormMaxBufferedBytes()),
-            byteBody
+            byteBody,
+            decodeContent
         ).fields();
     }
 

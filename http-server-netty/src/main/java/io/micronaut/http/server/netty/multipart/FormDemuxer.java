@@ -45,6 +45,7 @@ import io.netty.contrib.multipart.ContentDisposition;
 import io.netty.contrib.multipart.FormDecoderException;
 import io.netty.contrib.multipart.ParsedHeaderValue;
 import io.netty.contrib.multipart.PostBodyDecoder;
+import io.netty.contrib.multipart.VintageAccess;
 import io.netty.contrib.multipart.TooManyFormFieldsException;
 import io.netty.contrib.multipart.UndecodedDataLimitExceededException;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -68,6 +69,8 @@ import java.util.Optional;
 public final class FormDemuxer implements BufferConsumer {
     private static final Logger LOG = LoggerFactory.getLogger(FormDemuxer.class);
     private final PostBodyDecoder decoder;
+    // the URL-encoded decoder whose content is kept as it appears, or null to decode the content
+    private final VintageAccess.@Nullable UrlEncodedDecoder undecoded;
     /**
      * Finds the close delimiter of a multipart body, {@code null} for another body.
      */
@@ -107,7 +110,26 @@ public final class FormDemuxer implements BufferConsumer {
      * @param byteBody          The body
      */
     public FormDemuxer(PostBodyDecoder decoder, @Nullable String multipartBoundary, Charset charset, Channel channel, BodySizeLimits fieldLimits, BodySizeLimits totalLimits, ByteBody byteBody) {
+        this(decoder, multipartBoundary, charset, channel, fieldLimits, totalLimits, byteBody, true);
+    }
+
+    /**
+     * @param decoder           The decoder
+     * @param multipartBoundary The boundary of a multipart body, {@code null} for URL-encoded data
+     * @param charset           The charset of the decoder, which it encodes the boundary with
+     * @param channel           The channel
+     * @param fieldLimits       The limits of a field
+     * @param totalLimits       The limits of the form
+     * @param byteBody          The body
+     * @param decodeContent     Whether the content of the fields is decoded, e.g. percent-decoded for
+     *                          URL-encoded data, or kept as it appears in the body. The limits and the
+     *                          validation of the form apply either way
+     */
+    public FormDemuxer(PostBodyDecoder decoder, @Nullable String multipartBoundary, Charset charset, Channel channel, BodySizeLimits fieldLimits,
+                       BodySizeLimits totalLimits, ByteBody byteBody, boolean decodeContent) {
         this.decoder = decoder;
+        // a multipart field is not encoded: its content is the same either way
+        this.undecoded = !decodeContent && decoder instanceof VintageAccess.UrlEncodedDecoder urlEncoded ? urlEncoded : null;
         this.closeDelimiter = multipartBoundary == null ? null : CloseDelimiter.of(multipartBoundary, charset);
         this.fieldLimits = fieldLimits;
         if (byteBody instanceof AvailableByteBody abb) {
@@ -358,6 +380,15 @@ public final class FormDemuxer implements BufferConsumer {
         }
     }
 
+    /**
+     * @return The content of the current {@link PostBodyDecoder.Event#CONTENT} event, decoded or as
+     * it appears in the body
+     */
+    private ByteBuf content() {
+        VintageAccess.UrlEncodedDecoder urlEncoded = undecoded;
+        return urlEncoded == null ? decoder.decodedContent() : urlEncoded.undecodedContent();
+    }
+
     private static RuntimeException unexpectedEvent(PostBodyDecoder.Event event) {
         return new IllegalStateException("Unexpected event " + event);
     }
@@ -522,7 +553,7 @@ public final class FormDemuxer implements BufferConsumer {
         @Override
         void accept(PostBodyDecoder.Event event) {
             if (event == PostBodyDecoder.Event.CONTENT) {
-                ByteBuf content = decoder.decodedContent();
+                ByteBuf content = content();
                 buffers.add(content);
                 if (tracker.add(content.readableBytes()) != null) {
                     this.devolveToStreaming(true);
@@ -612,7 +643,7 @@ public final class FormDemuxer implements BufferConsumer {
         @Override
         void accept(PostBodyDecoder.Event event) {
             if (event == PostBodyDecoder.Event.CONTENT) {
-                add(decoder.decodedContent());
+                add(content());
             } else if (event == PostBodyDecoder.Event.FIELD_COMPLETE) {
                 baseSharedBuffer.complete();
                 if (fieldsPublisherCancelled) {

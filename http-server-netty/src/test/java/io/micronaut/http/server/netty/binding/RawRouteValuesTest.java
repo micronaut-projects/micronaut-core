@@ -112,16 +112,64 @@ class RawRouteValuesTest {
         assertEquals("a/b|a b|x!y|été|[1, 2]|", post("/raw/decoded-form", body));
     }
 
+    @Test
+    void aRawFormReadsTheFieldsUpToTheLimitOfTheForm() throws Exception {
+        // the default form-max-fields is 128
+        assertEquals(200, postStatus("/raw/form-all", "a" + "&a".repeat(127), MediaType.APPLICATION_FORM_URLENCODED));
+        assertEquals("{a=" + String.join(",", java.util.Collections.nCopies(128, "")) + "}",
+            post("/raw/form-all", "a" + "&a".repeat(127)));
+    }
+
+    @Test
+    void aRawFormIsValidatedLikeTheDecodedForm() throws Exception {
+        assertEquals(400, postStatus("/raw/form-all", "foo=ba\rr", MediaType.APPLICATION_FORM_URLENCODED));
+        assertEquals(400, postStatus("/raw/decoded-form-all", "foo=ba\rr", MediaType.APPLICATION_FORM_URLENCODED));
+    }
+
+    @Test
+    void theValuesOfARawFormOfACharsetThatIsNotAsciiCompatibleAreTheBytesOfTheBody() throws Exception {
+        // the values are percent-encoded ASCII, whatever the charset of the decoded values
+        assertEquals("{n\u00e9=%00%E9}", post("/raw/form-all", "%00n%00%E9=%00%E9", MediaType.APPLICATION_FORM_URLENCODED + ";charset=UTF-16BE"));
+    }
+
+    @Test
+    void aRawFormHasTheBufferLimitOfTheDecodedForm() throws Exception {
+        // like FormSmallBufferLimitTest: the limit is on the buffered values, not the whole body
+        try (ApplicationContext small = ApplicationContext.run(Map.of("spec.name", SPEC_NAME, "micronaut.server.port", -1,
+            "micronaut.server.max-request-buffer-size", 16))) {
+            EmbeddedServer smallServer = small.getBean(EmbeddedServer.class).start();
+            java.net.http.HttpResponse<String> response = client.send(java.net.http.HttpRequest.newBuilder(
+                    URI.create("http://localhost:" + smallServer.getPort() + "/raw/form-all"))
+                    .header("Content-Type", MediaType.APPLICATION_FORM_URLENCODED)
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString("a=12345678&b=1234567")).build(),
+                BodyHandlers.ofString());
+            assertEquals(200, response.statusCode(), response.body());
+            assertEquals("{a=12345678, b=1234567}", response.body());
+        }
+    }
+
     private static String get(String path) throws Exception {
         return client.send(java.net.http.HttpRequest.newBuilder(URI.create("http://localhost:" + server.getPort() + path)).build(),
             BodyHandlers.ofString()).body();
     }
 
     private static String post(String path, String body) throws Exception {
+        return post(path, body, MediaType.APPLICATION_FORM_URLENCODED);
+    }
+
+    private static String post(String path, String body, String contentType) throws Exception {
+        return send(path, body, contentType).body();
+    }
+
+    private static int postStatus(String path, String body, String contentType) throws Exception {
+        return send(path, body, contentType).statusCode();
+    }
+
+    private static java.net.http.HttpResponse<String> send(String path, String body, String contentType) throws Exception {
         return client.send(java.net.http.HttpRequest.newBuilder(URI.create("http://localhost:" + server.getPort() + path))
-                .header("Content-Type", MediaType.APPLICATION_FORM_URLENCODED)
-                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body)).build(),
-            BodyHandlers.ofString()).body();
+                .header("Content-Type", contentType)
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body, java.nio.charset.StandardCharsets.US_ASCII)).build(),
+            BodyHandlers.ofString());
     }
 
     @Controller("/raw")
@@ -151,6 +199,24 @@ class RawRouteValuesTest {
         @Post(uri = "/decoded-form", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
         CompletionStage<String> decodedForm(AsyncRequestBody body) {
             return body.form(FormOptions.defaults()).thenApply(RawController::describe);
+        }
+
+        @Post(uri = "/form-all", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> formAll(AsyncRequestBody body) {
+            return body.form(FormOptions.defaults().withRawValues()).thenApply(RawController::all);
+        }
+
+        @Post(uri = "/decoded-form-all", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> decodedFormAll(AsyncRequestBody body) {
+            return body.form().thenApply(RawController::all);
+        }
+
+        private static String all(io.micronaut.http.form.FormData form) {
+            java.util.Map<String, String> all = new java.util.LinkedHashMap<>();
+            for (String name : form.names()) {
+                all.put(name, String.join(",", form.getValues(name)));
+            }
+            return all.toString();
         }
 
         private static String describe(io.micronaut.http.form.FormData form) {

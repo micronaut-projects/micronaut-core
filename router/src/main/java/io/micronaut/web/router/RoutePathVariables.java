@@ -23,6 +23,8 @@ import io.micronaut.http.bind.MatchedPathVariables;
 import io.micronaut.web.router.exceptions.UnsatisfiedPathVariableRouteException;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Map;
 
 /**
@@ -48,7 +50,7 @@ public class RoutePathVariables extends MatchedPathVariables {
      * @param rawValues         The values as they appear in the path, not percent-decoded, viewed read-only
      * @param conversionService The conversion service of the route
      */
-    public RoutePathVariables(Map<String, Object> values, Map<String, Object> rawValues, ConversionService conversionService) {
+    public RoutePathVariables(Map<String, Object> values, @Nullable Map<String, Object> rawValues, ConversionService conversionService) {
         super(values, rawValues, conversionService);
     }
 

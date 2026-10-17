@@ -60,8 +60,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -113,6 +115,8 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         }
     };
 
+    // the characters of the syntax of a URL-encoded form, and of a percent-encoded value
+    private static final String ASCII_FORM_CHARACTERS = "&=+%azAZ09";
     private static final Logger LOG = LoggerFactory.getLogger(DefaultAsyncRequestBody.class);
     private static final List<String> ELEMENT_MEDIA_TYPES = List.of(MediaType.APPLICATION_JSON, MediaType.APPLICATION_JSON_STREAM);
     private static final List<String> FORM_MEDIA_TYPES = List.of(MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA);
@@ -370,15 +374,46 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
                 throw new IllegalStateException("The raw values of the form cannot be read: a filter replaced the body");
             }
             claimBytes("form");
-            if (cleared != null) {
-                // no body: a form without fields
-                return CompletableFuture.completedFuture(new DefaultFormData(Map.of(), Map.of(), binder.conversionService));
+            try {
+                if (cleared != null) {
+                    // no body: a form without fields
+                    return CompletableFuture.completedFuture(new DefaultFormData(Map.of(), Map.of(), binder.conversionService));
+                }
+                FormCapableHttpRequest<?> formRequest = formRequest();
+                // decoded by the decoder of the form, with its limits and its validation, but the
+                // values are kept as they appear: ASCII, unless the client sent other bytes
+                Charset charset = request.getCharacterEncoding();
+                UploadContext context = UploadContext.of(binder.formFactory(), formRequest, isAsciiCompatible(charset) ? charset : StandardCharsets.ISO_8859_1);
+                CloseableByteBody body = readBytes("form");
+                FormDataArgumentBinder.Collection collection = FormDataArgumentBinder.start(context, binder.formFactory(), binder.conversionService, formRequest,
+                    () -> encodedFields(formRequest, body));
+                owned(() -> {
+                    collection.cancel();
+                    return CompletableFuture.completedStage(null);
+                });
+                return collection.result().minimalCompletionStage();
+            } catch (Throwable e) {
+                return CompletableFuture.failedStage(e);
             }
-            UploadContext context = uploadContext();
-            Charset charset = request.getCharacterEncoding();
-            return content("form", context).text(context.maxBufferSize())
-                .thenApply(text -> DefaultFormData.rawUrlEncoded(text, charset, binder.conversionService));
         }
+    }
+
+    private static Publisher<RawFormField> encodedFields(FormCapableHttpRequest<?> formRequest, CloseableByteBody body) {
+        try {
+            return formRequest.getEncodedFormFields(body);
+        } catch (Throwable e) {
+            // no publisher took the body
+            body.close();
+            throw e;
+        }
+    }
+
+    /**
+     * @param charset A charset
+     * @return Whether it encodes the characters of a URL-encoded form as ASCII
+     */
+    private static boolean isAsciiCompatible(Charset charset) {
+        return Arrays.equals(ASCII_FORM_CHARACTERS.getBytes(charset), ASCII_FORM_CHARACTERS.getBytes(StandardCharsets.US_ASCII));
     }
 
     private CompletionStage<FormData> startForm() {
