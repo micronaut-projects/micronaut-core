@@ -1351,8 +1351,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             protected @Nullable SSLContext providedSslContext() {
                 ServerSslConfiguration ssl = Objects.requireNonNull(sslConfiguration);
                 SSLContext provided = ssl.getSslContext();
-                if (provided == null && ssl.getContextName() != null) {
-                    provided = applicationContext.getBean(SSLContext.class, Qualifiers.byName(ssl.getContextName()));
+                String contextName = ssl.getContextName();
+                if (provided == null && contextName != null) {
+                    provided = applicationContext.getBean(SSLContext.class, Qualifiers.byName(contextName));
                 }
                 return provided;
             }
