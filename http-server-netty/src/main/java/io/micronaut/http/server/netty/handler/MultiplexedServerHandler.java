@@ -39,7 +39,6 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.util.concurrent.EventExecutor;
-import io.netty.util.concurrent.Future;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -595,7 +594,16 @@ abstract class MultiplexedServerHandler {
             }
             if (!requiredCtx().executor().inEventLoop()) {
                 ByteBuf finalContent = content;
-                requiredCtx().executor().execute(() -> writeFull(response, finalContent));
+                requiredCtx().executor().execute(() -> {
+                    try {
+                        writeFull(response, finalContent);
+                    } catch (Throwable t) {
+                        // no caller to answer a fallback response: give up on the response
+                        LOG.warn("Failed to write the response", t);
+                        requestHandler.responseFailed(attachment, t);
+                        abortWrittenResponse();
+                    }
+                });
                 return;
             }
             if (headersWritten) {
@@ -677,7 +685,7 @@ abstract class MultiplexedServerHandler {
         }
 
         @Override
-        public final @Nullable Future<?> finalWrite() {
+        public final @Nullable ChannelFuture finalWrite() {
             return finalWrite;
         }
 

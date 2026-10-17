@@ -17,7 +17,7 @@ package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.body.NettyWriteContext;
-import io.netty.util.concurrent.Future;
+import io.netty.channel.ChannelFuture;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -48,8 +48,7 @@ public interface OutboundAccess extends NettyWriteContext {
     }
 
     /**
-     * Run a callback when the request is abandoned before its response is written (including a
-     * recorded final write that has not completed, see {@link #recordFinalWrite()}): the client
+     * Run a callback when the request is abandoned before its response is written: the client
      * closed the HTTP/1.1 connection, or reset the HTTP/2 stream of the request, or the HTTP/2
      * stream closed with its connection. The callback runs once, on the event loop.
      *
@@ -89,7 +88,7 @@ public interface OutboundAccess extends NettyWriteContext {
      * @return The future of the final write, or {@code null} if it was not issued or not recorded
      * @since 5.3.0
      */
-    default @Nullable Future<?> finalWrite() {
+    default @Nullable ChannelFuture finalWrite() {
         return null;
     }
 

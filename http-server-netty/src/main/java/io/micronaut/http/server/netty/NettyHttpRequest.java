@@ -614,15 +614,15 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      */
     @Override
     public void responseFailed(Throwable cause) {
-        ResponseCallbacks callbacks;
+        // the transfer to the callbacks happens under the lock, so that they keep the same first failure
         synchronized (this) {
             if (responseFailure == null) {
                 responseFailure = cause;
+                ResponseCallbacks callbacks = responseCallbacks;
+                if (callbacks != null) {
+                    callbacks.fail(cause);
+                }
             }
-            callbacks = responseCallbacks;
-        }
-        if (callbacks != null) {
-            callbacks.fail(cause);
         }
     }
 

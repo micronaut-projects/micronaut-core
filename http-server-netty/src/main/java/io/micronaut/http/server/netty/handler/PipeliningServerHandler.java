@@ -69,7 +69,6 @@ import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.Attribute;
-import io.netty.util.concurrent.Future;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1114,11 +1113,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         public Runnable whenAbandoned(Runnable callback) {
             // an HTTP/1.1 request is abandoned with its connection
             ChannelFuture closeFuture = requiredCtx().channel().closeFuture();
-            ChannelFutureListener listener = future -> {
-                if (finalWritePending()) {
-                    callback.run();
-                }
-            };
+            ChannelFutureListener listener = future -> callback.run();
             closeFuture.addListener(listener);
             return () -> closeFuture.removeListener(listener);
         }
@@ -1148,7 +1143,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
-        public @Nullable Future<?> finalWrite() {
+        public @Nullable ChannelFuture finalWrite() {
             return finalWrite;
         }
 

@@ -17,7 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.http.exceptions.ConnectionClosedException;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
-import io.netty.util.concurrent.Future;
+import io.netty.channel.ChannelFuture;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,7 +82,11 @@ final class ResponseCallbacks {
             }
             watching = true;
         }
-        addRemoval(outboundAccess.whenAbandoned(this::abandoned));
+        addRemoval(outboundAccess.whenAbandoned(() -> {
+            if (outboundAccess.isAbandoned()) {
+                abandoned();
+            }
+        }));
         return true;
     }
 
@@ -102,16 +106,23 @@ final class ResponseCallbacks {
         return true;
     }
 
-    Runnable whenAbandoned(Runnable callback) {
+    @Nullable Runnable whenAbandoned(Runnable callback) {
         synchronized (this) {
             if (released) {
                 return () -> { };
             }
-            // keeps the callback registered while the final write is in progress
-            track();
+            // keeps the callback registered while the final write is in progress; a final write
+            // issued unrecorded cannot be awaited, so the callback could not be kept for it
+            if (!track()) {
+                return null;
+            }
         }
         // a failing callback must not keep the others of the stream from running
         Runnable removal = addRemoval(outboundAccess.whenAbandoned(() -> {
+            // the HTTP/1.1 connection also closes after a written response, e.g. with connection: close
+            if (!outboundAccess.isAbandoned()) {
+                return;
+            }
             try {
                 callback.run();
             } catch (Throwable e) {
@@ -174,11 +185,19 @@ final class ResponseCallbacks {
             }
             cleanedUp = true;
         }
-        Future<?> finalWrite = outboundAccess.finalWrite();
+        ChannelFuture finalWrite = outboundAccess.finalWrite();
         if (finalWrite != null) {
             finalWrite.addListener(future -> {
-                release();
-                settle(future.cause());
+                Throwable cause = future.cause();
+                settle(cause);
+                if (cause == null) {
+                    release();
+                } else {
+                    // the write fails when the connection or the stream closes, before the close
+                    // is reported to the abandon callbacks in the same turn of the event loop:
+                    // they are removed after that
+                    finalWrite.channel().eventLoop().execute(this::release);
+                }
             });
             return;
         }

@@ -165,6 +165,21 @@ class ResponseCallbacksTest {
     }
 
     @Test
+    void keepAliveRequestsWithCallbacksAddNoListeners() throws Exception {
+        Recorder recorder = ctx.getBean(Recorder.class);
+        try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+            ResponseCallbacksOverheadTest.exchange(socket, "/handler/keepalive?id=keepalive-0");
+            Channel channel = recorder.channels.get("keepalive-0");
+            int listeners = ResponseCallbacksOverheadTest.closeListeners(channel.closeFuture());
+            for (int i = 1; i <= 500; i++) {
+                ResponseCallbacksOverheadTest.exchange(socket, "/handler/keepalive?id=keepalive-" + i);
+            }
+            assertNull(failure(ctx, "keepalive-500"));
+            assertEquals(listeners, ResponseCallbacksOverheadTest.closeListeners(channel.closeFuture()), "the abandon listeners are removed");
+        }
+    }
+
+    @Test
     void routeErrorIsReported() throws Exception {
         assertEquals(500, get("/handler/error?id=handler-error"));
         assertEquals("route failed", failure(ctx, "handler-error").getMessage());
@@ -266,6 +281,37 @@ class ResponseCallbacksTest {
         } finally {
             channel.close().sync();
         }
+    }
+
+    @Test
+    void anOffThreadHttp2ResponseWhoseHeadersCannotBeConvertedIsReported() throws Exception {
+        H2Client client = new H2Client();
+        Channel channel = connectHttp2(client);
+        try {
+            request(channel, client, "/handler/bad-te-async?id=h2-bad-te-async");
+            assertNotNull(failure(h2Ctx, "h2-bad-te-async"));
+            client.reset.get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+        } finally {
+            channel.close().sync();
+        }
+    }
+
+    @Test
+    void closingTheHttp2ConnectionWhileTheFinalWriteIsBlockedIsAnAbandonment() throws Exception {
+        Recorder recorder = h2Ctx.getBean(Recorder.class);
+        for (String id : new String[]{"h2-conn-close", "h2-conn-close-only"}) {
+            String path = id.endsWith("only") ? "/handler/large-abandon-only?id=" + id : "/handler/large?id=" + id;
+            H2Client client = new H2Client();
+            Channel channel = connectHttp2(client);
+            request(channel, client, path);
+            client.firstData.get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+            Thread.sleep(200);
+            assertFalse(recorder.abandoned(id).isDone());
+            // the whole connection, not the stream
+            channel.close().sync();
+            recorder.abandoned(id).get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+        }
+        assertNotNull(failure(h2Ctx, "h2-conn-close"));
     }
 
     @Test
@@ -500,6 +546,7 @@ class ResponseCallbacksTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class Recorder {
         final Map<String, ServerHttpRequest<?>> requests = new ConcurrentHashMap<>();
+        final Map<String, Channel> channels = new ConcurrentHashMap<>();
         final Map<String, CompletableFuture<Optional<Throwable>>> completions = new ConcurrentHashMap<>();
         final Map<String, CompletableFuture<Void>> abandoned = new ConcurrentHashMap<>();
         final Map<String, CompletableFuture<Boolean>> abandonedAfterFailure = new ConcurrentHashMap<>();
@@ -576,6 +623,11 @@ class ResponseCallbacksTest {
                 recorder.register(request);
                 return HttpResponse.ok("ok").contentType(MediaType.TEXT_PLAIN_TYPE);
             });
+            routes.GET("/handler/keepalive").handle((request, pathVariables) -> {
+                String id = recorder.register(request);
+                recorder.channels.put(id, ((NettyHttpRequest<?>) request).getChannelHandlerContext().channel());
+                return HttpResponse.ok("ok").contentType(MediaType.TEXT_PLAIN_TYPE);
+            });
             routes.GET("/handler/unregistered").handle((request, pathVariables) -> {
                 recorder.capture(request);
                 return HttpResponse.ok("ok").contentType(MediaType.TEXT_PLAIN_TYPE);
@@ -597,6 +649,12 @@ class ResponseCallbacksTest {
                 recorder.register(request);
                 // the quoted value cannot be converted to HTTP/2 headers
                 return HttpResponse.noContent().header("te", "\"a,b");
+            });
+            routes.GET("/handler/bad-te-async").handleAsync((request, pathVariables) -> {
+                recorder.register(request);
+                // completes on another thread, so the response is written from off the event loop
+                return CompletableFuture.supplyAsync(() -> HttpResponse.noContent().header("te", "\"a,b"),
+                    CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS));
             });
             routes.GET("/handler/pending").handleAsync((request, pathVariables) -> recorder.registerPending(request));
         }
