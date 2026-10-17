@@ -24,6 +24,7 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.netty.channel.Channel;
+import io.netty.util.concurrent.DefaultPromise;
 import io.netty.util.concurrent.Future;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
@@ -98,12 +99,9 @@ class ResponseCallbacksOverheadTest {
      * @return The number of listeners of the future
      */
     static int closeListeners(Future<?> future) throws ReflectiveOperationException {
-        Class<?> type = future.getClass();
-        while (!type.getName().equals("io.netty.util.concurrent.DefaultPromise")) {
-            type = type.getSuperclass();
-        }
-        Field listener = type.getDeclaredField("listener");
-        Field listeners = type.getDeclaredField("listeners");
+        assertTrue(future instanceof DefaultPromise<?>, future.getClass().getName());
+        Field listener = DefaultPromise.class.getDeclaredField("listener");
+        Field listeners = DefaultPromise.class.getDeclaredField("listeners");
         listener.setAccessible(true);
         listeners.setAccessible(true);
         synchronized (future) {
