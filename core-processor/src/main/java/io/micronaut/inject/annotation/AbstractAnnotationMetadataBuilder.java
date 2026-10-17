@@ -367,7 +367,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public CachedAnnotationMetadata lookupOrBuildForType(T typeElement) {
-        return lookupOrBuild(typeElement, typeElement);
+        return lookupOrBuild(getTypeCacheKey(typeElement), typeElement);
+    }
+
+    /**
+     * The cache key under which the metadata of a type is stored, the key the element annotation metadata
+     * factory of the implementation uses for a class, so that a lookup by the native type finds the metadata a
+     * visitor mutated through the class element. The default is the type itself.
+     *
+     * @param typeElement The type
+     * @return The cache key
+     * @since 5.3.0
+     */
+    protected Object getTypeCacheKey(T typeElement) {
+        return typeElement;
     }
 
     /**
@@ -1971,7 +1984,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (element == null) {
             return List.of();
         }
-        CachedAnnotationMetadata modifiedStereotypes = MUTATED_ANNOTATION_METADATA.get(element);
+        CachedAnnotationMetadata modifiedStereotypes = MUTATED_ANNOTATION_METADATA.get(getTypeCacheKey(element));
         if (modifiedStereotypes == null || modifiedStereotypes.isEmpty() || !modifiedStereotypes.isMutated()) {
             return List.of();
         }
