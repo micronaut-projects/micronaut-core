@@ -17,6 +17,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -109,5 +110,16 @@ class MatchedPathVariablesTest {
         MatchedPathVariables matched = (MatchedPathVariables) pathVariables;
         assertThrows(UnsupportedOperationException.class, () -> matched.values().put("id", "6"));
         assertEquals("PathVariables{id=5}", new MatchedPathVariables(Map.of("id", "5"), ConversionService.SHARED).toString());
+    }
+
+    @Test
+    void rawValues() {
+        PathVariables variables = new MatchedPathVariables(Map.of("path", "a/b", "id", "5"), Map.of("path", "a%2Fb", "id", "5"), ConversionService.SHARED);
+        assertEquals("a/b", variables.getString("path"));
+        assertEquals("a%2Fb", variables.rawString("path"));
+        assertEquals(5, variables.raw().getInt("id"));
+        assertSame(variables.raw(), variables.raw().raw());
+        assertSame(pathVariables.raw().getString("id"), pathVariables.getString("id"));
+        assertThrows(RuntimeException.class, () -> variables.rawString("missing"));
     }
 }

@@ -26,8 +26,11 @@ import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormFieldException;
 import org.jspecify.annotations.Nullable;
 
+import java.net.URLDecoder;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -60,6 +63,48 @@ final class DefaultFormData implements FormData {
         this.fields = fields;
         this.files = files;
         this.conversionService = conversionService;
+    }
+
+    /**
+     * The form of an {@code application/x-www-form-urlencoded} body with the values as they
+     * appear in it, not percent-decoded, and the names decoded.
+     *
+     * @param body              The body
+     * @param charset           The charset of the percent-encoded names
+     * @param conversionService The conversion service of the route
+     * @return The form
+     */
+    static DefaultFormData rawUrlEncoded(String body, Charset charset, ConversionService conversionService) {
+        Map<String, List<String>> fields = new LinkedHashMap<>();
+        int start = 0;
+        int length = body.length();
+        while (start <= length) {
+            int end = body.indexOf('&', start);
+            if (end < 0) {
+                end = length;
+            }
+            if (end > start) {
+                int equals = body.indexOf('=', start);
+                String name;
+                String value;
+                if (equals < 0 || equals > end) {
+                    name = body.substring(start, end);
+                    value = "";
+                } else {
+                    name = body.substring(start, equals);
+                    value = body.substring(equals + 1, end);
+                }
+                String decodedName;
+                try {
+                    decodedName = URLDecoder.decode(name, charset);
+                } catch (IllegalArgumentException e) {
+                    throw new FormFieldException(name, "Form field name [" + name + "] is not percent-encoded correctly");
+                }
+                fields.computeIfAbsent(decodedName, ignored -> new ArrayList<>(1)).add(value);
+            }
+            start = end + 1;
+        }
+        return new DefaultFormData(fields, Map.of(), conversionService);
     }
 
     @Override

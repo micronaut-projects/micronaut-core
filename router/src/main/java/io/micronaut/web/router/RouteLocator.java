@@ -406,7 +406,7 @@ public final class RouteLocator implements DynamicRouteTarget {
         Location location = Location.of(request, locatorMatch);
         LocationKey key = new LocationKey(this, request.getPath());
         Object target;
-        DefaultPathVariables pathVariables = new DefaultPathVariables(location.decodedValues(), locatorMatch.conversionService, location.owner());
+        DefaultPathVariables pathVariables = new DefaultPathVariables(location.decodedValues(), location.rawValues(), locatorMatch.conversionService, location.owner(), null);
         try {
             target = locator != null
                 ? locateSync(location, key, pathVariables)

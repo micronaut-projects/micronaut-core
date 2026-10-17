@@ -351,6 +351,20 @@ public interface AsyncRequestBody {
     CompletionStage<FormData> form();
 
     /**
+     * Read the whole submitted form, like {@link #form()}, with options, e.g. the values of the
+     * fields of an {@code application/x-www-form-urlencoded} form as they appear in the body, not
+     * percent-decoded, see {@link FormOptions#withRawValues()}.
+     *
+     * @param options The options
+     * @return Completes with the form, or exceptionally with an
+     * {@link io.micronaut.http.exceptions.HttpStatusException} with the status
+     * {@code 415 Unsupported Media Type} when the request has no form body
+     * @throws IllegalStateException if the body was already read
+     * @since 5.3.0
+     */
+    CompletionStage<FormData> form(FormOptions options);
+
+    /**
      * Read the submitted form part by part, as it arrives. The parts are closed when the method
      * completed, or, for a controller method that answers with a streamed response, when its
      * stream ended, see {@link FormParts}.

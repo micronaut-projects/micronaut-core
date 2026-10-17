@@ -63,7 +63,7 @@ final class PathVariablesArgumentBinder implements TypedRequestArgumentBinder<Pa
     public BindingResult<PathVariables> bind(ArgumentConversionContext<PathVariables> context, HttpRequest<?> source) {
         Optional<RouteMatch<?>> match = RouteAttributes.getRouteMatch(source);
         if (match.isPresent() && match.get() instanceof UriRouteMatch<?, ?> uriMatch) {
-            PathVariables pathVariables = new RoutePathVariables(uriMatch.getVariableValues(), conversionService);
+            PathVariables pathVariables = new RoutePathVariables(uriMatch.getVariableValues(), uriMatch.getRawVariableValues(), conversionService);
             return () -> Optional.of(pathVariables);
         }
         // e.g. a filter of a request that matched no route: a nullable argument is null

@@ -35,6 +35,7 @@ import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
+import io.micronaut.http.body.FormOptions;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyReader;
@@ -353,6 +354,30 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
     public CompletionStage<FormData> form() {
         synchronized (lock) {
             return startForm();
+        }
+    }
+
+    @Override
+    public CompletionStage<FormData> form(FormOptions options) {
+        MediaType contentType = request.getContentType().orElse(null);
+        if (!options.rawValues() || contentType == null || !contentType.matches(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
+            // a multipart form has no percent-encoding
+            return form();
+        }
+        synchronized (lock) {
+            if (decoded) {
+                // a filter set the body to an object: its values are not the ones of the body
+                throw new IllegalStateException("The raw values of the form cannot be read: a filter replaced the body");
+            }
+            claimBytes("form");
+            if (cleared != null) {
+                // no body: a form without fields
+                return CompletableFuture.completedFuture(new DefaultFormData(Map.of(), Map.of(), binder.conversionService));
+            }
+            UploadContext context = uploadContext();
+            Charset charset = request.getCharacterEncoding();
+            return content("form", context).text(context.maxBufferSize())
+                .thenApply(text -> DefaultFormData.rawUrlEncoded(text, charset, binder.conversionService));
         }
     }
 

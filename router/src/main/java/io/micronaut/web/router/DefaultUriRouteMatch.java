@@ -29,6 +29,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -170,6 +171,16 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
             }
         }
         return variables;
+    }
+
+    @Override
+    public Map<String, Object> getRawVariableValues() {
+        return Collections.unmodifiableMap(matchInfo.getVariableValues());
+    }
+
+    @Override
+    Map<String, Object> rawVariableValues() {
+        return matchInfo.getVariableValues();
     }
 
     @Override

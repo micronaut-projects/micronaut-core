@@ -23,6 +23,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.PathVariables;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Map;
@@ -45,16 +46,41 @@ import java.util.Set;
 public class MatchedPathVariables implements PathVariables {
 
     private final Map<String, Object> values;
+    private final Map<String, Object> rawValues;
     private final ConversionService conversionService;
+    // the decoded variables of the raw view, whose exceptions it fails with
+    private final @Nullable MatchedPathVariables decoded;
+    private @Nullable MatchedPathVariables raw;
 
     /**
+     * Variables whose values are their raw values, e.g. of a source that does not decode them.
+     *
      * @param values            The variable values, viewed read-only: the map of the match is
      *                          shared with the other arguments bound from it
      * @param conversionService The conversion service of the route
      */
     public MatchedPathVariables(Map<String, Object> values, ConversionService conversionService) {
+        this(values, values, conversionService);
+    }
+
+    /**
+     * @param values            The decoded variable values, viewed read-only
+     * @param rawValues         The values as they appear in the path, not percent-decoded, viewed read-only
+     * @param conversionService The conversion service of the route
+     */
+    public MatchedPathVariables(Map<String, Object> values, Map<String, Object> rawValues, ConversionService conversionService) {
         this.values = Collections.unmodifiableMap(values);
+        this.rawValues = rawValues == values ? this.values : Collections.unmodifiableMap(rawValues);
         this.conversionService = conversionService;
+        this.decoded = null;
+    }
+
+    private MatchedPathVariables(MatchedPathVariables decoded) {
+        this.values = decoded.rawValues;
+        this.rawValues = decoded.rawValues;
+        this.conversionService = decoded.conversionService;
+        this.decoded = decoded;
+        this.raw = this;
     }
 
     /**
@@ -69,6 +95,23 @@ public class MatchedPathVariables implements PathVariables {
      */
     public final ConversionService conversionService() {
         return conversionService;
+    }
+
+    /**
+     * @return The values as they appear in the path, not percent-decoded, read-only
+     */
+    public final Map<String, Object> rawValues() {
+        return rawValues;
+    }
+
+    @Override
+    public final PathVariables raw() {
+        MatchedPathVariables view = raw;
+        if (view == null) {
+            view = new MatchedPathVariables(this);
+            raw = view;
+        }
+        return view;
     }
 
     @Override
@@ -108,6 +151,9 @@ public class MatchedPathVariables implements PathVariables {
      * @return The exception
      */
     protected RuntimeException unsatisfied(String name, Argument<?> argument) {
+        if (decoded != null) {
+            return decoded.unsatisfied(name, argument);
+        }
         return new UnsatisfiedArgumentException(argument, "Required PathVariable [" + name + "] not specified");
     }
 
@@ -119,6 +165,9 @@ public class MatchedPathVariables implements PathVariables {
      * @return The exception
      */
     protected RuntimeException unconvertible(Argument<?> argument) {
+        if (decoded != null) {
+            return decoded.unconvertible(argument);
+        }
         return new UnsatisfiedArgumentException(argument);
     }
 
