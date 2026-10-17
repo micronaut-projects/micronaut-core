@@ -372,11 +372,10 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         return new DefaultClassPathResourceLoader(classLoader, basePath, false, logEnabled);
     }
 
-    @SuppressWarnings("MagicNumber")
     private @Nullable String normalize(@Nullable String path) {
         if (path != null) {
-            if (path.startsWith("classpath:")) {
-                path = path.substring(10);
+            if (path.startsWith(PREFIX)) {
+                path = path.substring(PREFIX.length());
             }
             if (path.startsWith("/")) {
                 path = path.substring(1);
@@ -449,10 +448,9 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         });
     }
 
-    @SuppressWarnings("MagicNumber")
     private String prefixPath(String path) {
-        if (path.startsWith("classpath:")) {
-            path = path.substring(10);
+        if (path.startsWith(PREFIX)) {
+            path = path.substring(PREFIX.length());
         }
         if (basePath != null) {
             if (path.startsWith("/")) {

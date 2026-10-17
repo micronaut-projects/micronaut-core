@@ -31,6 +31,7 @@ import io.micronaut.web.router.builder.HttpRouteSpec;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.RequestPredicates;
 import io.micronaut.web.router.builder.RouteSpec;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;
@@ -303,6 +304,17 @@ class HandlerRouteWebSocketTest {
         Client ordered = connect("/ws/ordered");
         assertEquals("lower order", ordered.next());
         ordered.close(1000, "done");
+    }
+
+    @Test
+    void theRouteSelectorOfTheRoutesSelectsTheUpgradedRoute() throws Exception {
+        // the selector selects the route of the higher order
+        Client selected = connect("/ws/selected");
+        assertEquals("selected", selected.next());
+        selected.close(1000, "done");
+
+        // the selector selects no route: not found, as for any other request
+        assertEquals(404, handshakeStatus("/ws/rejected", builder -> { }));
     }
 
     @Test
@@ -1236,6 +1248,19 @@ class HandlerRouteWebSocketTest {
                     .onOpen((session, request) -> session.sendAsync("higher order")));
                 routes.GET("/ws/ordered").order(-10).webSocket(ws -> ws
                     .onOpen((session, request) -> session.sendAsync("lower order")));
+                // a route selector of the routes selects among them, as for any other request
+                routes.group(group -> {
+                    group.selectedBy((request, matches) -> matches.stream()
+                        .filter(match -> match.getRouteInfo().getOrder() == 10)
+                        .map(RouteMatchSelector.Selection::of)
+                        .toList());
+                    group.GET("/ws/selected").order(10).webSocket(ws -> ws
+                        .onOpen((session, request) -> session.sendAsync("selected")));
+                    group.GET("/ws/selected").order(-10).webSocket(ws -> ws
+                        .onOpen((session, request) -> session.sendAsync("lower order")));
+                    group.GET("/ws/rejected").webSocket(ws -> ws
+                        .onOpen((session, request) -> session.sendAsync("rejected")));
+                });
 
                 routes.GET("/ws/port").port(routePort).webSocket(ws -> ws
                     .onOpen((session, request) -> session.sendAsync("port " + request.getServerAddress().getPort())));

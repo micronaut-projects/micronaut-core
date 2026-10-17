@@ -24,6 +24,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.form.FormData;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import io.micronaut.web.router.websocket.WebSocketEndpointSpec;
 import org.jspecify.annotations.Nullable;
 
@@ -93,7 +94,7 @@ final class DefaultLocatedHttpRouteSpec<T> implements LocatedHttpRouteSpec<T> {
     }
 
     @Override
-    public LocatedHttpRouteSpec<T> where(RouteCondition condition) {
+    public LocatedHttpRouteSpec<T> where(RequestCondition condition) {
         route.where(condition);
         return this;
     }
@@ -107,6 +108,12 @@ final class DefaultLocatedHttpRouteSpec<T> implements LocatedHttpRouteSpec<T> {
     @Override
     public LocatedHttpRouteSpec<T> order(int order) {
         route.order(order);
+        return this;
+    }
+
+    @Override
+    public LocatedHttpRouteSpec<T> selectedBy(@Nullable RouteMatchSelector selector) {
+        route.selectedBy(selector);
         return this;
     }
 
