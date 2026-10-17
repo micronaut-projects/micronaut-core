@@ -25,6 +25,8 @@ import io.netty.contrib.multipart.FormDecoderException;
 import io.netty.contrib.multipart.PostBodyDecoder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -504,6 +506,28 @@ public class FormDemuxerTest {
 
         streamingBody.sharedBuffer().complete();
         assertNull(fields.queue.poll());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"true,v=a%", "true,v=a%2", "false,v=a%", "false,v=a%2"})
+    public void aTruncatedEscapeAtTheEndOfTheInput(boolean decode, String input) {
+        MockUpstream upstream = new MockUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
+        new FormDemuxer(PostBodyDecoder.builder()
+            .enableQuirks(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE, DecoderQuirk.REFUSE_SHORT_PERCENT_DECODE)
+            .forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED,
+            streamingBody.rootBody(), decode).fields().subscribe(fields.noBackpressure());
+
+        // the decoder waits on the rest of the escape until the end of the input
+        write(streamingBody.sharedBuffer(), input);
+        RawFormField field = fields.queue.remove();
+        QueueSubscriber<String> data = content(field.byteBody()).noBackpressure();
+
+        streamingBody.sharedBuffer().complete();
+
+        assertBadRequest(data.error);
+        assertBadRequest(fields.error);
     }
 
     private FormDemuxer undecoded(ByteBody body) {

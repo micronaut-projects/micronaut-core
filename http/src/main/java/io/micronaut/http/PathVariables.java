@@ -211,7 +211,9 @@ public interface PathVariables extends NamedValues {
      * values, e.g. a route match of another router
      * @since 5.3.0
      */
-    PathVariables raw();
+    default PathVariables raw() {
+        throw new UnsupportedOperationException("The raw values of the path variables are not available");
+    }
 
     /**
      * The value of a required variable as it appears in the path, not percent-decoded, see

@@ -198,6 +198,12 @@ class RawRouteValuesTest {
     }
 
     @Test
+    void anAbsentOptionalVariableOfALocatorHasNoRawValue() throws Exception {
+        assertEquals("located:false|absent", get("/raw/shops/items"));
+        assertEquals("located:true|7", get("/raw/shops/7/items"));
+    }
+
+    @Test
     void anAbsentOptionalVariableHasNoRawValue() throws Exception {
         assertEquals("false|[]", get("/raw/optional"));
         assertEquals("true|a%2Fb", get("/raw/optional/a%2Fb"));
@@ -379,7 +385,24 @@ class RawRouteValuesTest {
         public void routes(HttpRouteBuilder routes) {
             routes.GET("/raw/fn/{name:[^/]+}", (request, pathVariables) ->
                 HttpResponse.ok(pathVariables.rawString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
+            routes.locate("/raw/shops{/shop:[0-9]+}", (request, pathVariables) -> "located:" + pathVariables.raw().contains("shop"), new ShopRoutes());
             routes.locate("/raw/located/{prefix}", (request, pathVariables) -> pathVariables.raw().getString("prefix"), new ItemRoutes());
+        }
+    }
+
+    static final class ShopRoutes implements LocatedRoutes<String> {
+        @Override
+        public Argument<String> targetType() {
+            return Argument.STRING;
+        }
+
+        @Override
+        public void routes(LocatedHttpRouteBuilder<String> located) {
+            // the constraint sees the raw variables of the prefix, without the absent one
+            located.GET("/items")
+                .constrain(pathVariables -> pathVariables.raw().contains("shop") == pathVariables.raw().names().contains("shop"))
+                .handle((request, pathVariables, shop) -> HttpResponse.ok(shop + "|" + (pathVariables.raw().contains("shop") ? pathVariables.rawString("shop") : "absent"))
+                    .contentType(MediaType.TEXT_PLAIN_TYPE));
         }
     }
 

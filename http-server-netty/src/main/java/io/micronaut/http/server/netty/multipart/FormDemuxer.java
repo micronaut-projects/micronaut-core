@@ -343,11 +343,13 @@ public final class FormDemuxer implements BufferConsumer {
         assert eventLoop == null || eventLoop.inEventLoop();
         try {
             decoder.endInput();
+            // the end of the input completes the last field, which the decoder validates then,
+            // e.g. a percent escape it was waiting on the rest of
+            forwardOutput();
         } catch (Exception e) {
             handleDecoderException(e);
             return;
         }
-        forwardOutput();
         if (closeDelimiter != null && !closeDelimiter.found()) {
             // the decoder ends the last part with the end of the input: a truncated body, or one
             // with another closing boundary, would be read as a shorter form

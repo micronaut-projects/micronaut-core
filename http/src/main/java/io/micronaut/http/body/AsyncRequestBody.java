@@ -351,18 +351,35 @@ public interface AsyncRequestBody {
     CompletionStage<FormData> form();
 
     /**
-     * Read the whole submitted form, like {@link #form()}, with options, e.g. the values of the
-     * fields of an {@code application/x-www-form-urlencoded} form as they appear in the body, not
-     * percent-decoded, see {@link FormOptions#withRawValues()}.
+     * Read the whole submitted form with options, e.g. the values of the fields of an
+     * {@code application/x-www-form-urlencoded} form as they appear in the body, not
+     * percent-decoded, see {@link FormOptions#withRawValues()}. With the
+     * {@link FormOptions#defaults() defaults}, and for a {@code multipart/form-data} form, which
+     * has no percent-encoding, it is {@link #form()}.
+     *
+     * <p>The raw values of a URL-encoded form are not the shared form of the request: the form is
+     * decoded from the bytes of the body, with the limits and the validation of the form, but the
+     * {@code FormData}, {@code FileUpload} and {@code @Part} arguments do not share it, nor does it
+     * reuse a form they already read. It reads the bytes, so it needs them: when another
+     * read consumed them, e.g. a {@code FormData} argument of a filter, or a filter replaced the body
+     * with an object, it fails with an {@link IllegalStateException}. Of a {@link #copy()}, it is
+     * read from a split of the bytes, which leaves the body to the route, like the other reads of
+     * a copy. An implementation that cannot read the raw values rejects them.</p>
      *
      * @param options The options
      * @return Completes with the form, or exceptionally with an
      * {@link io.micronaut.http.exceptions.HttpStatusException} with the status
      * {@code 415 Unsupported Media Type} when the request has no form body
-     * @throws IllegalStateException if the body was already read
+     * @throws IllegalStateException         if the body was already read
+     * @throws UnsupportedOperationException if this implementation cannot read the raw values
      * @since 5.3.0
      */
-    CompletionStage<FormData> form(FormOptions options);
+    default CompletionStage<FormData> form(FormOptions options) {
+        if (options.rawValues()) {
+            throw new UnsupportedOperationException("This body cannot read the raw values of a form");
+        }
+        return form();
+    }
 
     /**
      * Read the submitted form part by part, as it arrives. The parts are closed when the method
