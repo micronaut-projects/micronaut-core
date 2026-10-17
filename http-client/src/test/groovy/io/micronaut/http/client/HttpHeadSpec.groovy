@@ -259,12 +259,12 @@ class HttpHeadSpec extends Specification {
         Flux<HttpResponse> flowable = client.exchange(
                 HttpRequest.HEAD("/head/simple")
         )
-        String body
+        String body = 'not read'
         flowable.next().subscribe((Consumer) { HttpResponse res ->
             Thread.sleep(3000)
             body = res.getBody(String).orElse(null)
         })
-        def conditions = new PollingConditions(timeout: 4)
+        PollingConditions conditions = new PollingConditions(timeout: 4)
 
         then:
         conditions.eventually {
