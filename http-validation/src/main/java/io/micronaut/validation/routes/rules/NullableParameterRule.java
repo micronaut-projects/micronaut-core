@@ -15,6 +15,7 @@
  */
 package io.micronaut.validation.routes.rules;
 
+import io.micronaut.core.annotation.AnnotationView;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -97,7 +98,7 @@ public class NullableParameterRule implements RouteValidationRule {
                         .filter(p -> p.getName().equals(variable.getName()))
                         .forEach(p -> {
                             ClassElement type = p.getType();
-                            boolean hasDefaultValue = p.findAnnotation(Bindable.class).flatMap(av -> av.stringValue("defaultValue")).isPresent();
+                            boolean hasDefaultValue = hasDefaultValue(p);
                             if (!isNullable(p) && type != null && !type.isAssignable(Optional.class) && !hasDefaultValue) {
                                 errorMessages.add("The uri variable [%s] is optional, but the corresponding method argument [%s %s] is not defined as an Optional or annotated with a Nullable annotation.".formatted(variable.getName(), p.getType().toString(), p.getName()));
                             }
@@ -106,6 +107,11 @@ public class NullableParameterRule implements RouteValidationRule {
         }
 
         return new RouteValidationResult(errorMessages.toArray(EMPTY_STRING_ARRAY));
+    }
+
+    private boolean hasDefaultValue(TypedElement p) {
+        AnnotationView bindable = p.getAnnotationView(Bindable.class);
+        return bindable != null && bindable.stringValue("defaultValue").isPresent();
     }
 
     private boolean isNullable(TypedElement p) {

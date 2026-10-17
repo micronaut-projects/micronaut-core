@@ -244,6 +244,16 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
+    public @Nullable AnnotationView getAnnotationView(String annotation) {
+        return null;
+    }
+
+    @Override
+    public @Nullable AnnotationView getAnnotationView(Class<? extends Annotation> annotationClass) {
+        return null;
+    }
+
+    @Override
     public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(Class<T> annotationClass) {
         return Optional.empty();
     }

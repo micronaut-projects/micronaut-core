@@ -19,7 +19,7 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationView;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.MutableHttpRequest;
@@ -49,18 +49,21 @@ public class VersionClientRequestBinder implements AnnotatedClientRequestBinder<
     public void bind(MethodInvocationContext<Object, Object> context,
                      ClientRequestUriContext uriContext,
                      MutableHttpRequest<?> request) {
-        context.findAnnotation(Version.class)
-                .flatMap(AnnotationValue::stringValue)
-                .filter(StringUtils::isNotEmpty)
-                .ifPresent(version -> {
-                    ClientVersioningConfiguration configuration =
-                            getVersioningConfiguration(context.getAnnotationMetadata());
+        AnnotationView versionAnnotation = context.getAnnotationView(Version.class);
+        if (versionAnnotation == null) {
+            return;
+        }
+        String version = versionAnnotation.stringValue().orElse(null);
+        if (StringUtils.isEmpty(version)) {
+            return;
+        }
+        ClientVersioningConfiguration configuration =
+                getVersioningConfiguration(context.getAnnotationMetadata());
 
-                    configuration.getHeaders()
-                            .forEach(header -> request.header(header, version));
-                    configuration.getParameters()
-                            .forEach(parameter -> uriContext.addQueryParameter(parameter, version));
-                });
+        configuration.getHeaders()
+                .forEach(header -> request.header(header, version));
+        configuration.getParameters()
+                .forEach(parameter -> uriContext.addQueryParameter(parameter, version));
     }
 
     @Override

@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationView;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
@@ -277,6 +278,23 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             existing = mergeValue(annotation, existing, annotationMetadata.getAnnotation(annotation));
         }
         return Optional.ofNullable(existing);
+    }
+
+    @Override
+    public @Nullable AnnotationView getAnnotationView(String annotation) {
+        AnnotationView found = null;
+        for (AnnotationMetadata annotationMetadata : hierarchy) {
+            AnnotationView view = annotationMetadata.getAnnotationView(annotation);
+            if (view != null) {
+                if (found != null) {
+                    // Present more than once: the members have to be merged
+                    AnnotationValue<Annotation> merged = this.<Annotation>findAnnotation(annotation).orElse(null);
+                    return merged != null ? AnnotationView.of(merged) : null;
+                }
+                found = view;
+            }
+        }
+        return found;
     }
 
     @Nullable

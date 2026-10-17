@@ -19,7 +19,7 @@ import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.exceptions.BeanContextException;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
-import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationView;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.type.Argument;
@@ -57,7 +57,7 @@ final class ExecutableMethodProcessorListener implements BeanCreatedEventListene
 
     @Override
     public ExecutableMethodProcessor<?> onCreated(BeanCreatedEvent<ExecutableMethodProcessor<?>> event) {
-        AnnotationValue<Deprecated> deprecatedAnnotation = event.getBeanDefinition().getAnnotation(Deprecated.class);
+        AnnotationView deprecatedAnnotation = event.getBeanDefinition().getAnnotationView(Deprecated.class);
         adapt(event);
         if (deprecatedAnnotation == null) {
             return event.getBean();

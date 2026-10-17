@@ -1945,6 +1945,22 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Nullable
     private Object getRawSingleValue(String member, @Nullable Function<Object, Object> valueMapper) {
+        Object rawValue = rawSingleValue(values, member);
+        if (valueMapper != null && (rawValue instanceof String || rawValue instanceof EvaluatedExpression)) {
+            return valueMapper.apply(rawValue);
+        }
+        return rawValue;
+    }
+
+    /**
+     * The first value of a member, as the typed accessors read it.
+     *
+     * @param values The members
+     * @param member The member
+     * @return The value
+     */
+    @Nullable
+    static Object rawSingleValue(Map<CharSequence, Object> values, String member) {
         Object rawValue = values.get(member);
         if (rawValue != null) {
             if (rawValue.getClass().isArray()) {
@@ -1959,13 +1975,10 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                 }
             }
         }
-        if (valueMapper != null && (rawValue instanceof String || rawValue instanceof EvaluatedExpression)) {
-            return valueMapper.apply(rawValue);
-        }
         return rawValue;
     }
 
-    private static <T extends Enum> Optional<T> convertToEnum(Class<T> enumType, Object o) {
+    static <T extends Enum> Optional<T> convertToEnum(Class<T> enumType, Object o) {
         if (enumType.isInstance(o)) {
             return Optional.of((T) o);
         } else {
