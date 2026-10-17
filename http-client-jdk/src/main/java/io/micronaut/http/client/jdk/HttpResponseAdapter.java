@@ -99,8 +99,7 @@ public class HttpResponseAdapter<O> extends BaseHttpResponseAdapter<byte[], O> {
      */
     @Override
     public MutableHttpResponse<?> toMutableResponse() {
-        byte[] bytes = httpResponse.body();
-        return MutableByteBodyHttpResponse.of(this, ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt(bytes == null ? new byte[0] : bytes.clone()));
+        return MutableByteBodyHttpResponse.of(this, ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt(httpResponse.body().clone()));
     }
 
     private <T> Optional<T> convertBytes(@Nullable MediaType contentType, byte[] bytes, Argument<T> type) {
