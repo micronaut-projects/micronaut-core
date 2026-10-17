@@ -400,13 +400,14 @@ def apply_delegation(tree, targets):
                 return __mn_java.total(quantity, unit_price)
             ...the original body, for objects created in Python...
 
-    ``targets`` are ``Class#method`` strings, a nested class as ``Outer$Inner``. Returns how many
-    functions were rewritten.
+    ``targets`` are ``Class#method`` strings, a nested class as ``Outer$Inner``, with ``#list``,
+    ``#set`` or ``#dict`` appended when the Java body returns a collection, which a Python caller
+    receives as a Python one. Returns how many functions were rewritten.
     """
     wanted = {}
     for target in targets:
-        class_name, _, method = target.partition("#")
-        wanted.setdefault(class_name, set()).add(method)
+        class_name, method, *conversion = target.split("#")
+        wanted.setdefault(class_name, {})[method] = conversion[0] if conversion else None
     count = 0
     for class_node, path in _classes(tree):
         methods = wanted.get("$".join(path))
@@ -414,10 +415,14 @@ def apply_delegation(tree, targets):
             continue
         for statement in class_node.body:
             if isinstance(statement, ast.FunctionDef) and statement.name in methods and not _delegates(statement):
-                statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _delegation(statement)
+                statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _delegation(statement, methods[statement.name])
                 ast.fix_missing_locations(statement)
                 count += 1
     return count
+
+
+def _result_holder():
+    return ast.Name(id="__mn_m", ctx=ast.Load())
 
 
 def _classes(tree, path=()):
@@ -457,7 +462,7 @@ def _temporary(function):
     return name
 
 
-def _delegation(function):
+def _delegation(function, conversion=None):
     args = function.args
     receiver = (list(args.posonlyargs) + list(args.args))[0].arg
     names = [argument.arg for argument in list(args.posonlyargs) + list(args.args)][1:]
@@ -471,11 +476,27 @@ def _delegation(function):
             keywords=[],
         ),
     )
-    call = ast.Return(value=ast.Call(
+    result = ast.Call(
         func=ast.Attribute(value=ast.Name(id=temporary, ctx=ast.Load()), attr=function.name, ctx=ast.Load()),
         args=[ast.Name(id=name, ctx=ast.Load()) for name in names],
         keywords=[],
-    ))
+    )
+    if conversion in ("list", "set"):
+        result = ast.Call(func=ast.Name(id=conversion, ctx=ast.Load()), args=[result], keywords=[])
+    elif conversion == "dict":
+        # dict((k, m.get(k)) for k in m.keySet()): a Java map read through its interop members
+        result = ast.parse("dict((__mn_k, __mn_m.get(__mn_k)) for __mn_k in __mn_m.keySet())").body[0].value
+        result.args[0].generators[0].iter.func.value = _result_holder()
+        result = ast.Call(
+            func=ast.Lambda(args=ast.arguments(posonlyargs=[], args=[ast.arg(arg="__mn_m")], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[]), body=result),
+            args=[ast.Call(
+                func=ast.Attribute(value=ast.Name(id=temporary, ctx=ast.Load()), attr=function.name, ctx=ast.Load()),
+                args=[ast.Name(id=name, ctx=ast.Load()) for name in names],
+                keywords=[],
+            )],
+            keywords=[],
+        )
+    call = ast.Return(value=result)
     guard = ast.If(
         test=ast.Compare(left=ast.Name(id=temporary, ctx=ast.Load()), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
         body=[call],
