@@ -91,6 +91,92 @@ class AbsentPropertyDependantBean {}
         context.close()
     }
 
+    void "test missing beans treats a bean whose beanProperty requirement fails as absent"() {
+        given:
+        ApplicationContext context = buildContext('test.FallbackBean', '''
+package test;
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@ConfigurationProperties("config")
+class Config {
+    private String property;
+    public String getProperty() { return property; }
+    public void setProperty(String property) { this.property = property; }
+}
+
+class EventLoops {}
+
+@Factory
+class EventLoopsFactory {
+    @Singleton
+    @Requires(bean = Config.class, beanProperty = "property")
+    EventLoops eventLoops() {
+        return new EventLoops();
+    }
+}
+
+@Singleton
+@Requires(missingBeans = EventLoops.class)
+class FallbackBean {}
+''')
+        def fallback = context.classLoader.loadClass('test.FallbackBean')
+        def loops = context.classLoader.loadClass('test.EventLoops')
+
+        expect:
+        context.containsBean(fallback)
+
+        when:
+        context.getBean(loops)
+
+        then:
+        thrown(NoSuchBeanException)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test missing beans sees a bean whose beanProperty requirement is satisfied"() {
+        given:
+        ApplicationContext context = buildContext('test.FallbackBean', '''
+package test;
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@ConfigurationProperties("config")
+class Config {
+    private String property;
+    public String getProperty() { return property; }
+    public void setProperty(String property) { this.property = property; }
+}
+
+class EventLoops {}
+
+@Factory
+class EventLoopsFactory {
+    @Singleton
+    @Requires(bean = Config.class, beanProperty = "property")
+    EventLoops eventLoops() {
+        return new EventLoops();
+    }
+}
+
+@Singleton
+@Requires(missingBeans = EventLoops.class)
+class FallbackBean {}
+''')
+        context.environment.addPropertySource(PropertySource.of("test", ['config.property': 'set']))
+        def fallback = context.classLoader.loadClass('test.FallbackBean')
+        def loops = context.classLoader.loadClass('test.EventLoops')
+
+        expect:
+        !context.containsBean(fallback)
+        context.containsBean(loops)
+
+        cleanup:
+        context.close()
+    }
+
     void "test requires not equals property value with value not set"() {
         given:
         ApplicationContext context = buildContext('test.PresentPropertyDependantBean', '''
