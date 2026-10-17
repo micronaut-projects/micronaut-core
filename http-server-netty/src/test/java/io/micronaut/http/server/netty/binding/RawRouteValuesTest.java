@@ -180,6 +180,14 @@ class RawRouteValuesTest {
         assertEquals("{name=a/b, v=\u00e9}|" + body, post("/raw/copied-decoded", body));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"/raw/after-form-data", "/raw/after-text", "/raw/after-replaced"})
+    void aRawFormNeedsTheBytes(String path) throws Exception {
+        // an earlier read consumed the bytes, or a filter replaced the body: the leak check of
+        // the class checks the bytes were released
+        assertEquals("IllegalStateException", post(path, "v=a%2Fb"));
+    }
+
     @Test
     void aRawFormOfAMutatedRequest() throws Exception {
         assertEquals("{v=a%2Fb}", post("/raw/mutated", "v=a%2Fb"));
@@ -418,6 +426,34 @@ class RawRouteValuesTest {
             return form.thenApply(RawController::all);
         }
 
+        @Post(uri = "/after-form-data", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> afterFormData(AsyncRequestBody body) {
+            return rawFailure(body);
+        }
+
+        @Post(uri = "/after-text", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> afterText(AsyncRequestBody body) {
+            return body.text().thenCompose(text -> rawFailure(body));
+        }
+
+        @Post(uri = "/after-replaced", consumes = MediaType.ALL, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> afterReplaced(AsyncRequestBody body) {
+            return rawFailure(body);
+        }
+
+        private static CompletionStage<String> rawFailure(AsyncRequestBody body) {
+            try {
+                return body.form(FormOptions.defaults().withRawValues())
+                    .handle((form, error) -> error == null ? "read " + all(form) : unwrap(error).getClass().getSimpleName());
+            } catch (RuntimeException e) {
+                return java.util.concurrent.CompletableFuture.completedStage(e.getClass().getSimpleName());
+            }
+        }
+
+        private static Throwable unwrap(Throwable error) {
+            return error instanceof java.util.concurrent.CompletionException && error.getCause() != null ? error.getCause() : error;
+        }
+
         @Post(uri = "/mutated", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
         CompletionStage<String> mutated(HttpRequest<?> request, AsyncRequestBody body) {
             assertEquals("1", request.getHeaders().get("X-Mutated"));
@@ -461,6 +497,17 @@ class RawRouteValuesTest {
                 request.setAttribute(COPIED_FORM, RawController.all(form));
                 return null;
             });
+        }
+
+        @RequestFilter("/after-form-data")
+        void afterFormData(io.micronaut.http.form.FormData form) {
+            // the filter reads the form of the request, which consumes the body
+            assertEquals("a/b", form.getString("v"));
+        }
+
+        @RequestFilter("/after-replaced")
+        HttpRequest<?> afterReplaced(HttpRequest<?> request) {
+            return request.mutate().body(Map.of("v", "a/b"));
         }
 
         @RequestFilter("/mutated")
