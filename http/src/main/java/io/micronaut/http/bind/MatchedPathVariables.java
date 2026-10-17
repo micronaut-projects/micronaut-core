@@ -80,7 +80,14 @@ public class MatchedPathVariables implements PathVariables {
         this.decoded = null;
     }
 
-    private MatchedPathVariables(MatchedPathVariables decoded, Map<String, Object> rawValues) {
+    /**
+     * The raw view of variables, see {@link #rawView(Map)}: its values are the raw values, and it
+     * fails like the decoded variables.
+     *
+     * @param decoded   The decoded variables
+     * @param rawValues Their raw values
+     */
+    protected MatchedPathVariables(MatchedPathVariables decoded, Map<String, Object> rawValues) {
         this.values = rawValues;
         this.rawValues = rawValues;
         this.conversionService = decoded.conversionService;
@@ -118,10 +125,21 @@ public class MatchedPathVariables implements PathVariables {
             if (raws == null) {
                 throw new UnsupportedOperationException("The raw values of the path variables are not available");
             }
-            view = new MatchedPathVariables(this, raws);
+            view = rawView(raws);
             raw = view;
         }
         return view;
+    }
+
+    /**
+     * The raw view of these variables: a subclass that carries more of the route, e.g. its
+     * target, keeps it in the view.
+     *
+     * @param rawValues The raw values, read-only
+     * @return The view, created with {@link #MatchedPathVariables(MatchedPathVariables, Map)}
+     */
+    protected MatchedPathVariables rawView(Map<String, Object> rawValues) {
+        return new MatchedPathVariables(this, rawValues);
     }
 
     @Override

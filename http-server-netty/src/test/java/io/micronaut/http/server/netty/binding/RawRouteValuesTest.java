@@ -125,6 +125,25 @@ class RawRouteValuesTest {
             post("/raw/form-all", "a" + "&a".repeat(127)));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"/raw/form-all", "/raw/decoded-form-all", "/raw/form-data-arg"})
+    void aFormOverTheFieldLimitIsRejected(String path) throws Exception {
+        // the default form-max-fields is 128. The last fields of a body that arrived whole are
+        // decoded at its end: the failure releases the bytes, which the leak check of the class checks
+        assertEquals(413, postStatus(path, "a" + "&a".repeat(128), MediaType.APPLICATION_FORM_URLENCODED));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"v=%rr", "v=%a", "v=a%", "v=a%2", "%rr=v"})
+    void aMalformedEscapeIsRejectedByAStrictDecoder(String body) throws Exception {
+        try (ApplicationContext strict = strict()) {
+            int port = strict.getBean(EmbeddedServer.class).start().getPort();
+            for (String path : java.util.List.of("/raw/form-all", "/raw/decoded-form-all", "/raw/form-data-arg")) {
+                assertEquals(400, send(port, path, java.net.http.HttpRequest.BodyPublishers.ofString(body)).statusCode(), path);
+            }
+        }
+    }
+
     @Test
     void aRawFormIsValidatedLikeTheDecodedForm() throws Exception {
         assertEquals(400, postStatus("/raw/form-all", "foo=ba\rr", MediaType.APPLICATION_FORM_URLENCODED));
@@ -378,6 +397,11 @@ class RawRouteValuesTest {
         CompletionStage<String> rewritten(HttpRequest<?> request, AsyncRequestBody body) {
             assertEquals("true", request.getParameters().get("rewritten"));
             return formAll(body);
+        }
+
+        @Post(uri = "/form-data-arg", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        String formDataArg(io.micronaut.http.form.FormData form) {
+            return all(form);
         }
 
         @Post(uri = "/pending-early", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)

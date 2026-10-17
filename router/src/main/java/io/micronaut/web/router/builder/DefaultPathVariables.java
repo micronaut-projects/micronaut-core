@@ -81,6 +81,24 @@ public final class DefaultPathVariables extends RoutePathVariables {
         this(values, conversionService, null);
     }
 
+    private DefaultPathVariables(DefaultPathVariables decoded, Map<String, Object> rawValues) {
+        super(decoded, rawValues);
+        this.resolvedTarget = decoded.resolvedTarget;
+        this.selectedMediaType = decoded.selectedMediaType;
+    }
+
+    /**
+     * The raw view keeps the target and the negotiated media type of the route, which
+     * {@code LocatedRoutes.locatedTarget} and {@code RouteMatchSelector.selectedMediaType} read.
+     *
+     * @param rawValues The raw values
+     * @return The view
+     */
+    @Override
+    protected DefaultPathVariables rawView(Map<String, Object> rawValues) {
+        return new DefaultPathVariables(this, rawValues);
+    }
+
     /**
      * @return The target a {@code DynamicRouteTarget} resolved for the route, or {@code null}
      */

@@ -54,6 +54,14 @@ public class RoutePathVariables extends MatchedPathVariables {
         super(values, rawValues, conversionService);
     }
 
+    /**
+     * @param decoded   The decoded variables
+     * @param rawValues Their raw values
+     */
+    protected RoutePathVariables(RoutePathVariables decoded, Map<String, Object> rawValues) {
+        super(decoded, rawValues);
+    }
+
     @Override
     protected RuntimeException unsatisfied(String name, Argument<?> argument) {
         return new UnsatisfiedPathVariableRouteException(name, argument);
