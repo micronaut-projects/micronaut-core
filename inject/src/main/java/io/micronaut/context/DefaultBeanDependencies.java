@@ -95,6 +95,23 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
     }
 
     /**
+     * Finds a dependent this owner created by its bean instance. Identity selects it, not equality.
+     *
+     * @param bean The bean instance
+     * @return The registration, or null when this owner does not hold one for the instance
+     */
+    @SuppressWarnings("ReferenceEquality") // An instance is owned by identity, even when two beans compare equal.
+    synchronized @Nullable BeanRegistration<?> findOwned(Object bean) {
+        for (int i = owned.size() - 1; i >= 0; i--) {
+            BeanRegistration<?> registration = owned.get(i);
+            if (registration.bean == bean) {
+                return registration;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Destroys every owned dependent in reverse creation order. All of them are attempted; the first failure is
      * rethrown with the later ones suppressed on it.
      *
@@ -251,8 +268,8 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
 
     /**
      * Throws when nothing can be resolved through this owner any more: it is closing and the lookup is not made by
-     * its destruction callbacks, the context is shutting down and the lookup is not made by the thread running the
-     * shutdown, or the destruction invocation it belongs to has returned.
+     * its destruction callbacks, the context is shutting down and its callbacks have ended, or the destruction
+     * invocation it belongs to has returned.
      *
      * @param context The context
      */
@@ -275,6 +292,7 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
      */
     <T> T resolve(DefaultBeanContext context, @Nullable BeanDefinition<?> definition,
                   Function<? super DefaultBeanResolutionContext, T> operation) {
+        long shutdownPhase = context.shutdownPhase();
         checkOpen(context);
         // User factories run outside the owner lock. Publication is atomic with closing.
         List<BeanRegistration<?>> created = List.of();
@@ -284,11 +302,11 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
                 created = resolution.getAndResetDependentBeans();
                 synchronized (this) {
                     checkOpen(context);
-                    attach(created, resolution.requiredBeans());
                     if (destructionContext == null) {
                         // A temporary destruction group releases its dependents itself.
-                        context.trackShutdownDependents(this, created);
+                        context.trackShutdownDependents(shutdownPhase, this, created);
                     }
+                    attach(created, resolution.requiredBeans());
                 }
                 return result;
             } catch (RuntimeException | Error failure) {

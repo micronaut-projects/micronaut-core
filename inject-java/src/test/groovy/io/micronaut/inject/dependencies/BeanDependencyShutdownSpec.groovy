@@ -2,6 +2,9 @@ package io.micronaut.inject.dependencies
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.TimeUnit
+
 class BeanDependencyShutdownSpec extends AbstractTypeElementSpec {
     private static final String HEADER = '''
 package test;
@@ -140,7 +143,7 @@ class Holder { static BeanDependencyGroup group; }
         log.EVENTS == ['listener', 'owner', 'resource3', 'resource2', 'resource1']
     }
 
-    void "new top-level work during shutdown is rejected"() {
+    void "new top-level work during shutdown is accepted until the callbacks complete"() {
         given:
         def ctx = buildContext(HEADER + '''
 class Holder { static BeanDependencyGroup group; }
@@ -149,11 +152,11 @@ class Holder { static BeanDependencyGroup group; }
     Owner(BeanContext context) { this.context = context; }
     @PreDestroy void close() {
         try {
-            context.createDependencyGroup();
+            context.createDependencyGroup().close();
             Log.EVENTS.add("group created");
         } catch (IllegalStateException expected) { Log.EVENTS.add("group rejected"); }
         try {
-            context.createBeanRegistration(context.getBeanDefinition(Resource.class));
+            context.createBeanRegistration(context.getBeanDefinition(Resource.class)).close();
             Log.EVENTS.add("registration created");
         } catch (IllegalStateException expected) { Log.EVENTS.add("registration rejected"); }
         try {
@@ -175,8 +178,8 @@ class Holder { static BeanDependencyGroup group; }
         when:
         ctx.close()
 
-        then:
-        log.EVENTS == ['group rejected', 'registration rejected', 'other thread rejected']
+        then: 'what the other thread created through the earlier group is destroyed before the shutdown completes'
+        log.EVENTS == ['group created', 'resource1', 'registration created', 'other thread resolved', 'resource2']
 
         when:
         ctx.createDependencyGroup()
@@ -217,6 +220,248 @@ class Holder { static BeanDependencyGroup group; }
 
         then:
         log.EVENTS == ['owner', 'late', 'resource1']
+    }
+
+    void "a singleton destroyed after the shutdown event opens temporary groups in its pre-destroy method"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+@Singleton class Listener implements ApplicationEventListener<ShutdownEvent> {
+    public void onApplicationEvent(ShutdownEvent event) { Log.EVENTS.add("shutdown event"); }
+}
+@Singleton class Owner {
+    static BeanDependencyGroup retained;
+    static CreatedBean<Resource> created;
+    final BeanContext context;
+    Owner(BeanContext context) { this.context = context; }
+    @PreDestroy void close() {
+        context.withDependencies(group -> {
+            group.getBean(Resource.class);
+            group.getBean(Shared.class);
+            Log.EVENTS.add("temporary");
+            return null;
+        });
+        try (BeanDependencyGroup group = context.createDependencyGroup()) {
+            group.getBean(Resource.class);
+            Log.EVENTS.add("closed group");
+        }
+        retained = context.createDependencyGroup();
+        retained.getBean(Resource.class);
+        created = context.createBeanRegistration(context.getBeanDefinition(Resource.class));
+        Log.EVENTS.add("owner");
+    }
+}
+''')
+        ctx.getBean(ctx.classLoader.loadClass('test.Listener'))
+        ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+        def owner = ctx.classLoader.loadClass('test.Owner')
+        def resource = ctx.classLoader.loadClass('test.Resource')
+        def log = ctx.classLoader.loadClass('test.Log')
+
+        when:
+        ctx.close()
+
+        then: 'the released dependents go when released; the singleton created by the callback, then the rest, before the shutdown completes'
+        log.EVENTS == ['shutdown event', 'temporary', 'resource1', 'closed group', 'resource2', 'owner', 'shared', 'resource4', 'resource3']
+
+        when:
+        owner.created.close()
+        owner.retained.close()
+
+        then:
+        log.EVENTS.size() == 9
+
+        when:
+        owner.retained.getBean(resource)
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    void "work a destruction callback waits for on another thread opens groups during shutdown"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+@Singleton class Owner {
+    final BeanContext context;
+    Owner(BeanContext context) { this.context = context; }
+    @PreDestroy void close() {
+        CompletableFuture.runAsync(() -> {
+            context.withDependencies(group -> {
+                group.getBean(Resource.class);
+                Log.EVENTS.add("async temporary");
+                return null;
+            });
+            context.createDependencyGroup().getBean(Resource.class);
+            Log.EVENTS.add("async retained");
+        }).join();
+        Log.EVENTS.add("owner");
+    }
+}
+''')
+        ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+        def log = ctx.classLoader.loadClass('test.Log')
+
+        when:
+        ctx.close()
+
+        then:
+        log.EVENTS == ['async temporary', 'resource1', 'async retained', 'owner', 'resource2']
+    }
+
+    void "work a destruction callback does not wait for is rejected once the callbacks complete"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+@Singleton class Owner {
+    static final CountDownLatch RELEASE = new CountDownLatch(1);
+    static CompletableFuture<Void> work;
+    final BeanContext context;
+    Owner(BeanContext context) { this.context = context; }
+    @PreDestroy void close() {
+        work = CompletableFuture.runAsync(() -> {
+            try {
+                RELEASE.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            context.withDependencies(group -> group.getBean(Resource.class));
+        });
+    }
+}
+''')
+        def owner = ctx.classLoader.loadClass('test.Owner')
+        ctx.getBean(owner)
+        def log = ctx.classLoader.loadClass('test.Log')
+
+        when:
+        ctx.close()
+        owner.RELEASE.countDown()
+        owner.work.get(30, java.util.concurrent.TimeUnit.SECONDS)
+
+        then:
+        def e = thrown(java.util.concurrent.ExecutionException)
+        e.cause instanceof IllegalStateException
+        log.EVENTS.isEmpty()
+    }
+
+    void "a singleton a group lookup is still creating when the shutdown callbacks complete is destroyed"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+class Holder {
+    static BeanDependencyGroup group;
+    static final CountDownLatch ENTERED = new CountDownLatch(1);
+    static final CountDownLatch RESUME = new CountDownLatch(1);
+    static CompletableFuture<LateSingleton> work;
+}
+@Singleton class LateSingleton {
+    LateSingleton() throws InterruptedException {
+        Log.EVENTS.add("late created");
+        Holder.ENTERED.countDown();
+        Holder.RESUME.await(30, TimeUnit.SECONDS);
+    }
+    @PreDestroy void close() { Log.EVENTS.add("late destroyed"); }
+}
+@Singleton class Owner {
+    @PreDestroy void close() throws InterruptedException {
+        Holder.work = CompletableFuture.supplyAsync(() -> Holder.group.getBean(LateSingleton.class));
+        Holder.ENTERED.await(30, TimeUnit.SECONDS);
+    }
+}
+''')
+        def holder = ctx.classLoader.loadClass('test.Holder')
+        def log = ctx.classLoader.loadClass('test.Log')
+        holder.group = ctx.createDependencyGroup()
+        ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+
+        when:
+        ctx.close()
+        holder.RESUME.countDown()
+        holder.work.get(30, TimeUnit.SECONDS)
+
+        then: 'the lookup is rejected and the singleton it published after the shutdown is destroyed'
+        def e = thrown(ExecutionException)
+        e.cause instanceof IllegalStateException
+        log.EVENTS == ['late created', 'late destroyed']
+    }
+
+    void "a singleton a direct lookup is still creating when the shutdown callbacks complete is destroyed"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+class Holder {
+    static final CountDownLatch ENTERED = new CountDownLatch(1);
+    static final CountDownLatch RESUME = new CountDownLatch(1);
+    static CompletableFuture<LateSingleton> work;
+}
+@Singleton class LateSingleton {
+    LateSingleton() throws InterruptedException {
+        Log.EVENTS.add("late created");
+        Holder.ENTERED.countDown();
+        Holder.RESUME.await(30, TimeUnit.SECONDS);
+    }
+    @PreDestroy void close() { Log.EVENTS.add("late destroyed"); }
+}
+@Singleton class Owner {
+    final BeanContext context;
+    Owner(BeanContext context) { this.context = context; }
+    @PreDestroy void close() throws InterruptedException {
+        Holder.work = CompletableFuture.supplyAsync(() -> context.getBean(LateSingleton.class));
+        Holder.ENTERED.await(30, TimeUnit.SECONDS);
+    }
+}
+''')
+        def holder = ctx.classLoader.loadClass('test.Holder')
+        def log = ctx.classLoader.loadClass('test.Log')
+        ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+
+        when:
+        ctx.close()
+        holder.RESUME.countDown()
+        holder.work.get(30, TimeUnit.SECONDS)
+
+        then: 'the lookup fails and the singleton it published after the shutdown is destroyed'
+        def e = thrown(ExecutionException)
+        e.cause instanceof IllegalStateException
+        log.EVENTS == ['late created', 'late destroyed']
+    }
+
+    void "a fresh registration still being created when the shutdown completes is destroyed"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+class Holder {
+    static final CountDownLatch ENTERED = new CountDownLatch(1);
+    static final CountDownLatch RESUME = new CountDownLatch(1);
+    static CompletableFuture<CreatedBean<Slow>> work;
+}
+@Prototype class Slow {
+    final Shared shared;
+    Slow(Shared shared) throws InterruptedException {
+        this.shared = shared;
+        Log.EVENTS.add("slow created");
+        Holder.ENTERED.countDown();
+        Holder.RESUME.await(30, TimeUnit.SECONDS);
+    }
+    @PreDestroy void close() { Log.EVENTS.add("slow destroyed"); }
+}
+@Singleton class Owner {
+    final BeanContext context;
+    Owner(BeanContext context) { this.context = context; }
+    @PreDestroy void close() throws InterruptedException {
+        Holder.work = CompletableFuture.supplyAsync(() -> context.createBeanRegistration(context.getBeanDefinition(Slow.class)));
+        Holder.ENTERED.await(30, TimeUnit.SECONDS);
+    }
+}
+''')
+        def holder = ctx.classLoader.loadClass('test.Holder')
+        def log = ctx.classLoader.loadClass('test.Log')
+        ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+
+        when:
+        ctx.close()
+        holder.RESUME.countDown()
+        holder.work.get(30, TimeUnit.SECONDS)
+
+        then: 'the singleton it resolved while the callbacks ran goes with the shutdown, the registration is rejected and destroyed'
+        def e = thrown(ExecutionException)
+        e.cause instanceof IllegalStateException
+        log.EVENTS == ['slow created', 'shared', 'slow destroyed']
     }
 
     void "a per-target interceptor first needed during shutdown is destroyed with its target"() {
