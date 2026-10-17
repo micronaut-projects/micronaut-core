@@ -40,6 +40,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
+import io.netty.channel.socket.DuplexChannel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.compression.Brotli;
 import io.netty.handler.codec.compression.BrotliDecoder;
@@ -66,9 +67,12 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.Attribute;
+import io.netty.util.ReferenceCountUtil;
+import io.netty.util.concurrent.ScheduledFuture;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +85,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Netty handler that handles incoming {@link HttpRequest}s and forwards them to a
@@ -100,6 +105,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     private static final Logger LOG = LoggerFactory.getLogger(PipeliningServerHandler.class);
     private static final String DECOMPRESSOR_HANDLER = "decompressor";
+    /**
+     * How long the rest of a request body is read after a response that closes the connection,
+     * see {@link #closeAfterResponse()}.
+     */
+    private static final long LINGER_MILLIS = 5_000;
+    /**
+     * How much of the rest of a request body is read after a response that closes the
+     * connection, see {@link #closeAfterResponse()}.
+     */
+    private static final long LINGER_MAX_BYTES = 2L * 1024 * 1024;
 
     private final RequestHandler requestHandler;
     private final boolean quic;
@@ -428,7 +443,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         if (close) {
             return requiredCtx().writeAndFlush(message)
                 .addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE)
-                .addListener(ChannelFutureListener.CLOSE);
+                .addListener((ChannelFutureListener) future -> {
+                    if (future.isSuccess()) {
+                        closeAfterResponse();
+                    } else {
+                        future.channel().close();
+                    }
+                });
         } else {
             ChannelPromise promise = needsPromise ?
                 requiredCtx().newPromise().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE) :
@@ -1038,6 +1059,61 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void discard() {
             dispose();
             delegate.discard();
+        }
+    }
+
+    /**
+     * Close the connection after the last response was written. When the request body has not
+     * been received in full, closing the socket with unread bytes makes the transport reset the
+     * connection, and the client may see the reset instead of the response. In that case only
+     * the output is shut down, and the rest of the body is read and dropped before the
+     * connection is closed, within {@link #LINGER_MILLIS} and {@link #LINGER_MAX_BYTES}.
+     */
+    private void closeAfterResponse() {
+        ChannelHandlerContext context = requiredCtx();
+        if (inboundHandler == baseInboundHandler || removed
+            || !(context.channel() instanceof DuplexChannel channel) || !channel.isActive()) {
+            context.close();
+            return;
+        }
+        // fail or release what the reader of the body did not take
+        inboundHandler.discard();
+        inboundHandler = new LingeringInboundHandler();
+        ScheduledFuture<?> timeout = context.executor().schedule(() -> {
+            context.close();
+        }, LINGER_MILLIS, TimeUnit.MILLISECONDS);
+        channel.closeFuture().addListener(f -> timeout.cancel(false));
+        SslHandler ssl = context.pipeline().get(SslHandler.class);
+        if (ssl == null) {
+            channel.shutdownOutput();
+        } else {
+            ssl.closeOutbound().addListener(f -> channel.shutdownOutput());
+        }
+        refreshNeedMore();
+    }
+
+    /**
+     * Handler that drops the rest of a request body after a response that closes the
+     * connection, and closes the connection when the body ended.
+     */
+    private final class LingeringInboundHandler extends InboundHandler {
+        private long dropped;
+
+        @Override
+        void read(Object message) {
+            if (message instanceof HttpContent content) {
+                dropped += content.content().readableBytes();
+            }
+            boolean last = message instanceof LastHttpContent;
+            ReferenceCountUtil.release(message);
+            if (last || dropped > LINGER_MAX_BYTES) {
+                requiredCtx().close();
+            }
+        }
+
+        @Override
+        void handleUpstreamError(Throwable cause) {
+            requiredCtx().close();
         }
     }
 
