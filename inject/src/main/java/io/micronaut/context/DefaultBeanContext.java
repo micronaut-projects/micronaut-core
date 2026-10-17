@@ -6033,23 +6033,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (isDependencyResolutionClosed()) {
             throw new IllegalStateException("Cannot create a bean before the context is configured or after its shutdown has begun");
         }
-        // A context of its own collects the singletons the creation publishes after the shutdown callbacks completed
-        SingletonBeanResolutionContext resolution = new SingletonBeanResolutionContext(definition);
-        BeanRegistration<T> registration;
-        try {
-            registration = createFreshRegistration(resolution, definition);
-        } catch (RuntimeException | Error e) {
-            destroyLateSingletons(resolution.takeLateSingletons(), e);
-            throw e;
-        }
-        // the caller owns the fresh registration, not the context it was created in
-        resolution.getAndResetDependentBeans();
+        BeanRegistration<T> registration = createFreshRegistration(null, definition);
         List<BeanRegistration<?>> created = List.of(registration);
         try {
             trackShutdownDependents(phase, null, created);
         } catch (IllegalStateException e) {
             destroyCreatedBeans(created, e);
-            destroyLateSingletons(resolution.takeLateSingletons(), e);
             throw e;
         }
         return registration;
@@ -6130,14 +6119,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     /**
      * Notes a singleton published into the scope. One published while the shutdown callbacks run is counted, so that
-     * the shutdown makes another destruction pass for it. One whose creation outlived the callbacks is remembered by
-     * the resolution that created it, which destroys it when that resolution is rolled back.
+     * the shutdown makes another destruction pass for it. One whose creation outlived the callbacks belongs to a
+     * context that has shut down: it is destroyed at once, and the lookup that created it fails, except for a parallel
+     * initialization, which ends without a lookup.
      *
-     * @param resolutionContext The resolution context that created it, or null
      * @param registration The registration
      * @param startPhase The shutdown phase its creation started in
+     * @throws IllegalStateException if the shutdown callbacks completed while the singleton was being created
      */
-    void singletonPublished(@Nullable BeanResolutionContext resolutionContext, BeanRegistration<?> registration, long startPhase) {
+    void singletonPublished(BeanRegistration<?> registration, long startPhase) {
         if (shutdownPhase.get() == startPhase && !isShutdownWindowOpen(startPhase)) {
             return;
         }
@@ -6151,31 +6141,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 return;
             }
         }
-        if (resolutionContext instanceof AbstractBeanResolutionContext abstractContext) {
-            abstractContext.addLateSingleton(registration);
+        IllegalStateException failure = new IllegalStateException("Cannot create the singleton [" + registration.beanDefinition.getName()
+            + "] after the context shutdown callbacks have completed");
+        try {
+            destroyBean(registration);
+        } catch (RuntimeException e) {
+            failure.addSuppressed(e);
         }
-    }
-
-    /**
-     * Destroys the singletons a rolled back resolution published after the shutdown callbacks completed, unless the
-     * scope no longer holds them. A failure to destroy one is added to the failure of the resolution.
-     *
-     * @param singletons The singletons
-     * @param failure The failure of the resolution
-     */
-    @SuppressWarnings("java:S1181") // Destroy every late singleton before the original failure is rethrown.
-    void destroyLateSingletons(List<BeanRegistration<?>> singletons, Throwable failure) {
-        for (int i = singletons.size() - 1; i >= 0; i--) {
-            BeanRegistration<?> registration = singletons.get(i);
-            try {
-                if (singletonScope.findBeanRegistration(registration.beanDefinition) == registration) {
-                    destroyBean(registration);
-                }
-            } catch (RuntimeException | Error e) {
-                if (failure != e) {
-                    failure.addSuppressed(e);
-                }
-            }
+        if (currentParallelInitialization.get() == null) {
+            throw failure;
+        }
+        if (LOG.isWarnEnabled()) {
+            LOG.warn(failure.getMessage(), failure);
         }
     }
 

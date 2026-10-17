@@ -312,7 +312,6 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
             } catch (RuntimeException | Error failure) {
                 context.destroyCreatedBeans(created, failure);
                 context.destroyCreatedBeans(resolution.getAndResetDependentBeans(), failure);
-                context.destroyLateSingletons(resolution.takeLateSingletons(), failure);
                 throw failure;
             }
         }

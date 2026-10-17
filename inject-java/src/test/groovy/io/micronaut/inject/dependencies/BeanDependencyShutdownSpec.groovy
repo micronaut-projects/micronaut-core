@@ -382,6 +382,46 @@ class Holder {
         log.EVENTS == ['late created', 'late destroyed']
     }
 
+    void "a singleton a direct lookup is still creating when the shutdown callbacks complete is destroyed"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+class Holder {
+    static final CountDownLatch ENTERED = new CountDownLatch(1);
+    static final CountDownLatch RESUME = new CountDownLatch(1);
+    static CompletableFuture<LateSingleton> work;
+}
+@Singleton class LateSingleton {
+    LateSingleton() throws InterruptedException {
+        Log.EVENTS.add("late created");
+        Holder.ENTERED.countDown();
+        Holder.RESUME.await(30, TimeUnit.SECONDS);
+    }
+    @PreDestroy void close() { Log.EVENTS.add("late destroyed"); }
+}
+@Singleton class Owner {
+    final BeanContext context;
+    Owner(BeanContext context) { this.context = context; }
+    @PreDestroy void close() throws InterruptedException {
+        Holder.work = CompletableFuture.supplyAsync(() -> context.getBean(LateSingleton.class));
+        Holder.ENTERED.await(30, TimeUnit.SECONDS);
+    }
+}
+''')
+        def holder = ctx.classLoader.loadClass('test.Holder')
+        def log = ctx.classLoader.loadClass('test.Log')
+        ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+
+        when:
+        ctx.close()
+        holder.RESUME.countDown()
+        holder.work.get(30, TimeUnit.SECONDS)
+
+        then: 'the lookup fails and the singleton it published after the shutdown is destroyed'
+        def e = thrown(ExecutionException)
+        e.cause instanceof IllegalStateException
+        log.EVENTS == ['late created', 'late destroyed']
+    }
+
     void "a fresh registration still being created when the shutdown completes is destroyed"() {
         given:
         def ctx = buildContext(HEADER + '''
