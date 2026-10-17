@@ -74,6 +74,12 @@ class Finder:
     def unhinted(self, flag: bool):
         return "x" if flag else "y"
 
+    def maybe(self, flag: bool) -> str:
+        if flag:
+            token = "t"
+            return token
+        return "n"
+
     def counted(self, n: int) -> int | None:
         return n if n > 0 else None
 
@@ -130,6 +136,12 @@ class CorpusFindingsTest(unittest.TestCase):
 
     def test_an_unhinted_return_compiles_as_object(self):
         self.assertEqual("java.lang.Object", self._compiled("unhinted").returnType())
+
+    def test_a_local_read_inside_its_branch_only_is_declared_there(self):
+        body = self._compiled("maybe")
+        statements = list(body.body().statements())
+        self.assertEqual("If", statements[0].getClass().getSimpleName())
+        self.assertEqual("Local", list(statements[0].then().statements())[0].getClass().getSimpleName())
 
 
 SOURCE = '''
@@ -368,6 +380,7 @@ class WarningTest(unittest.TestCase):
 LOWERED = '''
 from typing import Optional
 from jakarta.inject import Singleton
+from java.lang import Exception, RuntimeException
 
 
 @Singleton
@@ -455,6 +468,66 @@ class Pricing:
     def switched(self, n: int) -> int:
         switch = n
         return switch
+
+    def summed(self, n: int) -> int:
+        total = 0
+        for i in range(1, n + 1, 2):
+            if i == 7:
+                break
+            if i == 3:
+                continue
+            total += i
+        return total
+
+    def countdown(self, n: int) -> str:
+        parts = ""
+        while n > 0:
+            parts = parts + str(n)
+            n = n - 1
+        return parts
+
+    def leaked(self, n: int) -> int:
+        for i in range(n):
+            last = i
+        return last
+
+    def guarded_by_java(self, n: int) -> int:
+        try:
+            return n
+        finally:
+            n = 0
+
+    def raises_python(self, n: int) -> int:
+        raise ValueError("no")
+
+    def shadowed(self, n: int) -> int:
+        try:
+            return n
+        except Exception as broad:
+            return 1
+        except RuntimeException as narrow:
+            return 2
+
+    def keyed(self, prices: dict[str, int]) -> int:
+        total = 0
+        for name in prices:
+            total += 1
+        return total
+
+    def tried(self, n: int) -> int:
+        try:
+            result = n + 1
+        finally:
+            pass
+        return result
+
+    def relooped(self, n: int) -> int:
+        for i in range(n):
+            pass
+        for i in range(n):
+            pass
+        i = 2
+        return i
 '''
 
 
@@ -522,7 +595,6 @@ class LoweringTest(unittest.TestCase):
 
     def test_constructs_without_a_lowering_are_skipped_with_their_reason(self):
         expectations = {
-            "loops": "unsupported-statement",
             "sibling": "sibling-call",
             "builtin": "python-builtin-not-lowered",
             "power": "unbounded-integer-op",
@@ -532,6 +604,10 @@ class LoweringTest(unittest.TestCase):
             "via_property": "sibling-call",
             "maybe": "unsupported-expression",
             "switched": "java-reserved-name",
+            "leaked": "unsupported-statement",
+            "raises_python": "python-exception",
+            "shadowed": "python-exception",  # without Java facts the exception types are unknown; with them the order is refused
+            "tried": "unsupported-statement",
         }
         for name, rule in expectations.items():
             decision = self.decisions[f"Pricing.{name}"]
@@ -545,6 +621,30 @@ class LoweringTest(unittest.TestCase):
         decision = self.decisions["Pricing.helper"]
         self.assertEqual("NOT_CANDIDATE", decision.outcome().name())
         self.assertEqual(["static-method"], rules(decision))
+
+    def test_loops_lower_with_flags_for_break_and_continue(self):
+        summed = self.bodies["summed"]
+        self.assertEqual("COMPILED", self.decisions["Pricing.summed"].outcome().name())
+        self.assertEqual("COMPILED", self.decisions["Pricing.relooped"].outcome().name())
+        self.assertEqual("local [result] is assigned in the try block and read after it", self.decisions["Pricing.tried"].reasons()[0].message())
+        statements = list(summed.body().statements())
+        loop = statements[1]
+        self.assertEqual("i", loop.variable())
+        self.assertTrue(loop.hasBreak())
+        self.assertTrue(loop.hasContinue())
+        self.assertEqual(1, loop.start().value())
+        self.assertEqual(2, loop.step().value())
+        countdown = self.bodies["countdown"]
+        statements = list(countdown.body().statements())
+        self.assertEqual("n_", statements[0].name())  # the reassigned parameter lives in a local of its own
+        loop = statements[2]
+        self.assertEqual(">", loop.test().op())
+        self.assertEqual("n_", loop.test().left().name())
+        self.assertFalse(loop.hasBreak())
+        self.assertEqual("COMPILED", self.decisions["Pricing.loops"].outcome().name())
+        self.assertEqual("COMPILED", self.decisions["Pricing.guarded_by_java"].outcome().name())
+        tried = list(self.bodies["guarded_by_java"].body().statements())[1]  # after the shadow of n
+        self.assertIsNotNone(tried.finallyBody())
 
     def test_assertions_raise_through_the_helper(self):
         guarded = self.bodies["guarded"]

@@ -137,6 +137,95 @@ public sealed interface Ir {
     }
 
     /**
+     * A loop over a condition.
+     *
+     * @param loop        The number of the loop, which its breaks and continues name
+     * @param test        The condition, of type boolean
+     * @param body        The statements run while the condition holds
+     * @param hasBreak    Whether the body breaks out of this loop
+     * @param hasContinue Whether the body continues this loop
+     */
+    record While(int loop, Expression test, Body body, boolean hasBreak, boolean hasContinue) implements Statement {
+    }
+
+    /**
+     * A loop over a range of longs, as Python's {@code for x in range(start, stop, step)}.
+     *
+     * @param loop        The number of the loop
+     * @param variable    The loop variable, a long declared by the loop
+     * @param start       The first value
+     * @param stop        The bound
+     * @param step        The step; zero raises as Python raises ValueError
+     * @param body        The statements run per value
+     * @param hasBreak    Whether the body breaks out of this loop
+     * @param hasContinue Whether the body continues this loop
+     */
+    record ForRange(int loop, String variable, Expression start, Expression stop, Expression step, Body body, boolean hasBreak, boolean hasContinue) implements Statement {
+    }
+
+    /**
+     * A loop over the elements of a Java {@code Iterable}.
+     *
+     * @param loop        The number of the loop
+     * @param variable    The loop variable, declared by the loop at {@code type}
+     * @param type        The Java type the elements are used at
+     * @param elementType The Java type the elements have, which the loop converts to {@code type}
+     * @param iterable    The iterable
+     * @param body        The statements run per element
+     * @param hasBreak    Whether the body breaks out of this loop
+     * @param hasContinue Whether the body continues this loop
+     */
+    record ForEach(int loop, String variable, String type, String elementType, Expression iterable, Body body, boolean hasBreak, boolean hasContinue) implements Statement {
+    }
+
+    /**
+     * A break out of a loop.
+     *
+     * @param loop The number of the loop
+     */
+    record Break(int loop) implements Statement {
+    }
+
+    /**
+     * A continue of a loop.
+     *
+     * @param loop The number of the loop
+     */
+    record Continue(int loop) implements Statement {
+    }
+
+    /**
+     * A throw of a Java exception.
+     *
+     * @param exception The exception, a Throwable
+     */
+    record Throw(Expression exception) implements Statement {
+    }
+
+    /**
+     * A try statement with typed catches.
+     *
+     * @param body           The statements tried
+     * @param catches        The handlers, in order
+     * @param finallyBody    The statements always run, or {@code null}
+     */
+    record Try(Body body, List<Catch> catches, @Nullable Body finallyBody) implements Statement {
+        public Try {
+            catches = List.copyOf(catches);
+        }
+    }
+
+    /**
+     * A handler of a try statement.
+     *
+     * @param type     The Java exception type caught
+     * @param variable The name the exception is bound to, or {@code null}
+     * @param body     The statements run
+     */
+    record Catch(String type, @Nullable String variable, Body body) {
+    }
+
+    /**
      * An expression evaluated for its effect.
      *
      * @param expression The expression
