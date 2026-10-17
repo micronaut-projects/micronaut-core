@@ -53,3 +53,15 @@ Test execution is pluggable: a `TestRunner` registered as a service and named by
 The JUnit Platform runner is built in. It runs every engine on the classpath, from Jupiter and Spock to Pyronaut's pytest engine, when `junit-platform-launcher` is on the launch classpath.
 
 The events become JUnit XML reports, one `TEST-<class>.xml` per class in the Surefire shape, which every CI server and IDE reads. They also go to every `TestReportListener` registered as a service, such as an HTML report.
+
+== HTML Report
+
+Add `micronaut-dev-test-report` to the development runtime classpath, as the build plugins do for `mnTest` and `mn:test`, and test mode also writes a page of the latest result of every test. The page goes to `micronaut.dev.test.html-report`, by default `build/micronaut-dev/test-report/index.html`. On the page:
+
+* failures come first, with their stack frames linked to the project's sources, in the file browser, IntelliJ IDEA or VS Code, and their captured output;
+* a change that does not compile is shown above the results it left standing;
+* the last runs are listed beside them.
+
+The page keeps the results as the XML reports do, so it never holds only the last affected run.
+
+With `micronaut-dev-livereload` on the classpath as well, the LiveReload server serves the page at `http://localhost:35729/tests/`, which the launcher logs. The page follows each run test by test over the event channel's `tests` topic, without reloading. Opened from the file system, the page shows the state it was written with.
