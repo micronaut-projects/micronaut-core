@@ -1,5 +1,6 @@
 package io.micronaut.http.server.tck.netty.tests;
 
+import io.micronaut.http.server.tck.WebSocketTckTags;
 import org.junit.platform.suite.api.ConfigurationParameter;
 import org.junit.platform.suite.api.ExcludeClassNamePatterns;
 import org.junit.platform.suite.api.ExcludeTags;
@@ -21,6 +22,7 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 @ExcludeTags({
     "multipart", // Multipart not supported by HttpClient
     "publisher-request-body", // the JDK client cannot send a Publisher request body (UnsupportedOperationException)
+    WebSocketTckTags.WEBSOCKET, // the JDK server cannot upgrade to WebSocket
     "fuzz" // the fuzz suite talks raw HTTP to the Netty server, which the Netty suite already runs
 })
 @ConfigurationParameter(key = "junit.jupiter.extensions.autodetection.enabled", value = "true")
