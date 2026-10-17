@@ -64,6 +64,10 @@ final class DirectRouteDeclaration {
      * The name of the bean that declares the route, for the messages, or {@code null}.
      */
     @Nullable String declaringBean;
+    /**
+     * Answers the requests by commands on their exchange, or {@code null}.
+     */
+    @Nullable DirectHandler handler;
 
     /**
      * @param httpMethodName The name of the method

@@ -31,6 +31,7 @@ import java.util.concurrent.CompletableFuture;
  * switch (match) {
  *     case DirectMatch.Sync sync -> write(sync.respond(responses));
  *     case DirectMatch.Async async -> hold(async.respondAsync(responses));
+ *     case DirectMatch.Handler handler -> handler.handle(exchange) ? write(exchange) : decline();
  * }
  * }</pre>
  *
@@ -82,5 +83,27 @@ public sealed interface DirectMatch {
          * {@link DirectRouteSupport#discard(HttpResponse)}.
          */
         CompletableFuture<@Nullable HttpResponse<?>> respondAsync(HttpResponseFactory responses);
+    }
+
+    /**
+     * A direct route that answers by commands, see
+     * {@link io.micronaut.web.router.builder.DirectRouteSpec#handle(io.micronaut.web.router.builder.DirectHandler)}:
+     * its handler checks the request and writes the response on the exchange of the runtime, on
+     * the calling thread, which should be the thread that received the request.
+     */
+    non-sealed interface Handler extends DirectMatch {
+
+        /**
+         * Run the handler of the route on the exchange of the request: the exchange the runtime
+         * matched the request with, so that the lookup and the handler read one object.
+         *
+         * @param exchange The exchange of the request, the {@link DirectRequest} given to
+         *                 {@link DirectRouteLookup#match(DirectRequest)}
+         * @return Whether the route answered the request: the runtime writes the response the
+         * exchange composed; {@code false} declines the request, which then continues to the
+         * ordinary routes with its body untouched
+         * @throws Exception if the handler fails: the runtime answers {@code 500}
+         */
+        boolean handle(DirectExchange exchange) throws Exception;
     }
 }
