@@ -19,6 +19,9 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
+import org.jspecify.annotations.Nullable;
+
+import java.util.function.Consumer;
 
 /**
  * This interface extends {@link HttpRequest} with methods that are specific to a request received
@@ -46,5 +49,52 @@ public interface ServerHttpRequest<B> extends HttpRequest<B> {
      */
     default ByteBodyFactory byteBodyFactory() {
         return ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
+    }
+
+    /**
+     * Run a callback once the response to this request is done: the final write of the response
+     * to the connection completed or failed, or the client went away before the response was
+     * written, also while the route has not answered yet. The failure is {@code null} if the
+     * response was written, else it is the error that the route failed with and that was answered
+     * with the default error response, the failure of writing the response, or a
+     * {@link io.micronaut.http.exceptions.ConnectionClosedException} if the client went away.
+     * The callback does not cancel or wait for the work of the route.
+     * <p>The callback runs once, usually on the event loop, so it must not block. Unlike a
+     * listener of {@code HttpRequestTerminatedEvent}, it costs nothing for the requests that do
+     * not register one.
+     *
+     * <p>Register before the response is handed to the connection, e.g. in the route, a filter
+     * before it continues, or a response filter: once the final write of the response was issued
+     * without a registration, its outcome cannot be told, and the registration is refused, even
+     * while that write is still in progress. For a WebSocket upgrade request that is upgraded, the
+     * response is done when the upgrade request is released, at the end of the session.
+     *
+     * @param callback The callback, given the failure of the response, if any
+     * @return {@code false} if the server does not support this, or the final write of the
+     * response was already issued, so the callback will not run
+     * @since 5.3.0
+     */
+    default boolean whenResponseCompleted(Consumer<@Nullable Throwable> callback) {
+        return false;
+    }
+
+    /**
+     * Run a callback when the client abandons this request before its response is written: the
+     * client closed the HTTP/1.1 connection, or reset the HTTP/2 stream of the request. This lets
+     * a route that answers asynchronously stop its work, e.g. cancel a pending
+     * {@link java.util.concurrent.CompletableFuture}. The callback runs at most once, usually on
+     * the event loop, so it must not block. It is removed when the response is done.
+     *
+     * <p>Like {@link #whenResponseCompleted}, register before the response is handed to the
+     * connection: a callback registered after the final write was issued without a registration
+     * is refused, since it could not be kept while that write is in progress.
+     *
+     * @param callback The callback
+     * @return Removes the callback, or {@code null} if the server cannot tell when the client goes
+     * away, or the final write of the response was already issued
+     * @since 5.3.0
+     */
+    default @Nullable Runnable whenAbandoned(Runnable callback) {
+        return null;
     }
 }

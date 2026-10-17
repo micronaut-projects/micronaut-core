@@ -35,6 +35,7 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -243,6 +244,24 @@ public final class RouteExecutor {
     }
 
     /**
+     * Report the failure to the server request, also through the wrappers of the filters.
+     */
+    private static void recordResponseFailure(HttpRequest<?> httpRequest, Throwable cause) {
+        HttpRequest<?> current = httpRequest;
+        while (true) {
+            if (current instanceof ResponseFailureRecorder recorder) {
+                recorder.responseFailed(cause);
+                return;
+            }
+            if (current instanceof HttpRequestWrapper<?> wrapper) {
+                current = wrapper.getDelegate();
+            } else {
+                return;
+            }
+        }
+    }
+
+    /**
      * Creates a default error response. Should be used when a response could not be retrieved
      * from any other method.
      *
@@ -252,6 +271,7 @@ public final class RouteExecutor {
      */
     public MutableHttpResponse<?> createDefaultErrorResponse(HttpRequest<?> httpRequest,
                                                              Throwable cause) {
+        recordResponseFailure(httpRequest, cause);
         logException(cause);
         MutableHttpResponse<?> mutableHttpResponse = HttpResponse.serverError();
         RouteAttributes.setException(mutableHttpResponse, cause);

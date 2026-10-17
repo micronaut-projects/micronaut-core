@@ -392,18 +392,25 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      *                message is flushed immediately in that case
      */
     private ChannelFuture write(Object message, boolean flush, boolean close, boolean needsPromise) {
+        return write(message, flush, close, needsPromise, null);
+    }
+
+    /**
+     * @param promise The promise of the write, or {@code null} to create one if needed
+     */
+    private ChannelFuture write(Object message, boolean flush, boolean close, boolean needsPromise, @Nullable ChannelPromise promise) {
         assert ctx != null;
         OutboundHandler current = outboundHandler;
         if (current != null && message instanceof HttpResponse && exposeResponseRequest()) {
             Attribute<Object> attribute = requiredCtx().channel().attr(HttpAccessLogHandler.RESPONSE_REQUEST);
             attribute.set(current.outboundAccess.attachment);
             try {
-                return write0(message, flush, close, needsPromise);
+                return write0(message, flush, close, needsPromise, promise);
             } finally {
                 attribute.set(null);
             }
         }
-        return write0(message, flush, close, needsPromise);
+        return write0(message, flush, close, needsPromise, promise);
     }
 
     /**
@@ -424,15 +431,21 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         return expose;
     }
 
-    private ChannelFuture write0(Object message, boolean flush, boolean close, boolean needsPromise) {
+    private ChannelFuture write0(Object message, boolean flush, boolean close, boolean needsPromise, @Nullable ChannelPromise given) {
         if (close) {
-            return requiredCtx().writeAndFlush(message)
+            ChannelPromise promise = given == null ? requiredCtx().newPromise() : given;
+            return requiredCtx().writeAndFlush(message, promise)
                 .addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE)
                 .addListener(ChannelFutureListener.CLOSE);
         } else {
-            ChannelPromise promise = needsPromise ?
-                requiredCtx().newPromise().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE) :
-                requiredCtx().voidPromise();
+            ChannelPromise promise;
+            if (given != null) {
+                promise = given.addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
+            } else {
+                promise = needsPromise ?
+                    requiredCtx().newPromise().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE) :
+                    requiredCtx().voidPromise();
+            }
             ChannelFuture future = requiredCtx().write(message, promise);
             if (flush) {
                 if (reading) {
@@ -1080,6 +1093,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Nullable
         private Object attachment = null;
         private boolean closeAfterWrite = false;
+        /**
+         * Set once the final write of the response is issued: the connection closing after it
+         * does not abandon the request.
+         */
+        private volatile boolean finalWriteIssued;
+        private volatile boolean recordFinalWrite;
+        private @Nullable ChannelFuture finalWrite;
 
         private OutboundAccessImpl(HttpRequest request) {
             this.request = request;
@@ -1109,6 +1129,35 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             ChannelFutureListener listener = future -> callback.run();
             closeFuture.addListener(listener);
             return () -> closeFuture.removeListener(listener);
+        }
+
+        @Override
+        public boolean isAbandoned() {
+            return !requiredCtx().channel().isActive() && finalWritePending();
+        }
+
+        /**
+         * @return Whether the final write was not issued, or was recorded and has not completed
+         * successfully: the connection closing after a written response does not abandon it
+         */
+        private boolean finalWritePending() {
+            if (!finalWriteIssued) {
+                return true;
+            }
+            ChannelFuture future = finalWrite;
+            return future != null && !future.isSuccess();
+        }
+
+        @Override
+        public boolean recordFinalWrite() {
+            // a volatile write before the read, the reverse of writePotentialEnd: one of them sees the other
+            recordFinalWrite = true;
+            return !finalWriteIssued;
+        }
+
+        @Override
+        public @Nullable ChannelFuture finalWrite() {
+            return finalWrite;
         }
 
         /**
@@ -1417,8 +1466,26 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         void writePotentialEnd(Object content, boolean flush, boolean close) {
             assert ctx != null;
-            boolean record = outboundAccess.jfrEvent != null && content instanceof LastHttpContent;
-            ChannelFuture future = write(content, flush, close, record);
+            boolean last = content instanceof LastHttpContent;
+            boolean record = outboundAccess.jfrEvent != null && last;
+            if (last) {
+                outboundAccess.finalWriteIssued = true;
+            }
+            boolean keep = last && outboundAccess.recordFinalWrite;
+            ChannelPromise recorded = null;
+            if (keep) {
+                // stored before the write is submitted: a write that fails inline closes the
+                // connection before write() returns, and the close must see the pending write
+                recorded = requiredCtx().newPromise();
+                outboundAccess.finalWrite = recorded;
+            }
+            if (!last) {
+                writeIntermediate(content, flush, close);
+                return;
+            }
+            // the recorded promise is the promise of the write, so that it completes before the
+            // listeners that the write adds, e.g. the one that closes the connection
+            ChannelFuture future = write(content, flush, close, record, recorded);
             if (record) {
                 future.addListener((ChannelFutureListener) f -> {
                     Http1RequestEvent jfrEvent = Objects.requireNonNull(outboundAccess.jfrEvent);
@@ -1427,6 +1494,23 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                         jfrEvent.populateChannel(requiredCtx().channel());
                         jfrEvent.populateRequest(outboundAccess.request);
                         jfrEvent.commit();
+                    }
+                });
+            }
+        }
+
+        /**
+         * Write a part of the response before its final write. A part of a recorded response, see
+         * {@link OutboundAccess#recordFinalWrite()}, can fail without closing the connection: its
+         * failure is the failure of the response.
+         */
+        final void writeIntermediate(Object content, boolean flush, boolean close) {
+            boolean watch = outboundAccess.recordFinalWrite;
+            ChannelFuture future = write(content, flush, close, watch);
+            if (watch) {
+                future.addListener((ChannelFutureListener) f -> {
+                    if (!f.isSuccess()) {
+                        requestHandler.responseFailed(outboundAccess.attachment, f.cause());
                     }
                 });
             }
@@ -1444,7 +1528,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 compressionSession.fixContentLength(hr);
 
                 // this can happen in FullHttpResponse, just send the full body.
-                write(new DefaultHttpResponse(hr.protocolVersion(), hr.status(), hr.headers()), false, false, false);
+                writeIntermediate(new DefaultHttpResponse(hr.protocolVersion(), hr.status(), hr.headers()), false, false);
             }
             boolean close = shouldCloseAfterContent(last);
             ByteBuf toSend = compressionSession.poll();
@@ -1455,13 +1539,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     writePotentialEnd(trailingHeaders.isEmpty() ? LastHttpContent.EMPTY_LAST_CONTENT : new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER, trailingHeaders), flush, close);
                 } else if (flush || close) {
                     // not sure if this can actually happen, but we need to forward a flush/close
-                    write(new DefaultHttpContent(Unpooled.EMPTY_BUFFER), flush, close, false);
+                    writeIntermediate(new DefaultHttpContent(Unpooled.EMPTY_BUFFER), flush, close);
                 } // else just don't send anything
             } else {
                 if (last) {
                     writePotentialEnd(new DefaultLastHttpContent(toSend, ((LastHttpContent) content).trailingHeaders()), flush, close);
                 } else {
-                    write(new DefaultHttpContent(toSend), flush, close, false);
+                    writeIntermediate(new DefaultHttpContent(toSend), flush, close);
                 }
             }
         }
@@ -1635,7 +1719,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void open() {
-            PipeliningServerHandler.this.write(Objects.requireNonNull(initialMessage), false, false, false);
+            writeIntermediate(Objects.requireNonNull(initialMessage), false, false);
             initialMessage = null;
         }
 
@@ -1672,6 +1756,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void fail(Throwable t) {
+            requestHandler.responseFailed(outboundAccess.attachment, t);
             if (LOG.isWarnEnabled()) {
                 if (initialMessage == null) {
                     LOG.warn("The streamed response body failed after some of it was written. The error cannot be forwarded to the client, and the response ends abruptly.", t);

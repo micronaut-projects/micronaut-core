@@ -172,6 +172,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             final NettyHttpRequest<?> msg;
             try {
                 msg = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+                // the hooks of ServerHttpRequest need the connection, also while the filters run
+                msg.outboundAccess(outboundAccess);
             } catch (IllegalArgumentException e) {
                 body.close();
 
@@ -183,6 +185,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                     serverConfiguration
                 );
                 outboundAccess.attachment(errorRequest);
+                errorRequest.outboundAccess(outboundAccess);
                 outboundAccess.closeAfterWrite();
 
                 PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate(() -> {
@@ -239,6 +242,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         Objects.requireNonNull(next).responseWritten(attachment);
     }
 
+    @Override
+    public void responseFailed(@Nullable Object attachment, Throwable cause) {
+        Objects.requireNonNull(next).responseFailed(attachment, cause);
+    }
+
     private void writeResponse(ChannelHandlerContext ctx,
                                NettyHttpRequest<?> msg,
                                boolean shouldProceedNormally,
@@ -277,7 +285,14 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
         try {
             installCompressionHandler(ctx, msg.getNativeRequest());
-            handleHandshake(ctx, msg, webSocketBean, actualResponse);
+            handleHandshake(ctx, msg, webSocketBean, actualResponse).addListener(future -> {
+                if (future.isSuccess()) {
+                    // the connection is no longer this request's: its close ends the session
+                    msg.responseUpgraded();
+                } else {
+                    msg.responseFailed(future.cause());
+                }
+            });
         } catch (Throwable e) {
             releaseRequest.run();
             throw e;
@@ -526,6 +541,14 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         WebsocketRequestLifecycle(RouteExecutor routeExecutor, Router router) {
             super(routeExecutor);
             this.router = router;
+        }
+
+        @Override
+        protected void onUnhandledError(Throwable cause) {
+            NettyHttpRequest<?> request = nettyRequest;
+            if (request != null) {
+                request.responseFailed(cause);
+            }
         }
 
         @Override
