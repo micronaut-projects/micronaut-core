@@ -24,6 +24,9 @@ import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableByteBodyHttpResponse;
+import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
@@ -86,6 +89,18 @@ public class HttpResponseAdapter<O> extends BaseHttpResponseAdapter<byte[], O> {
             return Optional.of((T) optional);
         }
         return (Optional<T>) optional;
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>The returned response keeps a copy of the received body bytes, so they can still be read
+     * or converted (e.g. the body of an error response that was not converted to the expected
+     * type). Setting an object body replaces the bytes.
+     */
+    @Override
+    public MutableHttpResponse<?> toMutableResponse() {
+        byte[] bytes = httpResponse.body();
+        return MutableByteBodyHttpResponse.of(this, ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt(bytes == null ? new byte[0] : bytes.clone()));
     }
 
     private <T> Optional<T> convertBytes(@Nullable MediaType contentType, byte[] bytes, Argument<T> type) {
