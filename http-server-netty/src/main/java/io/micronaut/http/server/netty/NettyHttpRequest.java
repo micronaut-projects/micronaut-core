@@ -40,6 +40,8 @@ import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.RouteMetadataAttributes;
 import io.micronaut.http.RouteMetadataHolder;
 import io.micronaut.http.ServerHttpRequest;
+import io.micronaut.http.body.AsyncRequestBody;
+import io.micronaut.http.body.AsyncRequestBodySource;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
@@ -123,7 +125,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
-public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T>, RouteMetadataHolder {
+public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T>, RouteMetadataHolder, AsyncRequestBodySource {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
 
     /**
@@ -224,6 +226,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      */
     @Nullable
     private HttpRequest<?> filteredRequest;
+    private @Nullable AsyncRequestBodySource asyncBodies;
 
     /**
      * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
@@ -263,6 +266,24 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             this.byteBodyFactory = factory;
         }
         return factory;
+    }
+
+    /**
+     * Set what gives the {@link AsyncRequestBody} of this request, see
+     * {@link AsyncRequestBody#of(HttpRequest)}.
+     *
+     * @param asyncBodies The source of the bodies
+     * @since 5.3.0
+     */
+    @Internal
+    public void setAsyncRequestBodySource(@Nullable AsyncRequestBodySource asyncBodies) {
+        this.asyncBodies = asyncBodies;
+    }
+
+    @Override
+    public @Nullable AsyncRequestBody asyncRequestBody(HttpRequest<?> request) {
+        AsyncRequestBodySource source = asyncBodies;
+        return source == null ? null : source.asyncRequestBody(request);
     }
 
     public void setLegacyBody(@Nullable Object legacyBody) {
@@ -971,7 +992,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     /**
      * Mutable version of the request.
      */
-    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, RouteMetadataHolder, ServerHttpRequest<T>, FormCapableHttpRequest<T> {
+    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, RouteMetadataHolder, ServerHttpRequest<T>, FormCapableHttpRequest<T>, AsyncRequestBodySource {
 
         @Nullable
         private URI uri;
@@ -1076,6 +1097,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         public ByteBody byteBody() {
             // the bytes of the request, which the route reads unless the body was set
             return NettyHttpRequest.this.byteBody();
+        }
+
+        @Override
+        public @Nullable AsyncRequestBody asyncRequestBody(HttpRequest<?> request) {
+            return NettyHttpRequest.this.asyncRequestBody(request);
         }
 
         @Override

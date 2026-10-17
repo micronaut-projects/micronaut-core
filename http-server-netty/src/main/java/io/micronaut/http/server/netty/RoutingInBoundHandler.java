@@ -41,6 +41,7 @@ import io.micronaut.http.netty.body.RawDuplexHandler;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.RouteExecutor;
+import io.micronaut.http.server.binding.AsyncRequestBodyBinding;
 import io.micronaut.http.server.ServerResponseAttributes;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -121,6 +122,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
     final ApplicationEventPublisher<HttpRequestReceivedEvent> receivedPublisher;
     final RouteExecutor routeExecutor;
+    private final AsyncRequestBodyBinding asyncBodies;
     final ConversionService conversionService;
     /**
      * This is set to {@code true} if <i>any</i> {@link HttpPipelineBuilder} has a logging handler.
@@ -162,6 +164,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         Optional<Boolean> isMultiPartEnabled = serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = isMultiPartEnabled.isEmpty() || isMultiPartEnabled.get();
         this.routeExecutor = embeddedServerContext.getRouteExecutor();
+        this.asyncBodies = new AsyncRequestBodyBinding(() -> routeExecutor.getRequestArgumentSatisfier().getBinderRegistry());
         this.conversionService = conversionService;
         this.applicationContext = embeddedServerContext.getApplicationContext();
     }
@@ -313,6 +316,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             });
             return;
         }
+        mnRequest.setAsyncRequestBodySource(asyncBodies);
         prepareRequest(ctx, outboundAccess, mnRequest);
         if (receivedPublisher.isEmpty() && ctx.executor().inEventLoop()) {
             // nothing to wait for: skip the completion callbacks

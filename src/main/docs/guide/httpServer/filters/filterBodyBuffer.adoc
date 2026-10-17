@@ -1,0 +1,18 @@
+A filter sometimes has to look at the bytes of the request body before the route runs, e.g. to verify a signature or a checksum, while the route still reads the body afterwards. A request filter method can take an api:http.body.AsyncRequestBody[] argument for it, see <<asyncRequestBody, Reading the Body Asynchronously>>. A filter that is not given arguments, an api:http.filter.HttpServerFilter[] or a filter of a <<functionalRoutesFilters, functional route>>, e.g. `beforeReplacingAsync`, gets the same body with `AsyncRequestBody.of(request)`.
+
+The following pre-matching filter rejects a request whose body does not match the checksum in its `X-Content-SHA256` header:
+
+snippet::io.micronaut.docs.server.filters.bodybuffer.ChecksumFilter[tags="imports,clazz", indent=0, title="A filter that reads the body"]
+
+<1> `AsyncRequestBody.of(request)` is the body of the request, and `copy()` a copy whose reads leave the body for the route.
+<2> `bytes(maximumBytes)` buffers the copy without blocking the event loop and completes with its bytes. The bytes can be read as often as needed.
+<3> Complete with `null` to proceed: the route reads the body, unaffected by the filter.
+<4> Or answer the request without invoking the route.
+
+snippet::io.micronaut.docs.server.filters.bodybuffer.ChecksumController[tags="clazz", indent=0, title="The route still reads the body"]
+
+<1> The `@Body` argument reads the body of the request after the filter read its copy.
+
+Nothing is read before the filter reads the body, so requests whose filters do not read it stream their body to the route as usual. A request that sends `Expect: 100-continue` is answered with `100 Continue` when the filter reads the body: a filter that answers without reading it, e.g. with `401`, never receives it.
+
+The copy is held in memory for the route, so it is limited by `micronaut.server.max-request-buffer-size`, and by the smaller limit given to `bytes`: a larger body fails the returned stage with a api:http.exceptions.ContentLengthExceededException[], answered with `413 Request Entity Too Large`. What the reads of a body from `AsyncRequestBody.of` leave open is released when the request ends.
