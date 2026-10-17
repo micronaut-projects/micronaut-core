@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
 import io.micronaut.python.processing.annotation.PythonAnnotationMetadataBuilder;
 import io.micronaut.python.processing.annotation.PythonElementAnnotationMetadataFactory;
 import io.micronaut.python.processing.model.ClassDef;
@@ -48,6 +49,7 @@ import javax.lang.model.element.Element;
  * @param originatingElement The Java element that triggered Python processing.
  * @param classesCache The per-processing-run class element cache.
  * @param scriptsCache The per-processing-run script element cache.
+ * @param staticCompilationPlan The static compilation plan of the run, once planned
  * @since 5.2.0
  * @author Micronaut
  */
@@ -60,7 +62,8 @@ public record PythonProcessingEnvironment(
     PythonVisitorContext visitorContext,
     Element originatingElement,
     AtomicReference<Map<String, ClassElement>> classesCache,
-    AtomicReference<Map<String, ClassElement>> scriptsCache
+    AtomicReference<Map<String, ClassElement>> scriptsCache,
+    AtomicReference<StaticCompilationPlan> staticCompilationPlan
 ) implements AutoCloseable {
 
     /**
@@ -80,6 +83,7 @@ public record PythonProcessingEnvironment(
             null,
             originatingElement,
             new AtomicReference<>(),
+            new AtomicReference<>(),
             new AtomicReference<>()
         );
     }
@@ -97,6 +101,7 @@ public record PythonProcessingEnvironment(
             javaVisitorContext,
             visitorContext,
             originatingElement,
+            new AtomicReference<>(),
             new AtomicReference<>(),
             new AtomicReference<>()
         );
@@ -118,6 +123,7 @@ public record PythonProcessingEnvironment(
             null,
             null,
             new AtomicReference<>(),
+            new AtomicReference<>(),
             new AtomicReference<>()
         );
     }
@@ -136,6 +142,7 @@ public record PythonProcessingEnvironment(
             null,
             null,
             null,
+            new AtomicReference<>(),
             new AtomicReference<>(),
             new AtomicReference<>()
         );
