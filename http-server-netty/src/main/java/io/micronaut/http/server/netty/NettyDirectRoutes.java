@@ -545,12 +545,6 @@ final class NettyDirectRoutes {
     }
 
     /**
-     * A response ready to be written.
-     *
-     * @param head    Its status and headers
-     * @param content Its body
-     */
-    /**
      * The {@code Date} header of a second.
      *
      * @param second The epoch second
@@ -559,6 +553,12 @@ final class NettyDirectRoutes {
     private record EncodedDate(long second, AsciiString ascii) {
     }
 
+    /**
+     * A response ready to be written.
+     *
+     * @param head    Its status and headers
+     * @param content Its body
+     */
     private record Prepared(HttpResponse head, ByteBuf content) {
     }
 
