@@ -115,8 +115,9 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         }
     };
 
-    // the characters of the syntax of a URL-encoded form, and of a percent-encoded value
-    private static final String ASCII_FORM_CHARACTERS = "&=+%azAZ09";
+    // every ASCII character, which a raw value of a URL-encoded form keeps
+    private static final byte[] ASCII_BYTES = asciiBytes();
+    private static final String ASCII = new String(ASCII_BYTES, StandardCharsets.US_ASCII);
     private static final Logger LOG = LoggerFactory.getLogger(DefaultAsyncRequestBody.class);
     private static final List<String> ELEMENT_MEDIA_TYPES = List.of(MediaType.APPLICATION_JSON, MediaType.APPLICATION_JSON_STREAM);
     private static final List<String> FORM_MEDIA_TYPES = List.of(MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA);
@@ -398,6 +399,14 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         }
     }
 
+    private static byte[] asciiBytes() {
+        byte[] bytes = new byte[128];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) i;
+        }
+        return bytes;
+    }
+
     private static Publisher<RawFormField> encodedFields(FormCapableHttpRequest<?> formRequest, CloseableByteBody body) {
         try {
             return formRequest.getEncodedFormFields(body);
@@ -410,10 +419,12 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
     /**
      * @param charset A charset
-     * @return Whether it encodes the characters of a URL-encoded form as ASCII
+     * @return Whether it encodes and decodes every ASCII character as its ASCII byte: the raw value
+     * of a field keeps any ASCII character, e.g. {@code ~}, which some charsets map elsewhere
      */
     private static boolean isAsciiCompatible(Charset charset) {
-        return Arrays.equals(ASCII_FORM_CHARACTERS.getBytes(charset), ASCII_FORM_CHARACTERS.getBytes(StandardCharsets.US_ASCII));
+        return charset.equals(StandardCharsets.UTF_8) || charset.equals(StandardCharsets.ISO_8859_1) || charset.equals(StandardCharsets.US_ASCII)
+            || Arrays.equals(ASCII.getBytes(charset), ASCII_BYTES) && new String(ASCII_BYTES, charset).equals(ASCII);
     }
 
     private CompletionStage<FormData> startForm() {

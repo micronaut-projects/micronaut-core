@@ -1003,7 +1003,7 @@ final class UriRouteSet {
         if (route instanceof DefaultUrlRouteInfo<Object, Object> info && info.isConstrained()) {
             constrainedMatch = info.tryMatch(uri);
             if (constrainedMatch == null || !info.acceptsVariables(constrainedValues(request, constrainedMatch.getVariableValues()),
-                rawConstrainedValues(request, constrainedMatch.getRawVariableValues()))) {
+                rawConstrainedValues(request, constrainedMatch))) {
                 return null;
             }
         }
@@ -1043,7 +1043,7 @@ final class UriRouteSet {
     private static boolean acceptsVariables(HttpRequest<?> request, UriRouteInfo<?, ?> route, UriRouteMatch<?, ?> match) {
         return !(route instanceof DefaultUrlRouteInfo<?, ?> info && info.isConstrained())
             || info.acceptsVariables(constrainedValues(request, match.getVariableValues()),
-                rawConstrainedValues(request, match.getRawVariableValues()));
+                rawConstrainedValues(request, match));
     }
 
     /**
@@ -1059,14 +1059,25 @@ final class UriRouteSet {
     }
 
     /**
-     * The raw variables the constraints of a route see, see {@link #constrainedValues(HttpRequest, Map)}.
+     * The raw variables the constraints of a route see, see {@link #constrainedValues(HttpRequest, Map)}:
+     * those its handler gets. The captures of the match, also of its absent optional variables,
+     * override those of the prefixes of the locator routes, before the absent ones are left out, as
+     * for the match the handler gets.
      *
      * @param request The request, a {@link RouteLocator.LocatedRequest} for a route of a located target
-     * @param values  The raw values of the variables of the match
+     * @param match   The match
      * @return The raw values, with those of the prefixes of the locator routes
      */
-    private static Map<String, Object> rawConstrainedValues(HttpRequest<?> request, Map<String, Object> values) {
-        return request instanceof RouteLocator.LocatedRequest<?> located ? located.location().withPrefixValues(values) : values;
+    private static Map<String, Object> rawConstrainedValues(HttpRequest<?> request, UriRouteMatch<?, ?> match) {
+        if (!(request instanceof RouteLocator.LocatedRequest<?> located)) {
+            return match.getRawVariableValues();
+        }
+        Map<String, Object> captures = match instanceof DefaultUriRouteMatch<?, ?> defaultMatch
+            ? defaultMatch.matchInfo().getVariableValues()
+            : match.getRawVariableValues();
+        Map<String, Object> values = located.location().withPrefixValues(captures);
+        values.values().removeIf(Objects::isNull);
+        return values;
     }
 
     private static boolean shouldSkipForPort(HttpRequest<?> request, UriRouteInfo<Object, Object> route, @Nullable Set<Integer> ports) {

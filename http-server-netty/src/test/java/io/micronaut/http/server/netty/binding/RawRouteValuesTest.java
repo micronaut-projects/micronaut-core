@@ -204,6 +204,37 @@ class RawRouteValuesTest {
     }
 
     @Test
+    void anAbsentVariableOfALocatedRouteShadowsTheVariableOfThePrefix() throws Exception {
+        // the constraint and the handler see the same raw variables: the absent id of the route
+        assertEquals("tenant abc|false", get("/raw/tenants/abc/items"));
+        assertEquals("tenant abc|7", get("/raw/tenants/abc/items/7"));
+    }
+
+    @Test
+    void aRawValueKeepsTheAsciiCharactersACharsetMapsElsewhere() throws Exception {
+        // x-IBM943 decodes 0x7E as U+203E
+        assertEquals("{v=~\\}", post("/raw/form-all", "v=~\\", MediaType.APPLICATION_FORM_URLENCODED + ";charset=x-IBM943"));
+    }
+
+    @Test
+    void aRawFormTheHandlerDoesNotWaitFor() throws Exception {
+        assertEquals("early", post("/raw/early", "v=a%2Fb"));
+        // the server keeps serving: the leak check of the class checks the bytes were released
+        assertEquals("{v=a%2Fb}", post("/raw/form-all", "v=a%2Fb"));
+    }
+
+    @Test
+    void aRawFormWhoseClientDisconnects() throws Exception {
+        try (java.net.Socket socket = new java.net.Socket(java.net.InetAddress.getLoopbackAddress(), server.getPort())) {
+            java.io.OutputStream out = socket.getOutputStream();
+            out.write(("POST /raw/form-all HTTP/1.1\r\nHost: localhost\r\nContent-Type: " + MediaType.APPLICATION_FORM_URLENCODED
+                + "\r\nContent-Length: 1000\r\n\r\nv=a%2Fb&w=").getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+            out.flush();
+        }
+        assertEquals("{v=a%2Fb}", post("/raw/form-all", "v=a%2Fb"));
+    }
+
+    @Test
     void anAbsentOptionalVariableHasNoRawValue() throws Exception {
         assertEquals("false|[]", get("/raw/optional"));
         assertEquals("true|a%2Fb", get("/raw/optional/a%2Fb"));
@@ -293,6 +324,13 @@ class RawRouteValuesTest {
         CompletionStage<String> rewritten(HttpRequest<?> request, AsyncRequestBody body) {
             assertEquals("true", request.getParameters().get("rewritten"));
             return formAll(body);
+        }
+
+        @Post(uri = "/early", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> early(AsyncRequestBody body) {
+            // the form is not waited for: the read is cancelled when the handler completed
+            body.form(FormOptions.defaults().withRawValues());
+            return java.util.concurrent.CompletableFuture.completedStage("early");
         }
 
         @Post(uri = "/mutated", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
@@ -385,8 +423,25 @@ class RawRouteValuesTest {
         public void routes(HttpRouteBuilder routes) {
             routes.GET("/raw/fn/{name:[^/]+}", (request, pathVariables) ->
                 HttpResponse.ok(pathVariables.rawString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
+            routes.locate("/raw/tenants/{id}", (request, pathVariables) -> "tenant " + pathVariables.rawString("id"), new TenantRoutes());
             routes.locate("/raw/shops{/shop:[0-9]+}", (request, pathVariables) -> "located:" + pathVariables.raw().contains("shop"), new ShopRoutes());
             routes.locate("/raw/located/{prefix}", (request, pathVariables) -> pathVariables.raw().getString("prefix"), new ItemRoutes());
+        }
+    }
+
+    static final class TenantRoutes implements LocatedRoutes<String> {
+        @Override
+        public Argument<String> targetType() {
+            return Argument.STRING;
+        }
+
+        @Override
+        public void routes(LocatedHttpRouteBuilder<String> located) {
+            // the id of the route shadows the id of the prefix, also when it is absent
+            located.GET("/items{/id}")
+                .constrain(pathVariables -> !pathVariables.raw().contains("id") || !"abc".equals(pathVariables.rawString("id")))
+                .handle((request, pathVariables, tenant) -> HttpResponse.ok(tenant + "|" + (pathVariables.raw().contains("id") ? pathVariables.rawString("id") : "false"))
+                    .contentType(MediaType.TEXT_PLAIN_TYPE));
         }
     }
 
