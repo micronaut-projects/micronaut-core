@@ -173,7 +173,8 @@ class LocatorBodyTest {
         assembly.addImplicitHeadRoutes();
         Router router = new DefaultRouter(List.of(), List.of(() -> assembly));
 
-        IllegalStateException error = assertThrows(IllegalStateException.class, () -> router.findClosest(HttpRequest.POST("/orders", "")));
+        HttpRequest<?> request = HttpRequest.POST("/orders", "");
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> router.findClosest(request));
         assertTrue(error.getMessage().contains("No HTTP server provides the body"), error.getMessage());
     }
 

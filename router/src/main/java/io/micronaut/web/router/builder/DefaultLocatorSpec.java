@@ -107,7 +107,7 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, RouteCondition
                 throw new IllegalStateException("No HTTP server provides the body of the request " + request.getMethodName()
                     + " " + request.getPath() + " to its route locator");
             }
-            CompletionStage<? extends @Nullable T> stage;
+            CompletionStage<? extends @Nullable T> stage = null;
             try {
                 // the located route reads the body of the request again
                 stage = reader.apply(bound.copy()).thenCompose(body -> {
@@ -117,9 +117,11 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, RouteCondition
                         throw e instanceof CompletionException completion ? completion : new CompletionException(e);
                     }
                 });
-            } catch (RuntimeException | Error e) {
-                release(bound);
-                throw e;
+            } finally {
+                if (stage == null) {
+                    // failed before the read started
+                    release(bound);
+                }
             }
             return stage.whenComplete((target, error) -> release(bound));
         }

@@ -23,6 +23,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.multipart.MultipartBody;
@@ -110,8 +111,9 @@ class HandlerRouteLocatorBodyTest {
 
     @Test
     void anAsyncLocatorOfTheFormThatLocatesNothingIsNotFound() {
-        HttpClientResponseException error = assertThrows(HttpClientResponseException.class, () -> client.toBlocking()
-            .retrieve(HttpRequest.POST("/accounts/9/greet", "token=none&name=Ann").contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)));
+        BlockingHttpClient blocking = client.toBlocking();
+        HttpRequest<?> request = HttpRequest.POST("/accounts/9/greet", "token=none&name=Ann").contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE);
+        HttpClientResponseException error = assertThrows(HttpClientResponseException.class, () -> blocking.retrieve(request));
         assertEquals(HttpStatus.NOT_FOUND, error.getStatus());
     }
 
@@ -124,8 +126,9 @@ class HandlerRouteLocatorBodyTest {
 
     @Test
     void aRequestWithoutTheBodyOfARequiredTypeIsABadRequest() {
-        HttpClientResponseException error = assertThrows(HttpClientResponseException.class, () -> client.toBlocking()
-            .retrieve(HttpRequest.POST("/orders/route", "").contentType(MediaType.APPLICATION_JSON_TYPE)));
+        BlockingHttpClient blocking = client.toBlocking();
+        HttpRequest<?> request = HttpRequest.POST("/orders/route", "").contentType(MediaType.APPLICATION_JSON_TYPE);
+        HttpClientResponseException error = assertThrows(HttpClientResponseException.class, () -> blocking.retrieve(request));
         assertEquals(HttpStatus.BAD_REQUEST, error.getStatus());
         assertEquals(0, recorder.calls.get(), "the locator is not called");
     }
@@ -138,8 +141,9 @@ class HandlerRouteLocatorBodyTest {
 
     @Test
     void theErrorOfTheLocatorIsHandledLikeAControllerError() {
-        HttpClientResponseException error = assertThrows(HttpClientResponseException.class, () -> client.toBlocking()
-            .retrieve(HttpRequest.POST("/raw/echo", "fail").contentType(MediaType.TEXT_PLAIN_TYPE)));
+        BlockingHttpClient blocking = client.toBlocking();
+        HttpRequest<?> request = HttpRequest.POST("/raw/echo", "fail").contentType(MediaType.TEXT_PLAIN_TYPE);
+        HttpClientResponseException error = assertThrows(HttpClientResponseException.class, () -> blocking.retrieve(request));
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, error.getStatus());
     }
 
