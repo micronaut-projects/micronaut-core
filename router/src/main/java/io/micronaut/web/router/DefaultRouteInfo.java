@@ -277,6 +277,9 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
 
     @Override
     public boolean doesProduce(@Nullable MediaType acceptableType) {
+        if (acceptableType != null && AcceptedMediaTypes.isRejected(acceptableType)) {
+            return false;
+        }
         return producesMediaTypesContainsAll || acceptableType == null || acceptableType.equals(MediaType.ALL_TYPE) || producesMediaTypes.contains(acceptableType);
     }
 
@@ -303,6 +306,23 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     private static boolean computeAnyMediaTypesMatch(List<MediaType> producedMediaTypes, Collection<MediaType> acceptableTypes) {
+        if (AcceptedMediaTypes.hasRejected(acceptableTypes)) {
+            for (MediaType acceptableType : acceptableTypes) {
+                if (AcceptedMediaTypes.isRejected(acceptableType)) {
+                    continue;
+                }
+                if (acceptableType.equals(MediaType.ALL_TYPE)) {
+                    for (MediaType producedMediaType : producedMediaTypes) {
+                        if (AcceptedMediaTypes.isAcceptable(producedMediaType, acceptableTypes)) {
+                            return true;
+                        }
+                    }
+                } else if (producedMediaTypes.contains(acceptableType) && AcceptedMediaTypes.isAcceptable(acceptableType, acceptableTypes)) {
+                    return true;
+                }
+            }
+            return false;
+        }
         for (MediaType acceptableType : acceptableTypes) {
             if (acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType)) {
                 return true;

@@ -22,6 +22,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.web.router.AcceptedMediaTypes;
 import jakarta.inject.Singleton;
 
 /**
@@ -52,7 +53,7 @@ final class DefaultErrorResponseProcessor implements ErrorResponseProcessor {
         }
         final boolean isError = response.status().getCode() >= 400;
         if (isError
-            && request.accept().stream().anyMatch(mediaType -> mediaType.equals(MediaType.TEXT_HTML_TYPE))
+            && request.accept().stream().anyMatch(mediaType -> mediaType.equals(MediaType.TEXT_HTML_TYPE) && !AcceptedMediaTypes.isRejected(mediaType))
             && request.accept().stream().noneMatch(m -> m.matchesExtension(MediaType.EXTENSION_JSON))
         ) {
             return response.body(htmlBodyErrorResponseProvider.body(errorContext, response))

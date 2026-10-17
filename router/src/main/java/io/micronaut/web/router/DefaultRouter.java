@@ -384,6 +384,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         if (CollectionUtils.isNotEmpty(acceptedProducedTypes)) {
             // take the highest priority accepted type
             final MediaType mediaType = acceptedProducedTypes.iterator().next();
+            if (AcceptedMediaTypes.isRejected(mediaType)) {
+                // sorted by the quality: no type is acceptable
+                return uriRoutes;
+            }
             var mostSpecific = new ArrayList<UriRouteMatch<T, R>>(uriRoutes.size());
             for (UriRouteMatch<T, R> routeMatch : uriRoutes) {
                 if (routeMatch.getRouteInfo().explicitlyProduces(mediaType)) {

@@ -65,6 +65,7 @@ import io.micronaut.inject.MethodReference;
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.executor.ExecutorSelector;
+import io.micronaut.web.router.AcceptedMediaTypes;
 import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.DefaultUrlRouteInfo;
 import io.micronaut.web.router.GroupErrorRoutes;
@@ -91,6 +92,7 @@ import reactor.util.context.ContextView;
 
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -304,8 +306,13 @@ public final class RouteExecutor {
             }
         }
         final List<MediaType> producesList = finalRoute.getProduces();
+        Collection<MediaType> accepted = request != null ? request.accept() : List.of();
+        if (AcceptedMediaTypes.hasRejected(accepted)) {
+            // an accepted type of the quality 0 is not acceptable, RFC 9110 12.4.2
+            return acceptableResponseContentType(producesList, accepted);
+        }
         if (request != null) {
-            final Iterator<MediaType> i = request.accept().iterator();
+            final Iterator<MediaType> i = accepted.iterator();
             if (i.hasNext()) {
                 final MediaType mt = i.next();
                 if (producesList.contains(mt)) {
@@ -322,6 +329,30 @@ public final class RouteExecutor {
             defaultResponseMediaType = MediaType.APPLICATION_JSON_TYPE;
         }
         return MediaType.ALL_TYPE.equals(defaultResponseMediaType) ? MediaType.APPLICATION_JSON_TYPE : defaultResponseMediaType;
+    }
+
+    /**
+     * @param producesList The types the route produces
+     * @param accepted     The accepted types, some of the quality 0
+     * @return The produced type of the most preferred acceptable accepted type, else the first
+     * acceptable produced type, else the first produced type
+     */
+    private static MediaType acceptableResponseContentType(List<MediaType> producesList, Collection<MediaType> accepted) {
+        for (MediaType mt : accepted) {
+            if (!AcceptedMediaTypes.isRejected(mt) && !MediaType.ALL_TYPE.equals(mt)
+                && producesList.contains(mt) && AcceptedMediaTypes.isAcceptable(mt, accepted)) {
+                return mt;
+            }
+        }
+        List<MediaType> produces = producesList.isEmpty() ? List.of(MediaType.APPLICATION_JSON_TYPE) : producesList;
+        for (MediaType mt : produces) {
+            MediaType candidate = MediaType.ALL_TYPE.equals(mt) ? MediaType.APPLICATION_JSON_TYPE : mt;
+            if (AcceptedMediaTypes.isAcceptable(candidate, accepted)) {
+                return candidate;
+            }
+        }
+        MediaType first = produces.get(0);
+        return MediaType.ALL_TYPE.equals(first) ? MediaType.APPLICATION_JSON_TYPE : first;
     }
 
     private static @Nullable MediaType selectedMediaType(HttpRequest<?> request) {

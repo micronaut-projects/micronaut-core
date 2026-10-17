@@ -680,8 +680,13 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         if (producesMediaTypesContainsAll || acceptableTypes == null || acceptableTypes.isEmpty()) {
             return true;
         }
+        boolean hasRejected = AcceptedMediaTypes.hasRejected(acceptableTypes);
         for (MediaType acceptableType : acceptableTypes) {
-            if (anyCompatible(producesMediaTypes, acceptableType)) {
+            if (hasRejected) {
+                if (anyAcceptable(producesMediaTypes, acceptableType, acceptableTypes)) {
+                    return true;
+                }
+            } else if (anyCompatible(producesMediaTypes, acceptableType)) {
                 return true;
             }
         }
@@ -697,7 +702,32 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         if (routeMatchSelector == null) {
             return super.doesProduce(acceptableType);
         }
+        if (acceptableType != null && AcceptedMediaTypes.isRejected(acceptableType)) {
+            return false;
+        }
         return producesMediaTypesContainsAll || acceptableType == null || anyCompatible(producesMediaTypes, acceptableType);
+    }
+
+    /**
+     * @param types          The types of a route
+     * @param acceptableType An accepted type
+     * @param acceptedTypes  All the accepted types
+     * @return Whether one of the types is compatible with the accepted type, which is not of the
+     * quality {@code 0}, and not rejected by a more specific accepted type of the quality {@code 0}
+     */
+    private static boolean anyAcceptable(List<MediaType> types, MediaType acceptableType, Collection<MediaType> acceptedTypes) {
+        if (AcceptedMediaTypes.isRejected(acceptableType)) {
+            return false;
+        }
+        for (MediaType type : types) {
+            if (acceptableType.matches(type) && AcceptedMediaTypes.isAcceptable(type, acceptedTypes)) {
+                return true;
+            }
+            if (type.matches(acceptableType) && AcceptedMediaTypes.isAcceptable(acceptableType, acceptedTypes)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

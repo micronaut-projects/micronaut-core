@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.web.router.AcceptedMediaTypes;
 
 import java.util.Collection;
 import java.util.List;
@@ -255,8 +256,22 @@ public final class RequestPredicates {
             if (accepted.isEmpty()) {
                 return true;
             }
+            boolean hasRejected = AcceptedMediaTypes.hasRejected(accepted);
             for (MediaType acceptedType : accepted) {
-                if (compatible(acceptedType)) {
+                if (hasRejected ? acceptable(acceptedType, accepted) : compatible(acceptedType)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private boolean acceptable(MediaType acceptedType, Collection<MediaType> accepted) {
+            if (AcceptedMediaTypes.isRejected(acceptedType)) {
+                return false;
+            }
+            for (MediaType candidate : types) {
+                if (acceptedType.matches(candidate) && AcceptedMediaTypes.isAcceptable(candidate, accepted)
+                    || candidate.matches(acceptedType) && AcceptedMediaTypes.isAcceptable(acceptedType, accepted)) {
                     return true;
                 }
             }
