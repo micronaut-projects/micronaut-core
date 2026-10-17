@@ -135,6 +135,7 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
     @Override
     public ExecutionFlow<HttpResponse<?>> apply(Throwable throwable) {
         NettyHttpRequest<?> request = Objects.requireNonNull(nettyRequest);
+        request.responseFailed(throwable);
         return Objects.requireNonNull(writeErrorContext).propagate(() -> onWriteError(request, throwable));
     }
 

@@ -1111,6 +1111,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             return () -> closeFuture.removeListener(listener);
         }
 
+        @Override
+        public boolean isAbandoned() {
+            return !requiredCtx().channel().isActive();
+        }
+
         /**
          * Mark this channel to be closed after this response has been written.
          */
@@ -1672,6 +1677,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void fail(Throwable t) {
+            requestHandler.responseFailed(outboundAccess.attachment, t);
             if (LOG.isWarnEnabled()) {
                 if (initialMessage == null) {
                     LOG.warn("The streamed response body failed after some of it was written. The error cannot be forwarded to the client, and the response ends abruptly.", t);

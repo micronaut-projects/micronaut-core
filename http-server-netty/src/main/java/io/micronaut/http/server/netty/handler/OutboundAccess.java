@@ -57,6 +57,18 @@ public interface OutboundAccess extends NettyWriteContext {
     Runnable whenAbandoned(Runnable callback);
 
     /**
+     * Whether the request has been abandoned, see {@link #whenAbandoned(Runnable)}: the
+     * HTTP/1.1 connection is closed, or the HTTP/2 stream was closed before the response was
+     * written.
+     *
+     * @return {@code true} iff the request has been abandoned
+     * @since 5.3.0
+     */
+    default boolean isAbandoned() {
+        return false;
+    }
+
+    /**
      * Give up on the response of this request, after writing it failed in a way that may have
      * left a part of it on the connection, so that no other response can be written in its
      * place: HTTP/1.1 closes the connection, HTTP/2 resets the stream. Does nothing if the

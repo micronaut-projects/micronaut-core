@@ -458,6 +458,11 @@ abstract class MultiplexedServerHandler {
             return () -> { };
         }
 
+        @Override
+        public final synchronized boolean isAbandoned() {
+            return abandoned;
+        }
+
         private synchronized void removeAbandonCallback(Runnable callback) {
             List<Runnable> callbacks = abandonCallbacks;
             if (callbacks != null) {
@@ -1050,6 +1055,7 @@ abstract class MultiplexedServerHandler {
 
             @Override
             public void fail(Throwable e) {
+                requestHandler.responseFailed(attachment, e);
                 if (!reset(e)) {
                     LOG.warn("The streamed response body failed after some of it was written. The error cannot be forwarded to the client, and the response ends abruptly.", e);
                 }

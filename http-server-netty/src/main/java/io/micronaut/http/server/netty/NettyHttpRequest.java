@@ -98,6 +98,8 @@ import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import org.jspecify.annotations.NonNull;
+import io.micronaut.http.server.ResponseFailureRecorder;
+import io.micronaut.http.server.netty.handler.OutboundAccess;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -113,6 +115,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -123,7 +126,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
-public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T>, RouteMetadataHolder {
+public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T>, RouteMetadataHolder, ResponseFailureRecorder {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
 
     /**
@@ -212,6 +215,15 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Nullable
     private NettyByteBodyFactory byteBodyFactory;
     private final RequestResourceScope disposalResources = new RequestResourceScope();
+    /**
+     * The connection of this request, for the callbacks of
+     * {@link #whenResponseCompleted} and {@link #whenAbandoned}. Both referents are thread-safe
+     * themselves: volatile only publishes the reference.
+     */
+    @SuppressWarnings("java:S3077")
+    private volatile @Nullable OutboundAccess outboundAccess;
+    @SuppressWarnings("java:S3077")
+    private volatile @Nullable ResponseCallbacks responseCallbacks;
     @Nullable
     private ParsedFormType parsedFormType;
 
@@ -533,6 +545,70 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             }
         }
         return bodyConvertor;
+    }
+
+    /**
+     * Set the connection of this request, which serves the callbacks of
+     * {@link #whenResponseCompleted} and {@link #whenAbandoned}.
+     *
+     * @param outboundAccess The connection
+     */
+    void outboundAccess(OutboundAccess outboundAccess) {
+        this.outboundAccess = outboundAccess;
+    }
+
+    private @Nullable ResponseCallbacks responseCallbacks() {
+        ResponseCallbacks callbacks = responseCallbacks;
+        if (callbacks == null) {
+            OutboundAccess access = outboundAccess;
+            if (access == null) {
+                return null;
+            }
+            synchronized (this) {
+                callbacks = responseCallbacks;
+                if (callbacks == null) {
+                    callbacks = new ResponseCallbacks(access);
+                    responseCallbacks = callbacks;
+                }
+            }
+        }
+        return callbacks;
+    }
+
+    @Override
+    public boolean whenResponseCompleted(Consumer<@Nullable Throwable> callback) {
+        ResponseCallbacks callbacks = responseCallbacks();
+        return callbacks != null && callbacks.whenCompleted(Objects.requireNonNull(callback, "callback"));
+    }
+
+    @Override
+    public @Nullable Runnable whenAbandoned(Runnable callback) {
+        ResponseCallbacks callbacks = responseCallbacks();
+        return callbacks == null ? null : callbacks.whenAbandoned(Objects.requireNonNull(callback, "callback"));
+    }
+
+    /**
+     * Remember why the response to this request failed, for the callbacks of
+     * {@link #whenResponseCompleted}.
+     *
+     * @param cause The failure
+     */
+    @Override
+    public void responseFailed(Throwable cause) {
+        ResponseCallbacks callbacks = responseCallbacks;
+        if (callbacks != null) {
+            callbacks.fail(cause);
+        }
+    }
+
+    /**
+     * The response to this request is done: run the callbacks of {@link #whenResponseCompleted}.
+     */
+    void responseCompleted() {
+        ResponseCallbacks callbacks = responseCallbacks;
+        if (callbacks != null) {
+            callbacks.complete();
+        }
     }
 
     /**
@@ -971,7 +1047,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     /**
      * Mutable version of the request.
      */
-    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, RouteMetadataHolder, ServerHttpRequest<T>, FormCapableHttpRequest<T> {
+    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, RouteMetadataHolder, ServerHttpRequest<T>, FormCapableHttpRequest<T>, ResponseFailureRecorder {
 
         @Nullable
         private URI uri;
@@ -1081,6 +1157,21 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         public ByteBodyFactory byteBodyFactory() {
             return NettyHttpRequest.this.byteBodyFactory();
+        }
+
+        @Override
+        public boolean whenResponseCompleted(Consumer<@Nullable Throwable> callback) {
+            return NettyHttpRequest.this.whenResponseCompleted(callback);
+        }
+
+        @Override
+        public @Nullable Runnable whenAbandoned(Runnable callback) {
+            return NettyHttpRequest.this.whenAbandoned(callback);
+        }
+
+        @Override
+        public void responseFailed(Throwable cause) {
+            NettyHttpRequest.this.responseFailed(cause);
         }
 
         @Override

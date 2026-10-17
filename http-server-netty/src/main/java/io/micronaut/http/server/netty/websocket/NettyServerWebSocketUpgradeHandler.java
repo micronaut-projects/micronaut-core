@@ -239,6 +239,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         Objects.requireNonNull(next).responseWritten(attachment);
     }
 
+    @Override
+    public void responseFailed(@Nullable Object attachment, Throwable cause) {
+        Objects.requireNonNull(next).responseFailed(attachment, cause);
+    }
+
     private void writeResponse(ChannelHandlerContext ctx,
                                NettyHttpRequest<?> msg,
                                boolean shouldProceedNormally,

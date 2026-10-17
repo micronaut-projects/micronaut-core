@@ -252,6 +252,9 @@ public final class RouteExecutor {
      */
     public MutableHttpResponse<?> createDefaultErrorResponse(HttpRequest<?> httpRequest,
                                                              Throwable cause) {
+        if (httpRequest instanceof ResponseFailureRecorder recorder) {
+            recorder.responseFailed(cause);
+        }
         logException(cause);
         MutableHttpResponse<?> mutableHttpResponse = HttpResponse.serverError();
         RouteAttributes.setException(mutableHttpResponse, cause);

@@ -202,6 +202,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     private void cleanupRequest(NettyHttpRequest<?> request) {
         try {
+            request.responseCompleted();
             request.release();
         } finally {
             ExecutionFlow<Void> terminatedFlow = ExecutionFlow.empty();
@@ -236,6 +237,13 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 request.getChannelHandlerContext().channel().attr(ACCESS_LOG_REQUEST_ATTRIBUTE).compareAndSet(request, null);
             }
             cleanupRequest(request);
+        }
+    }
+
+    @Override
+    public void responseFailed(@Nullable Object attachment, Throwable cause) {
+        if (attachment != null) {
+            ((NettyHttpRequest<?>) attachment).responseFailed(cause);
         }
     }
 
@@ -340,6 +348,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             ctx.channel().attr(ACCESS_LOG_REQUEST_ATTRIBUTE).set(mnRequest);
         }
         outboundAccess.attachment(mnRequest);
+        mnRequest.outboundAccess(outboundAccess);
     }
 
     /**
@@ -444,6 +453,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             finalResponse.onComplete((r, t) -> {
                 ByteBodyHttpResponse<?> encodedResponse;
                 if (t != null) {
+                    nettyHttpRequest.responseFailed(t);
                     // fallback of the fallback...
                     encodedResponse = ByteBodyHttpResponseWrapper.wrap(HttpResponse.serverError(), NettyByteBodyFactory.empty());
                     try {
@@ -488,6 +498,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                         u.addSuppressed(t);
                     }
                     t = u;
+                    nettyHttpRequest.responseFailed(u);
                     // the response may not have reached the connection: the client would wait
                     // for it until it times out
                     writeFallbackResponse(outboundAccess, u);
