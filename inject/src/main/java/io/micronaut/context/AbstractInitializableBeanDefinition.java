@@ -3254,6 +3254,16 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
+    public io.micronaut.core.annotation.@Nullable AnnotationView getAnnotationView(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().getAnnotationView(p0);
+    }
+
+    @Override
+    public io.micronaut.core.annotation.@Nullable AnnotationView getAnnotationView(java.lang.String p0) {
+        return getAnnotationMetadata().getAnnotationView(p0);
+    }
+
+    @Override
     public <A extends java.lang.annotation.Annotation> io.micronaut.core.annotation.@Nullable AnnotationValue<A> getAnnotation(java.lang.Class<A> p0) {
         return getAnnotationMetadata().getAnnotation(p0);
     }

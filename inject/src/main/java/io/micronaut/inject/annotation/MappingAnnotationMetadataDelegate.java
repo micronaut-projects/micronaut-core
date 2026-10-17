@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationView;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -459,6 +460,19 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
             return mapAnnotationValue(av);
         }
         return null;
+    }
+
+    @Override
+    public @Nullable AnnotationView getAnnotationView(String annotation) {
+        // The values have to be mapped
+        AnnotationValue<Annotation> av = this.<Annotation>findAnnotation(annotation).orElse(null);
+        return av != null ? AnnotationView.of(av) : null;
+    }
+
+    @Override
+    public @Nullable AnnotationView getAnnotationView(Class<? extends Annotation> annotationClass) {
+        AnnotationValue<? extends Annotation> av = findAnnotation(annotationClass).orElse(null);
+        return av != null ? AnnotationView.of(av) : null;
     }
 
     @Override

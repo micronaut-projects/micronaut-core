@@ -739,6 +739,40 @@ public interface AnnotationMetadata extends AnnotationSource {
         }
     }
 
+    /**
+     * Finds a view of the members of the given annotation without building an {@link AnnotationValue} when the
+     * metadata can avoid it. The view's accessors return what the accessors of
+     * {@link #findAnnotation(String)}'s value return.
+     *
+     * @param annotation The annotation name
+     * @return The view or {@code null} if the annotation is not present
+     * @since 5.3.0
+     */
+    @Internal
+    default @Nullable AnnotationView getAnnotationView(String annotation) {
+        AnnotationValue<Annotation> value = findAnnotation(annotation).orElse(null);
+        return value != null ? AnnotationView.of(value) : null;
+    }
+
+    /**
+     * Finds a view of the members of the given annotation without building an {@link AnnotationValue} when the
+     * metadata can avoid it. The view's accessors return what the accessors of
+     * {@link #findAnnotation(Class)}'s value return.
+     *
+     * @param annotationClass The annotation class
+     * @return The view or {@code null} if the annotation is not present
+     * @since 5.3.0
+     */
+    @Internal
+    default @Nullable AnnotationView getAnnotationView(Class<? extends Annotation> annotationClass) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        if (isRepeatableAnnotation(annotationClass)) {
+            AnnotationValue<? extends Annotation> value = findAnnotation(annotationClass).orElse(null);
+            return value != null ? AnnotationView.of(value) : null;
+        }
+        return getAnnotationView(annotationClass.getName());
+    }
+
     @Override
     default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);

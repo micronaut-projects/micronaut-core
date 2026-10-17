@@ -587,6 +587,16 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
+    default @Nullable AnnotationView getAnnotationView(String annotation) {
+        return getAnnotationMetadata().getAnnotationView(annotation);
+    }
+
+    @Override
+    default @Nullable AnnotationView getAnnotationView(Class<? extends Annotation> annotationClass) {
+        return getAnnotationMetadata().getAnnotationView(annotationClass);
+    }
+
+    @Override
     default <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
         return getAnnotationMetadata().findAnnotation(annotation);
     }

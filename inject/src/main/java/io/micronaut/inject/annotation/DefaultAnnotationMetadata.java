@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationView;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -1296,6 +1297,27 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public Optional<Class<? extends Annotation>> getAnnotationType(String name, ClassLoader classLoader) {
         return AnnotationMetadataSupport.getAnnotationType(name, classLoader);
+    }
+
+    @Override
+    public @Nullable AnnotationView getAnnotationView(String annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        if (allAnnotations == null || StringUtils.isEmpty(annotation)) {
+            return null;
+        }
+        Map<CharSequence, Object> values = allAnnotations.get(annotation);
+        if (values == null && allStereotypes != null) {
+            values = allStereotypes.get(annotation);
+        }
+        if (values != null) {
+            // The typed accessors of the value findAnnotation builds read the members only, so the raw map gives the same results
+            return AnnotationView.of(annotation, values);
+        }
+        if (findRepeatableAnnotationContainerInternal(annotation) == null) {
+            return null;
+        }
+        AnnotationValue<Annotation> value = this.<Annotation>firstRepeatedValue(getAnnotationValuesByName(annotation)).orElse(null);
+        return value != null ? AnnotationView.of(value) : null;
     }
 
     @SuppressWarnings("Duplicates")

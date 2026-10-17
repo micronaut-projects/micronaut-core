@@ -19,6 +19,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationView;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
@@ -432,6 +433,15 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
             return values.map(av -> new EnvironmentAnnotationValue<>(env, av));
         }
         return values;
+    }
+
+    @Override
+    public @Nullable AnnotationView getAnnotationView(String annotation) {
+        if (getEnvironment() == null) {
+            // findAnnotation returns the target's value unchanged
+            return environmentAnnotationMetadata.getAnnotationView(annotation);
+        }
+        return AnnotationMetadata.super.getAnnotationView(annotation);
     }
 
     @Override
