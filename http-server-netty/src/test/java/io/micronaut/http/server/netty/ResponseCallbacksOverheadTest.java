@@ -47,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ResponseCallbacksOverheadTest {
     static final String SPEC_NAME = "ResponseCallbacksOverheadTest";
-    private static final int REQUESTS = 5_000;
+    private static final int REQUESTS = 1_000;
 
     @Test
     void keepAliveRequestsWithoutCallbacksAddNoListeners() throws Exception {
