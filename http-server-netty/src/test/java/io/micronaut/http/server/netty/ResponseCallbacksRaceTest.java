@@ -112,18 +112,22 @@ class ResponseCallbacksRaceTest {
 
         @Override
         public void attachment(Object attachment) {
+            // not used by the callbacks
         }
 
         @Override
         public void closeAfterWrite() {
+            // not used by the callbacks
         }
 
         @Override
         public void write(HttpResponse response, ByteBody body) {
+            // not used by the callbacks
         }
 
         @Override
         public void abort() {
+            // not used by the callbacks
         }
 
         @Override
@@ -134,6 +138,7 @@ class ResponseCallbacksRaceTest {
 
         @Override
         public void writeHeadResponse(HttpResponse response) {
+            // not used by the callbacks
         }
     }
 }
