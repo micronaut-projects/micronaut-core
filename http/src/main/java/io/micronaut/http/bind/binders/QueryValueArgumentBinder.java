@@ -47,6 +47,10 @@ import java.util.Optional;
  */
 public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> implements AnnotatedRequestArgumentBinder<QueryValue, T> {
 
+    // Neither annotation is repeatable: the name lookups skip the repeatable container resolution of the class lookups
+    private static final String QUERY_VALUE = QueryValue.class.getName();
+    private static final String FORMAT = Format.class.getName();
+
     /**
      * Constructor.
      *
@@ -93,7 +97,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
         Argument<T> argument = context.getArgument();
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
 
-        if (source.getMethod().permitsRequestBody() && !annotationMetadata.hasAnnotation(QueryValue.class)) {
+        if (source.getMethod().permitsRequestBody() && !annotationMetadata.hasAnnotation(QUERY_VALUE)) {
             // During the unmatched check avoid requests that don't allow bodies
             return BindingResult.unsatisfied();
         }
@@ -113,7 +117,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
         // First try converting from the ConvertibleMultiValues type and if conversion is successful, return it.
         // Otherwise, use the given uri template to deduce what to do with the variable
         Optional<T> multiValueConversion;
-        if (annotationMetadata.hasAnnotation(Format.class)) {
+        if (annotationMetadata.hasAnnotation(FORMAT)) {
             multiValueConversion = conversionService.convert(parameters, context);
         } else {
             multiValueConversion = Optional.empty();
