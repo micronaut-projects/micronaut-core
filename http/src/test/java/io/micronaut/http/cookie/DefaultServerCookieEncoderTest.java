@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -30,6 +31,22 @@ class DefaultServerCookieEncoderTest {
         cookie = Cookie.of("id", "a3fWa").maxAge(maxAge);
         String result = cookieEncoder.encode(cookie).get(0);
         assertTrue(expected.equals(result) || expected2.equals(result));
+    }
+
+    @Test
+    void expiresKeepsTheRfc1123FormatUnderANonEnglishDefaultLocale() {
+        Locale previous = Locale.getDefault(Locale.Category.FORMAT);
+        Locale.setDefault(Locale.Category.FORMAT, Locale.FRANCE);
+        try {
+            ServerCookieEncoder cookieEncoder = new DefaultServerCookieEncoder();
+            String encoded = cookieEncoder.encode(Cookie.of("id", "a3fWa").maxAge(2592000)).get(0);
+            String expires = encoded.substring(encoded.indexOf(Cookie.ATTRIBUTE_EXPIRES + "=") + 8);
+            assertTrue(expires.matches(
+                "(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \\d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \\d{4} \\d{2}:\\d{2}:\\d{2} GMT"),
+                expires);
+        } finally {
+            Locale.setDefault(Locale.Category.FORMAT, previous);
+        }
     }
 
     @Test
@@ -164,7 +181,7 @@ class DefaultServerCookieEncoderTest {
         ZoneId gmtZone = ZoneId.of("GMT");
         LocalDateTime localDateTime = LocalDateTime.now(gmtZone).plusSeconds(maxAgeSeconds);
         ZonedDateTime gmtDateTime = ZonedDateTime.of(localDateTime, gmtZone);
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US);
         return gmtDateTime.format(formatter);
     }
 }
