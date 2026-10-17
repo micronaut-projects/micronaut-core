@@ -89,6 +89,13 @@ public sealed interface LocatorSpec permits DefaultLocatorSpec {
      * {@code multipart/form-data}, as {@link FormData}, like a handler of
      * {@link HttpRouteSpec#form()}. The located route that reads the form receives the same form.
      *
+     * <p>The locator route still matches every request under its prefix: a request whose
+     * content type is not a form, e.g. a {@code GET}, a {@code HEAD}, a CORS preflight or a JSON
+     * body for a located route, is located with {@link FormData#empty() the empty form}, like a
+     * JAX-RS {@code @FormParam} without a form entity, and its body is neither read nor
+     * buffered: the located routes decide what they consume. A form that fails to read, e.g. a
+     * malformed or too large multipart body, fails the request; it does not become empty.</p>
+     *
      * @return The locator stage
      */
     LocatorBodySpec<FormData> form();

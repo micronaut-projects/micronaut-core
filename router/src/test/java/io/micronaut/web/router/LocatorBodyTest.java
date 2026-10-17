@@ -166,6 +166,39 @@ class LocatorBodyTest {
     }
 
     @Test
+    void aRequestThatIsNotAFormIsLocatedWithTheEmptyFormWithoutReadingTheBody() {
+        AtomicReference<FormData> received = new AtomicReference<>();
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> {
+            located.GET("/", (request, pathVariables) -> HttpResponse.ok());
+            located.POST("/", (request, pathVariables) -> HttpResponse.ok());
+        });
+        Router router = router(routes -> routes.locator("/orders")
+            .form()
+            .locate((request, pathVariables, form) -> {
+                received.set(form);
+                return "order";
+            }, target -> items));
+
+        // located at once: no body is waited for
+        assertNotNull(router.findClosest(HttpRequest.GET("/orders")));
+        assertSame(FormData.empty(), received.get());
+        assertNotNull(router.findClosest(HttpRequest.POST("/orders", "{}").contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE)));
+        assertTrue(bound.isEmpty(), "the body is not bound");
+    }
+
+    @Test
+    void aFormRequestReadsTheForm() {
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/", (request, pathVariables) -> HttpResponse.ok()));
+        Router router = router(routes -> routes.locator("/orders")
+            .form()
+            .locate((request, pathVariables, form) -> form.getString("id"), target -> items));
+
+        HttpRequest<?> request = HttpRequest.POST("/orders", "").contentType(io.micronaut.http.MediaType.APPLICATION_FORM_URLENCODED_TYPE);
+        pending(() -> router.findClosest(request));
+        assertEquals(1, bound.size());
+    }
+
+    @Test
     void withoutAServerTheBodyIsNotProvided() {
         LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/", (request, pathVariables) -> HttpResponse.ok()));
         RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });

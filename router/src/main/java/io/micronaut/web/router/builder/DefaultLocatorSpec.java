@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.ReleasableRequestBody;
@@ -61,28 +62,42 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, RouteCondition
             LocatorBodySpec<B> body = (LocatorBodySpec<B>) body();
             return body;
         }
-        return new Body<>(this, copy -> copy.body(bodyType));
+        return new Body<>(this, null, copy -> copy.body(bodyType));
     }
 
     @Override
     public LocatorBodySpec<AsyncRequestBody> body() {
-        return new Body<>(this, CompletableFuture::completedFuture);
+        return new Body<>(this, null, CompletableFuture::completedFuture);
     }
 
     @Override
     public LocatorBodySpec<FormData> form() {
-        // the form of a copy is the one form of the request
-        return new Body<>(this, AsyncRequestBody::form);
+        // the form of a copy is the one form of the request; a request whose body is not a form,
+        // e.g. a GET or a JSON body for a located route, is located with the empty form, and its
+        // body is left unread to the located route
+        return new Body<>(this, request -> isForm(request) ? null : FormData.empty(), AsyncRequestBody::form);
+    }
+
+    /**
+     * @param request A request
+     * @return Whether its content type is a form, {@code application/x-www-form-urlencoded} or {@code multipart/form-data}
+     */
+    private static boolean isForm(HttpRequest<?> request) {
+        MediaType contentType = request.getContentType().orElse(null);
+        return contentType != null
+            && (contentType.matches(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || contentType.matches(MediaType.MULTIPART_FORM_DATA_TYPE));
     }
 
     /**
      * The locator of a body read from a copy of the body of the request.
      *
-     * @param spec   The locator route
-     * @param reader Reads the body from the copy
-     * @param <B>    The type of the body
+     * @param spec     The locator route
+     * @param unread   The body to locate a request with without reading its body, {@code null} when it is read; {@code null} to read every body
+     * @param reader   Reads the body from the copy
+     * @param <B>      The type of the body
      */
     record Body<B extends @Nullable Object>(DefaultLocatorSpec spec,
+                                            @Nullable Function<HttpRequest<?>, @Nullable B> unread,
                                             Function<AsyncRequestBody, CompletionStage<? extends B>> reader) implements LocatorBodySpec<B> {
 
         @Override
@@ -101,7 +116,12 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, RouteCondition
         private <T> CompletionStage<? extends @Nullable T> locate(RouteConditionContext context,
                                                                  HttpRequest<?> request,
                                                                  PathVariables pathVariables,
-                                                                 AsyncBodyLocatorHandler<B, ? extends T> locator) {
+                                                                 AsyncBodyLocatorHandler<B, ? extends T> locator) throws Exception {
+            B without = unread == null ? null : unread.apply(request);
+            if (without != null) {
+                // nothing is bound, copied or buffered
+                return Objects.requireNonNull(locator.locate(request, pathVariables, without), () -> "The locator returned no stage: " + locator);
+            }
             AsyncRequestBody bound = context.locatorBody(request);
             if (bound == null) {
                 throw new IllegalStateException("No HTTP server provides the body of the request " + request.getMethodName()

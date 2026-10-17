@@ -65,7 +65,7 @@ class HandlerRouteLocatorBodyTest {
 
     @BeforeAll
     static void start() {
-        ctx = ApplicationContext.run(Map.of("spec.name", SPEC_NAME, "micronaut.server.port", -1));
+        ctx = ApplicationContext.run(Map.of("spec.name", SPEC_NAME, "micronaut.server.port", -1, "micronaut.server.cors.enabled", true));
         server = ctx.getBean(EmbeddedServer.class).start();
         client = ctx.createBean(HttpClient.class, server.getURL());
         recorder = ctx.getBean(Recorder.class);
@@ -107,6 +107,48 @@ class HandlerRouteLocatorBodyTest {
         String response = client.toBlocking().retrieve(HttpRequest.POST("/accounts/8/upload", body)
             .contentType(MediaType.MULTIPART_FORM_DATA_TYPE));
         assertEquals("account 8 silver: note.txt the note", response);
+    }
+
+    @Test
+    void aGetIsLocatedWithTheEmptyForm() {
+        assertEquals("account 1 anonymous", client.toBlocking().retrieve(HttpRequest.GET("/accounts/1/profile")));
+        assertEquals(List.of(FormData.empty()), recorder.forms);
+    }
+
+    @Test
+    void aHeadIsLocatedWithTheEmptyForm() {
+        HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.HEAD("/accounts/1/profile"));
+        assertEquals(HttpStatus.OK, response.getStatus());
+        assertEquals(1, recorder.calls.get());
+    }
+
+    @Test
+    void aJsonBodyUnderAFormLocatorIsLeftToTheLocatedRoute() {
+        String response = client.toBlocking().retrieve(HttpRequest.POST("/accounts/2/order", "{\"kind\":\"express\",\"id\":3}")
+            .contentType(MediaType.APPLICATION_JSON_TYPE));
+        assertEquals("account 2 anonymous: order 3", response);
+        assertEquals(List.of(FormData.empty()), recorder.forms);
+    }
+
+    @Test
+    void aMalformedMultipartBodyFailsInsteadOfBecomingEmpty() {
+        BlockingHttpClient blocking = client.toBlocking();
+        HttpRequest<?> request = HttpRequest.POST("/accounts/3/greet", "--x\r\nnot a part")
+            .contentType("multipart/form-data");
+        HttpClientResponseException error = assertThrows(HttpClientResponseException.class, () -> blocking.retrieve(request));
+        // a multipart body without a boundary cannot be decoded: the reading of the form fails it
+        assertEquals(HttpStatus.UNSUPPORTED_MEDIA_TYPE, error.getStatus());
+        assertEquals(0, recorder.calls.get(), "the locator is not called");
+    }
+
+    @Test
+    void aCorsPreflightUnderAFormLocatorIsAnswered() {
+        HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.OPTIONS("/accounts/4/greet")
+            .header("Origin", "https://example.com")
+            .header("Access-Control-Request-Method", "POST"));
+        assertEquals(HttpStatus.OK, response.getStatus());
+        assertEquals("https://example.com", response.getHeaders().get("Access-Control-Allow-Origin"));
+        assertEquals(List.of(FormData.empty()), recorder.forms);
     }
 
     @Test
@@ -178,7 +220,7 @@ class HandlerRouteLocatorBodyTest {
                 .locateAsync((request, pathVariables, form) -> {
                     recorder.calls.incrementAndGet();
                     recorder.forms.add(form);
-                    String token = form.getString("token");
+                    String token = form.find("token", String.class).orElse("anonymous");
                     return CompletableFuture.completedFuture("none".equals(token) ? null : new Account(pathVariables.getLong("id"), token));
                 }, accounts);
             routes.locator("/orders")
@@ -217,6 +259,12 @@ class HandlerRouteLocatorBodyTest {
                 return HttpResponse.ok("account " + account.id() + " " + account.token() + ": hello " + form.getString("name"))
                     .contentType(MediaType.TEXT_PLAIN_TYPE);
             });
+            located.GET("/profile", (request, pathVariables) -> {
+                Account account = LocatedRoutes.locatedTarget(pathVariables) instanceof Account a ? a : null;
+                return HttpResponse.ok("account " + account.id() + " " + account.token()).contentType(MediaType.TEXT_PLAIN_TYPE);
+            });
+            located.POST("/order").body(Order.class).handle((request, pathVariables, account, order) ->
+                HttpResponse.ok("account " + account.id() + " " + account.token() + ": order " + order.id()).contentType(MediaType.TEXT_PLAIN_TYPE));
             located.POST("/upload").form().handleAsync((request, pathVariables, account, form) ->
                 form.getFile("file").text(1024).thenApply(text ->
                     HttpResponse.ok("account " + account.id() + " " + account.token() + ": " + form.getFile("file").fileName() + " " + text)
