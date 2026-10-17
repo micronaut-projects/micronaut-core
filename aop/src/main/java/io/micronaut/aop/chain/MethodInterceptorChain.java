@@ -22,6 +22,7 @@ import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.aop.ScheduledInvocation;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
@@ -31,6 +32,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
@@ -88,6 +90,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         @Nullable InterceptorKind kind) {
         super(interceptors, target, executionHandle, EMPTY_OBJECT_ARRAY);
         this.kind = kind;
+        setScheduledInvocation(ScheduledInvocation.claim(target, executionHandle));
     }
 
     /**
@@ -102,6 +105,23 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     public MethodInterceptorChain(Interceptor<T, R>[] interceptors, T target, ExecutableMethod<T, R> executionHandle, @Nullable Object... originalParameters) {
         super(interceptors, target, executionHandle, originalParameters);
         this.kind = null;
+        setScheduledInvocation(ScheduledInvocation.claim(target, executionHandle));
+    }
+
+    private MethodInterceptorChain(Interceptor<T, R>[] interceptors,
+                                   T target,
+                                   ExecutableMethod<T, R> executionHandle,
+                                   @Nullable Object[] originalParameters,
+                                   @Nullable ScheduledInvocation scheduledInvocation) {
+        super(interceptors, target, executionHandle, originalParameters);
+        this.kind = null;
+        setScheduledInvocation(scheduledInvocation);
+    }
+
+    private void setScheduledInvocation(@Nullable ScheduledInvocation scheduledInvocation) {
+        if (scheduledInvocation != null) {
+            getAttributes().put(ScheduledInvocation.ATTRIBUTE, scheduledInvocation);
+        }
     }
 
     @Override
@@ -112,7 +132,10 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     @Override
     @Nullable
     public R invoke(T instance, @Nullable Object... arguments) {
-        return new MethodInterceptorChain<>(interceptors, instance, executionHandle, originalParameters).proceed();
+        MutableConvertibleValues<Object> localAttributes = attributes;
+        ScheduledInvocation scheduledInvocation = localAttributes == null ? null
+            : localAttributes.get(ScheduledInvocation.ATTRIBUTE, ScheduledInvocation.class).orElse(null);
+        return new MethodInterceptorChain<>(interceptors, instance, executionHandle, originalParameters, scheduledInvocation).proceed();
     }
 
     @Override
