@@ -48,7 +48,8 @@ public interface OutboundAccess extends NettyWriteContext {
     }
 
     /**
-     * Run a callback when the request is abandoned before its response is written: the client
+     * Run a callback when the request is abandoned before its response is written (including a
+     * recorded final write that has not completed, see {@link #recordFinalWrite()}): the client
      * closed the HTTP/1.1 connection, or reset the HTTP/2 stream of the request, or the HTTP/2
      * stream closed with its connection. The callback runs once, on the event loop.
      *
@@ -60,8 +61,8 @@ public interface OutboundAccess extends NettyWriteContext {
 
     /**
      * Whether the request has been abandoned, see {@link #whenAbandoned(Runnable)}: the
-     * HTTP/1.1 connection is closed, or the HTTP/2 stream was closed before the response was
-     * written.
+     * HTTP/1.1 connection is closed, or the HTTP/2 stream was closed, before the response was
+     * written, also while its recorded final write is still in progress.
      *
      * @return {@code true} iff the request has been abandoned
      * @since 5.3.0
@@ -74,9 +75,11 @@ public interface OutboundAccess extends NettyWriteContext {
      * Keep the future of the final write of the response, see {@link #finalWrite()}. Called
      * before the response is written, from any thread.
      *
+     * @return {@code false} if the final write was issued already, without being recorded
      * @since 5.3.0
      */
-    default void recordFinalWrite() {
+    default boolean recordFinalWrite() {
+        return true;
     }
 
     /**

@@ -17,18 +17,28 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
+import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.ConnectionClosedException;
+import io.micronaut.http.filter.HttpServerFilter;
+import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
@@ -202,6 +212,78 @@ class ResponseCallbacksTest {
             assertFalse(recorder.completion("large").isDone(), "the response is still being written");
         }
         assertNotNull(failure(ctx, "large"), "the final write failed when the client went away");
+    }
+
+    @Test
+    void anAbandonmentWhileTheFinalWriteIsQueuedIsReportedOverHttp1() throws Exception {
+        Recorder recorder = ctx.getBean(Recorder.class);
+        for (String path : new String[]{"/handler/large?id=h1-queued", "/handler/large-abandon-only?id=h1-queued-only"}) {
+            String id = path.substring(path.indexOf("id=") + 3);
+            try (Socket socket = new Socket()) {
+                socket.setReceiveBufferSize(4096);
+                socket.connect(new InetSocketAddress(server.getHost(), server.getPort()));
+                OutputStream out = socket.getOutputStream();
+                out.write(("GET " + path + " HTTP/1.1\r\nHost: localhost\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+                out.flush();
+                assertTrue(socket.getInputStream().read(new byte[16]) > 0);
+                Thread.sleep(200);
+                assertFalse(recorder.abandoned(id).isDone());
+            }
+            recorder.abandoned(id).get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+        }
+        assertNotNull(failure(ctx, "h1-queued"));
+    }
+
+    @Test
+    void anAbandonmentWhileTheFinalWriteIsFlowControlledIsReportedOverHttp2() throws Exception {
+        Recorder recorder = h2Ctx.getBean(Recorder.class);
+        for (String id : new String[]{"h2-queued", "h2-queued-only"}) {
+            String path = id.endsWith("only") ? "/handler/large-abandon-only?id=" + id : "/handler/large?id=" + id;
+            H2Client client = new H2Client();
+            Channel channel = connectHttp2(client);
+            try {
+                // the client never returns the flow control window: the body waits on the server
+                Http2FrameStream stream = request(channel, client, path);
+                client.firstData.get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+                Thread.sleep(200);
+                assertFalse(recorder.abandoned(id).isDone());
+                channel.writeAndFlush(new DefaultHttp2ResetFrame(Http2Error.CANCEL).stream(stream)).sync();
+                recorder.abandoned(id).get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+            } finally {
+                channel.close().sync();
+            }
+        }
+        assertNotNull(failure(h2Ctx, "h2-queued"));
+    }
+
+    @Test
+    void aBodylessHttp2ResponseWhoseHeadersCannotBeConvertedIsReported() throws Exception {
+        H2Client client = new H2Client();
+        Channel channel = connectHttp2(client);
+        try {
+            request(channel, client, "/handler/bad-te?id=h2-bad-te");
+            assertNotNull(failure(h2Ctx, "h2-bad-te"));
+        } finally {
+            channel.close().sync();
+        }
+    }
+
+    @Test
+    void aFailureOfAReplacedRequestIsReportedToTheOriginal() throws Exception {
+        assertEquals(500, get("/callbacks/replaced-error?id=replaced-error"));
+        assertEquals("replaced route failed", failure(ctx, "replaced-error").getMessage());
+    }
+
+    @Test
+    void aHandledWriterErrorIsNotReported() throws Exception {
+        assertEquals(409, get("/callbacks/writer-handled?id=writer-handled"));
+        assertNull(failure(ctx, "writer-handled"));
+    }
+
+    @Test
+    void anUnhandledWriterErrorIsReported() throws Exception {
+        assertEquals(500, get("/callbacks/writer-unhandled?id=writer-unhandled"));
+        assertEquals("unhandled writer failure", failure(ctx, "writer-unhandled").getMessage());
     }
 
     @Test
@@ -506,6 +588,16 @@ class ResponseCallbacksTest {
                 recorder.register(request);
                 return HttpResponse.ok(new byte[LARGE_BODY]).contentType(MediaType.APPLICATION_OCTET_STREAM_TYPE);
             });
+            routes.GET("/handler/large-abandon-only").handle((request, pathVariables) -> {
+                String id = recorder.capture(request);
+                assertNotNull(((ServerHttpRequest<?>) request).whenAbandoned(() -> recorder.abandoned(id).complete(null)));
+                return HttpResponse.ok(new byte[LARGE_BODY]).contentType(MediaType.APPLICATION_OCTET_STREAM_TYPE);
+            });
+            routes.GET("/handler/bad-te").handle((request, pathVariables) -> {
+                recorder.register(request);
+                // the quoted value cannot be converted to HTTP/2 headers
+                return HttpResponse.noContent().header("te", "\"a,b");
+            });
             routes.GET("/handler/pending").handleAsync((request, pathVariables) -> recorder.registerPending(request));
         }
     }
@@ -561,6 +653,29 @@ class ResponseCallbacksTest {
             return HttpResponse.badRequest();
         }
 
+        @Get(value = "/replaced-error", produces = MediaType.TEXT_PLAIN)
+        String replacedError() {
+            throw new IllegalStateException("replaced route failed");
+        }
+
+        @Get(value = "/writer-handled", produces = MediaType.TEXT_PLAIN)
+        FailingBody writerHandled(HttpRequest<?> request) {
+            recorder.register(request);
+            return new FailingBody(true);
+        }
+
+        @Get(value = "/writer-unhandled", produces = MediaType.TEXT_PLAIN)
+        FailingBody writerUnhandled(HttpRequest<?> request) {
+            recorder.register(request);
+            return new FailingBody(false);
+        }
+
+        @Error(HandledWriterException.class)
+        @Produces(MediaType.TEXT_PLAIN)
+        HttpResponse<String> onHandledWriter() {
+            return HttpResponse.<String>status(HttpStatus.CONFLICT).body("handled");
+        }
+
         @Get("/pending")
         CompletableFuture<HttpResponse<?>> pending(HttpRequest<?> request) {
             return recorder.registerPending(request);
@@ -593,5 +708,41 @@ class ResponseCallbacksTest {
     }
 
     static final class HandledException extends RuntimeException {
+    }
+
+    static final class HandledWriterException extends RuntimeException {
+    }
+
+    record FailingBody(boolean handled) {
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    @Produces(MediaType.TEXT_PLAIN)
+    static class FailingWriter implements MessageBodyWriter<FailingBody> {
+        @Override
+        public void writeTo(Argument<FailingBody> type, MediaType mediaType, FailingBody object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+            if (object.handled()) {
+                throw new HandledWriterException();
+            }
+            throw new IllegalStateException("unhandled writer failure");
+        }
+    }
+
+    @Filter("/callbacks/replaced-error")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class ReplacingFilter implements HttpServerFilter {
+        private final Recorder recorder;
+
+        ReplacingFilter(Recorder recorder) {
+            this.recorder = recorder;
+        }
+
+        @Override
+        public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+            recorder.register(request);
+            // continues with a request that has nothing to do with the received one
+            return chain.proceed(HttpRequest.GET(request.getPath()));
+        }
     }
 }

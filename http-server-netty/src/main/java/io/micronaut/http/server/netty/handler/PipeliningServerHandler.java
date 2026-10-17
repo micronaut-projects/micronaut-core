@@ -1115,7 +1115,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // an HTTP/1.1 request is abandoned with its connection
             ChannelFuture closeFuture = requiredCtx().channel().closeFuture();
             ChannelFutureListener listener = future -> {
-                if (!finalWriteIssued) {
+                if (finalWritePending()) {
                     callback.run();
                 }
             };
@@ -1125,12 +1125,26 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public boolean isAbandoned() {
-            return !finalWriteIssued && !requiredCtx().channel().isActive();
+            return !requiredCtx().channel().isActive() && finalWritePending();
+        }
+
+        /**
+         * @return Whether the final write was not issued, or was recorded and has not completed
+         * successfully: the connection closing after a written response does not abandon it
+         */
+        private boolean finalWritePending() {
+            if (!finalWriteIssued) {
+                return true;
+            }
+            ChannelFuture future = finalWrite;
+            return future != null && !future.isSuccess();
         }
 
         @Override
-        public void recordFinalWrite() {
+        public boolean recordFinalWrite() {
+            // a volatile write before the read, the reverse of writePotentialEnd: one of them sees the other
             recordFinalWrite = true;
+            return !finalWriteIssued;
         }
 
         @Override
@@ -1446,10 +1460,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             assert ctx != null;
             boolean last = content instanceof LastHttpContent;
             boolean record = outboundAccess.jfrEvent != null && last;
-            boolean keep = last && outboundAccess.recordFinalWrite;
             if (last) {
                 outboundAccess.finalWriteIssued = true;
             }
+            boolean keep = last && outboundAccess.recordFinalWrite;
             ChannelFuture future = write(content, flush, close, record || keep);
             if (keep) {
                 outboundAccess.finalWrite = future;

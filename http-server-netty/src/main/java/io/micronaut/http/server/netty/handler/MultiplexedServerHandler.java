@@ -172,8 +172,17 @@ abstract class MultiplexedServerHandler {
          * Whether the stream was abandoned, guarded by this stream.
          */
         private boolean abandoned;
+        /**
+         * Set once the promise of the final write of the response is created, before the write
+         * is submitted.
+         */
+        private volatile boolean finalWriteIssued;
         private volatile boolean recordFinalWrite;
-        private @Nullable ChannelFuture finalWrite;
+        /**
+         * The recorded promise of the final write, see {@link #recordFinalWrite()}. Confined to
+         * the event loop.
+         */
+        private @Nullable ChannelPromise finalWrite;
 
         MultiplexedStream(int streamId) {
             if (JfrSupport.isRecorderInitialized() && Http2RequestEvent.isTurnedOn()) {
@@ -407,7 +416,7 @@ abstract class MultiplexedServerHandler {
          * stream error, while the request waited for its route.
          */
         final void onStreamClosed() {
-            if (!finished) {
+            if (!finished || finalWritePending()) {
                 reset = true;
                 abandon();
             }
@@ -661,8 +670,10 @@ abstract class MultiplexedServerHandler {
         }
 
         @Override
-        public final void recordFinalWrite() {
+        public final boolean recordFinalWrite() {
+            // a volatile write before the read, the reverse of endPromise: one of them sees the other
             recordFinalWrite = true;
+            return !finalWriteIssued;
         }
 
         @Override
@@ -670,9 +681,19 @@ abstract class MultiplexedServerHandler {
             return finalWrite;
         }
 
+        /**
+         * @return Whether the recorded final write has not completed successfully yet
+         */
+        private boolean finalWritePending() {
+            ChannelPromise promise = finalWrite;
+            return promise != null && !promise.isSuccess();
+        }
+
         private ChannelPromise endPromise(HttpResponse response) {
+            finalWriteIssued = true;
+            boolean record = recordFinalWrite;
             if (jfrEvent == null) {
-                if (recordFinalWrite) {
+                if (record) {
                     ChannelPromise promise = requiredCtx().newPromise();
                     finalWrite = promise;
                     return promise;
@@ -680,7 +701,7 @@ abstract class MultiplexedServerHandler {
                 return requiredCtx().voidPromise();
             }
             ChannelPromise promise = requiredCtx().newPromise();
-            if (recordFinalWrite) {
+            if (record) {
                 finalWrite = promise;
             }
             return promise.addListener((ChannelFutureListener) future -> {

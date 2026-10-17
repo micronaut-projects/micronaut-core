@@ -135,7 +135,6 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
     @Override
     public ExecutionFlow<HttpResponse<?>> apply(Throwable throwable) {
         NettyHttpRequest<?> request = Objects.requireNonNull(nettyRequest);
-        request.responseFailed(throwable);
         return Objects.requireNonNull(writeErrorContext).propagate(() -> onWriteError(request, throwable));
     }
 
@@ -148,6 +147,13 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
         // HTTP/2 stream: no one waits for the target any more
         Runnable remove = outboundAccess.whenAbandoned(() -> RouteLocator.abandonPendingLocations(request));
         located.whenComplete((ignored, error) -> remove.run());
+    }
+
+    @Override
+    protected void onUnhandledError(Throwable cause) {
+        if (nettyRequest != null) {
+            nettyRequest.responseFailed(cause);
+        }
     }
 
     @Override

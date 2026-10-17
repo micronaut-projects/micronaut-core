@@ -31,9 +31,11 @@ import java.util.function.Consumer;
  * {@link io.micronaut.http.ServerHttpRequest#whenResponseCompleted} and
  * {@link io.micronaut.http.ServerHttpRequest#whenAbandoned}. Only created for a request that
  * registers one.
- * <p>The completion callbacks are settled once, by whichever comes first: the final write of
- * the response completes (or fails), the request is cleaned up without a final write, or the
- * client abandons the request.
+ * <p>The first registration has the connection record the final write of the response. The
+ * completion callbacks are settled once, by whichever comes first: the recorded final write
+ * completes or fails, the request is cleaned up without a recorded final write, or the client
+ * abandons the request. The abandonment callbacks stay registered until the recorded final write
+ * completes.
  */
 final class ResponseCallbacks {
     private static final Logger LOG = LoggerFactory.getLogger(ResponseCallbacks.class);
@@ -45,8 +47,16 @@ final class ResponseCallbacks {
      */
     private @Nullable List<Runnable> removals;
     private @Nullable Throwable failure;
+    /**
+     * Whether the final write of the response is recorded.
+     */
+    private boolean tracking;
     private boolean watching;
     private boolean cleanedUp;
+    /**
+     * Whether the abandon callbacks have been removed: the response is done.
+     */
+    private boolean released;
     private boolean settled;
 
     /**
@@ -60,7 +70,7 @@ final class ResponseCallbacks {
 
     boolean whenCompleted(Consumer<@Nullable Throwable> callback) {
         synchronized (this) {
-            if (settled) {
+            if (settled || !track()) {
                 return false;
             }
             if (completionCallbacks == null) {
@@ -72,16 +82,33 @@ final class ResponseCallbacks {
             }
             watching = true;
         }
-        outboundAccess.recordFinalWrite();
         addRemoval(outboundAccess.whenAbandoned(this::abandoned));
+        return true;
+    }
+
+    /**
+     * Have the connection record the final write, once, before a callback is accepted.
+     *
+     * @return {@code false} if the final write was issued already, unrecorded, so that its
+     * outcome cannot be told
+     */
+    private boolean track() {
+        if (!tracking) {
+            if (!outboundAccess.recordFinalWrite()) {
+                return false;
+            }
+            tracking = true;
+        }
         return true;
     }
 
     Runnable whenAbandoned(Runnable callback) {
         synchronized (this) {
-            if (cleanedUp) {
+            if (released) {
                 return () -> { };
             }
+            // keeps the callback registered while the final write is in progress
+            track();
         }
         // a failing callback must not keep the others of the stream from running
         Runnable removal = addRemoval(outboundAccess.whenAbandoned(() -> {
@@ -102,14 +129,14 @@ final class ResponseCallbacks {
     }
 
     /**
-     * Keep a removal to run when the request is cleaned up, or run it at once if it is already.
+     * Keep a removal to run when the response is done, or run it at once if it is already.
      *
      * @param removal The removal
      * @return The removal
      */
     private Runnable addRemoval(Runnable removal) {
         synchronized (this) {
-            if (!cleanedUp) {
+            if (!released) {
                 if (removals == null) {
                     removals = new ArrayList<>(2);
                 }
@@ -137,16 +164,37 @@ final class ResponseCallbacks {
     }
 
     /**
-     * The request is cleaned up after its response: remove the abandon callbacks, and settle the
-     * completion callbacks when the final write of the response completes.
+     * The request is cleaned up after its response: once the recorded final write of the
+     * response completes, remove the abandon callbacks and settle the completion callbacks.
      */
     void cleanedUp() {
-        List<Runnable> toRemove;
         synchronized (this) {
             if (cleanedUp) {
                 return;
             }
             cleanedUp = true;
+        }
+        Future<?> finalWrite = outboundAccess.finalWrite();
+        if (finalWrite != null) {
+            finalWrite.addListener(future -> {
+                release();
+                settle(future.cause());
+            });
+            return;
+        }
+        release();
+        if (outboundAccess.isAbandoned()) {
+            abandoned();
+        } else {
+            // no recorded final write, e.g. a switch of protocols
+            settle(null);
+        }
+    }
+
+    private void release() {
+        List<Runnable> toRemove;
+        synchronized (this) {
+            released = true;
             toRemove = removals;
             removals = null;
         }
@@ -154,15 +202,6 @@ final class ResponseCallbacks {
             for (Runnable removal : toRemove) {
                 removal.run();
             }
-        }
-        Future<?> finalWrite = outboundAccess.finalWrite();
-        if (finalWrite != null) {
-            finalWrite.addListener(future -> settle(future.cause()));
-        } else if (outboundAccess.isAbandoned()) {
-            abandoned();
-        } else {
-            // e.g. a switch of protocols, or a final write issued before the first registration
-            settle(null);
         }
     }
 
