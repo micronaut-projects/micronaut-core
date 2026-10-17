@@ -113,6 +113,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -863,6 +864,15 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public @NonNull Publisher<RawFormField> getRawFormFields(ByteBody byteBody) {
+        return formFields(byteBody, true);
+    }
+
+    @Override
+    public @NonNull Publisher<RawFormField> getEncodedFormFields(ByteBody byteBody) {
+        return formFields(byteBody, false);
+    }
+
+    private Publisher<RawFormField> formFields(ByteBody byteBody, boolean decodeContent) {
         NettyHttpServerConfiguration nhsc = (NettyHttpServerConfiguration) serverConfiguration;
         long undecodedLimit = Math.min(nhsc.getFieldMaxBufferedBytes(), nhsc.getFormMaxBufferedBytes());
         Charset charset = getCharacterEncoding();
@@ -888,13 +898,29 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             channelHandlerContext.channel(),
             new BodySizeLimits(nhsc.getFieldMaxBytes(), nhsc.getFieldMaxBufferedBytes()),
             new BodySizeLimits(nhsc.getFormMaxBytes(), nhsc.getFormMaxBufferedBytes()),
-            byteBody
+            byteBody,
+            content(decodeContent, nhsc.getFormDecoderQuirks())
         ).fields();
     }
 
     @Override
     public boolean hasFormBody() {
         return parseFormType() != null;
+    }
+
+    /**
+     * @param decode Whether the content is decoded
+     * @param quirks The quirks of the decoder
+     * @return How the form reads the content of its fields: undecoded content is only validated
+     * when the decoder refuses malformed percent escapes, which it checks when it decodes
+     */
+    private static FormDemuxer.Content content(boolean decode, Set<DecoderQuirk> quirks) {
+        if (decode) {
+            return FormDemuxer.Content.DECODED;
+        }
+        return quirks.contains(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE) || quirks.contains(DecoderQuirk.REFUSE_SHORT_PERCENT_DECODE)
+            ? FormDemuxer.Content.UNDECODED_VALIDATED
+            : FormDemuxer.Content.UNDECODED;
     }
 
     /**
@@ -1032,6 +1058,14 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
                 throw new IllegalStateException("The body of the request was set: it has no form fields to read");
             }
             return NettyHttpRequest.this.getRawFormFields(byteBody);
+        }
+
+        @Override
+        public Publisher<RawFormField> getEncodedFormFields(ByteBody byteBody) {
+            if (bodySet) {
+                throw new IllegalStateException("The body of the request was set: it has no form fields to read");
+            }
+            return NettyHttpRequest.this.getEncodedFormFields(byteBody);
         }
 
         @Override

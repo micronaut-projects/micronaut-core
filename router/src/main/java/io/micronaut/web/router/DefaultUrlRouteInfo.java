@@ -558,7 +558,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     /**
-     * @return Whether the route has constraints on its path variables, see {@link #acceptsVariables(Map)}
+     * @return Whether the route has constraints on its path variables, see {@link #acceptsVariables(Map, Map)}
      */
     boolean isConstrained() {
         return !constraints.isEmpty();
@@ -568,11 +568,12 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * Whether the path variables of a match of this route pass its constraints, viewed as the
      * {@link PathVariables} the handler gets. A constraint that throws rejects them.
      *
-     * @param variables The variable values of the match
+     * @param variables    The variable values of the match
+     * @param rawVariables The values as they appear in the path, not percent-decoded
      * @return Whether all the constraints accept them
      */
-    boolean acceptsVariables(Map<String, Object> variables) {
-        PathVariables pathVariables = new DefaultPathVariables(variables, conversionService);
+    boolean acceptsVariables(Map<String, Object> variables, Map<String, Object> rawVariables) {
+        PathVariables pathVariables = new DefaultPathVariables(variables, rawVariables, conversionService, null, null);
         for (Predicate<? super PathVariables> constraint : constraints) {
             try {
                 if (!constraint.test(pathVariables)) {

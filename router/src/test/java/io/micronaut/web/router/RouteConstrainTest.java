@@ -57,6 +57,16 @@ class RouteConstrainTest {
     }
 
     @Test
+    void aConstraintSeesTheRawValues() {
+        Router router = router(routes -> routes.GET("/files/{name}")
+            .constrain(variables -> variables.rawString("name").equals("a%2Fb") && variables.getString("name").equals("a/b"))
+            .handle(handler("file")));
+
+        assertEquals("file", target(router, HttpRequest.GET("/files/a%2Fb")));
+        assertNull(router.findClosest(HttpRequest.GET("/files/a%2fc")));
+    }
+
+    @Test
     void aConstraintOnAVariableAsAString() {
         Router router = router(routes -> routes.GET("/files/{name}")
             .constrain("name", name -> !name.startsWith("."))
