@@ -155,7 +155,6 @@ final class DefaultDirectRouteBuilder implements DirectRouteBuilder {
         return bean == null ? null : beanName(bean);
     }
 
-
     /**
      * Add the routes of a pending route that its terminal ended.
      *
