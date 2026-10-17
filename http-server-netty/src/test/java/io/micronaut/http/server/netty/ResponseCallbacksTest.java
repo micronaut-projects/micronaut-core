@@ -39,7 +39,14 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.ConnectionClosedException;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
+import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.runtime.server.EmbeddedServer;
+import io.micronaut.websocket.annotation.OnMessage;
+import io.micronaut.websocket.annotation.ServerWebSocket;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.netty.bootstrap.Bootstrap;
@@ -315,6 +322,51 @@ class ResponseCallbacksTest {
     }
 
     @Test
+    void streamedHttp2TrailersThatCannotBeConvertedAreReported() throws Exception {
+        H2Client client = new H2Client();
+        Channel channel = connectHttp2(client);
+        try {
+            request(channel, client, "/handler/bad-trailers?id=h2-bad-trailers");
+            assertNotNull(failure(h2Ctx, "h2-bad-trailers"));
+            client.reset.get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+        } finally {
+            channel.close().sync();
+        }
+    }
+
+    @Test
+    void aRejectedWebSocketUpgradeCompletes() throws Exception {
+        try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+            socket.setSoTimeout((int) TIMEOUT_MILLIS);
+            OutputStream out = socket.getOutputStream();
+            out.write(webSocketUpgrade("/ws-callbacks/rejected?id=ws-rejected"));
+            out.flush();
+            String response = readUntil(socket.getInputStream(), "\r\n\r\n");
+            assertTrue(response.startsWith("HTTP/1.1 403"), response);
+        }
+        assertNull(failure(ctx, "ws-rejected"));
+    }
+
+    @Test
+    void aWebSocketUpgradeAbandonedDuringAnAsyncFilter() throws Exception {
+        Recorder recorder = ctx.getBean(Recorder.class);
+        try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+            OutputStream out = socket.getOutputStream();
+            out.write(webSocketUpgrade("/ws-callbacks/pending?id=ws-pending"));
+            out.flush();
+            recorder.gate("ws-pending").get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+            assertFalse(recorder.abandoned("ws-pending").isDone());
+        }
+        recorder.abandoned("ws-pending").get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+        assertInstanceOf(ConnectionClosedException.class, failure(ctx, "ws-pending"));
+    }
+
+    private static byte[] webSocketUpgrade(String path) {
+        return ("GET " + path + " HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n"
+            + "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n").getBytes(StandardCharsets.US_ASCII);
+    }
+
+    @Test
     void aFailureOfAReplacedRequestIsReportedToTheOriginal() throws Exception {
         assertEquals(500, get("/callbacks/replaced-error?id=replaced-error"));
         assertEquals("replaced route failed", failure(ctx, "replaced-error").getMessage());
@@ -514,7 +566,7 @@ class ResponseCallbacksTest {
         channel.eventLoop().execute(() -> {
             Http2FrameStream stream = client.newStream();
             DefaultHttp2Headers headers = new DefaultHttp2Headers();
-            headers.method("GET").scheme("http").authority("localhost").path(path);
+            headers.method("GET").scheme("http").authority("localhost").path(path).set("te", "trailers");
             channel.writeAndFlush(new DefaultHttp2HeadersFrame(headers, true).stream(stream));
             written.complete(stream);
         });
@@ -656,6 +708,16 @@ class ResponseCallbacksTest {
                 return CompletableFuture.supplyAsync(() -> HttpResponse.noContent().header("te", "\"a,b"),
                     CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS));
             });
+            routes.GET("/handler/bad-trailers").handle((request, pathVariables) -> {
+                recorder.register(request);
+                ByteBodyFactory factory = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
+                // supplied later, so that the body is streamed and ends with the trailers
+                CompletableFuture<io.micronaut.http.HttpHeaders> trailers = CompletableFuture.supplyAsync(
+                    () -> new SimpleHttpHeaders(Map.of("te", "\"a,b"), ConversionService.SHARED),
+                    CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS));
+                return ByteBodyHttpResponseWrapper.wrap(HttpResponse.ok().contentType(MediaType.TEXT_PLAIN_TYPE),
+                    factory.withTrailers(factory.copyOf("body", StandardCharsets.UTF_8), trailers));
+            });
             routes.GET("/handler/pending").handleAsync((request, pathVariables) -> recorder.registerPending(request));
         }
     }
@@ -766,6 +828,36 @@ class ResponseCallbacksTest {
     }
 
     static final class HandledException extends RuntimeException {
+    }
+
+    @ServerWebSocket("/ws-callbacks/{name}")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class CallbacksWebSocket {
+        @OnMessage
+        String echo(String message) {
+            return message;
+        }
+    }
+
+    @Filter("/ws-callbacks/**")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class WebSocketFilter implements HttpServerFilter {
+        private final Recorder recorder;
+
+        WebSocketFilter(Recorder recorder) {
+            this.recorder = recorder;
+        }
+
+        @Override
+        public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+            String id = recorder.register(request);
+            if (request.getPath().endsWith("/rejected")) {
+                return Mono.just(HttpResponse.status(HttpStatus.FORBIDDEN));
+            }
+            // never answers: the client goes away first
+            recorder.gate(id).complete(null);
+            return Mono.never();
+        }
     }
 
     static final class HandledWriterException extends RuntimeException {

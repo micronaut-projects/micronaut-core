@@ -392,18 +392,25 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      *                message is flushed immediately in that case
      */
     private ChannelFuture write(Object message, boolean flush, boolean close, boolean needsPromise) {
+        return write(message, flush, close, needsPromise, null);
+    }
+
+    /**
+     * @param promise The promise of the write, or {@code null} to create one if needed
+     */
+    private ChannelFuture write(Object message, boolean flush, boolean close, boolean needsPromise, @Nullable ChannelPromise promise) {
         assert ctx != null;
         OutboundHandler current = outboundHandler;
         if (current != null && message instanceof HttpResponse && exposeResponseRequest()) {
             Attribute<Object> attribute = requiredCtx().channel().attr(HttpAccessLogHandler.RESPONSE_REQUEST);
             attribute.set(current.outboundAccess.attachment);
             try {
-                return write0(message, flush, close, needsPromise);
+                return write0(message, flush, close, needsPromise, promise);
             } finally {
                 attribute.set(null);
             }
         }
-        return write0(message, flush, close, needsPromise);
+        return write0(message, flush, close, needsPromise, promise);
     }
 
     /**
@@ -424,15 +431,21 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         return expose;
     }
 
-    private ChannelFuture write0(Object message, boolean flush, boolean close, boolean needsPromise) {
+    private ChannelFuture write0(Object message, boolean flush, boolean close, boolean needsPromise, @Nullable ChannelPromise given) {
         if (close) {
-            return requiredCtx().writeAndFlush(message)
+            ChannelPromise promise = given == null ? requiredCtx().newPromise() : given;
+            return requiredCtx().writeAndFlush(message, promise)
                 .addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE)
                 .addListener(ChannelFutureListener.CLOSE);
         } else {
-            ChannelPromise promise = needsPromise ?
-                requiredCtx().newPromise().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE) :
-                requiredCtx().voidPromise();
+            ChannelPromise promise;
+            if (given != null) {
+                promise = given.addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
+            } else {
+                promise = needsPromise ?
+                    requiredCtx().newPromise().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE) :
+                    requiredCtx().voidPromise();
+            }
             ChannelFuture future = requiredCtx().write(message, promise);
             if (flush) {
                 if (reading) {
@@ -1459,10 +1472,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 outboundAccess.finalWriteIssued = true;
             }
             boolean keep = last && outboundAccess.recordFinalWrite;
-            ChannelFuture future = write(content, flush, close, record || keep);
+            ChannelPromise recorded = null;
             if (keep) {
-                outboundAccess.finalWrite = future;
+                // stored before the write is submitted: a write that fails inline closes the
+                // connection before write() returns, and the close must see the pending write
+                recorded = requiredCtx().newPromise();
+                outboundAccess.finalWrite = recorded;
             }
+            // the recorded promise is the promise of the write, so that it completes before the
+            // listeners that the write adds, e.g. the one that closes the connection
+            ChannelFuture future = write(content, flush, close, record, recorded);
             if (record) {
                 future.addListener((ChannelFutureListener) f -> {
                     Http1RequestEvent jfrEvent = Objects.requireNonNull(outboundAccess.jfrEvent);

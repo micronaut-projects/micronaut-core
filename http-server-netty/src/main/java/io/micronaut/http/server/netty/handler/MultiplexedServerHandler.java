@@ -1055,7 +1055,15 @@ abstract class MultiplexedServerHandler {
                             data = previous;
                         }
                     }
-                    writeEnd(data, body, response);
+                    try {
+                        writeEnd(data, body, response);
+                    } catch (Throwable t) {
+                        // e.g. trailers that cannot be converted: the writer still reports the
+                        // response as written, which cleans up the request
+                        LOG.warn("Failed to end the streamed response", t);
+                        requestHandler.responseFailed(attachment, t);
+                        reset(t);
+                    }
                 }
                 flush();
             }

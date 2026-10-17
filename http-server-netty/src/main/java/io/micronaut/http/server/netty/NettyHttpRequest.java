@@ -558,7 +558,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      *
      * @param outboundAccess The connection
      */
-    void outboundAccess(OutboundAccess outboundAccess) {
+    @Internal
+    public void outboundAccess(OutboundAccess outboundAccess) {
         this.outboundAccess = outboundAccess;
     }
 

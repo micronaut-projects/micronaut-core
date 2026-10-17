@@ -172,6 +172,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             final NettyHttpRequest<?> msg;
             try {
                 msg = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+                // the hooks of ServerHttpRequest need the connection, also while the filters run
+                msg.outboundAccess(outboundAccess);
             } catch (IllegalArgumentException e) {
                 body.close();
 
@@ -183,6 +185,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                     serverConfiguration
                 );
                 outboundAccess.attachment(errorRequest);
+                errorRequest.outboundAccess(outboundAccess);
                 outboundAccess.closeAfterWrite();
 
                 PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate(() -> {

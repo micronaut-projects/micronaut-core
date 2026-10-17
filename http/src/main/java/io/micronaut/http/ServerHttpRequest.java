@@ -63,9 +63,15 @@ public interface ServerHttpRequest<B> extends HttpRequest<B> {
      * listener of {@code HttpRequestTerminatedEvent}, it costs nothing for the requests that do
      * not register one.
      *
+     * <p>Register before the response is handed to the connection, e.g. in the route, a filter
+     * before it continues, or a response filter: once the final write of the response was issued
+     * without a registration, its outcome cannot be told, and the registration is refused, even
+     * while that write is still in progress. For a WebSocket upgrade request that is upgraded, the
+     * response is done when the upgrade request is released, at the end of the session.
+     *
      * @param callback The callback, given the failure of the response, if any
-     * @return {@code false} if the server does not support this, or the response is already done,
-     * so the callback will not run
+     * @return {@code false} if the server does not support this, or the final write of the
+     * response was already issued, so the callback will not run
      * @since 5.3.0
      */
     default boolean whenResponseCompleted(Consumer<@Nullable Throwable> callback) {
@@ -79,9 +85,13 @@ public interface ServerHttpRequest<B> extends HttpRequest<B> {
      * {@link java.util.concurrent.CompletableFuture}. The callback runs at most once, usually on
      * the event loop, so it must not block. It is removed when the response is done.
      *
+     * <p>Like {@link #whenResponseCompleted}, register before the response is handed to the
+     * connection: a callback registered after the final write was issued without a registration
+     * is refused, since it could not be kept while that write is in progress.
+     *
      * @param callback The callback
      * @return Removes the callback, or {@code null} if the server cannot tell when the client goes
-     * away
+     * away, or the final write of the response was already issued
      * @since 5.3.0
      */
     default @Nullable Runnable whenAbandoned(Runnable callback) {
