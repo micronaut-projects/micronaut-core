@@ -122,7 +122,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
     final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
     final ApplicationEventPublisher<HttpRequestReceivedEvent> receivedPublisher;
     final RouteExecutor routeExecutor;
-    private final AsyncRequestBodyBinding asyncBodies;
     final ConversionService conversionService;
     /**
      * This is set to {@code true} if <i>any</i> {@link HttpPipelineBuilder} has a logging handler.
@@ -130,6 +129,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
      */
     boolean supportLoggingHandler = false;
     private final ApplicationContext applicationContext;
+    private final AsyncRequestBodyBinding asyncBodies;
     /**
      * Decides whether a {@link HttpRequestTerminatedEvent} has to be published for a request.
      * Resolved on first use, see {@link #resolveTerminatedEventFilter()}.
