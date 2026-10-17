@@ -218,9 +218,9 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 }
                 HttpResponse<?> actualResponse = response;
                 if (ctx.executor().inEventLoop()) {
-                    writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, actualResponse, outboundAccess);
+                    writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, requestLifecycle.propagatedContext, actualResponse, outboundAccess);
                 } else {
-                    ctx.executor().execute(() -> writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, actualResponse, outboundAccess));
+                    ctx.executor().execute(() -> writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, requestLifecycle.propagatedContext, actualResponse, outboundAccess));
                 }
             });
         } else {
@@ -241,6 +241,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     private void writeResponse(ChannelHandlerContext ctx,
                                NettyHttpRequest<?> msg,
                                boolean shouldProceedNormally,
+                               PropagatedContext propagatedContext,
                                HttpResponse<?> actualResponse,
                                OutboundAccess outboundAccess) {
         if (cancelUpgrade) {
@@ -283,7 +284,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                     routeExecutor.getCoroutineHelper().orElse(null),
                     routeEndpoint,
                     // the handlers of a WebSocket route run on the executor of the route
-                    routeEndpoint == null ? null : routeMatch.getRouteInfo().getExecutor(serverConfiguration));
+                    routeEndpoint == null ? null : routeMatch.getRouteInfo().getExecutor(serverConfiguration),
+                    propagatedContext);
                 pipeline.addBefore(ctx.name(), NettyServerWebSocketHandler.ID, webSocketHandler);
 
                 pipeline.remove(ctx.name());
@@ -481,6 +483,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
     private static final class WebsocketRequestLifecycle extends RequestLifecycle {
         boolean shouldProceedNormally;
+        /**
+         * The context of the upgrade request after the filters, e.g. with the elements added by
+         * a filter, that the handlers of the WebSocket run in.
+         */
+        PropagatedContext propagatedContext = PropagatedContext.empty();
 
         private final Router router;
         @Nullable
@@ -517,6 +524,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             if (routeMatch == null) {
                 return ExecutionFlow.error(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
             }
+            this.propagatedContext = propagatedContext;
             MutableHttpResponse<?> response = HttpResponse.ok();
             RouteAttributes.setRouteMatch(response, routeMatch);
             RouteAttributes.setRouteInfo(response, routeMatch.getRouteInfo());
