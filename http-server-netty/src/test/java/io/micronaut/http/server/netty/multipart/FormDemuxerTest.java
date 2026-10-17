@@ -517,7 +517,7 @@ public class FormDemuxerTest {
         new FormDemuxer(PostBodyDecoder.builder()
             .enableQuirks(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE, DecoderQuirk.REFUSE_SHORT_PERCENT_DECODE)
             .forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED,
-            streamingBody.rootBody(), decode).fields().subscribe(fields.noBackpressure());
+            streamingBody.rootBody(), decode ? FormDemuxer.Content.DECODED : FormDemuxer.Content.UNDECODED_VALIDATED).fields().subscribe(fields.noBackpressure());
 
         // the decoder waits on the rest of the escape until the end of the input
         write(streamingBody.sharedBuffer(), input);
@@ -530,10 +530,21 @@ public class FormDemuxerTest {
         assertBadRequest(fields.error);
     }
 
+    @Test
+    public void undecodedContentOfADecoderThatRefusesNoEscapeIsNotValidated() {
+        Queue<RawFormField> fields = toQueue(new FormDemuxer(PostBodyDecoder.builder().forUrlEncodedData(), null, StandardCharsets.UTF_8, channel,
+            BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, byteBodyFactory.copyOf("foo=%rr", StandardCharsets.UTF_8), FormDemuxer.Content.UNDECODED).fields());
+
+        RawFormField field = fields.remove();
+        QueueSubscriber<String> data = content(field.byteBody()).noBackpressure();
+        assertEquals("%rr", data.queue.poll());
+        assertTrue(data.complete);
+    }
+
     private FormDemuxer undecoded(ByteBody body) {
         return new FormDemuxer(PostBodyDecoder.builder()
             .enableQuirks(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE, DecoderQuirk.REFUSE_SHORT_PERCENT_DECODE)
-            .forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, body, false);
+            .forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, body, FormDemuxer.Content.UNDECODED_VALIDATED);
     }
 
     @Test

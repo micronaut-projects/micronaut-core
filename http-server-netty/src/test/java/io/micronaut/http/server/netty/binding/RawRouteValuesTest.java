@@ -52,6 +52,7 @@ import java.util.Map;
 import java.util.concurrent.CompletionStage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The raw values of the path variables and of the fields of a url-encoded form, as they appear
@@ -211,27 +212,80 @@ class RawRouteValuesTest {
     }
 
     @Test
+    void anAbsentVariableOfANestedLocatorShadowsTheVariableOfTheOuterPrefix() throws Exception {
+        assertEquals("false|null", get("/raw/orgs/acme/shops/items"));
+        assertEquals("7|7", get("/raw/orgs/acme/shops/7/items"));
+    }
+
+    @Test
     void aRawValueKeepsTheAsciiCharactersACharsetMapsElsewhere() throws Exception {
         // x-IBM943 decodes 0x7E as U+203E
         assertEquals("{v=~\\}", post("/raw/form-all", "v=~\\", MediaType.APPLICATION_FORM_URLENCODED + ";charset=x-IBM943"));
     }
 
     @Test
-    void aRawFormTheHandlerDoesNotWaitFor() throws Exception {
-        assertEquals("early", post("/raw/early", "v=a%2Fb"));
-        // the server keeps serving: the leak check of the class checks the bytes were released
+    void aPendingRawFormIsCancelledWhenTheHandlerCompleted() throws Exception {
+        PENDING.set(null);
+        try (java.net.Socket socket = partialForm("/raw/pending-early")) {
+            // the body has not arrived: the response proves the handler completed while the form was pending
+            assertTrue(readUntil(socket.getInputStream(), "early").contains("early"));
+            java.util.concurrent.CompletableFuture<?> form = awaitPending();
+            java.util.concurrent.ExecutionException failure = org.junit.jupiter.api.Assertions.assertThrows(
+                java.util.concurrent.ExecutionException.class, () -> form.get(10, java.util.concurrent.TimeUnit.SECONDS));
+            org.junit.jupiter.api.Assertions.assertInstanceOf(java.util.concurrent.CancellationException.class, failure.getCause());
+        }
+        // the leak check of the class checks the bytes that arrived were released
         assertEquals("{v=a%2Fb}", post("/raw/form-all", "v=a%2Fb"));
     }
 
     @Test
-    void aRawFormWhoseClientDisconnects() throws Exception {
-        try (java.net.Socket socket = new java.net.Socket(java.net.InetAddress.getLoopbackAddress(), server.getPort())) {
-            java.io.OutputStream out = socket.getOutputStream();
-            out.write(("POST /raw/form-all HTTP/1.1\r\nHost: localhost\r\nContent-Type: " + MediaType.APPLICATION_FORM_URLENCODED
-                + "\r\nContent-Length: 1000\r\n\r\nv=a%2Fb&w=").getBytes(java.nio.charset.StandardCharsets.US_ASCII));
-            out.flush();
+    void aPendingRawFormFailsWhenTheClientDisconnects() throws Exception {
+        PENDING.set(null);
+        java.util.concurrent.CompletableFuture<?> form;
+        try (java.net.Socket ignored = partialForm("/raw/pending")) {
+            form = awaitPending();
+            org.junit.jupiter.api.Assertions.assertFalse(form.isDone(), "the form waits for the rest of the body");
         }
+        org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class,
+            () -> form.get(10, java.util.concurrent.TimeUnit.SECONDS));
         assertEquals("{v=a%2Fb}", post("/raw/form-all", "v=a%2Fb"));
+    }
+
+    /**
+     * @param path The path
+     * @return A connection that sent the start of a form of 1000 bytes
+     */
+    private static java.net.Socket partialForm(String path) throws java.io.IOException {
+        java.net.Socket socket = new java.net.Socket(java.net.InetAddress.getLoopbackAddress(), server.getPort());
+        socket.setSoTimeout(10_000);
+        java.io.OutputStream out = socket.getOutputStream();
+        out.write(("POST " + path + " HTTP/1.1\r\nHost: localhost\r\nContent-Type: " + MediaType.APPLICATION_FORM_URLENCODED
+            + "\r\nContent-Length: 1000\r\n\r\nv=a%2Fb&w=").getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+        out.flush();
+        return socket;
+    }
+
+    private static java.util.concurrent.CompletableFuture<?> awaitPending() throws InterruptedException {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+        while (PENDING.get() == null) {
+            if (System.nanoTime() > deadline) {
+                throw new AssertionError("the route did not start the form");
+            }
+            Thread.sleep(10);
+        }
+        return PENDING.get();
+    }
+
+    private static String readUntil(java.io.InputStream in, String expected) throws java.io.IOException {
+        java.io.ByteArrayOutputStream read = new java.io.ByteArrayOutputStream();
+        int b;
+        while ((b = in.read()) != -1) {
+            read.write(b);
+            if (read.toString(java.nio.charset.StandardCharsets.US_ASCII).contains(expected)) {
+                break;
+            }
+        }
+        return read.toString(java.nio.charset.StandardCharsets.US_ASCII);
     }
 
     @Test
@@ -326,11 +380,18 @@ class RawRouteValuesTest {
             return formAll(body);
         }
 
-        @Post(uri = "/early", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
-        CompletionStage<String> early(AsyncRequestBody body) {
+        @Post(uri = "/pending-early", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> pendingEarly(AsyncRequestBody body) {
             // the form is not waited for: the read is cancelled when the handler completed
-            body.form(FormOptions.defaults().withRawValues());
+            PENDING.set(body.form(FormOptions.defaults().withRawValues()).toCompletableFuture());
             return java.util.concurrent.CompletableFuture.completedStage("early");
+        }
+
+        @Post(uri = "/pending", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> pending(AsyncRequestBody body) {
+            java.util.concurrent.CompletableFuture<io.micronaut.http.form.FormData> form = body.form(FormOptions.defaults().withRawValues()).toCompletableFuture();
+            PENDING.set(form);
+            return form.thenApply(RawController::all);
         }
 
         @Post(uri = "/mutated", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
@@ -354,6 +415,9 @@ class RawRouteValuesTest {
     }
 
     private static final String COPIED_FORM = "raw.copied.form";
+    // the raw form a route started and did not wait for, or waits for
+    private static final java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletableFuture<?>> PENDING =
+        new java.util.concurrent.atomic.AtomicReference<>();
 
     @ServerFilter("/raw")
     @Requires(property = "spec.name", value = SPEC_NAME)
@@ -423,9 +487,37 @@ class RawRouteValuesTest {
         public void routes(HttpRouteBuilder routes) {
             routes.GET("/raw/fn/{name:[^/]+}", (request, pathVariables) ->
                 HttpResponse.ok(pathVariables.rawString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
+            routes.locate("/raw/orgs/{id}", (request, pathVariables) -> pathVariables.rawString("id"), new OrgRoutes());
             routes.locate("/raw/tenants/{id}", (request, pathVariables) -> "tenant " + pathVariables.rawString("id"), new TenantRoutes());
             routes.locate("/raw/shops{/shop:[0-9]+}", (request, pathVariables) -> "located:" + pathVariables.raw().contains("shop"), new ShopRoutes());
             routes.locate("/raw/located/{prefix}", (request, pathVariables) -> pathVariables.raw().getString("prefix"), new ItemRoutes());
+        }
+    }
+
+    static final class OrgRoutes implements LocatedRoutes<String> {
+        @Override
+        public Argument<String> targetType() {
+            return Argument.STRING;
+        }
+
+        @Override
+        public void routes(LocatedHttpRouteBuilder<String> located) {
+            // the absent id of the nested prefix shadows the id of the outer one
+            located.locate("/shops{/id:[0-9]+}", (request, pathVariables, org) -> org, new OrgShopRoutes());
+        }
+    }
+
+    static final class OrgShopRoutes implements LocatedRoutes<String> {
+        @Override
+        public Argument<String> targetType() {
+            return Argument.STRING;
+        }
+
+        @Override
+        public void routes(LocatedHttpRouteBuilder<String> located) {
+            located.GET("/items", (request, pathVariables) -> HttpResponse.ok(
+                    (pathVariables.raw().contains("id") ? pathVariables.rawString("id") : "false") + "|" + pathVariables.find("id", String.class).orElse("null"))
+                .contentType(MediaType.TEXT_PLAIN_TYPE));
         }
     }
 

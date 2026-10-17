@@ -975,8 +975,14 @@ public final class RouteLocator implements DynamicRouteTarget {
                 filters.addAll(outer.filters);
             }
             matchInfo.getVariableValues().forEach((name, value) -> {
-                // an optional variable that is absent has no value, as for a match
-                if (!REMAINDER.equals(name) && value != null) {
+                if (REMAINDER.equals(name)) {
+                    return;
+                }
+                if (value == null) {
+                    // an optional variable that is absent has no value, as for a match, and
+                    // shadows the variable of the same name of an outer prefix
+                    rawValues.remove(name);
+                } else {
                     rawValues.put(name, value);
                 }
             });

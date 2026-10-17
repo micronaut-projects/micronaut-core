@@ -113,6 +113,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -898,13 +899,28 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             new BodySizeLimits(nhsc.getFieldMaxBytes(), nhsc.getFieldMaxBufferedBytes()),
             new BodySizeLimits(nhsc.getFormMaxBytes(), nhsc.getFormMaxBufferedBytes()),
             byteBody,
-            decodeContent
+            content(decodeContent, nhsc.getFormDecoderQuirks())
         ).fields();
     }
 
     @Override
     public boolean hasFormBody() {
         return parseFormType() != null;
+    }
+
+    /**
+     * @param decode Whether the content is decoded
+     * @param quirks The quirks of the decoder
+     * @return How the form reads the content of its fields: undecoded content is only validated
+     * when the decoder refuses malformed percent escapes, which it checks when it decodes
+     */
+    private static FormDemuxer.Content content(boolean decode, Set<DecoderQuirk> quirks) {
+        if (decode) {
+            return FormDemuxer.Content.DECODED;
+        }
+        return quirks.contains(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE) || quirks.contains(DecoderQuirk.REFUSE_SHORT_PERCENT_DECODE)
+            ? FormDemuxer.Content.UNDECODED_VALIDATED
+            : FormDemuxer.Content.UNDECODED;
     }
 
     /**

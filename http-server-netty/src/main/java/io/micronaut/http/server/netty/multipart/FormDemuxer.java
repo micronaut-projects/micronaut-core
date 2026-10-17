@@ -71,6 +71,8 @@ public final class FormDemuxer implements BufferConsumer {
     private final PostBodyDecoder decoder;
     // the URL-encoded decoder whose content is kept as it appears, or null to decode the content
     private final VintageAccess.@Nullable UrlEncodedDecoder undecoded;
+    // whether the undecoded content is validated like the decoded content would be
+    private final boolean validateUndecoded;
     /**
      * Finds the close delimiter of a multipart body, {@code null} for another body.
      */
@@ -110,7 +112,7 @@ public final class FormDemuxer implements BufferConsumer {
      * @param byteBody          The body
      */
     public FormDemuxer(PostBodyDecoder decoder, @Nullable String multipartBoundary, Charset charset, Channel channel, BodySizeLimits fieldLimits, BodySizeLimits totalLimits, ByteBody byteBody) {
-        this(decoder, multipartBoundary, charset, channel, fieldLimits, totalLimits, byteBody, true);
+        this(decoder, multipartBoundary, charset, channel, fieldLimits, totalLimits, byteBody, Content.DECODED);
     }
 
     /**
@@ -121,15 +123,16 @@ public final class FormDemuxer implements BufferConsumer {
      * @param fieldLimits       The limits of a field
      * @param totalLimits       The limits of the form
      * @param byteBody          The body
-     * @param decodeContent     Whether the content of the fields is decoded, e.g. percent-decoded for
+     * @param content           Whether the content of the fields is decoded, e.g. percent-decoded for
      *                          URL-encoded data, or kept as it appears in the body. The limits and the
      *                          validation of the form apply either way
      */
     public FormDemuxer(PostBodyDecoder decoder, @Nullable String multipartBoundary, Charset charset, Channel channel, BodySizeLimits fieldLimits,
-                       BodySizeLimits totalLimits, ByteBody byteBody, boolean decodeContent) {
+                       BodySizeLimits totalLimits, ByteBody byteBody, Content content) {
         this.decoder = decoder;
         // a multipart field is not encoded: its content is the same either way
-        this.undecoded = !decodeContent && decoder instanceof VintageAccess.UrlEncodedDecoder urlEncoded ? urlEncoded : null;
+        this.undecoded = content != Content.DECODED && decoder instanceof VintageAccess.UrlEncodedDecoder urlEncoded ? urlEncoded : null;
+        this.validateUndecoded = content == Content.UNDECODED_VALIDATED;
         this.closeDelimiter = multipartBoundary == null ? null : CloseDelimiter.of(multipartBoundary, charset);
         this.fieldLimits = fieldLimits;
         if (byteBody instanceof AvailableByteBody abb) {
@@ -392,6 +395,26 @@ public final class FormDemuxer implements BufferConsumer {
     }
 
     /**
+     * How the content of the fields is read.
+     */
+    public enum Content {
+        /**
+         * Decoded, e.g. percent-decoded for URL-encoded data.
+         */
+        DECODED,
+        /**
+         * As it appears in the body, for a decoder that validates nothing when it decodes the
+         * content, e.g. without the quirks that refuse malformed percent escapes.
+         */
+        UNDECODED,
+        /**
+         * As it appears in the body, validated like the decoded content, for a decoder that
+         * refuses malformed percent escapes.
+         */
+        UNDECODED_VALIDATED
+    }
+
+    /**
      * @return The content of the current {@link PostBodyDecoder.Event#CONTENT} event, decoded or as
      * it appears in the body
      */
@@ -401,6 +424,9 @@ public final class FormDemuxer implements BufferConsumer {
             return decoder.decodedContent();
         }
         ByteBuf content = urlEncoded.undecodedContent();
+        if (!validateUndecoded) {
+            return content;
+        }
         // validated like the decoded content, e.g. the percent escapes the decoder refuses: the
         // decoder does not split an escape between two contents
         ByteBuf check = content.copy();
