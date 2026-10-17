@@ -90,7 +90,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     };
 
     private final String annotationName;
-    private final ConvertibleValues<Object> convertibleValues;
+    // Created on first use: the typed accessors read the values directly. The view is not changed once created,
+    // volatile only publishes it safely (ConvertibleValuesMap has a non-final field)
+    @SuppressWarnings("java:S3077")
+    @Nullable
+    private volatile ConvertibleValues<Object> convertibleValues;
     private final Map<CharSequence, Object> values;
     @Nullable
     private Map<CharSequence, Object> defaultValues;
@@ -212,7 +216,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                            @Nullable
                            AnnotationDefaultValuesProvider defaultValuesProvider) {
         this.annotationName = annotationName;
-        this.convertibleValues = newConvertibleValues(values);
+        this.convertibleValues = null;
         this.values = values;
         this.defaultValues = defaultValues;
         this.valueMapper = null;
@@ -1222,12 +1226,17 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The convertible values
      */
     public ConvertibleValues<Object> getConvertibleValues() {
-        return convertibleValues;
+        ConvertibleValues<Object> cv = convertibleValues;
+        if (cv == null) {
+            cv = newConvertibleValues(values);
+            convertibleValues = cv;
+        }
+        return cv;
     }
 
     @Override
     public <T> Optional<T> get(CharSequence member, ArgumentConversionContext<T> conversionContext) {
-        Optional<T> result = convertibleValues.get(member, conversionContext);
+        Optional<T> result = getConvertibleValues().get(member, conversionContext);
         if (result.isPresent()) {
             return result;
         }
