@@ -49,6 +49,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -85,6 +86,16 @@ public class AsyncRequestBodyOfTest {
             HttpResponse<String> response = server.exchange(post("/fbb/handler", body), String.class);
             assertEquals(200, response.code());
             assertEquals(sha256(body) + ":" + body.length(), response.body());
+        }
+    }
+
+    @Test
+    void copiesOfSeparatelyAcquiredBodiesAreReadAtTheSameTime() throws IOException {
+        String body = largeBody(300 * 1024);
+        try (ServerUnderTest server = server(Map.of())) {
+            HttpResponse<String> response = server.exchange(post("/fbb/concurrent", body), String.class);
+            assertEquals(200, response.code());
+            assertEquals("same," + sha256(body) + "," + sha256(body) + ":" + body.length(), response.body());
         }
     }
 
@@ -183,6 +194,22 @@ public class AsyncRequestBodyOfTest {
                     request.setAttribute(DIGEST, sha256(bytes));
                     return null;
                 }));
+            routes.serverFilter("/fbb/concurrent").beforeReplacingAsync(request -> {
+                AsyncRequestBody first = AsyncRequestBody.of(request);
+                AsyncRequestBody second = AsyncRequestBody.of(request);
+                // two readers that acquired the body separately read their copies on other threads
+                CompletableFuture<byte[]> a = CompletableFuture.supplyAsync(() -> second.copy().bytes(Integer.MAX_VALUE))
+                    .thenCompose(CompletionStage::toCompletableFuture);
+                CompletableFuture<byte[]> b = CompletableFuture.supplyAsync(() -> first.copy().bytes(Integer.MAX_VALUE))
+                    .thenCompose(CompletionStage::toCompletableFuture);
+                return a.thenCombine(b, (x, y) -> {
+                    request.setAttribute(DIGEST, (first == second ? "same," : "different,") + sha256(x) + "," + sha256(y));
+                    return (HttpResponse<?>) null;
+                });
+            });
+            routes.POST("/fbb/concurrent").consumesAll().body(Argument.STRING).handle((request, pathVariables, body) ->
+                HttpResponse.ok(request.getAttribute(DIGEST, String.class).orElse("none") + ":" + (body == null ? 0 : body.length()))
+                    .contentType(MediaType.TEXT_PLAIN_TYPE));
             routes.POST("/fbb/empty").consumesAll().handle((request, pathVariables) ->
                 HttpResponse.ok(request.getAttribute(DIGEST, String.class).orElse("none")).contentType(MediaType.TEXT_PLAIN_TYPE));
             routes.POST("/fbb/handler").consumesAll().body(Argument.STRING).handle((request, pathVariables, body) ->

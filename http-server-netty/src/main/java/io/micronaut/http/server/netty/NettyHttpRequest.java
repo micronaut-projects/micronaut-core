@@ -227,6 +227,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Nullable
     private HttpRequest<?> filteredRequest;
     private @Nullable AsyncRequestBodySource asyncBodies;
+    /**
+     * The request the last {@link #asyncRequestBody} was bound for, and its body, guarded by this.
+     */
+    private @Nullable HttpRequest<?> asyncBodyRequest;
+    private @Nullable AsyncRequestBody asyncBody;
 
     /**
      * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
@@ -283,7 +288,20 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Override
     public @Nullable AsyncRequestBody asyncRequestBody(HttpRequest<?> request) {
         AsyncRequestBodySource source = asyncBodies;
-        return source == null ? null : source.asyncRequestBody(request);
+        if (source == null) {
+            return null;
+        }
+        // one body for a request, whose copies share its lock: the bytes of the request are not
+        // thread-safe, and the binding detaches the state of the route, so it is bound once
+        synchronized (this) {
+            AsyncRequestBody body = asyncBody;
+            if (body == null || asyncBodyRequest != request) {
+                body = source.asyncRequestBody(request);
+                asyncBodyRequest = request;
+                asyncBody = body;
+            }
+            return body;
+        }
     }
 
     public void setLegacyBody(@Nullable Object legacyBody) {

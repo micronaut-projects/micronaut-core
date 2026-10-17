@@ -202,6 +202,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 return;
             }
 
+            Objects.requireNonNull(next).prepareAsyncRequestBody(msg);
             // the route is matched by the lifecycle, after the pre-matching filters, so that a
             // failure to match, e.g. of a route condition, is answered with an error response
             WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, router);
