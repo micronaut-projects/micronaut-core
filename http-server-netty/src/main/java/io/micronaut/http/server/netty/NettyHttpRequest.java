@@ -40,6 +40,8 @@ import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.RouteMetadataAttributes;
 import io.micronaut.http.RouteMetadataHolder;
 import io.micronaut.http.ServerHttpRequest;
+import io.micronaut.http.body.AsyncRequestBody;
+import io.micronaut.http.body.AsyncRequestBodySource;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
@@ -123,7 +125,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
-public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T>, RouteMetadataHolder {
+public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T>, RouteMetadataHolder, AsyncRequestBodySource {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
 
     /**
@@ -224,6 +226,12 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      */
     @Nullable
     private HttpRequest<?> filteredRequest;
+    private @Nullable AsyncRequestBodySource asyncBodies;
+    /**
+     * The request the last {@link #asyncRequestBody} was bound for, and its body, guarded by this.
+     */
+    private @Nullable HttpRequest<?> asyncBodyRequest;
+    private @Nullable AsyncRequestBody asyncBody;
 
     /**
      * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
@@ -263,6 +271,37 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             this.byteBodyFactory = factory;
         }
         return factory;
+    }
+
+    /**
+     * Set what gives the {@link AsyncRequestBody} of this request, see
+     * {@link AsyncRequestBody#of(HttpRequest)}.
+     *
+     * @param asyncBodies The source of the bodies
+     * @since 5.3.0
+     */
+    @Internal
+    public void setAsyncRequestBodySource(@Nullable AsyncRequestBodySource asyncBodies) {
+        this.asyncBodies = asyncBodies;
+    }
+
+    @Override
+    public @Nullable AsyncRequestBody asyncRequestBody(HttpRequest<?> request) {
+        AsyncRequestBodySource source = asyncBodies;
+        if (source == null) {
+            return null;
+        }
+        // one body for a request, whose copies share its lock: the bytes of the request are not
+        // thread-safe, and the binding detaches the state of the route, so it is bound once
+        synchronized (this) {
+            AsyncRequestBody body = asyncBody;
+            if (body == null || asyncBodyRequest != request) {
+                body = source.asyncRequestBody(request);
+                asyncBodyRequest = request;
+                asyncBody = body;
+            }
+            return body;
+        }
     }
 
     public void setLegacyBody(@Nullable Object legacyBody) {
@@ -971,7 +1010,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     /**
      * Mutable version of the request.
      */
-    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, RouteMetadataHolder, ServerHttpRequest<T>, FormCapableHttpRequest<T> {
+    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, RouteMetadataHolder, ServerHttpRequest<T>, FormCapableHttpRequest<T>, AsyncRequestBodySource {
 
         @Nullable
         private URI uri;
@@ -1076,6 +1115,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         public ByteBody byteBody() {
             // the bytes of the request, which the route reads unless the body was set
             return NettyHttpRequest.this.byteBody();
+        }
+
+        @Override
+        public @Nullable AsyncRequestBody asyncRequestBody(HttpRequest<?> request) {
+            return NettyHttpRequest.this.asyncRequestBody(request);
         }
 
         @Override

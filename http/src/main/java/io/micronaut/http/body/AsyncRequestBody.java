@@ -17,6 +17,8 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormParts;
 import org.jspecify.annotations.Nullable;
@@ -152,6 +154,20 @@ import java.util.concurrent.CompletionStage;
  * that continues with another {@link io.micronaut.http.ServerHttpRequest} replaces the bytes with
  * its {@link io.micronaut.http.ServerHttpRequest#byteBody() byteBody()}. The body is read once
  * either way.</p>
+ *
+ * <h2>Filters without arguments</h2>
+ * <p>A filter that is not given arguments, an {@link io.micronaut.http.filter.HttpServerFilter}
+ * or a filter of a functional route, e.g. {@code beforeReplacingAsync}, gets the body of its
+ * request with {@link #of(HttpRequest)}, and reads it like a filter method does: it reads a
+ * {@link #copy()} to leave the body for the route.</p>
+ * <pre>{@code
+ * routes.serverFilter("/signed/**").beforeReplacingAsync(request -> AsyncRequestBody.of(request)
+ *     .copy()
+ *     .bytes(64 * 1024)
+ *     .thenApply(bytes -> verifier.verify(request, bytes) ? null : HttpResponse.unauthorized()));
+ * }</pre>
+ * <p>Nothing is read before the body is: a filter that does not read the body leaves it
+ * streamed to the route. What its reads left open is released when the request ends.</p>
  *
  * <h2>{@code 100 Continue}</h2>
  * <p>A request that expects {@code 100 Continue} is answered with {@code 100 Continue} when the
@@ -399,4 +415,38 @@ public interface AsyncRequestBody {
      * @since 5.3.0
      */
     AsyncRequestBody copy();
+
+    /**
+     * The body of a request received by the server, for a filter that is not given arguments,
+     * e.g. an {@link io.micronaut.http.filter.HttpServerFilter} or a filter of a functional
+     * route: the body of the request as the filters before it left it, like the
+     * {@code AsyncRequestBody} argument of a filter method. Read a {@link #copy()} of it to leave
+     * the body for the route. The calls with the same request return the same
+     * {@code AsyncRequestBody}, which has one read: read a {@link #copy()} of it for each reader,
+     * e.g. for two readers that run at the same time.
+     *
+     * <p>It is supported by the Netty server. A server that does not support it, e.g. a servlet
+     * server that does not implement it yet, throws an {@link UnsupportedOperationException}.</p>
+     *
+     * <p>What the reads left open is released when the request ends, not when the filter
+     * completed: the work on the body must be part of the stage the filter returns.</p>
+     *
+     * @param request The request: a request received by the server, or a request a filter
+     *                continued with that wraps it
+     * @return The body
+     * @throws UnsupportedOperationException if the request was not received by a server that
+     * supports it
+     * @since 5.3.0
+     */
+    static AsyncRequestBody of(HttpRequest<?> request) {
+        for (HttpRequest<?> current : HttpRequestWrapper.unwrap(request)) {
+            if (current instanceof AsyncRequestBodySource source) {
+                AsyncRequestBody body = source.asyncRequestBody(request);
+                if (body != null) {
+                    return body;
+                }
+            }
+        }
+        throw new UnsupportedOperationException("The request has no AsyncRequestBody, it was not received by a server that supports it: " + request);
+    }
 }
