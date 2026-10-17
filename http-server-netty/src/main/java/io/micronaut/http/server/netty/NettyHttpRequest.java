@@ -1045,6 +1045,14 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         }
 
         @Override
+        public Publisher<RawFormField> getEncodedFormFields(ByteBody byteBody) {
+            if (bodySet) {
+                throw new IllegalStateException("The body of the request was set: it has no form fields to read");
+            }
+            return NettyHttpRequest.this.getEncodedFormFields(byteBody);
+        }
+
+        @Override
         public void addDisposalResource(Runnable dispose) {
             NettyHttpRequest.this.addDisposalResource(dispose);
         }

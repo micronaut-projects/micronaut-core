@@ -465,6 +465,54 @@ public class FormDemuxerTest {
     }
 
     @Test
+    public void parseErrorOfUndecodedContent() {
+        MockUpstream upstream = new MockUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
+        undecoded(streamingBody.rootBody()).fields().subscribe(fields.noBackpressure());
+
+        write(streamingBody.sharedBuffer(), "foo=ba");
+
+        RawFormField field = fields.queue.remove();
+        assertEquals("foo", field.metadata().name());
+        QueueSubscriber<String> data = content(field.byteBody()).noBackpressure();
+        assertEquals("ba", data.queue.poll());
+
+        // an escape split between two inputs is validated whole
+        write(streamingBody.sharedBuffer(), "%r");
+        write(streamingBody.sharedBuffer(), "r");
+
+        assertBadRequest(data.error);
+        assertBadRequest(fields.error);
+    }
+
+    @Test
+    public void undecodedContentKeepsTheEscapes() {
+        MockUpstream upstream = new MockUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
+        undecoded(streamingBody.rootBody()).fields().subscribe(fields.noBackpressure());
+
+        write(streamingBody.sharedBuffer(), "n%61me=a%2");
+        write(streamingBody.sharedBuffer(), "Fb+c&");
+
+        RawFormField field = fields.queue.remove();
+        assertEquals("name", field.metadata().name());
+        QueueSubscriber<String> data = content(field.byteBody()).noBackpressure();
+        assertEquals("a%2Fb+c", String.join("", data.queue));
+        assertTrue(data.complete);
+
+        streamingBody.sharedBuffer().complete();
+        assertNull(fields.queue.poll());
+    }
+
+    private FormDemuxer undecoded(ByteBody body) {
+        return new FormDemuxer(PostBodyDecoder.builder()
+            .enableQuirks(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE, DecoderQuirk.REFUSE_SHORT_PERCENT_DECODE)
+            .forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, body, false);
+    }
+
+    @Test
     public void fieldBufferLimit() {
         MockUpstream upstream = new MockUpstream();
         ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);

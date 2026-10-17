@@ -20,11 +20,14 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.RequestFilter;
+import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.FormOptions;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -35,6 +38,7 @@ import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.LocatedHttpRouteBuilder;
 import io.micronaut.web.router.builder.LocatedRoutes;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -148,6 +152,57 @@ class RawRouteValuesTest {
         }
     }
 
+    @Test
+    void aRawFormOfACopyLeavesTheBytesToTheRoute() throws Exception {
+        // the decoder percent-decodes the names, and the values that end its input, in place
+        String body = "n%61me=a%2Fb&v=%C3%A9";
+        assertEquals("{name=a%2Fb, v=%C3%A9}|" + body, post("/raw/copied", body));
+        assertEquals("{name=a/b, v=\u00e9}|" + body, post("/raw/copied-decoded", body));
+    }
+
+    @Test
+    void aRawFormOfAMutatedRequest() throws Exception {
+        assertEquals("{v=a%2Fb}", post("/raw/mutated", "v=a%2Fb"));
+    }
+
+    @Test
+    void aRawFormOfARequestWhoseUriAFilterChanged() throws Exception {
+        assertEquals("{v=a%2Fb}", post("/raw/rewritten", "v=a%2Fb"));
+    }
+
+    @Test
+    void anEscapeSplitBetweenTwoChunksOfARawForm() throws Exception {
+        // the body arrives in pieces: an escape split between them is read whole, and validated by
+        // the decoder that refuses malformed escapes
+        try (ApplicationContext strict = strict()) {
+            int port = strict.getBean(EmbeddedServer.class).start().getPort();
+            java.net.http.HttpResponse<String> accepted = send(port, "/raw/form-all",
+                java.net.http.HttpRequest.BodyPublishers.fromPublisher(new ChunkPublisher("v=a%2", "Fb%C", "3%A9")));
+            assertEquals("{v=a%2Fb%C3%A9}", accepted.body());
+        }
+    }
+
+    /**
+     * @return A server whose form decoder refuses the malformed percent escapes
+     */
+    private static ApplicationContext strict() {
+        return ApplicationContext.run(Map.of("spec.name", SPEC_NAME, "micronaut.server.port", -1,
+            "micronaut.server.netty.form-decoder-quirks", java.util.List.of("refuse-non-hex-percent-decode", "refuse-short-percent-decode")));
+    }
+
+    private static java.net.http.HttpResponse<String> send(int port, String path, java.net.http.HttpRequest.BodyPublisher body) throws Exception {
+        return client.send(java.net.http.HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                .header("Content-Type", MediaType.APPLICATION_FORM_URLENCODED)
+                .POST(body).build(),
+            BodyHandlers.ofString());
+    }
+
+    @Test
+    void anAbsentOptionalVariableHasNoRawValue() throws Exception {
+        assertEquals("false|[]", get("/raw/optional"));
+        assertEquals("true|a%2Fb", get("/raw/optional/a%2Fb"));
+    }
+
     private static String get(String path) throws Exception {
         return client.send(java.net.http.HttpRequest.newBuilder(URI.create("http://localhost:" + server.getPort() + path)).build(),
             BodyHandlers.ofString()).body();
@@ -211,7 +266,36 @@ class RawRouteValuesTest {
             return body.form().thenApply(RawController::all);
         }
 
-        private static String all(io.micronaut.http.form.FormData form) {
+        @Get(uri = "/optional{/page}", produces = MediaType.TEXT_PLAIN)
+        String optional(HttpRequest<?> request, PathVariables pathVariables) {
+            UriRouteMatch<?, ?> match = (UriRouteMatch<?, ?>) RouteAttributes.getRouteMatch(request).orElseThrow();
+            Map<String, Object> raw = match.getRawVariableValues();
+            return raw.containsKey("page") + "|" + (raw.containsKey("page") ? pathVariables.rawString("page") : raw.keySet().toString());
+        }
+
+        @Post(uri = "/copied", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> copied(HttpRequest<?> request, AsyncRequestBody body) {
+            return body.text().thenApply(text -> request.getAttribute(COPIED_FORM, String.class).orElse("none") + "|" + text);
+        }
+
+        @Post(uri = "/copied-decoded", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> copiedDecoded(HttpRequest<?> request, AsyncRequestBody body) {
+            return copied(request, body);
+        }
+
+        @Post(uri = "/rewritten", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> rewritten(HttpRequest<?> request, AsyncRequestBody body) {
+            assertEquals("true", request.getParameters().get("rewritten"));
+            return formAll(body);
+        }
+
+        @Post(uri = "/mutated", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> mutated(HttpRequest<?> request, AsyncRequestBody body) {
+            assertEquals("1", request.getHeaders().get("X-Mutated"));
+            return formAll(body);
+        }
+
+        static String all(io.micronaut.http.form.FormData form) {
             java.util.Map<String, String> all = new java.util.LinkedHashMap<>();
             for (String name : form.names()) {
                 all.put(name, String.join(",", form.getValues(name)));
@@ -222,6 +306,69 @@ class RawRouteValuesTest {
         private static String describe(io.micronaut.http.form.FormData form) {
             return form.getString("path") + "|" + form.getString("plus") + "|" + form.getString("bang") + "|"
                 + form.getString("text") + "|" + form.getValues("name") + "|" + form.getValues("empty").get(0);
+        }
+    }
+
+    private static final String COPIED_FORM = "raw.copied.form";
+
+    @ServerFilter("/raw")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class RawFilter {
+        @RequestFilter("/copied")
+        CompletionStage<@Nullable HttpResponse<?>> copied(HttpRequest<?> request, AsyncRequestBody body) {
+            return copy(request, body, FormOptions.defaults().withRawValues());
+        }
+
+        @RequestFilter("/copied-decoded")
+        CompletionStage<@Nullable HttpResponse<?>> copiedDecoded(HttpRequest<?> request, AsyncRequestBody body) {
+            return copy(request, body, FormOptions.defaults());
+        }
+
+        private static CompletionStage<@Nullable HttpResponse<?>> copy(HttpRequest<?> request, AsyncRequestBody body, FormOptions options) {
+            return body.copy().form(options).thenApply(form -> {
+                request.setAttribute(COPIED_FORM, RawController.all(form));
+                return null;
+            });
+        }
+
+        @RequestFilter("/mutated")
+        HttpRequest<?> mutated(HttpRequest<?> request) {
+            return request.mutate().header("X-Mutated", "1");
+        }
+
+        @RequestFilter("/rewritten")
+        void rewritten(MutableHttpRequest<?> request) {
+            request.uri(URI.create("/raw/rewritten?rewritten=true"));
+        }
+    }
+
+    /**
+     * A body in the given pieces, each sent once the previous one was requested.
+     */
+    private record ChunkPublisher(String... chunks) implements java.util.concurrent.Flow.Publisher<java.nio.ByteBuffer> {
+        @Override
+        public void subscribe(java.util.concurrent.Flow.Subscriber<? super java.nio.ByteBuffer> subscriber) {
+            subscriber.onSubscribe(new java.util.concurrent.Flow.Subscription() {
+                private int next;
+                private boolean done;
+
+                @Override
+                public synchronized void request(long n) {
+                    for (long i = 0; i < n && !done; i++) {
+                        if (next == chunks.length) {
+                            done = true;
+                            subscriber.onComplete();
+                            return;
+                        }
+                        subscriber.onNext(java.nio.ByteBuffer.wrap(chunks[next++].getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
+                    }
+                }
+
+                @Override
+                public synchronized void cancel() {
+                    done = true;
+                }
+            });
         }
     }
 

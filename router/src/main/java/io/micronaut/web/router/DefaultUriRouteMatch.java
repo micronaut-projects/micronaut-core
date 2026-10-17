@@ -51,6 +51,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     private final @Nullable MediaType selectedMediaType;
     @Nullable
     private Map<String, Object> variables;
+    private @Nullable Map<String, Object> rawVariables;
     private @Nullable ExecutableMethod<T, R> inheritingMethod;
 
     /**
@@ -175,12 +176,28 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
 
     @Override
     public Map<String, Object> getRawVariableValues() {
-        return Collections.unmodifiableMap(matchInfo.getVariableValues());
+        return Collections.unmodifiableMap(rawVariableValues());
     }
 
     @Override
     Map<String, Object> rawVariableValues() {
-        return matchInfo.getVariableValues();
+        Map<String, Object> raw = rawVariables;
+        if (raw == null) {
+            Map<String, Object> matchVariables = matchInfo.getVariableValues();
+            if (matchVariables.containsValue(null)) {
+                // an optional variable that is absent has no value
+                raw = CollectionUtils.newLinkedHashMap(matchVariables.size());
+                for (Map.Entry<String, Object> entry : matchVariables.entrySet()) {
+                    if (entry.getValue() != null) {
+                        raw.put(entry.getKey(), entry.getValue());
+                    }
+                }
+            } else {
+                raw = matchVariables;
+            }
+            rawVariables = raw;
+        }
+        return raw;
     }
 
     @Override

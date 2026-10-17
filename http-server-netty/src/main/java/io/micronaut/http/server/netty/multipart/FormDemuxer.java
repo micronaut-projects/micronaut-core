@@ -319,13 +319,22 @@ public final class FormDemuxer implements BufferConsumer {
      * writes the next input into that buffer and compacts it in place. The bytes of a body can be
      * shared with another reader, e.g. a copy of the form that a filter decodes as it arrives
      * while the bytes are buffered for the route: writing into them corrupts the form the route
-     * reads. The decoder is given a composite view of the input, which it extends with components
-     * and compacts by dropping them, without writing into the bytes.
+     * reads. The multipart decoder is given a composite view of the input, which it extends with
+     * components and compacts by dropping them, without writing into the bytes. The URL-encoded
+     * decoder also percent-decodes the names, and the values that end its input, in place: it is
+     * given a private copy of the input, which is small, as the form is buffered.
      *
      * @param input The input, owned by the view
      * @return The view
      */
-    private static ByteBuf decoderInput(ByteBuf input) {
+    private ByteBuf decoderInput(ByteBuf input) {
+        if (decoder instanceof VintageAccess.UrlEncodedDecoder) {
+            try {
+                return input.alloc().buffer(input.readableBytes()).writeBytes(input);
+            } finally {
+                input.release();
+            }
+        }
         return input.alloc().compositeBuffer().addComponent(true, input);
     }
 
@@ -386,7 +395,22 @@ public final class FormDemuxer implements BufferConsumer {
      */
     private ByteBuf content() {
         VintageAccess.UrlEncodedDecoder urlEncoded = undecoded;
-        return urlEncoded == null ? decoder.decodedContent() : urlEncoded.undecodedContent();
+        if (urlEncoded == null) {
+            return decoder.decodedContent();
+        }
+        ByteBuf content = urlEncoded.undecodedContent();
+        // validated like the decoded content, e.g. the percent escapes the decoder refuses: the
+        // decoder does not split an escape between two contents
+        ByteBuf check = content.copy();
+        try {
+            urlEncoded.decodeComponent(check, false);
+        } catch (RuntimeException e) {
+            content.release();
+            throw e;
+        } finally {
+            check.release();
+        }
+        return content;
     }
 
     private static RuntimeException unexpectedEvent(PostBodyDecoder.Event event) {
