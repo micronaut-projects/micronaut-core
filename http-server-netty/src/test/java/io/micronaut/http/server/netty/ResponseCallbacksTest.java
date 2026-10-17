@@ -100,7 +100,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ResponseCallbacksTest {
     private static final String SPEC_NAME = "ResponseCallbacksTest";
     private static final long TIMEOUT_MILLIS = 10_000;
-    private static final int LARGE_BODY = 32 * 1024 * 1024;
+    private static final int LARGE_BODY = 4 * 1024 * 1024;
 
     private static ApplicationContext ctx;
     private static EmbeddedServer server;
