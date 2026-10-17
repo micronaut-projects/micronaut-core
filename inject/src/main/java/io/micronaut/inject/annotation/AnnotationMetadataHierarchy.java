@@ -545,12 +545,21 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
-        List<AnnotationValue<T>> list = new ArrayList<>(10);
-        Set<AnnotationValue<T>> uniqueValues = new HashSet<>(10);
+        List<AnnotationValue<T>> list = new ArrayList<>();
+        Set<AnnotationValue<T>> uniqueValues = null;
         for (AnnotationMetadata am : hierarchy) {
-            for (AnnotationValue<T> tAnnotationValue : am.getAnnotationValuesByType(annotationType)) {
-                if (uniqueValues.add(tAnnotationValue)) {
-                    list.add(tAnnotationValue);
+            for (AnnotationValue<T> value : am.getAnnotationValuesByType(annotationType)) {
+                if (list.isEmpty()) {
+                    list.add(value);
+                    continue;
+                }
+                if (uniqueValues == null) {
+                    // Only created once there is a second value to compare: the list holds the first value only
+                    uniqueValues = new HashSet<>();
+                    uniqueValues.add(list.get(0));
+                }
+                if (uniqueValues.add(value)) {
+                    list.add(value);
                 }
             }
         }
@@ -567,17 +576,27 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     private <T extends Annotation, V> List<AnnotationValue<T>> mergeAnnotationValues(V annotationType,
                                                                                      BiFunction<AnnotationMetadata, V, List<AnnotationValue<T>>> fn) {
-        List<AnnotationValue<T>> list = new ArrayList<>(10);
-        Set<AnnotationValue<T>> uniqueValues = new HashSet<>(10);
+        List<AnnotationValue<T>> list = new ArrayList<>();
+        Set<AnnotationValue<T>> uniqueValues = null;
         for (AnnotationMetadata am : hierarchy) {
-            for (AnnotationValue<T> tAnnotationValue : fn.apply(am, annotationType)) {
-                if (uniqueValues.add(tAnnotationValue)) {
-                    list.add(tAnnotationValue);
+            for (AnnotationValue<T> value : fn.apply(am, annotationType)) {
+                if (list.isEmpty()) {
+                    list.add(value);
+                    continue;
+                }
+                if (uniqueValues == null) {
+                    // Only created once there is a second value to compare: the list holds the first value only
+                    uniqueValues = new HashSet<>();
+                    uniqueValues.add(list.get(0));
+                }
+                if (uniqueValues.add(value)) {
+                    list.add(value);
                 }
             }
         }
-        return Collections.unmodifiableList(list);
+        return list.isEmpty() ? Collections.emptyList() : Collections.unmodifiableList(list);
     }
+
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(Class<T> annotationType) {
