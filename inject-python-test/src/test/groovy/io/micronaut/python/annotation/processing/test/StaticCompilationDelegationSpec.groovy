@@ -65,6 +65,13 @@ class Calc:
     def twice(self, name: str) -> str:
         return self.label(2, name)
 
+    @Logged
+    def stamp(self, name: str, *, mark: str = "!") -> str:
+        return name + mark
+
+    def stamped(self, name: str) -> str:
+        return self.stamp(name)
+
 @Singleton
 class Caller:
     def __init__(self, calc: Calc):
@@ -229,6 +236,7 @@ class Caller:
         def decision = decisions.find { it.qualifiedName() == 'Calc.label' }
         decision.outcome() == StaticCompilationDecision.Outcome.NOT_CANDIDATE
         decision.reasons()*.rule() == ['intercepted-method']
+        decisions.find { it.qualifiedName() == 'Calc.twice' }.outcome() == StaticCompilationDecision.Outcome.COMPILED
 
         when:
         def viaJava = calc.label(3, 'jar')
@@ -241,6 +249,18 @@ class Caller:
         viaSelf == 'logged 2 x cup'
         interceptor.asPolyglotValue().getMember('calls').toString() == "['label', 'label', 'label']"
         PythonStatic.entries('python.Calc#label') == 0
+
+        and: "the compiled caller of the advised method ran as Java and called it through the Python object"
+        PythonStatic.entries('python.Calc#twice') == 1
+
+        when: "an advised sibling without a Java layout is called: Python calls it directly, without its interceptors"
+        def stamped = calc.stamped('x')
+
+        then: "the caller stays in Python, so the direct call is kept"
+        stamped == 'x!'
+        decisions.find { it.qualifiedName() == 'Calc.stamped' }.outcome() == StaticCompilationDecision.Outcome.SKIPPED
+        decisions.find { it.qualifiedName() == 'Calc.stamped' }.reasons()*.rule() == ['sibling-call']
+        interceptor.asPolyglotValue().getMember('calls').toString() == "['label', 'label', 'label']"
 
         cleanup:
         context?.close()

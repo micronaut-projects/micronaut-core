@@ -114,8 +114,9 @@ public sealed interface Ir {
      * @param property The property
      * @param type     The Java type of the property
      * @param value    The value
+     * @param accessor Whether the property is a Python {@code @property}, whose setter runs on the Python object
      */
-    record PutSelf(String property, String type, Expression value) implements Statement {
+    record PutSelf(String property, String type, Expression value, boolean accessor) implements Statement {
     }
 
     /**
@@ -269,8 +270,9 @@ public sealed interface Ir {
      *
      * @param property The property
      * @param type     The Java type of the property
+     * @param accessor Whether the property is a Python {@code @property}, whose getter runs on the Python object
      */
-    record SelfProperty(String property, String type) implements Expression {
+    record SelfProperty(String property, String type, boolean accessor) implements Expression {
     }
 
     /**
@@ -290,6 +292,30 @@ public sealed interface Ir {
                       List<Expression> arguments,
                       String type) implements Expression {
         public InvokeJava {
+            parameterTypes = List.copyOf(parameterTypes);
+            arguments = List.copyOf(arguments);
+        }
+    }
+
+    /**
+     * A call of a method of the class on {@code self}. Dispatched {@code java} when the stub declares
+     * the method (a bridged public method, compiled or not): the stub's Java method is called.
+     * Dispatched {@code python} otherwise (a method the stub does not bridge, an advised method whose
+     * interceptor chain runs on the Python object, a method a subclass overrides, a call relying on
+     * default arguments): the method of the Python object is invoked, as the Python code would.
+     *
+     * @param name           The method name
+     * @param parameterTypes The Java parameter types of the stub method, for a {@code java} dispatch
+     * @param arguments      The arguments
+     * @param type           The Java return type, {@code void} for none
+     * @param dispatch       {@code java} or {@code python}
+     */
+    record InvokeSibling(String name,
+                         List<String> parameterTypes,
+                         List<Expression> arguments,
+                         String type,
+                         String dispatch) implements Expression {
+        public InvokeSibling {
             parameterTypes = List.copyOf(parameterTypes);
             arguments = List.copyOf(arguments);
         }

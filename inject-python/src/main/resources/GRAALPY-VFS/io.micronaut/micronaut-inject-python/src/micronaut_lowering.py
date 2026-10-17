@@ -37,7 +37,7 @@ def _ir(name):
 Body, Local, Assign, PutSelf, If, Return, Eval = (_ir(n) for n in ("Body", "Local", "Assign", "PutSelf", "If", "Return", "Eval"))
 While, ForRange, ForEach, Break, Continue, Throw, Try, Catch = (_ir(n) for n in ("While", "ForRange", "ForEach", "Break", "Continue", "Throw", "Try", "Catch"))
 Const, Param, LocalRef, SelfProperty = (_ir(n) for n in ("Const", "Param", "LocalRef", "SelfProperty"))
-InvokeJava, NewJava, StaticField, Field = (_ir(n) for n in ("InvokeJava", "NewJava", "StaticField", "Field"))
+InvokeJava, NewJava, StaticField, Field, InvokeSibling = (_ir(n) for n in ("InvokeJava", "NewJava", "StaticField", "Field", "InvokeSibling"))
 Binary, Unary, Compare, And, Or, Conditional, Truthy, StrJoin, Helper, Cast = (
     _ir(n) for n in ("Binary", "Unary", "Compare", "And", "Or", "Conditional", "Truthy", "StrJoin", "Helper", "Cast"))
 
@@ -143,6 +143,16 @@ def _assigned_names(statements):
     return names
 
 
+def _decorated_with(function_node, names):
+    for decorator in function_node.decorator_list:
+        target = decorator.func if isinstance(decorator, ast.Call) else decorator
+        if isinstance(target, ast.Name) and target.id in names:
+            return True
+        if isinstance(target, ast.Attribute) and target.attr in names:
+            return True
+    return False
+
+
 def _reads(name, statements):
     """Whether the statements read the local of the name before binding it again."""
     for statement in statements:
@@ -202,8 +212,9 @@ class Refused(Exception):
 class Lowering:
     """Lowers one function body; see the module documentation."""
 
-    def __init__(self, checker, module, class_def, function_def, node, rules, class_model=None):
+    def __init__(self, checker, module, class_def, function_def, node, rules, class_model=None, advised=None):
         self.checker = checker
+        self.advised = advised or (lambda function_def: False)  # whether a method of the class is advised
         self.module = module
         self.class_def = class_def
         self.function_def = function_def
@@ -771,7 +782,7 @@ class Lowering:
         if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
             property_type = self._self_property_type(target.attr, target)
             self.bridge_calls += 1
-            return PutSelf(target.attr, property_type, self._coerce(value, property_type, node))
+            return PutSelf(target.attr, property_type, self._coerce(value, property_type, node), self._is_accessor(target.attr))
         if isinstance(target, ast.Subscript):
             return self._subscript_store(target, value, node)
         self._refuse("unsupported-statement", "assigning to anything but a local, a property of self or an element has no static lowering", node)
@@ -803,7 +814,7 @@ class Lowering:
                 self._refuse("unknown-type", f"local [{node.target.id}] is updated before it is assigned", node)
             current = self._name(node.target)
         elif isinstance(node.target, ast.Attribute) and isinstance(node.target.value, ast.Name) and node.target.value.id == "self":
-            current = SelfProperty(node.target.attr, self._self_property_type(node.target.attr, node.target))
+            current = SelfProperty(node.target.attr, self._self_property_type(node.target.attr, node.target), self._is_accessor(node.target.attr))
             self.bridge_calls += 1
         else:
             self._refuse("unsupported-statement", "updating anything but a local or a property of self has no static lowering", node)
@@ -1102,7 +1113,7 @@ class Lowering:
         if isinstance(node.value, ast.Name) and node.value.id == "self":
             self.bridge_calls += 1
             property_type = self._self_property_type(node.attr, node)
-            read = SelfProperty(node.attr, property_type)
+            read = SelfProperty(node.attr, property_type, self._is_accessor(node.attr))
             # an int attribute (an instance attribute hinted through __init__) is a long in the body
             used = JAVA_NUMBERS.get(property_type, property_type)
             return Cast(read, used) if used != property_type else read
@@ -1121,6 +1132,11 @@ class Lowering:
             self._refuse("unknown-type", "a class is not a value here", node)
         self._refuse("dynamic-call", f"the attribute [{node.attr}] resolves to no Java field or property of self", node)
 
+    def _is_accessor(self, name):
+        """Whether the attribute of self is a @property: its getter and setter run on the Python object."""
+        found = self.class_model.find(name) if self.class_model is not None else None
+        return found is not None and found[0] == "property"
+
     def _self_property_type(self, name, node):
         """The Java type of a property of self, from the hint of the attribute or property."""
         if self.class_model is None:
@@ -1133,8 +1149,14 @@ class Lowering:
         if kind == "attribute":
             typed = self.bindings.of_hint(found[1].typeName())
         elif kind == "property":
-            # a @property runs Python code: reading it is a call into the class, not a value read
-            self._refuse("sibling-call", f"the property [{name}] runs its Python getter; not compiled yet", node)
+            # a @property runs its Python getter: read through the Python object, whose attribute
+            # access runs it, at the type the getter is hinted with
+            getter = found[1].getter()
+            return_def = getter.returnType() if getter is not None else None
+            hint = return_def.typeAnnotation() if return_def is not None else None
+            if hint is None:
+                self._refuse("unknown-self-attribute", f"the property [{name}] has no return hint", node)
+            typed = self.bindings.of_hint(hint)
         elif kind == "instance":
             typed = self.class_model.instance_attribute_type(name, self.bindings)
         if typed is None:
@@ -1172,7 +1194,7 @@ class Lowering:
         if target is None:
             typed = self._typed(function.value) if isinstance(function, ast.Attribute) else None
             if isinstance(function, ast.Attribute) and isinstance(function.value, ast.Name) and function.value.id == "self":
-                self._refuse("sibling-call", f"calling the method [{function.attr}] of the class has no static lowering yet", node)
+                return self._sibling_call(function.attr, node)
             if typed is not None and typed.kind in (PY, PY_REF):
                 self._refuse("sibling-call", "calling a Python class of the compilation has no static lowering yet", node)
             if isinstance(function, ast.Name) and function.id in ("len", "int", "float", "bool", "abs", "min", "max", "isinstance", "range", "print", "sorted", "reversed", "enumerate", "zip", "sum", "any", "all", "round"):
@@ -1198,6 +1220,74 @@ class Lowering:
         call = InvokeJava(receiver, owner, name, parameter_types, arguments, return_type)
         used = JAVA_NUMBERS.get(return_type, return_type)
         return Cast(call, used) if used != return_type else call
+
+    def _sibling_call(self, name, node):
+        """
+        A call of a method of the class on self. The stub's Java method is called when the stub
+        declares one for the call (a public method with a hinted signature the call fills, that no
+        advice intercepts and no subclass of the compilation overrides); otherwise the method of the
+        Python object is invoked, which runs the interceptors, the override or the defaults as Python would.
+        """
+        if self.class_model is None:
+            self._refuse("sibling-call", f"self.{name}() has no known target", node)
+        found = self.class_model.find(name)
+        if found is None:
+            self._refuse("unknown-self-attribute", f"[{self.class_model.name}] has no method [{name}]", node)
+        if found[0] != "method":
+            self._refuse("sibling-call", f"calling [{name}], which is not a method of the class, has no static lowering", node)
+        function_def, function_node = found[1], found[2]
+        if function_node is None or function_def.isStatic() or _decorated_with(function_node, ("staticmethod", "classmethod")):
+            self._refuse("sibling-call", f"calling the static or class method [{name}] has no static lowering yet", node)
+        if function_def.isAsync() or function_def.isGenerator():
+            self._refuse("sibling-call", f"calling the async or generator method [{name}] has no static lowering", node)
+        if self.advised(function_def) and (function_node.args.kwonlyargs or function_node.args.vararg is not None or function_node.args.kwarg is not None):
+            # the self-invocation binder installs no chain for a method without a Java layout, so
+            # Python calls it directly, without its interceptors; a call through the bean's proxy would run them
+            self._refuse("sibling-call", f"the advised method [{name}] has no Java layout: Python calls it on self directly, without its interceptors", node)
+        return_def = function_def.returnType()
+        hint = return_def.typeAnnotation() if return_def is not None else None
+        if hint is None:
+            # the generated method returns an Object for an unhinted method that returns a value
+            return_type = self._inferred_return(self.class_model, function_def, function_node, node) if function_def.hasReturnValue() else VOID
+        elif hint.name() == "None":
+            return_type = VOID
+        else:
+            return_type = self._stub_type(self.bindings.of_hint(hint), hint, node)
+        lowered_arguments = [self._expression(argument) for argument in node.args]
+        parameters = [argument for argument in function_def.arguments().arguments() if argument.name() not in ("self", "cls")]
+        declares = (not name.startswith("_") and not self.advised(function_def) and not self.class_model.subclass_defines(name)
+                    and len(parameters) == len(lowered_arguments)
+                    and all(argument.typeAnnotation() is not None and not argument.variadic() for argument in parameters)
+                    and function_node.args.vararg is None and not function_node.args.kwonlyargs and function_node.args.kwarg is None)
+        if declares:
+            parameter_types = [self._stub_type(self.bindings.of_hint(argument.typeAnnotation()), argument.typeAnnotation(), node) for argument in parameters]
+            arguments = [self._coerce(argument, parameter_type, argument_node)
+                         for argument, parameter_type, argument_node in zip(lowered_arguments, parameter_types, node.args)]
+            self.java_calls += 1
+            declared = OBJECT if hint is None and return_type != VOID else return_type
+            call = InvokeSibling(name, parameter_types, arguments, declared, "java")
+            call = Cast(call, return_type) if declared != return_type else call
+        else:
+            self.bridge_calls += 1
+            call = InvokeSibling(name, [], [self._boxed(argument, node) for argument in lowered_arguments], return_type, "python")
+        used = JAVA_NUMBERS.get(return_type, return_type)
+        return Cast(call, used) if used != return_type else call
+
+    def _inferred_return(self, model, function_def, function_node, node):
+        """
+        The Java type a call of an unhinted method has: the one static type of every value the
+        method returns, when the checker infers one, else the Object its generated method declares.
+        """
+        inferred = self.checker.inferred_return(model, function_def, function_node)
+        if inferred is None:
+            return OBJECT
+        try:
+            value_type = self._value_type(inferred, node)
+        except Refused:
+            self.reasons.pop()
+            return OBJECT
+        # a number or a boolean stays the Object the method declares: its box is Python's choice
+        return OBJECT if value_type in (LONG, DOUBLE, BOOLEAN) else value_type
 
     def _most_specific(self, matching, arguments, owner, name, node):
         """
