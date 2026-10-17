@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
@@ -48,6 +49,11 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     private final UriRouteInfo<T, R> uriRouteInfo;
     private final Charset defaultCharset;
     private final @Nullable MediaType selectedMediaType;
+    /**
+     * The status a route selector rejected the request with, {@code 406} or {@code 415}, see
+     * {@link io.micronaut.web.router.spi.RouteMatchSelector.Selection#rejectionStatus()}.
+     */
+    private final @Nullable HttpStatus rejectionStatus;
     @Nullable
     private Map<String, Object> variables;
     private @Nullable ExecutableMethod<T, R> inheritingMethod;
@@ -70,11 +76,21 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
                                  Charset defaultCharset,
                                  ConversionService conversionService,
                                  @Nullable MediaType selectedMediaType) {
+        this(matchInfo, routeInfo, defaultCharset, conversionService, selectedMediaType, null);
+    }
+
+    private DefaultUriRouteMatch(UriMatchInfo matchInfo,
+                                 UriRouteInfo<T, R> routeInfo,
+                                 Charset defaultCharset,
+                                 ConversionService conversionService,
+                                 @Nullable MediaType selectedMediaType,
+                                 @Nullable HttpStatus rejectionStatus) {
         super(routeInfo, conversionService);
         this.matchInfo = matchInfo;
         this.uriRouteInfo = routeInfo;
         this.defaultCharset = defaultCharset;
         this.selectedMediaType = selectedMediaType;
+        this.rejectionStatus = rejectionStatus;
     }
 
     /**
@@ -90,7 +106,27 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
      * @return A new match with the match info and the negotiated media type of this match
      */
     DefaultUriRouteMatch<T, R> withMatchInfo(UriMatchInfo matchInfo) {
-        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, conversionService, selectedMediaType);
+        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, conversionService, selectedMediaType, rejectionStatus);
+    }
+
+    /**
+     * @param status The status a route selector rejected the request with, {@code 406} or {@code 415}
+     * @return A new match of the same route and path, rejected with the status
+     */
+    DefaultUriRouteMatch<T, R> withRejectionStatus(HttpStatus status) {
+        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, conversionService, selectedMediaType, status);
+    }
+
+    /**
+     * The status the route selector of the route rejected the request with: a match the router
+     * finds for the routes of any method, see {@link Router#findAny(io.micronaut.http.HttpRequest)},
+     * which the request is answered with {@code 406} or {@code 415} for, with the types of the route.
+     *
+     * @return The status, or {@code null} if the match is not rejected
+     * @since 5.3.0
+     */
+    public @Nullable HttpStatus rejectionStatus() {
+        return rejectionStatus;
     }
 
     @Override

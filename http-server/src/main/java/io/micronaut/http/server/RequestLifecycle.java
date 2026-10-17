@@ -733,6 +733,9 @@ public class RequestLifecycle {
         Set<MediaType> acceptableContentTypes = contentType != null ? new HashSet<>(5) : Set.of();
         Set<String> allowedMethods = new HashSet<>(5);
         Set<MediaType> produceableContentTypes = hasAcceptHeader ? new HashSet<>(5) : Set.of();
+        // a route selector rejected the request, see RouteMatchSelector.Selection#rejectionStatus()
+        boolean unsupportedMediaType = false;
+        boolean notAcceptable = false;
         Class<?> declaringType = null;
         UriRouteMatch<?, ?> webSocketRoute = null;
         for (UriRouteMatch<?, ?> anyRoute : anyMatchingRoutes) {
@@ -746,8 +749,19 @@ public class RequestLifecycle {
             // the route of any custom method is a route of the method of a custom request
             boolean sameMethod = requestMethodName.equals(routeMethod)
                 || httpMethod == HttpMethod.CUSTOM && AnyMethodRoutes.CUSTOM_METHODS.equals(routeMethod);
+            HttpStatus rejection = anyRoute instanceof DefaultUriRouteMatch<?, ?> defaultMatch ? defaultMatch.rejectionStatus() : null;
             if (!sameMethod) {
                 allowedMethods.add(routeMethod);
+            } else if (rejection == HttpStatus.UNSUPPORTED_MEDIA_TYPE) {
+                unsupportedMediaType = true;
+                if (contentType != null) {
+                    acceptableContentTypes.addAll(anyRoute.getRouteInfo().getConsumes());
+                }
+            } else if (rejection == HttpStatus.NOT_ACCEPTABLE) {
+                notAcceptable = true;
+                if (hasAcceptHeader) {
+                    produceableContentTypes.addAll(anyRoute.getRouteInfo().getProduces());
+                }
             } else {
                 if (contentType != null && !anyRoute.getRouteInfo().doesConsume(contentType)) {
                     acceptableContentTypes.addAll(anyRoute.getRouteInfo().getConsumes());
@@ -759,18 +773,18 @@ public class RequestLifecycle {
             declaringType = anyRoute.getDeclaringType();
         }
 
-        if (CollectionUtils.isNotEmpty(acceptableContentTypes)) {
+        if (unsupportedMediaType || CollectionUtils.isNotEmpty(acceptableContentTypes)) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", httpRequest.getUri(),
                     requestMethodName, contentType);
             }
             return onStatusError(
                 httpRequest,
-                new UnsupportedMediaException(Objects.requireNonNull(contentType).toString(),  acceptableContentTypes.stream().map(MediaType::toString).toList()),
+                new UnsupportedMediaException(String.valueOf(contentType),  acceptableContentTypes.stream().map(MediaType::toString).toList()),
                 declaringType,
                 propagatedContext);
         }
-        if (CollectionUtils.isNotEmpty(produceableContentTypes)) {
+        if (notAcceptable || CollectionUtils.isNotEmpty(produceableContentTypes)) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", httpRequest.getUri(),
                     requestMethodName,

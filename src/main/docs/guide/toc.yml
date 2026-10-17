@@ -214,6 +214,7 @@ httpServer:
     functionalRoutesAnnotations: Annotations on Handler Routes
     functionalRoutesErrors: Error and Status Routes
     functionalRoutesLocators: Locator Routes
+    functionalRoutesTemplates: Route Templates and Route Selectors
     functionalRoutesWebSocket: WebSocket Routes
     functionalRoutesLimitations: Limitations
   sessions: HTTP Sessions

@@ -154,6 +154,11 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * The order of the route selector, read once, or {@code null}, see {@link RouteMatchSelector#order()}.
      */
     private final @Nullable Comparator<UriRouteInfo<?, ?>> routeMatchSelectorOrder;
+    /**
+     * Whether the route selector selects by the media types itself, read once, see
+     * {@link RouteMatchSelector#selectsMediaTypes()}.
+     */
+    private final boolean routeMatchSelectorSelectsMediaTypes;
 
     @Nullable
     private ExecutorService executorService;
@@ -406,6 +411,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         }
         this.routeMatchSelector = routeMatchSelector;
         this.routeMatchSelectorOrder = routeMatchSelector == null ? null : routeMatchSelector.order().orElse(null);
+        this.routeMatchSelectorSelectsMediaTypes = routeMatchSelector != null && routeMatchSelector.selectsMediaTypes();
         this.dynamicTarget = targetMethod instanceof HandlerMethod<?> handler && handler.getTarget() instanceof DynamicRouteTarget;
         this.inherited = inherited;
         if (targetMethod instanceof HandlerMethod<?>) {
@@ -641,6 +647,14 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
 
     @Nullable RouteMatchSelector routeMatchSelector() {
         return routeMatchSelector;
+    }
+
+    /**
+     * @return Whether the route selector of the route selects by the media types itself, read
+     * once when the route was built, see {@link RouteMatchSelector#selectsMediaTypes()}
+     */
+    boolean routeMatchSelectorSelectsMediaTypes() {
+        return routeMatchSelectorSelectsMediaTypes;
     }
 
     /**

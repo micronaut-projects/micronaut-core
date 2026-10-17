@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.UriMatchInfo;
@@ -101,6 +102,11 @@ final class UriRouteSet {
      * {@link RouteMatchSelector}.
      */
     private final boolean hasSelectors;
+    /**
+     * Whether a route has a route selector that selects by the media types itself, see
+     * {@link RouteMatchSelector#selectsMediaTypes()}.
+     */
+    private final boolean hasMediaTypeSelectors;
     private final boolean noRoutes;
 
     private UriRouteSet(Map<HttpMethod, List<UriRouteInfo<Object, Object>>> routesByMethod,
@@ -108,16 +114,20 @@ final class UriRouteSet {
                         boolean hasDynamicTargets) {
         boolean selectorOrders = false;
         boolean selectors = false;
+        boolean mediaTypeSelectors = false;
         for (List<UriRouteInfo<Object, Object>> routes : routesByMethod.values()) {
             selectorOrders |= hasSelectorOrder(routes);
             selectors |= hasSelector(routes);
+            mediaTypeSelectors |= hasMediaTypeSelector(routes);
         }
         for (List<UriRouteInfo<Object, Object>> routes : customRoutesByMethod.values()) {
             selectorOrders |= hasSelectorOrder(routes);
             selectors |= hasSelector(routes);
+            mediaTypeSelectors |= hasMediaTypeSelector(routes);
         }
         this.hasSelectorOrders = selectorOrders;
         this.hasSelectors = selectors;
+        this.hasMediaTypeSelectors = mediaTypeSelectors;
         Map<HttpMethod, UriRouteInfo<Object, Object>[]> methodMap = CollectionUtils.newEnumMap(HttpMethod.values());
         Map<String, UriRouteInfo<Object, Object>[]> customMethodMap = CollectionUtils.newHashMap(routesByMethod.size() + customRoutesByMethod.size());
         for (Map.Entry<HttpMethod, List<UriRouteInfo<Object, Object>>> e : routesByMethod.entrySet()) {
@@ -216,7 +226,7 @@ final class UriRouteSet {
      * @return The matches
      */
     <T, R> List<UriRouteMatch<T, R>> find(HttpRequest<?> request, String uri, @Nullable Set<Integer> ports) {
-        return findMatches(request, uri, ports);
+        return findMethodMatches(request, uri, ports, false);
     }
 
     /**
@@ -658,7 +668,7 @@ final class UriRouteSet {
     <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request, @Nullable Predicate<UriRouteMatch<T, R>> filter,
                                              @Nullable Set<Integer> ports) {
         String path = request.getPath();
-        var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
+        List<UriRouteMatch<T, R>> matchedRoutes = new ArrayList<>(5);
         boolean selecting = hasSelectors(request);
         // the matches of the routes of any method among the routes of a custom method: a route
         // selector of that method is given them too, as when a request of the method is routed
@@ -695,6 +705,11 @@ final class UriRouteSet {
                 }
             }
         }
+        if (hasDynamicTargets && hasSelectorOrders(request)) {
+            // a locator route that a route of another method is more specific than does not
+            // locate, as when a request of its method is routed
+            matchedRoutes = withoutDominatedLocators(request, matchedRoutes, matchedRoutes);
+        }
         List<UriRouteMatch<T, R>> selected = selecting && !matchedRoutes.isEmpty() ? selectAny(request, matchedRoutes, anyMethodMatches) : matchedRoutes;
         return hasDynamicTargets ? resolveAny(request, selected, filter) : selected;
     }
@@ -724,11 +739,13 @@ final class UriRouteSet {
         Collection<MediaType> accepted = request.accept();
         for (UriRouteMatch<T, R> match : matches) {
             // as when a request is routed, the located routes of a locator route decide which media types they accept
-            if (DynamicRouteTarget.of(match.getRouteInfo()) != null || isCompatible(atLocation(request, match.getRouteInfo()), contentType, accepted)) {
+            if (DynamicRouteTarget.of(match.getRouteInfo()) != null || isCandidate(atLocation(request, match.getRouteInfo()), contentType, accepted)) {
                 byMethod.computeIfAbsent(match.getRouteInfo().getHttpMethodName(), method -> new ArrayList<>()).add(match);
             }
         }
         List<UriRouteMatch<?, ?>> rejected = null;
+        // the matches a route selector rejected the request with, see Selection#rejectionStatus()
+        List<UriRouteMatch<T, R>> rejections = null;
         for (List<UriRouteMatch<T, R>> methodCandidates : byMethod.values()) {
             List<UriRouteMatch<T, R>> candidates = withAnyMethodMatches(methodCandidates, anyMethodMatches, contentType, accepted);
             RouteMatchSelector selector = commonSelector(request, candidates);
@@ -746,7 +763,14 @@ final class UriRouteSet {
                 selected = DefaultRouter.resolveAmbiguity(request, selected, true);
             }
             if (hasNoDynamicTarget(selected) && !selected.isEmpty()) {
-                selected = select(selector, request, selectorRequest, selected);
+                selected = selectOrReject(selector, request, selectorRequest, selected);
+                if (isRejection(selected)) {
+                    // the rejected match stands for the method: its types answer 406 or 415
+                    if (rejections == null) {
+                        rejections = new ArrayList<>(2);
+                    }
+                    rejections.add(selected.get(0));
+                }
             }
             for (UriRouteMatch<T, R> candidate : methodCandidates) {
                 if (!isSelected(selected, candidate)) {
@@ -757,16 +781,40 @@ final class UriRouteSet {
                 }
             }
         }
-        if (rejected == null) {
+        if (rejected == null && rejections == null) {
             return matches;
         }
         List<UriRouteMatch<T, R>> result = new ArrayList<>(matches.size());
         for (UriRouteMatch<T, R> match : matches) {
-            if (!containsIdentical(rejected, match)) {
-                result.add(match);
+            if (rejected == null || !containsIdentical(rejected, match)) {
+                result.add(rejectionOf(rejections, match));
             }
         }
         return result;
+    }
+
+    /**
+     * @param rejections The matches a route selector rejected the request with, or {@code null}
+     * @param match      A match
+     * @return The rejection of the route of the match, or the match
+     */
+    private static <T, R> UriRouteMatch<T, R> rejectionOf(@Nullable List<UriRouteMatch<T, R>> rejections, UriRouteMatch<T, R> match) {
+        if (rejections != null) {
+            for (UriRouteMatch<T, R> rejection : rejections) {
+                if (rejection.getRouteInfo() == match.getRouteInfo()) {
+                    return rejection;
+                }
+            }
+        }
+        return match;
+    }
+
+    /**
+     * @param selected The matches a route selector selected
+     * @return Whether they are the rejection of the request, see {@link RouteMatchSelector.Selection#rejectionStatus()}
+     */
+    private static boolean isRejection(List<? extends UriRouteMatch<?, ?>> selected) {
+        return selected.size() == 1 && selected.get(0) instanceof DefaultUriRouteMatch<?, ?> match && match.rejectionStatus() != null;
     }
 
     /**
@@ -785,11 +833,20 @@ final class UriRouteSet {
         }
         List<UriRouteMatch<T, R>> result = new ArrayList<>(candidates);
         for (UriRouteMatch<T, R> match : anyMethod) {
-            if (DynamicRouteTarget.of(match.getRouteInfo()) != null || isCompatible(match.getRouteInfo(), contentType, accepted)) {
+            if (DynamicRouteTarget.of(match.getRouteInfo()) != null || isCandidate(match.getRouteInfo(), contentType, accepted)) {
                 result.add(match);
             }
         }
         return result;
+    }
+
+    /**
+     * @return Whether a route is given to its route selector for the media types of a request:
+     * when the selector selects by the media types itself, or the types are compatible
+     */
+    private static boolean isCandidate(UriRouteInfo<?, ?> route, @Nullable MediaType contentType, Collection<MediaType> accepted) {
+        return DefaultRouter.selectsMediaTypes(route) && (!route.getHttpMethod().permitsRequestBody() || route.isPermitsRequestBody())
+            || isCompatible(route, contentType, accepted);
     }
 
     /**
@@ -915,6 +972,37 @@ final class UriRouteSet {
      * @return The matches
      */
     private <T, R> List<UriRouteMatch<T, R>> findMatches(HttpRequest<?> request, String uri, @Nullable Set<Integer> ports) {
+        boolean mediaTypeSelecting = hasMediaTypeSelectors(request);
+        List<UriRouteMatch<T, R>> matches = findMethodMatches(request, uri, ports, mediaTypeSelecting);
+        if (matches.isEmpty()) {
+            return matches;
+        }
+        if (mediaTypeSelecting) {
+            matches = withoutIncompatible(request, matches);
+        }
+        if (hasDynamicTargets && hasSelectorOrders(request) && !hasNoDynamicTarget(matches)) {
+            // the routes of every method that match the path: a locator route that one of them is
+            // more specific than does not locate, see RouteMatchSelector
+            matches = withoutDominatedLocators(request, matches, findAny(uri, request, ports));
+        }
+        return matches;
+    }
+
+    /**
+     * The matches of the routes of the method of a request, in route order.
+     *
+     * @param request            The request
+     * @param uri                The URI to match
+     * @param ports              The default ports, or {@code null}
+     * @param mediaTypeSelecting Whether the routes whose route selector selects by the media types
+     *                           match whatever the media types of the request, see
+     *                           {@link RouteMatchSelector#selectsMediaTypes()}
+     * @param <T>                The target type
+     * @param <R>                The result type
+     * @return The matches
+     */
+    private <T, R> List<UriRouteMatch<T, R>> findMethodMatches(HttpRequest<?> request, String uri, @Nullable Set<Integer> ports,
+                                                               boolean mediaTypeSelecting) {
         HttpMethod httpMethod = request.getMethod();
         String methodKey = httpMethod == HttpMethod.CUSTOM ? request.getMethodName() : httpMethod.name();
         UriRouteInfo<Object, Object>[] routes = allRoutesByMethod.get(methodKey);
@@ -938,6 +1026,10 @@ final class UriRouteSet {
         for (int i = 0; i < count; i++) {
             UriRouteInfo<Object, Object> route = routes[candidates == null ? i : candidates[i]];
             UriRouteInfo<Object, Object> mediaTypes = mediaTypes(request, route);
+            if (mediaTypeSelecting && mediaTypes != null && DefaultRouter.selectsMediaTypes(mediaTypes)) {
+                // its route selector selects by the media types, see withoutIncompatible
+                mediaTypes = null;
+            }
             if (mediaTypes != null) {
                 if (permitsBody && contentType == null && !mediaTypes.consumesAll()) {
                     contentType = request.getContentType().orElse(null);
@@ -964,6 +1056,102 @@ final class UriRouteSet {
             return matches;
         }
         return first == null ? Collections.emptyList() : Collections.singletonList(first);
+    }
+
+    /**
+     * The matches whose media types are compatible with the request, unless they all have the
+     * same route selector that selects by the media types itself, which is then given them all,
+     * see {@link RouteMatchSelector#selectsMediaTypes()}.
+     *
+     * @param request The request
+     * @param matches The matches, including the ones of the routes of a selector that selects by
+     *                the media types whatever their types
+     * @return The matches the router selects among
+     */
+    private static <T, R> List<UriRouteMatch<T, R>> withoutIncompatible(HttpRequest<?> request, List<UriRouteMatch<T, R>> matches) {
+        RouteMatchSelector common = commonSelector(request, matches);
+        if (common != null && common.selectsMediaTypes()) {
+            return matches;
+        }
+        MediaType contentType = null;
+        Collection<MediaType> accepted = null;
+        List<UriRouteMatch<T, R>> result = null;
+        for (int i = 0; i < matches.size(); i++) {
+            UriRouteMatch<T, R> match = matches.get(i);
+            UriRouteInfo<?, ?> route = match.getRouteInfo();
+            boolean keep = true;
+            if (DynamicRouteTarget.of(route) == null) {
+                UriRouteInfo<?, ?> located = atLocation(request, route);
+                if (DefaultRouter.selectsMediaTypes(located)) {
+                    if (accepted == null) {
+                        contentType = request.getContentType().orElse(null);
+                        accepted = request.accept();
+                    }
+                    keep = isCompatible(located, contentType, accepted);
+                }
+            }
+            if (!keep && result == null) {
+                result = new ArrayList<>(matches.subList(0, i));
+            } else if (keep && result != null) {
+                result.add(match);
+            }
+        }
+        return result == null ? matches : result;
+    }
+
+    /**
+     * Remove the locator routes that a route of the same route selector, which is not a locator
+     * route, is more specific than by the {@link RouteMatchSelector#order() order} of the
+     * selector: as in JAX-RS, the path selects the route before the method does, so that the
+     * {@code 405} status and the automatic {@code OPTIONS} and {@code HEAD} responses of the
+     * more specific route apply.
+     *
+     * @param request The request
+     * @param matches The matches to remove the locator routes of
+     * @param others  The matches of the path of every method
+     * @return The matches, without the locator routes a more specific route of their selector matches the path of
+     */
+    private static <T, R> List<UriRouteMatch<T, R>> withoutDominatedLocators(HttpRequest<?> request,
+                                                                            List<UriRouteMatch<T, R>> matches,
+                                                                            List<? extends UriRouteMatch<?, ?>> others) {
+        List<UriRouteMatch<T, R>> result = null;
+        for (int i = 0; i < matches.size(); i++) {
+            UriRouteMatch<T, R> match = matches.get(i);
+            boolean keep = DynamicRouteTarget.of(match.getRouteInfo()) == null || !isDominated(request, match, others);
+            if (!keep && result == null) {
+                result = new ArrayList<>(matches.subList(0, i));
+            } else if (keep && result != null) {
+                result.add(match);
+            }
+        }
+        return result == null ? matches : result;
+    }
+
+    /**
+     * @param request The request
+     * @param locator The match of a locator route
+     * @param others  The matches of the path of every method
+     * @return Whether a match of a route of the same route selector, which is not a locator route,
+     * is more specific than the locator route by the order of the selector
+     */
+    private static boolean isDominated(HttpRequest<?> request, UriRouteMatch<?, ?> locator, List<? extends UriRouteMatch<?, ?>> others) {
+        // compared with the settings they inherit at the location of the request
+        UriRouteInfo<?, ?> locatorRoute = RouteLocator.atLocationOf(request, locator.getRouteInfo());
+        RouteMatchSelector selector = DefaultRouter.selector(locatorRoute);
+        Comparator<UriRouteInfo<?, ?>> order = DefaultRouter.selectorOrder(locatorRoute);
+        if (selector == null || order == null) {
+            return false;
+        }
+        for (UriRouteMatch<?, ?> other : others) {
+            if (DynamicRouteTarget.of(other.getRouteInfo()) != null) {
+                continue;
+            }
+            UriRouteInfo<?, ?> otherRoute = RouteLocator.atLocationOf(request, other.getRouteInfo());
+            if (DefaultRouter.selector(otherRoute) == selector && order.compare(otherRoute, locatorRoute) < 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1091,9 +1279,25 @@ final class UriRouteSet {
      * @param matches  The matches, of the routes of the selector
      * @return The selected matches, with their negotiated media types
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
     private static <T, R> List<UriRouteMatch<T, R>> select(RouteMatchSelector selector, HttpRequest<?> request, HttpRequest<?> selectorRequest,
                                                            List<UriRouteMatch<T, R>> matches) {
+        List<UriRouteMatch<T, R>> selected = selectOrReject(selector, request, selectorRequest, matches);
+        // a rejected request is not routed: the router finds the rejection again for the 406 or 415, see findAny
+        return isRejection(selected) ? List.of() : selected;
+    }
+
+    /**
+     * Let a route selector select among the matches of its routes, or reject the request.
+     *
+     * @param selector The route selector
+     * @param request  The request
+     * @param matches  The matches, of the routes of the selector
+     * @return The selected matches, with their negotiated media types, or the one match the
+     * selector rejected the request with, see {@link RouteMatchSelector.Selection#rejectionStatus()}
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static <T, R> List<UriRouteMatch<T, R>> selectOrReject(RouteMatchSelector selector, HttpRequest<?> request, HttpRequest<?> selectorRequest,
+                                                                   List<UriRouteMatch<T, R>> matches) {
         // for a request a locator route located, the routes with the settings of the location
         List<UriRouteMatch<T, R>> given = atLocation(request, matches);
         List<RouteMatchSelector.Selection> selections = selector.select(selectorRequest, Collections.unmodifiableList((List) given));
@@ -1107,6 +1311,14 @@ final class UriRouteSet {
                 throw new IllegalStateException("The route selector " + selector + " selected a match that it was not given: " + selection.match());
             }
             UriRouteMatch<T, R> selected = matches.get(index);
+            HttpStatus rejection = selection.rejectionStatus();
+            if (rejection != null) {
+                if (selections.size() != 1) {
+                    throw new IllegalStateException("The route selector " + selector + " rejected the request with " + rejection
+                        + " among other selections: a rejection is the only selection");
+                }
+                return selected instanceof DefaultUriRouteMatch<T, R> defaultMatch ? List.of(defaultMatch.withRejectionStatus(rejection)) : List.of();
+            }
             MediaType mediaType = selection.responseMediaType();
             if (mediaType != null && selected instanceof DefaultUriRouteMatch<T, R> defaultMatch) {
                 selected = defaultMatch.withSelectedMediaType(mediaType);
@@ -1230,6 +1442,18 @@ final class UriRouteSet {
 
     /**
      * @param request The request
+     * @return Whether a route may have a route selector that selects by the media types itself
+     */
+    private boolean hasMediaTypeSelectors(HttpRequest<?> request) {
+        if (hasMediaTypeSelectors) {
+            return true;
+        }
+        RouteMatchSelector located = RouteLocator.locatedSelector(request);
+        return located != null && located.selectsMediaTypes();
+    }
+
+    /**
+     * @param request The request
      * @return Whether a route may have a route selector with its own order
      */
     private boolean hasSelectorOrders(HttpRequest<?> request) {
@@ -1265,6 +1489,19 @@ final class UriRouteSet {
 
     /**
      * @param routes The routes of a method
+     * @return Whether a route has a route selector that selects by the media types itself
+     */
+    private static boolean hasMediaTypeSelector(List<UriRouteInfo<Object, Object>> routes) {
+        for (UriRouteInfo<Object, Object> route : routes) {
+            if (DefaultRouter.selectsMediaTypes(route)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param routes The routes
      * @return Whether a route has a route selector with its own order
      */
     private static boolean hasSelectorOrder(List<UriRouteInfo<Object, Object>> routes) {

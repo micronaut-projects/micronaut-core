@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.uri.RouteCaptures;
@@ -910,8 +911,10 @@ public final class RouteLocator implements DynamicRouteTarget {
             LocatedUriMatchInfo info = new LocatedUriMatchInfo(location.original().getPath(), values, variables, target,
                 location.filters(), location.errorScopes(),
                 located == route ? location.inheritance().annotationMetadata() : AnnotationMetadata.EMPTY_METADATA, location.prefixTemplate());
-            // the media type a route selector of the target's table negotiated is kept
-            return (UriRouteMatch<T, R>) located.resolvedMatch(info, innerMatch.selectedMediaType());
+            // the media type a route selector of the target's table negotiated is kept, and its rejection
+            UriRouteMatch<T, R> wrapped = (UriRouteMatch<T, R>) located.resolvedMatch(info, innerMatch.selectedMediaType());
+            HttpStatus rejection = innerMatch.rejectionStatus();
+            return rejection != null && wrapped instanceof DefaultUriRouteMatch<T, R> wrappedMatch ? wrappedMatch.withRejectionStatus(rejection) : wrapped;
         }
 
         /**
