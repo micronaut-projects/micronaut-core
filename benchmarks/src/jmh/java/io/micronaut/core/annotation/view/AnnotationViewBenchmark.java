@@ -71,6 +71,15 @@ public class AnnotationViewBenchmark {
         return value != null ? value.stringValue("value").orElse(null) : null;
     }
 
+    /**
+     * Reads a member through the conversion service, which uses the convertible values of the annotation value.
+     */
+    @Benchmark
+    public Integer typeGetAnnotationConverted() {
+        AnnotationValue<ViewAnn> value = definition.getAnnotation(ViewAnn.class);
+        return value != null ? value.get("count", Integer.class).orElse(null) : null;
+    }
+
     @Benchmark
     public String typeView() {
         AnnotationView view = definition.getAnnotationView(ViewAnn.class);
