@@ -459,6 +459,12 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         locate(prefixUri, new RouteLocator(locator, routesOf, assembly.locatedTables(), locatorGroupSettings()));
     }
 
+    @Override
+    public final LocatorSpec locator(String prefixUri) {
+        checkOpen();
+        return new DefaultLocatorSpec(this, prefixUri, assembly.routeConditionContext());
+    }
+
     /**
      * The media types and the executor of the groups of a locator route, which the routes it
      * locates inherit: they are given to the settings when the outermost group is closed, like
