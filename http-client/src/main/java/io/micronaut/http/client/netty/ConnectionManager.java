@@ -714,6 +714,9 @@ public class ConnectionManager {
         defaultSettings.maxHeaderListSize(http2Configuration == null
             ? HttpClientConfiguration.Http2ClientConfiguration.DEFAULT_MAX_HEADER_LIST_SIZE
             : http2Configuration.getMaxHeaderListSize());
+        defaultSettings.initialWindowSize(http2Configuration == null
+            ? HttpClientConfiguration.Http2ClientConfiguration.DEFAULT_INITIAL_WINDOW_SIZE
+            : http2Configuration.getInitialWindowSize());
 
         Http2FrameCodecBuilder builder = Http2FrameCodecBuilder.forClient()
             .initialSettings(defaultSettings);
