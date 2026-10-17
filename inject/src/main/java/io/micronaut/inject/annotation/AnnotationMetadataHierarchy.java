@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.OptionalValues;
 
@@ -273,11 +274,27 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      */
     @Override
     public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
+        return Optional.ofNullable(getAnnotation(annotation));
+    }
+
+    @Override
+    public <T extends Annotation> @Nullable AnnotationValue<T> getAnnotation(String annotation) {
         AnnotationValue<T> existing = null;
         for (AnnotationMetadata annotationMetadata : hierarchy) {
             existing = mergeValue(annotation, existing, annotationMetadata.getAnnotation(annotation));
         }
-        return Optional.ofNullable(existing);
+        return existing;
+    }
+
+    @Override
+    public <T extends Annotation> @Nullable AnnotationValue<T> getAnnotation(Class<T> annotationClass) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        // As findAnnotation(Class), without creating an Optional to unwrap
+        if (isRepeatableAnnotation(annotationClass)) {
+            List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
+            return values.isEmpty() ? null : values.get(0);
+        }
+        return getAnnotation(annotationClass.getName());
     }
 
     @Override
@@ -545,12 +562,21 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
-        List<AnnotationValue<T>> list = new ArrayList<>(10);
-        Set<AnnotationValue<T>> uniqueValues = new HashSet<>(10);
+        List<AnnotationValue<T>> list = new ArrayList<>();
+        Set<AnnotationValue<T>> uniqueValues = null;
         for (AnnotationMetadata am : hierarchy) {
-            for (AnnotationValue<T> tAnnotationValue : am.getAnnotationValuesByType(annotationType)) {
-                if (uniqueValues.add(tAnnotationValue)) {
-                    list.add(tAnnotationValue);
+            for (AnnotationValue<T> value : am.getAnnotationValuesByType(annotationType)) {
+                if (list.isEmpty()) {
+                    list.add(value);
+                    continue;
+                }
+                if (uniqueValues == null) {
+                    // Only created once there is a second value to compare: the list holds the first value only
+                    uniqueValues = new HashSet<>();
+                    uniqueValues.add(list.get(0));
+                }
+                if (uniqueValues.add(value)) {
+                    list.add(value);
                 }
             }
         }
@@ -567,17 +593,27 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     private <T extends Annotation, V> List<AnnotationValue<T>> mergeAnnotationValues(V annotationType,
                                                                                      BiFunction<AnnotationMetadata, V, List<AnnotationValue<T>>> fn) {
-        List<AnnotationValue<T>> list = new ArrayList<>(10);
-        Set<AnnotationValue<T>> uniqueValues = new HashSet<>(10);
+        List<AnnotationValue<T>> list = new ArrayList<>();
+        Set<AnnotationValue<T>> uniqueValues = null;
         for (AnnotationMetadata am : hierarchy) {
-            for (AnnotationValue<T> tAnnotationValue : fn.apply(am, annotationType)) {
-                if (uniqueValues.add(tAnnotationValue)) {
-                    list.add(tAnnotationValue);
+            for (AnnotationValue<T> value : fn.apply(am, annotationType)) {
+                if (list.isEmpty()) {
+                    list.add(value);
+                    continue;
+                }
+                if (uniqueValues == null) {
+                    // Only created once there is a second value to compare: the list holds the first value only
+                    uniqueValues = new HashSet<>();
+                    uniqueValues.add(list.get(0));
+                }
+                if (uniqueValues.add(value)) {
+                    list.add(value);
                 }
             }
         }
-        return Collections.unmodifiableList(list);
+        return list.isEmpty() ? Collections.emptyList() : Collections.unmodifiableList(list);
     }
+
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(Class<T> annotationType) {

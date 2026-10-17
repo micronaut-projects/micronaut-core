@@ -1235,6 +1235,26 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     @Override
+    @SuppressWarnings("unchecked")
+    public <T> Optional<T> get(CharSequence member, Class<T> requiredType) {
+        if (getClass() == AnnotationValue.class && convertibleValues == null) {
+            // Nothing needed the convertible values yet: return a member that already has the required type
+            // directly, as the conversion service would, without creating them and a conversion context
+            Object value = values.get(member);
+            if (value != null && !AnnotationUtil.STEREOTYPES_MEMBER.contentEquals(member)) {
+                if (requiredType == Object.class) {
+                    return Optional.of((T) value);
+                }
+                Class<?> wrapperType = requiredType.isPrimitive() ? ReflectionUtils.getWrapperType(requiredType) : requiredType;
+                if (wrapperType.isInstance(value) && !(value instanceof Iterable) && !(value instanceof Map)) {
+                    return Optional.of((T) value);
+                }
+            }
+        }
+        return get(member, ConversionContext.of(Argument.of(requiredType)));
+    }
+
+    @Override
     public <T> Optional<T> get(CharSequence member, ArgumentConversionContext<T> conversionContext) {
         Optional<T> result = getConvertibleValues().get(member, conversionContext);
         if (result.isPresent()) {
