@@ -52,11 +52,13 @@ public interface ServerHttpRequest<B> extends HttpRequest<B> {
     }
 
     /**
-     * Run a callback once the response to this request is done: it has been written, writing it
-     * failed, or the client went away before it was written. The failure is {@code null} if the
+     * Run a callback once the response to this request is done: the final write of the response
+     * to the connection completed or failed, or the client went away before the response was
+     * written, also while the route has not answered yet. The failure is {@code null} if the
      * response was written, else it is the error that the route failed with and that was answered
      * with the default error response, the failure of writing the response, or a
      * {@link io.micronaut.http.exceptions.ConnectionClosedException} if the client went away.
+     * The callback does not cancel or wait for the work of the route.
      * <p>The callback runs once, usually on the event loop, so it must not block. Unlike a
      * listener of {@code HttpRequestTerminatedEvent}, it costs nothing for the requests that do
      * not register one.

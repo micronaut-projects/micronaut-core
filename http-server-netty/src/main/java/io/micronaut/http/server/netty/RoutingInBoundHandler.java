@@ -202,7 +202,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     private void cleanupRequest(NettyHttpRequest<?> request) {
         try {
-            request.responseCompleted();
+            request.responseCleanedUp();
             request.release();
         } finally {
             ExecutionFlow<Void> terminatedFlow = ExecutionFlow.empty();

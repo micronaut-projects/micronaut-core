@@ -69,6 +69,7 @@ import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.Attribute;
+import io.netty.util.concurrent.Future;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1080,6 +1081,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Nullable
         private Object attachment = null;
         private boolean closeAfterWrite = false;
+        /**
+         * Set once the final write of the response is issued: the connection closing after it
+         * does not abandon the request.
+         */
+        private volatile boolean finalWriteIssued;
+        private volatile boolean recordFinalWrite;
+        private @Nullable ChannelFuture finalWrite;
 
         private OutboundAccessImpl(HttpRequest request) {
             this.request = request;
@@ -1106,14 +1114,28 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         public Runnable whenAbandoned(Runnable callback) {
             // an HTTP/1.1 request is abandoned with its connection
             ChannelFuture closeFuture = requiredCtx().channel().closeFuture();
-            ChannelFutureListener listener = future -> callback.run();
+            ChannelFutureListener listener = future -> {
+                if (!finalWriteIssued) {
+                    callback.run();
+                }
+            };
             closeFuture.addListener(listener);
             return () -> closeFuture.removeListener(listener);
         }
 
         @Override
         public boolean isAbandoned() {
-            return !requiredCtx().channel().isActive();
+            return !finalWriteIssued && !requiredCtx().channel().isActive();
+        }
+
+        @Override
+        public void recordFinalWrite() {
+            recordFinalWrite = true;
+        }
+
+        @Override
+        public @Nullable Future<?> finalWrite() {
+            return finalWrite;
         }
 
         /**
@@ -1422,8 +1444,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         void writePotentialEnd(Object content, boolean flush, boolean close) {
             assert ctx != null;
-            boolean record = outboundAccess.jfrEvent != null && content instanceof LastHttpContent;
-            ChannelFuture future = write(content, flush, close, record);
+            boolean last = content instanceof LastHttpContent;
+            boolean record = outboundAccess.jfrEvent != null && last;
+            boolean keep = last && outboundAccess.recordFinalWrite;
+            if (last) {
+                outboundAccess.finalWriteIssued = true;
+            }
+            ChannelFuture future = write(content, flush, close, record || keep);
+            if (keep) {
+                outboundAccess.finalWrite = future;
+            }
             if (record) {
                 future.addListener((ChannelFutureListener) f -> {
                     Http1RequestEvent jfrEvent = Objects.requireNonNull(outboundAccess.jfrEvent);

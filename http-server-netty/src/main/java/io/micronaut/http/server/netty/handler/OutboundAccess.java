@@ -17,6 +17,8 @@ package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.body.NettyWriteContext;
+import io.netty.util.concurrent.Future;
+import org.jspecify.annotations.Nullable;
 
 /**
  * @since 4.4.0
@@ -66,6 +68,26 @@ public interface OutboundAccess extends NettyWriteContext {
      */
     default boolean isAbandoned() {
         return false;
+    }
+
+    /**
+     * Keep the future of the final write of the response, see {@link #finalWrite()}. Called
+     * before the response is written, from any thread.
+     *
+     * @since 5.3.0
+     */
+    default void recordFinalWrite() {
+    }
+
+    /**
+     * The final write of the response, if {@link #recordFinalWrite()} was called before it was
+     * issued. Called on the event loop.
+     *
+     * @return The future of the final write, or {@code null} if it was not issued or not recorded
+     * @since 5.3.0
+     */
+    default @Nullable Future<?> finalWrite() {
+        return null;
     }
 
     /**

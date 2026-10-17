@@ -39,6 +39,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.util.concurrent.EventExecutor;
+import io.netty.util.concurrent.Future;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -171,6 +172,8 @@ abstract class MultiplexedServerHandler {
          * Whether the stream was abandoned, guarded by this stream.
          */
         private boolean abandoned;
+        private volatile boolean recordFinalWrite;
+        private @Nullable ChannelFuture finalWrite;
 
         MultiplexedStream(int streamId) {
             if (JfrSupport.isRecorderInitialized() && Http2RequestEvent.isTurnedOn()) {
@@ -657,11 +660,30 @@ abstract class MultiplexedServerHandler {
             }
         }
 
+        @Override
+        public final void recordFinalWrite() {
+            recordFinalWrite = true;
+        }
+
+        @Override
+        public final @Nullable Future<?> finalWrite() {
+            return finalWrite;
+        }
+
         private ChannelPromise endPromise(HttpResponse response) {
             if (jfrEvent == null) {
+                if (recordFinalWrite) {
+                    ChannelPromise promise = requiredCtx().newPromise();
+                    finalWrite = promise;
+                    return promise;
+                }
                 return requiredCtx().voidPromise();
             }
-            return requiredCtx().newPromise().addListener((ChannelFutureListener) future -> {
+            ChannelPromise promise = requiredCtx().newPromise();
+            if (recordFinalWrite) {
+                finalWrite = promise;
+            }
+            return promise.addListener((ChannelFutureListener) future -> {
                 jfrEvent.end();
                 if (jfrEvent.shouldCommit()) {
                     jfrEvent.populateChannel(requiredCtx().channel());

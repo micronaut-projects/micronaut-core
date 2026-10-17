@@ -224,6 +224,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private volatile @Nullable OutboundAccess outboundAccess;
     @SuppressWarnings("java:S3077")
     private volatile @Nullable ResponseCallbacks responseCallbacks;
+    private volatile boolean responseCleanedUp;
+    /**
+     * The first failure of the response, guarded by this request.
+     */
+    private @Nullable Throwable responseFailure;
     @Nullable
     private ParsedFormType parsedFormType;
 
@@ -557,57 +562,80 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         this.outboundAccess = outboundAccess;
     }
 
-    private @Nullable ResponseCallbacks responseCallbacks() {
-        ResponseCallbacks callbacks = responseCallbacks;
-        if (callbacks == null) {
-            OutboundAccess access = outboundAccess;
-            if (access == null) {
-                return null;
-            }
-            synchronized (this) {
-                callbacks = responseCallbacks;
-                if (callbacks == null) {
-                    callbacks = new ResponseCallbacks(access);
-                    responseCallbacks = callbacks;
-                }
-            }
-        }
-        return callbacks;
-    }
-
     @Override
     public boolean whenResponseCompleted(Consumer<@Nullable Throwable> callback) {
+        Objects.requireNonNull(callback, "callback");
         ResponseCallbacks callbacks = responseCallbacks();
-        return callbacks != null && callbacks.whenCompleted(Objects.requireNonNull(callback, "callback"));
+        return callbacks != null && callbacks.whenCompleted(callback);
     }
 
     @Override
     public @Nullable Runnable whenAbandoned(Runnable callback) {
+        Objects.requireNonNull(callback, "callback");
         ResponseCallbacks callbacks = responseCallbacks();
-        return callbacks == null ? null : callbacks.whenAbandoned(Objects.requireNonNull(callback, "callback"));
+        return callbacks == null ? null : callbacks.whenAbandoned(callback);
+    }
+
+    /**
+     * @return The callbacks, created on first use, or {@code null} if this request has no
+     * connection or its response is already done
+     */
+    private @Nullable ResponseCallbacks responseCallbacks() {
+        ResponseCallbacks callbacks = responseCallbacks;
+        if (callbacks != null) {
+            return callbacks;
+        }
+        OutboundAccess access = outboundAccess;
+        if (access == null) {
+            return null;
+        }
+        synchronized (this) {
+            callbacks = responseCallbacks;
+            if (callbacks == null) {
+                if (responseCleanedUp) {
+                    return null;
+                }
+                callbacks = new ResponseCallbacks(access, responseFailure);
+                responseCallbacks = callbacks;
+            }
+        }
+        // the response may have been cleaned up in the meantime, see responseCleanedUp
+        if (responseCleanedUp) {
+            callbacks.cleanedUp();
+        }
+        return callbacks;
     }
 
     /**
      * Remember why the response to this request failed, for the callbacks of
-     * {@link #whenResponseCompleted}.
+     * {@link #whenResponseCompleted}. The first failure wins.
      *
      * @param cause The failure
      */
     @Override
     public void responseFailed(Throwable cause) {
-        ResponseCallbacks callbacks = responseCallbacks;
+        ResponseCallbacks callbacks;
+        synchronized (this) {
+            if (responseFailure == null) {
+                responseFailure = cause;
+            }
+            callbacks = responseCallbacks;
+        }
         if (callbacks != null) {
             callbacks.fail(cause);
         }
     }
 
     /**
-     * The response to this request is done: run the callbacks of {@link #whenResponseCompleted}.
+     * The request is cleaned up after its response: settle the callbacks of
+     * {@link #whenResponseCompleted} once the final write of the response completes.
      */
-    void responseCompleted() {
+    void responseCleanedUp() {
+        // a volatile write before the read, so that a concurrent first registration sees one or the other
+        responseCleanedUp = true;
         ResponseCallbacks callbacks = responseCallbacks;
         if (callbacks != null) {
-            callbacks.complete();
+            callbacks.cleanedUp();
         }
     }
 

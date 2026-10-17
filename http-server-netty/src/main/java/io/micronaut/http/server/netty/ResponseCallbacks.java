@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.http.exceptions.ConnectionClosedException;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
+import io.netty.util.concurrent.Future;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +31,9 @@ import java.util.function.Consumer;
  * {@link io.micronaut.http.ServerHttpRequest#whenResponseCompleted} and
  * {@link io.micronaut.http.ServerHttpRequest#whenAbandoned}. Only created for a request that
  * registers one.
+ * <p>The completion callbacks are settled once, by whichever comes first: the final write of
+ * the response completes (or fails), the request is cleaned up without a final write, or the
+ * client abandons the request.
  */
 final class ResponseCallbacks {
     private static final Logger LOG = LoggerFactory.getLogger(ResponseCallbacks.class);
@@ -41,33 +45,71 @@ final class ResponseCallbacks {
      */
     private @Nullable List<Runnable> removals;
     private @Nullable Throwable failure;
-    private boolean done;
+    private boolean watching;
+    private boolean cleanedUp;
+    private boolean settled;
 
-    ResponseCallbacks(OutboundAccess outboundAccess) {
+    /**
+     * @param outboundAccess The connection of the request
+     * @param failure        The failure of the response recorded before the callbacks were created
+     */
+    ResponseCallbacks(OutboundAccess outboundAccess, @Nullable Throwable failure) {
         this.outboundAccess = outboundAccess;
+        this.failure = failure;
     }
 
-    synchronized boolean whenCompleted(Consumer<@Nullable Throwable> callback) {
-        if (done) {
-            return false;
+    boolean whenCompleted(Consumer<@Nullable Throwable> callback) {
+        synchronized (this) {
+            if (settled) {
+                return false;
+            }
+            if (completionCallbacks == null) {
+                completionCallbacks = new ArrayList<>(1);
+            }
+            completionCallbacks.add(callback);
+            if (watching) {
+                return true;
+            }
+            watching = true;
         }
-        if (completionCallbacks == null) {
-            completionCallbacks = new ArrayList<>(1);
-        }
-        completionCallbacks.add(callback);
+        outboundAccess.recordFinalWrite();
+        addRemoval(outboundAccess.whenAbandoned(this::abandoned));
         return true;
     }
 
     Runnable whenAbandoned(Runnable callback) {
         synchronized (this) {
-            if (done) {
+            if (cleanedUp) {
                 return () -> { };
             }
         }
-        // registered outside the lock: the callback runs at once if the request is abandoned already
-        Runnable removal = outboundAccess.whenAbandoned(callback);
+        // a failing callback must not keep the others of the stream from running
+        Runnable removal = addRemoval(outboundAccess.whenAbandoned(() -> {
+            try {
+                callback.run();
+            } catch (Throwable e) {
+                LOG.warn("A request abandonment callback failed", e);
+            }
+        }));
+        return () -> {
+            synchronized (this) {
+                if (removals != null) {
+                    removals.remove(removal);
+                }
+            }
+            removal.run();
+        };
+    }
+
+    /**
+     * Keep a removal to run when the request is cleaned up, or run it at once if it is already.
+     *
+     * @param removal The removal
+     * @return The removal
+     */
+    private Runnable addRemoval(Runnable removal) {
         synchronized (this) {
-            if (!done) {
+            if (!cleanedUp) {
                 if (removals == null) {
                     removals = new ArrayList<>(2);
                 }
@@ -85,43 +127,63 @@ final class ResponseCallbacks {
      * @param cause The failure
      */
     synchronized void fail(Throwable cause) {
-        if (!done && failure == null) {
+        if (failure == null) {
             failure = cause;
         }
     }
 
+    private void abandoned() {
+        settle(new ConnectionClosedException("The client went away before the response was written"));
+    }
+
     /**
-     * The response is done: remove the abandon callbacks and run the completion callbacks, once.
+     * The request is cleaned up after its response: remove the abandon callbacks, and settle the
+     * completion callbacks when the final write of the response completes.
      */
-    void complete() {
-        List<Consumer<@Nullable Throwable>> callbacks;
+    void cleanedUp() {
         List<Runnable> toRemove;
-        Throwable cause;
         synchronized (this) {
-            if (done) {
+            if (cleanedUp) {
                 return;
             }
-            done = true;
-            callbacks = completionCallbacks;
+            cleanedUp = true;
             toRemove = removals;
-            completionCallbacks = null;
             removals = null;
-            cause = failure;
         }
         if (toRemove != null) {
             for (Runnable removal : toRemove) {
                 removal.run();
             }
         }
+        Future<?> finalWrite = outboundAccess.finalWrite();
+        if (finalWrite != null) {
+            finalWrite.addListener(future -> settle(future.cause()));
+        } else if (outboundAccess.isAbandoned()) {
+            abandoned();
+        } else {
+            // e.g. a switch of protocols, or a final write issued before the first registration
+            settle(null);
+        }
+    }
+
+    private void settle(@Nullable Throwable cause) {
+        List<Consumer<@Nullable Throwable>> callbacks;
+        Throwable reported;
+        synchronized (this) {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            callbacks = completionCallbacks;
+            completionCallbacks = null;
+            reported = failure == null ? cause : failure;
+        }
         if (callbacks == null) {
             return;
         }
-        if (cause == null && outboundAccess.isAbandoned()) {
-            cause = new ConnectionClosedException("The client went away before the response was written");
-        }
         for (Consumer<@Nullable Throwable> callback : callbacks) {
             try {
-                callback.accept(cause);
+                callback.accept(reported);
             } catch (Throwable e) {
                 LOG.warn("A response completion callback failed", e);
             }
