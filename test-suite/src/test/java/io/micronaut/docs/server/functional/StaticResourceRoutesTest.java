@@ -45,9 +45,14 @@ class StaticResourceRoutesTest {
             assertEquals("text/html", manual.getContentType().orElseThrow().getName());
             assertEquals("true", manual.getHeaders().get("X-Manual"));
 
+            // a hidden file, served by the route that serves them
+            HttpResponse<String> security = http.exchange(HttpRequest.GET("/public/.well-known/security.txt"), String.class);
+            assertEquals(HttpStatus.OK, security.getStatus());
+            assertEquals("Contact: mailto:security@example.com\n", security.body());
+
             // a missing file, and paths that try to leave the directory, are not found
             for (String path : List.of("/assets/missing.css", "/assets/../secret.txt", "/assets/%2e%2e/secret.txt",
-                    "/assets/..%2fsecret.txt", "/site/..%2f..%2fsecret.txt")) {
+                    "/assets/..%2fsecret.txt", "/site/..%2f..%2fsecret.txt", "/site/.well-known/security.txt")) {
                 var request = HttpRequest.GET(path);
                 HttpClientResponseException notFound = assertThrows(HttpClientResponseException.class,
                     () -> http.exchange(request, String.class), path);

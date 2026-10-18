@@ -34,6 +34,10 @@ class StaticResourceRoutes(@Value("\${site.directory}") private val siteDirector
             manual.GET("").resources(StaticResources.classpath("functional-static/manual")) // <4>
         }
         // end::group[]
+
+        // tag::hidden[]
+        routes.GET("/public").resources(StaticResources.fileSystem(siteDirectory).hiddenFiles(true)) // <1>
+        // end::hidden[]
     }
 }
 // end::clazz[]

@@ -38,4 +38,8 @@ class StaticResourceRoutes(HttpRoutes):
 
         routes.path("/manual", manual_routes)
         # end::group[]
+
+        # tag::hidden[]
+        routes.GET("/public").resources(StaticResources.fileSystem(self.site_directory).hiddenFiles(True))  # <1>
+        # end::hidden[]
 # end::clazz[]

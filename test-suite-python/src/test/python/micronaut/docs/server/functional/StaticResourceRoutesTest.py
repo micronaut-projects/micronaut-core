@@ -42,9 +42,14 @@ class StaticResourceRoutesTest:
         assert manual.getContentType().orElseThrow().getName() == "text/html"
         assert manual.getHeaders().get("X-Manual") == "true"
 
+        # a hidden file, served by the route that serves them
+        security = http.exchange(HttpRequest.GET("/public/.well-known/security.txt"), String)
+        assert security.getStatus() == HttpStatus.OK
+        assert security.body() == "Contact: mailto:security@example.com\n"
+
         # a missing file, and paths that try to leave the directory, are not found
         for path in ["/assets/missing.css", "/assets/../secret.txt", "/assets/%2e%2e/secret.txt",
-                     "/assets/..%2fsecret.txt", "/site/..%2f..%2fsecret.txt"]:
+                     "/assets/..%2fsecret.txt", "/site/..%2f..%2fsecret.txt", "/site/.well-known/security.txt"]:
             try:
                 http.exchange(HttpRequest.GET(path), String)
                 raise AssertionError("the request did not fail: " + path)

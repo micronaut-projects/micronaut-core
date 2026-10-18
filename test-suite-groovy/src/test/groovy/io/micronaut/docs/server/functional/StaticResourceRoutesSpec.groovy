@@ -45,6 +45,13 @@ class StaticResourceRoutesSpec extends Specification {
         manual.body() == "<h1>Manual</h1>\n"
         manual.contentType.get().name == "text/html"
         manual.headers.get("X-Manual") == "true"
+
+        when: "a hidden file, served by the route that serves them"
+        HttpResponse<String> security = client.toBlocking().exchange(HttpRequest.GET("/public/.well-known/security.txt"), String)
+
+        then:
+        security.status == HttpStatus.OK
+        security.body() == "Contact: mailto:security@example.com\n"
     }
 
     void "a missing file and a path that leaves the directory are not found: #path"() {
@@ -57,6 +64,6 @@ class StaticResourceRoutesSpec extends Specification {
 
         where:
         path << ["/assets/missing.css", "/assets/../secret.txt", "/assets/%2e%2e/secret.txt",
-                 "/assets/..%2fsecret.txt", "/site/..%2f..%2fsecret.txt"]
+                 "/assets/..%2fsecret.txt", "/site/..%2f..%2fsecret.txt", "/site/.well-known/security.txt"]
     }
 }

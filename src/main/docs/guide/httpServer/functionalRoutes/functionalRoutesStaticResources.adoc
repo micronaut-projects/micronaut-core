@@ -15,7 +15,7 @@ A route of resources is declared in a group like any other route. `GET("")` serv
 snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="group", indent=0, title="Static resources in a group"]
 
 <1> The media types of the group do not apply to a route of resources: the content type of each resource follows its file name, here `text/html` for `index.html`, although the group produces JSON.
-<2> The executor of the group applies, so the resources are read on the blocking executor.
+<2> The executor of the group applies. Without one, a route of resources runs on the blocking executor, because reading files and jars blocks: the executor of the route or of its groups replaces it.
 <3> The filters of the group apply to the route of resources, like to the other routes of the group.
 <4> `GET /manual` answers `index.html` of `functional-static/manual`.
 
@@ -28,6 +28,10 @@ snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="group", 
 * `cacheControl(value)`: the `Cache-Control` header of the resources.
 * `pathVariable(name)`: the name of the path variable of the path of the resource, `path` by default.
 * `hiddenFiles(serve)`: whether the hidden files are served, the paths with a segment that starts with a dot, e.g. `.env`, `.git/config` or `.well-known/security.txt`. By default they are not: such a path is answered with `404`.
+
+snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="hidden", indent=0, title="Serving the hidden files"]
+
+<1> `GET /public/.well-known/security.txt` answers the file, while `GET /site/.well-known/security.txt` of the route without the option answers `404`.
 
 ==== Responses
 
