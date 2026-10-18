@@ -121,6 +121,21 @@ public class StaticResourceResolver {
      */
     @Internal
     public static Optional<URL> resolve(List<ResourceLoader> loaders, String path, @Nullable String indexPage) {
+        return resolveResource(loaders, path, indexPage).map(ResolvedResource::url);
+    }
+
+    /**
+     * Resolves the path of a resource like {@link #resolve(List, String, String)}, and tells
+     * whether the URL is the index page of the path.
+     *
+     * @param loaders   The resource loaders, tried in order
+     * @param path      The path of the resource, relative to the base of the loaders
+     * @param indexPage The name of the index page, or {@code null} for none
+     * @return The resource, if a loader has it
+     * @since 5.3.0
+     */
+    @Internal
+    public static Optional<ResolvedResource> resolveResource(List<ResourceLoader> loaders, String path, @Nullable String indexPage) {
         if (path.startsWith("/")) {
             path = path.substring(1);
         }
@@ -130,7 +145,7 @@ public class StaticResourceResolver {
             if (indexPage == null) {
                 return Optional.empty();
             }
-            path = indexPage;
+            return firstResource(loaders, indexPage).map(url -> new ResolvedResource(url, true));
         }
         String indexPath = null;
         if (!root && indexPage != null && path.indexOf('.', path.lastIndexOf('/') + 1) == -1) {
@@ -140,15 +155,36 @@ public class StaticResourceResolver {
         for (ResourceLoader loader : loaders) {
             Optional<URL> resource = loader.getResource(path);
             if (resource.isPresent()) {
-                return resource;
+                return Optional.of(new ResolvedResource(resource.get(), false));
             }
             if (indexPath != null) {
                 resource = loader.getResource(indexPath);
                 if (resource.isPresent()) {
-                    return resource;
+                    return Optional.of(new ResolvedResource(resource.get(), true));
                 }
             }
         }
         return Optional.empty();
+    }
+
+    private static Optional<URL> firstResource(List<ResourceLoader> loaders, String path) {
+        for (ResourceLoader loader : loaders) {
+            Optional<URL> resource = loader.getResource(path);
+            if (resource.isPresent()) {
+                return resource;
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * A resolved resource.
+     *
+     * @param url   The URL of the resource
+     * @param index Whether it is the index page of the path, not the path itself
+     * @since 5.3.0
+     */
+    @Internal
+    public record ResolvedResource(URL url, boolean index) {
     }
 }

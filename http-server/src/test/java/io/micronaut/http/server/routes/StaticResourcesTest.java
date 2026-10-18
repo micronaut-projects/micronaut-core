@@ -129,14 +129,14 @@ class StaticResourcesTest {
         Files.writeString(base.resolve("hello.txt"), "hello");
         File hello = base.resolve("hello.txt").toFile();
 
-        assertTrue(DefaultStaticResources.isSpelledAsRequested(hello, "hello.txt"));
-        assertTrue(DefaultStaticResources.isSpelledAsRequested(base.resolve("docs/index.html").toFile(), "docs"));
-        assertTrue(DefaultStaticResources.isSpelledAsRequested(base.resolve("docs/index.html").toFile(), "docs/"));
+        assertTrue(DefaultStaticResources.isSpelledAsRequested(hello, "hello.txt", false));
+        assertTrue(DefaultStaticResources.isSpelledAsRequested(base.resolve("docs/index.html").toFile(), "docs", true));
+        assertTrue(DefaultStaticResources.isSpelledAsRequested(base.resolve("docs/index.html").toFile(), "docs/", true));
         File upper = base.resolve("HELLO.TXT").toFile();
         if (upper.exists()) {
             // a file system that ignores the case
-            assertFalse(DefaultStaticResources.isSpelledAsRequested(upper, "HELLO.TXT"));
-            assertFalse(DefaultStaticResources.isSpelledAsRequested(base.resolve("DOCS/index.html").toFile(), "DOCS"));
+            assertFalse(DefaultStaticResources.isSpelledAsRequested(upper, "HELLO.TXT", false));
+            assertFalse(DefaultStaticResources.isSpelledAsRequested(base.resolve("DOCS/index.html").toFile(), "DOCS", true));
         }
     }
 
@@ -145,11 +145,11 @@ class StaticResourcesTest {
         Files.createDirectories(base.resolve("secret/home"));
         Files.writeString(base.resolve("secret/home/home"), "index");
 
-        assertTrue(DefaultStaticResources.isSpelledAsRequested(base.resolve("secret/home/home").toFile(), "secret/home"));
+        assertTrue(DefaultStaticResources.isSpelledAsRequested(base.resolve("secret/home/home").toFile(), "secret/home", true));
         File upper = base.resolve("SECRET/home/home").toFile();
         if (upper.exists()) {
             // a file system that ignores the case: the index file home of SECRET/home
-            assertFalse(DefaultStaticResources.isSpelledAsRequested(upper, "SECRET/home"));
+            assertFalse(DefaultStaticResources.isSpelledAsRequested(upper, "SECRET/home", true));
         }
     }
 
@@ -205,6 +205,29 @@ class StaticResourcesTest {
         public ResourceLoader forBase(String basePath) {
             return this;
         }
+    }
+
+    @Test
+    void anotherUnicodeSpellingOrCaseOfANameIsNotListed(@TempDir Path base) throws IOException {
+        Files.createDirectories(base.resolve("home"));
+        Files.writeString(base.resolve("home/HOME"), "index");
+        Files.writeString(base.resolve("\u304c.txt"), "ga");
+        Files.writeString(base.resolve("\uD801\uDC28.txt"), "deseret");
+
+        // the index file HOME of home, requested as HOME
+        File index = base.resolve("HOME/HOME").toFile();
+        if (index.exists()) {
+            assertFalse(DefaultStaticResources.isSpelledAsRequested(index, "HOME", true));
+        }
+        assertTrue(DefaultStaticResources.isSpelledAsRequested(base.resolve("home/HOME").toFile(), "home", true));
+        // a decomposed spelling and an uppercase supplementary letter
+        for (String name : new String[]{"\u304b\u3099.txt", "\uD801\uDC00.txt"}) {
+            File other = base.resolve(name).toFile();
+            if (other.exists()) {
+                assertFalse(DefaultStaticResources.isSpelledAsRequested(other, name, false), name);
+            }
+        }
+        assertTrue(DefaultStaticResources.isSpelledAsRequested(base.resolve("\u304c.txt").toFile(), "\u304c.txt", false));
     }
 
     @Test

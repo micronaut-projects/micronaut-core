@@ -132,9 +132,9 @@ final class DefaultStaticResources implements StaticResources {
             || spansSegments(pathVariables)) {
             return HttpResponse.notFound();
         }
-        Optional<URL> resolved;
+        Optional<StaticResourceResolver.ResolvedResource> resolved;
         try {
-            resolved = StaticResourceResolver.resolve(loaders, path, indexFile);
+            resolved = StaticResourceResolver.resolveResource(loaders, path, indexFile);
         } catch (InvalidPathException e) {
             // a name the file system does not allow, e.g. a? on Windows
             return HttpResponse.notFound();
@@ -142,11 +142,12 @@ final class DefaultStaticResources implements StaticResources {
         if (resolved.isEmpty()) {
             return HttpResponse.notFound();
         }
-        URL url = resolved.get();
+        URL url = resolved.get().url();
+        boolean index = resolved.get().index();
         FileCustomizableResponseType body;
         if (FILE_PROTOCOL.equals(url.getProtocol())) {
             File file = toFile(url);
-            if (file == null || !file.isFile() || !file.canRead() || !isSpelledAsRequested(file, path)) {
+            if (file == null || !file.isFile() || !file.canRead() || !isSpelledAsRequested(file, path, index)) {
                 // a resource loader may resolve a directory
                 return HttpResponse.notFound();
             }
@@ -281,23 +282,18 @@ final class DefaultStaticResources implements StaticResources {
      * list, exactly: only the names under the base, not the directories above it, and without
      * following the links, which the loaders check.
      *
-     * @param file The file, whose path ends with the names of the request
-     * @param path The relative path of the resource, the file or the directory of its index file
+     * @param file  The file, whose path ends with the names of the request
+     * @param path  The relative path of the resource, the file or the directory of its index file
+     * @param index Whether the file is the index file of the path, not the path itself
      * @return Whether the names of the file system are the names of the request
      */
-    static boolean isSpelledAsRequested(File file, String path) {
+    static boolean isSpelledAsRequested(File file, String path, boolean index) {
         String resource = withoutTrailingSlash(path);
         String[] requested = resource.isEmpty() ? new String[0] : resource.split("/", -1);
-        // the loader resolved the path itself, or the index file under it: the names of the file
-        // are the names of the request, exactly, then the index file
-        int names;
-        if (requested.length > 0 && endsWith(file, requested, null)) {
-            names = requested.length;
-        } else if (endsWith(file, requested, file.getName())) {
-            names = requested.length + 1;
-        } else {
+        if (!endsWith(file, requested, index ? file.getName() : null)) {
             return false;
         }
+        int names = requested.length + (index ? 1 : 0);
         File current = file;
         for (int i = 0; i < names; i++) {
             File directory = current.getParentFile();
@@ -312,9 +308,6 @@ final class DefaultStaticResources implements StaticResources {
     private static boolean endsWith(File file, String[] names, @Nullable String index) {
         File current = file;
         if (index != null) {
-            if (!index.equals(current.getName())) {
-                return false;
-            }
             current = current.getParentFile();
         }
         for (int i = names.length - 1; i >= 0; i--) {
@@ -327,18 +320,14 @@ final class DefaultStaticResources implements StaticResources {
     }
 
     /**
-     * Whether a directory lists a name exactly: a file system that tells the case apart has no
-     * other spelling of the name, so it is not listed.
+     * Whether a directory lists a name exactly, as the same string: not another spelling the file
+     * system resolves to the same file, e.g. another case or another Unicode normalization.
      *
      * @param directory The directory
      * @param name      The name of an existing file of the directory
      * @return Whether the name is the name the directory lists
      */
     private static boolean isListed(File directory, String name) {
-        String otherCase = otherCase(name);
-        if (otherCase.equals(name) || !new File(directory, otherCase).exists()) {
-            return true;
-        }
         try (DirectoryStream<Path> entries = Files.newDirectoryStream(directory.toPath())) {
             for (Path entry : entries) {
                 if (name.equals(entry.getFileName().toString())) {
@@ -349,15 +338,6 @@ final class DefaultStaticResources implements StaticResources {
         } catch (IOException | RuntimeException e) {
             return false;
         }
-    }
-
-    private static String otherCase(String name) {
-        StringBuilder builder = new StringBuilder(name.length());
-        for (int i = 0; i < name.length(); i++) {
-            char c = name.charAt(i);
-            builder.append(Character.isUpperCase(c) ? Character.toLowerCase(c) : Character.toUpperCase(c));
-        }
-        return builder.toString();
     }
 
     /**

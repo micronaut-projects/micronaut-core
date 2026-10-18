@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -74,6 +75,18 @@ class StaticResourceResolverLoadersTest {
 
         assertEquals(first.resolve("v1.2/docs/index.html").toRealPath(), path(StaticResourceResolver.resolve(loaders, "v1.2/docs", "index.html")));
         assertEquals(first.resolve(".well-known/index.html").toRealPath(), path(StaticResourceResolver.resolve(loaders, ".well-known/", "index.html")));
+    }
+
+    @Test
+    void aResolvedResourceTellsTheIndexPage() throws IOException {
+        write(first.resolve("index.html"));
+        write(first.resolve("docs/index.html"));
+        write(first.resolve("hello.txt"));
+        List<ResourceLoader> loaders = List.of(new DefaultFileSystemResourceLoader(first));
+
+        assertFalse(StaticResourceResolver.resolveResource(loaders, "hello.txt", "index.html").orElseThrow().index());
+        assertTrue(StaticResourceResolver.resolveResource(loaders, "docs", "index.html").orElseThrow().index());
+        assertTrue(StaticResourceResolver.resolveResource(loaders, "", "index.html").orElseThrow().index());
     }
 
     @Test
