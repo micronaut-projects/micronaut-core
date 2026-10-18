@@ -120,18 +120,13 @@ public final class AcceptedMediaTypes {
         }
         boolean range = WILDCARD.equals(type.getType()) || WILDCARD.equals(type.getSubtype());
         for (MediaType acceptedType : accepted) {
-            if (isRejected(acceptedType)) {
-                continue;
-            }
-            MediaType candidate;
-            if (covers(acceptedType, type)) {
+            MediaType candidate = null;
+            if (!isRejected(acceptedType) && covers(acceptedType, type)) {
                 candidate = type;
-            } else if (range && type.matches(acceptedType)) {
+            } else if (!isRejected(acceptedType) && range && type.matches(acceptedType)) {
                 candidate = acceptedType;
-            } else {
-                continue;
             }
-            if (isAcceptable(candidate, accepted)) {
+            if (candidate != null && isAcceptable(candidate, accepted)) {
                 return true;
             }
         }
