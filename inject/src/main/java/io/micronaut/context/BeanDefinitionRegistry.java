@@ -353,6 +353,8 @@ public interface BeanDefinitionRegistry {
      * Find active {@link jakarta.inject.Singleton} beans for the given bean type. Note that
      * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
      *
+     * <p>The registrations are not sorted; use {@link #getBeanRegistrations(Class)} for an ordered result.</p>
+     *
      * @param beanType The bean type
      * @param <T>      The concrete type
      * @return The beans
@@ -363,6 +365,10 @@ public interface BeanDefinitionRegistry {
      * Find and if necessary initialize {@link jakarta.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
      * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
      *
+     * <p>The registrations are sorted by {@link io.micronaut.core.order.Ordered#getOrder() order}, as for an
+     * injected {@code List}. Registrations with the same order keep their definition order, which depends on the
+     * class path.</p>
+     *
      * @param beanType The bean type
      * @param <T>      The concrete type
      * @return The beans
@@ -372,6 +378,10 @@ public interface BeanDefinitionRegistry {
     /**
      * Find and if necessary initialize {@link jakarta.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
      * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
+     *
+     * <p>The registrations are sorted by {@link io.micronaut.core.order.Ordered#getOrder() order}, as for an
+     * injected {@code List}. Registrations with the same order keep their definition order, which depends on the
+     * class path.</p>
      *
      * @param beanType The bean type
      * @param qualifier The qualifier
@@ -384,6 +394,10 @@ public interface BeanDefinitionRegistry {
     /**
      * Find and if necessary initialize {@link jakarta.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
      * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
+     *
+     * <p>The registrations are sorted by {@link io.micronaut.core.order.Ordered#getOrder() order}, as for an
+     * injected {@code List}. Registrations with the same order keep their definition order, which depends on the
+     * class path.</p>
      *
      * @param beanType The bean type
      * @param qualifier The qualifier

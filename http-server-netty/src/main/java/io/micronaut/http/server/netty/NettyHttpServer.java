@@ -95,6 +95,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.InetSocketAddress;
@@ -1344,6 +1345,17 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             @Override
             protected SslContextHolder createLegacy() {
                 return createLegacySslContextHolder(quic());
+            }
+
+            @Override
+            protected @Nullable SSLContext providedSslContext() {
+                ServerSslConfiguration ssl = Objects.requireNonNull(sslConfiguration);
+                SSLContext provided = ssl.getSslContext();
+                String contextName = ssl.getContextName();
+                if (provided == null && contextName != null) {
+                    provided = applicationContext.getBean(SSLContext.class, Qualifiers.byName(contextName));
+                }
+                return provided;
             }
 
             @Override
