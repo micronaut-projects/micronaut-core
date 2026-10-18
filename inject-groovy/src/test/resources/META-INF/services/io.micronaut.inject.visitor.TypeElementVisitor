@@ -12,3 +12,4 @@ io.micronaut.ast.groovy.annotation.AnnotationMemberDefaultsSpec$DefaultsRecordin
 io.micronaut.ast.groovy.annotation.ConstantReferenceDefaultsSpec$ConstantDefaultsRecordingVisitor
 io.micronaut.inject.visitor.SubclassMemberAnnotationMutationSpec$MarkingVisitor
 io.micronaut.inject.test.hierarchy.RecordingTypeHierarchyVisitor
+io.micronaut.inject.qualifiers.NonBindingMarkingVisitor

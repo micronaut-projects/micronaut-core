@@ -406,7 +406,7 @@ public final class RouteLocator implements DynamicRouteTarget {
         Location location = Location.of(request, locatorMatch);
         LocationKey key = new LocationKey(this, request.getPath());
         Object target;
-        DefaultPathVariables pathVariables = new DefaultPathVariables(location.decodedValues(), locatorMatch.conversionService, location.owner());
+        DefaultPathVariables pathVariables = new DefaultPathVariables(location.decodedValues(), location.rawValues(), locatorMatch.conversionService, location.owner(), null);
         try {
             target = locator != null
                 ? locateSync(location, key, pathVariables)
@@ -902,7 +902,7 @@ public final class RouteLocator implements DynamicRouteTarget {
                 return match;
             }
             Location location = request.location();
-            Map<String, Object> values = location.withPrefixValues(inner.getVariableValues());
+            Map<String, Object> values = location.withPrefixValues(inner.getVariableValues(), inner.getVariables());
             List<UriMatchVariable> variables = new ArrayList<>(location.variables());
             variables.addAll(inner.getVariables());
             // the route with the settings of the location, built once per location like the route of a group
@@ -974,16 +974,27 @@ public final class RouteLocator implements DynamicRouteTarget {
                 decoded.putAll(outer.decodedValues);
                 filters.addAll(outer.filters);
             }
-            matchInfo.getVariableValues().forEach((name, value) -> {
-                if (!REMAINDER.equals(name)) {
-                    rawValues.put(name, value);
-                }
-            });
             for (UriMatchVariable variable : matchInfo.getVariables()) {
                 if (!REMAINDER.equals(variable.getName())) {
                     variables.add(variable);
+                    // a variable of this prefix shadows the one of an outer prefix, also when it
+                    // is absent, which a template may leave out of the values
+                    rawValues.remove(variable.getName());
+                    decoded.remove(variable.getName());
                 }
             }
+            matchInfo.getVariableValues().forEach((name, value) -> {
+                if (REMAINDER.equals(name)) {
+                    return;
+                }
+                if (value == null) {
+                    // an optional variable that is absent has no value, as for a match, and
+                    // shadows the variable of the same name of an outer prefix
+                    rawValues.remove(name);
+                } else {
+                    rawValues.put(name, value);
+                }
+            });
             locatorMatch.getVariableValues().forEach((name, value) -> {
                 if (!REMAINDER.equals(name)) {
                     decoded.put(name, value);
@@ -1033,24 +1044,33 @@ public final class RouteLocator implements DynamicRouteTarget {
          * The variables of a match of the rest of the path, with those of the prefixes: the
          * variables the handler of a located route gets, and its constraints see.
          *
-         * @param values The raw values of the variables of the match of the rest of the path
+         * @param values   The raw values of the variables of the match of the rest of the path
+         * @param declared The variables of the template of the match: they shadow the variables
+         *                 of the prefixes of the same names, also when they are absent, which a
+         *                 template may leave out of the values
          * @return The raw values of the variables of the prefixes, then of the match
          */
-        Map<String, Object> withPrefixValues(Map<String, Object> values) {
-            Map<String, Object> all = new LinkedHashMap<>(rawValues);
-            all.putAll(values);
-            return all;
+        Map<String, Object> withPrefixValues(Map<String, Object> values, List<UriMatchVariable> declared) {
+            return shadowed(rawValues, values, declared);
         }
 
         /**
          * The variables the constraints of a located route see: the decoded values of the
          * prefixes, the values the handler gets, with the variables of the match.
          *
-         * @param values The values of the variables of the match of the rest of the path
+         * @param values   The values of the variables of the match of the rest of the path
+         * @param declared The variables of the template of the match, see {@link #withPrefixValues(Map, List)}
          * @return The decoded values of the variables of the prefixes, then of the match
          */
-        Map<String, Object> withDecodedPrefixValues(Map<String, Object> values) {
-            Map<String, Object> all = new LinkedHashMap<>(decodedValues);
+        Map<String, Object> withDecodedPrefixValues(Map<String, Object> values, List<UriMatchVariable> declared) {
+            return shadowed(decodedValues, values, declared);
+        }
+
+        private static Map<String, Object> shadowed(Map<String, Object> prefixValues, Map<String, Object> values, List<UriMatchVariable> declared) {
+            Map<String, Object> all = new LinkedHashMap<>(prefixValues);
+            for (UriMatchVariable variable : declared) {
+                all.remove(variable.getName());
+            }
             all.putAll(values);
             return all;
         }

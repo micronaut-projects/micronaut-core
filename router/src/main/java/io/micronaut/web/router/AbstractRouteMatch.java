@@ -307,6 +307,13 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     }
 
     /**
+     * @return The values of the variables as they appear in the path, not percent-decoded
+     */
+    Map<String, Object> rawVariableValues() {
+        return getVariableValues();
+    }
+
+    /**
      * @return The target a {@link DynamicRouteTarget} resolved for the route, or {@code null}
      */
     @Nullable Object resolvedTarget() {
@@ -336,7 +343,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             Argument<Object> argument = (Argument<Object>) arguments[i];
             if (arguments[i].getType() == PathVariables.class) {
                 // a handler function's path variables come from the match, not a binder
-                setValue(i, argument, new DefaultPathVariables(getVariableValues(), conversionService, resolvedTarget(), selectedMediaType()));
+                setValue(i, argument, new DefaultPathVariables(getVariableValues(), rawVariableValues(), conversionService, resolvedTarget(), selectedMediaType()));
                 continue;
             }
             Object value = getVariableValues().get(argumentNames[i]);
