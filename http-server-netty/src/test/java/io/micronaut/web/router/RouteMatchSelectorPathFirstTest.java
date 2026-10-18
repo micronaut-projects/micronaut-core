@@ -60,7 +60,9 @@ class RouteMatchSelectorPathFirstTest {
         context = ApplicationContext.run(Map.of(
             "spec.name", SPEC_NAME,
             "micronaut.server.port", -1,
-            "micronaut.server.dispatch-options-requests", true));
+            "micronaut.server.dispatch-options-requests", true,
+            "micronaut.router.static-resources.static.paths", "classpath:public",
+            "micronaut.router.static-resources.static.mapping", "/static/**"));
         server = context.getBean(EmbeddedServer.class).start();
         client = HttpClient.newHttpClient();
     }
@@ -114,6 +116,33 @@ class RouteMatchSelectorPathFirstTest {
         assertEquals(406, client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode());
     }
 
+    @Test
+    void aRejectionIsAnsweredInsteadOfAStaticFileOfThePath() throws Exception {
+        // the file public/index.html is at /static/index.html, and so is a route that produces JSON
+        assertEquals(406, send("GET", "/static/index.html", "Accept", "text/html").statusCode());
+        assertEquals("index", send("GET", "/static/index.html", "Accept", "application/json").body());
+        // without a route of the path, the file
+        assertEquals(200, send("GET", "/static/foo/index.html", "Accept", "text/html").statusCode());
+    }
+
+    @Test
+    void aRejectionIsAnsweredByTheStatusRouteOfTheGroupOfTheRejectedRoute() throws Exception {
+        java.net.http.HttpResponse<String> response = send("GET", "/local/fixed", "Accept", "text/plain");
+        assertEquals(406, response.statusCode());
+        assertEquals("local", response.body());
+        // a request no route of the group matches: the global status route
+        java.net.http.HttpResponse<String> global = send("GET", "/r/fixed", "Accept", "text/plain");
+        assertEquals(406, global.statusCode());
+        assertEquals("global", global.body());
+    }
+
+    @Test
+    void aRejectionOfALocatedRouteIsAnsweredByTheStatusRouteOfItsGroup() throws Exception {
+        java.net.http.HttpResponse<String> response = send("GET", "/loc/1/fixed", "Accept", "text/plain");
+        assertEquals(406, response.statusCode());
+        assertEquals("located", response.body());
+    }
+
     private static Set<String> allowed(java.net.http.HttpResponse<?> response) {
         return response.headers().allValues("Allow").stream()
             .flatMap(allow -> Arrays.stream(allow.split(",")))
@@ -129,6 +158,10 @@ class RouteMatchSelectorPathFirstTest {
             request.header(header, value);
         }
         return client.send(request.build(), java.net.http.HttpResponse.BodyHandlers.ofString());
+    }
+
+    private static HttpResponse<String> status406(String body) {
+        return HttpResponse.<String>status(io.micronaut.http.HttpStatus.NOT_ACCEPTABLE).body(body).contentType(MediaType.TEXT_PLAIN_TYPE);
     }
 
     @Singleton
@@ -148,6 +181,31 @@ class RouteMatchSelectorPathFirstTest {
                         HttpResponse.ok("item " + pathVariables.getString("item") + " of " + target).contentType(MediaType.TEXT_PLAIN_TYPE));
                 }
             };
+            LocatedRoutes<String> located = new LocatedRoutes<>() {
+                @Override
+                public Argument<String> targetType() {
+                    return Argument.STRING;
+                }
+
+                @Override
+                public void routes(LocatedHttpRouteBuilder<String> routes) {
+                    routes.group(group -> {
+                        group.status(io.micronaut.http.HttpStatus.NOT_ACCEPTABLE, request -> status406("located"));
+                        group.GET("/fixed").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, pathVariables) -> HttpResponse.ok("fixed"));
+                    });
+                }
+            };
+            routes.status(io.micronaut.http.HttpStatus.NOT_ACCEPTABLE, request -> status406("global"));
+            routes.group(group -> {
+                group.templates(TestPathFirstColonRouteTemplateEngine.INSTANCE).selectedBy(TestPathFirstColonRouteTemplateEngine.INSTANCE);
+                group.status(io.micronaut.http.HttpStatus.NOT_ACCEPTABLE, request -> status406("local"));
+                group.GET("/local/fixed").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, pathVariables) -> HttpResponse.ok("fixed"));
+                group.locate("/loc/:id", (request, pathVariables) -> "located", target -> located);
+            });
+            routes.group(group -> {
+                group.templates(TestPathFirstColonRouteTemplateEngine.INSTANCE).selectedBy(TestPathFirstColonRouteTemplateEngine.INSTANCE);
+                group.GET("/static/index.html").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, pathVariables) -> HttpResponse.ok("index").contentType(MediaType.TEXT_PLAIN_TYPE));
+            });
             routes.group(group -> {
                 group.templates(TestPathFirstColonRouteTemplateEngine.INSTANCE).selectedBy(TestPathFirstColonRouteTemplateEngine.INSTANCE);
                 group.GET("/r/fixed").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, pathVariables) -> HttpResponse.ok("fixed").contentType(MediaType.TEXT_PLAIN_TYPE));

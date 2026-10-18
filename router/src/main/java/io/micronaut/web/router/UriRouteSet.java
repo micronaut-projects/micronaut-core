@@ -721,7 +721,12 @@ final class UriRouteSet {
         if (hasDynamicTargets && hasSelectorOrders(request) && hasOrderedLocator(request, matchedRoutes)) {
             // a locator route that a route of another method is more specific than does not
             // locate, as when a request of its method is routed
-            matchedRoutes = withoutDominatedLocators(request, matchedRoutes, matchedRoutes);
+            List<UriRouteMatch<T, R>> others = matchedRoutes;
+            matchedRoutes = withoutDominatedLocators(request, matchedRoutes, others);
+            if (anyMethodMatches != null) {
+                // the copies of the routes of any method among the routes of a custom method too
+                anyMethodMatches.replaceAll((method, methodMatches) -> withoutDominatedLocators(request, methodMatches, others));
+            }
         }
         List<UriRouteMatch<T, R>> selected = selecting && !matchedRoutes.isEmpty() ? selectAny(request, matchedRoutes, anyMethodMatches) : matchedRoutes;
         return hasDynamicTargets ? resolveAny(request, selected, filter) : selected;

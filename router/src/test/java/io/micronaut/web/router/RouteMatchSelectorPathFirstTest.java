@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A route selector that ranks the routes by the path first, as JAX-RS does: it is given the
@@ -85,6 +86,13 @@ class RouteMatchSelectorPathFirstTest {
             g.templates(PathFirstColonRouteTemplateEngine.INSTANCE).selectedBy(PathFirstColonRouteTemplateEngine.INSTANCE);
             g.route("REPORT", "/rr/fixed").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, variables) -> HttpResponse.ok());
             g.any("/rr/:x").consumes(MediaType.TEXT_XML_TYPE).handle((request, variables) -> HttpResponse.ok());
+        });
+        routes.group(g -> {
+            g.templates(PathFirstColonRouteTemplateEngine.INSTANCE).selectedBy(PathFirstColonRouteTemplateEngine.INSTANCE);
+            // a locator route that GET /x/fixed is more specific than, and a less specific route of a custom method
+            g.GET("/x/fixed").handle((request, variables) -> HttpResponse.ok());
+            g.locate("/x/:id", (request, variables) -> "located", target -> root);
+            g.route("REPORT", "/x/:a").handle((request, variables) -> HttpResponse.ok());
         });
         routes.GET("/v/{x}").produces(MediaType.TEXT_PLAIN_TYPE).handle((request, variables) -> HttpResponse.ok());
         routes.locate("/tenants/{tenant}", (request, variables) -> "tenant", target -> tenant);
@@ -160,6 +168,16 @@ class RouteMatchSelectorPathFirstTest {
         List<UriRouteMatch<Object, Object>> any = router.findAny(request);
         assertEquals(HttpStatus.NOT_ACCEPTABLE, ((DefaultUriRouteMatch<?, ?>) only(ofMethod(any, "REPORT"))).rejectionStatus());
         assertEquals(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ((DefaultUriRouteMatch<?, ?>) only(ofMethod(any, "*"))).rejectionStatus());
+    }
+
+    @Test
+    void aDroppedLocatorRouteDoesNotHideTheRouteOfACustomMethod() {
+        MutableHttpRequest<?> report = HttpRequest.create(HttpMethod.CUSTOM, "/x/fixed", "REPORT");
+        assertEquals("/x/:a", template(router.findClosest(report)));
+        // the allowed methods, e.g. of OPTIONS or of a CORS preflight request, agree with the routing of REPORT
+        router.findAny(HttpRequest.OPTIONS("/x/fixed")).forEach(m -> System.out.println("DEBUG " + m.getRouteInfo()));
+        assertTrue(methods(router.findAny(HttpRequest.OPTIONS("/x/fixed"))).contains("REPORT"));
+        assertTrue(methods(router.findAny(report)).contains("REPORT"));
     }
 
     @Test
