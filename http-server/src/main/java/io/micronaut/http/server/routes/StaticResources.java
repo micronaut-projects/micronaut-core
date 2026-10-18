@@ -19,9 +19,12 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.file.DefaultFileSystemResourceLoader;
+import io.micronaut.core.io.file.FileSystemResourceLoader;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.web.router.builder.ResourceHandler;
 import org.jspecify.annotations.Nullable;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -42,9 +45,10 @@ import java.util.Objects;
  * {@link io.micronaut.web.router.builder.HttpRouteSpec#resources(ResourceHandler)}. It
  * answers {@code 404} when no location has the resource, when the path is a directory without an
  * index file, when the path tries to leave the base: a {@code .} or {@code ..} segment, a
- * backslash, an absolute path or a percent-encoded dot, slash or backslash, and when a segment
- * of the path is hidden, i.e. starts with a dot, e.g. {@code .env}, unless
- * {@link #hiddenFiles(boolean)} serves them.</p>
+ * backslash, a colon, a NUL character, an absolute path or a dot, slash or backslash encoded
+ * twice, when the path is another spelling of a path the router may route elsewhere: an empty
+ * segment or an encoded slash or backslash, and when a segment of the path is hidden, i.e.
+ * starts with a dot, e.g. {@code .env}, unless {@link #hiddenFiles(boolean)} serves them.</p>
  *
  * <p>A file of the file system is a {@link io.micronaut.http.server.types.files.SystemFile}, and
  * any other resource, e.g. in a jar, a {@link io.micronaut.http.server.types.files.StreamedFile}.
@@ -77,7 +81,8 @@ public sealed interface StaticResources extends ResourceHandler permits DefaultS
 
     /**
      * The resources under a package of the classpath, e.g. {@code public} for
-     * {@code src/main/resources/public}.
+     * {@code src/main/resources/public}, of the context class loader of the thread that creates
+     * them, like the class loader of the application.
      *
      * @param base The base path of the resources on the classpath
      * @return The static resources
@@ -93,9 +98,14 @@ public sealed interface StaticResources extends ResourceHandler permits DefaultS
      *
      * @param base The directory
      * @return The static resources
+     * @throws IllegalArgumentException if the directory does not exist
      */
     static StaticResources fileSystem(Path base) {
         Objects.requireNonNull(base, "base");
+        if (!Files.isDirectory(base)) {
+            // instead of a 404 for every resource
+            throw new IllegalArgumentException("The directory of the static resources does not exist: " + base.toAbsolutePath());
+        }
         return of(new DefaultFileSystemResourceLoader(base));
     }
 
@@ -129,7 +139,8 @@ public sealed interface StaticResources extends ResourceHandler permits DefaultS
     /**
      * The resources of locations with a prefix, like the paths of
      * {@code micronaut.router.static-resources}: {@code classpath:public} or
-     * {@code file:/var/www}. The first location that has a resource provides it.
+     * {@code file:/var/www}. The first location that has a resource provides it. The classpath
+     * locations are of the context class loader of the thread that creates them.
      *
      * @param locations The locations
      * @return The static resources
@@ -137,7 +148,11 @@ public sealed interface StaticResources extends ResourceHandler permits DefaultS
      */
     static StaticResources of(String... locations) {
         Objects.requireNonNull(locations, "locations");
-        ResourceResolver resolver = new ResourceResolver();
+        // the class loader of the application, not of micronaut-core, and no value loaders, e.g. string:
+        ResourceResolver resolver = new ResourceResolver(new ResourceLoader[]{
+            ClassPathResourceLoader.defaultLoader(Thread.currentThread().getContextClassLoader()),
+            FileSystemResourceLoader.defaultLoader()
+        });
         ResourceLoader[] loaders = new ResourceLoader[locations.length];
         for (int i = 0; i < locations.length; i++) {
             String location = Objects.requireNonNull(locations[i], "location");
@@ -153,6 +168,7 @@ public sealed interface StaticResources extends ResourceHandler permits DefaultS
      *
      * @param name The name of the path variable, {@value #DEFAULT_PATH_VARIABLE} by default
      * @return A copy with the path variable
+     * @throws IllegalArgumentException if the name is not a plain name, of letters, digits and underscores
      */
     StaticResources pathVariable(String name);
 
@@ -164,6 +180,8 @@ public sealed interface StaticResources extends ResourceHandler permits DefaultS
      *
      * @param name The name of the index file, {@value #DEFAULT_INDEX_FILE} by default, or {@code null} for none
      * @return A copy with the index file
+     * @throws IllegalArgumentException if the name is empty, {@code .} or {@code ..}, or has a
+     *                                  slash, a backslash or a colon
      */
     StaticResources indexFile(@Nullable String name);
 

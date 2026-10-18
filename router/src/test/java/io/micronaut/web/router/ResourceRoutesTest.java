@@ -262,6 +262,58 @@ class ResourceRoutesTest {
     }
 
     @Test
+    void aResourceHandlerOfAnOrdinaryRouteIsARouteOfResources() {
+        Router router = router(routes -> routes.path("/api", api -> {
+            api.produces(MediaType.APPLICATION_JSON_TYPE);
+            api.GET("/files/{+path}", resources("files", "path"));
+            api.GET("/memory/{+path}", new InMemory());
+        }));
+        Router plain = router(routes -> routes.GET("/files/{+path}", handler("files")));
+
+        UriRouteInfo<Object, Object> files = route(router, HttpRequest.GET("/api/files/site.css").accept(MediaType.of("text/css")));
+        assertEquals(route(plain, HttpRequest.GET("/files/site.css")).getProduces(), files.getProduces());
+        Exception error = assertThrows(Exception.class, () -> files.getExecutor(ThreadSelection.MANUAL));
+        assertTrue(error.getMessage().contains("blocking"), error.getMessage());
+        assertNull(route(router, HttpRequest.GET("/api/memory/site.css").accept(MediaType.of("text/css"))).getExecutor(ThreadSelection.MANUAL));
+    }
+
+    @Test
+    void theExecutorOfTheClosestGroupReplacesTheBlockingExecutor() {
+        Router router = router(routes -> routes.path("/outer", outer -> {
+            outer.executeOn("outer-executor");
+            outer.path("/inner", inner -> {
+                inner.executeOn("inner-executor");
+                inner.GET("/assets").resources(resources("inner", "path"));
+            });
+            outer.path("/plain", plain -> plain.GET("/assets").resources(resources("plain", "path")));
+            outer.path("/loop", loop -> {
+                loop.nonBlocking();
+                loop.GET("/assets").resources(resources("loop", "path"));
+            });
+        }));
+
+        Exception inner = assertThrows(Exception.class, () -> route(router, HttpRequest.GET("/outer/inner/assets/a.css")).getExecutor(ThreadSelection.MANUAL));
+        assertTrue(inner.getMessage().contains("inner-executor"), inner.getMessage());
+        Exception outer = assertThrows(Exception.class, () -> route(router, HttpRequest.GET("/outer/plain/assets/a.css")).getExecutor(ThreadSelection.MANUAL));
+        assertTrue(outer.getMessage().contains("outer-executor"), outer.getMessage());
+        assertNull(route(router, HttpRequest.GET("/outer/loop/assets/a.css")).getExecutor(ThreadSelection.MANUAL));
+    }
+
+    @Test
+    void aVariableOfThePrefixMatchesOneSegment() {
+        Router router = router(routes -> {
+            routes.GET("/tenants/{tenant:[a-z]+?}").resources(resources("tenants", "path"));
+            for (String prefix : new String[]{"/docs{/version}", "/dirs/{+dir}", "/any/{dir:.*}", "/slash/{dir:[^x]+}", "/many/{dirs*}"}) {
+                assertThrows(IllegalArgumentException.class, () -> routes.GET(prefix).resources(resources("bad", "path")), prefix);
+            }
+        });
+
+        assertEquals("tenants", target(router, "/tenants/acme/site.css"));
+        assertEquals("acme", router.findClosest(HttpRequest.GET("/tenants/acme/site.css")).getVariableValues().get("tenant"));
+        assertNull(router.findClosest(HttpRequest.GET("/docs/css/site.css")));
+    }
+
+    @Test
     void aRouteOfResourcesThatDoesNotBlockRunsLikeAnyHandler() {
         Router router = router(routes -> routes.GET("/memory").resources(new InMemory()));
 

@@ -225,6 +225,17 @@ public class StaticResourcesRoutesTest {
     }
 
     @Test
+    void anotherSpellingOfAPathIsNotFound() throws IOException {
+        try (ServerUnderTest server = server()) {
+            // the more specific route of /static-fn/special.txt is not bypassed, nor any file served twice
+            assertEquals("special handler", exchange(server, HttpRequest.GET("/static-fn/special.txt")).body());
+            for (String uri : new String[]{"/static-fn//special.txt", "/static-fn/css//site.css", "/static-fn/css%2fsite.css", "/static-fn/css%2Fsite.css", "/files/sub%2fpage.html"}) {
+                assertEquals(HttpStatus.NOT_FOUND, exchange(server, HttpRequest.GET(uri)).getStatus(), uri);
+            }
+        }
+    }
+
+    @Test
     void theHiddenFilesAreNotFoundUnlessServed() throws IOException {
         try (ServerUnderTest server = server()) {
             for (String uri : new String[]{"/files/.env", "/files/.git/config"}) {

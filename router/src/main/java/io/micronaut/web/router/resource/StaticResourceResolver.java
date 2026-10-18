@@ -133,7 +133,8 @@ public class StaticResourceResolver {
             path = indexPage;
         }
         String indexPath = null;
-        if (!root && indexPage != null && path.indexOf('.') == -1) {
+        if (!root && indexPage != null && path.indexOf('.', path.lastIndexOf('/') + 1) == -1) {
+            // a path whose last segment has no extension may be a directory
             indexPath = (path.endsWith("/") ? path : path + "/") + indexPage;
         }
         for (ResourceLoader loader : loaders) {

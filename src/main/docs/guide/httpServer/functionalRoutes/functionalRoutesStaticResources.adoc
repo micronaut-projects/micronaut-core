@@ -23,10 +23,10 @@ snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="group", 
 
 `StaticResources` is immutable: each option returns a copy.
 
-* `classpath(base)`, `fileSystem(directory)` (a `String` or a `Path`), `of(locations...)` with the locations of `micronaut.router.static-resources`, e.g. `classpath:public` and `file:/var/www`, and `of(resourceLoaders...)`. With several locations, the first one that has a resource answers it.
-* `indexFile(name)`: the file answered for the prefix itself and for a path without an extension that is a directory, `index.html` by default; `null` for none, then such a request is answered with `404`.
+* `classpath(base)`, `fileSystem(directory)` (a `String` or a `Path`), `of(locations...)` with the locations of `micronaut.router.static-resources`, e.g. `classpath:public` and `file:/var/www`, and `of(resourceLoaders...)`. With several locations, the first one that has a resource answers it. The classpath locations are of the context class loader of the thread that creates them, the class loader of the application. `fileSystem(directory)` fails with an `IllegalArgumentException` if the directory does not exist.
+* `indexFile(name)`: the file answered for the prefix itself and for a path whose last segment has no extension and is a directory, e.g. `v1.2/docs`, `index.html` by default; `null` for none, then such a request is answered with `404`. It is the name of a file, without a slash.
 * `cacheControl(value)`: the `Cache-Control` header of the resources.
-* `pathVariable(name)`: the name of the path variable of the path of the resource, `path` by default.
+* `pathVariable(name)`: the name of the path variable of the path of the resource, `path` by default: letters, digits and underscores.
 * `hiddenFiles(serve)`: whether the hidden files are served, the paths with a segment that starts with a dot, e.g. `.env`, `.git/config` or `.well-known/security.txt`. By default they are not: such a path is answered with `404`.
 
 snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="hidden", indent=0, title="Serving the hidden files"]
@@ -39,22 +39,23 @@ A file of the file system is answered as a api:http.server.types.files.SystemFil
 
 * the content type follows the extension of the file name;
 * the response has a `Last-Modified` header, and a request with a matching `If-Modified-Since` header is answered with `304`;
-* a `Range` request for a file of the file system is answered with `206`;
+* a `Range` request for a file of the file system is answered with `206`. A resource of the classpath is a file of the file system when the classpath is a directory, e.g. while developing, and not in a jar, so it is answered with `206` while developing but not from the jar;
 * a `HEAD` request is answered with the headers of a `GET` request, including `304` to a matching `If-Modified-Since`, without the content.
 
-A request for a resource that no location has, or for a directory without an index file, is answered with `404`. So is a path that tries to leave the base: a `.` or `..` segment, a backslash, an absolute path, or a percent-encoded dot, slash or backslash, e.g. `/assets/%2e%2e/secret.txt` or `/assets/..%2fsecret.txt`.
+A request for a resource that no location has, or for a directory without an index file, is answered with `404`. So is a path that tries to leave the base: a `.` or `..` segment, a backslash, a colon, a NUL character, an absolute path, or a dot, slash or backslash encoded twice, e.g. `/assets/%252e%252e/secret.txt`, which the router decodes once. So is another spelling of a path, which the router could route elsewhere, e.g. past a more specific route under the prefix: an empty segment, as in `/assets/css//site.css`, or an encoded slash or backslash, as in `/assets/css%2fsite.css` or `/assets/..%2fsecret.txt`.
 
 ==== The rules of a route of resources
 
 * `resources(...)` ends a route of `GET` only, e.g. `GET(uri)` or `route(HttpMethod.GET, uri)`. On any other route, e.g. `POST(uri)`, `any(uri)` or a route of `GET` and `POST`, it throws an `IllegalStateException` while the routes are built, so the application fails at startup. It throws one too on a route already ended by another terminal.
-* The URI of the route is a prefix: it has no query or fragment, and the path variable of the handler is a plain name. Otherwise the route fails with an `IllegalArgumentException`. The prefix is a URI template: in a group whose `templates(...)` parse another language, `resources(...)` throws an `IllegalStateException`.
+* The URI of the route is a prefix: it has no query or fragment, each of its variables matches one segment, e.g. `{tenant}` or `{tenant:[a-z]+}`, not `{/version}`, `{+dir}` or `{dir:.*}`, and the path variable of the handler is a plain name. Otherwise the route fails with an `IllegalArgumentException`. The prefix is a URI template: in a group whose `templates(...)` parse another language, `resources(...)` throws an `IllegalStateException`.
 * The media types of its groups do not apply, but their filters, executor, conditions, order, port, annotations and attributes do.
 * Reading the resources of the file system and of the classpath blocks, so the route runs on the blocking executor, unless the route or its groups declare an executor, e.g. `executeOn(...)` or `nonBlocking()`. A custom `ResourceHandler` that reads its resources without blocking returns `false` from `blocking()`.
+* A `ResourceHandler` given to an ordinary route, e.g. `GET("/files/{+path}", StaticResources.fileSystem(directory))`, runs like a route of resources: on the blocking executor, without the media types of its groups.
 * A route of resources is a route of an `HttpRoutes` bean: on a located route, see <<functionalRoutesLocators, Locator Routes>>, it throws an `IllegalStateException`.
 * The prefix of the route, with the prefixes of its groups, does not have the path variable of the handler, e.g. `path("/tenants/{path}", ...)`: it throws an `IllegalStateException`. Give the handler another one with `pathVariable(...)`.
 
 ==== Static resources of the configuration
 
-The static resources of the configuration, `micronaut.router.static-resources` (see <<staticResources, Serving Static Resources>>), and the routes of resources share the resolution of a path to a resource, api:web.router.resource.StaticResourceResolver[]: the order of the locations, the index file of a directory and the content type are the same.
+The static resources of the configuration, `micronaut.router.static-resources` (see <<staticResources, Serving Static Resources>>), and the routes of resources share the resolution of a path to a resource, api:web.router.resource.StaticResourceResolver[]: the order of the locations, the index file of a directory and the content type are the same. A route of resources rejects more paths, e.g. the hidden files and the other spellings of a path, and its classpath locations are of the context class loader of the thread that creates them.
 
 Use the configuration to serve static resources without code, e.g. to change the locations per environment. Use a route of resources to give them the settings of a route: filters, conditions, an order, a port, an executor or a `Cache-Control` header, or to declare them with the other functional routes of a group.

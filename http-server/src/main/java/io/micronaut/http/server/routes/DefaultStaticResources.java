@@ -69,11 +69,18 @@ final class DefaultStaticResources implements StaticResources {
     @Override
     public StaticResources pathVariable(String name) {
         Objects.requireNonNull(name, "name");
+        if (name.isEmpty() || !name.chars().allMatch(c -> Character.isLetterOrDigit(c) || c == '_')) {
+            throw new IllegalArgumentException("The path variable of static resources must be a plain name: " + name);
+        }
         return new DefaultStaticResources(loaders, name, indexFile, cacheControl, hiddenFiles);
     }
 
     @Override
     public StaticResources indexFile(@Nullable String name) {
+        if (name != null && (name.isEmpty() || ".".equals(name) || "..".equals(name)
+            || name.indexOf('/') >= 0 || name.indexOf('\\') >= 0 || name.indexOf(':') >= 0)) {
+            throw new IllegalArgumentException("The index file of static resources must be the name of a file: " + name);
+        }
         return new DefaultStaticResources(loaders, pathVariable, name, cacheControl, hiddenFiles);
     }
 
@@ -116,7 +123,7 @@ final class DefaultStaticResources implements StaticResources {
     @Override
     public HttpResponse<?> handle(HttpRequest<?> request, PathVariables pathVariables) {
         String path = pathVariables.findString(pathVariable).orElse("");
-        if (!isRelative(path) || (!hiddenFiles && isHidden(path))) {
+        if (!isRelative(path) || (!hiddenFiles && isHidden(path)) || isAlias(path, request.getUri().getRawPath())) {
             return HttpResponse.notFound();
         }
         Optional<URL> resolved = StaticResourceResolver.resolve(loaders, path, indexFile);
@@ -188,6 +195,26 @@ final class DefaultStaticResources implements StaticResources {
             start = end + 1;
         }
         return true;
+    }
+
+    /**
+     * Whether a path is another spelling of a path that the router may route elsewhere, e.g. to a
+     * more specific route: an empty segment, as in {@code css//site.css}, or an encoded slash or
+     * backslash, as in {@code css%2fsite.css}, which the router matches as one segment.
+     *
+     * @param path    The decoded path of the resource
+     * @param rawPath The raw path of the request
+     * @return Whether it is an alias
+     */
+    static boolean isAlias(String path, @Nullable String rawPath) {
+        if (path.contains("//")) {
+            return true;
+        }
+        if (rawPath == null || rawPath.indexOf('%') == -1) {
+            return false;
+        }
+        String lowerCase = rawPath.toLowerCase(Locale.ROOT);
+        return lowerCase.contains("%2f") || lowerCase.contains("%5c");
     }
 
     /**

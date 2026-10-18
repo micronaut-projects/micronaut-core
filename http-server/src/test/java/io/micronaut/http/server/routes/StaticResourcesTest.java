@@ -66,6 +66,30 @@ class StaticResourcesTest {
     }
 
     @Test
+    void theOptionsAreChecked() {
+        StaticResources resources = StaticResources.classpath("public");
+        for (String name : new String[]{"", ".", "..", "a/index.html", "a\\index.html", "c:index.html"}) {
+            assertThrows(IllegalArgumentException.class, () -> resources.indexFile(name), name);
+        }
+        for (String name : new String[]{"", "a-b", "a.b", "a/b"}) {
+            assertThrows(IllegalArgumentException.class, () -> resources.pathVariable(name), name);
+        }
+        assertEquals("default.htm", resources.indexFile("default.htm").indexFile());
+        assertThrows(IllegalArgumentException.class, () -> StaticResources.fileSystem("/no/such/directory/of/static/resources"));
+        assertThrows(IllegalArgumentException.class, () -> StaticResources.of("string:hello"));
+    }
+
+    @Test
+    void anotherSpellingOfAPathIsAnAlias() {
+        assertTrue(DefaultStaticResources.isAlias("css//site.css", "/assets/css//site.css"));
+        assertTrue(DefaultStaticResources.isAlias("css/site.css", "/assets/css%2fsite.css"));
+        assertTrue(DefaultStaticResources.isAlias("css/site.css", "/assets/css%2Fsite.css"));
+        assertTrue(DefaultStaticResources.isAlias("css\\site.css", "/assets/css%5csite.css"));
+        assertFalse(DefaultStaticResources.isAlias("css/site.css", "/assets/css/site.css"));
+        assertFalse(DefaultStaticResources.isAlias("my file.txt", "/assets/my%20file.txt"));
+    }
+
+    @Test
     void aLocationNeedsASupportedPrefix() {
         assertThrows(IllegalArgumentException.class, () -> StaticResources.of("public"));
         assertThrows(IllegalArgumentException.class, () -> StaticResources.of(new String[0]));

@@ -69,10 +69,63 @@ record RoutePrefix(String value) {
      * @throws IllegalArgumentException if the prefix has a query or a fragment
      */
     static void checkPath(String prefix, String owner) {
-        if (prefix.indexOf('?') >= 0 || prefix.indexOf('#') >= 0
-            || prefix.contains("{?") || prefix.contains("{&") || prefix.contains("{#")) {
-            throw new IllegalArgumentException("The prefix of " + owner + " is a path, without a query or a fragment: " + prefix);
+        int depth = 0;
+        for (int i = 0; i < prefix.length(); i++) {
+            char c = prefix.charAt(i);
+            if (c == '{') {
+                // a variable of a query or a fragment; the regular expression of a variable may have any character
+                if (depth == 0 && i + 1 < prefix.length() && "?&#".indexOf(prefix.charAt(i + 1)) >= 0) {
+                    throw notAPath(prefix, owner);
+                }
+                depth++;
+            } else if (c == '}') {
+                depth = Math.max(0, depth - 1);
+            } else if (depth == 0 && (c == '?' || c == '#')) {
+                throw notAPath(prefix, owner);
+            }
         }
+    }
+
+    /**
+     * Check that the variables of a prefix match one segment each: a variable of the path that
+     * follows it, e.g. {@code {+path}}, starts after the last segment of the prefix.
+     *
+     * @param prefix The prefix
+     * @param owner  What the prefix is the prefix of, for the message, e.g. {@code a route of resources}
+     * @throws IllegalArgumentException if a variable may match an empty value at the end of the
+     *                                  prefix or several segments: an optional or reserved
+     *                                  expansion, e.g. {@code {/version}} or {@code {+dir}}, an
+     *                                  exploded one, or a regular expression that may match a slash
+     */
+    static void checkSegmentVariables(String prefix, String owner) {
+        int start = prefix.indexOf('{');
+        while (start >= 0) {
+            int depth = 0;
+            int end = start;
+            for (; end < prefix.length(); end++) {
+                char c = prefix.charAt(end);
+                if (c == '{') {
+                    depth++;
+                } else if (c == '}' && --depth == 0) {
+                    break;
+                }
+            }
+            String variable = prefix.substring(start + 1, Math.min(end, prefix.length()));
+            int colon = variable.indexOf(':');
+            String names = colon == -1 ? variable : variable.substring(0, colon);
+            String regex = colon == -1 ? "" : variable.substring(colon + 1);
+            boolean operator = !names.isEmpty() && "+/.;".indexOf(names.charAt(0)) >= 0;
+            boolean spans = regex.indexOf('.') >= 0 || regex.indexOf('/') >= 0 || regex.indexOf('\\') >= 0 || regex.contains("[^");
+            if (operator || names.indexOf('*') >= 0 || spans) {
+                throw new IllegalArgumentException("The variable {" + variable + "} of the prefix of " + owner + " " + prefix
+                    + " may match several segments or none: a variable of the prefix matches one segment, e.g. {tenant} or {tenant:[a-z]+}");
+            }
+            start = prefix.indexOf('{', end);
+        }
+    }
+
+    private static IllegalArgumentException notAPath(String prefix, String owner) {
+        return new IllegalArgumentException("The prefix of " + owner + " is a path, without a query or a fragment: " + prefix);
     }
 
     /**

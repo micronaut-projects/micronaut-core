@@ -47,6 +47,11 @@ import java.util.function.Supplier;
 final class PendingRoute {
 
     /**
+     * The settings of a route of resources that it does not inherit from its groups: the handler
+     * decides the media type of each resource.
+     */
+    static final int RESOURCE_SETTINGS = RouteGroupDefaults.CONSUMES_SETTING | RouteGroupDefaults.PRODUCES_SETTING;
+    /**
      * The name of the blocking executor, {@code TaskExecutors.BLOCKING}.
      */
     private static final String BLOCKING_EXECUTOR = "blocking";
@@ -197,6 +202,7 @@ final class PendingRoute {
         String pathVariable;
         try {
             RoutePrefix.checkPath(template, "a route of resources");
+            RoutePrefix.checkSegmentVariables(template, "a route of resources");
             pathVariable = resourcePathVariable(resources);
             if (UriMatchTemplate.of(template).getVariableNames().contains(pathVariable)) {
                 throw new IllegalStateException("The prefix of the route " + description + " has the variable " + pathVariable
@@ -224,17 +230,18 @@ final class PendingRoute {
             added.add(builder.getRoute(root, handler.get()));
             added.add(builder.getRoute(paths, handler.get()));
             return added;
-        }, resources.blocking() ? PendingRoute::blockingResources : null, RouteGroupDefaults.CONSUMES_SETTING | RouteGroupDefaults.PRODUCES_SETTING);
+        }, resourceSettings(resources), RESOURCE_SETTINGS);
     }
 
     /**
-     * Run the routes of resources whose reading blocks on the blocking executor: the executor of
-     * the route, or of its groups, given later, replaces it.
+     * The settings a route of resources gives its routes: those whose reading blocks run on the
+     * blocking executor, which the executor of the route, or of its groups, given later, replaces.
      *
-     * @param route A route of resources
+     * @param resources The handler of the resources
+     * @return The settings, or {@code null}
      */
-    private static void blockingResources(RouteSettings route) {
-        route.executeOn(BLOCKING_EXECUTOR);
+    static @Nullable Consumer<RouteSettings> resourceSettings(ResourceHandler resources) {
+        return resources.blocking() ? route -> route.executeOn(BLOCKING_EXECUTOR) : null;
     }
 
     private static String resourcePathVariable(ResourceHandler resources) {

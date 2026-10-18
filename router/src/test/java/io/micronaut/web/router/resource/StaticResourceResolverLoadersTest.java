@@ -67,6 +67,16 @@ class StaticResourceResolverLoadersTest {
     }
 
     @Test
+    void onlyAnExtensionOfTheLastSegmentSkipsTheIndexPage() throws IOException {
+        write(first.resolve("v1.2/docs/index.html"));
+        write(first.resolve(".well-known/index.html"));
+        List<ResourceLoader> loaders = List.of(new DefaultFileSystemResourceLoader(first));
+
+        assertEquals(first.resolve("v1.2/docs/index.html").toRealPath(), path(StaticResourceResolver.resolve(loaders, "v1.2/docs", "index.html")));
+        assertEquals(first.resolve(".well-known/index.html").toRealPath(), path(StaticResourceResolver.resolve(loaders, ".well-known/", "index.html")));
+    }
+
+    @Test
     void eachLoaderIsTriedWithThePathBeforeTheIndexPageUnderIt() throws IOException {
         // a file without an extension that only the second loader has
         write(second.resolve("LICENSE"));
