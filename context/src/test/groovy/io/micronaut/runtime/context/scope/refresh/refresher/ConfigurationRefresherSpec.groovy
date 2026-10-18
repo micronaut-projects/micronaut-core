@@ -364,9 +364,18 @@ class ConfigurationRefresherSpec extends Specification {
 
     void "refreshAll treats everything as changed"() {
         given:
-        def context = ApplicationContext.run(["spec.name": "ConfigurationRefresherSpec", "pool.url": "one", "bound.label": "a"])
+        Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec", "pool.url": "one", "bound.label": "a"]
+        def source = new MapPropertySource("test", values) {
+            @Override
+            Object get(String key) { values[key] }
+
+            @Override
+            Iterator<String> iterator() { values.keySet().iterator() }
+        }
+        def context = ApplicationContext.builder().propertySources(source).start()
         def refresher = context.getBean(ConfigurationRefresher)
         context.getBean(Pool)
+        values["bound.label"] = "b"
         context.getBean(BoundConfiguration)
 
         when:
@@ -378,6 +387,26 @@ class ConfigurationRefresherSpec extends Specification {
         result.rebound()*.beanType.contains(PoolConfiguration)
         result.recreated()*.beanType.contains(BoundConfiguration)
         result.outcomes() == [ReloadingConfigurationWatcher.Outcome.RECREATE]
+
+        cleanup:
+        context.close()
+    }
+
+    void "refreshAll keeps a constructor-bound configuration whose values did not change, and the beans that received it"() {
+        given:
+        def context = ApplicationContext.run(["spec.name": "ConfigurationRefresherSpec", "pool.url": "one", "bound.label": "a"])
+        def refresher = context.getBean(ConfigurationRefresher)
+        def configuration = context.getBean(BoundConfiguration)
+        def user = context.getBean(BoundUser)
+
+        when:
+        def result = refresher.refreshAll()
+
+        then: "a server holding its configuration, as a servlet container does, is not stopped by a forced refresh"
+        result.change().all()
+        !result.recreated()*.beanType.contains(BoundConfiguration)
+        context.getBean(BoundConfiguration).is(configuration)
+        context.getBean(BoundUser).is(user)
 
         cleanup:
         context.close()
