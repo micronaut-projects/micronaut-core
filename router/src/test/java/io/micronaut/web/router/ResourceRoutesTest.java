@@ -307,7 +307,7 @@ class ResourceRoutesTest {
             routes.GET("/segment/{name:[^/]+}").resources(resources("segment", "path"));
             routes.GET("/dotted/{name:[.a-z]+}").resources(resources("dotted", "path"));
             for (String prefix : new String[]{"/docs{/version}", "/dirs/{+dir}", "/any/{dir:.*}", "/slash/{dir:[^x]+}", "/many/{dirs*}",
-                "/range/{dir:[!-~]+}", "/empty/{dir:[a-z]*}", "/optional/{dir:a?}"}) {
+                "/range/{dir:[!-~]+}", "/empty/{dir:[a-z]*}", "/optional/{dir:a?}", "/modifier/{dir:?}"}) {
                 assertThrows(IllegalArgumentException.class, () -> routes.GET(prefix).resources(resources("bad", "path")), prefix);
             }
         });

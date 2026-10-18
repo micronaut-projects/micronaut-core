@@ -29,14 +29,11 @@ import io.micronaut.web.router.resource.StaticResourceResolver;
 import org.jspecify.annotations.Nullable;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.LinkOption;
-import java.nio.file.Path;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -132,7 +129,13 @@ final class DefaultStaticResources implements StaticResources {
             || spansSegments(pathVariables)) {
             return HttpResponse.notFound();
         }
-        Optional<URL> resolved = StaticResourceResolver.resolve(loaders, path, indexFile);
+        Optional<URL> resolved;
+        try {
+            resolved = StaticResourceResolver.resolve(loaders, path, indexFile);
+        } catch (InvalidPathException e) {
+            // a name the file system does not allow, e.g. a? on Windows
+            return HttpResponse.notFound();
+        }
         if (resolved.isEmpty()) {
             return HttpResponse.notFound();
         }
@@ -207,53 +210,66 @@ final class DefaultStaticResources implements StaticResources {
      * Whether a path is another spelling of a path that the router may route elsewhere, e.g. to a
      * more specific route: an empty segment, as in {@code css//site.css}, or an encoded slash, as
      * in {@code css%2fsite.css}, which the router matches as one segment. Only the end of the raw
-     * path of the request, the path of the resource, is checked, not the prefix.
+     * path of the request, the path of the resource, is checked, not the prefix, and it is not
+     * decoded, so the check does not depend on the charset of the router.
      *
      * @param path    The decoded path of the resource
      * @param rawPath The raw path of the request
      * @return Whether it is an alias
      */
     static boolean isAlias(String path, @Nullable String rawPath) {
-        if (path.contains("//")) {
+        String resource = withoutTrailingSlash(path);
+        if (resource.contains("//")) {
             return true;
         }
-        if (path.isEmpty() || rawPath == null || rawPath.indexOf('%') == -1) {
+        if (resource.isEmpty() || rawPath == null || rawPath.indexOf('%') == -1) {
             return false;
         }
-        // the raw segments of the path of the resource: as many as its decoded segments, unless
-        // one of them is an encoded slash
+        // the router ignores a trailing slash
+        String raw = withoutTrailingSlash(rawPath);
+        // as many raw segments as decoded ones: with an encoded slash in the path of the
+        // resource, they reach the prefix, and have the encoded slash
+        int start = raw.length();
+        for (int i = 0; i < segments(resource); i++) {
+            start = raw.lastIndexOf('/', start - 1);
+            if (start < 0) {
+                return true;
+            }
+        }
+        String rawResource = raw.substring(start + 1).toLowerCase(Locale.ROOT);
+        return rawResource.contains("%2f");
+    }
+
+    private static String withoutTrailingSlash(String path) {
+        int end = path.length();
+        while (end > 0 && path.charAt(end - 1) == '/') {
+            end--;
+        }
+        return path.substring(0, end);
+    }
+
+    private static int segments(String path) {
         int segments = 1;
         for (int i = 0; i < path.length(); i++) {
             if (path.charAt(i) == '/') {
                 segments++;
             }
         }
-        int start = rawPath.length();
-        for (int i = 0; i < segments; i++) {
-            start = rawPath.lastIndexOf('/', start - 1);
-            if (start < 0) {
-                return true;
-            }
-        }
-        String rawResource = rawPath.substring(start + 1);
-        try {
-            return !URLDecoder.decode(rawResource, StandardCharsets.UTF_8).equals(path);
-        } catch (IllegalArgumentException e) {
-            return true;
-        }
+        return segments;
     }
 
     /**
      * Whether a variable of the route other than the path of the resource matched several
-     * segments, e.g. a variable of the prefix whose regular expression matches a slash: the path of
-     * the resource is then not the end of the path of the request.
+     * segments or none, e.g. a variable of the prefix whose regular expression matches a slash or
+     * an empty value: the path of the resource is then not the end of the path of the request.
      *
      * @param pathVariables The path variables of the route
      * @return Whether a variable spans segments
      */
     private boolean spansSegments(PathVariables pathVariables) {
         for (String name : pathVariables.names()) {
-            if (!name.equals(pathVariable) && pathVariables.findString(name).filter(value -> value.indexOf('/') >= 0).isPresent()) {
+            if (!name.equals(pathVariable)
+                && pathVariables.findString(name).filter(value -> value.isEmpty() || value.indexOf('/') >= 0).isPresent()) {
                 return true;
             }
         }
@@ -262,33 +278,33 @@ final class DefaultStaticResources implements StaticResources {
 
     /**
      * Whether a file of the file system is spelled as the path of the request, e.g. not
-     * {@code HELLO.TXT} for {@code hello.txt} on a file system that ignores the case, which the
-     * router may route elsewhere, e.g. to a more specific route.
+     * {@code HELLO.TXT} for {@code hello.txt} on a file system that ignores the case, e.g. on
+     * macOS or Windows, which the router may route elsewhere, e.g. to a more specific route. The
+     * names of the path, and of the index file, are compared with the names their directories
+     * list, exactly: only the names under the base, not the directories above it, and without
+     * following the links, which the loaders check.
      *
-     * @param file The file
-     * @param path The relative path of the resource, the file or its directory of the index file
-     * @return Whether the names of the file system are the names of the path
+     * @param file The file, whose path ends with the names of the request
+     * @param path The relative path of the resource, the file or the directory of its index file
+     * @return Whether the names of the file system are the names of the request
      */
     static boolean isSpelledAsRequested(File file, String path) {
-        Path real;
-        try {
-            // the names of the file system, without following the links, which the loaders check
-            real = file.toPath().toRealPath(LinkOption.NOFOLLOW_LINKS);
-        } catch (IOException | RuntimeException e) {
-            return false;
+        String resource = withoutTrailingSlash(path);
+        int names = resource.isEmpty() ? 0 : segments(resource);
+        if (names == 0 || !file.getName().equals(resource.substring(resource.lastIndexOf('/') + 1))) {
+            // the index file of the directory
+            names++;
         }
-        String trimmed = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
-        if (trimmed.isEmpty()) {
-            // the index file of the base
-            return indexName(real, file);
+        File current = file;
+        for (int i = 0; i < names && current != null; i++) {
+            File directory = current.getParentFile();
+            String[] listed = directory == null ? null : directory.list();
+            if (listed == null || !Arrays.asList(listed).contains(current.getName())) {
+                return false;
+            }
+            current = directory;
         }
-        Path requested = Paths.get(trimmed);
-        return real.endsWith(requested) || (real.getParent() != null && real.getParent().endsWith(requested) && indexName(real, file));
-    }
-
-    private static boolean indexName(Path real, File file) {
-        Path name = real.getFileName();
-        return name != null && name.toString().equals(file.getName());
+        return current != null;
     }
 
     /**

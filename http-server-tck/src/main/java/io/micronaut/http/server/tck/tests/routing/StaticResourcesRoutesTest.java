@@ -236,6 +236,10 @@ public class StaticResourcesRoutesTest {
             assertEquals(HttpStatus.NOT_FOUND, exchange(server, HttpRequest.GET("/files/HELLO.TXT")).getStatus());
             // an encoded slash of a literal prefix is the prefix, not an alias
             assertEquals("Hello file", exchange(server, HttpRequest.GET("/encoded%2Fprefix/hello.txt")).body());
+            // with a trailing slash, which the router ignores
+            assertEquals(HttpStatus.OK, exchange(server, HttpRequest.GET("/encoded%2Fprefix/sub/page.html/")).getStatus());
+            // and the index file of a directory, spelled as on the file system
+            assertEquals(HttpStatus.OK, exchange(server, HttpRequest.GET("/encoded%2Fprefix/")).getStatus());
         }
     }
 

@@ -15,13 +15,25 @@
  */
 package io.micronaut.http.server.routes;
 
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.PathVariables;
+import io.micronaut.http.bind.MatchedPathVariables;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -97,6 +109,12 @@ class StaticResourcesTest {
         assertFalse(DefaultStaticResources.isAlias("hello.txt", "/tenant/acme%2Feu/assets/hello.txt"));
         assertFalse(DefaultStaticResources.isAlias("", "/a%2Fb"));
         assertTrue(DefaultStaticResources.isAlias("a/b/c.txt", "/a%2Fb/c.txt"));
+        // the router ignores a trailing slash
+        assertFalse(DefaultStaticResources.isAlias("docs", "/encoded%2Fprefix/docs/"));
+        assertFalse(DefaultStaticResources.isAlias("my file.txt", "/assets/my%20file.txt/"));
+        // the raw path is not decoded: any charset of the router
+        assertFalse(DefaultStaticResources.isAlias("caf\u00e9.txt", "/assets/caf%E9.txt"));
+        assertFalse(DefaultStaticResources.isAlias("caf\u00e9.txt", "/assets/caf%C3%A9.txt"));
         assertFalse(DefaultStaticResources.isAlias("css/site.css", "/assets/css/site.css"));
         assertFalse(DefaultStaticResources.isAlias("my file.txt", "/assets/my%20file.txt"));
     }
@@ -116,6 +134,60 @@ class StaticResourcesTest {
             // a file system that ignores the case
             assertFalse(DefaultStaticResources.isSpelledAsRequested(upper, "HELLO.TXT"));
             assertFalse(DefaultStaticResources.isSpelledAsRequested(base.resolve("DOCS/index.html").toFile(), "DOCS"));
+        }
+    }
+
+    @Test
+    void anEmptyOrSeveralSegmentsVariableOfThePrefixIsNotFound(@TempDir Path base) throws Exception {
+        Files.writeString(base.resolve("hello.txt"), "hello");
+        StaticResources resources = StaticResources.fileSystem(base);
+        assertEquals(HttpStatus.OK, resources.handle(HttpRequest.GET("/docs/v1/hello.txt"), variables(Map.of("v", "v1", "path", "hello.txt"))).getStatus());
+        assertEquals(HttpStatus.NOT_FOUND, resources.handle(HttpRequest.GET("/docs//hello.txt"), variables(Map.of("v", "", "path", "hello.txt"))).getStatus());
+        assertEquals(HttpStatus.NOT_FOUND, resources.handle(HttpRequest.GET("/docs/a/b/hello.txt"), variables(Map.of("v", "a/b", "path", "hello.txt"))).getStatus());
+    }
+
+    @Test
+    void aNameTheFileSystemDoesNotAllowIsNotFound() throws Exception {
+        StaticResources resources = StaticResources.of(new FixedLoader() {
+            @Override
+            public Optional<URL> getResource(String path) {
+                throw new InvalidPathException(path, "Illegal char <?>");
+            }
+        });
+        assertEquals(HttpStatus.NOT_FOUND, resources.handle(HttpRequest.GET("/files/a%3Fb.txt"), variables(Map.of("path", "a?b.txt"))).getStatus());
+    }
+
+    private static PathVariables variables(Map<String, Object> values) {
+        return new MatchedPathVariables(values, ConversionService.SHARED);
+    }
+
+    /**
+     * A loader without resources.
+     */
+    private static class FixedLoader implements ResourceLoader {
+        @Override
+        public Optional<InputStream> getResourceAsStream(String path) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<URL> getResource(String path) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Stream<URL> getResources(String name) {
+            return Stream.empty();
+        }
+
+        @Override
+        public boolean supportsPrefix(String path) {
+            return false;
+        }
+
+        @Override
+        public ResourceLoader forBase(String basePath) {
+            return this;
         }
     }
 

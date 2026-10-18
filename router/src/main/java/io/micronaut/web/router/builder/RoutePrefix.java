@@ -143,8 +143,8 @@ record RoutePrefix(String value) {
         try {
             pattern = Pattern.compile(regex);
         } catch (PatternSyntaxException e) {
-            // the URI template reports it
-            return false;
+            // not a regular expression, e.g. the optional modifier of {v:?}
+            return true;
         }
         for (String value : SPANNING_VALUES) {
             if (pattern.matcher(value).matches()) {
