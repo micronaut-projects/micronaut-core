@@ -211,6 +211,10 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                     .propagate(() -> requestLifecycle.handle(msg))
             );
             responseFlow.onComplete((r, throwable) -> {
+                // the upgrade does not read the body of its request, which is not empty when the
+                // request went through the h2c upgrade handler: that aggregates every request
+                // with an Upgrade header into a FullHttpRequest
+                body.close();
                 HttpResponse<?> response = r;
                 if (response == null) {
                     // the lifecycle answers failures itself, this is a last resort so that the
