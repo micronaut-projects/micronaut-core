@@ -411,4 +411,70 @@ class ConfigurationRefresherSpec extends Specification {
         cleanup:
         context.close()
     }
+
+    void "a refresh of the keys a caller reports recreates the constructor-bound configuration under them"() {
+        given:
+        Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec", "pool.url": "one", "bound.label": "a"]
+        def source = new MapPropertySource("test", values) {
+            @Override
+            Object get(String key) { values[key] }
+
+            @Override
+            Iterator<String> iterator() { values.keySet().iterator() }
+        }
+        def context = ApplicationContext.builder().propertySources(source).start()
+        def refresher = context.getBean(ConfigurationRefresher)
+        def configuration = context.getBean(BoundConfiguration)
+        values["bound.label"] = "b"
+
+        when:
+        context.environment.refresh()
+        def result = refresher.refresh(new ConfigurationChange(false, ["bound.label"] as Set, ["bound.label": "a"], ["bound.label": "b"]))
+
+        then:
+        !result.change().all()
+        !context.getBean(BoundConfiguration).is(configuration)
+        context.getBean(BoundConfiguration).label == "b"
+
+        cleanup:
+        context.close()
+    }
+
+    void "a forced refresh through #path recreates a constructor-bound configuration only when a key under its prefix changed: #changed"() {
+        given:
+        Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec", "pool.url": "one", "bound.label": "a"]
+        def source = new MapPropertySource("test", values) {
+            @Override
+            Object get(String key) { values[key] }
+
+            @Override
+            Iterator<String> iterator() { values.keySet().iterator() }
+        }
+        def context = ApplicationContext.builder().propertySources(source).start()
+        def refresher = context.getBean(ConfigurationRefresher)
+        def configuration = context.getBean(BoundConfiguration)
+        values[property] = "b"
+
+        when:
+        context.environment.refresh()
+        if (path == "event") {
+            context.publishEvent(new RefreshEvent())
+        } else {
+            refresher.refresh(ConfigurationChange.ofAll())
+        }
+
+        then:
+        context.getBean(BoundConfiguration).is(configuration) == !changed
+        context.getBean(BoundConfiguration).label == (changed ? "b" : "a")
+
+        cleanup:
+        context.close()
+
+        where:
+        path      | property      | changed
+        "refresh" | "bound.label" | true
+        "refresh" | "pool.url"    | false
+        "event"   | "bound.label" | true
+        "event"   | "pool.url"    | false
+    }
 }
