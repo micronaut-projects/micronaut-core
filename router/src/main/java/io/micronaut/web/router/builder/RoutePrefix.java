@@ -125,7 +125,7 @@ record RoutePrefix(String value) {
             boolean operator = !names.isEmpty() && "+/.;".indexOf(names.charAt(0)) >= 0;
             if (operator || names.indexOf('*') >= 0 || (!regex.isEmpty() && spans(regex))) {
                 throw new IllegalArgumentException("The variable {" + variable + "} of the prefix of " + owner + " " + prefix
-                    + " may match several segments or none: a variable of the prefix matches one segment, e.g. {tenant} or {tenant:[a-z]+}");
+                    + " may match several segments or none: a variable of the prefix matches one segment, without capturing groups, e.g. {tenant} or {tenant:[a-z]+}");
             }
             start = prefix.indexOf('{', end);
         }
@@ -144,6 +144,10 @@ record RoutePrefix(String value) {
             pattern = Pattern.compile(regex);
         } catch (PatternSyntaxException e) {
             // not a regular expression, e.g. the optional modifier of {v:?}
+            return true;
+        }
+        if (pattern.matcher("").groupCount() > 0) {
+            // the matcher of a URI template reads the values of the variables from the groups
             return true;
         }
         for (String value : SPANNING_VALUES) {

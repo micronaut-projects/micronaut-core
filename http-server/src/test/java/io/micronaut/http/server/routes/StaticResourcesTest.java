@@ -109,7 +109,10 @@ class StaticResourcesTest {
         assertFalse(DefaultStaticResources.isAlias("hello.txt", "/tenant/acme%2Feu/assets/hello.txt"));
         assertFalse(DefaultStaticResources.isAlias("", "/a%2Fb"));
         assertTrue(DefaultStaticResources.isAlias("a/b/c.txt", "/a%2Fb/c.txt"));
-        // the router ignores a trailing slash
+        // the router ignores one trailing slash, not more
+        assertTrue(DefaultStaticResources.isAlias("hello.txt//", "/files/hello.txt///"));
+        assertTrue(DefaultStaticResources.isAlias("hello.txt/", "/files/hello.txt//"));
+        assertFalse(DefaultStaticResources.isAlias("docs", "/files/docs/"));
         assertFalse(DefaultStaticResources.isAlias("docs", "/encoded%2Fprefix/docs/"));
         assertFalse(DefaultStaticResources.isAlias("my file.txt", "/assets/my%20file.txt/"));
         // the raw path is not decoded: any charset of the router
@@ -134,6 +137,19 @@ class StaticResourcesTest {
             // a file system that ignores the case
             assertFalse(DefaultStaticResources.isSpelledAsRequested(upper, "HELLO.TXT"));
             assertFalse(DefaultStaticResources.isSpelledAsRequested(base.resolve("DOCS/index.html").toFile(), "DOCS"));
+        }
+    }
+
+    @Test
+    void anIndexFileNamedLikeItsDirectoryDoesNotSkipTheSpellingOfTheDirectories(@TempDir Path base) throws IOException {
+        Files.createDirectories(base.resolve("secret/home"));
+        Files.writeString(base.resolve("secret/home/home"), "index");
+
+        assertTrue(DefaultStaticResources.isSpelledAsRequested(base.resolve("secret/home/home").toFile(), "secret/home"));
+        File upper = base.resolve("SECRET/home/home").toFile();
+        if (upper.exists()) {
+            // a file system that ignores the case: the index file home of SECRET/home
+            assertFalse(DefaultStaticResources.isSpelledAsRequested(upper, "SECRET/home"));
         }
     }
 

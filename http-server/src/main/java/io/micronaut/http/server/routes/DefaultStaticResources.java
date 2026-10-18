@@ -29,11 +29,14 @@ import io.micronaut.web.router.resource.StaticResourceResolver;
 import org.jspecify.annotations.Nullable;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -218,10 +221,12 @@ final class DefaultStaticResources implements StaticResources {
      * @return Whether it is an alias
      */
     static boolean isAlias(String path, @Nullable String rawPath) {
-        String resource = withoutTrailingSlash(path);
-        if (resource.contains("//")) {
+        if (path.contains("//") || path.endsWith("/")) {
+            // an empty segment: the router captures the path without the one trailing slash it
+            // ignores, so a trailing slash of the path is another one
             return true;
         }
+        String resource = path;
         if (resource.isEmpty() || rawPath == null || rawPath.indexOf('%') == -1) {
             return false;
         }
@@ -238,14 +243,6 @@ final class DefaultStaticResources implements StaticResources {
         }
         String rawResource = raw.substring(start + 1).toLowerCase(Locale.ROOT);
         return rawResource.contains("%2f");
-    }
-
-    private static String withoutTrailingSlash(String path) {
-        int end = path.length();
-        while (end > 0 && path.charAt(end - 1) == '/') {
-            end--;
-        }
-        return path.substring(0, end);
     }
 
     private static int segments(String path) {
@@ -290,21 +287,85 @@ final class DefaultStaticResources implements StaticResources {
      */
     static boolean isSpelledAsRequested(File file, String path) {
         String resource = withoutTrailingSlash(path);
-        int names = resource.isEmpty() ? 0 : segments(resource);
-        if (names == 0 || !file.getName().equals(resource.substring(resource.lastIndexOf('/') + 1))) {
-            // the index file of the directory
-            names++;
+        String[] requested = resource.isEmpty() ? new String[0] : resource.split("/", -1);
+        // the loader resolved the path itself, or the index file under it: the names of the file
+        // are the names of the request, exactly, then the index file
+        int names;
+        if (requested.length > 0 && endsWith(file, requested, null)) {
+            names = requested.length;
+        } else if (endsWith(file, requested, file.getName())) {
+            names = requested.length + 1;
+        } else {
+            return false;
         }
         File current = file;
-        for (int i = 0; i < names && current != null; i++) {
+        for (int i = 0; i < names; i++) {
             File directory = current.getParentFile();
-            String[] listed = directory == null ? null : directory.list();
-            if (listed == null || !Arrays.asList(listed).contains(current.getName())) {
+            if (directory == null || !isListed(directory, current.getName())) {
                 return false;
             }
             current = directory;
         }
-        return current != null;
+        return true;
+    }
+
+    private static boolean endsWith(File file, String[] names, @Nullable String index) {
+        File current = file;
+        if (index != null) {
+            if (!index.equals(current.getName())) {
+                return false;
+            }
+            current = current.getParentFile();
+        }
+        for (int i = names.length - 1; i >= 0; i--) {
+            if (current == null || !names[i].equals(current.getName())) {
+                return false;
+            }
+            current = current.getParentFile();
+        }
+        return true;
+    }
+
+    /**
+     * Whether a directory lists a name exactly: a file system that tells the case apart has no
+     * other spelling of the name, so it is not listed.
+     *
+     * @param directory The directory
+     * @param name      The name of an existing file of the directory
+     * @return Whether the name is the name the directory lists
+     */
+    private static boolean isListed(File directory, String name) {
+        String otherCase = otherCase(name);
+        if (otherCase.equals(name) || !new File(directory, otherCase).exists()) {
+            return true;
+        }
+        try (DirectoryStream<Path> entries = Files.newDirectoryStream(directory.toPath())) {
+            for (Path entry : entries) {
+                if (name.equals(entry.getFileName().toString())) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (IOException | RuntimeException e) {
+            return false;
+        }
+    }
+
+    private static String otherCase(String name) {
+        StringBuilder builder = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            builder.append(Character.isUpperCase(c) ? Character.toLowerCase(c) : Character.toUpperCase(c));
+        }
+        return builder.toString();
+    }
+
+    /**
+     * @param path A path
+     * @return The path without the one trailing slash the router ignores
+     */
+    private static String withoutTrailingSlash(String path) {
+        return path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
     }
 
     /**

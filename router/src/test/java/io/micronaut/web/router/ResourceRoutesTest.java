@@ -306,8 +306,9 @@ class ResourceRoutesTest {
             routes.GET("/digits/{id:\\d+}").resources(resources("digits", "path"));
             routes.GET("/segment/{name:[^/]+}").resources(resources("segment", "path"));
             routes.GET("/dotted/{name:[.a-z]+}").resources(resources("dotted", "path"));
+            routes.GET("/choice/{name:ab|cd}").resources(resources("choice", "path"));
             for (String prefix : new String[]{"/docs{/version}", "/dirs/{+dir}", "/any/{dir:.*}", "/slash/{dir:[^x]+}", "/many/{dirs*}",
-                "/range/{dir:[!-~]+}", "/empty/{dir:[a-z]*}", "/optional/{dir:a?}", "/modifier/{dir:?}"}) {
+                "/range/{dir:[!-~]+}", "/empty/{dir:[a-z]*}", "/optional/{dir:a?}", "/modifier/{dir:?}", "/groups/{tenant:(ac)(hello[.]txt)}"}) {
                 assertThrows(IllegalArgumentException.class, () -> routes.GET(prefix).resources(resources("bad", "path")), prefix);
             }
         });
@@ -318,6 +319,7 @@ class ResourceRoutesTest {
         assertEquals("digits", target(router, "/digits/42/site.css"));
         assertEquals("segment", target(router, "/segment/a.b/site.css"));
         assertEquals("dotted", target(router, "/dotted/a.b/site.css"));
+        assertEquals("choice", target(router, "/choice/cd/site.css"));
     }
 
     @Test
