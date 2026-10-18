@@ -153,6 +153,37 @@ class HandlerRouteLocatorBodyHttp2CancellationTest {
         }
     }
 
+    @Test
+    void aLocatorWaitingForASharedStageAfterTheFormWasReadIsAbandonedWhenTheClientResetsTheStream() throws Exception {
+        HandlerRouteLocatorHttp2CancellationTest.Client client = new HandlerRouteLocatorHttp2CancellationTest.Client();
+        Channel channel = connect(client);
+        try {
+            for (String id : new String[]{"one", "two"}) {
+                int abandoned = abandoned();
+                CompletableFuture<Http2FrameStream> written = new CompletableFuture<>();
+                channel.eventLoop().execute(() -> {
+                    Http2FrameStream stream = client.newStream();
+                    DefaultHttp2Headers headers = new DefaultHttp2Headers();
+                    headers.method("POST").scheme("http").authority("localhost").path("/shared/" + id + "/greet");
+                    headers.set("content-type", MediaType.APPLICATION_FORM_URLENCODED);
+                    channel.write(new DefaultHttp2HeadersFrame(headers, false).stream(stream));
+                    channel.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.copiedBuffer("token=gold&name=Ann", StandardCharsets.UTF_8), true).stream(stream));
+                    written.complete(stream);
+                });
+                Http2FrameStream stream = written.get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+                // the form was read: the locator waits for a stage shared by every request
+                await("the locator of " + id + " reads the form", () -> located.ids.contains(id));
+                channel.writeAndFlush(new DefaultHttp2ResetFrame(Http2Error.CANCEL).stream(stream)).sync();
+                await("the request of " + id + " is abandoned", () -> abandoned() > abandoned);
+                assertFalse(located.shared.isDone(), "the shared stage is not cancelled");
+            }
+            assertTrue(channel.isActive(), "the connection stays open");
+            assertServes(channel, client);
+        } finally {
+            channel.close().sync();
+        }
+    }
+
     /**
      * Send the headers and part of the form, and wait until the server reads the form.
      */
@@ -239,6 +270,10 @@ class HandlerRouteLocatorBodyHttp2CancellationTest {
          * The ids whose body failed to be read.
          */
         final Set<String> failed = ConcurrentHashMap.newKeySet();
+        /**
+         * A stage shared by every request, e.g. of a cache, that never completes.
+         */
+        final CompletableFuture<Object> shared = new CompletableFuture<>();
     }
 
     @Singleton
@@ -270,6 +305,12 @@ class HandlerRouteLocatorBodyHttp2CancellationTest {
                             return id + " " + form.getString("token");
                         });
                 }, accounts);
+            routes.locator("/shared/{id}")
+                .form()
+                .locateAsync((request, pathVariables, form) -> {
+                    located.ids.add(pathVariables.getString("id"));
+                    return located.shared;
+                }, target -> accounts);
         }
     }
 

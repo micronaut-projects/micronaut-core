@@ -17,3 +17,17 @@ The filters of the matched located route apply, after the filters of the groups 
 A synchronous locator runs while the request is matched, on the thread that matches it, typically an event loop thread, and must not block. The target is located once per request and kept for the rest of the request: a locator, synchronous or asynchronous, runs at most once per request, also when the request is answered with a `405` whose allowed methods are those of the located routes. A request with a custom HTTP method, such as `PROPFIND`, is located like any other: it is answered by the located route of that method, or by a located route declared with `any(...)`, and otherwise with a `405` whose allowed methods are those of the located routes. The constraints of a located route see the path variables of the prefixes, as its handler does.
 
 The server waits for the stage of an asynchronous locator without blocking. When the client goes away before the stage completes, the Netty server stops waiting for it, when the connection closes or the HTTP/2 stream is reset, without cancelling it: a locator may return a stage it shares with other requests, e.g. of a cache. A CORS preflight request for a path under the prefix of an asynchronous locator is answered once the locator has located its target, with the methods of its located routes, before the filters that run after the routes are matched.
+
+==== Locators that read the body
+
+A locator that needs the body of the request to locate its target, e.g. a JAX-RS resource that reads `@FormParam` fields before its sub-resource locator runs, is declared with `locator(prefix)`, followed by a body stage, like the body stages of a route, and `locate` or `locateAsync`:
+
+snippet::io.micronaut.docs.server.functional.FormLocatorRoutes[tags="imports,clazz", indent=0, title="A locator that reads the form"]
+
+<1> `locator(prefix)` declares a locator route whose locator reads the body. It matches every request under the prefix, like `locate(...)`.
+<2> The body stage: `form()` for the submitted form, `body(type)` for the body decoded to a type, like a `@Body` argument, or `body()` for an api:http.body.AsyncRequestBody[] the locator reads itself.
+<3> The locator receives the body once it was read. It runs on the thread that completed the read, typically an event loop thread, and must not block: use `locateAsync` for a target that is loaded later.
+<4> The located route reads the body again. The form is read once: the locator and the located route receive the same form, with its files.
+<5> A request whose content type is not a form, such as this `GET`, a `HEAD`, a CORS preflight or a JSON body for a located route, is located with the empty form, see api:http.form.FormData#empty()[], without reading its body, like a JAX-RS `@FormParam` without a form entity. A form that fails to read fails the request.
+
+The locator reads a copy of the body, see api:http.body.AsyncRequestBody#copy()[], so the body is held to `micronaut.server.max-request-buffer-size` as a whole, with a `413` for a larger body. With `body(type)`, a request without a body is a `400`, unless the type is nullable. What the read of the locator left open is released before the request is matched with the located routes, and when the client goes away, while the body is read or while the locator waits for its stage. Otherwise the locator is an asynchronous locator: it runs once per request, and its failures are answered by the error routes.

@@ -23,7 +23,9 @@ import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.form.FormData;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.web.router.RouteConditionContext;
+import io.micronaut.web.router.RouteLocator;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +34,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 /**
@@ -127,33 +130,99 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, RouteCondition
                 throw new IllegalStateException("No HTTP server provides the body of the request " + request.getMethodName()
                     + " " + request.getPath() + " to its route locator");
             }
+            // the locator runs when the body was read, maybe on another thread: in the context of the matching
+            PropagatedContext propagated = PropagatedContext.getOrEmpty();
+            BodyLocation<T> location = new BodyLocation<>(bound);
             CompletionStage<? extends @Nullable T> stage = null;
             try {
                 // the located route reads the body of the request again
-                stage = reader.apply(bound.copy()).thenCompose(body -> {
+                stage = reader.apply(bound.copy()).thenCompose(body -> propagated.propagate(() -> {
                     try {
                         return Objects.requireNonNull(locator.locate(request, pathVariables, body), () -> "The locator returned no stage: " + locator);
                     } catch (Exception e) {
                         throw e instanceof CompletionException completion ? completion : new CompletionException(e);
                     }
-                });
+                }));
             } finally {
                 if (stage == null) {
                     // failed before the read started
-                    release(bound);
+                    location.abandon();
                 }
             }
-            return stage.whenComplete((target, error) -> release(bound));
+            // the stage of the locator may be shared and outlive the request: it references the
+            // location only, which stops holding the body when the request is abandoned
+            stage.whenComplete(location::located);
+            return location;
+        }
+
+    }
+
+    /**
+     * The location of a target by a locator that reads the body: completes with the outcome of
+     * the locator once what its read of the body left open was released, like the result of a
+     * handler of the body, see {@link ReleasableRequestBody#releaseAfter}. It is the request's
+     * own stage: abandoned with the request, it releases the body at once, and stops holding it
+     * for a stage of the locator that may be shared and outlive the request.
+     *
+     * @param <T> The type of the target
+     */
+    static final class BodyLocation<T> extends CompletableFuture<@Nullable T> implements RouteLocator.AbandonableStage {
+        private final AtomicReference<@Nullable AsyncRequestBody> body;
+
+        BodyLocation(AsyncRequestBody body) {
+            this.body = new AtomicReference<>(body);
         }
 
         /**
-         * Release what the read of the copy left open, e.g. the elements the locator did not read.
+         * The locator completed: release the body, then complete with its outcome.
          */
-        private static void release(AsyncRequestBody body) {
-            if (body instanceof ReleasableRequestBody releasable) {
+        void located(@Nullable T target, @Nullable Throwable error) {
+            AsyncRequestBody held = body.getAndSet(null);
+            if (held == null) {
+                // abandoned: nobody waits
+                return;
+            }
+            if (!(held instanceof ReleasableRequestBody releasable)) {
+                complete(target, error, null);
+                return;
+            }
+            CompletionStage<Void> released;
+            try {
+                released = releasable.releaseBody();
+            } catch (RuntimeException e) {
+                complete(target, error, e);
+                return;
+            }
+            released.whenComplete((ignored, releaseError) -> complete(target, error, releaseError));
+        }
+
+        private void complete(@Nullable T target, @Nullable Throwable error, @Nullable Throwable releaseError) {
+            Throwable releaseFailure = unwrap(releaseError);
+            Throwable failure = unwrap(error);
+            if (failure != null) {
+                if (releaseFailure != null && releaseFailure != failure) {
+                    failure.addSuppressed(releaseFailure);
+                }
+                completeExceptionally(failure);
+            } else if (releaseFailure != null) {
+                // like a handler of the body: a failure to release fails a successful outcome
+                completeExceptionally(releaseFailure);
+            } else {
+                complete(target);
+            }
+        }
+
+        private static @Nullable Throwable unwrap(@Nullable Throwable error) {
+            return error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+        }
+
+        @Override
+        public void abandon() {
+            AsyncRequestBody held = body.getAndSet(null);
+            if (held instanceof ReleasableRequestBody releasable) {
                 releasable.releaseBody().whenComplete((ignored, error) -> {
                     if (error != null) {
-                        LOG.warn("Failed to release the body read by a route locator", error);
+                        LOG.warn("Failed to release the body read by the route locator of an abandoned request", error);
                     }
                 });
             }

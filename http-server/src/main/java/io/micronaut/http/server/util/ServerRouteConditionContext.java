@@ -24,6 +24,7 @@ import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.AsyncRequestBody;
+import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.web.router.RouteConditionContext;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
@@ -60,13 +61,14 @@ final class ServerRouteConditionContext implements RouteConditionContext {
      * @param hostResolver          The host resolver
      * @param clientAddressResolver The client address resolver
      * @param clock                 The clock, or {@code null} for the system clock
-     * @param binderRegistry        The binders of the arguments of the routes
+     * @param argumentSatisfier     Binds the arguments of the routes, with the binders of the server
      */
     ServerRouteConditionContext(HttpHostResolver hostResolver,
                                 HttpClientAddressResolver clientAddressResolver,
                                 @Nullable Clock clock,
-                                BeanProvider<RequestBinderRegistry> binderRegistry) {
-        this.binderRegistry = SupplierUtil.memoized(binderRegistry::get);
+                                BeanProvider<RequestArgumentSatisfier> argumentSatisfier) {
+        // the registry of the server the routes and the filters bind their arguments with
+        this.binderRegistry = SupplierUtil.memoized(() -> argumentSatisfier.get().getBinderRegistry());
         this.hostResolver = hostResolver;
         this.clientAddressResolver = clientAddressResolver;
         this.clock = clock != null ? clock : Clock.systemUTC();

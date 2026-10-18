@@ -574,6 +574,9 @@ public final class RouteLocator implements DynamicRouteTarget {
             Completion completion = new Completion(key);
             Outcome pending = new Outcome(null, null, located, completion, location);
             completion.waitFor(outcomes, pending);
+            if (stage instanceof AbandonableStage abandonable) {
+                completion.owned = abandonable;
+            }
             // the locator is not called again until the stage completes
             outcomes.put(key, pending);
             stage.whenComplete(completion);
@@ -807,6 +810,23 @@ public final class RouteLocator implements DynamicRouteTarget {
     }
 
     /**
+     * The stage of an asynchronous locator that belongs to one request, e.g. of a locator that
+     * reads the body of the request: unlike a stage a locator may share with other requests, it
+     * is abandoned when the request is, see {@link #abandonPendingLocations(HttpRequest)}, so that
+     * it releases what it holds of the request, while the stages it waits for, which may be
+     * shared, keep running.
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    public interface AbandonableStage {
+        /**
+         * Release what the stage holds of its request; the stage is no longer waited for.
+         */
+        void abandon();
+    }
+
+    /**
      * Records the outcome of the stage of an asynchronous locator. The stage references it until
      * it completes, and it references the request until it is released: a request abandoned
      * while the stage is pending is not kept by the stage.
@@ -817,6 +837,10 @@ public final class RouteLocator implements DynamicRouteTarget {
          * The outcome the stage completes, until it does or the request is abandoned.
          */
         private final AtomicReference<@Nullable Waiting> waiting = new AtomicReference<>();
+        /**
+         * The stage of the locator, when it is the request's own, see {@link AbandonableStage}.
+         */
+        private volatile @Nullable AbandonableStage owned;
 
         /**
          * @param key The key of the outcome
@@ -847,10 +871,15 @@ public final class RouteLocator implements DynamicRouteTarget {
         }
 
         /**
-         * Stop referencing the request.
+         * Stop referencing the request, and abandon the stage of the locator if it is the request's own.
          */
         void release() {
             waiting.set(null);
+            AbandonableStage stage = owned;
+            if (stage != null) {
+                owned = null;
+                stage.abandon();
+            }
         }
     }
 

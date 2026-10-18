@@ -17,6 +17,8 @@ package io.micronaut.web.router;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.propagation.PropagatedContextElement;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -33,6 +35,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -62,6 +65,7 @@ class LocatorBodyTest {
 
     private final List<TestBody> bound = new ArrayList<>();
     private final CompletableFuture<Object> content = new CompletableFuture<>();
+    private CompletableFuture<Void> releaseStage = CompletableFuture.completedFuture(null);
     private @Nullable ApplicationContext context;
 
     @AfterEach
@@ -199,6 +203,113 @@ class LocatorBodyTest {
     }
 
     @Test
+    void anAbandonedRequestIsNotHeldByASharedStageOfTheLocator() {
+        // shared by every request, e.g. of a cache, and never completes
+        CompletableFuture<Object> shared = new CompletableFuture<>();
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/", (request, pathVariables) -> HttpResponse.ok()));
+        Router router = router(routes -> routes.locator("/orders")
+            .body(String.class)
+            .locateAsync((request, pathVariables, body) -> shared, target -> items));
+
+        WeakReference<HttpRequest<?>> abandoned = abandonAfterTheBodyWasRead(router);
+        // the count only: the body references the request
+        AtomicInteger released = bound.getFirst().released;
+        // released when the request was abandoned, not when the shared stage completes
+        assertEquals(1, released.get());
+        bound.clear();
+        for (int i = 0; i < 50 && abandoned.get() != null; i++) {
+            System.gc();
+        }
+        assertNull(abandoned.get(), "the shared stage does not hold the abandoned request");
+        shared.complete("late");
+        assertEquals(1, released.get(), "released once");
+    }
+
+    private WeakReference<HttpRequest<?>> abandonAfterTheBodyWasRead(Router router) {
+        HttpRequest<?> request = HttpRequest.POST("/orders", "");
+        pending(() -> router.findClosest(request));
+        content.complete("body");
+        // the body was read: the locator waits for its own stage
+        pending(() -> router.findClosest(request));
+        assertEquals(0, bound.getFirst().released.get());
+        RouteLocator.abandonPendingLocations(request);
+        return new WeakReference<>(request);
+    }
+
+    @Test
+    void theLocationCompletesOnceTheBodyWasReleased() {
+        releaseStage = new CompletableFuture<>();
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/", (request, pathVariables) -> HttpResponse.ok()));
+        Router router = router(routes -> routes.locator("/orders")
+            .body(String.class)
+            .locate((request, pathVariables, body) -> body, target -> items));
+
+        HttpRequest<?> request = HttpRequest.POST("/orders", "");
+        CompletionStage<?> pending = pending(() -> router.findClosest(request));
+        content.complete("order");
+        assertFalse(pending.toCompletableFuture().isDone(), "the release of the body is waited for");
+        releaseStage.complete(null);
+        assertTrue(pending.toCompletableFuture().isDone());
+        assertNotNull(router.findClosest(request));
+    }
+
+    @Test
+    void aFailureToReleaseTheBodyFailsTheLocation() {
+        IllegalStateException releaseFailure = new IllegalStateException("release failed");
+        releaseStage = CompletableFuture.failedFuture(releaseFailure);
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/", (request, pathVariables) -> HttpResponse.ok()));
+        Router router = router(routes -> routes.locator("/orders")
+            .body(String.class)
+            .locate((request, pathVariables, body) -> body, target -> items));
+
+        HttpRequest<?> request = HttpRequest.POST("/orders", "");
+        pending(() -> router.findClosest(request));
+        content.complete("order");
+        assertSame(releaseFailure, assertThrows(IllegalStateException.class, () -> router.findClosest(request)));
+    }
+
+    @Test
+    void aFailureToReleaseIsSuppressedByTheFailureOfTheLocator() {
+        IllegalStateException releaseFailure = new IllegalStateException("release failed");
+        releaseStage = CompletableFuture.failedFuture(releaseFailure);
+        IllegalArgumentException locatorFailure = new IllegalArgumentException("locator failed");
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/", (request, pathVariables) -> HttpResponse.ok()));
+        Router router = router(routes -> routes.locator("/orders")
+            .body(String.class)
+            .locate((request, pathVariables, body) -> {
+                throw locatorFailure;
+            }, target -> items));
+
+        HttpRequest<?> request = HttpRequest.POST("/orders", "");
+        pending(() -> router.findClosest(request));
+        content.complete("order");
+        assertSame(locatorFailure, assertThrows(IllegalArgumentException.class, () -> router.findClosest(request)));
+        assertSame(releaseFailure, locatorFailure.getSuppressed()[0]);
+    }
+
+    @Test
+    void theLocatorRunsInTheContextOfTheMatchingWhenTheBodyArrivesLater() {
+        AtomicReference<@Nullable Trace> seen = new AtomicReference<>();
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/", (request, pathVariables) -> HttpResponse.ok()));
+        Router router = router(routes -> routes.locator("/orders")
+            .body(String.class)
+            .locate((request, pathVariables, body) -> {
+                seen.set(PropagatedContext.getOrEmpty().find(Trace.class).orElse(null));
+                return body;
+            }, target -> items));
+
+        HttpRequest<?> request = HttpRequest.POST("/orders", "");
+        PropagatedContext.getOrEmpty().plus(new Trace("t-1")).propagate(() -> pending(() -> router.findClosest(request)));
+        // completed outside of the context, e.g. on the thread that received the last chunk
+        content.complete("order");
+        assertEquals(new Trace("t-1"), seen.get());
+        assertTrue(PropagatedContext.getOrEmpty().find(Trace.class).isEmpty(), "the context is not leaked to the completing thread");
+    }
+
+    record Trace(String id) implements PropagatedContextElement {
+    }
+
+    @Test
     void withoutAServerTheBodyIsNotProvided() {
         LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/", (request, pathVariables) -> HttpResponse.ok()));
         RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
@@ -239,7 +350,7 @@ class LocatorBodyTest {
 
             @Override
             public AsyncRequestBody locatorBody(HttpRequest<?> request) {
-                TestBody body = new TestBody(content, null);
+                TestBody body = new TestBody(content, null, releaseStage, request);
                 bound.add(body);
                 return body;
             }
@@ -258,22 +369,29 @@ class LocatorBodyTest {
         final AtomicInteger released = new AtomicInteger();
         private final CompletableFuture<Object> content;
         private final @Nullable TestBody original;
+        private final CompletableFuture<Void> releaseStage;
+        /**
+         * Like the body of a server, it references its request.
+         */
+        private final @Nullable HttpRequest<?> request;
 
-        TestBody(CompletableFuture<Object> content, @Nullable TestBody original) {
+        TestBody(CompletableFuture<Object> content, @Nullable TestBody original, CompletableFuture<Void> releaseStage, @Nullable HttpRequest<?> request) {
             this.content = content;
             this.original = original;
+            this.releaseStage = releaseStage;
+            this.request = request;
         }
 
         @Override
         public CompletionStage<Void> releaseBody() {
             released.incrementAndGet();
-            return CompletableFuture.completedFuture(null);
+            return releaseStage;
         }
 
         @Override
         public AsyncRequestBody copy() {
             copies.incrementAndGet();
-            return new TestBody(content, this);
+            return new TestBody(content, this, CompletableFuture.completedFuture(null), request);
         }
 
         @SuppressWarnings("unchecked")
