@@ -150,6 +150,9 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
             // configuration files that are usually absent, so the miss is the common case.
             return Optional.empty();
         }
+        if (!isWithinBaseDirectory(url, path)) {
+            return Optional.empty();
+        }
         if (startsWithBase(url)) {
             try {
                 URI uri = url.toURI();
@@ -273,6 +276,36 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         }
     }
 
+    /**
+     * Whether a resource of a directory on the class path stays, once symbolic links are followed, inside the base
+     * directory of that class path entry. A loader with a base path, such as the one serving static resources,
+     * must not reach files outside of it through a symbolic link.
+     *
+     * @param url  The URL the class loader resolved
+     * @param path The requested path
+     * @return True if the resource is within the base directory, or is not a file of a directory with a base path
+     */
+    private boolean isWithinBaseDirectory(URL url, String path) {
+        if (StringUtils.isEmpty(basePath) || !"file".equals(url.getProtocol())) {
+            return true;
+        }
+        try {
+            Path file = Paths.get(url.toURI());
+            Path root = file;
+            int segments = file.getFileSystem().getPath(prefixPath(path)).normalize().getNameCount();
+            for (int i = 0; i < segments && root != null; i++) {
+                root = root.getParent();
+            }
+            if (root == null) {
+                return false;
+            }
+            Path baseDirectory = root.resolve(basePath).toRealPath();
+            return file.toRealPath().startsWith(baseDirectory);
+        } catch (URISyntaxException | IOException | RuntimeException e) {
+            return false;
+        }
+    }
+
     private boolean startsWithBase(URL url) {
         if (checkBase) {
             if (baseURL == null) {
@@ -303,7 +336,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
         if (!isDirectory) {
             URL url = classLoader.getResource(prefixPath(path));
-            if (url != null && startsWithBase(url)) {
+            if (url != null && startsWithBase(url) && isWithinBaseDirectory(url, path)) {
                 return Optional.of(url);
             }
         }
@@ -337,7 +370,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         Stream.Builder<URL> builder = Stream.builder();
         while (all.hasMoreElements()) {
             URL url = all.nextElement();
-            if (startsWithBase(url)) {
+            if (startsWithBase(url) && isWithinBaseDirectory(url, path)) {
                 builder.accept(url);
             }
         }
