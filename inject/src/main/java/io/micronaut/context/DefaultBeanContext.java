@@ -1522,8 +1522,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             BeanDefinition<T> beanDefinition = candidate.get();
             try (BeanResolutionContext resolutionContext = newResolutionContext(beanDefinition, null)) {
                 if (beanDefinition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-                    T bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
-                    return postBeanCreated(resolutionContext, beanDefinition, beanArg, qualifier, bean);
+                    return createBeanWithArgumentValues(resolutionContext, instantiatableBeanDefinition, beanArg, qualifier, argumentValues);
                 }
             }
         }
@@ -1572,10 +1571,39 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             LOG.trace("Computed bean argument values: {}", argumentValues);
         }
         if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-            T bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
-            return postBeanCreated(resolutionContext, definition, beanType, qualifier, bean);
+            return createBeanWithArgumentValues(resolutionContext, instantiatableBeanDefinition, beanType, qualifier, argumentValues);
         } else {
             throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
+        }
+    }
+
+    /**
+     * Creates a bean the caller supplies the arguments of, outside the registrations the context tracks.
+     *
+     * <p>The creation is begun on the resolution context as {@link #createRegistration} begins the creation of a
+     * bean the context resolves, so that what is resolved on behalf of the bean knows it is being created: the
+     * interceptors created for it, those a subclass proxy is injected with among them, are told the bean, see
+     * {@link InterceptionTarget}, and a {@link BeanDependencyResolver} it injects is owned by it. The context
+     * holds no registration for the bean, so what the creation owns is not released with it; see
+     * {@link #destroyBean(Object)} for what is.</p>
+     */
+    private <T> T createBeanWithArgumentValues(BeanResolutionContext resolutionContext,
+                                               InstantiatableBeanDefinition<T> definition,
+                                               Argument<T> beanType,
+                                               @Nullable Qualifier<T> qualifier,
+                                               @Nullable Map<String, Object> argumentValues) {
+        AbstractBeanResolutionContext creatingContext = resolutionContext instanceof AbstractBeanResolutionContext creating ? creating : null;
+        BeanCreationState previousCreation = creatingContext == null ? null : creatingContext.creationState;
+        if (creatingContext != null) {
+            creatingContext.beginCreation(definition);
+        }
+        try {
+            T bean = resolveByBeanFactory(resolutionContext, definition, qualifier, argumentValues);
+            return postBeanCreated(resolutionContext, definition, beanType, qualifier, bean);
+        } finally {
+            if (creatingContext != null) {
+                creatingContext.creationState = previousCreation;
+            }
         }
     }
 
@@ -2177,8 +2205,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             BeanDefinition<T> candidate = concreteCandidate.get();
             try (BeanResolutionContext context = newResolutionContext(candidate, resolutionContext)) {
                 if (candidate instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-                    T bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
-                    return postBeanCreated(context, candidate, Argument.of(beanType), qualifier, bean);
+                    return createBeanWithArgumentValues(context, instantiatableBeanDefinition, Argument.of(beanType), qualifier, Collections.emptyMap());
                 } else {
                     throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                 }
