@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * The prefix of the URI templates of the routes of a group, see
@@ -33,6 +35,11 @@ import java.util.Objects;
  */
 @Internal
 record RoutePrefix(String value) {
+
+    /**
+     * Values of several segments or none, which a variable of a prefix does not match.
+     */
+    private static final String[] SPANNING_VALUES = {"", "/", "a/b", "0/0", "a/", "/a", "-/-", "._~/!$", "A/Z", "%/%"};
 
     private static final char SLASH = '/';
     private static final char VARIABLE_START = '{';
@@ -95,7 +102,8 @@ record RoutePrefix(String value) {
      * @throws IllegalArgumentException if a variable may match an empty value at the end of the
      *                                  prefix or several segments: an optional or reserved
      *                                  expansion, e.g. {@code {/version}} or {@code {+dir}}, an
-     *                                  exploded one, or a regular expression that may match a slash
+     *                                  exploded one, or a regular expression that matches an
+     *                                  empty value or a value with a slash
      */
     static void checkSegmentVariables(String prefix, String owner) {
         int start = prefix.indexOf('{');
@@ -115,13 +123,35 @@ record RoutePrefix(String value) {
             String names = colon == -1 ? variable : variable.substring(0, colon);
             String regex = colon == -1 ? "" : variable.substring(colon + 1);
             boolean operator = !names.isEmpty() && "+/.;".indexOf(names.charAt(0)) >= 0;
-            boolean spans = regex.indexOf('.') >= 0 || regex.indexOf('/') >= 0 || regex.indexOf('\\') >= 0 || regex.contains("[^");
-            if (operator || names.indexOf('*') >= 0 || spans) {
+            if (operator || names.indexOf('*') >= 0 || (!regex.isEmpty() && spans(regex))) {
                 throw new IllegalArgumentException("The variable {" + variable + "} of the prefix of " + owner + " " + prefix
                     + " may match several segments or none: a variable of the prefix matches one segment, e.g. {tenant} or {tenant:[a-z]+}");
             }
             start = prefix.indexOf('{', end);
         }
+    }
+
+    /**
+     * Whether a regular expression of a variable matches an empty value or a value with a slash,
+     * tried on values of the kinds that a regular expression of one segment does not match.
+     *
+     * @param regex The regular expression
+     * @return Whether it may match several segments or none
+     */
+    private static boolean spans(String regex) {
+        Pattern pattern;
+        try {
+            pattern = Pattern.compile(regex);
+        } catch (PatternSyntaxException e) {
+            // the URI template reports it
+            return false;
+        }
+        for (String value : SPANNING_VALUES) {
+            if (pattern.matcher(value).matches()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static IllegalArgumentException notAPath(String prefix, String owner) {

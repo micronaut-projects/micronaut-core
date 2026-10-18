@@ -232,6 +232,10 @@ public class StaticResourcesRoutesTest {
             for (String uri : new String[]{"/static-fn//special.txt", "/static-fn/css//site.css", "/static-fn/css%2fsite.css", "/static-fn/css%2Fsite.css", "/files/sub%2fpage.html"}) {
                 assertEquals(HttpStatus.NOT_FOUND, exchange(server, HttpRequest.GET(uri)).getStatus(), uri);
             }
+            // a file system that ignores the case: another spelling of a file is not found either
+            assertEquals(HttpStatus.NOT_FOUND, exchange(server, HttpRequest.GET("/files/HELLO.TXT")).getStatus());
+            // an encoded slash of a literal prefix is the prefix, not an alias
+            assertEquals("Hello file", exchange(server, HttpRequest.GET("/encoded%2Fprefix/hello.txt")).body());
         }
     }
 
@@ -356,6 +360,7 @@ public class StaticResourcesRoutesTest {
             routes.GET("/static-fn").resources(StaticResources.classpath("static-fn").cacheControl(CACHE_CONTROL));
             routes.GET("/files").resources(StaticResources.fileSystem(root));
             routes.GET("/all-files").resources(StaticResources.fileSystem(root).hiddenFiles(true));
+            routes.GET("/encoded%2Fprefix").resources(StaticResources.fileSystem(root));
             routes.GET("/raw/{+file}", StaticResources.classpath("static-fn").pathVariable("file").indexFile(null));
             routes.GET("/static-fn/special.txt", (request, pathVariables) -> HttpResponse.ok("special handler").contentType(MediaType.TEXT_PLAIN_TYPE));
             routes.path("/grouped", group -> {

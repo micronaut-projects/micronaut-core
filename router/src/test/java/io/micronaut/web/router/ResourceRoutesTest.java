@@ -303,7 +303,11 @@ class ResourceRoutesTest {
     void aVariableOfThePrefixMatchesOneSegment() {
         Router router = router(routes -> {
             routes.GET("/tenants/{tenant:[a-z]+?}").resources(resources("tenants", "path"));
-            for (String prefix : new String[]{"/docs{/version}", "/dirs/{+dir}", "/any/{dir:.*}", "/slash/{dir:[^x]+}", "/many/{dirs*}"}) {
+            routes.GET("/digits/{id:\\d+}").resources(resources("digits", "path"));
+            routes.GET("/segment/{name:[^/]+}").resources(resources("segment", "path"));
+            routes.GET("/dotted/{name:[.a-z]+}").resources(resources("dotted", "path"));
+            for (String prefix : new String[]{"/docs{/version}", "/dirs/{+dir}", "/any/{dir:.*}", "/slash/{dir:[^x]+}", "/many/{dirs*}",
+                "/range/{dir:[!-~]+}", "/empty/{dir:[a-z]*}", "/optional/{dir:a?}"}) {
                 assertThrows(IllegalArgumentException.class, () -> routes.GET(prefix).resources(resources("bad", "path")), prefix);
             }
         });
@@ -311,6 +315,36 @@ class ResourceRoutesTest {
         assertEquals("tenants", target(router, "/tenants/acme/site.css"));
         assertEquals("acme", router.findClosest(HttpRequest.GET("/tenants/acme/site.css")).getVariableValues().get("tenant"));
         assertNull(router.findClosest(HttpRequest.GET("/docs/css/site.css")));
+        assertEquals("digits", target(router, "/digits/42/site.css"));
+        assertEquals("segment", target(router, "/segment/a.b/site.css"));
+        assertEquals("dotted", target(router, "/dotted/a.b/site.css"));
+    }
+
+    @Test
+    void aLocatedResourceHandlerIsNotARouteOfResources() {
+        AtomicReference<@Nullable Exception> error = new AtomicReference<>();
+        TestLocatedRoutes<Object> located = TestLocatedRoutes.of(routes -> {
+            try {
+                routes.GET("/files/{+path}", resources("files", "path"));
+            } catch (IllegalStateException e) {
+                error.set(e);
+            }
+            routes.GET("/", (request, pathVariables) -> HttpResponse.ok());
+        });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
+        builder.locate("/orders/{id}", (request, pathVariables) -> "order", target -> located);
+        builder.close();
+        assembly.addImplicitHeadRoutes();
+        Router router = new DefaultRouter(List.of(), List.of(() -> assembly));
+        HttpRequest<?> request = HttpRequest.GET("/orders/1/");
+        UriRouteMatch<Object, Object> match = router.findClosest(request);
+        assertNotNull(match);
+        new FilterRunner(router.findFilters(request, match), (r, propagatedContext) -> ExecutionFlow.just(HttpResponse.ok()))
+            .run(request);
+
+        assertNotNull(error.get());
+        assertTrue(error.get().getMessage().contains("located route"), error.get().getMessage());
     }
 
     @Test

@@ -181,12 +181,7 @@ final class PendingRoute {
      */
     void endResources(ResourceHandler resources) {
         checkPending();
-        if (builder.located()) {
-            // the handler of the resources would not see the located target
-            drop();
-            throw new IllegalStateException("The route " + description
-                + " is a located route: a route of resources is a route of an HttpRoutes bean");
-        }
+        checkNotLocated();
         Supplier<@Nullable String> source = getTemplate;
         if (source == null) {
             drop();
@@ -242,6 +237,29 @@ final class PendingRoute {
      */
     static @Nullable Consumer<RouteSettings> resourceSettings(ResourceHandler resources) {
         return resources.blocking() ? route -> route.executeOn(BLOCKING_EXECUTOR) : null;
+    }
+
+    /**
+     * End a route with a handler of resources at its own URI template, e.g.
+     * {@code GET("/files/{+path}", resources)}: it runs like a route of resources.
+     *
+     * @param resources The handler of the resources
+     * @throws IllegalStateException if the route is a located route
+     */
+    void endResourceHandler(ResourceHandler resources) {
+        checkPending();
+        checkNotLocated();
+        end(() -> HandlerMethod.of(resources), resourceSettings(resources), RESOURCE_SETTINGS);
+    }
+
+    private void checkNotLocated() {
+        if (builder.located()) {
+            // the handler of the resources would not see the located target, nor its settings the
+            // media types and the executor of the locator
+            drop();
+            throw new IllegalStateException("The route " + description
+                + " is a located route: a route of resources is a route of an HttpRoutes bean");
+        }
     }
 
     private static String resourcePathVariable(ResourceHandler resources) {

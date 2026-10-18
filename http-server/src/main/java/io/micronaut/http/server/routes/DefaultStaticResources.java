@@ -29,8 +29,13 @@ import io.micronaut.web.router.resource.StaticResourceResolver;
 import org.jspecify.annotations.Nullable;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Locale;
@@ -123,7 +128,8 @@ final class DefaultStaticResources implements StaticResources {
     @Override
     public HttpResponse<?> handle(HttpRequest<?> request, PathVariables pathVariables) {
         String path = pathVariables.findString(pathVariable).orElse("");
-        if (!isRelative(path) || (!hiddenFiles && isHidden(path)) || isAlias(path, request.getUri().getRawPath())) {
+        if (!isRelative(path) || (!hiddenFiles && isHidden(path)) || isAlias(path, request.getUri().getRawPath())
+            || spansSegments(pathVariables)) {
             return HttpResponse.notFound();
         }
         Optional<URL> resolved = StaticResourceResolver.resolve(loaders, path, indexFile);
@@ -134,7 +140,7 @@ final class DefaultStaticResources implements StaticResources {
         FileCustomizableResponseType body;
         if (FILE_PROTOCOL.equals(url.getProtocol())) {
             File file = toFile(url);
-            if (file == null || !file.isFile() || !file.canRead()) {
+            if (file == null || !file.isFile() || !file.canRead() || !isSpelledAsRequested(file, path)) {
                 // a resource loader may resolve a directory
                 return HttpResponse.notFound();
             }
@@ -199,8 +205,9 @@ final class DefaultStaticResources implements StaticResources {
 
     /**
      * Whether a path is another spelling of a path that the router may route elsewhere, e.g. to a
-     * more specific route: an empty segment, as in {@code css//site.css}, or an encoded slash or
-     * backslash, as in {@code css%2fsite.css}, which the router matches as one segment.
+     * more specific route: an empty segment, as in {@code css//site.css}, or an encoded slash, as
+     * in {@code css%2fsite.css}, which the router matches as one segment. Only the end of the raw
+     * path of the request, the path of the resource, is checked, not the prefix.
      *
      * @param path    The decoded path of the resource
      * @param rawPath The raw path of the request
@@ -210,11 +217,78 @@ final class DefaultStaticResources implements StaticResources {
         if (path.contains("//")) {
             return true;
         }
-        if (rawPath == null || rawPath.indexOf('%') == -1) {
+        if (path.isEmpty() || rawPath == null || rawPath.indexOf('%') == -1) {
             return false;
         }
-        String lowerCase = rawPath.toLowerCase(Locale.ROOT);
-        return lowerCase.contains("%2f") || lowerCase.contains("%5c");
+        // the raw segments of the path of the resource: as many as its decoded segments, unless
+        // one of them is an encoded slash
+        int segments = 1;
+        for (int i = 0; i < path.length(); i++) {
+            if (path.charAt(i) == '/') {
+                segments++;
+            }
+        }
+        int start = rawPath.length();
+        for (int i = 0; i < segments; i++) {
+            start = rawPath.lastIndexOf('/', start - 1);
+            if (start < 0) {
+                return true;
+            }
+        }
+        String rawResource = rawPath.substring(start + 1);
+        try {
+            return !URLDecoder.decode(rawResource, StandardCharsets.UTF_8).equals(path);
+        } catch (IllegalArgumentException e) {
+            return true;
+        }
+    }
+
+    /**
+     * Whether a variable of the route other than the path of the resource matched several
+     * segments, e.g. a variable of the prefix whose regular expression matches a slash: the path of
+     * the resource is then not the end of the path of the request.
+     *
+     * @param pathVariables The path variables of the route
+     * @return Whether a variable spans segments
+     */
+    private boolean spansSegments(PathVariables pathVariables) {
+        for (String name : pathVariables.names()) {
+            if (!name.equals(pathVariable) && pathVariables.findString(name).filter(value -> value.indexOf('/') >= 0).isPresent()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a file of the file system is spelled as the path of the request, e.g. not
+     * {@code HELLO.TXT} for {@code hello.txt} on a file system that ignores the case, which the
+     * router may route elsewhere, e.g. to a more specific route.
+     *
+     * @param file The file
+     * @param path The relative path of the resource, the file or its directory of the index file
+     * @return Whether the names of the file system are the names of the path
+     */
+    static boolean isSpelledAsRequested(File file, String path) {
+        Path real;
+        try {
+            // the names of the file system, without following the links, which the loaders check
+            real = file.toPath().toRealPath(LinkOption.NOFOLLOW_LINKS);
+        } catch (IOException | RuntimeException e) {
+            return false;
+        }
+        String trimmed = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+        if (trimmed.isEmpty()) {
+            // the index file of the base
+            return indexName(real, file);
+        }
+        Path requested = Paths.get(trimmed);
+        return real.endsWith(requested) || (real.getParent() != null && real.getParent().endsWith(requested) && indexName(real, file));
+    }
+
+    private static boolean indexName(Path real, File file) {
+        Path name = real.getFileName();
+        return name != null && name.toString().equals(file.getName());
     }
 
     /**

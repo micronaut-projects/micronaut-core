@@ -16,6 +16,12 @@
 package io.micronaut.http.server.routes;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -84,9 +90,33 @@ class StaticResourcesTest {
         assertTrue(DefaultStaticResources.isAlias("css//site.css", "/assets/css//site.css"));
         assertTrue(DefaultStaticResources.isAlias("css/site.css", "/assets/css%2fsite.css"));
         assertTrue(DefaultStaticResources.isAlias("css/site.css", "/assets/css%2Fsite.css"));
-        assertTrue(DefaultStaticResources.isAlias("css\\site.css", "/assets/css%5csite.css"));
+        // a backslash is not relative
+        assertFalse(DefaultStaticResources.isRelative("css\\site.css"));
+        // an encoded slash of the prefix is not an alias of the path of the resource
+        assertFalse(DefaultStaticResources.isAlias("css/site.css", "/a%2Fb/css/site.css"));
+        assertFalse(DefaultStaticResources.isAlias("hello.txt", "/tenant/acme%2Feu/assets/hello.txt"));
+        assertFalse(DefaultStaticResources.isAlias("", "/a%2Fb"));
+        assertTrue(DefaultStaticResources.isAlias("a/b/c.txt", "/a%2Fb/c.txt"));
         assertFalse(DefaultStaticResources.isAlias("css/site.css", "/assets/css/site.css"));
         assertFalse(DefaultStaticResources.isAlias("my file.txt", "/assets/my%20file.txt"));
+    }
+
+    @Test
+    void aFileIsSpelledAsRequested(@TempDir Path base) throws IOException {
+        Files.createDirectories(base.resolve("docs"));
+        Files.writeString(base.resolve("docs/index.html"), "index");
+        Files.writeString(base.resolve("hello.txt"), "hello");
+        File hello = base.resolve("hello.txt").toFile();
+
+        assertTrue(DefaultStaticResources.isSpelledAsRequested(hello, "hello.txt"));
+        assertTrue(DefaultStaticResources.isSpelledAsRequested(base.resolve("docs/index.html").toFile(), "docs"));
+        assertTrue(DefaultStaticResources.isSpelledAsRequested(base.resolve("docs/index.html").toFile(), "docs/"));
+        File upper = base.resolve("HELLO.TXT").toFile();
+        if (upper.exists()) {
+            // a file system that ignores the case
+            assertFalse(DefaultStaticResources.isSpelledAsRequested(upper, "HELLO.TXT"));
+            assertFalse(DefaultStaticResources.isSpelledAsRequested(base.resolve("DOCS/index.html").toFile(), "DOCS"));
+        }
     }
 
     @Test
