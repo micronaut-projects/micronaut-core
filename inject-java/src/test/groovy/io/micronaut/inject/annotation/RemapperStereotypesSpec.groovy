@@ -94,9 +94,5 @@ class Fruit {
         void start(VisitorContext visitorContext) {
             visitorContext.getClassElement('remapstereo.Ripe').ifPresent { it.annotate('remapstereo.Extra') }
         }
-
-        @Override
-        void visitClass(ClassElement element, VisitorContext context) {
-        }
     }
 }
