@@ -36,12 +36,17 @@ public final class TestPathFirstColonRouteTemplateEngine extends TestColonRouteT
 
     public static final String ID = "test.colon.path-first";
 
-    public static final TestPathFirstColonRouteTemplateEngine INSTANCE = new TestPathFirstColonRouteTemplateEngine();
+    public static final TestPathFirstColonRouteTemplateEngine INSTANCE = new TestPathFirstColonRouteTemplateEngine(ID);
+
+    /**
+     * Another selector of the same language, e.g. of another JAX-RS application.
+     */
+    public static final TestPathFirstColonRouteTemplateEngine OTHER = new TestPathFirstColonRouteTemplateEngine(ID + ".other");
 
     private static final Comparator<UriRouteInfo<?, ?>> ORDER = Comparator.comparingInt((UriRouteInfo<?, ?> route) -> declared(route).rawLength()).reversed();
 
-    private TestPathFirstColonRouteTemplateEngine() {
-        super(ID);
+    private TestPathFirstColonRouteTemplateEngine(String id) {
+        super(id);
     }
 
     public static RouteTemplate template(String expression) {
@@ -87,7 +92,16 @@ public final class TestPathFirstColonRouteTemplateEngine extends TestColonRouteT
         if (consuming.isEmpty()) {
             return List.of(Selection.unsupportedMediaType(path.get(0)));
         }
-        Collection<MediaType> accepted = request.accept();
+        // an accepted type of quality 0 is not acceptable
+        List<MediaType> accepted = new ArrayList<>();
+        for (MediaType type : request.accept()) {
+            if (type.getQualityAsNumber().signum() > 0) {
+                accepted.add(type);
+            }
+        }
+        if (accepted.isEmpty() && !request.accept().isEmpty()) {
+            return List.of(Selection.notAcceptable(consuming.get(0)));
+        }
         for (UriRouteMatch<?, ?> match : consuming) {
             if (accepted.isEmpty() || anyCompatible(match.getRouteInfo().getProduces(), accepted)) {
                 return List.of(Selection.of(match));

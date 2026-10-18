@@ -1318,8 +1318,12 @@ final class UriRouteSet {
     private static <T, R> List<UriRouteMatch<T, R>> select(RouteMatchSelector selector, HttpRequest<?> request, HttpRequest<?> selectorRequest,
                                                            List<UriRouteMatch<T, R>> matches) {
         List<UriRouteMatch<T, R>> selected = selectOrReject(selector, request, selectorRequest, matches);
-        // a rejected request is not routed: the router finds the rejection again for the 406 or 415, see findAny
-        return isRejection(selected) ? List.of() : selected;
+        if (isRejection(selected)) {
+            // a rejected request is not routed: the server answers the 406 or 415 of the rejection
+            RouteRejections.set(request, (DefaultUriRouteMatch<?, ?>) selected.get(0));
+            return List.of();
+        }
+        return selected;
     }
 
     /**

@@ -61,6 +61,7 @@ import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteResolution;
 import io.micronaut.web.router.RouteMatch;
+import io.micronaut.web.router.RouteRejections;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
@@ -616,6 +617,8 @@ public class RequestLifecycle {
      */
     @Internal
     protected @Nullable UriRouteMatch<Object, Object> matchRoute(HttpRequest<?> request) {
+        // the rejection of a route selector is the one of this routing
+        RouteRejections.clear(request);
         Router router = routeExecutor.router;
         if (!router.hasBodyConditions()) {
             return routeExecutor.findRouteMatch(request);
@@ -660,15 +663,16 @@ public class RequestLifecycle {
                 // routes whose body conditions the body did not meet, nor a file on their path
                 return onStatusError(request, new NotFoundException(), null, propagatedContext);
             }
+            // a route selector that rejected the request chose a route of the path: the route
+            // answers, not a file of the path, which is not opened
+            DefaultUriRouteMatch<?, ?> rejected = RouteRejections.get(request);
+            if (rejected != null) {
+                return onRejection(request, rejected, propagatedContext);
+            }
             //Check if there is a file for the route before returning route not found
             FileCustomizableResponseType fileCustomizableResponseType = findFile(request);
             if (fileCustomizableResponseType != null) {
-                // a route selector that rejected the request chose a route of the path: the route answers, not the file
-                UriRouteMatch<?, ?> rejected = rejectionOf(request, findAnyRoutes(request));
-                if (rejected == null) {
-                    return ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType));
-                }
-                return onRejection(request, rejected, propagatedContext);
+                return ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType));
             }
             return onRouteMiss(request, propagatedContext);
         }
@@ -733,32 +737,6 @@ public class RequestLifecycle {
     }
 
     /**
-     * @param request The request
-     * @param matches The routes of the path for every HTTP method
-     * @return The match a route selector rejected the request with, see
-     * {@link io.micronaut.web.router.spi.RouteMatchSelector.Selection#rejectionStatus()}: of the
-     * method of the request, over the one of the routes of any method, or {@code null}
-     */
-    private static @Nullable UriRouteMatch<?, ?> rejectionOf(HttpRequest<?> request, List<UriRouteMatch<Object, Object>> matches) {
-        String requestMethodName = request.getMethodName();
-        boolean custom = request.getMethod() == HttpMethod.CUSTOM;
-        UriRouteMatch<?, ?> rejected = null;
-        for (UriRouteMatch<?, ?> match : matches) {
-            if (rejectionStatus(match) == null) {
-                continue;
-            }
-            String routeMethod = match.getRouteInfo().getHttpMethodName();
-            if (requestMethodName.equals(routeMethod)) {
-                return match;
-            }
-            if (rejected == null && custom && AnyMethodRoutes.CUSTOM_METHODS.equals(routeMethod)) {
-                rejected = match;
-            }
-        }
-        return rejected;
-    }
-
-    /**
      * Answer a request that a route selector rejected, see
      * {@link io.micronaut.web.router.spi.RouteMatchSelector.Selection#rejectionStatus()}, as a
      * failure of the rejected route: the status routes and the error routes of the route, of its
@@ -777,7 +755,9 @@ public class RequestLifecycle {
                 rejected.getRouteInfo().getConsumes().stream().map(MediaType::toString).toList())
             : new NotAcceptableException(request.accept().stream().map(MediaType::toString).toList(),
                 rejected.getRouteInfo().getProduces().stream().map(MediaType::toString).toList());
-        // the error routes of the groups of the rejected route find them from the route of the request
+        // the error routes of the groups of the rejected route, and of its locations, find them
+        // from the route match of the request
+        RouteAttributes.setRouteMatch(request, rejected);
         RouteAttributes.setRouteInfo(request, rejected.getRouteInfo());
         RouteMatch<Object> statusRoute = routeExecutor.findStatusRoute(request, status.getCode(), rejected.getRouteInfo());
         if (statusRoute != null) {
@@ -798,6 +778,11 @@ public class RequestLifecycle {
         // if there is no route present try to locate a route that matches a different HTTP method.
         // The route of a WebSocket only matches an upgrade request, see ServerWebSocketProcessor:
         // the request is taken as one during the lookup, so that it also finds the WebSocket at its path
+        // the rejection of a route selector, as the router decided it while it routed the request
+        DefaultUriRouteMatch<?, ?> rejected = RouteRejections.get(httpRequest);
+        if (rejected != null) {
+            return onRejection(httpRequest, rejected, propagatedContext);
+        }
         final List<UriRouteMatch<Object, Object>> anyMatchingRoutes = findAnyRoutes(httpRequest);
         final Collection<MediaType> acceptedTypes = httpRequest.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(acceptedTypes);
@@ -820,9 +805,6 @@ public class RequestLifecycle {
                 || httpMethod == HttpMethod.CUSTOM && AnyMethodRoutes.CUSTOM_METHODS.equals(routeMethod);
             if (!sameMethod) {
                 allowedMethods.add(routeMethod);
-            } else if (rejectionStatus(anyRoute) != null) {
-                // answered for the rejected route alone, see rejectionOf
-                continue;
             } else {
                 if (contentType != null && !anyRoute.getRouteInfo().doesConsume(contentType)) {
                     acceptableContentTypes.addAll(anyRoute.getRouteInfo().getConsumes());
@@ -834,10 +816,6 @@ public class RequestLifecycle {
             declaringType = anyRoute.getDeclaringType();
         }
 
-        UriRouteMatch<?, ?> rejected = rejectionOf(httpRequest, anyMatchingRoutes);
-        if (rejected != null) {
-            return onRejection(httpRequest, rejected, propagatedContext);
-        }
         if (CollectionUtils.isNotEmpty(acceptableContentTypes)) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", httpRequest.getUri(),

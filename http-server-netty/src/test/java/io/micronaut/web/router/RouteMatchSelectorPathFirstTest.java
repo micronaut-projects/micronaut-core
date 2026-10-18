@@ -143,6 +143,37 @@ class RouteMatchSelectorPathFirstTest {
         assertEquals("located", response.body());
     }
 
+    @Test
+    void aRejectionOfALocatedRouteIsAnsweredByTheStatusRouteAroundItsLocator() throws Exception {
+        // the located routes have no status route: the one of the group of the locator route answers
+        java.net.http.HttpResponse<String> response = send("GET", "/anc/1/fixed", "Accept", "text/plain");
+        assertEquals(406, response.statusCode());
+        assertEquals("ancestor", response.body());
+    }
+
+    @Test
+    void aLocatedCustomMethodIsAnsweredWithTheRejectionOfItsRouting() throws Exception {
+        // REPORT /fixed of any method is the most specific, and cannot consume JSON: 415, not the 406 of REPORT /{x}
+        HttpRequest request = HttpRequest.newBuilder(URI.create(server.getURL() + "/cm/1/fixed"))
+            .method("REPORT", HttpRequest.BodyPublishers.ofString("{}"))
+            .header("Accept", "text/plain")
+            .header("Content-Type", "application/json")
+            .build();
+        assertEquals(415, client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode());
+    }
+
+    @Test
+    void theRejectionOfTheSelectorOfTheCandidatesWinsOverTheTypesOfOtherSelectors() throws Exception {
+        // the route of the other selector cannot consume JSON; the selector of the candidate rejects q=0
+        assertEquals(406, send("POST", "/mx/fixed", Map.of("Content-Type", "application/json", "Accept", "text/plain;q=0")).statusCode());
+    }
+
+    @Test
+    void aRejectionIsNotLostToAWebSocketOfThePath() throws Exception {
+        // a plain GET: the WebSocket does not match it, and the selector rejects the HTTP route
+        assertEquals(406, send("GET", "/ws/fixed", "Accept", "text/plain").statusCode());
+    }
+
     private static Set<String> allowed(java.net.http.HttpResponse<?> response) {
         return response.headers().allValues("Allow").stream()
             .flatMap(allow -> Arrays.stream(allow.split(",")))
@@ -152,11 +183,13 @@ class RouteMatchSelectorPathFirstTest {
     }
 
     private static java.net.http.HttpResponse<String> send(String method, String path, String header, String value) throws IOException, InterruptedException {
+        return send(method, path, header == null ? Map.of() : Map.of(header, value));
+    }
+
+    private static java.net.http.HttpResponse<String> send(String method, String path, Map<String, String> headers) throws IOException, InterruptedException {
         HttpRequest.BodyPublisher body = "POST".equals(method) ? HttpRequest.BodyPublishers.ofString("{}") : HttpRequest.BodyPublishers.noBody();
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(server.getURL() + path)).method(method, body);
-        if (header != null) {
-            request.header(header, value);
-        }
+        headers.forEach(request::header);
         return client.send(request.build(), java.net.http.HttpResponse.BodyHandlers.ofString());
     }
 
@@ -196,6 +229,34 @@ class RouteMatchSelectorPathFirstTest {
                 }
             };
             routes.status(io.micronaut.http.HttpStatus.NOT_ACCEPTABLE, request -> status406("global"));
+            LocatedRoutes<String> unhandled = new LocatedRoutes<>() {
+                @Override
+                public Argument<String> targetType() {
+                    return Argument.STRING;
+                }
+
+                @Override
+                public void routes(LocatedHttpRouteBuilder<String> routes) {
+                    routes.GET("/fixed").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, pathVariables) -> HttpResponse.ok("fixed"));
+                    routes.route("REPORT", "/{x}").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, pathVariables) -> HttpResponse.ok("x"));
+                    routes.any("/fixed").consumes(MediaType.TEXT_XML_TYPE).handle((request, pathVariables) -> HttpResponse.ok("any"));
+                }
+            };
+            routes.group(group -> {
+                group.templates(TestPathFirstColonRouteTemplateEngine.INSTANCE).selectedBy(TestPathFirstColonRouteTemplateEngine.INSTANCE);
+                group.status(io.micronaut.http.HttpStatus.NOT_ACCEPTABLE, request -> status406("ancestor"));
+                group.locate("/anc/:id", (request, pathVariables) -> "located", target -> unhandled);
+                group.locate("/cm/:id", (request, pathVariables) -> "located", target -> unhandled);
+                group.GET("/ws/:x").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, pathVariables) -> HttpResponse.ok("x"));
+                group.POST("/mx/:x").consumes(MediaType.APPLICATION_JSON_TYPE).produces(MediaType.TEXT_PLAIN_TYPE)
+                    .handle((request, pathVariables) -> HttpResponse.ok("x").contentType(MediaType.TEXT_PLAIN_TYPE));
+            });
+            // a WebSocket has a URI template, and the selector of the routes of its path
+            routes.GET("/ws/fixed").selectedBy(TestPathFirstColonRouteTemplateEngine.INSTANCE)
+                .webSocket(ws -> ws.onMessage(Argument.STRING, (session, message) -> session.sendAsync(message)));
+            routes.route(io.micronaut.http.HttpMethod.POST, TestPathFirstColonRouteTemplateEngine.template("/mx/fixed"))
+                .selectedBy(TestPathFirstColonRouteTemplateEngine.OTHER).consumes(MediaType.TEXT_XML_TYPE)
+                .handle((request, pathVariables) -> HttpResponse.ok("fixed"));
             routes.group(group -> {
                 group.templates(TestPathFirstColonRouteTemplateEngine.INSTANCE).selectedBy(TestPathFirstColonRouteTemplateEngine.INSTANCE);
                 group.status(io.micronaut.http.HttpStatus.NOT_ACCEPTABLE, request -> status406("local"));

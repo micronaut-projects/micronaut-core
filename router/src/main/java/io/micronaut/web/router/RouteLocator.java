@@ -298,7 +298,11 @@ public final class RouteLocator implements DynamicRouteTarget {
         } catch (RuntimeException e) {
             throw located.failed(e);
         }
-        return target == null ? null : located.wrap(target);
+        if (target == null) {
+            located.wrapRejection();
+            return null;
+        }
+        return located.wrap(target);
     }
 
     @Override
@@ -320,7 +324,10 @@ public final class RouteLocator implements DynamicRouteTarget {
         return switch (target) {
             case RouteResolution.Matched<T, R> m -> new RouteResolution.Matched<>(located.wrap(m.match()));
             case RouteResolution.Pending<T, R> p -> new RouteResolution.Pending<>(p.pending().located(located.request(), located::wrap, located::failed));
-            case RouteResolution.NotFound<T, R> n -> n;
+            case RouteResolution.NotFound<T, R> n -> {
+                located.wrapRejection();
+                yield n;
+            }
         };
     }
 
@@ -893,6 +900,17 @@ public final class RouteLocator implements DynamicRouteTarget {
          * @param <R>   The return type
          * @return The match of the request
          */
+        /**
+         * The rejection of the request by a route selector of the target's table, as the match of
+         * the request, with the variables and the scopes of the location, see {@link RouteRejections}.
+         */
+        void wrapRejection() {
+            DefaultUriRouteMatch<?, ?> rejection = RouteRejections.get(request);
+            if (rejection != null && wrap(rejection) instanceof DefaultUriRouteMatch<?, ?> wrapped) {
+                RouteRejections.set(request, wrapped);
+            }
+        }
+
         <T, R> UriRouteMatch<T, R> wrap(UriRouteMatch<T, R> match) {
             if (!(match instanceof DefaultUriRouteMatch<T, R> innerMatch) || !(match.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> route)) {
                 return match;
