@@ -616,12 +616,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         try {
             result = invokeExecutable(boundExecutable, methodExecutionHandle);
         } catch (Throwable e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Error invoking @OnClose handler {}.{}: {}", target.getClass().getSimpleName(), methodExecutionHandle.getExecutableMethod(), e.getMessage(), e);
-            }
-            // a failed close handler still answers the close of the peer
-            closeAfterHandler(ctx, closeReply);
-            return;
+            // reported and answered like a failed handler: a failed close handler still
+            // answers the close of the peer
+            result = ExecutionFlow.error(e);
         }
 
         result.onComplete((v, t) -> {
@@ -656,10 +653,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             try {
                 executor.execute(() -> answerClose(ctx, closeReply));
             } catch (Throwable e) {
-                // the event loop rejected the task, e.g. it is shutting down
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Failed to answer the close of WebSocket session {}: {}", getSession(), e.getMessage(), e);
-                }
+                // the event loop rejected the task, e.g. it is shutting down: the channel is
+                // closed without an answer
                 ctx.channel().close();
             }
         }
@@ -679,11 +674,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         try {
             write = ctx.writeAndFlush(new CloseWebSocketFrame(closeReply.getCode(), closeReply.getReason()));
         } catch (Throwable e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Failed to answer the close of WebSocket session {}: {}", getSession(), e.getMessage(), e);
-            }
-            ctx.close();
-            return;
+            // e.g. the close frame could not be allocated: handled like a failed write
+            write = ctx.newFailedFuture(e);
         }
         write.addListener(future -> {
             if (!future.isSuccess() && LOG.isDebugEnabled()) {
