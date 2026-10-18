@@ -347,6 +347,9 @@ public final class RouteLocator implements DynamicRouteTarget {
         } catch (RuntimeException e) {
             throw located.failed(e);
         }
+        if (targetMatches.isEmpty()) {
+            located.wrapRejection();
+        }
         return located.wrap(targetMatches);
     }
 

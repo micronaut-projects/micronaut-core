@@ -765,7 +765,7 @@ final class UriRouteSet {
         // the matches a route selector rejected the request with, see Selection#rejectionStatus()
         List<UriRouteMatch<T, R>> rejections = null;
         for (List<UriRouteMatch<T, R>> methodCandidates : byMethod.values()) {
-            List<UriRouteMatch<T, R>> candidates = withAnyMethodMatches(methodCandidates, anyMethodMatches, contentType, accepted);
+            List<UriRouteMatch<T, R>> candidates = withAnyMethodMatches(request, methodCandidates, anyMethodMatches, contentType, accepted);
             RouteMatchSelector selector = commonSelector(request, candidates);
             if (selector == null) {
                 continue;
@@ -836,13 +836,15 @@ final class UriRouteSet {
     }
 
     /**
+     * @param request          The request
      * @param candidates       The compatible matches of the routes of a method
      * @param anyMethodMatches The matches of the routes of any method, by the custom method whose routes they are among, or {@code null}
      * @param contentType      The content type of the request
      * @param accepted         The accepted types of the request
      * @return The candidates, with the compatible matches of the routes of any method if the method is custom
      */
-    private static <T, R> List<UriRouteMatch<T, R>> withAnyMethodMatches(List<UriRouteMatch<T, R>> candidates,
+    private static <T, R> List<UriRouteMatch<T, R>> withAnyMethodMatches(HttpRequest<?> request,
+                                                                         List<UriRouteMatch<T, R>> candidates,
                                                                          @Nullable Map<String, List<UriRouteMatch<T, R>>> anyMethodMatches,
                                                                          @Nullable MediaType contentType, Collection<MediaType> accepted) {
         List<UriRouteMatch<T, R>> anyMethod = anyMethodMatches == null ? null : anyMethodMatches.get(candidates.get(0).getRouteInfo().getHttpMethodName());
@@ -851,7 +853,8 @@ final class UriRouteSet {
         }
         List<UriRouteMatch<T, R>> result = new ArrayList<>(candidates);
         for (UriRouteMatch<T, R> match : anyMethod) {
-            if (DynamicRouteTarget.of(match.getRouteInfo()) != null || isCandidate(match.getRouteInfo(), contentType, accepted)) {
+            // with the settings it inherits at the location of the request, as the matches of the method
+            if (DynamicRouteTarget.of(match.getRouteInfo()) != null || isCandidate(atLocation(request, match.getRouteInfo()), contentType, accepted)) {
                 result.add(match);
             }
         }

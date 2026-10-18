@@ -60,6 +60,14 @@ class RouteMatchSelectorPathFirstTest {
             g.locate("/:id", (request, variables) -> "nested", target -> root);
         }));
 
+    /**
+     * Routes of a custom method and of any method, which inherit the selector of their locator route.
+     */
+    private final TestLocatedRoutes<Object> custom = TestLocatedRoutes.of(routes -> {
+        routes.route("REPORT", "/{x}").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, variables) -> HttpResponse.ok());
+        routes.any("/fixed").consumes(MediaType.TEXT_XML_TYPE).handle((request, variables) -> HttpResponse.ok());
+    });
+
     private final Router router = RouteTemplateEngineOrderTest.router(null, routes -> {
         routes.group(g -> {
             g.templates(PathFirstColonRouteTemplateEngine.INSTANCE).selectedBy(PathFirstColonRouteTemplateEngine.INSTANCE);
@@ -93,6 +101,7 @@ class RouteMatchSelectorPathFirstTest {
             g.GET("/x/fixed").handle((request, variables) -> HttpResponse.ok());
             g.locate("/x/:id", (request, variables) -> "located", target -> root);
             g.route("REPORT", "/x/:a").handle((request, variables) -> HttpResponse.ok());
+            g.locate("/cm/:id", (request, variables) -> "custom", target -> custom);
         });
         routes.GET("/v/{x}").produces(MediaType.TEXT_PLAIN_TYPE).handle((request, variables) -> HttpResponse.ok());
         routes.locate("/tenants/{tenant}", (request, variables) -> "tenant", target -> tenant);
@@ -178,6 +187,34 @@ class RouteMatchSelectorPathFirstTest {
         router.findAny(HttpRequest.OPTIONS("/x/fixed")).forEach(m -> System.out.println("DEBUG " + m.getRouteInfo()));
         assertTrue(methods(router.findAny(HttpRequest.OPTIONS("/x/fixed"))).contains("REPORT"));
         assertTrue(methods(router.findAny(report)).contains("REPORT"));
+    }
+
+    @Test
+    void theRoutesOfALocatedCustomMethodAreFoundAsTheyAreRouted() {
+        // the route of any method /fixed is the most specific, and cannot consume JSON: 415, for routing and findAny
+        MutableHttpRequest<?> request = HttpRequest.create(HttpMethod.CUSTOM, "/cm/1/fixed", "REPORT")
+            .header(HttpHeaders.ACCEPT, "text/plain").header(HttpHeaders.CONTENT_TYPE, "application/json");
+        assertNull(router.findClosest(request));
+        DefaultUriRouteMatch<?, ?> rejection = RouteRejections.get(request);
+        assertNotNull(rejection);
+        assertEquals(HttpStatus.UNSUPPORTED_MEDIA_TYPE, rejection.rejectionStatus());
+        assertEquals("1", rejection.getVariableValues().get("id"));
+        List<UriRouteMatch<Object, Object>> any = router.findAny(request);
+        // the REPORT route is not selected: the rejected route of any method stands for the method
+        assertEquals(List.of(), ofMethod(any, "REPORT"));
+        UriRouteMatch<Object, Object> found = only(ofMethod(any, "*"));
+        assertEquals(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ((DefaultUriRouteMatch<?, ?>) found).rejectionStatus());
+    }
+
+    @Test
+    void aLocatedRejectionOfFilteredRoutesHasTheContextOfTheLocation() {
+        // as FilteredRouter, e.g. with API versioning: findAllClosest with a filter
+        MutableHttpRequest<?> request = HttpRequest.create(HttpMethod.CUSTOM, "/cm/1/fixed", "REPORT")
+            .header(HttpHeaders.ACCEPT, "text/plain").header(HttpHeaders.CONTENT_TYPE, "application/json");
+        assertEquals(List.of(), router.findAllClosest(request, match -> true));
+        DefaultUriRouteMatch<?, ?> rejection = RouteRejections.get(request);
+        assertNotNull(rejection);
+        assertEquals("1", rejection.getVariableValues().get("id"));
     }
 
     @Test

@@ -56,6 +56,7 @@ import io.micronaut.web.router.AnyMethodRoutes;
 import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.DefaultUriRouteMatch;
 import io.micronaut.web.router.PendingRouteMatch;
+import io.micronaut.web.router.GroupErrorRoutes;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteLocator;
@@ -737,6 +738,22 @@ public class RequestLifecycle {
     }
 
     /**
+     * Answer the request with the rejection of a route selector while it was routed, see
+     * {@link io.micronaut.web.router.spi.RouteMatchSelector.Selection#rejectionStatus()}, e.g. for
+     * a lifecycle that matches its routes differently, such as the upgrade of a WebSocket.
+     *
+     * @param request           The request
+     * @param propagatedContext The propagated context
+     * @return The response flow, or {@code null} if no route selector rejected the request
+     * @since 5.3.0
+     */
+    @Internal
+    protected final @Nullable ExecutionFlow<HttpResponse<?>> rejectionResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
+        DefaultUriRouteMatch<?, ?> rejected = RouteRejections.get(request);
+        return rejected == null ? null : onRejection(request, rejected, propagatedContext);
+    }
+
+    /**
      * Answer a request that a route selector rejected, see
      * {@link io.micronaut.web.router.spi.RouteMatchSelector.Selection#rejectionStatus()}, as a
      * failure of the rejected route: the status routes and the error routes of the route, of its
@@ -759,9 +776,21 @@ public class RequestLifecycle {
         // from the route match of the request
         RouteAttributes.setRouteMatch(request, rejected);
         RouteAttributes.setRouteInfo(request, rejected.getRouteInfo());
-        RouteMatch<Object> statusRoute = routeExecutor.findStatusRoute(request, status.getCode(), rejected.getRouteInfo());
-        if (statusRoute != null) {
-            return executeRoute(request, propagatedContext, statusRoute);
+        // the routes of the rejected route, of its class, its groups and its locations, before the global ones
+        Router router = routeExecutor.router;
+        Class<?> declaringType = rejected.getDeclaringType();
+        RouteMatch<?> scoped = router.findStatusRoute(declaringType, status, request).orElse(null);
+        if (scoped == null) {
+            scoped = GroupErrorRoutes.findStatusRoute(request, rejected.getRouteInfo(), status.getCode());
+        }
+        if (scoped == null) {
+            scoped = router.findErrorRoute(declaringType, cause, request).orElse(null);
+        }
+        if (scoped == null) {
+            scoped = GroupErrorRoutes.findErrorRoute(request, rejected.getRouteInfo(), cause);
+        }
+        if (scoped != null) {
+            return executeRoute(request, propagatedContext, scoped);
         }
         return onStatusError(request, cause, rejected.getDeclaringType(), propagatedContext);
     }

@@ -174,6 +174,25 @@ class RouteMatchSelectorPathFirstTest {
         assertEquals(406, send("GET", "/ws/fixed", "Accept", "text/plain").statusCode());
     }
 
+    @Test
+    void aGroupErrorRouteAnswersARejectionBeforeAGlobalStatusRoute() throws Exception {
+        java.net.http.HttpResponse<String> response = send("GET", "/err/fixed", "Accept", "text/plain");
+        assertEquals(406, response.statusCode());
+        assertEquals("group error", response.body());
+    }
+
+    @Test
+    void aRejectedWebSocketUpgradeIsAnsweredWithTheRejection() throws Exception {
+        // the selector rejects an upgrade that accepts no type
+        java.util.concurrent.CompletionException failure = org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.CompletionException.class, () ->
+            client.newWebSocketBuilder()
+                .header("Accept", "*/*;q=0")
+                .buildAsync(URI.create(server.getURL().toString().replace("http", "ws") + "/ws/fixed"), new java.net.http.WebSocket.Listener() { })
+                .join());
+        java.net.http.WebSocketHandshakeException handshake = (java.net.http.WebSocketHandshakeException) failure.getCause();
+        assertEquals(406, handshake.getResponse().statusCode());
+    }
+
     private static Set<String> allowed(java.net.http.HttpResponse<?> response) {
         return response.headers().allValues("Allow").stream()
             .flatMap(allow -> Arrays.stream(allow.split(",")))
@@ -250,6 +269,11 @@ class RouteMatchSelectorPathFirstTest {
                 group.GET("/ws/:x").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, pathVariables) -> HttpResponse.ok("x"));
                 group.POST("/mx/:x").consumes(MediaType.APPLICATION_JSON_TYPE).produces(MediaType.TEXT_PLAIN_TYPE)
                     .handle((request, pathVariables) -> HttpResponse.ok("x").contentType(MediaType.TEXT_PLAIN_TYPE));
+            });
+            routes.group(group -> {
+                group.templates(TestPathFirstColonRouteTemplateEngine.INSTANCE).selectedBy(TestPathFirstColonRouteTemplateEngine.INSTANCE);
+                group.error(io.micronaut.http.server.exceptions.NotAcceptableException.class, (request, error) -> status406("group error"));
+                group.GET("/err/fixed").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, pathVariables) -> HttpResponse.ok("fixed"));
             });
             // a WebSocket has a URI template, and the selector of the routes of its path
             routes.GET("/ws/fixed").selectedBy(TestPathFirstColonRouteTemplateEngine.INSTANCE)
