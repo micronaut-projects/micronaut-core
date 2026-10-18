@@ -272,7 +272,10 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
 
     @Override
     public boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes) {
-        return producesMediaTypesContainsAll || anyMediaTypesMatch(producesMediaTypes, acceptableTypes);
+        if (producesMediaTypesContainsAll) {
+            return !AcceptedMediaTypes.hasRejected(acceptableTypes) || AcceptedMediaTypes.anyAcceptable(acceptableTypes);
+        }
+        return anyMediaTypesMatch(producesMediaTypes, acceptableTypes);
     }
 
     @Override
@@ -317,8 +320,12 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
                             return true;
                         }
                     }
-                } else if (producedMediaTypes.contains(acceptableType) && AcceptedMediaTypes.isAcceptable(acceptableType, acceptableTypes)) {
-                    return true;
+                } else {
+                    for (MediaType producedMediaType : producedMediaTypes) {
+                        if (producedMediaType.equals(acceptableType) && AcceptedMediaTypes.isAcceptable(producedMediaType, acceptableTypes)) {
+                            return true;
+                        }
+                    }
                 }
             }
             return false;

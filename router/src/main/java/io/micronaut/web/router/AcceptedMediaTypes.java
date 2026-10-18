@@ -16,10 +16,11 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.MediaType;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
+import java.util.Map;
 
 /**
  * The checks of the accepted media types that take a quality of {@code 0} into account: an
@@ -32,6 +33,7 @@ import java.util.Collection;
 public final class AcceptedMediaTypes {
 
     private static final String WILDCARD = "*";
+    private static final String QUALITY = "q";
 
     private AcceptedMediaTypes() {
     }
@@ -61,6 +63,23 @@ public final class AcceptedMediaTypes {
     }
 
     /**
+     * @param accepted The accepted media types
+     * @return Whether some media type is acceptable: one of the accepted types has a quality above
+     * {@code 0} and is not rejected by an at least as specific accepted range of the quality {@code 0}
+     */
+    public static boolean anyAcceptable(@Nullable Collection<MediaType> accepted) {
+        if (accepted == null || accepted.isEmpty()) {
+            return true;
+        }
+        for (MediaType type : accepted) {
+            if (!isRejected(type) && isAcceptable(type, accepted)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Whether a produced media type is acceptable: the most specific accepted media range that
      * covers it decides, a range of the quality {@code 0} rejecting it. A produced media range is
      * acceptable when it covers an accepted type with a quality above {@code 0}.
@@ -76,7 +95,7 @@ public final class AcceptedMediaTypes {
         MediaType best = null;
         int bestSpecificity = -1;
         for (MediaType range : accepted) {
-            if (range.matches(produced)) {
+            if (covers(range, produced)) {
                 int specificity = specificity(range);
                 // with the same specificity a rejection wins
                 if (specificity > bestSpecificity || specificity == bestSpecificity && isRejected(range)) {
@@ -96,10 +115,57 @@ public final class AcceptedMediaTypes {
         return false;
     }
 
+    /**
+     * @param range The accepted range
+     * @param type  A media type
+     * @return Whether the range covers the type: its type and subtype, and the parameters of the
+     * range other than the quality
+     */
+    private static boolean covers(MediaType range, MediaType type) {
+        if (!range.matches(type)) {
+            return false;
+        }
+        Map<CharSequence, String> typeParameters = type.getParametersMap();
+        for (Map.Entry<CharSequence, String> parameter : range.getParametersMap().entrySet()) {
+            String name = parameter.getKey().toString();
+            if (QUALITY.equalsIgnoreCase(name)) {
+                continue;
+            }
+            String value = parameterValue(typeParameters, name);
+            if (value == null || !value.equalsIgnoreCase(parameter.getValue())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static @Nullable String parameterValue(Map<CharSequence, String> parameters, String name) {
+        for (Map.Entry<CharSequence, String> parameter : parameters.entrySet()) {
+            if (name.equalsIgnoreCase(parameter.getKey().toString())) {
+                return parameter.getValue();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * @param range The accepted range
+     * @return The precedence of the range, RFC 9110 12.5.1: a more specific range overrides a
+     * less specific one, the parameters other than the quality making it more specific
+     */
     private static int specificity(MediaType range) {
         if (WILDCARD.equals(range.getType())) {
             return 0;
         }
-        return WILDCARD.equals(range.getSubtype()) ? 1 : 2;
+        if (WILDCARD.equals(range.getSubtype())) {
+            return 1;
+        }
+        int parameters = 0;
+        for (CharSequence name : range.getParametersMap().keySet()) {
+            if (!QUALITY.equalsIgnoreCase(name.toString())) {
+                parameters++;
+            }
+        }
+        return 2 + parameters;
     }
 }

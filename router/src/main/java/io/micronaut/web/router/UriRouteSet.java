@@ -801,7 +801,8 @@ final class UriRouteSet {
             && (!route.isPermitsRequestBody() || (!route.consumesAll() && !route.doesConsume(contentType)))) {
             return false;
         }
-        return route.producesAll() || route.doesProduce(accepted);
+        // a route that produces all types still rejects a request that accepts no type, see AcceptedMediaTypes
+        return route.producesAll() && !AcceptedMediaTypes.hasRejected(accepted) || route.doesProduce(accepted);
     }
 
     /**
@@ -942,7 +943,7 @@ final class UriRouteSet {
                 if (permitsBody && contentType == null && !mediaTypes.consumesAll()) {
                     contentType = request.getContentType().orElse(null);
                 }
-                if (acceptedProducedTypes == null && !mediaTypes.producesAll()) {
+                if (acceptedProducedTypes == null) {
                     acceptedProducedTypes = request.accept();
                 }
             }
@@ -1014,7 +1015,7 @@ final class UriRouteSet {
             if (permitsBody && !mediaTypes.consumesAll() && !mediaTypes.doesConsume(contentType)) {
                 return null;
             }
-            if (!mediaTypes.producesAll() && !mediaTypes.doesProduce(acceptedProducedTypes)) {
+            if (!(mediaTypes.producesAll() && !AcceptedMediaTypes.hasRejected(acceptedProducedTypes)) && !mediaTypes.doesProduce(acceptedProducedTypes)) {
                 return null;
             }
         }

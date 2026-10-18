@@ -19,14 +19,17 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Post;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -93,6 +96,44 @@ class AcceptQualityZeroTest {
         assertContentType(response, "application/json");
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"controller", "route"})
+    void rejectedPreferredTypeKeepsTheConsumesDisambiguation(String kind) throws Exception {
+        String response = post("/q0/" + kind + "/consumes", "application/json", "text/html;q=0, */*", "{}");
+        assertStatus(response, 200);
+        assertTrue(response.endsWith("json"), response);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"controller", "route"})
+    void parametersMakeARangeMoreSpecific(String kind) throws Exception {
+        assertStatus(get("/q0/" + kind + "/flowed", "text/plain;format=flowed, text/plain;q=0"), 200);
+        assertStatus(get("/q0/" + kind + "/flowed", "text/plain;format=flowed;q=0, text/plain"), 406);
+        assertStatus(get("/q0/" + kind + "/flowed", "text/plain;format=fixed, text/plain;q=0"), 406);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"controller/all", "route/all", "controller/default"})
+    void aRouteThatProducesAllTypesRejectsWhenNoTypeIsAcceptable(String path) throws Exception {
+        assertStatus(get("/q0/" + path, "*/*"), 200);
+        assertStatus(get("/q0/" + path, "*/*;q=0"), 406);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"controller/all", "route/all"})
+    void aRouteThatProducesAllTypesChoosesAnAcceptableType(String path) throws Exception {
+        String response = get("/q0/" + path, "application/json;q=0, text/plain");
+        assertStatus(response, 200);
+        assertContentType(response, "text/plain");
+    }
+
+    @Test
+    void aRejectedJsonTypeDoesNotSuppressAnHtmlError() throws Exception {
+        String response = get("/q0/missing", "text/html, application/json;q=0");
+        assertStatus(response, 404);
+        assertContentType(response, "text/html");
+    }
+
     private static void assertStatus(String response, int status) {
         assertTrue(response.startsWith("HTTP/1.1 " + status + " "), response);
     }
@@ -102,14 +143,28 @@ class AcceptQualityZeroTest {
     }
 
     private static String get(String path, String accept) throws Exception {
+        return exchange("GET " + path + " HTTP/1.1\r\n"
+            + "Host: " + server.getHost() + "\r\n"
+            + "Accept: " + accept + "\r\n"
+            + "Connection: close\r\n"
+            + "\r\n");
+    }
+
+    private static String post(String path, String contentType, String accept, String body) throws Exception {
+        return exchange("POST " + path + " HTTP/1.1\r\n"
+            + "Host: " + server.getHost() + "\r\n"
+            + "Content-Type: " + contentType + "\r\n"
+            + "Content-Length: " + body.getBytes(StandardCharsets.UTF_8).length + "\r\n"
+            + "Accept: " + accept + "\r\n"
+            + "Connection: close\r\n"
+            + "\r\n" + body);
+    }
+
+    private static String exchange(String request) throws Exception {
         try (Socket socket = new Socket(server.getHost(), server.getPort())) {
             socket.setSoTimeout(30_000);
             OutputStream out = socket.getOutputStream();
-            out.write(("GET " + path + " HTTP/1.1\r\n"
-                + "Host: " + server.getHost() + "\r\n"
-                + "Accept: " + accept + "\r\n"
-                + "Connection: close\r\n"
-                + "\r\n").getBytes(StandardCharsets.US_ASCII));
+            out.write(request.getBytes(StandardCharsets.UTF_8));
             out.flush();
             InputStream in = socket.getInputStream();
             ByteArrayOutputStream response = new ByteArrayOutputStream();
@@ -129,6 +184,22 @@ class AcceptQualityZeroTest {
             routes.GET("/q0/route/both")
                 .produces(MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE)
                 .handle((request, pathVariables) -> HttpResponse.ok("hello"));
+            routes.GET("/q0/route/flowed")
+                .produces(MediaType.of("text/plain;format=flowed"))
+                .handle((request, pathVariables) -> HttpResponse.ok("hello"));
+            routes.GET("/q0/route/all")
+                .produces(MediaType.ALL_TYPE)
+                .handle((request, pathVariables) -> HttpResponse.ok("hello"));
+            routes.POST("/q0/route/consumes")
+                .consumes(MediaType.APPLICATION_JSON_TYPE)
+                .produces(MediaType.APPLICATION_JSON_TYPE)
+                .body(String.class)
+                .handle((request, pathVariables, body) -> HttpResponse.ok("json"));
+            routes.POST("/q0/route/consumes")
+                .consumesAll()
+                .produces(MediaType.APPLICATION_JSON_TYPE)
+                .body(String.class)
+                .handle((request, pathVariables, body) -> HttpResponse.ok("any"));
         }
     }
 
@@ -143,6 +214,31 @@ class AcceptQualityZeroTest {
         @Get(value = "/both", produces = {MediaType.TEXT_PLAIN, MediaType.APPLICATION_JSON})
         String both() {
             return "hello";
+        }
+
+        @Get(value = "/flowed", produces = "text/plain;format=flowed")
+        String flowed() {
+            return "hello";
+        }
+
+        @Get(value = "/all", produces = MediaType.ALL)
+        String all() {
+            return "hello";
+        }
+
+        @Get("/default")
+        String unannotated() {
+            return "hello";
+        }
+
+        @Post(value = "/consumes", consumes = MediaType.APPLICATION_JSON, produces = MediaType.APPLICATION_JSON)
+        String consumesJson(@Body String body) {
+            return "json";
+        }
+
+        @Post(value = "/consumes", consumes = MediaType.ALL, produces = MediaType.APPLICATION_JSON)
+        String consumesAll(@Body String body) {
+            return "any";
         }
     }
 }

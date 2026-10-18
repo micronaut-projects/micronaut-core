@@ -334,13 +334,24 @@ public final class RouteExecutor {
     /**
      * @param producesList The types the route produces
      * @param accepted     The accepted types, some of the quality 0
-     * @return The produced type of the most preferred acceptable accepted type, else the first
+     * @return The produced type of the most preferred acceptable accepted type (any concrete accepted type
+     * for a route that produces all types), else the first
      * acceptable produced type, else the first produced type
      */
     private static MediaType acceptableResponseContentType(List<MediaType> producesList, Collection<MediaType> accepted) {
+        boolean producesAll = producesList.contains(MediaType.ALL_TYPE);
         for (MediaType mt : accepted) {
-            if (!AcceptedMediaTypes.isRejected(mt) && !MediaType.ALL_TYPE.equals(mt)
-                && producesList.contains(mt) && AcceptedMediaTypes.isAcceptable(mt, accepted)) {
+            if (AcceptedMediaTypes.isRejected(mt) || MediaType.ALL_TYPE.equals(mt)) {
+                continue;
+            }
+            int index = producesList.indexOf(mt);
+            if (index >= 0) {
+                // the produced type, with its parameters
+                MediaType produced = producesList.get(index);
+                if (AcceptedMediaTypes.isAcceptable(produced, accepted)) {
+                    return produced;
+                }
+            } else if (producesAll && !"*".equals(mt.getType()) && !"*".equals(mt.getSubtype()) && AcceptedMediaTypes.isAcceptable(mt, accepted)) {
                 return mt;
             }
         }

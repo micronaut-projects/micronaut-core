@@ -677,10 +677,13 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         if (routeMatchSelector == null) {
             return super.doesProduce(acceptableTypes);
         }
-        if (producesMediaTypesContainsAll || acceptableTypes == null || acceptableTypes.isEmpty()) {
+        if (acceptableTypes == null || acceptableTypes.isEmpty()) {
             return true;
         }
         boolean hasRejected = AcceptedMediaTypes.hasRejected(acceptableTypes);
+        if (producesMediaTypesContainsAll) {
+            return !hasRejected || AcceptedMediaTypes.anyAcceptable(acceptableTypes);
+        }
         for (MediaType acceptableType : acceptableTypes) {
             if (hasRejected) {
                 if (anyAcceptable(producesMediaTypes, acceptableType, acceptableTypes)) {
