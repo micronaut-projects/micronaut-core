@@ -713,6 +713,27 @@ public class RequestLifecycle {
         return propagatedContext.propagate(() -> ExecutionFlow.just(routeExecutor.createDefaultErrorResponse(httpRequest, cause)));
     }
 
+    /**
+     * Answer a request that a route selector rejected, see
+     * {@link io.micronaut.web.router.spi.RouteMatchSelector.Selection#rejectionStatus()}.
+     *
+     * @param request           The request
+     * @param rejected          The rejected match
+     * @param status            The status, {@code 406} or {@code 415}
+     * @param contentType       The content type of the request
+     * @param acceptedTypes     The accepted types of the request
+     * @param propagatedContext The propagated context
+     * @return The response flow
+     */
+    private ExecutionFlow<HttpResponse<?>> onRejection(HttpRequest<?> request, UriRouteMatch<?, ?> rejected, HttpStatus status,
+                                                       @Nullable MediaType contentType, Collection<MediaType> acceptedTypes,
+                                                       PropagatedContext propagatedContext) {
+        HttpStatusException cause = status == HttpStatus.UNSUPPORTED_MEDIA_TYPE
+            ? new UnsupportedMediaException(String.valueOf(contentType), rejected.getRouteInfo().getConsumes().stream().map(MediaType::toString).toList())
+            : new NotAcceptableException(acceptedTypes.stream().map(MediaType::toString).toList(), rejected.getRouteInfo().getProduces().stream().map(MediaType::toString).toList());
+        return onStatusError(request, cause, rejected.getDeclaringType(), propagatedContext);
+    }
+
     final ExecutionFlow<HttpResponse<?>> onRouteMiss(HttpRequest<?> httpRequest, PropagatedContext propagatedContext) {
         HttpMethod httpMethod = httpRequest.getMethod();
         String requestMethodName = httpRequest.getMethodName();
@@ -733,9 +754,10 @@ public class RequestLifecycle {
         Set<MediaType> acceptableContentTypes = contentType != null ? new HashSet<>(5) : Set.of();
         Set<String> allowedMethods = new HashSet<>(5);
         Set<MediaType> produceableContentTypes = hasAcceptHeader ? new HashSet<>(5) : Set.of();
-        // a route selector rejected the request, see RouteMatchSelector.Selection#rejectionStatus()
-        boolean unsupportedMediaType = false;
-        boolean notAcceptable = false;
+        // a route selector rejected the request, see RouteMatchSelector.Selection#rejectionStatus():
+        // the rejection of the routes of the method of the request, over the one of the routes of any method
+        UriRouteMatch<?, ?> rejected = null;
+        HttpStatus rejectionStatus = null;
         Class<?> declaringType = null;
         UriRouteMatch<?, ?> webSocketRoute = null;
         for (UriRouteMatch<?, ?> anyRoute : anyMatchingRoutes) {
@@ -752,15 +774,10 @@ public class RequestLifecycle {
             HttpStatus rejection = anyRoute instanceof DefaultUriRouteMatch<?, ?> defaultMatch ? defaultMatch.rejectionStatus() : null;
             if (!sameMethod) {
                 allowedMethods.add(routeMethod);
-            } else if (rejection == HttpStatus.UNSUPPORTED_MEDIA_TYPE) {
-                unsupportedMediaType = true;
-                if (contentType != null) {
-                    acceptableContentTypes.addAll(anyRoute.getRouteInfo().getConsumes());
-                }
-            } else if (rejection == HttpStatus.NOT_ACCEPTABLE) {
-                notAcceptable = true;
-                if (hasAcceptHeader) {
-                    produceableContentTypes.addAll(anyRoute.getRouteInfo().getProduces());
+            } else if (rejection != null) {
+                if (rejected == null || AnyMethodRoutes.CUSTOM_METHODS.equals(rejected.getRouteInfo().getHttpMethodName())) {
+                    rejected = anyRoute;
+                    rejectionStatus = rejection;
                 }
             } else {
                 if (contentType != null && !anyRoute.getRouteInfo().doesConsume(contentType)) {
@@ -773,18 +790,22 @@ public class RequestLifecycle {
             declaringType = anyRoute.getDeclaringType();
         }
 
-        if (unsupportedMediaType || CollectionUtils.isNotEmpty(acceptableContentTypes)) {
+        if (rejected != null) {
+            // answered for the rejected route alone: its types, and the error routes of its declaring type
+            return onRejection(httpRequest, rejected, Objects.requireNonNull(rejectionStatus), contentType, acceptedTypes, propagatedContext);
+        }
+        if (CollectionUtils.isNotEmpty(acceptableContentTypes)) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", httpRequest.getUri(),
                     requestMethodName, contentType);
             }
             return onStatusError(
                 httpRequest,
-                new UnsupportedMediaException(String.valueOf(contentType),  acceptableContentTypes.stream().map(MediaType::toString).toList()),
+                new UnsupportedMediaException(Objects.requireNonNull(contentType).toString(),  acceptableContentTypes.stream().map(MediaType::toString).toList()),
                 declaringType,
                 propagatedContext);
         }
-        if (notAcceptable || CollectionUtils.isNotEmpty(produceableContentTypes)) {
+        if (CollectionUtils.isNotEmpty(produceableContentTypes)) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", httpRequest.getUri(),
                     requestMethodName,

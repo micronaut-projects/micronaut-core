@@ -264,7 +264,7 @@ final class UriRouteSet {
      */
     @Nullable <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request, @Nullable Set<Integer> ports) throws DuplicateRouteException {
         String path = request.getPath();
-        return resolveDynamic(request, closestRoute(path, request, findMatches(request, path, ports)));
+        return resolveDynamic(request, closestRoute(path, request, findMatches(request, path, ports, null)));
     }
 
     /**
@@ -297,7 +297,7 @@ final class UriRouteSet {
             return RouteResolution.of(findClosest(request, ports));
         }
         String path = request.getPath();
-        List<UriRouteMatch<T, R>> matches = filter(findMatches(request, path, ports), filter);
+        List<UriRouteMatch<T, R>> matches = findMatches(request, path, ports, filter);
         if (!PendingRouteMatch.anyHasBodyConditions(matches)) {
             if (filter != null && hasDynamicTargets) {
                 // as findAllClosest: the targets resolve their routes, which the filter sees, before
@@ -336,7 +336,7 @@ final class UriRouteSet {
     <T, R> List<UriRouteMatch<T, R>> findAllCandidates(HttpRequest<?> request,
                                                        @Nullable Predicate<UriRouteMatch<T, R>> filter,
                                                        @Nullable Set<Integer> ports) {
-        List<UriRouteMatch<T, R>> matches = filter(findMatches(request, request.getPath(), ports), filter);
+        List<UriRouteMatch<T, R>> matches = findMatches(request, request.getPath(), ports, filter);
         return hasDynamicTargets ? resolveAll(request, matches, filter) : matches;
     }
 
@@ -535,7 +535,7 @@ final class UriRouteSet {
     private <T, R> List<UriRouteMatch<T, R>> findAllClosestRoutes(HttpRequest<?> request,
                                                                   @Nullable Predicate<UriRouteMatch<T, R>> filter,
                                                                   @Nullable Set<Integer> ports) {
-        List<UriRouteMatch<T, R>> uriRoutes = filter(findMatches(request, request.getPath(), ports), filter);
+        List<UriRouteMatch<T, R>> uriRoutes = findMatches(request, request.getPath(), ports, filter);
         // the route selector of every match, found once
         RouteMatchSelector common = hasSelectors(request) && !uriRoutes.isEmpty() ? commonSelector(request, uriRoutes) : null;
         if (common != null && hasNoDynamicTarget(uriRoutes)) {
@@ -620,8 +620,21 @@ final class UriRouteSet {
      * @param <R>     The result type
      * @return The matches
      */
-    @SuppressWarnings("unchecked")
     <T, R> List<UriRouteMatch<T, R>> findAny(String uri, @Nullable HttpRequest<?> request, @Nullable Set<Integer> ports) {
+        return findAny(uri, request, ports, false);
+    }
+
+    /**
+     * @param uri                The URI
+     * @param request            The request whose port and conditions the routes must accept, or {@code null}
+     * @param ports              The default ports, or {@code null}
+     * @param requestConstraints Whether the constraints see the variables of the prefixes of the
+     *                           locator routes of the request, as when the request is routed
+     * @return The matches
+     */
+    @SuppressWarnings("unchecked")
+    private <T, R> List<UriRouteMatch<T, R>> findAny(String uri, @Nullable HttpRequest<?> request, @Nullable Set<Integer> ports,
+                                                     boolean requestConstraints) {
         var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
         for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : allRoutesByMethod.entrySet()) {
             if (skipForAny(entry.getKey(), request)) {
@@ -644,7 +657,7 @@ final class UriRouteSet {
                     }
                 }
                 UriRouteMatch match = route.tryMatch(uri);
-                if (match != null && acceptsVariables(route, match)) {
+                if (match != null && (requestConstraints && request != null ? acceptsVariables(request, route, match) : acceptsVariables(route, match))) {
                     matchedRoutes.add(match);
                 }
             }
@@ -705,7 +718,7 @@ final class UriRouteSet {
                 }
             }
         }
-        if (hasDynamicTargets && hasSelectorOrders(request)) {
+        if (hasDynamicTargets && hasSelectorOrders(request) && hasOrderedLocator(request, matchedRoutes)) {
             // a locator route that a route of another method is more specific than does not
             // locate, as when a request of its method is routed
             matchedRoutes = withoutDominatedLocators(request, matchedRoutes, matchedRoutes);
@@ -971,21 +984,39 @@ final class UriRouteSet {
      * @param <R>     The result type
      * @return The matches
      */
-    private <T, R> List<UriRouteMatch<T, R>> findMatches(HttpRequest<?> request, String uri, @Nullable Set<Integer> ports) {
+    private <T, R> List<UriRouteMatch<T, R>> findMatches(HttpRequest<?> request, String uri, @Nullable Set<Integer> ports,
+                                                         @Nullable Predicate<UriRouteMatch<T, R>> filter) {
         boolean mediaTypeSelecting = hasMediaTypeSelectors(request);
-        List<UriRouteMatch<T, R>> matches = findMethodMatches(request, uri, ports, mediaTypeSelecting);
+        // the candidates first: which selector the matches share, and which routes are more
+        // specific than a locator route, is decided among the routes the filter accepts
+        List<UriRouteMatch<T, R>> matches = filter(findMethodMatches(request, uri, ports, mediaTypeSelecting), filter);
         if (matches.isEmpty()) {
             return matches;
         }
         if (mediaTypeSelecting) {
             matches = withoutIncompatible(request, matches);
         }
-        if (hasDynamicTargets && hasSelectorOrders(request) && !hasNoDynamicTarget(matches)) {
-            // the routes of every method that match the path: a locator route that one of them is
-            // more specific than does not locate, see RouteMatchSelector
-            matches = withoutDominatedLocators(request, matches, findAny(uri, request, ports));
+        if (hasDynamicTargets && hasSelectorOrders(request) && hasOrderedLocator(request, matches)) {
+            // the candidate routes of every method that match the path: a locator route that one
+            // of them is more specific than does not locate, see RouteMatchSelector
+            List<UriRouteMatch<T, R>> others = filter(findAny(uri, request, ports, true), filter);
+            matches = withoutDominatedLocators(request, matches, others);
         }
         return matches;
+    }
+
+    /**
+     * @param request The request
+     * @param matches The matches
+     * @return Whether a match is of a locator route whose route selector has an order
+     */
+    private static boolean hasOrderedLocator(HttpRequest<?> request, List<? extends UriRouteMatch<?, ?>> matches) {
+        for (UriRouteMatch<?, ?> match : matches) {
+            if (DynamicRouteTarget.of(match.getRouteInfo()) != null && DefaultRouter.selectorOrder(request, match.getRouteInfo()) != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

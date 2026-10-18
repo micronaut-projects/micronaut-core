@@ -43,6 +43,22 @@ class RouteMatchSelectorPathFirstTest {
     private final TestLocatedRoutes<Object> items = TestLocatedRoutes.of(routes ->
         routes.route(HttpMethod.GET, ColonRouteTemplateEngine.template("/items/:item")).handle((request, variables) -> HttpResponse.ok()));
 
+    private final TestLocatedRoutes<Object> root = TestLocatedRoutes.of(routes -> {
+        routes.GET("/", (request, variables) -> HttpResponse.ok());
+        routes.POST("/", (request, variables) -> HttpResponse.ok());
+    });
+
+    /**
+     * The routes of a tenant: a route of the selector constrained by the variable of the prefix,
+     * more specific than a locator route of the selector.
+     */
+    private final TestLocatedRoutes<Object> tenant = TestLocatedRoutes.of(routes ->
+        routes.group(g -> {
+            g.templates(PathFirstColonRouteTemplateEngine.INSTANCE).selectedBy(PathFirstColonRouteTemplateEngine.INSTANCE);
+            g.GET("/sub").constrain(variables -> "acme".equals(variables.getString("tenant"))).handle((request, variables) -> HttpResponse.ok());
+            g.locate("/:id", (request, variables) -> "nested", target -> root);
+        }));
+
     private final Router router = RouteTemplateEngineOrderTest.router(null, routes -> {
         routes.group(g -> {
             g.templates(PathFirstColonRouteTemplateEngine.INSTANCE).selectedBy(PathFirstColonRouteTemplateEngine.INSTANCE);
@@ -56,6 +72,22 @@ class RouteMatchSelectorPathFirstTest {
             g.GET("/g/sub").handle((request, variables) -> HttpResponse.ok());
             g.locate("/g/:id", (request, variables) -> "located", target -> items);
         });
+        routes.group(g -> {
+            g.templates(PathFirstColonRouteTemplateEngine.INSTANCE).selectedBy(PathFirstColonRouteTemplateEngine.INSTANCE);
+            // of version 1, with a route of version 2 that has no selector, see V1
+            g.GET("/v/fixed").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, variables) -> HttpResponse.ok());
+            g.GET("/v/:x").produces(MediaType.TEXT_PLAIN_TYPE).handle((request, variables) -> HttpResponse.ok());
+            // a route of version 2 more specific than a locator route of version 1
+            g.GET("/h/sub").handle((request, variables) -> HttpResponse.ok());
+            g.locate("/h/:id", (request, variables) -> "located", target -> root);
+        });
+        routes.group(g -> {
+            g.templates(PathFirstColonRouteTemplateEngine.INSTANCE).selectedBy(PathFirstColonRouteTemplateEngine.INSTANCE);
+            g.route("REPORT", "/rr/fixed").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, variables) -> HttpResponse.ok());
+            g.any("/rr/:x").consumes(MediaType.TEXT_XML_TYPE).handle((request, variables) -> HttpResponse.ok());
+        });
+        routes.GET("/v/{x}").produces(MediaType.TEXT_PLAIN_TYPE).handle((request, variables) -> HttpResponse.ok());
+        routes.locate("/tenants/{tenant}", (request, variables) -> "tenant", target -> tenant);
         // of the selector and of the Micronaut policy: the types decide first, as for other routes
         routes.route(HttpMethod.GET, PathFirstColonRouteTemplateEngine.template("/m/fixed")).selectedBy(PathFirstColonRouteTemplateEngine.INSTANCE)
             .produces(MediaType.APPLICATION_JSON_TYPE).handle((request, variables) -> HttpResponse.ok());
@@ -109,6 +141,50 @@ class RouteMatchSelectorPathFirstTest {
         assertNotNull(located);
         assertEquals("5", located.getVariableValues().get("id"));
         assertEquals("3", located.getVariableValues().get("item"));
+    }
+
+    /**
+     * The candidates of a request of version 1, e.g. of API versioning: not the routes of version 2.
+     */
+    private static final java.util.function.Predicate<UriRouteMatch<Object, Object>> V1 = match -> {
+        String expression = match.getRouteInfo().getRouteTemplate().expression();
+        return !expression.equals("/v/{x}") && !expression.equals("/h/sub");
+    };
+
+    @Test
+    void theCustomMethodAndTheRoutesOfAnyMethodAreRejectedApart() {
+        // REPORT /rr/fixed is chosen for REPORT and cannot produce text/plain; the route of any method cannot consume JSON
+        MutableHttpRequest<?> request = HttpRequest.create(HttpMethod.CUSTOM, "/rr/fixed", "REPORT")
+            .header(HttpHeaders.ACCEPT, "text/plain").header(HttpHeaders.CONTENT_TYPE, "application/json");
+        assertNull(router.findClosest(request));
+        List<UriRouteMatch<Object, Object>> any = router.findAny(request);
+        assertEquals(HttpStatus.NOT_ACCEPTABLE, ((DefaultUriRouteMatch<?, ?>) only(ofMethod(any, "REPORT"))).rejectionStatus());
+        assertEquals(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ((DefaultUriRouteMatch<?, ?>) only(ofMethod(any, "*"))).rejectionStatus());
+    }
+
+    @Test
+    void theSelectorOfTheCandidatesDecidesAfterTheFilter() {
+        // the route of version 2 has no selector: without it, the candidates share the selector, which rejects
+        MutableHttpRequest<?> request = get("/v/fixed", "text/plain");
+        assertEquals(List.of(), router.findAllClosest(request, V1));
+    }
+
+    @Test
+    void aRouteTheFilterExcludesDoesNotKeepALocatorRouteFromLocating() {
+        List<UriRouteMatch<Object, Object>> located = router.findAllClosest(HttpRequest.GET("/h/sub"), V1);
+        assertEquals(1, located.size(), located.toString());
+        assertEquals("sub", located.get(0).getVariableValues().get("id"));
+        assertEquals("/h/sub", template(router.findClosest(HttpRequest.GET("/h/sub"))));
+    }
+
+    @Test
+    void theConstraintsOfAMoreSpecificLocatedRouteSeeThePrefixVariables() {
+        // GET /sub of the tenant acme is more specific than the nested locator route: POST is not allowed
+        MutableHttpRequest<?> post = HttpRequest.POST("/tenants/acme/sub", "");
+        assertNull(router.findClosest(post));
+        assertEquals(Set.of("GET", "HEAD"), methods(router.findAny(post)));
+        // another tenant has no such route: the nested locator route locates
+        assertNotNull(router.findClosest(HttpRequest.GET("/tenants/other/sub")));
     }
 
     private static MutableHttpRequest<?> get(String path, String accept) {

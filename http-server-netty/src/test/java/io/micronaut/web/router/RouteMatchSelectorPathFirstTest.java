@@ -103,6 +103,17 @@ class RouteMatchSelectorPathFirstTest {
         assertEquals("item 3 of 5", send("GET", "/GetTest/5/items/3", null, null).body());
     }
 
+    @Test
+    void theRejectionOfTheCustomMethodWinsOverTheRouteOfAnyMethod() throws Exception {
+        // REPORT /rr/fixed is chosen and cannot produce text/plain; the route of any method alone cannot consume JSON: 415
+        HttpRequest request = HttpRequest.newBuilder(URI.create(server.getURL() + "/rr/fixed"))
+            .method("REPORT", HttpRequest.BodyPublishers.ofString("x"))
+            .header("Accept", "text/plain")
+            .header("Content-Type", "application/json")
+            .build();
+        assertEquals(406, client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode());
+    }
+
     private static Set<String> allowed(java.net.http.HttpResponse<?> response) {
         return response.headers().allValues("Allow").stream()
             .flatMap(allow -> Arrays.stream(allow.split(",")))
@@ -144,6 +155,8 @@ class RouteMatchSelectorPathFirstTest {
                 group.POST("/c/fixed").consumes(MediaType.APPLICATION_JSON_TYPE).handle((request, pathVariables) -> HttpResponse.ok("fixed").contentType(MediaType.TEXT_PLAIN_TYPE));
                 group.POST("/c/:x").consumes(MediaType.TEXT_PLAIN_TYPE).handle((request, pathVariables) -> HttpResponse.ok("x").contentType(MediaType.TEXT_PLAIN_TYPE));
                 group.GET("/GetTest/sub").handle((request, pathVariables) -> HttpResponse.ok("sub").contentType(MediaType.TEXT_PLAIN_TYPE));
+                group.route("REPORT", "/rr/fixed").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, pathVariables) -> HttpResponse.ok("fixed"));
+                group.any("/rr/:x").consumes(MediaType.TEXT_XML_TYPE).handle((request, pathVariables) -> HttpResponse.ok("x"));
                 // the locator converts the id to an int, as a JAX-RS sub-resource locator of an int parameter
                 group.locate("/GetTest/:id", (request, pathVariables) -> Integer.valueOf(pathVariables.getString("id")), target -> items);
             });
