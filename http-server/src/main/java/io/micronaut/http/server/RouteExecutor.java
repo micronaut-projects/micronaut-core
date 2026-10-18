@@ -29,6 +29,7 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -40,9 +41,12 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.body.BodyElements;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
+import io.micronaut.http.body.stream.ReleasingBodyElements;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
@@ -54,12 +58,15 @@ import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
+import io.micronaut.http.server.stream.ResponseStreams;
 import io.micronaut.http.server.util.HttpDateHeader;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.DefaultRouteInfo;
+import io.micronaut.web.router.DefaultUrlRouteInfo;
 import io.micronaut.web.router.GroupErrorRoutes;
 import io.micronaut.web.router.MethodBasedRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
@@ -86,6 +93,7 @@ import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -129,6 +137,15 @@ public final class RouteExecutor {
      */
     private final boolean suspendedRoutesNeedReactorContext;
     private final ConversionService conversionService;
+    /**
+     * The executor that may block, which closes the elements of a response body that would be
+     * closed on an event loop.
+     */
+    private final Supplier<@Nullable ExecutorService> blockingExecutor;
+    /**
+     * Chooses a route by the body of a request, {@code null} if no route has body conditions.
+     */
+    private final @Nullable BodyRouteSelector bodyRouteSelector;
 
     /**
      * Default constructor.
@@ -155,6 +172,15 @@ public final class RouteExecutor {
         this.coroutineHelper = beanContext.findBean(CoroutineHelper.class);
         this.suspendedRoutesNeedReactorContext = coroutineHelper.isPresent() && coroutineHelper.get().isReactorContextPropagated();
         this.conversionService = beanContext.getConversionService();
+        this.blockingExecutor = SupplierUtil.memoized(() -> executorSelector.select(TaskExecutors.BLOCKING).orElse(null));
+        if (router.hasBodyConditions()) {
+            // a body condition reads at most what the server may buffer
+            BodyRouteSelector.checkMaxBytes(router, serverConfiguration.getMaxRequestBufferSize());
+            this.bodyRouteSelector = new BodyRouteSelector(serverConfiguration, beanContext.getBean(MessageBodyHandlerRegistry.class),
+                requestArgumentSatisfier.getBinderRegistry(), conversionService);
+        } else {
+            this.bodyRouteSelector = null;
+        }
     }
 
     /**
@@ -196,6 +222,13 @@ public final class RouteExecutor {
     @Nullable
     UriRouteMatch<Object, Object> findRouteMatch(HttpRequest<?> httpRequest) {
         return router.findClosest(httpRequest);
+    }
+
+    /**
+     * @return The step that chooses a route by the body of a request
+     */
+    BodyRouteSelector bodyRouteSelector() {
+        return Objects.requireNonNull(bodyRouteSelector, "No route has body conditions");
     }
 
     static void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
@@ -263,6 +296,13 @@ public final class RouteExecutor {
      * @return The default content type declared on the route
      */
     public MediaType resolveDefaultResponseContentType(@Nullable HttpRequest<?> request, RouteInfo<?> finalRoute) {
+        if (request != null && finalRoute instanceof DefaultUrlRouteInfo<?, ?> uriRoute && uriRoute.hasRouteMatchSelector()) {
+            // the media type the route selector of the kind of the template of the route negotiated
+            MediaType selected = selectedMediaType(request);
+            if (selected != null) {
+                return selected;
+            }
+        }
         final List<MediaType> producesList = finalRoute.getProduces();
         if (request != null) {
             final Iterator<MediaType> i = request.accept().iterator();
@@ -282,6 +322,11 @@ public final class RouteExecutor {
             defaultResponseMediaType = MediaType.APPLICATION_JSON_TYPE;
         }
         return MediaType.ALL_TYPE.equals(defaultResponseMediaType) ? MediaType.APPLICATION_JSON_TYPE : defaultResponseMediaType;
+    }
+
+    private static @Nullable MediaType selectedMediaType(HttpRequest<?> request) {
+        RouteMatch<?> match = RouteAttributes.getRouteMatch(request).orElse(null);
+        return match instanceof UriRouteMatch<?, ?> uriMatch ? uriMatch.getSelectedMediaType().orElse(null) : null;
     }
 
     private MutableHttpResponse<?> notFoundErrorResponse(HttpRequest<?> request) {
@@ -757,6 +802,9 @@ public final class RouteExecutor {
             return response;
         }
         Object body = response.body();
+        if (body instanceof BodyElements<?> elements) {
+            return response.body(releaseWhenClosed(request, elements));
+        }
         if (body == null || body instanceof HttpResponse<?> || !Publishers.isConvertibleToPublisher(body)) {
             return response;
         }
@@ -767,12 +815,48 @@ public final class RouteExecutor {
         return response.body(releaseWhenStreamEnds(request, publisher));
     }
 
+    /**
+     * Release the bodies the route of the request was invoked with when the
+     * {@link BodyElements} body of its response is closed, like {@link #releaseWhenStreamEnds}
+     * does for a stream: the elements may be made of the reads of the body. The server closes
+     * them once: when the response ends, fails, or the client disconnects, or when a filter
+     * replaces the response.
+     *
+     * @param request  The request of the route
+     * @param elements The elements of the response body
+     * @param <T>      The type of an element
+     * @return The elements, which release the bodies when they are closed
+     */
+    private static <T> BodyElements<T> releaseWhenClosed(HttpRequest<?> request, BodyElements<T> elements) {
+        ReleasableRequestBody bodies = BasicHttpAttributes.takeRouteBodies(request);
+        if (bodies == null) {
+            return elements;
+        }
+        // the elements keep their own operations, e.g. the elements of the request body
+        return ReleasingBodyElements.onClose(elements, () -> releaseLogged(request, bodies));
+    }
+
+    /**
+     * Close the {@link BodyElements} of a response body that is not written: on the blocking
+     * executor when the current thread is an event loop, since closing them may block, e.g. a
+     * database cursor.
+     *
+     * @param request  The request
+     * @param elements The elements
+     */
+    void discardElements(HttpRequest<?> request, BodyElements<?> elements) {
+        ResponseStreams.discard(elements, request, blockingExecutor.get());
+    }
+
     private MutableHttpResponse<?> finaliseResponse(@Nullable HttpRequest<?> request, RouteInfo<?> routeInfo, @Nullable RouteMatch<?> routeMatch, MutableHttpResponse<?> response) {
         // for head request we never emit the body
         if (request != null && request.getMethod().equals(HttpMethod.HEAD)) {
             final Object o = response.getBody().orElse(null);
             if (o instanceof ReferenceCounted referenceCounted) {
                 referenceCounted.release();
+            } else if (o instanceof BodyElements<?> elements) {
+                // they are never pulled
+                discardElements(request, elements);
             }
             response.body(null);
             if (o != null) {

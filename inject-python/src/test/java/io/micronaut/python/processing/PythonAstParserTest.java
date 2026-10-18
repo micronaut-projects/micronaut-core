@@ -51,6 +51,8 @@ import io.micronaut.python.processing.element.PythonFieldElement;
 import io.micronaut.python.processing.element.PythonMethodElement;
 import io.micronaut.python.processing.element.PythonParameterElement;
 import io.micronaut.python.processing.model.ScriptDef;
+import io.micronaut.python.processing.model.SourceSpan;
+import io.micronaut.python.processing.model.AttributeDef;
 import io.micronaut.sourcegen.model.EnumDef;
 import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -136,6 +138,34 @@ public class PythonAstParserTest {
         } finally {
             parser.close();
         }
+    }
+
+    @Test
+    void parseFailsOnAnErrorOfTheSourceWhileParseTransformedReportsIt() {
+        // an annotation declared in the source, as the processor reads it without a Java visitor context
+        String source = """
+            @micronaut_annotation("jakarta.inject.Inject")
+            def Inject(*args, **kwargs):
+                def decorator(func):
+                    return func
+                return decorator
+
+            def micronaut_annotation(name):
+                return lambda func: func
+
+            class Service:
+                @staticmethod
+                def make(ctx: str = Inject()) -> str:
+                    return "x"
+            """;
+        PythonAstParser parser = new PythonAstParser();
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> parseAndClose(parser, source));
+        assertTrue(error.getMessage().contains("[python:injected-parameter]"), error.getMessage());
+        assertTrue(error.getMessage().contains("-->"), error.getMessage());
+    }
+
+    private static void parseAndClose(PythonAstParser parser, String source) {
+        parser.parse(source).close();
     }
 
     @Test
@@ -2419,6 +2449,418 @@ class ProductMappers:
     }
 
     @Test
+    void testDataclassClassVarsAreStaticAndNotConstructorArguments() {
+        for (String annotation : List.of("ClassVar[str]", "Shared[str]", "typing.ClassVar[str]", "t.ClassVar[str]",
+            "'ClassVar[str]'", "ClassVar")) {
+            try (PythonEnvironment environment = new PythonAstParser().parse("""
+                from dataclasses import dataclass
+                from typing import ClassVar, ClassVar as Shared
+                import typing
+                import typing as t
+
+                @dataclass
+                class Contact:
+                    name: str
+                    kind: %s = "service"
+                    VERSION: int = 1
+                """.formatted(annotation))) {
+                var contact = environment.classes().get("Contact");
+                var kind = contact.attributes().get(1);
+                assertTrue(kind.isStatic(), annotation);
+                assertEquals(annotation.equals("ClassVar") ? "object" : "str", kind.typeName().name());
+                assertEquals("service", kind.value());
+                assertFalse(contact.attributes().get(2).isStatic(), "capitalization is not a static-field marker");
+                assertEquals(List.of("name", "VERSION"), contact.constructor().arguments().arguments().stream()
+                    .map(ArgumentDef::name).toList(), annotation);
+
+                try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                    ClassElement element = processingEnvironment.classes().get("Contact");
+                    assertEquals(List.of("kind"), element.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyStatic())
+                        .stream().map(FieldElement::getName).toList(), annotation);
+                    assertEquals(List.of("name", "VERSION"), element.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyInstance())
+                        .stream().map(FieldElement::getName).toList(), annotation);
+                    assertEquals(List.of("name", "VERSION"), element.getBeanProperties().stream()
+                        .map(PropertyElement::getName).toList(), annotation);
+                    assertEquals(List.of("name", "kind", "VERSION"), element.getBeanProperties(
+                        PropertyElementQuery.of(element).allowStaticProperties(true)).stream()
+                        .map(PropertyElement::getName).toList(), annotation);
+                    assertEquals(annotation.equals("ClassVar") ? "java.lang.Object" : "java.lang.String",
+                        element.findField("kind").orElseThrow().getType().getName(), annotation);
+                }
+            }
+        }
+    }
+
+    @Test
+    void testDataclassClassVarDetectionRequiresTheTopLevelTypingType() {
+        try (PythonEnvironment environment = new PythonAstParser().parse("""
+            from dataclasses import dataclass
+            from typing import Annotated, ClassVar as TypingClassVar
+            from other_package import ClassVar as Foreign
+
+            class ClassVar:
+                pass
+
+            Wrapped = Annotated[TypingClassVar[str], "not a class variable"]
+
+            @dataclass
+            class Contact:
+                local: ClassVar = None
+                foreign: Foreign[str] = "foreign"
+                nested: list[TypingClassVar[str]] = None
+                wrapped: Wrapped = "wrapped"
+                VERSION: int = 1
+            """)) {
+            var contact = environment.classes().get("Contact");
+            assertTrue(contact.attributes().stream().noneMatch(attribute -> attribute.isStatic()));
+            assertEquals(List.of("local", "foreign", "nested", "wrapped", "VERSION"),
+                contact.constructor().arguments().arguments().stream().map(ArgumentDef::name).toList());
+        }
+    }
+
+    @Test
+    void testDataclassClassVarsStayStaticAcrossInheritedOverrides() {
+        try (PythonEnvironment environment = new PythonAstParser().parse("""
+            from dataclasses import dataclass
+            from typing import ClassVar
+
+            @dataclass
+            class Base:
+                name: str
+                kind: ClassVar[str] = "shared"
+
+            @dataclass
+            class Child(Base):
+                kind = "changed"
+
+            class Mid(Base):
+                kind: str = "annotated change"
+
+            @dataclass
+            class Leaf(Mid):
+                pass
+            """)) {
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                ClassElement child = processingEnvironment.classes().get("Child");
+                FieldElement kind = child.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyDeclared()).stream()
+                    .filter(field -> field.getName().equals("kind")).findFirst().orElseThrow();
+                assertTrue(kind.isStatic());
+                assertTrue(kind.getModifiers().contains(io.micronaut.inject.ast.ElementModifier.STATIC));
+                assertEquals("changed", kind.getConstantValue());
+                assertEquals(List.of("name"), java.util.Arrays.stream(child.getPrimaryConstructor().orElseThrow().getParameters())
+                    .map(ParameterElement::getName).toList());
+                assertEquals(List.of("name"), child.getBeanProperties().stream().map(PropertyElement::getName).toList());
+                assertEquals(List.of("kind"), child.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyStatic().onlyDeclared()).stream()
+                    .map(FieldElement::getName).toList());
+                assertEquals(List.of("name"), child.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyInstance()).stream()
+                    .map(FieldElement::getName).toList());
+                ClassElement mid = processingEnvironment.classes().get("Mid");
+                assertTrue(mid.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyDeclared()).getFirst().isStatic());
+                assertEquals(List.of("name"), processingEnvironment.classes().get("Leaf").getBeanProperties().stream()
+                    .map(PropertyElement::getName).toList());
+            }
+        }
+    }
+
+    @Test
+    void testDataclassAnnotatedDataInfersMappedEntity() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from dataclasses import dataclass
+            from typing import Annotated
+            from micronaut.data.annotation import Id, GeneratedValue
+
+            @dataclass
+            class Fruit:
+                name: str
+                id: Annotated[int | None, Id, GeneratedValue] = None
+            """)) {
+            var fruit = environment.classes().get("Fruit");
+            var id = fruit.attributes().get(1);
+            assertTrue(id.decorators().stream().anyMatch(d -> d.annotationName().equals("jakarta.annotation.Nullable")));
+            assertEquals(List.of("io.micronaut.data.annotation.Id", "io.micronaut.data.annotation.GeneratedValue"),
+                id.decorators().stream().map(DecoratorDef::annotationName)
+                    .filter(name -> name.startsWith("io.micronaut.data.annotation.")).toList());
+            assertTrue(id.hasDefaultValue(), "explicit None remains a default");
+            assertNull(id.value());
+            assertTrue(fruit.decorators().stream().anyMatch(d -> d.annotationName().equals("io.micronaut.data.annotation.MappedEntity")));
+            assertFalse(fruit.decorators().stream().anyMatch(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")),
+                "MappedEntity supplies Data-specific introspection indexes");
+        }
+    }
+
+    @Test
+    void testDataclassAnnotatedDataIdentityDefaultsAndDtoControls() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            import dataclasses as dc
+            from dataclasses import dataclass as data, field as f
+            from typing import Annotated
+            from other_package import dataclass as foreign_data
+            from micronaut.data.annotation import Id, GeneratedValue, MappedEntity
+            from micronaut.core.annotation import Introspected
+            from jakarta.validation.constraints import Min
+
+            STRATEGY = "SEQUENCE"
+
+            @dc.dataclass
+            class Entity:
+                id: Annotated[int, Id, Min(0)] = dc.field(metadata={"help": object()})
+                label: str = f(default="ready")
+                tags: list[str] = f(default_factory=list)
+
+            @MappedEntity("configured")
+            @Introspected(excludes=["secret"])
+            @data
+            class Configured:
+                id: Annotated[int | None, Id, GeneratedValue(value=STRATEGY,
+                    definition="CREATE SEQUENCE fruit_seq", ref="fruit_seq")] = f(default=None)
+                secret: str = "hidden"
+
+            @data
+            class Plain:
+                id: int
+
+            @data
+            class Validated:
+                id: Annotated[int, Min(0)]
+
+            @data
+            class Metadata:
+                id: int = f(metadata={"data": {"id": True, "generated_value": True}, "third_party": object()})
+
+            @foreign_data
+            class ForeignClass:
+                id: Annotated[int, Id]
+
+            class NotDataclass:
+                id: Annotated[int, Id]
+
+            @data
+            class Outer:
+                id: int
+
+                @dc.dataclass
+                class Nested:
+                    id: Annotated[int, Id]
+            """)) {
+            var entity = environment.classes().get("Entity");
+            assertTrue(entity.decorators().stream().anyMatch(d -> d.annotationName().equals("io.micronaut.data.annotation.MappedEntity")));
+            var id = entity.attributes().getFirst();
+            assertFalse(id.hasDefaultValue());
+            assertTrue(id.decorators().stream().anyMatch(d -> d.annotationName().equals("jakarta.validation.constraints.Min")));
+            assertTrue(id.decorators().stream().anyMatch(d -> d.annotationName().equals("io.micronaut.data.annotation.Id")));
+            assertEquals("ready", entity.attributes().get(1).value());
+            assertEquals("list", entity.attributes().get(2).defaultFactoryName());
+            var configured = environment.classes().get("Configured");
+            assertEquals(1, configured.decorators().stream().filter(d -> d.annotationName().equals("io.micronaut.data.annotation.MappedEntity")).count());
+            assertEquals(List.of("secret"), configured.decorators().stream()
+                .filter(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")).findFirst().orElseThrow().members().get("excludes"));
+            var generation = configured.attributes().getFirst().decorators().stream()
+                .filter(d -> d.annotationName().equals("io.micronaut.data.annotation.GeneratedValue")).findFirst().orElseThrow();
+            assertEquals("SEQUENCE", generation.members().get("value"));
+            assertEquals("fruit_seq", generation.members().get("ref"));
+            assertEquals("CREATE SEQUENCE fruit_seq", generation.members().get("definition"));
+            for (String name : List.of("Plain", "Validated", "Metadata", "ForeignClass", "NotDataclass", "Outer")) {
+                assertFalse(environment.classes().get(name).decorators().stream()
+                    .anyMatch(d -> d.annotationName().equals("io.micronaut.data.annotation.MappedEntity")), name);
+            }
+            assertTrue(environment.classes().get("Metadata").attributes().getFirst().decorators().isEmpty(),
+                "dataclass field metadata does not declare Data annotations");
+            assertTrue(environment.classes().get("Outer").nestedClasses().getFirst().decorators().stream()
+                .anyMatch(d -> d.annotationName().equals("io.micronaut.data.annotation.MappedEntity")));
+        }
+    }
+
+    @Test
+    void testDataclassAnnotatedDataAliases() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from dataclasses import dataclass
+            from typing import Annotated
+            from micronaut.data.annotation import Id as Identity, GeneratedValue
+            import micronaut.data.annotation as data
+
+            @dataclass
+            class Called:
+                id: Annotated[int, Identity()]
+
+            @dataclass
+            class Module:
+                id: Annotated[int, data.Id]
+
+            @dataclass
+            class ModuleCalled:
+                id: Annotated[int, data.Id()]
+
+            @dataclass
+            class GeneratedOnly:
+                value: Annotated[int, GeneratedValue]
+
+            """)) {
+            for (String name : List.of("Called", "Module", "ModuleCalled", "GeneratedOnly")) {
+                assertTrue(environment.classes().get(name).decorators().stream()
+                    .anyMatch(d -> d.annotationName().equals("io.micronaut.data.annotation.MappedEntity")), name);
+            }
+            var generated = environment.classes().get("GeneratedOnly").attributes().getFirst();
+            assertFalse(generated.decorators().stream().anyMatch(d -> d.annotationName().equals("io.micronaut.data.annotation.Id")),
+                "GeneratedValue does not imply Id");
+        }
+    }
+
+    @Test
+    void testDataclassFieldMetadataIsNotAValidationDsl() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from dataclasses import dataclass, field
+
+            @dataclass
+            class Contact:
+                name: str = field(metadata={"validation": {"not_blank": True}})
+                label: str = field(default="ready", metadata={"validation": {"not_blanc": True}})
+            """)) {
+            var contact = environment.classes().get("Contact");
+            assertTrue(contact.attributes().stream().allMatch(a -> a.decorators().isEmpty()),
+                "field metadata is available to other Python libraries, not interpreted as constraints");
+            assertFalse(contact.attributes().getFirst().hasDefaultValue());
+            assertEquals("ready", contact.attributes().get(1).value());
+            assertTrue(contact.decorators().stream().anyMatch(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")));
+        }
+    }
+
+    @Test
+    void testDataclassAnnotatedValidation() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from dataclasses import dataclass, field
+            from typing import Annotated
+            from jakarta.validation.constraints import NotBlank
+
+            @dataclass
+            class Contact:
+                name: Annotated[str, NotBlank] = field(metadata={"help": "Contact name"})
+            """)) {
+            ClassDef contact = environment.classes().get("Contact");
+            var field = contact.attributes().getFirst();
+            assertEquals(List.of("jakarta.validation.constraints.NotBlank"),
+                field.decorators().stream().map(DecoratorDef::annotationName).toList());
+            assertFalse(field.hasDefaultValue(), "metadata-only field() is required");
+            assertFalse(contact.constructor().arguments().arguments().getFirst().hasDefaultValue());
+        }
+    }
+
+    @Test
+    void testDataclassFieldDefaultsAndImportIdentity() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            import dataclasses as dc
+            from dataclasses import dataclass as data, field as f
+            from other_package import field as other_field, dataclass as other_dataclass
+            from micronaut.core.annotation import Introspected as Inspect
+            from typing import Annotated
+            from jakarta.validation.constraints import NotBlank, Size, NotEmpty
+
+            SHARED_OPTIONS = {"default": "shared"}
+
+            @dc.dataclass
+            class Contact:
+                name: Annotated[str, NotBlank] = dc.field(metadata={"help": object()})
+                optional: str | None = f(default=None)
+                label: Annotated[str, Size(min=1)] = f(default="ready")
+                tags: Annotated[list[str], NotEmpty] = f(default_factory=list)
+                foreign: str = other_field(metadata={"help": "Other library"})
+
+            @data
+            class ThirdParty:
+                first: str = f(metadata=OTHER_LIBRARY_METADATA)
+                second: str = f(metadata={**OTHER_LIBRARY_METADATA})
+                third: str = f(**options)
+                fourth: str = f(**{"metadata": {"help": "Required"}})
+                fifth: str = f(**SHARED_OPTIONS)
+                sixth: str | None = f(**{"default": None})
+                seventh: str = f(**{**{"default": "nested"}})
+
+            @Inspect(excludes=["secret"])
+            @data(frozen=True)
+            class Configured:
+                secret: str
+
+            @other_dataclass
+            class Foreign:
+                name: str = f(metadata={"help": "Foreign dataclass"})
+
+            class Plain:
+                name: str = f(metadata={"help": "Plain class"})
+            """)) {
+            var contact = environment.classes().get("Contact");
+            var fields = contact.attributes();
+            assertEquals(List.of(false, true, true, true, true), fields.stream().map(a -> a.hasDefaultValue()).toList());
+            assertNull(fields.get(1).value());
+            assertEquals("ready", fields.get(2).value());
+            assertEquals("list", fields.get(3).defaultFactoryName());
+            assertTrue(fields.get(4).decorators().isEmpty(), "other libraries' field helpers do not carry Jakarta constraints");
+            assertEquals(List.of(false, true, true, true, true), contact.constructor().arguments().arguments().stream().map(a -> a.hasDefaultValue()).toList());
+            assertEquals(1, contact.decorators().stream().filter(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")).count());
+            var configured = environment.classes().get("Configured");
+            assertTrue(configured.frozenDataclass());
+            assertEquals("dataclass", configured.decorators().stream().filter(d -> d.annotationName().equals("dataclasses.dataclass")).findFirst().orElseThrow().name());
+            assertEquals(1, configured.decorators().stream().filter(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")).count());
+            assertEquals(List.of("secret"), configured.decorators().stream().filter(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")).findFirst().orElseThrow().members().get("excludes"));
+            var thirdPartyFields = environment.classes().get("ThirdParty").attributes();
+            assertTrue(thirdPartyFields.stream().noneMatch(a -> a.decorators().stream()
+                .anyMatch(d -> d.annotationName().startsWith("jakarta.validation."))));
+            assertEquals(List.of(false, false, true, false, true, true, true),
+                thirdPartyFields.stream().map(a -> a.hasDefaultValue()).toList());
+            assertFalse(thirdPartyFields.get(3).hasDefaultValue());
+            assertEquals("shared", thirdPartyFields.get(4).value());
+            assertNull(thirdPartyFields.get(5).value());
+            assertEquals("nested", thirdPartyFields.get(6).value());
+            for (String name : List.of("Foreign", "Plain")) {
+                var ordinary = environment.classes().get(name);
+                assertTrue(ordinary.decorators().stream().noneMatch(d -> d.annotationName().equals("io.micronaut.core.annotation.Introspected")));
+                assertTrue(ordinary.attributes().getFirst().decorators().isEmpty());
+                assertNull(ordinary.constructor());
+            }
+        }
+    }
+
+    @Test
+    void testDataclassAnnotatedStandardConstraintCatalog() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from dataclasses import dataclass
+            from typing import Annotated
+            from jakarta.validation import Valid
+            from jakarta.validation.constraints import (
+                NotBlank, NotNull, Null, NotEmpty, Size, Min, Max, DecimalMin, DecimalMax,
+                Positive, PositiveOrZero, Negative, NegativeOrZero, Digits, Pattern, Email,
+                AssertTrue, AssertFalse, Past, PastOrPresent, Future, FutureOrPresent,
+            )
+
+            @dataclass
+            class AllConstraints:
+                value: Annotated[str,
+                    NotBlank(message="required"), NotNull, Null, NotEmpty,
+                    Size(min=1, max=20), Min(0), Max(9),
+                    DecimalMin("0.001"), DecimalMax("9.99", inclusive=False),
+                    Positive, PositiveOrZero, Negative, NegativeOrZero,
+                    Digits(integer=2, fraction=3),
+                    Pattern(regexp="[a-z]+", flags=[Pattern.Flag.CASE_INSENSITIVE]),
+                    Email(regexp=".*example.com"), AssertTrue, AssertFalse,
+                    Past, PastOrPresent, Future, FutureOrPresent, Valid]
+            """)) {
+            var decorators = environment.classes().get("AllConstraints").attributes().getFirst().decorators();
+            assertEquals(23, decorators.size());
+            assertEquals(23, decorators.stream().map(DecoratorDef::annotationName).distinct().count());
+            assertTrue(decorators.stream().allMatch(d -> d.annotationName().startsWith("jakarta.validation.")));
+            assertEquals(0, decorators.stream().filter(d -> d.name().equals("Min")).findFirst().orElseThrow().members().get("value"));
+            assertEquals("0.001", decorators.stream().filter(d -> d.name().equals("DecimalMin")).findFirst().orElseThrow().members().get("value"));
+            assertEquals(List.of("jakarta.validation.constraints.Pattern.Flag.CASE_INSENSITIVE"), decorators.stream().filter(d -> d.name().equals("Pattern")).findFirst().orElseThrow().members().get("flags"));
+            assertNull(decorators.stream().filter(d -> d.name().equals("Valid")).findFirst().orElseThrow().repeatedName());
+        }
+    }
+
+    @Test
     void testDataclassDefaultFactoryConstructorArgumentParsing() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         try (PythonEnvironment environment = pythonProcessor.parse("""
@@ -2845,6 +3287,127 @@ class ProductMappers:
      * A visitor context that knows io.example.oas.SampleJavaType and nothing else -- in particular it
      * does not answer to the "example.oas" spelling Python uses.
      */
+
+    @Test
+    void definitionsKeepTheirOriginalPositionsThroughTheTransform(@TempDir Path directory) throws Exception {
+        // the two annotation imports become generated decorator functions hoisted to the top of the
+        // module, which used to shift every line number the processor saw
+        String source = """
+            from typing import Annotated
+
+            from jakarta.inject import Singleton
+            from micronaut.context.annotation import Executable, Parameter
+            from java.util import ArrayList
+
+
+            @Singleton
+            class Greeter:
+                greeting: str = "hello"
+                count = 0; nämé: str = "é"
+
+                def __init__(self, service: Annotated[str, Parameter]):
+                    self.service = service
+
+                @Executable
+                def greet(self, name: str, *rest: str) -> str:
+                    return self.greeting + name
+
+                @property
+                def label(self) -> str:
+                    return "x"
+            """;
+        Path file = Files.writeString(directory.resolve("greeter.py"), source);
+        Source pythonSource = Source.newBuilder("python", file.toFile()).build();
+        VisitorContext visitorContext = visitorContextResolving(Map.of(
+            "jakarta.inject.Singleton", jakarta.inject.Singleton.class,
+            "io.micronaut.context.annotation.Executable", io.micronaut.context.annotation.Executable.class,
+            "io.micronaut.context.annotation.Parameter", io.micronaut.context.annotation.Parameter.class,
+            "java.util.ArrayList", java.util.ArrayList.class
+        ));
+        PythonAstParser parser = new PythonAstParser();
+        try {
+            List<PythonAstParser.TransformResult> transformed = parser.transform(visitorContext, List.of(directory.toString()), pythonSource);
+            assertTrue(transformed.get(0).code().contains("def Singleton("));
+            try (PythonEnvironment environment = parser.parseTransformed(transformed, List.of(directory.toString()), visitorContext)) {
+                ClassDef greeter = environment.classes().get("python.Greeter");
+                assertNotNull(greeter);
+                // the source reports its real path (/private/var rather than /var on macOS)
+                String path = pythonSource.getPath();
+
+                assertEquals(new SourceSpan(path, 9, 1, 22, 19), greeter.span());
+                DecoratorDef singleton = greeter.decorators().get(0);
+                assertEquals("jakarta.inject.Singleton", singleton.annotationName());
+                assertEquals(new SourceSpan(path, 8, 2, 8, 11), singleton.span());
+
+                AttributeDef greeting = greeter.attributes().stream().filter(attribute -> attribute.name().equals("greeting")).findFirst().orElseThrow();
+                assertEquals(new SourceSpan(path, 10, 5, 10, 28), greeting.span());
+                // columns count characters, not the UTF-8 bytes the AST counts
+                AttributeDef accented = greeter.attributes().stream().filter(attribute -> attribute.name().equals("nämé")).findFirst().orElseThrow();
+                assertEquals(new SourceSpan(path, 11, 16, 11, 31), accented.span());
+                AttributeDef service = greeter.attributes().stream().filter(attribute -> attribute.name().equals("service")).findFirst().orElseThrow();
+                assertEquals(new SourceSpan(path, 14, 9, 14, 31), service.span());
+
+                FunctionDef greet = greeter.functions().stream().filter(function -> function.name().equals("greet")).findFirst().orElseThrow();
+                // a function starts at its def line, its decorators are located separately
+                assertEquals(new SourceSpan(path, 17, 5, 18, 36), greet.span());
+                assertEquals(new SourceSpan(path, 16, 6, 16, 16), greet.decorators().get(0).span());
+                assertEquals(new SourceSpan(path, 17, 21, 17, 30), greet.arguments().arguments().get(0).span());
+                // *rest is located at its name, after the star
+                ArgumentDef rest = greet.arguments().arguments().get(1);
+                assertTrue(rest.variadic());
+                assertEquals(new SourceSpan(path, 17, 33, 17, 42), rest.span());
+                assertEquals(new SourceSpan(path, 13, 5, 14, 31), greeter.constructor().span());
+                assertEquals(new SourceSpan(path, 21, 5, 22, 19), greeter.properties().get(0).span());
+                assertEquals(new SourceSpan(path, 21, 5, 22, 19), greeter.properties().get(0).getter().span());
+
+                // the generated decorator functions have no position in the source
+                DecoratorDef generated = environment.decorators().get("jakarta.inject.Singleton");
+                assertNotNull(generated);
+                assertNull(generated.span());
+            }
+        } finally {
+            parser.close();
+        }
+    }
+
+    @Test
+    void definitionsOfInlineSourcesAreLocatedByName() {
+        try (PythonEnvironment environment = new PythonAstParser().parse("""
+            class Plain:
+                value: int = 1
+            """)) {
+            ClassDef plain = environment.classes().get("Plain");
+            assertEquals(new SourceSpan("Unknown", 1, 1, 2, 19), plain.span());
+        }
+    }
+
+    @Test
+    void definitionsOfCrLfSourcesAreLocatedByLine() {
+        // a module annotation invoked through a name imported from a Java package, in a source with Windows line endings
+        String source = String.join("\r\n",
+            "from micronaut.test.extensions.junit5.annotation import MicronautTest",
+            "",
+            "MicronautTest()",
+            "",
+            "def test_handler(first: str, *rest: str) -> None:",
+            "    pass",
+            "");
+        try (PythonEnvironment environment = new PythonAstParser().parse(source, "example")) {
+            ScriptDef script = environment.scripts().get("example.Unknown");
+            assertNotNull(script);
+            assertEquals(new SourceSpan("Unknown", 1, 1, 7, 1), script.span());
+
+            DecoratorDef micronautTest = script.decorators().getFirst();
+            assertEquals("io.micronaut.test.extensions.junit5.annotation.MicronautTest", micronautTest.annotationName());
+            assertEquals(new SourceSpan("Unknown", 3, 1, 3, 16), micronautTest.span());
+
+            FunctionDef handler = script.functions().getFirst();
+            assertEquals(new SourceSpan("Unknown", 5, 1, 6, 9), handler.span());
+            assertEquals(new SourceSpan("Unknown", 5, 18, 5, 28), handler.arguments().arguments().get(0).span());
+            assertEquals(new SourceSpan("Unknown", 5, 31, 5, 40), handler.arguments().arguments().get(1).span());
+        }
+    }
+
     private static VisitorContext ioPrefixedVisitorContext() {
         return (VisitorContext) Proxy.newProxyInstance(
             VisitorContext.class.getClassLoader(),
@@ -2868,6 +3431,39 @@ class ProductMappers:
                     if (args != null && args.length >= 1 && "io.example.oas".equals(args[0])) {
                         return new ClassElement[] { ClassElement.of(io.example.oas.SampleJavaType.class) };
                     }
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+    }
+
+    private static VisitorContext visitorContextResolving(Map<String, Class<?>> classes) {
+        return (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> "testVisitorContext";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                if ("getClassElement".equals(method.getName()) && args != null && args.length >= 1 && classes.containsKey((String) args[0])) {
+                    return Optional.of(ClassElement.of(classes.get((String) args[0])));
+                }
+                if ("getClassElements".equals(method.getName())) {
                     return ClassElement.ZERO_CLASS_ELEMENTS;
                 }
                 if (Optional.class.equals(method.getReturnType())) {

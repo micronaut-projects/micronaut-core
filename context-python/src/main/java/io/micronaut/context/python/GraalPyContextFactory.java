@@ -103,6 +103,10 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * failed, retrying with the underscore stripped (the rule the compiler applies, {@code keyword.iskeyword},
      * so the same spelling works everywhere) and then asking the runtime for an inherited member.
      * <p>
+     * It makes every {@link Exception} an instance of the Python {@code Exception} class, so that
+     * {@code except Exception} catches the exceptions of Java calls ({@link Error}s remain only a
+     * {@code BaseException}, as GraalPy makes every foreign exception).
+     * <p>
      * It also makes every {@link java.util.concurrent.CompletionStage} and Reactive Streams publisher
      * awaitable, whichever Java call returned it (see {@link PythonAsyncioRuntime#awaitJava}).
      */
@@ -129,6 +133,14 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                     raise AttributeError(f"foreign object has no attribute '{name}'")
 
             register_interop_type(java.type('java.lang.Object'), MicronautJavaObject)
+
+            # GraalPy makes every Java throwable a BaseException only: a java.lang.Exception thrown by a Java call
+            # is also an Exception, so that `except Exception` catches it like any Python error, while a
+            # java.lang.Error stays out of reach of `except Exception`, as KeyboardInterrupt and SystemExit do
+            class MicronautJavaException(Exception):
+                __slots__ = ()
+
+            register_interop_type(java.type('java.lang.Exception'), MicronautJavaException)
 
             # a CompletionStage or Publisher any Java call returned (Mono.toFuture(), a static factory) is
             # awaitable like the value of an injected client
@@ -188,6 +200,30 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 def __str__(self):
                     return str(self.__micronaut_python_object__())
 
+                def with_traceback(self, tb):
+                    return self.__micronaut_python_object__().with_traceback(tb)
+
+                def add_note(self, note):
+                    return self.__micronaut_python_object__().add_note(note)
+
+                def __reduce__(self):
+                    return self.__micronaut_python_object__().__reduce__()
+
+            # The wrapper of a Python exception is a java.lang.Exception, which makes its type derive from
+            # Exception (see the Java object members); the view comes first in that type, so the exception
+            # state the BaseException descriptors would read from the wrapper is that of the wrapped exception
+            def delegated(name):
+                def get(self):
+                    return getattr(self.__micronaut_python_object__(), name)
+
+                def set(self, value):
+                    setattr(self.__micronaut_python_object__(), name, value)
+
+                return property(get, set)
+
+            for name in ('args', '__cause__', '__context__', '__suppress_context__', '__traceback__'):
+                setattr(JavaWrapperView, name, delegated(name))
+
             try:
                 polyglot.register_interop_type(wrapper_class, JavaWrapperView)
             except KeyError:
@@ -206,7 +242,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
     /**
      * Complete the members of the Java objects of a context: keyword-safe aliases, inherited public
-     * methods, and {@code await} on stages and publishers.
+     * methods, {@code await} on stages and publishers, and Java exceptions caught by {@code except Exception}.
      *
      * @param context The context
      */
@@ -358,37 +394,45 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         VirtualFileSystem vfs = VirtualFileSystem.newBuilder()
             .resourceDirectory(APPLICATION_PATH)
             .resourceClassLoader(classLoader).build();
-        Context.Builder builder = contextConfiguration.getBuilder()
-            .apply(GraalPyResources.forVirtualFileSystem(vfs))
-            .logHandler(new GraalPySlf4jLogHandler())
-            .allowExperimentalOptions(true)
-            .allowCreateProcess(true)
-            .allowEnvironmentAccess(EnvironmentAccess.INHERIT)
-            .allowValueSharing(true)
-            .allowPolyglotAccess(PolyglotAccess.ALL)
-            // Allow access to host classes
-            .allowHostAccess(hostAccess)
-            .hostClassLoader(classLoader)
-            .engine(engine)
-            .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
-            // Python reaches Java through java.type(...) and "from a.b import C". By default the
-            // filter accepts every class the application class loader can load, the application's
-            // own packages included, which is what generated and user Python code needs. That also
-            // exposes java.lang.Runtime, ProcessBuilder and the like, so an application that runs
-            // Python it trusts less than its Java can narrow the surface with
-            // graalpy.context.host-class-lookup; the filter then keeps the JDK, Jakarta and framework
-            // packages the generated code depends on and adds only the configured packages.
-            .allowHostClassLookup(contextConfiguration.hostClassFilter());
-        resolveVirtualEnvExecutable(System.getenv())
-            .ifPresent(executable -> builder.option("python.Executable", executable.toString()));
-        GraalPyContextCustomizers.load(classLoader)
-            .forEach(customizer -> customizer.customize(builder));
+        // the engine must not close under a context it does not know of yet, such as one a pool
+        // warm-up builds while the application shuts down
+        PythonContextRegistry.beginContextBuild(engine);
+        Context context;
+        try {
+            Context.Builder builder = contextConfiguration.getBuilder()
+                .apply(GraalPyResources.forVirtualFileSystem(vfs))
+                .logHandler(new GraalPySlf4jLogHandler())
+                .allowExperimentalOptions(true)
+                .allowCreateProcess(true)
+                .allowEnvironmentAccess(EnvironmentAccess.INHERIT)
+                .allowValueSharing(true)
+                .allowPolyglotAccess(PolyglotAccess.ALL)
+                // Allow access to host classes
+                .allowHostAccess(hostAccess)
+                .hostClassLoader(classLoader)
+                .engine(engine)
+                .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
+                // Python reaches Java through java.type(...) and "from a.b import C". By default the
+                // filter accepts every class the application class loader can load, the application's
+                // own packages included, which is what generated and user Python code needs. That also
+                // exposes java.lang.Runtime, ProcessBuilder and the like, so an application that runs
+                // Python it trusts less than its Java can narrow the surface with
+                // graalpy.context.host-class-lookup; the filter then keeps the JDK, Jakarta and framework
+                // packages the generated code depends on and adds only the configured packages.
+                .allowHostClassLookup(contextConfiguration.hostClassFilter());
+            resolveVirtualEnvExecutable(System.getenv())
+                .ifPresent(executable -> builder.option("python.Executable", executable.toString()));
+            GraalPyContextCustomizers.load(classLoader)
+                .forEach(customizer -> customizer.customize(builder));
 
-        LOG.debug("Configured GraalPy Context.Builder in {}ms", System.currentTimeMillis() - now);
+            LOG.debug("Configured GraalPy Context.Builder in {}ms", System.currentTimeMillis() - now);
 
-        now = System.currentTimeMillis();
-        var context = builder.build();
-        PythonContextRegistry.registerContext(context);
+            now = System.currentTimeMillis();
+            context = builder.build();
+            PythonContextRegistry.registerContext(context);
+        } finally {
+            PythonContextRegistry.endContextBuild(engine);
+        }
         LOG.debug("GraalPy Context Built in {}ms", System.currentTimeMillis() - now);
         boolean bootstrapped = false;
         try {
@@ -403,7 +447,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 LOG.debug("GraalPy Context ID registered in {}ms", System.currentTimeMillis() - now);
             }
             // Before any application code runs: Java objects answer to keyword-safe member aliases and to
-            // the public methods GraalPy does not expose because a non-public superclass declares them
+            // the public methods GraalPy does not expose because a non-public superclass declares them, and
+            // their exceptions to `except Exception`
             now = System.currentTimeMillis();
             registerJavaObjectMembers(context);
             LOG.debug("GraalPy Java object members registered in {}ms", System.currentTimeMillis() - now);

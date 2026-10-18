@@ -92,7 +92,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
 
     @Override
     public ClassElement getGenericField() {
-        return newClassElement(fieldNode.getType(), getDeclaringType().getTypeArguments());
+        return newClassElement(fieldNode.getType(), getDeclaringType().getTypeArguments(), fieldNode);
     }
 
     @Override
@@ -164,7 +164,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     @Override
     public ClassElement getType() {
         if (type == null) {
-            type = newClassElement(fieldNode.getType());
+            type = newClassElement(fieldNode.getType(), null, fieldNode);
         }
         return type;
     }
@@ -172,7 +172,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     @Override
     public @NonNull ClassElement getGenericType() {
         if (genericType == null) {
-            genericType = newClassElement(fieldNode.getType(), getDeclaringType().getTypeArguments());
+            genericType = newClassElement(fieldNode.getType(), getDeclaringType().getTypeArguments(), fieldNode);
         }
         return genericType;
     }

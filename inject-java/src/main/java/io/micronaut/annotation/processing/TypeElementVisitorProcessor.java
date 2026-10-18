@@ -41,10 +41,8 @@ import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
 import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.visitor.util.ProcessorOptionsSystemProperties;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
-import io.micronaut.inject.writer.ByteCodeWriterUtils;
-import io.micronaut.inject.writer.OriginatingElements;
-import io.micronaut.sourcegen.model.ObjectDef;
 import org.jspecify.annotations.Nullable;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -54,7 +52,6 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
-import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
@@ -72,8 +69,6 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static io.micronaut.core.util.StringUtils.EMPTY_STRING;
 
 /**
  * <p>The annotation processed used to execute type element visitors.</p>
@@ -148,10 +143,8 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors = findTypeElementVisitors();
 
         // set supported options as system properties to keep compatibility
-        // in particular for micronaut-openapi
-        processingEnv.getOptions().entrySet().stream()
-            .filter(entry -> entry.getKey() != null && entry.getKey().startsWith(VisitorContext.MICRONAUT_BASE_OPTION_NAME))
-            .forEach(entry -> System.setProperty(entry.getKey(), entry.getValue() == null ? EMPTY_STRING : entry.getValue()));
+        // in particular for micronaut-openapi, they are restored once the processing is over
+        ProcessorOptionsSystemProperties.apply(processingEnv.getElementUtils(), processingEnv.getOptions());
 
         this.loadedVisitors = new ArrayList<>(typeElementVisitors.size());
 
@@ -253,6 +246,10 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         "It should not be possible to process elements without at least one annotation present and this call breaks that assumption")
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        return ProcessorOptionsSystemProperties.process(this, roundEnv.processingOver(), () -> processRound(annotations, roundEnv));
+    }
+
+    private boolean processRound(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         javaVisitorContext.newRound();
         if (loadedVisitors != null && !loadedVisitors.isEmpty() && !processingGeneratedAnnotation(annotations)) {
 
@@ -351,6 +348,24 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 }
             }
 
+            if (!roundEnv.processingOver()) {
+                // nothing generated in the final round is processed, so it is not a round for the visitors
+                for (LoadedVisitor loadedVisitor : loadedVisitors) {
+                    try {
+                        loadedVisitor.getVisitor().finishRound(javaVisitorContext);
+                    } catch (ProcessingException e) {
+                        var originatingElement = (JavaNativeElement) e.getOriginatingElement();
+                        error(originatingElement == null ? null : originatingElement.element(), "%s", e.getMessage());
+                    } catch (Throwable e) {
+                        var stackTraceWriter = new StringWriter();
+                        e.printStackTrace(new PrintWriter(stackTraceWriter));
+
+                        error("Error finishing the round of type visitor [%s]: %s\n%s",
+                            loadedVisitor.getVisitor(), e.getMessage(), stackTraceWriter);
+                    }
+                }
+            }
+
             for (LoadedVisitor loadedVisitor : loadedVisitors) {
                 try {
                     loadedVisitor.getVisitor().finish(javaVisitorContext);
@@ -385,29 +400,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             javaVisitorContext.finish();
         }
         return false;
-    }
-
-    private void write(OutputObjectDef outputObjectDef, VisitorContext visitorContext) {
-        try {
-            ObjectDef objectDef = outputObjectDef.objectDef();
-            Class<?> serviceClass = outputObjectDef.serviceClass();
-            OriginatingElements originatingElements = outputObjectDef.originatingElements();
-            if (serviceClass != null) {
-                classWriterOutputVisitor.visitServiceDescriptor(serviceClass.getName(), objectDef.getName(), originatingElements.getOriginatingElements()[0], outputObjectDef.serviceContent());
-            }
-            try (OutputStream outputStream = classWriterOutputVisitor.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
-                outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
-            }
-        } catch (Exception e) {
-            // raise a compile error
-            String message = e.getMessage();
-            Element javaElement = null;
-            io.micronaut.inject.ast.Element astElement = outputObjectDef.originatingElements().getOriginatingElements()[0];
-            if (astElement.getNativeType() instanceof JavaNativeElement javaNativeElement) {
-                javaElement = javaNativeElement.element();
-            }
-            error(javaElement, "Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
-        }
     }
 
     /**

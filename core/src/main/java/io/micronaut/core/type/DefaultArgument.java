@@ -72,6 +72,11 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     private final Argument<?> @Nullable [] typeParameterArray;
     private final AnnotationMetadata annotationMetadata;
     private final boolean isTypeVar;
+    /**
+     * The component this array was written with, {@code null} when it is rebuilt from the array.
+     */
+    @Nullable
+    private final Argument<?> componentType;
     @Nullable
     private String namePrecalculated;
     @Nullable
@@ -147,12 +152,35 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
                               @Nullable AnnotationMetadata annotationMetadata,
                               Map<String, Argument<?>> typeParameters,
                               Argument<?> @Nullable [] typeParameterArray, boolean isTypeVariable) {
+        this(type, name, annotationMetadata, typeParameters, typeParameterArray, isTypeVariable, null);
+    }
+
+    private DefaultArgument(Class<T> type,
+                            @Nullable String name,
+                            @Nullable AnnotationMetadata annotationMetadata,
+                            Map<String, Argument<?>> typeParameters,
+                            Argument<?> @Nullable [] typeParameterArray,
+                            boolean isTypeVariable,
+                            @Nullable Argument<?> componentType) {
         this.type = Objects.requireNonNull(type, "Type cannot be null");
         this.name = name;
         this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
         this.typeParameters = typeParameters;
         this.typeParameterArray = typeParameterArray;
         this.isTypeVar = isTypeVariable;
+        this.componentType = componentType;
+    }
+
+    /**
+     * A copy of an argument with the component it was written with.
+     *
+     * @param argument      The argument
+     * @param componentType The component, {@code null} to rebuild it from the array
+     * @since 5.3.0
+     */
+    protected DefaultArgument(DefaultArgument<T> argument, @Nullable Argument<?> componentType) {
+        this(argument.type, argument.name, argument.annotationMetadata, argument.typeParameters,
+            argument.typeParameterArray, argument.isTypeVar, componentType);
     }
 
     /**
@@ -191,16 +219,64 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
         this.name = name;
         this.typeParameters = initializeTypeParameters(this.typeParameterArray);
         this.isTypeVar = false;
+        this.componentType = null;
     }
 
     @Override
     public Argument<T> withName(@Nullable String name) {
-        return new DefaultArgument<>(type, name, annotationMetadata, typeParameters, typeParameterArray, isTypeVar);
+        return new DefaultArgument<>(type, name, annotationMetadata, typeParameters, typeParameterArray, isTypeVar, componentType);
     }
 
     @Override
     public Argument<T> withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        return new DefaultArgument<>(type, name, annotationMetadata, typeParameters, typeParameterArray, isTypeVar);
+        return new DefaultArgument<>(type, name, annotationMetadata, typeParameters, typeParameterArray, isTypeVar, componentType);
+    }
+
+    @Override
+    public @Nullable Argument<?> componentType() {
+        return componentType != null ? componentType : Argument.super.componentType();
+    }
+
+    @Override
+    public Argument<T> withComponentType(Argument<?> componentType) {
+        ArgumentStructure.checkComponentType(this, componentType);
+        DefaultArgument<T> copy = copyWithComponentType(componentType);
+        return copy != null ? copy : this;
+    }
+
+    /**
+     * A copy of this argument of the same kind with the component it was written with, see
+     * {@link #DefaultArgument(DefaultArgument, Argument)}.
+     *
+     * @param componentType The component, {@code null} to rebuild it from the array
+     * @return The copy, or {@code null} if this kind of argument does not keep a component
+     * @since 5.3.0
+     */
+    protected @Nullable DefaultArgument<T> copyWithComponentType(@Nullable Argument<?> componentType) {
+        return getClass() == DefaultArgument.class ? new DefaultArgument<>(this, componentType) : null;
+    }
+
+    /**
+     * Gives a copy of this argument the component this argument was written with.
+     *
+     * @param copy The copy, of the same kind as this argument
+     * @return The copy with the component
+     */
+    final Argument<T> keepComponentType(DefaultArgument<T> copy) {
+        if (componentType == null) {
+            return copy;
+        }
+        DefaultArgument<T> withComponent = copy.copyWithComponentType(componentType);
+        return withComponent != null ? withComponent : copy;
+    }
+
+    @Override
+    public Argument<T> withTypeParameters(Argument<?>... typeParameters) {
+        if (isRawType()) {
+            // a subclass, such as the arguments the bean context wraps, may answer raw without being a DefaultRawArgument
+            return new DefaultRawArgument<>(type, name, annotationMetadata, typeParameters);
+        }
+        return new DefaultArgument<>(type, name, annotationMetadata, initializeTypeParameters(typeParameters), typeParameters, isTypeVar);
     }
 
     @Override

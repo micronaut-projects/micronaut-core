@@ -92,7 +92,7 @@ Singletons and custom-scoped beans remain owned by their scopes. Dynamically res
 
 The resolver can be used during construction and retained for later use. It must be injected into a managed consumer; it is unavailable through a standalone context lookup. As with other dependent resources, callers obtaining standalone prototypes should retain and close their api:context.BeanRegistration[]. Ordinary api:context.BeanContext[] and api:context.BeanProvider[] lookups keep their existing lifecycle behavior.
 
-New resolver lookups are rejected once destruction of the consumer or context shutdown begins. Existing dependencies remain available to destruction callbacks. A lookup racing destruction releases newly created dependents if it cannot attach them to the consumer. The resolver does not retain the consumer's construction path; do not use it to resolve the consumer recursively during construction.
+Once destruction of the consumer begins, only its own destruction callbacks, such as a `@PreDestroy` method, can still look up, on the destroying thread and until they return; what they create is destroyed with the consumer, after the callbacks. Once context shutdown begins, lookups are only accepted on the thread running the shutdown, on behalf of a api:context.event.ShutdownEvent[] listener or a destruction callback, and what they create is destroyed before the shutdown completes. Other lookups are rejected. A lookup racing destruction releases newly created dependents if it cannot attach them to the consumer. The resolver does not retain the consumer's construction path; do not use it to resolve the consumer recursively during construction.
 
 ==== Explicit dependency ownership
 
@@ -111,9 +111,14 @@ closed automatically with it. Independent groups must be closed by their callers
 
 For temporary method arguments, `BeanContext.withDependencies(group -> ...)` releases owned dependencies
 when the synchronous invocation ends, including when it fails. Cleanup attempts every dependent and suppresses
-cleanup failures on the invocation's exception. It rejects new groups once shutdown begins.
+cleanup failures on the invocation's exception.
+
+Once shutdown begins, new groups and fresh registrations can only be created by a `ShutdownEvent` listener, on the
+thread publishing the event. Groups created earlier, independent or owned by a consumer, stay usable by the listeners
+and destruction callbacks running on the shutdown thread. Whatever a group creates during shutdown is destroyed before
+the shutdown completes, even if the group is never closed; what it held before remains the caller's to release.
 
 A `BeanPreDestroyEventListener` that needs temporary dependencies while a bean is being destroyed calls
 `event.withDependencies(group -> ...)`. These lookups are allowed during shutdown, only on the destruction
-thread and until the listener returns; injected resolvers and independent groups still reject new lookups
-once shutdown starts. Do not return an owned dependency from either invocation, since it has already been destroyed.
+thread and until the listener returns; `BeanContext.withDependencies` itself is not available to a destruction
+listener during shutdown. Do not return an owned dependency from either invocation, since it has already been destroyed.

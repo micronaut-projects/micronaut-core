@@ -19,11 +19,13 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.client.internal.ElementsStages;
 import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Mono;
 
 import java.util.Objects;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
 
 /**
  * Default {@link AsyncHttpClient} implementation that adapts a reactive {@link HttpClient}.
@@ -47,7 +49,7 @@ public class DefaultAsyncOverReactiveHttpClient implements AsyncHttpClient {
     public <I, O, E> CompletionStage<HttpResponse<O>> exchange(HttpRequest<I> request,
                                                                @Nullable Argument<O> bodyType,
                                                                Argument<E> errorType) {
-        return Mono.from(httpClient.exchange(request, bodyType, errorType)).toFuture();
+        return ElementsStages.map(Mono.from(httpClient.exchange(request, bodyType, errorType)).toFuture(), Function.identity(), ignored -> { });
     }
 
     @Override

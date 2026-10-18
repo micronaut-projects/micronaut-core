@@ -21,8 +21,10 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.form.FormData;
+import io.micronaut.web.router.websocket.WebSocketEndpointSpec;
 
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
@@ -53,8 +55,8 @@ import org.jspecify.annotations.Nullable;
  *     <li><b>Body stages.</b> {@link #body(Argument)}, {@link #body()} and {@link #form()} declare
  *     the body the handler receives: the pending route becomes an {@link HttpBodyRouteSpec}, whose
  *     terminals take a handler of that body.</li>
- *     <li><b>Terminals.</b> {@link #handle(RequestHandler)}, {@link #handleAsync(AsyncRequestHandler)}
- *     and the {@code respond} methods add the route, with the settings given before. A route is
+ *     <li><b>Terminals.</b> {@link #handle(RequestHandler)}, {@link #handleAsync(AsyncRequestHandler)},
+ *     {@link #sse(SseHandler)} and the {@code respond} methods add the route, with the settings given before. A route is
  *     ended with exactly one terminal: a second one, or a setting after the terminal, fails with an
  *     {@link IllegalStateException}. A pending route with no terminal fails the startup, see
  *     {@link HttpRouteBuilder}.</li>
@@ -272,4 +274,61 @@ public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits D
      * @since 5.3.0
      */
     void resources(ResourceHandler resources);
+
+    /**
+     * End a {@code GET} route with WebSocket handler functions, the functional counterpart of a
+     * {@link io.micronaut.websocket.annotation.ServerWebSocket} bean: the server upgrades a
+     * {@code GET} request to the URI template to a WebSocket connection, and calls the handlers
+     * the lambda declares, see {@link WebSocketEndpointSpec}. Requires {@code micronaut-websocket}.
+     *
+     * <pre>{@code
+     * routes.GET("/chat/{room}")
+     *     .beforeReplacing(request -> authorized(request) ? null : HttpResponse.forbidden()).and()
+     *     .webSocket(ws -> ws
+     *         .onOpen((session, request) -> session.sendAsync("joined " + session.getUriVariables().get("room", String.class).orElseThrow()))
+     *         .onMessage(Argument.of(ChatMessage.class), (session, message) -> session.sendAsync(reply(message))));
+     * }</pre>
+     *
+     * <p>The route is a route of the upgrade request: its conditions, filters, groups, order, port
+     * and attributes apply to the upgrade request, e.g. a filter that answers with a response
+     * rejects the upgrade, and a request that is not an upgrade is answered with an error. Of the
+     * WebSocket routes that match an upgrade, the closest one is upgraded, then the one of the
+     * lowest order, like the route of any other request. Its executor, see
+     * {@link RouteSpec#executeOn(String)}, or the executor of its group, runs the handlers of the
+     * connections: by default the event loop, so a handler that blocks, e.g. on I/O, needs another
+     * executor, e.g. {@code executeOn(TaskExecutors.BLOCKING)}. A WebSocket route has no media
+     * types and no response type: the media types of its group do not apply to it, and its own,
+     * e.g. {@link RouteSpec#produces(io.micronaut.http.MediaType...)}, are an error.</p>
+     *
+     * @param endpoint Declares the handlers of the WebSocket connections
+     * @throws IllegalStateException if the route was already ended, is not a route of {@code GET}
+     *                               only, has media types or a response type, or
+     *                               {@code micronaut-websocket} is missing
+     * @since 5.3.0
+     */
+    void webSocket(Consumer<WebSocketEndpointSpec> endpoint);
+
+    /**
+     * End the route with a server-sent events handler: the response is a
+     * {@code text/event-stream} of the events the handler pushes to its
+     * {@link io.micronaut.http.sse.SseEmitter}. The route produces {@code text/event-stream}, not
+     * the media types its group produces. A route whose handler may answer with another response,
+     * see {@link io.micronaut.http.sse.SseEmitter#respond}, declares the types of both, e.g.
+     * {@code produces(MediaType.TEXT_EVENT_STREAM_TYPE, MediaType.APPLICATION_JSON_TYPE)}. The handler does not read the body of the request, like
+     * a {@link RequestHandler}: a handler that does declares a body stage first, e.g.
+     * {@code body(Prompt.class).sse(...)}, see {@link HttpBodyRouteSpec#sse(SseBodyHandler)}.
+     *
+     * <pre>{@code
+     * routes.GET("/ticks").sse((request, pathVariables, events) -> {
+     *     Subscription subscription = ticker.onTick(tick -> events.send(Event.of(tick).id(String.valueOf(tick.sequence()))));
+     *     events.keepOpen().heartbeat(Duration.ofSeconds(15)).onClose(error -> subscription.cancel());
+     * });
+     * }</pre>
+     *
+     * @param handler The handler
+     * @throws IllegalStateException if the route was already ended, or declared media types without {@code text/event-stream} with {@code produces}
+     * @see SseHandler
+     * @since 5.3.0
+     */
+    void sse(SseHandler handler);
 }

@@ -22,13 +22,15 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.RouteArguments;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -47,33 +49,84 @@ final class PendingRoute {
     /**
      * Adds the routes of a handler: one, or one per HTTP method.
      */
-    private final BiFunction<String, Supplier<HandlerMethod<?>>, List<RouteSettings>> routes;
-    /**
-     * The URI template of the route, under the prefix.
-     */
-    private final String template;
+    private final Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes;
     private final String description;
     /**
-     * Whether the route is a route of {@code GET} only, which may be a route of resources.
+     * The URI template of a route of {@code GET} only, which may be a WebSocket route or a route
+     * of resources, or {@code null}.
      */
-    private final boolean getOnly;
+    private final @Nullable Supplier<@Nullable String> getTemplate;
     private final List<Consumer<HandlerRoutes>> settings = new ArrayList<>();
+    /**
+     * The first setting of the route about its bodies, e.g. {@code produces}, which a WebSocket
+     * route does not have, or {@code null}.
+     */
+    private @Nullable String bodySetting;
+    /**
+     * The media types of the last {@code produces}, or {@code null}.
+     */
+    private MediaType @Nullable [] produces;
     private boolean ended;
 
     /**
      * @param builder     The builder that declared the route
-     * @param template    The URI template of the route, under the prefix
-     * @param routes      Adds the routes of the handler at a URI template
+     * @param routes      Adds the routes of the handler
      * @param description Describes the route for the messages, e.g. {@code GET /items/{id} declared by ItemRoutes}
-     * @param getOnly     Whether the route is a route of {@code GET} only
      */
-    PendingRoute(AbstractHttpRouteBuilder builder, String template, BiFunction<String, Supplier<HandlerMethod<?>>, List<RouteSettings>> routes,
-                 String description, boolean getOnly) {
+    PendingRoute(AbstractHttpRouteBuilder builder, Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes, String description) {
+        this(builder, routes, description, null);
+    }
+
+    /**
+     * @param builder     The builder that declared the route
+     * @param routes      Adds the routes of the handler
+     * @param description Describes the route for the messages, e.g. {@code GET /items/{id} declared by ItemRoutes}
+     * @param getTemplate Gives the URI template of a route of {@code GET} only, {@code null} if its
+     *                    template is of another language; or {@code null} for another route
+     */
+    PendingRoute(AbstractHttpRouteBuilder builder, Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes,
+                 String description, @Nullable Supplier<@Nullable String> getTemplate) {
         this.builder = builder;
-        this.template = template;
         this.routes = routes;
         this.description = description;
-        this.getOnly = getOnly;
+        this.getTemplate = getTemplate;
+    }
+
+    /**
+     * The URI template of a WebSocket route: only a route of {@code GET} only is upgraded. Any
+     * other route is dropped and the terminal fails.
+     *
+     * @return The URI template, under the prefix
+     * @throws IllegalStateException if the route is not a route of {@code GET} only, is a located
+     *                               route, or has media types or a response type
+     */
+    String webSocketTemplate() {
+        if (builder.located()) {
+            // the server finds the WebSocket route of an upgrade request among the routes it
+            // knows when it starts, not among the routes of the targets located per request
+            drop();
+            throw new IllegalStateException("The route " + description
+                + " is a located route: a WebSocket route is a route of an HttpRoutes bean");
+        }
+        Supplier<@Nullable String> source = getTemplate;
+        if (source == null) {
+            drop();
+            throw new IllegalStateException("The route " + description
+                + " is not a WebSocket route: a WebSocket route is a GET route, e.g. GET(uri).webSocket(...)");
+        }
+        String template = source.get();
+        if (template == null) {
+            drop();
+            throw new IllegalStateException("The route " + description
+                + " is not a WebSocket route: a WebSocket route has a URI template, not a template of another language");
+        }
+        String setting = bodySetting;
+        if (setting != null) {
+            drop();
+            throw new IllegalStateException("The WebSocket route " + description + " has " + setting
+                + ": the upgrade request and the messages of a WebSocket route have no media types or response type");
+        }
+        return template;
     }
 
     /**
@@ -99,7 +152,7 @@ final class PendingRoute {
     void end(Supplier<HandlerMethod<?>> handler, @Nullable Consumer<RouteSettings> init, int own) {
         checkPending();
         ended = true;
-        addRoutes(() -> routes.apply(template, handler), init, own);
+        addRoutes(() -> routes.apply(handler), init, own);
     }
 
     /**
@@ -109,16 +162,24 @@ final class PendingRoute {
      * group do not apply.
      *
      * @param resources The handler of the resources
-     * @throws IllegalStateException    if the route is not a route of {@code GET} only
+     * @throws IllegalStateException    if the route is not a route of {@code GET} only, or its
+     *                                  template is not a URI template
      * @throws IllegalArgumentException if the path variable of the handler is not a plain name, or
      *                                  the URI prefix has a query or a fragment
      */
     void endResources(ResourceHandler resources) {
         checkPending();
-        if (!getOnly) {
+        Supplier<@Nullable String> source = getTemplate;
+        if (source == null) {
             drop();
             throw new IllegalStateException("The route " + description
                 + " is not a route of resources: a route of resources is a GET route, e.g. GET(uriPrefix).resources(...)");
+        }
+        String template = source.get();
+        if (template == null) {
+            drop();
+            throw new IllegalStateException("The route " + description
+                + " is not a route of resources: a route of resources has a URI template, not a template of another language");
         }
         String pathVariable;
         try {
@@ -143,8 +204,8 @@ final class PendingRoute {
         // the prefix itself, e.g. for the index file, and every path under it
         addRoutes(() -> {
             List<RouteSettings> added = new ArrayList<>(2);
-            added.addAll(routes.apply(root, handler));
-            added.addAll(routes.apply(paths, handler));
+            added.add(builder.getRoute(root, handler.get()));
+            added.add(builder.getRoute(paths, handler.get()));
             return added;
         }, null, RouteGroupDefaults.CONSUMES_SETTING | RouteGroupDefaults.PRODUCES_SETTING);
     }
@@ -200,7 +261,36 @@ final class PendingRoute {
         return new NullPointerException(name);
     }
 
-    private void drop() {
+    /**
+     * Check that the media types the route declared include the one its terminal writes, e.g. the
+     * {@code text/event-stream} of {@link HttpRouteSpec#sse}: a route that declared only others
+     * would negotiate types it does not write. It may declare others besides, for the other
+     * responses of its handler. Such a route is dropped and the terminal fails.
+     *
+     * @param mediaType The media type the terminal writes
+     * @param terminal  The name of the terminal, for the message
+     * @throws IllegalStateException if the route declared media types without this one
+     */
+    void producesIncluding(MediaType mediaType, String terminal) {
+        MediaType[] declared = produces;
+        if (declared == null) {
+            return;
+        }
+        for (MediaType type : declared) {
+            if (type.getName().equals(mediaType.getName())) {
+                return;
+            }
+        }
+        drop();
+        throw new IllegalStateException("The route " + description + " produces " + Arrays.toString(declared)
+            + ", but " + terminal + " writes " + mediaType + ": add it to produces(...), or remove produces(...)");
+    }
+
+    /**
+     * Drop the route: its terminal failed, so the startup does not fail again for a route with
+     * no terminal.
+     */
+    void drop() {
         ended = true;
         builder.dropPending(this);
     }
@@ -208,6 +298,13 @@ final class PendingRoute {
     private void addSetting(Consumer<HandlerRoutes> setting) {
         checkPending();
         settings.add(setting);
+    }
+
+    private void addBodySetting(String name, Consumer<HandlerRoutes> setting) {
+        addSetting(setting);
+        if (bodySetting == null) {
+            bodySetting = name;
+        }
     }
 
     private void checkPending() {
@@ -219,16 +316,17 @@ final class PendingRoute {
 
     void consumes(MediaType[] mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
-        addSetting(added -> added.consumes(checked));
+        addBodySetting("consumes", added -> added.consumes(checked));
     }
 
     void consumesAll() {
-        addSetting(HandlerRoutes::consumesAll);
+        addBodySetting("consumesAll", HandlerRoutes::consumesAll);
     }
 
     void produces(MediaType[] mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
-        addSetting(added -> added.produces(checked));
+        addBodySetting("produces", added -> added.produces(checked));
+        produces = checked;
     }
 
     void annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
@@ -243,7 +341,7 @@ final class PendingRoute {
 
     void responseType(Argument<?> responseType) {
         Objects.requireNonNull(responseType, "responseType");
-        addSetting(added -> added.responseType(responseType));
+        addBodySetting("responseType", added -> added.responseType(responseType));
     }
 
     void executeOn(String executorName) {
@@ -275,7 +373,11 @@ final class PendingRoute {
         addSetting(added -> added.order(order));
     }
 
-    void where(RouteCondition condition) {
+    void selectedBy(@Nullable RouteMatchSelector selector) {
+        addSetting(added -> added.selectedBy(selector));
+    }
+
+    void where(RequestCondition condition) {
         Objects.requireNonNull(condition, "condition");
         addSetting(added -> added.where(condition));
     }

@@ -20,6 +20,7 @@ dependencies {
     api(libs.jakarta.inject.api)
 
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.h2)
     testImplementation(libs.junit.platform.launcher)
     testImplementation(libs.micronaut.test.junit5)
     testImplementation(platform(libs.test.boms.micronaut.validation))
@@ -66,4 +67,9 @@ tasks {
     sourcesJar {
         from("$projectDir/src/main/groovy")
     }
+}
+
+// Run the whole corpus of tests at a type-check mode: ./gradlew :micronaut-inject-python-test:test -Ppython-ci -Dmicronaut.python.typecheck=error
+tasks.withType<Test>().configureEach {
+    System.getProperty("micronaut.python.typecheck")?.let { systemProperty("micronaut.python.typecheck", it) }
 }

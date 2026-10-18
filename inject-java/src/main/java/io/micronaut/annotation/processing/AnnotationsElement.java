@@ -40,9 +40,20 @@ import java.util.Set;
 @Internal
 final class AnnotationsElement implements Element {
     private final TypeMirror typeMirror;
+    @Nullable
+    private final List<? extends AnnotationMirror> annotationMirrors;
 
     public AnnotationsElement(TypeMirror clazz) {
+        this(clazz, null);
+    }
+
+    /**
+     * @param clazz The type mirror
+     * @param annotationMirrors The annotations to provide instead of the type mirror's
+     */
+    AnnotationsElement(TypeMirror clazz, @Nullable List<? extends AnnotationMirror> annotationMirrors) {
         this.typeMirror = clazz;
+        this.annotationMirrors = annotationMirrors;
     }
 
     @Override
@@ -78,7 +89,7 @@ final class AnnotationsElement implements Element {
 
     @Override
     public List<? extends AnnotationMirror> getAnnotationMirrors() {
-        return typeMirror.getAnnotationMirrors();
+        return annotationMirrors != null ? annotationMirrors : typeMirror.getAnnotationMirrors();
     }
 
     @Override
@@ -109,11 +120,11 @@ final class AnnotationsElement implements Element {
             return false;
         }
         AnnotationsElement that = (AnnotationsElement) o;
-        return Objects.equals(typeMirror, that.typeMirror);
+        return Objects.equals(typeMirror, that.typeMirror) && Objects.equals(annotationMirrors, that.annotationMirrors);
     }
 
     @Override
     public int hashCode() {
-        return typeMirror.hashCode();
+        return Objects.hash(typeMirror, annotationMirrors);
     }
 }

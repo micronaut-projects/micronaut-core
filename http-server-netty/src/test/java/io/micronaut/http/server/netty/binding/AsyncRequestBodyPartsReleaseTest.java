@@ -393,7 +393,7 @@ class AsyncRequestBodyPartsReleaseTest {
                 String second = rest(file("d2.txt", DOC2));
                 writeChunk(out, second.substring(0, second.length() - DOC2.length() / 2));
                 probe.awaitStaging();
-                assertEquals(PENDING, probe.outcome("read"));
+                assertEquals(PENDING, probe.awaitPending("read"));
             }
             // the client disconnected: the stream is cancelled, the walk and the transfer aborted
             assertEquals(CANCELLED, probe.awaitOutcome("walk"));
@@ -464,7 +464,7 @@ class AsyncRequestBodyPartsReleaseTest {
                 String second = rest(file("d1.txt", DOC1));
                 writeChunk(out, second.substring(0, second.length() - DOC1.length() / 2));
                 probe.awaitStaging();
-                assertEquals(PENDING, probe.outcome("read"));
+                assertEquals(PENDING, probe.awaitPending("read"));
             }
             // the client disconnected: the stream is cancelled, the walk and the transfer aborted
             assertEquals(CANCELLED, probe.awaitOutcome("walk"));
@@ -953,6 +953,17 @@ class AsyncRequestBodyPartsReleaseTest {
 
         String awaitOutcome(String name) {
             return await(() -> !PENDING.equals(outcome(name)) && !"none".equals(outcome(name)), () -> outcome(name));
+        }
+
+        /**
+         * The route tracks a transfer once it started it, so its staging file can exist before
+         * the transfer is tracked: the outcome is still that of an earlier transfer, or none.
+         *
+         * @param name The name of the tracked work
+         * @return The outcome, pending unless the work is not tracked in time
+         */
+        String awaitPending(String name) {
+            return await(() -> PENDING.equals(outcome(name)), () -> outcome(name));
         }
 
         String awaitNoFiles(Path dir) {

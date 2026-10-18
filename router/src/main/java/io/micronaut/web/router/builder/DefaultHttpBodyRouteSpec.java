@@ -22,6 +22,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.form.FormData;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -128,7 +129,13 @@ final class DefaultHttpBodyRouteSpec<B extends @Nullable Object> implements Http
     }
 
     @Override
-    public HttpBodyRouteSpec<B> where(RouteCondition condition) {
+    public HttpBodyRouteSpec<B> selectedBy(@Nullable RouteMatchSelector selector) {
+        route.selectedBy(selector);
+        return this;
+    }
+
+    @Override
+    public HttpBodyRouteSpec<B> where(RequestCondition condition) {
         route.where(condition);
         return this;
     }
@@ -183,6 +190,19 @@ final class DefaultHttpBodyRouteSpec<B extends @Nullable Object> implements Http
             route.end(() -> HandlerMethod.formAsync(form), DefaultHttpBodyRouteSpec::consumesForms, RouteGroupDefaults.CONSUMES_SETTING);
         } else {
             route.end(() -> HandlerMethod.ofAsync(type, checked), null, 0);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public void sse(SseBodyHandler<B> handler) {
+        SseBodyHandler<B> checked = route.terminal(handler, HANDLER);
+        Argument<B> type = bodyType;
+        if (type == null) {
+            SseBodyHandler<FormData> form = (SseBodyHandler<FormData>) checked;
+            DefaultHttpRouteSpec.endSse(route, () -> HandlerMethod.formSse(form), DefaultHttpBodyRouteSpec::consumesForms, RouteGroupDefaults.CONSUMES_SETTING);
+        } else {
+            DefaultHttpRouteSpec.endSse(route, () -> HandlerMethod.ofSse(type, checked), null, 0);
         }
     }
 

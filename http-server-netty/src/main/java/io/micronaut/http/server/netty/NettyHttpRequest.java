@@ -46,6 +46,7 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.DirectByteBodyAccess;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
+import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
@@ -101,7 +102,6 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 
 import javax.net.ssl.SSLSession;
 import java.net.InetSocketAddress;
@@ -209,6 +209,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private final CloseableByteBody body;
     @Nullable
     private Object legacyBody;
+    @Nullable
+    private NettyByteBodyFactory byteBodyFactory;
     private final RequestResourceScope disposalResources = new RequestResourceScope();
     @Nullable
     private ParsedFormType parsedFormType;
@@ -254,7 +256,13 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public ByteBodyFactory byteBodyFactory() {
-        return new NettyByteBodyFactory(channelHandlerContext.channel());
+        // one for the request, not one for each read of its body: a benign race at worst creates two
+        NettyByteBodyFactory factory = this.byteBodyFactory;
+        if (factory == null) {
+            factory = new NettyByteBodyFactory(channelHandlerContext.channel());
+            this.byteBodyFactory = factory;
+        }
+        return factory;
     }
 
     public void setLegacyBody(@Nullable Object legacyBody) {
@@ -773,7 +781,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public Optional<io.netty.handler.codec.http.HttpRequest> toHttpRequestDirect() {
-        return Optional.of(new DelegateStreamedHttpRequest(nettyRequest, NettyByteBodyFactory.toByteBufs(byteBody()).map(DefaultHttpContent::new)));
+        return Optional.of(new DelegateStreamedHttpRequest(nettyRequest, BodyPublishers.map(NettyByteBodyFactory.toByteBufs(byteBody()), DefaultHttpContent::new)));
     }
 
     @Override
@@ -854,11 +862,12 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     @Override
-    public @NonNull Flux<RawFormField> getRawFormFields(ByteBody byteBody) {
+    public @NonNull Publisher<RawFormField> getRawFormFields(ByteBody byteBody) {
         NettyHttpServerConfiguration nhsc = (NettyHttpServerConfiguration) serverConfiguration;
         long undecodedLimit = Math.min(nhsc.getFieldMaxBufferedBytes(), nhsc.getFormMaxBufferedBytes());
+        Charset charset = getCharacterEncoding();
         PostBodyDecoder.Builder builder = PostBodyDecoder.builder()
-            .charset(getCharacterEncoding())
+            .charset(charset)
             .maxFields(nhsc.getFormMaxFields())
             .enableQuirks(nhsc.getFormDecoderQuirks().toArray(new DecoderQuirk[0]))
             .undecodedLimit(undecodedLimit > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) undecodedLimit);
@@ -874,6 +883,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
         return new FormDemuxer(
             decoder,
+            formType instanceof NettyHttpRequest.FormTypeMultipart multipart ? multipart.boundary() : null,
+            charset,
             channelHandlerContext.channel(),
             new BodySizeLimits(nhsc.getFieldMaxBytes(), nhsc.getFieldMaxBufferedBytes()),
             new BodySizeLimits(nhsc.getFormMaxBytes(), nhsc.getFormMaxBufferedBytes()),

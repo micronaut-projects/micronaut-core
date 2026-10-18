@@ -42,7 +42,7 @@ A request for a resource that no location has, or for a directory without an ind
 ==== The rules of a route of resources
 
 * `resources(...)` ends a route of `GET` only, e.g. `GET(uri)` or `route(HttpMethod.GET, uri)`. On any other route, e.g. `POST(uri)`, `any(uri)` or a route of `GET` and `POST`, it throws an `IllegalStateException` while the routes are built, so the application fails at startup. It throws one too on a route already ended by another terminal.
-* The URI of the route is a prefix: it has no query or fragment, and the path variable of the handler is a plain name. Otherwise the route fails with an `IllegalArgumentException`.
+* The URI of the route is a prefix: it has no query or fragment, and the path variable of the handler is a plain name. Otherwise the route fails with an `IllegalArgumentException`. The prefix is a URI template: in a group whose `templates(...)` parse another language, `resources(...)` throws an `IllegalStateException`.
 * The media types of its groups do not apply, but their filters, executor, conditions, order, port, annotations and attributes do.
 
 ==== Static resources of the configuration

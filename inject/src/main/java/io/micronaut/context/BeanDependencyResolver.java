@@ -28,9 +28,15 @@ import org.jspecify.annotations.Nullable;
  * its scope. Resolved singleton dependencies outlive the consumer during context shutdown.</p>
  *
  * <p>The resolver can be retained and used after injection. Each lookup uses normal scope and qualifier rules;
- * prototype lookups create separate instances. Lookups are rejected once destruction of the consumer or shutdown
- * of the context begins. Existing dependencies remain usable during the consumer's destruction callbacks.
- * A custom scope's lifetime and explicit destruction of a shared dependency are not extended by this resolver.</p>
+ * prototype lookups create separate instances. A custom scope's lifetime and explicit destruction of a shared
+ * dependency are not extended by this resolver.</p>
+ *
+ * <p>Once destruction of the consumer begins, only its own destruction callbacks, such as a {@code @PreDestroy}
+ * method, may still look up, on the destroying thread and until they return; what they create is destroyed with
+ * the consumer, after them. Once context shutdown begins, lookups are only accepted on the thread running the
+ * shutdown, where they are made on behalf of a {@link io.micronaut.context.event.ShutdownEvent} listener or a
+ * destruction callback; what they create is destroyed before the shutdown completes, with its owner or after it.
+ * Any other lookup is rejected.</p>
  *
  * <p>Obtain this resolver by injection into a managed bean. It is not available as a standalone context lookup.
  * It does not retain a construction path and must not be used to resolve the consumer recursively while it is
@@ -67,7 +73,8 @@ public interface BeanDependencyResolver {
      * @param qualifier The qualifier, or {@code null}
      * @param <T> The bean type
      * @return The dependency
-     * @throws IllegalStateException if destruction or context shutdown has begun
+     * @throws IllegalStateException if destruction or context shutdown has begun and the lookup is not made on behalf
+     * of a destruction callback or a shutdown event listener
      */
     <T> T getBean(Argument<T> type, @Nullable Qualifier<T> qualifier);
 
@@ -104,7 +111,7 @@ public interface BeanDependencyResolver {
 
     /**
      * Resolves a registration using the same ownership rules as {@link #getBean(Argument, Qualifier)}.
-     * Shared registrations remain scope-owned; use {@link BeanDependencyGroup#destroy(BeanRegistration)}
+     * Shared registrations remain scope-owned; use {@link #destroy(BeanRegistration)}
      * for early destruction of owned instances rather than closing a shared registration.
      * @param type The requested type, including generic arguments
      * @param qualifier The qualifier, or {@code null}
@@ -144,6 +151,16 @@ public interface BeanDependencyResolver {
      * @since 5.3.0
      */
     <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type);
+
+    /**
+     * Destroys and forgets a registration this resolver owns, before its owner is destroyed. A shared registration
+     * is never destroyed. Registration identity, rather than equality of bean definitions or instances, identifies
+     * ownership.
+     * @param registration The registration, as returned by one of the registration lookups of this resolver
+     * @return Whether this resolver owned the registration
+     * @since 5.3.0
+     */
+    boolean destroy(BeanRegistration<?> registration);
 
     /**
      * Creates a child group. The consumer closes it automatically, but the caller may close it earlier.

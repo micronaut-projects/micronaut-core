@@ -17,6 +17,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.DefaultFullHttpResponse
+import io.netty.handler.codec.http.DefaultHttpHeaders
 import io.netty.handler.codec.http.DefaultHttpResponse
 import io.netty.handler.codec.http.HttpHeaderNames
 import io.netty.handler.codec.http.HttpHeaderValues
@@ -157,6 +158,115 @@ class Http2ServerHandlerSpec extends Specification {
         def response = (Http2HeadersFrame) client.readInbound()
         "200".contentEquals(response.headers().status())
         "0".contentEquals(response.headers().get(HttpHeaderNames.CONTENT_LENGTH))
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "a response that fails after its headers were handed over is reset, not followed by other headers"() {
+        given:
+        def content = Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)
+        Throwable failure = null
+        int responsesWritten = 0
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                def headers = new DefaultHttpHeaders() {
+                    @Override
+                    Iterator<Map.Entry<CharSequence, CharSequence>> iteratorCharSequence() {
+                        throw new OutOfMemoryError("Simulated failure")
+                    }
+                }
+                try {
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, headers), new NettyByteBodyFactory(ctx.channel()).adapt(content))
+                } catch (Throwable t) {
+                    failure = t
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR), NettyByteBodyFactory.empty())
+                }
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                responsesWritten++
+            }
+        })
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        def req1 = new DefaultHttp2Headers()
+        req1.method(HttpMethod.GET.asciiName())
+        req1.scheme("http")
+        req1.authority("yawk.at")
+        req1.path("/")
+        client.writeOutbound(new DefaultHttp2HeadersFrame(req1, true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        failure instanceof OutOfMemoryError
+        content.refCnt() == 0
+        responsesWritten == 1
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        def reset = (Http2ResetFrame) client.readInbound()
+        reset.errorCode() == Http2Error.INTERNAL_ERROR.code()
+        client.readInbound() == null
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "abort resets a stream whose response is not complete"() {
+        given:
+        OutboundAccess access = null
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                access = outboundAccess
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        def req1 = new DefaultHttp2Headers()
+        req1.method(HttpMethod.GET.asciiName())
+        req1.scheme("http")
+        req1.authority("yawk.at")
+        req1.path("/")
+        client.writeOutbound(new DefaultHttp2HeadersFrame(req1, true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        access.abort()
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        ((Http2ResetFrame) client.readInbound()).errorCode() == Http2Error.INTERNAL_ERROR.code()
+
+        when:
+        // the stream is finished: a late response is dropped
+        access.abort()
+        access.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyByteBodyFactory.empty())
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        client.readInbound() == null
 
         cleanup:
         client.checkException()
@@ -441,6 +551,80 @@ class Http2ServerHandlerSpec extends Specification {
         rst.errorCode() == Http2Error.INTERNAL_ERROR.code()
 
         cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "an aggregate accepted while the window had room is not reported again when the held frame is written behind the window"() {
+        given:
+        def upstream = new PipeliningServerHandlerSpec.RecordingUpstream()
+        def streamingBody = null
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                streamingBody = new NettyByteBodyFactory(ctx.channel()).createStreamingBody(BodySizeLimits.UNLIMITED, upstream)
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), streamingBody.rootBody())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+        def readBuffers = new NettyByteBodyFactory(server).readBufferFactory()
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        def req1 = new DefaultHttp2Headers()
+        req1.method(HttpMethod.GET.asciiName())
+        req1.scheme("http")
+        req1.authority("yawk.at")
+        req1.path("/")
+        client.writeOutbound(new DefaultHttp2HeadersFrame(req1, true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        client.readInbound() instanceof Http2HeadersFrame
+
+        when: 'a large piece leaves 50 bytes of the window'
+        def windowSize = duplexHandler.frameCodec.connection().remote().flowController().windowSize(duplexHandler.frameCodec.connection().stream(stream1.id()))
+        def first = randomData(windowSize - 50)
+        server.eventLoop().execute {
+            streamingBody.sharedBuffer().add(readBuffers.adapt(first.retainedSlice()))
+        }
+        EmbeddedTestUtil.advance(server, client)
+        then: 'it is written and reported'
+        duplexHandler.received.readSlice(duplexHandler.received.readableBytes()) == first
+        upstream.consumed == first.readableBytes()
+
+        when: 'in one turn: a small piece is accepted while the stream is writable, a large piece drains it into the held frame and fills the window, and another small piece follows'
+        long consumedInTurn = -1
+        server.eventLoop().execute {
+            streamingBody.sharedBuffer().add(readBuffers.adapt(Unpooled.copiedBuffer("a" * 100, StandardCharsets.UTF_8)))
+            streamingBody.sharedBuffer().add(readBuffers.adapt(Unpooled.copiedBuffer("L" * 2048, StandardCharsets.UTF_8)))
+            streamingBody.sharedBuffer().add(readBuffers.adapt(Unpooled.copiedBuffer("b" * 100, StandardCharsets.UTF_8)))
+            consumedInTurn = upstream.consumed
+        }
+        EmbeddedTestUtil.advance(server, client)
+        then: 'only the accepted piece is reported; the rest waits behind the window'
+        consumedInTurn == first.readableBytes() + 100
+        upstream.consumed == first.readableBytes() + 100
+        duplexHandler.received.readSlice(duplexHandler.received.readableBytes()).toString(StandardCharsets.UTF_8) == "a" * 50
+
+        when: 'the client opens the window'
+        client.writeOutbound(new DefaultHttp2WindowUpdateFrame(windowSize).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then: 'the batch is written and every byte has been reported exactly once'
+        duplexHandler.received.readSlice(duplexHandler.received.readableBytes()).toString(StandardCharsets.UTF_8) == "a" * 50 + "L" * 2048 + "b" * 100
+        upstream.consumed == first.readableBytes() + 100 + 2048 + 100
+
+        cleanup:
+        first.release()
         client.checkException()
         server.checkException()
         client.finishAndReleaseAll()

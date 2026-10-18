@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.body;
 
+import io.micronaut.http.body.stream.ByteBodyElements;
+
 import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
@@ -28,6 +30,7 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
+import io.micronaut.http.body.stream.BodyElementsPublisher;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.body.stream.TrailingByteBody;
@@ -41,6 +44,7 @@ import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 
 /**
  * Factory methods for {@link ByteBody}s.
@@ -212,6 +216,33 @@ public class ByteBodyFactory {
     }
 
     /**
+     * The executor the {@link StreamingBody#sharedBuffer() buffer} of a
+     * {@link #createStreamingBody streaming body} of this factory must be fed on, in the order the
+     * tasks were submitted. <b>Internal API.</b>
+     *
+     * @return The executor: the event loop of a runtime with one, or an executor that runs the
+     * task on the calling thread, since the default buffer serializes concurrent calls itself
+     * @since 5.3.0
+     */
+    @Internal
+    public Executor streamingBodyExecutor() {
+        return Runnable::run;
+    }
+
+    /**
+     * Whether the current thread is an event loop thread of the runtime of this factory, which
+     * must not block: the thread of the {@link #streamingBodyExecutor()}, or the thread of
+     * another event loop. <b>Internal API.</b>
+     *
+     * @return {@code true} if blocking the current thread would block an event loop
+     * @since 5.3.0
+     */
+    @Internal
+    public boolean isEventLoopThread() {
+        return false;
+    }
+
+    /**
      * Create a new body adapter for transforming a publisher into a {@link ByteBody}. <b>Internal
      * API.</b>
      *
@@ -257,6 +288,42 @@ public class ByteBodyFactory {
         } else {
             return adapt(buf);
         }
+    }
+
+    /**
+     * Create a new streaming body from {@link ReadBuffer}s pulled one at a time, without Reactive
+     * Streams: an element is asked for when the consumer of the body wants more bytes. The body
+     * takes over the elements, and closes each buffer once its bytes are consumed. Discarding
+     * the body closes the elements.
+     *
+     * @param elements The pieces of the body
+     * @return The body
+     * @since 5.3.0
+     */
+    @Experimental
+    public CloseableByteBody adapt(BodyElements<ReadBuffer> elements) {
+        if (elements instanceof ByteBodyElements<ReadBuffer> raw) {
+            CloseableByteBody available = raw.takeUnreadAvailableBody();
+            if (available != null) {
+                return available;
+            }
+        }
+        // an element read while the body is discarded is closed
+        return adapt(new BodyElementsPublisher<>(elements, ReadBuffer::close));
+    }
+
+    /**
+     * Create a new streaming body from {@link ReadBuffer}s pulled one at a time, see
+     * {@link #adapt(BodyElements)}.
+     *
+     * @param elements      The pieces of the body
+     * @param contentLength The length of the body, if known
+     * @return The body
+     * @since 5.3.0
+     */
+    @Experimental
+    public CloseableByteBody adapt(BodyElements<ReadBuffer> elements, OptionalLong contentLength) {
+        return adapt(new BodyElementsPublisher<>(elements, ReadBuffer::close), contentLength);
     }
 
     /**
@@ -410,11 +477,23 @@ public class ByteBodyFactory {
         if (body instanceof BaseStreamingByteBody<?> bsbb) {
             return bsbb;
         }
+        // Available bodies cannot report their length after the publisher claims their bytes.
+        OptionalLong expectedLength = body.expectedLength();
+        if (body instanceof AvailableByteBody available) {
+            StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, bytesConsumed -> {
+                // All bytes have arrived; there is no producer to notify about demand.
+            });
+            expectedLength.ifPresent(sb.sharedBuffer::setExpectedLength);
+            // Transfer the owned buffer directly, avoiding a publisher/subscription round trip.
+            sb.sharedBuffer.add(available.toReadBuffer());
+            sb.sharedBuffer.complete(body.trailers());
+            return sb.rootBody;
+        }
         AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
         StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb.sharedBuffer);
         adapter.setTrailers(body.trailers());
-        body.expectedLength().ifPresent(sb.sharedBuffer::setExpectedLength);
+        expectedLength.ifPresent(sb.sharedBuffer::setExpectedLength);
         return sb.rootBody;
     }
 

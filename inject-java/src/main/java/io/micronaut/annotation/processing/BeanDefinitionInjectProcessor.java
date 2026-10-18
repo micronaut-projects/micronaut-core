@@ -35,13 +35,10 @@ import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.BeanElementVisitor;
-import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.visitor.util.ProcessorOptionsSystemProperties;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
-import io.micronaut.inject.writer.ByteCodeWriterUtils;
-import io.micronaut.inject.writer.OriginatingElements;
-import io.micronaut.sourcegen.model.ObjectDef;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
@@ -51,7 +48,6 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Name;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
-import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -125,6 +121,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
     @Override
     public final boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        // keep the options exposed as system properties until the bean element visitors are finished
+        return ProcessorOptionsSystemProperties.process(this, roundEnv.processingOver(), () -> processRound(annotations, roundEnv));
+    }
+
+    private boolean processRound(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         javaVisitorContext.newRound();
         boolean processingOver = roundEnv.processingOver();
         if (!processingOver) {
@@ -312,29 +313,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         return false;
-    }
-
-    private void write(OutputObjectDef outputObjectDef, VisitorContext visitorContext) {
-        try {
-            ObjectDef objectDef = outputObjectDef.objectDef();
-            Class<?> serviceClass = outputObjectDef.serviceClass();
-            OriginatingElements originatingElements = outputObjectDef.originatingElements();
-            if (serviceClass != null) {
-                classWriterOutputVisitor.visitServiceDescriptor(serviceClass.getName(), objectDef.getName(), originatingElements.getOriginatingElements()[0], outputObjectDef.serviceContent());
-            }
-            try (OutputStream outputStream = classWriterOutputVisitor.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
-                outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
-            }
-        } catch (Exception e) {
-            // raise a compile error
-            String message = e.getMessage();
-            Element javaElement = null;
-            io.micronaut.inject.ast.Element astElement = outputObjectDef.originatingElements().getOriginatingElements()[0];
-            if (astElement.getNativeType() instanceof JavaNativeElement javaNativeElement) {
-                javaElement = javaNativeElement.element();
-            }
-            error(javaElement, "Unexpected error: %s", (Object) (message != null ? message : e.getClass().getSimpleName()));
-        }
     }
 
 }

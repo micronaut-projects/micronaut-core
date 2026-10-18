@@ -58,19 +58,25 @@ class ServerRedirectSpec extends Specification {
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/217")
     void "test https redirect"() {
 
-        given:"An HTTPS URL issues an HTTPS"
-        YoutubeClient youtubeClient=  embeddedServer.getApplicationContext().getBean(YoutubeClient)
-        HttpClient client = HttpClient.create(new URL("https://www.youtube.com"))
-        String declarativeResult = Mono.from(youtubeClient.test()).block()
-        String response= client
-                .toBlocking().retrieve("/")
-//
-        expect:"The response was returned and doesn't loop"
-        response
-        declarativeResult
+        given:
+        EmbeddedServer httpsServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'ServerRedirectSpec',
+                'micronaut.server.ssl.enabled': true,
+                'micronaut.server.ssl.build-self-signed': true,
+                'micronaut.server.ssl.port': -1,
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+        ])
+        HttpsRedirectClient declarativeClient = httpsServer.applicationContext.getBean(HttpsRedirectClient)
+        HttpClient client = httpsServer.applicationContext.createBean(HttpClient, httpsServer.URL)
+
+        expect:
+        httpsServer.URI.scheme == 'https'
+        Mono.from(declarativeClient.test()).block() == 'good'
+        client.toBlocking().retrieve('/redirect/temporary') == 'good'
 
         cleanup:
-        client.close()
+        client?.close()
+        httpsServer?.close()
     }
 
     @Unroll
@@ -339,9 +345,9 @@ class ServerRedirectSpec extends Specification {
     }
 
     @Requires(property = 'spec.name', value = 'ServerRedirectSpec')
-    @Client("https://www.youtube.com")
-    static interface YoutubeClient {
-        @Get
+    @Client("/")
+    static interface HttpsRedirectClient {
+        @Get("/redirect/temporary")
         @SingleResult
         Publisher<String> test()
     }

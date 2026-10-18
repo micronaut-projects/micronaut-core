@@ -53,6 +53,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
@@ -94,6 +95,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * refresh builds a replacement that is not published yet. Guarded by {@link #catalogLock}.
      */
     private ResolverState writeState = state;
+    /**
+     * Incremented after every change that can change what a lookup or a placeholder resolution
+     * returns: a property source processed, the caches reset, the state reset or a refreshed state
+     * published. See {@link #getRevision()}.
+     */
+    private final AtomicLong revision = new AtomicLong();
     /**
      * The thread {@link #refresh(Runnable)} is building a replacement state on, or {@code null}
      * outside a refresh. Written under {@link #catalogLock}, read without it by every lookup.
@@ -161,6 +168,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             writeState = empty;
             if (refreshingThread == null) {
                 state = empty;
+                revision.incrementAndGet();
             }
         }
     }
@@ -203,6 +211,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             try {
                 rebuild.run();
                 state = writeState;
+                revision.incrementAndGet();
             } finally {
                 refreshingThread = null;
                 writeState = state;
@@ -365,8 +374,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                     return true;
                 } else {
                     String finalName = name + ".";
+                    String indexedName = name + "[";
                     for (String key : entries.keySet()) {
-                        if (key.startsWith(finalName)) {
+                        if (key.startsWith(finalName) || key.startsWith(indexedName)) {
                             return true;
                         }
                     }
@@ -527,7 +537,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             }
             if (value == null) {
                 int i = name.indexOf('[');
-                if (i > -1 && name.endsWith("]")) {
+                if (i > -1 && name.endsWith("]") && name.indexOf('[', i + 1) == -1) {
                     String newKey = name.substring(0, i);
                     value = entries.getOrDefault(newKey, NULL_ENTRY).value();
                     String index = name.substring(i + 1, name.length() - 1);
@@ -535,7 +545,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                         if (value != null) {
                             if (value instanceof List<?> list) {
                                 try {
-                                    value = list.get(Integer.parseInt(index));
+                                    int number = Integer.parseInt(index);
+                                    // an index past the end of the list, e.g. one a refresh removed, has no value
+                                    value = number >= 0 && number < list.size() ? list.get(number) : null;
                                 } catch (NumberFormatException e) {
                                     // ignore
                                 }
@@ -551,6 +563,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                             value = entries.getOrDefault(subKey, NULL_ENTRY).value();
                         }
                     }
+                } else if (i > -1) {
+                    // an index in the middle of the name, e.g. foo[0].bar or foo[0].bar[1].baz
+                    value = resolveNestedIndexedValue(entries, name, i);
                 }
             }
 
@@ -612,6 +627,65 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             return Optional.of((T) Collections.emptyMap());
         }
         return Optional.empty();
+    }
+
+    /**
+     * Resolves a value for a name that contains an index which is followed by further segments,
+     * for example {@code foo[0].bar} or {@code foo[0].bar[1]}, by walking the expanded container
+     * stored under the un-indexed base name.
+     *
+     * @param entries The entries
+     * @param name The property name
+     * @param firstBracket The index of the first {@code [} in the name
+     * @return The value or {@code null}
+     */
+    private static @Nullable Object resolveNestedIndexedValue(Map<String, DefaultPropertyEntry> entries, String name, int firstBracket) {
+        Object current = entries.getOrDefault(name.substring(0, firstBracket), NULL_ENTRY).value();
+        int pos = firstBracket;
+        int length = name.length();
+        while (current != null && pos < length) {
+            char c = name.charAt(pos);
+            if (c == '[') {
+                int end = name.indexOf(']', pos);
+                if (end == -1) {
+                    return null;
+                }
+                String index = name.substring(pos + 1, end);
+                if (current instanceof List<?> list) {
+                    if (!StringUtils.isDigits(index)) {
+                        return null;
+                    }
+                    int number = Integer.parseInt(index);
+                    current = number < list.size() ? list.get(number) : null;
+                } else if (current instanceof Map<?, ?> map) {
+                    current = map.get(index);
+                } else {
+                    return null;
+                }
+                pos = end + 1;
+            } else if (c == '.') {
+                if (!(current instanceof Map<?, ?> map)) {
+                    return null;
+                }
+                // the expanded container keys a map entry by everything up to the next index,
+                // e.g. foo[0].bar.baz[0] is stored as {"bar.baz": [...]}, fall back to a single segment
+                int nextBracket = name.indexOf('[', pos);
+                int end = nextBracket == -1 ? length : nextBracket;
+                Object next = map.get(name.substring(pos + 1, end));
+                if (next == null) {
+                    int nextDot = name.indexOf('.', pos + 1);
+                    if (nextDot != -1 && nextDot < end) {
+                        end = nextDot;
+                        next = map.get(name.substring(pos + 1, end));
+                    }
+                }
+                current = next;
+                pos = end;
+            } else {
+                return null;
+            }
+        }
+        return current;
     }
 
     /**
@@ -855,6 +929,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             // A lookup can cache a miss between reset() and catalog reinitialization.
             // Clear those entries after the rebuilt catalog becomes visible.
             resetCaches();
+            // counted here too in case a subclass overrides resetCaches()
+            revision.incrementAndGet();
         }
     }
 
@@ -1156,6 +1232,22 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
+     * Returns a number that changes whenever the properties may have changed: when a property
+     * source is processed, the caches are reset or the properties are refreshed. While it is
+     * unchanged, a property lookup or the resolution of a placeholder that only refers to
+     * properties returns what it returned before, so a value derived from them can be reused.
+     * A caller reads the revision <i>before</i> it reads the properties, and reuses the value only
+     * while the revision is the same.
+     *
+     * @return The revision of the properties
+     * @since 5.3.0
+     */
+    @Internal
+    public long getRevision() {
+        return revision.get();
+    }
+
+    /**
      * Subclasses can override to reset caches.
      */
     protected void resetCaches() {
@@ -1163,6 +1255,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         currentState.containsCache.clear();
         currentState.resolvedValueCache.clear();
         currentState.placeholderResolutionCache.clear();
+        revision.incrementAndGet();
     }
 
     private void processSubmapKey(Map<String, Object> map, String key, Object value, @Nullable StringConvention keyConvention) {

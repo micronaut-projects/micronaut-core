@@ -48,8 +48,8 @@ public class StaticResourceResolver {
     };
 
     private static final String INDEX_PAGE = "index.html";
-    private final @Nullable AntPathMatcher pathMatcher;
-    private final Map<String, List<ResourceLoader>> resourceMappings;
+    private final AntPathMatcher pathMatcher = PathMatcher.ANT;
+    private volatile Map<String, List<ResourceLoader>> resourceMappings; // NOSONAR java:S3077 a fresh map per update, never mutated once published
 
     /**
      * Default constructor.
@@ -57,20 +57,32 @@ public class StaticResourceResolver {
      * @param configurations The static resource configurations
      */
     StaticResourceResolver(List<StaticResourceConfiguration> configurations) {
+        this.resourceMappings = mappingsOf(configurations);
+    }
+
+    /**
+     * Replaces the mappings with the ones of the given configurations, which the factory does when
+     * the {@code micronaut.router.static-resources} configuration changed.
+     *
+     * @param configurations The static resource configurations
+     * @since 5.3.0
+     */
+    @Internal
+    public void update(List<StaticResourceConfiguration> configurations) {
+        this.resourceMappings = mappingsOf(configurations);
+    }
+
+    private static Map<String, List<ResourceLoader>> mappingsOf(List<StaticResourceConfiguration> configurations) {
         if (CollectionUtils.isEmpty(configurations)) {
-            this.pathMatcher = null;
-            this.resourceMappings = Collections.emptyMap();
-        } else {
-            this.resourceMappings = new LinkedHashMap<>();
-            this.pathMatcher = PathMatcher.ANT;
-            if (CollectionUtils.isNotEmpty(configurations)) {
-                for (StaticResourceConfiguration config: configurations) {
-                    if (config.isEnabled()) {
-                        this.resourceMappings.put(config.getMapping(), config.getResourceLoaders());
-                    }
-                }
+            return Collections.emptyMap();
+        }
+        Map<String, List<ResourceLoader>> mappings = new LinkedHashMap<>();
+        for (StaticResourceConfiguration config : configurations) {
+            if (config.isEnabled()) {
+                mappings.put(config.getMapping(), config.getResourceLoaders());
             }
         }
+        return mappings;
     }
 
     /**
@@ -83,7 +95,7 @@ public class StaticResourceResolver {
         for (Map.Entry<String, List<ResourceLoader>> entry : resourceMappings.entrySet()) {
             List<ResourceLoader> loaders = entry.getValue();
             String mapping = entry.getKey();
-            if (!loaders.isEmpty() && pathMatcher != null && pathMatcher.matches(mapping, resourcePath)) {
+            if (!loaders.isEmpty() && pathMatcher.matches(mapping, resourcePath)) {
                 String path = pathMatcher.extractPathWithinPattern(mapping, resourcePath);
                 Optional<URL> resource = resolve(loaders, path, INDEX_PAGE);
                 if (resource.isPresent()) {

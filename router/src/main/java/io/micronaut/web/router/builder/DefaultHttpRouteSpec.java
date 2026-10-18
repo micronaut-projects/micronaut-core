@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.builder;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -24,10 +25,14 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.form.FormData;
+import io.micronaut.web.router.spi.RouteMatchSelector;
+import io.micronaut.web.router.websocket.WebSocketRouteEndpoint;
+import io.micronaut.web.router.websocket.WebSocketEndpointSpec;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -43,6 +48,8 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     private static final String HANDLER = "handler";
 
     private static final String RESPONSE = "response";
+
+    private static final MediaType[] EVENT_STREAM = {MediaType.TEXT_EVENT_STREAM_TYPE};
 
     private static final Argument<AsyncRequestBody> ASYNC_BODY = Argument.of(AsyncRequestBody.class);
 
@@ -128,7 +135,13 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     }
 
     @Override
-    public HttpRouteSpec where(RouteCondition condition) {
+    public HttpRouteSpec selectedBy(@Nullable RouteMatchSelector selector) {
+        route.selectedBy(selector);
+        return this;
+    }
+
+    @Override
+    public HttpRouteSpec where(RequestCondition condition) {
         route.where(condition);
         return this;
     }
@@ -208,6 +221,60 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     public void respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response) {
         Function<? super PathVariables, ? extends HttpResponse<?>> checked = route.terminal(response, RESPONSE);
         respond(() -> HandlerMethod.respond(checked), null, false);
+    }
+
+    @Override
+    public void webSocket(Consumer<WebSocketEndpointSpec> endpoint) {
+        Consumer<WebSocketEndpointSpec> checked = route.terminal(endpoint, "endpoint");
+        String template = route.webSocketTemplate();
+        AnnotationMetadata metadata;
+        try {
+            // loads the endpoint, which is a bean of micronaut-websocket, before the lambda runs
+            metadata = WebSocketRouteEndpoint.ROUTE_METADATA;
+        } catch (LinkageError e) {
+            route.drop();
+            throw new IllegalStateException("The WebSocket route " + route.description() + " requires micronaut-websocket", e);
+        }
+        // an Object: no type of micronaut-websocket is in the signatures of this class, its
+        // lambdas included, so that it can be reflected on without it, e.g. by Groovy
+        Object webSocket;
+        try {
+            webSocket = WebSocketRouteEndpoint.of(template, checked);
+        } catch (RuntimeException e) {
+            route.drop();
+            throw e;
+        }
+        // the upgrade request has no body and the connection no response body: the media types
+        // of a group do not apply, its executor runs the handlers of the connections
+        route.end(() -> HandlerMethod.webSocket(webSocket, metadata),
+            // the server finds the endpoint in the attribute of the route
+            settings -> settings.attribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, webSocket),
+            RouteGroupDefaults.CONSUMES_SETTING | RouteGroupDefaults.PRODUCES_SETTING);
+    }
+
+    @Override
+    public void sse(SseHandler handler) {
+        SseHandler checked = route.terminal(handler, HANDLER);
+        endSse(route, () -> HandlerMethod.of(checked), null, 0);
+    }
+
+    /**
+     * End a server-sent events route: it produces {@code text/event-stream}, its own type and not
+     * the type its group produces, or the types it declared, which must include it.
+     *
+     * @param route   The route
+     * @param handler Creates the handler method of a route
+     * @param init    Gives a route the other settings of the terminal, or {@code null}
+     * @param own     The other settings of the terminal, which the routes do not inherit from their groups
+     */
+    static void endSse(PendingRoute route, Supplier<HandlerMethod<?>> handler, @Nullable Consumer<RouteSettings> init, int own) {
+        route.producesIncluding(MediaType.TEXT_EVENT_STREAM_TYPE, "sse");
+        route.end(handler, settings -> {
+            settings.produces(EVENT_STREAM);
+            if (init != null) {
+                init.accept(settings);
+            }
+        }, own | RouteGroupDefaults.PRODUCES_SETTING);
     }
 
     /**

@@ -48,6 +48,33 @@ record Product2(Double price, String name) {
             properties.get(1).name == "name"
     }
 
+    void "test inherited method reports the interface methods the subclass introduces"() {
+        expect:
+        buildClassElement('test.Child', """
+package test
+
+interface Deep {
+    fun run()
+}
+
+interface Contract {
+    fun run()
+}
+
+open class Parent : Deep {
+    override fun run() {
+    }
+}
+
+open class Child : Parent(), Contract, Runnable
+""") { ClassElement ce ->
+            def method = ce.getEnclosedElements(ElementQuery.ALL_METHODS.named("run"))
+                .find { it.declaringType.name == "test.Parent" }
+            assert method.overriddenMethods*.declaringType*.name == ["test.Deep", "test.Contract", "java.lang.Runnable"]
+            ce
+        }
+    }
+
     void "test sealed class"() {
         expect:
             // getPermittedSubclasses() resolves through KSP, so it has to be read while the resolver session is live
@@ -1266,13 +1293,13 @@ class MyBean {
             def saveAll2 = ce.findMethod("saveAll2").get()
             def listTypeArgument2 = saveAll2.getParameters()[0].getType().getTypeArguments(List).get("E")
         then:
-            validateMyBookArgument(listTypeArgument2)
+            validateMyBookArgumentOfAnnotatedTypeParameter(listTypeArgument2)
 
         when:
             def saveAll3 = ce.findMethod("saveAll3").get()
             def listTypeArgument3 = saveAll3.getParameters()[0].getType().getTypeArguments(List).get("E")
         then:
-            validateMyBookArgument(listTypeArgument3)
+            validateMyBookArgumentOfAnnotatedTypeParameter(listTypeArgument3)
 
         when:
             def saveAll4 = ce.findMethod("saveAll4").get()
@@ -1297,7 +1324,7 @@ class MyBean {
             def save3 = ce.findMethod("save3").get()
             def parameter3 = save3.getParameters()[0].getType()
         then:
-            validateMyBookArgument(parameter3)
+            validateMyBookArgumentOfAnnotatedTypeParameter(parameter3)
 
         when:
             def save4 = ce.findMethod("save4").get()
@@ -1384,8 +1411,7 @@ class MyBean {
             validateMyBookArgument(listTypeArgument5)
     }
 
-    @PendingFeature
-    void "test how the type annotations from the type are propagated - pending 2"() {
+    void "test type annotations on a type parameter use are propagated"() {
         given:
             ClassElement ce = buildClassElementTransformed('test.MyBean','''\
 package test;
@@ -1422,6 +1448,14 @@ class MyBean {
         then:
             validateMyBookArgument(parameter5)
 
+    }
+
+    void validateMyBookArgumentOfAnnotatedTypeParameter(ClassElement classElement) {
+        // The annotations of the type parameter declaration don't apply to its uses
+        assert !classElement.hasAnnotation(TypeUseRuntimeAnn.class)
+        assert classElement.hasAnnotation(MyEntity.class)
+        assert classElement.hasAnnotation(Introspected.class)
+        assert !classElement.getTypeAnnotationMetadata().hasAnnotation(TypeUseRuntimeAnn.class)
     }
 
     void validateMyBookArgument(ClassElement classElement) {

@@ -17,10 +17,13 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.Internal;
 import org.codehaus.groovy.ast.AnnotatedNode;
+import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.PackageNode;
+
+import java.util.List;
 
 /**
  * Groovy's native element.
@@ -93,13 +96,15 @@ public sealed interface GroovyNativeElement {
     /**
      * The placeholder element.
      *
-     * @param annotatedNode The placeholder node
+     * @param annotatedNode The placeholder node: the type parameter declaration or a use of it
      * @param owner The owner node
      * @param variableName The variable name
+     * @param typeAnnotations The type annotations of this declaration or use
      */
     record Placeholder(ClassNode annotatedNode,
                        GroovyNativeElement owner,
-                       String variableName) implements GroovyNativeElement {
+                       String variableName,
+                       List<AnnotationNode> typeAnnotations) implements GroovyNativeElement {
     }
 
 }

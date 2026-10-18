@@ -39,7 +39,7 @@ record ComponentBean(@ComponentMark("component") String name) {
                 .stringValue("test.ComponentMark").orElse(null)
     }
 
-    void "a class type-parameter annotation is present on the reflective property argument"() {
+    void "a class type-parameter annotation is absent from the generated and reflective property argument"() {
         given:
         BeanIntrospection<?> generated = buildBeanIntrospection("test.GenericBean", '''
 package test;
@@ -72,8 +72,9 @@ class GenericBean<@TypeParameterMark("T") T> {
         BeanIntrospection<?> reflective = ReflectionBeanIntrospection.of(generated.beanType)
 
         expect:
+        // The annotations of the type parameter declaration don't apply to its uses
         generated.getRequiredProperty("value", Object).asArgument().annotationMetadata
-            .stringValue("test.TypeParameterMark").orElse(null) == "T"
+            .stringValue("test.TypeParameterMark").orElse(null) == null
 
         and:
         reflective.getRequiredProperty("value", Object).asArgument().annotationMetadata
@@ -82,7 +83,7 @@ class GenericBean<@TypeParameterMark("T") T> {
                 .stringValue("test.TypeParameterMark").orElse(null)
     }
 
-    void "a method type-parameter annotation is present on reflective argument and return metadata"() {
+    void "a method type-parameter annotation is absent from generated and reflective argument and return metadata"() {
         given:
         BeanIntrospection<?> generated = buildBeanIntrospection("test.MethodBean", '''
 package test;
@@ -113,10 +114,11 @@ class MethodBean {
         def reflectedMethod = reflective.beanMethods.find { it.name == "echo" }
 
         expect:
+        // The annotations of the type parameter declaration don't apply to its uses
         generatedMethod.arguments[0].annotationMetadata
-            .stringValue("test.TypeParameterMark").orElse(null) == "E"
+            .stringValue("test.TypeParameterMark").orElse(null) == null
         generatedMethod.returnType.asArgument().annotationMetadata
-            .stringValue("test.TypeParameterMark").orElse(null) == "E"
+            .stringValue("test.TypeParameterMark").orElse(null) == null
 
         and:
         reflectedMethod.arguments[0].annotationMetadata

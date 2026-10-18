@@ -23,6 +23,7 @@ import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.FlowAdapters;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -39,6 +40,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -456,13 +458,17 @@ public class Publishers {
      */
     public static boolean isConvertibleToPublisher(Class<?> type) {
         // first, check for some common types without instanceof
-        if (type == Publisher.class) {
+        if (type == Publisher.class || type == Flow.Publisher.class) {
             return true;
         }
-        if (type.isPrimitive() || type.getName().startsWith("java.") || type.isArray()) {
+        if (type.isPrimitive() || type.isArray()) {
             return false;
         }
-        if (Publisher.class.isAssignableFrom(type)) {
+        if (type.getName().startsWith("java.")) {
+            // Flow.Publisher is the only reactive type in the JDK
+            return Flow.Publisher.class.isAssignableFrom(type);
+        }
+        if (Publisher.class.isAssignableFrom(type) || Flow.Publisher.class.isAssignableFrom(type)) {
             return true;
         } else {
             for (Class<?> reactiveType : REACTIVE_TYPES) {
@@ -557,6 +563,9 @@ public class Publishers {
         Objects.requireNonNull(object, "Argument [object] cannot be null");
         if (object instanceof Publisher<?> publisher) {
             return (Publisher<T>) publisher;
+        }
+        if (object instanceof Flow.Publisher<?> flowPublisher) {
+            return (Publisher<T>) FlowAdapters.toPublisher(flowPublisher);
         }
         if (object instanceof CompletableFuture cf) {
             return Publishers.fromCompletableFuture(() -> cf);

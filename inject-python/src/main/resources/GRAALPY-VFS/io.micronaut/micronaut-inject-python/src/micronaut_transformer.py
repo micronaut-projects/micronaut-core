@@ -6,6 +6,7 @@ import re
 import warnings
 import java
 from typing import Optional, Dict, List, Any, Set
+from micronaut_facades import FacadeRegistry, runtime_facade_annotation_names
 
 PYTHON_KEYWORD_METHOD_ALIASES = {
     f"{name}_": name
@@ -29,6 +30,17 @@ def normalize_python_keyword_alias(name: str) -> str:
     if name.endswith('_') and keyword.iskeyword(name[:-1]):
         return name[:-1]
     return name
+
+
+def mark_generated(nodes) -> None:
+    """
+    Mark statements the transformer generated, and everything inside them, so the processor knows
+    they have no position in the original source: their line numbers are those of the generated
+    snippet they were parsed from.
+    """
+    for statement in nodes:
+        for node in ast.walk(statement):
+            node._mn_generated = True
 
 
 def ensure_non_empty_bodies(tree: ast.AST) -> None:
@@ -72,6 +84,20 @@ def unresolved_java_io_import_error(name: str, kind: str = 'import') -> str:
 
 _AnnotationTypes = java.type("io.micronaut.python.processing.util.PythonAnnotationTypes")
 _JavaTypes = java.type("io.micronaut.python.processing.util.PythonJavaTypes")
+_Diagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
+_SourceSpan = java.type("io.micronaut.python.processing.model.SourceSpan")
+
+# CPython reports the columns of AST nodes as UTF-8 byte offsets, GraalPy as character offsets; the
+# probe finds out which, so the spans always count characters. It runs on first use, not at import:
+# a module imported from its bytecode cache must not need the compiler.
+_ast_columns_are_bytes = None
+
+
+def ast_columns_are_bytes():
+    global _ast_columns_are_bytes
+    if _ast_columns_are_bytes is None:
+        _ast_columns_are_bytes = ast.parse('"\u00e9"; x\n').body[1].col_offset == 6
+    return _ast_columns_are_bytes
 
 
 def decorator_name(decorator: ast.AST) -> Optional[str]:
@@ -276,7 +302,8 @@ class MicronautTransformer(ast.NodeTransformer):
     """
 
     def __init__(self, callback_get_class_element, callback_get_class_elements, strip_java_interface_bases=False,
-                 package_name='', source_root='', python_source_dirs=None):
+                 package_name='', source_root='', python_source_dirs=None, facades: Optional[FacadeRegistry] = None, source_path=None, source_text=None,
+                 callback_is_dependency_python_module=None):
         """
         Initialize the transformer.
 
@@ -287,9 +314,14 @@ class MicronautTransformer(ast.NodeTransformer):
             package_name: The package of the module being transformed, when it belongs to a source root
             source_root: The source root the module belongs to, when there is one
             python_source_dirs: The Python source directories of the project, whose modules are never Java imports
+            facades: The curated modules (facades) the module may import, or None
+            source_path: The path of the module, for the location of its diagnostics
+            source_text: The text of the module, for the column conversion of its diagnostics
+            callback_is_dependency_python_module: Whether a dependency provides the module's Python VFS source
         """
         self.callback_get_class_element = callback_get_class_element
         self.callback_get_class_elements = callback_get_class_elements
+        self.callback_is_dependency_python_module = callback_is_dependency_python_module
         self.strip_java_interface_bases = strip_java_interface_bases
         self.package_name = package_name or ''
         self.source_root = source_root or ''
@@ -305,7 +337,11 @@ class MicronautTransformer(ast.NodeTransformer):
         self.java_interface_names = set()
         self.java_class_elements = {}
         self.java_keyword_method_aliases = {}
+        # The problems found in the module, as located PythonDiagnostic values
         self.validation_errors = []
+        self.source_path = source_path or "Unknown"
+        self._source_lines = re.split(r"\r\n|\r|\n", source_text) if source_text is not None else None
+        self._current_statement = None
         self.has_java_import = False
         self.exported_types = []
         self.all_class_names = []
@@ -314,6 +350,34 @@ class MicronautTransformer(ast.NodeTransformer):
         self.uses_builtin_exception = False
         self.uses_java_interface_defaults = False
         self.uses_java_base = False
+        self.facades = facades
+        # names bound to a facade at run time (``from pyronaut import http``) -> the facade
+        self.facade_bindings: Dict[str, str] = {}
+
+    def _span_of(self, node):
+        """
+        The location of a node in the source, or None for a node without a position. Lines are one-based;
+        columns are one-based character offsets, the end column exclusive.
+        """
+        line = getattr(node, "lineno", None) if node is not None else None
+        if line is None:
+            return None
+        end_line = getattr(node, "end_lineno", None) or line
+        column = self._char_column(line, getattr(node, "col_offset", 0))
+        end_offset = getattr(node, "end_col_offset", None)
+        end_column = self._char_column(end_line, end_offset) if end_offset is not None else column + 1
+        return _SourceSpan(self.source_path, line, column + 1, end_line, end_column + 1)
+
+    def _char_column(self, line, column):
+        if not column or not ast_columns_are_bytes() or self._source_lines is None or line < 1 or line > len(self._source_lines):
+            return column or 0
+        return len(self._source_lines[line - 1].encode("utf-8")[:column].decode("utf-8", "replace"))
+
+    def _error(self, rule, message, node=None):
+        """
+        Record a problem of the module, located at the given node or at the statement being visited.
+        """
+        self.validation_errors.append(_Diagnostic.error(rule, message, self._span_of(node if node is not None else self._current_statement)))
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         """
@@ -324,6 +388,7 @@ class MicronautTransformer(ast.NodeTransformer):
         """
         if not node.module:
             return node
+        self._current_statement = node
 
         if node.module == 'pyronaut.build':
             return None
@@ -350,7 +415,7 @@ class MicronautTransformer(ast.NodeTransformer):
                     transformed_any = True
                     bindings.extend(ast.copy_location(binding, node) for binding in star_bindings if isinstance(binding, ast.stmt))
                 elif java_io_package and not self.callback_get_class_elements(java_module):
-                    self.validation_errors.append(unresolved_java_io_import_error(java_module, 'package'))
+                    self._error('unresolved-import', unresolved_java_io_import_error(java_module, 'package'), node)
             else:
                 # Handle specific imports
                 binding = self._handle_specific_import(java_module, transformed_module, alias)
@@ -364,7 +429,7 @@ class MicronautTransformer(ast.NodeTransformer):
                     if self._handle_package_import(f'{java_module}.{alias.name}'):
                         imports_java_package = True
                     elif not self._imports_compiled_python_class(java_module, alias.name):
-                        self.validation_errors.append(self._java_io_import_error(node.module, java_module, alias))
+                        self._error('unresolved-import', self._java_io_import_error(node.module, java_module, alias), node)
                 elif node.level == 0:
                     self._check_unresolved_java_import(node.module, java_module, alias.name)
 
@@ -393,18 +458,21 @@ class MicronautTransformer(ast.NodeTransformer):
         or @a.Executable can be recognized at runtime without requiring the module to exist.
         If any decorators are generated, remove the import from the AST.
         """
+        self._current_statement = node
         for alias in node.names:
             java_module_name = self._to_java_import_module(alias.name)
             # Scan the entire package for annotation types
             resolved = self._handle_package_import(java_module_name)
             if is_java_io_package(java_module_name):
                 if not resolved:
-                    self.validation_errors.append(unresolved_java_io_import_error(java_module_name, 'package'))
+                    self._error('unresolved-import', unresolved_java_io_import_error(java_module_name, 'package'), node)
                 elif not alias.asname:
-                    self.validation_errors.append(
+                    self._error(
+                        'import-alias-required',
                         f"Java package import [import {alias.name}] requires an alias such as "
                         f"[import {alias.name} as {alias.name.split('.')[-1]}]: io is Python's built-in module, "
-                        f"so the name io cannot refer to the Java package at runtime."
+                        f"so the name io cannot refer to the Java package at runtime.",
+                        node
                     )
 
         return node
@@ -474,10 +542,9 @@ class MicronautTransformer(ast.NodeTransformer):
             and any(alias.name == 'builtins' and alias.asname is None for alias in statement.names)
             for statement in node.body
         ):
-            node.body.insert(
-                self._generated_code_insert_index(node),
-                ast.Import(names=[ast.alias(name='builtins', asname=None)])
-            )
+            builtins_import = ast.Import(names=[ast.alias(name='builtins', asname=None)])
+            mark_generated([builtins_import])
+            node.body.insert(self._generated_code_insert_index(node), builtins_import)
 
         # Add generated code at the beginning
         if (self.transformed_code or self.has_java_import
@@ -537,6 +604,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                     raise RuntimeError(f"Error parsing generated decorator (generated code is not valid Python): {e}") from e
                     continue
 
+            mark_generated(generated_nodes)
             insert_at = self._generated_code_insert_index(node)
             node.body = node.body[:insert_at] + generated_nodes + node.body[insert_at:]
 
@@ -573,6 +641,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             level=0
         )
         ast.fix_missing_locations(future_import)
+        mark_generated([future_import])
 
         insert_at = 0
         if node.body and self._is_module_docstring(node.body[0]):
@@ -702,9 +771,9 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AsyncFunctionDef:
         if self.class_depth > 0 and self.function_depth == 0:
             if node.name == "__init__":
-                self.validation_errors.append("Async constructors are not supported")
+                self._error('unsupported-async', "Async constructors are not supported", node)
             if self._is_python_property_decorator(node):
-                self.validation_errors.append(f"Async property [{node.name}] is not supported")
+                self._error('unsupported-async', f"Async property [{node.name}] is not supported", node)
         node.decorator_list = [
             self._normalize_decorator(decorator)
             for decorator in node.decorator_list
@@ -880,7 +949,8 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             return None
         if import_name == module_name.rsplit('.', 1)[-1]:
             return outer_element
-        self.validation_errors.append(
+        self._error(
+            'unresolved-import',
             f"Cannot import [{import_name}] from [{module_name}]: Java type [{outer_element.getName()}] "
             f"has no nested type named [{import_name}]"
         )
@@ -934,7 +1004,8 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             return
         if java_module_name.split('.')[0] not in JAVA_IMPORT_NAMESPACES and not self._is_java_package(java_module_name):
             return
-        self.validation_errors.append(
+        self._error(
+            'unresolved-import',
             f"Cannot import [{import_name}] from [{python_module_name}]: the Java type "
             f"[{self._java_type_name_of_import(java_module_name, import_name)}] is not on the compile classpath. "
             "Check the imported name, or add the dependency that provides it."
@@ -976,12 +1047,15 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
 
     def _is_python_module(self, module_name: str) -> bool:
         """
-        Whether the module is importable in the compiler's Python environment, as the standard library is.
+        Whether the module is a dependency's Python VFS source or is importable in the compiler's
+        Python environment, as the standard library is.
         The ``java`` namespace is never a Python module: GraalPy's ``java`` import hook finds a spec for any
         ``java.*`` name, whether or not such a package exists.
         """
         if module_name.split('.')[0] == 'java':
             return False
+        if self.callback_is_dependency_python_module is not None and self.callback_is_dependency_python_module(module_name):
+            return True
         try:
             return importlib.util.find_spec(module_name) is not None
         except Exception:
@@ -1121,6 +1195,9 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         base_name = self._base_name(base)
         if not base_name:
             return None
+        facade_class_element = self._facade_class_element(base_name)
+        if facade_class_element is not None:
+            return facade_class_element
         class_element = self.java_class_elements.get(base_name)
         if class_element is not None or '.' not in base_name:
             return class_element
@@ -1134,6 +1211,28 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             self.callback_get_class_element(outer.getName() + '.' + nested)
             or self.callback_get_class_element(outer.getName() + '$' + nested.replace('.', '$'))
         )
+
+    def _facade_class_element(self, dotted: str):
+        """The class element of a Java type referenced through a facade bound at run time (``inject.Listener``)."""
+        root, _, rest = dotted.partition('.')
+        facade_name = self.facade_bindings.get(root)
+        if facade_name is None or not rest or self.facades is None:
+            return None
+        parts = rest.split('.')
+        facade = self.facades.facade(facade_name)
+        while facade is not None and parts:
+            member = facade.members.get(parts[0])
+            if member is None:
+                return None
+            parts = parts[1:]
+            if member.kind == 'MODULE':
+                facade = self.facades.facade(member.binary_name)
+                continue
+            if member.kind not in ('INTERFACE', 'CLASS', 'ENUM'):
+                return None
+            name = member.binary_name + ''.join('$' + part for part in parts)
+            return self.callback_get_class_element(name)
+        return None
 
     # a single leading underscore: a name starting with two underscores is mangled inside a class body,
     # which would turn the base call of a nested class into _Outer__micronaut_java_base
@@ -1669,8 +1768,9 @@ class MicronautRuntimeTransformer(MicronautTransformer):
     """
 
     def __init__(self, callback_get_class_element, callback_get_class_elements, missing_decorator_code=None,
-                 package_name='', source_root=''):
-        super().__init__(callback_get_class_element, callback_get_class_elements, True, package_name, source_root)
+                 package_name='', source_root='', facades: Optional[FacadeRegistry] = None):
+        super().__init__(callback_get_class_element, callback_get_class_elements, True, package_name, source_root,
+                         facades=facades)
         if missing_decorator_code:
             self.transformed_code.extend(missing_decorator_code)
             # The stubs define generated decorators the module applies without importing them
@@ -1757,6 +1857,9 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             return node
         if node.module == 'pyronaut.build':
             return None
+        if self._track_facade_import_from(node):
+            # served by the Java import finder at run time, as the facade it is
+            return node
 
         java_module = self._to_java_import_module(node.module)
         for alias in node.names:
@@ -1796,6 +1899,12 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         runtime package, which lives without the ``io.`` prefix.
         """
         for alias in node.names:
+            if self.facades is not None and self.facades.facade(alias.name) is not None:
+                # import pyronaut.http as http -> @http.Get; import pyronaut.http -> @pyronaut.http.Get
+                bound_name = alias.asname or alias.name
+                self.facade_bindings[bound_name] = alias.name
+                runtime_facade_annotation_names(self.facades, alias.name, bound_name, self.package_decorators)
+                continue
             # import jakarta.inject as i -> @i.Singleton; import jakarta.inject -> @jakarta.inject.Singleton
             self._track_package_decorators(alias.asname or alias.name, self._to_java_import_module(alias.name))
         if not any(is_java_io_package(alias.name) for alias in node.names):
@@ -1806,6 +1915,49 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             for alias in node.names
         ]
         return ast.copy_location(ast.Import(names=names), node)
+
+    def _track_facade_import_from(self, node: ast.ImportFrom) -> bool:
+        """
+        Record what a from-import of a facade binds (``from pyronaut.http import Get``, ``from pyronaut import http``):
+        its annotations are applied as decorators, its Java types are classes whose interfaces a class strips.
+        Returns whether the statement imports from a facade, which keeps it as written.
+        """
+        if self.facades is None or node.level != 0:
+            return False
+        facade = self.facades.facade(node.module)
+        if facade is not None:
+            shadowed = self.names_bound_after_star_import.get(id(node), self.locally_bound_names)
+            for alias in node.names:
+                if alias.name == '*':
+                    for member in facade.members.values():
+                        if member.name not in shadowed:
+                            self._track_runtime_facade_member(member.name, member)
+                else:
+                    member = facade.members.get(alias.name)
+                    if member is not None:
+                        self._track_runtime_facade_member(alias.asname or alias.name, member)
+            return True
+        for alias in node.names:
+            full_name = f'{node.module}.{alias.name}'
+            if alias.name != '*' and self.facades.facade(full_name) is not None:
+                bound_name = alias.asname or alias.name
+                self.facade_bindings[bound_name] = full_name
+                runtime_facade_annotation_names(self.facades, full_name, bound_name, self.package_decorators)
+        return False
+
+    def _track_runtime_facade_member(self, variable_name: str, member):
+        if member.kind == 'ANNOTATION':
+            self.generated_decorators.add(variable_name)
+        elif member.kind == 'MODULE':
+            self.facade_bindings[variable_name] = member.binary_name
+            runtime_facade_annotation_names(self.facades, member.binary_name, variable_name, self.package_decorators)
+        elif member.kind in ('INTERFACE', 'CLASS', 'ENUM'):
+            class_element = self.callback_get_class_element(member.binary_name)
+            if class_element is not None and not _JavaTypes.isPythonClass(class_element):
+                self._track_java_class(variable_name, class_element)
+                self.java_runtime_names.add(variable_name)
+                if class_element.isInterface():
+                    self.imported_java_interface_names.add(variable_name)
 
     def _track_package_decorators(self, bound_name: str, java_module: str):
         """
@@ -1822,6 +1974,23 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             for class_element in self.callback_get_class_elements(java_module) or []
             if self._is_annotation_class(class_element)
         }
+
+    def visit_AnnAssign(self, node: ast.AnnAssign):
+        """
+        Drop the marker value of a module attribute (``embedded_server: EmbeddedServer = Inject()``): the injection
+        sets the attribute when the module's bean is created, and the module body would otherwise bind the marker
+        over it. The statement keeps its annotation and its source position.
+        """
+        if (self.class_depth == 0 and self.function_depth == 0 and node.value is not None
+                and isinstance(node.target, ast.Name) and self._is_annotation_marker(node.value)):
+            node.value = None
+        return self.generic_visit(node)
+
+    def _is_annotation_marker(self, node) -> bool:
+        """Whether a value calls annotations: ``Inject()``, ``inject.Named("a") & inject.Inject()``."""
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitAnd):
+            return self._is_annotation_marker(node.left) and self._is_annotation_marker(node.right)
+        return isinstance(node, ast.Call) and self._is_annotation_decorator(node.func)
 
     def _is_annotation_decorator(self, decorator) -> bool:
         if isinstance(decorator, ast.Attribute):
@@ -1889,6 +2058,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
 
             for annotation in annotations:
                 for annotation_node in ast.walk(annotation):
-                    if isinstance(annotation_node, ast.Name) and annotation_node.id in self.java_runtime_names:
+                    if isinstance(annotation_node, ast.Name) and (
+                            annotation_node.id in self.java_runtime_names or annotation_node.id in self.facade_bindings):
                         return True
         return False

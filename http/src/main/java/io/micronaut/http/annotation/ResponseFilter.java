@@ -65,6 +65,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *     <li>An updated {@link HttpResponse}</li>
  *     <li>A {@link Publisher} (or other reactive type) that produces any of these return types, to
  *     delay further execution</li>
+ *     <li>A {@link java.util.concurrent.CompletionStage} (or
+ *     {@link java.util.concurrent.CompletableFuture}) that produces any of these return types, to
+ *     delay further execution</li>
  * </ul>
  *
  * @since 4.0.0

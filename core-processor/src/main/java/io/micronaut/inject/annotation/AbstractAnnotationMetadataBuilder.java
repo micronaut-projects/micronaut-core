@@ -88,6 +88,19 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final List<AnnotationRemapper> ALL_ANNOTATION_REMAPPERS = new ArrayList<>(5);
     private static final Map<Object, CachedAnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
     private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
+    /**
+     * The members of each annotation type that are annotated {@link NonBinding}, by annotation name: read once
+     * from the member declarations and recorded on every occurrence of the annotation.
+     */
+    private static final Map<String, Set<String>> NON_BINDING_MEMBERS = new HashMap<>(20);
+    /**
+     * The annotation types whose members' metadata is being built. Building it reads the annotations on the
+     * members, and an occurrence of an annotation type read there reads its own members in turn, so two
+     * annotation types whose members are annotated with each other would otherwise read each other without end.
+     * The members of a type that is already being read are not read again: the occurrence they belong to is
+     * nested in a member's metadata, which nothing resolves by.
+     */
+    private static final Set<String> READING_MEMBERS = new HashSet<>(4);
     private static final String ALIAS_FOR_MEMBER = "member";
 
     static {
@@ -256,20 +269,30 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     public final Map<CharSequence, Object> getAnnotationDefaultValues(String annotationName) {
         return getAnnotationMirror(annotationName)
-            .map(annotationType -> {
-                Map<? extends T, ?> annotationDefaultValues = readAnnotationDefaultValues(annotationName, annotationType, true);
-                Map<CharSequence, Object> defaultValues = getAnnotationDefaults(
-                    annotationType,
-                    annotationName,
-                    annotationDefaultValues,
-                    new HashMap<>()
-                );
-                if (defaultValues == null || defaultValues.isEmpty()) {
-                    return Collections.<CharSequence, Object>emptyMap();
-                }
-                return Collections.unmodifiableMap(defaultValues);
-            })
+            .map(annotationType -> getAnnotationDefaultValues(annotationName, annotationType))
             .orElse(Collections.emptyMap());
+    }
+
+    /**
+     * Resolves the default values declared by the given annotation type, including empty string defaults.
+     *
+     * @param annotationName The annotation type name
+     * @param annotationType The native annotation type
+     * @return The default values by member name, in declaration order; empty when the type declares none
+     * @since 5.3.0
+     */
+    public final Map<CharSequence, Object> getAnnotationDefaultValues(String annotationName, T annotationType) {
+        Map<? extends T, ?> annotationDefaultValues = readAnnotationDefaultValues(annotationName, annotationType, true);
+        Map<CharSequence, Object> defaultValues = getAnnotationDefaults(
+            annotationType,
+            annotationName,
+            annotationDefaultValues,
+            new HashMap<>()
+        );
+        if (defaultValues == null || defaultValues.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return Collections.unmodifiableMap(defaultValues);
     }
 
     /**
@@ -296,19 +319,45 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Build the metadata for the given parameter element. The metadata is keyed by the type that <em>declares</em>
-     * the method, not by the type the method is reached through: a parameter of an inherited method is the same
+     * Build the metadata for the given parameter element read through the type that declares its method. The
+     * metadata is shared by every type the method is read through: a parameter of an inherited method is the same
      * parameter whether it is read through the declaring class or through a subclass, so a mutation made through
-     * one must be visible through the other. Unlike a method, a parameter's metadata never includes the owning
-     * type's annotations, so nothing distinguishes it per owner.
+     * the declaring class is visible through every subclass.
      *
      * @param declaringType    The type declaring the method
      * @param methodElement    The method element
      * @param parameterElement The parameter element
      * @return The {@link AnnotationMetadata}
+     * @see #lookupOrBuildForParameter(Object, Object, Object, Object)
      */
     public CachedAnnotationMetadata lookupOrBuildForParameter(T declaringType, T methodElement, T parameterElement) {
         return lookupOrBuild(new Key3<>(declaringType, methodElement, parameterElement), parameterElement);
+    }
+
+    /**
+     * Build the metadata for the given parameter element read through the given owning type. A mutation made
+     * through the type declaring the method is shared, as with
+     * {@link #lookupOrBuildForParameter(Object, Object, Object)}, and is visible through every type the method is
+     * read through. A mutation made through a subclass belongs to that subclass only: a visitor annotating the
+     * parameters of one bean must not annotate the same inherited parameter read through another subclass, nor
+     * through the declaring type. Once the owning type holds such a mutation, the parameter read or mutated
+     * through the owning type uses it, and a later mutation made through the declaring type is no longer seen
+     * through that owning type.
+     *
+     * @param owningType       The type the method is read through
+     * @param declaringType    The type declaring the method
+     * @param methodElement    The method element
+     * @param parameterElement The parameter element
+     * @return The {@link AnnotationMetadata}
+     * @since 5.3.0
+     */
+    public CachedAnnotationMetadata lookupOrBuildForParameter(T owningType, T declaringType, T methodElement, T parameterElement) {
+        return lookupOrBuildForOwner(
+            new Key3<>(declaringType, methodElement, parameterElement),
+            new OwnerKey3<>(owningType, methodElement, parameterElement),
+            parameterElement,
+            !owningType.equals(declaringType)
+        );
     }
 
     /**
@@ -348,12 +397,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     /**
      * Build the metadata for the given field element read through the given owning type, excluding any class
-     * metadata. A mutation made on the field itself is keyed by the declaring type, as with
+     * metadata. A mutation made through the type declaring the field is shared, as with
      * {@link #lookupOrBuildForField(Object, Object)}, and is visible through every type the field is read through.
-     * A mutation made on the field as a component of a bean property belongs to the owning type: a bean property is
-     * resolved for the type it is read through, as its accessor methods are, so annotating the property of a super
-     * type must not annotate the same property read through a subclass. Once the owning type holds such a mutation,
-     * the field read or mutated through the owning type uses it.
+     * A mutation made through a subclass belongs to that subclass only: a visitor annotating the fields of one bean
+     * must not annotate the same inherited field read through another subclass, nor through the declaring type.
+     * A mutation made on the field as a component of a bean property belongs to the owning type whichever type it
+     * is made through: a bean property is resolved for the type it is read through, as its accessor methods are, so
+     * annotating the property of a super type must not annotate the same property read through a subclass. Once
+     * the owning type holds such a mutation, the field read or mutated through the owning type uses it, and a
+     * later mutation made through the declaring type is no longer seen through that owning type.
      *
      * @param owningType        The type the field is read through
      * @param declaringType     The type declaring the field
@@ -363,7 +415,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @since 5.2.1
      */
     public CachedAnnotationMetadata lookupOrBuildForField(T owningType, T declaringType, T element, boolean propertyComponent) {
-        return lookupOrBuildForOwner(new Key2<>(declaringType, element), new OwnerKey2<>(owningType, element), element, propertyComponent);
+        return lookupOrBuildForOwner(
+            new Key2<>(declaringType, element),
+            new OwnerKey2<>(owningType, element),
+            element,
+            propertyComponent || !owningType.equals(declaringType)
+        );
     }
 
     /**
@@ -1064,7 +1121,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             annotationValues = new LinkedHashMap<>(3);
         } else {
             annotationValues = new LinkedHashMap<>(5);
-            Set<String> nonBindingMembers = new LinkedHashSet<>(2);
             for (Map.Entry<? extends T, ?> entry : elementValues.entrySet()) {
                 T member = entry.getKey();
 
@@ -1073,27 +1129,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
 
                 Object annotationValue = entry.getValue();
-                if (hasAnnotations(member)) {
-                    final MutableAnnotationMetadata memberMetadata = new MutableAnnotationMetadata();
-                    final List<? extends A> annotationsForMember = getAnnotationsForType(member)
-                            .stream().filter((a) -> !getAnnotationTypeName(a).equals(annotationName))
-                            .toList();
-
-                    addAnnotations(memberMetadata, member, false,
-                            true, annotationsForMember);
-
-                    boolean isInstantiatedMember = memberMetadata.hasAnnotation(InstantiatedMember.class);
-
-                    if (memberMetadata.hasAnnotation(NonBinding.class)) {
-                        final String memberName = getElementName(member);
-                        nonBindingMembers.add(memberName);
-                    }
-                    if (isInstantiatedMember) {
-                        final String memberName = getAnnotationMemberName(member);
-                        final Object rawValue = readAnnotationValue(originatingElement, member, annotationName, memberName, annotationValue);
-                        if (rawValue instanceof AnnotationClassValue<?> annotationClassValue) {
-                            annotationValues.put(memberName, new AnnotationClassValue<>(annotationClassValue.getName(), true));
-                        }
+                if (hasAnnotations(member) && buildMemberMetadata(annotationName, member).hasAnnotation(InstantiatedMember.class)) {
+                    final String memberName = getAnnotationMemberName(member);
+                    final Object rawValue = readAnnotationValue(originatingElement, member, annotationName, memberName, annotationValue);
+                    if (rawValue instanceof AnnotationClassValue<?> annotationClassValue) {
+                        annotationValues.put(memberName, new AnnotationClassValue<>(annotationClassValue.getName(), true));
                     }
                 }
 
@@ -1105,11 +1145,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         annotationValues);
 
             }
+        }
 
-            if (!nonBindingMembers.isEmpty()) {
-                nonBindingMembers.add(AnnotationUtil.NON_BINDING_ATTRIBUTE);
-                annotationValues.put(AnnotationUtil.NON_BINDING_ATTRIBUTE, nonBindingMembers.toArray(String[]::new));
-            }
+        Set<String> nonBindingMembers = getNonBindingMembers(annotationName, annotationType, elementValues);
+        if (!nonBindingMembers.isEmpty()) {
+            annotationValues.put(AnnotationUtil.NON_BINDING_ATTRIBUTE, nonBindingMembers.toArray(String[]::new));
         }
 
         Map<CharSequence, Object> defaultValues = getCachedAnnotationDefaults(annotationName, annotationType);
@@ -1118,6 +1158,77 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 annotationType,
                 new AnnotationValue<>(annotationName, annotationValues, defaultValues, retentionPolicy)
         );
+    }
+
+    /**
+     * The members of an annotation type that are annotated {@link NonBinding}, followed by
+     * {@link AnnotationUtil#NON_BINDING_ATTRIBUTE} itself, which is what every occurrence of the annotation
+     * records under that attribute. Every member is read, written or not, so that an occurrence leaving a
+     * non-binding member at its default records it as non-binding too: a lookup that writes the member can
+     * then see that it does not take part in the comparison. The members are read once per annotation type and
+     * cached with the annotation defaults.
+     *
+     * <p>The members of an annotation type are the ones the occurrence writes and the ones that have a default,
+     * which between them are all of them, so the two are read rather than the type asked for its members.
+     * Reading a member's metadata reads the annotations on it, so an annotation type that is already being read
+     * further up the stack, because a member of another annotation type is annotated with it, answers no
+     * members rather than reading itself again; the answer is not cached, and the occurrence it is given to is
+     * the one nested in a member's metadata, which nothing resolves by.</p>
+     *
+     * @param annotationName The annotation name
+     * @param annotationType The annotation type
+     * @param elementValues  The members the occurrence writes
+     * @return The non-binding members, or an empty set when there are none
+     */
+    private Set<String> getNonBindingMembers(String annotationName, T annotationType, Map<? extends T, ?> elementValues) {
+        Set<String> cached = NON_BINDING_MEMBERS.get(annotationName);
+        if (cached != null) {
+            return cached;
+        }
+        if (READING_MEMBERS.contains(annotationName)) {
+            return Collections.emptySet();
+        }
+        Set<String> nonBindingMembers = new LinkedHashSet<>(2);
+        Set<T> members = new LinkedHashSet<>(readAnnotationDefaultValues(annotationName, annotationType, true).keySet());
+        if (elementValues != null) {
+            members.addAll(elementValues.keySet());
+        }
+        for (T member : members) {
+            if (member != null && hasAnnotations(member) && buildMemberMetadata(annotationName, member).hasAnnotation(NonBinding.class)) {
+                nonBindingMembers.add(getElementName(member));
+            }
+        }
+        if (!nonBindingMembers.isEmpty()) {
+            nonBindingMembers.add(AnnotationUtil.NON_BINDING_ATTRIBUTE);
+        }
+        Set<String> result = nonBindingMembers.isEmpty() ? Collections.emptySet() : Collections.unmodifiableSet(nonBindingMembers);
+        NON_BINDING_MEMBERS.put(annotationName, result);
+        return result;
+    }
+
+    /**
+     * The metadata of a member of an annotation type, from the annotations declared on the member other than
+     * the annotation type itself. The members of an annotation type that is already being read, further up the
+     * stack, answer no metadata rather than being read again (see {@link #READING_MEMBERS}).
+     *
+     * @param annotationName The annotation type the member belongs to
+     * @param member         The member
+     * @return The metadata
+     */
+    private MutableAnnotationMetadata buildMemberMetadata(String annotationName, T member) {
+        final MutableAnnotationMetadata memberMetadata = new MutableAnnotationMetadata();
+        if (!READING_MEMBERS.add(annotationName)) {
+            return memberMetadata;
+        }
+        try {
+            final List<? extends A> annotationsForMember = getAnnotationsForType(member)
+                    .stream().filter((a) -> !getAnnotationTypeName(a).equals(annotationName))
+                    .toList();
+            addAnnotations(memberMetadata, member, false, true, annotationsForMember);
+            return memberMetadata;
+        } finally {
+            READING_MEMBERS.remove(annotationName);
+        }
     }
 
     /**
@@ -1476,6 +1587,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private ProcessedAnnotation addDefaults(ProcessedAnnotation processedAnnotation) {
+        processedAnnotation = addNonBindingMembers(processedAnnotation);
         if (processedAnnotation.getAnnotationValue().getDefaultValues() != null) {
             return processedAnnotation;
         }
@@ -1489,6 +1601,36 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             processedAnnotation = processedAnnotation.mutateAnnotationValue(builder -> builder.defaultValues(Collections.emptyMap()));
         }
         return processedAnnotation;
+    }
+
+    /**
+     * The annotation with its non-binding members recorded, for an occurrence that was not read from a mirror:
+     * one a visitor added, one a mapper or transformer produced, or one a retained tree was read back with. An
+     * occurrence that already records them, or whose type is not on the classpath, is left as it is.
+     */
+    private ProcessedAnnotation addNonBindingMembers(ProcessedAnnotation processedAnnotation) {
+        AnnotationValue<?> annotationValue = processedAnnotation.getAnnotationValue();
+        T annotationType = processedAnnotation.annotationType;
+        if (annotationType == null || annotationValue.contains(AnnotationUtil.NON_BINDING_ATTRIBUTE)) {
+            return processedAnnotation;
+        }
+        String annotationName = annotationValue.getAnnotationName();
+        Set<String> nonBindingMembers = NON_BINDING_MEMBERS.get(annotationName);
+        if (nonBindingMembers == null) {
+            Map<T, Object> writtenMembers = new LinkedHashMap<>();
+            for (CharSequence memberName : annotationValue.getValues().keySet()) {
+                T member = getAnnotationMember(annotationType, memberName);
+                if (member != null) {
+                    writtenMembers.put(member, memberName);
+                }
+            }
+            nonBindingMembers = getNonBindingMembers(annotationName, annotationType, writtenMembers);
+        }
+        if (nonBindingMembers.isEmpty()) {
+            return processedAnnotation;
+        }
+        String[] recorded = nonBindingMembers.toArray(String[]::new);
+        return processedAnnotation.mutateAnnotationValue(builder -> builder.member(AnnotationUtil.NON_BINDING_ATTRIBUTE, recorded));
     }
 
     private List<ProcessedAnnotation> extractStereotypes(ProcessingContext context,
@@ -2063,6 +2205,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     @Internal
     public static void clearCaches() {
         ANNOTATION_DEFAULTS.clear();
+        NON_BINDING_MEMBERS.clear();
     }
 
     /**
@@ -2387,6 +2530,23 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         @Override
         public Iterator<T> iterator() {
             return List.of(owningType, e2).iterator();
+        }
+    }
+
+    /**
+     * Key used to reference the metadata a parameter is mutated with for one owning type. The first element is the
+     * owning type so that {@link #clearMutated(Object)} can drop the entry when that type is cleared.
+     *
+     * @param owningType The owning type
+     * @param e2         The element 2
+     * @param e3         The element 3
+     * @param <T>        the element type
+     */
+    @Internal
+    private record OwnerKey3<T>(T owningType, T e2, T e3) implements Iterable<T> {
+        @Override
+        public Iterator<T> iterator() {
+            return List.of(owningType, e2, e3).iterator();
         }
     }
 

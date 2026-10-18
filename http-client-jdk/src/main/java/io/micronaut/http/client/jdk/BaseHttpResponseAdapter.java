@@ -54,7 +54,8 @@ abstract class BaseHttpResponseAdapter<B, O> implements HttpResponse<O> {
 
     @Override
     public String reason() {
-        return getStatus().getReason();
+        // a status the enum does not know, e.g. 599, has no reason
+        return HttpStatus.getDefaultReason(code());
     }
 
     @Override

@@ -26,7 +26,7 @@ import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.RequestHandler;
 import io.micronaut.web.router.builder.ResourceHandler;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -130,6 +130,17 @@ class ResourceRoutesTest {
     }
 
     @Test
+    void aRouteOfResourcesHasAUriTemplate() {
+        Router router = router(routes -> routes.group(g -> {
+            g.templates(ColonRouteTemplateEngine.INSTANCE);
+            assertThrows(IllegalStateException.class, () -> g.GET("/assets").resources(resources("assets", "path")));
+        }));
+
+        // the failed route is dropped, not left without a terminal
+        assertNull(router.findClosest(HttpRequest.GET("/assets/site.css")));
+    }
+
+    @Test
     void aRouteOfGetOnlyByAnyMeansIsARouteOfResources() {
         Router router = router(routes -> {
             routes.route("GET", "/byName").resources(resources("byName", "path"));
@@ -195,7 +206,7 @@ class ResourceRoutesTest {
     void theRouteIsAnOrdinaryRouteWithItsOwnSettings() {
         Router router = router(routes -> routes.GET("/assets")
             .attribute("static", true)
-            .where(RouteCondition.custom(request -> !request.getHeaders().contains("X-Skip")))
+            .where(RequestCondition.custom(request -> !request.getHeaders().contains("X-Skip")))
             .resources(resources("assets", "path")));
 
         // both routes

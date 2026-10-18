@@ -28,10 +28,11 @@ import java.util.Optional;
  * @param <T> A type
  * @author Denis Stepanov
  * @since 4.0.0
+ * @deprecated Form binders use transport-independent request capabilities instead.
  */
 @Experimental
-public sealed interface NettyRequestArgumentBinder<T> extends RequestArgumentBinder<T>
-    permits NettyCompletedFileUploadBinder, NettyPublisherPartUploadBinder, NettyStreamingFileUploadBinder {
+@Deprecated(since = "5.3.0", forRemoval = true)
+public interface NettyRequestArgumentBinder<T> extends RequestArgumentBinder<T> {
 
     @Override
     default BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {

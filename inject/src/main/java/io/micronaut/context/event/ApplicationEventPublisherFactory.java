@@ -17,8 +17,10 @@ package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.BeanWatchNotifier;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Indexes;
 import io.micronaut.core.annotation.Internal;
@@ -242,6 +244,14 @@ public final class ApplicationEventPublisherFactory<T>
                 .stream()
                 .sorted(OrderUtil.COMPARATOR_ZERO)
                 .toArray(ApplicationEventListener[]::new));
+            /**
+             * The context whose class change watches a class change reaches, ahead of the listeners of the event,
+             * whoever publishes it; null for a type of event that cannot be a class change, which costs a publication
+             * nothing more.
+             */
+            private final @Nullable BeanWatchNotifier classChangeWatches = (ClassChangeEvent.class.isAssignableFrom(eventType.getType())
+                || eventType.getType().isAssignableFrom(ClassChangeEvent.class))
+                && beanContext instanceof BeanWatchNotifier notifier ? notifier : null;
 
             @Override
             public void publishEvent(Object event) {
@@ -249,6 +259,7 @@ public final class ApplicationEventPublisherFactory<T>
                     if (EventLogger.LOG.isDebugEnabled()) {
                         EventLogger.LOG.debug("Publishing event: {}", event);
                     }
+                    notifyClassChangeWatches(event);
                     notifyEventListeners(event, lazyListeners.get());
                 }
             }
@@ -260,6 +271,8 @@ public final class ApplicationEventPublisherFactory<T>
                 ApplicationEventListener[] eventListeners = lazyListeners.get();
                 executor.get().execute(() -> {
                     try {
+                        // asynchronously too, the watches see a class change ahead of the listeners, on their thread
+                        notifyClassChangeWatches(event);
                         notifyEventListeners(event, eventListeners);
                         future.complete(null);
                     } catch (Exception e) {
@@ -271,7 +284,23 @@ public final class ApplicationEventPublisherFactory<T>
 
             @Override
             public boolean isEmpty() {
-                return lazyListeners.get().length == 0;
+                // a class change reaches the context's class change watches too, which a caller skipping an empty publisher would miss
+                return lazyListeners.get().length == 0 && !hasClassChangeWatches();
+            }
+
+            private boolean hasClassChangeWatches() {
+                return classChangeWatches != null && ClassChangeEvent.class.isAssignableFrom(eventType.getType())
+                    && classChangeWatches.hasClassChangeWatches();
+            }
+
+            /**
+             * A class change reaches the class change watches of the context ahead of the listeners of the event,
+             * whoever publishes it, on the thread that notifies the listeners.
+             */
+            private void notifyClassChangeWatches(Object event) {
+                if (classChangeWatches != null && event instanceof ClassChangeEvent change) {
+                    classChangeWatches.notifyClassChange(change);
+                }
             }
         };
     }
