@@ -589,6 +589,17 @@ internal class KotlinAnnotationMetadataBuilder(
             .or { ClassUtils.forName(className, javaClass.classLoader) }
             .or { ClassUtils.forName(className, visitorContext::class.java.classLoader) }
 
+    override fun getTypeCacheKey(typeElement: KSAnnotated): Any {
+        // The metadata of a class is cached under the key of its class element, see
+        // KotlinElementAnnotationMetadataFactory.getClassDefinitionCacheKey; an annotation type resolved from an
+        // occurrence or by name must find the metadata a visitor mutated through that element
+        val declaration = if (typeElement is KotlinAnnotationType) typeElement.type else typeElement
+        if (declaration is KSClassDeclaration) {
+            return KotlinClassNativeElement(declaration, null)
+        }
+        return typeElement
+    }
+
     override fun getAnnotationMirror(annotationName: String): Optional<KSAnnotated> {
         // annotation names are binary names (Outer$Inner), while KSP looks a declaration up by source name (Outer.Inner)
         val declaration = visitorContext.classDeclarationByName(annotationName)

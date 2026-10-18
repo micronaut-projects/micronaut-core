@@ -1,1 +1,2 @@
+io.micronaut.kotlin.processing.annotations.RemapperStereotypesSpec$RecordingRemapper
 io.micronaut.kotlin.processing.qualifiers.MemberReadingAnnotationRemapper
