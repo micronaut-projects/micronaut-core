@@ -273,7 +273,8 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     @Override
     public boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes) {
         if (producesMediaTypesContainsAll) {
-            return !AcceptedMediaTypes.hasRejected(acceptableTypes) || AcceptedMediaTypes.anyAcceptable(acceptableTypes);
+            // the route must be able to answer in a type that is acceptable, see RouteExecutor
+            return !AcceptedMediaTypes.hasRejected(acceptableTypes) || AcceptedMediaTypes.negotiate(producesMediaTypes, true, acceptableTypes) != null;
         }
         return anyMediaTypesMatch(producesMediaTypes, acceptableTypes);
     }
@@ -310,25 +311,8 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
 
     private static boolean computeAnyMediaTypesMatch(List<MediaType> producedMediaTypes, Collection<MediaType> acceptableTypes) {
         if (AcceptedMediaTypes.hasRejected(acceptableTypes)) {
-            for (MediaType acceptableType : acceptableTypes) {
-                if (AcceptedMediaTypes.isRejected(acceptableType)) {
-                    continue;
-                }
-                if (acceptableType.equals(MediaType.ALL_TYPE)) {
-                    for (MediaType producedMediaType : producedMediaTypes) {
-                        if (AcceptedMediaTypes.isAcceptable(producedMediaType, acceptableTypes)) {
-                            return true;
-                        }
-                    }
-                } else {
-                    for (MediaType producedMediaType : producedMediaTypes) {
-                        if (producedMediaType.equals(acceptableType) && AcceptedMediaTypes.isAcceptable(producedMediaType, acceptableTypes)) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
+            // an accepted type of the quality 0 is not acceptable, RFC 9110 12.4.2
+            return AcceptedMediaTypes.negotiate(producedMediaTypes, false, acceptableTypes) != null;
         }
         for (MediaType acceptableType : acceptableTypes) {
             if (acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType)) {

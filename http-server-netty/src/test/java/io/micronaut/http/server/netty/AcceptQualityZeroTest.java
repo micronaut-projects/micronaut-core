@@ -127,6 +127,31 @@ class AcceptQualityZeroTest {
         assertContentType(response, "text/plain");
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"controller/all", "route/all"})
+    void aRouteThatProducesAllTypesDoesNotAnswerInARejectedType(String path) throws Exception {
+        String response = get("/q0/" + path, "application/json;q=0, text/plain");
+        assertStatus(response, 200);
+        assertContentType(response, "text/plain");
+        assertStatus(get("/q0/" + path, "application/json;q=0, */*"), 406);
+    }
+
+    @Test
+    void anUnannotatedControllerMethodProducesTheJsonOfTheController() throws Exception {
+        // @Controller produces JSON by default: as for Accept: text/plain, the route is not acceptable
+        assertStatus(get("/q0/controller/default", "text/plain"), 406);
+        assertStatus(get("/q0/controller/default", "application/json;q=0, text/plain"), 406);
+        assertStatus(get("/q0/controller/default", "application/json;q=0, */*"), 406);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"controller", "route"})
+    void parameterizedVariantsKeepThePreferenceOfTheClient(String kind) throws Exception {
+        String response = get("/q0/" + kind + "/variants", "text/plain;format=fixed, text/plain;format=flowed;q=0.5, application/json;q=0");
+        assertStatus(response, 200);
+        assertContentType(response, "text/plain;format=fixed");
+    }
+
     @Test
     void aRejectedJsonTypeDoesNotSuppressAnHtmlError() throws Exception {
         String response = get("/q0/missing", "text/html, application/json;q=0");
@@ -187,6 +212,9 @@ class AcceptQualityZeroTest {
             routes.GET("/q0/route/flowed")
                 .produces(MediaType.of("text/plain;format=flowed"))
                 .handle((request, pathVariables) -> HttpResponse.ok("hello"));
+            routes.GET("/q0/route/variants")
+                .produces(MediaType.of("text/plain;format=flowed"), MediaType.of("text/plain;format=fixed"))
+                .handle((request, pathVariables) -> HttpResponse.ok("hello"));
             routes.GET("/q0/route/all")
                 .produces(MediaType.ALL_TYPE)
                 .handle((request, pathVariables) -> HttpResponse.ok("hello"));
@@ -218,6 +246,11 @@ class AcceptQualityZeroTest {
 
         @Get(value = "/flowed", produces = "text/plain;format=flowed")
         String flowed() {
+            return "hello";
+        }
+
+        @Get(value = "/variants", produces = {"text/plain;format=flowed", "text/plain;format=fixed"})
+        String variants() {
             return "hello";
         }
 

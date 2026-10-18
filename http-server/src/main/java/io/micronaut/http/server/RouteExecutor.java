@@ -309,7 +309,7 @@ public final class RouteExecutor {
         Collection<MediaType> accepted = request != null ? request.accept() : List.of();
         if (AcceptedMediaTypes.hasRejected(accepted)) {
             // an accepted type of the quality 0 is not acceptable, RFC 9110 12.4.2
-            return acceptableResponseContentType(producesList, accepted);
+            return acceptableResponseContentType(finalRoute, producesList, accepted);
         }
         if (request != null) {
             final Iterator<MediaType> i = accepted.iterator();
@@ -332,35 +332,17 @@ public final class RouteExecutor {
     }
 
     /**
+     * @param finalRoute   The route
      * @param producesList The types the route produces
      * @param accepted     The accepted types, some of the quality 0
-     * @return The produced type of the most preferred acceptable accepted type (any concrete accepted type
-     * for a route that produces all types), else the first
-     * acceptable produced type, else the first produced type
+     * @return The negotiated type, else, when no type is acceptable, which routing excludes for the
+     * routes of a request (an error route answers anyway), the first produced type
      */
-    private static MediaType acceptableResponseContentType(List<MediaType> producesList, Collection<MediaType> accepted) {
-        boolean producesAll = producesList.contains(MediaType.ALL_TYPE);
-        for (MediaType mt : accepted) {
-            if (AcceptedMediaTypes.isRejected(mt) || MediaType.ALL_TYPE.equals(mt)) {
-                continue;
-            }
-            int index = producesList.indexOf(mt);
-            if (index >= 0) {
-                // the produced type, with its parameters
-                MediaType produced = producesList.get(index);
-                if (AcceptedMediaTypes.isAcceptable(produced, accepted)) {
-                    return produced;
-                }
-            } else if (producesAll && !"*".equals(mt.getType()) && !"*".equals(mt.getSubtype()) && AcceptedMediaTypes.isAcceptable(mt, accepted)) {
-                return mt;
-            }
-        }
+    private static MediaType acceptableResponseContentType(RouteInfo<?> finalRoute, List<MediaType> producesList, Collection<MediaType> accepted) {
         List<MediaType> produces = producesList.isEmpty() ? List.of(MediaType.APPLICATION_JSON_TYPE) : producesList;
-        for (MediaType mt : produces) {
-            MediaType candidate = MediaType.ALL_TYPE.equals(mt) ? MediaType.APPLICATION_JSON_TYPE : mt;
-            if (AcceptedMediaTypes.isAcceptable(candidate, accepted)) {
-                return candidate;
-            }
+        MediaType negotiated = AcceptedMediaTypes.negotiate(produces, finalRoute.producesAll(), accepted);
+        if (negotiated != null) {
+            return negotiated;
         }
         MediaType first = produces.get(0);
         return MediaType.ALL_TYPE.equals(first) ? MediaType.APPLICATION_JSON_TYPE : first;

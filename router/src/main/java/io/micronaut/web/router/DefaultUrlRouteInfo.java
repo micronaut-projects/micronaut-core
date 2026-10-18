@@ -682,14 +682,13 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         }
         boolean hasRejected = AcceptedMediaTypes.hasRejected(acceptableTypes);
         if (producesMediaTypesContainsAll) {
-            return !hasRejected || AcceptedMediaTypes.anyAcceptable(acceptableTypes);
+            return !hasRejected || AcceptedMediaTypes.negotiate(producesMediaTypes, true, acceptableTypes) != null;
+        }
+        if (hasRejected) {
+            return anyAcceptable(producesMediaTypes, acceptableTypes);
         }
         for (MediaType acceptableType : acceptableTypes) {
-            if (hasRejected) {
-                if (anyAcceptable(producesMediaTypes, acceptableType, acceptableTypes)) {
-                    return true;
-                }
-            } else if (anyCompatible(producesMediaTypes, acceptableType)) {
+            if (anyCompatible(producesMediaTypes, acceptableType)) {
                 return true;
             }
         }
@@ -712,21 +711,17 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     /**
-     * @param types          The types of a route
-     * @param acceptableType An accepted type
-     * @param acceptedTypes  All the accepted types
-     * @return Whether one of the types is compatible with the accepted type, which is not of the
-     * quality {@code 0}, and not rejected by a more specific accepted type of the quality {@code 0}
+     * @param types         The types of a route
+     * @param acceptedTypes The accepted types, some of the quality {@code 0}
+     * @return Whether a type of the route, with its parameters, is acceptable, or a produced
+     * range covers a concrete acceptable accepted type
      */
-    private static boolean anyAcceptable(List<MediaType> types, MediaType acceptableType, Collection<MediaType> acceptedTypes) {
-        if (AcceptedMediaTypes.isRejected(acceptableType)) {
-            return false;
+    private static boolean anyAcceptable(List<MediaType> types, Collection<MediaType> acceptedTypes) {
+        if (AcceptedMediaTypes.negotiate(types, false, acceptedTypes) != null) {
+            return true;
         }
         for (MediaType type : types) {
-            if (acceptableType.matches(type) && AcceptedMediaTypes.isAcceptable(type, acceptedTypes)) {
-                return true;
-            }
-            if (type.matches(acceptableType) && AcceptedMediaTypes.isAcceptable(acceptableType, acceptedTypes)) {
+            if (AcceptedMediaTypes.coversAcceptable(type, acceptedTypes)) {
                 return true;
             }
         }

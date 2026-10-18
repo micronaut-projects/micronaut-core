@@ -256,22 +256,27 @@ public final class RequestPredicates {
             if (accepted.isEmpty()) {
                 return true;
             }
-            boolean hasRejected = AcceptedMediaTypes.hasRejected(accepted);
+            if (AcceptedMediaTypes.hasRejected(accepted)) {
+                return acceptable(accepted);
+            }
             for (MediaType acceptedType : accepted) {
-                if (hasRejected ? acceptable(acceptedType, accepted) : compatible(acceptedType)) {
+                if (compatible(acceptedType)) {
                     return true;
                 }
             }
             return false;
         }
 
-        private boolean acceptable(MediaType acceptedType, Collection<MediaType> accepted) {
-            if (AcceptedMediaTypes.isRejected(acceptedType)) {
-                return false;
+        /**
+         * With accepted types of the quality 0: a type, with its parameters, is acceptable, or a
+         * range of the types covers a concrete acceptable accepted type.
+         */
+        private boolean acceptable(Collection<MediaType> accepted) {
+            if (AcceptedMediaTypes.negotiate(types, false, accepted) != null) {
+                return true;
             }
             for (MediaType candidate : types) {
-                if (acceptedType.matches(candidate) && AcceptedMediaTypes.isAcceptable(candidate, accepted)
-                    || candidate.matches(acceptedType) && AcceptedMediaTypes.isAcceptable(acceptedType, accepted)) {
+                if (AcceptedMediaTypes.coversAcceptable(candidate, accepted)) {
                     return true;
                 }
             }

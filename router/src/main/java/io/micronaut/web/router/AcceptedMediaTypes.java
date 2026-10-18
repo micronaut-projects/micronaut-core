@@ -20,6 +20,8 @@ import io.micronaut.http.MediaType;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -34,6 +36,8 @@ public final class AcceptedMediaTypes {
 
     private static final String WILDCARD = "*";
     private static final String QUALITY = "q";
+    private static final String CHARSET = "charset";
+    private static final int LEVEL = 1000;
 
     private AcceptedMediaTypes() {
     }
@@ -63,20 +67,73 @@ public final class AcceptedMediaTypes {
     }
 
     /**
-     * @param accepted The accepted media types
-     * @return Whether some media type is acceptable: one of the accepted types has a quality above
-     * {@code 0} and is not rejected by an at least as specific accepted range of the quality {@code 0}
+     * Negotiates the type of a response: for each accepted range, by the preference of the client,
+     * the first produced type that it covers and that is acceptable, else, for a route that
+     * produces all types, the accepted type itself when it is concrete and acceptable.
+     *
+     * @param produces    The types the route produces, {@code *}{@code /*} producing JSON
+     * @param producesAll Whether the route produces all types
+     * @param accepted    The accepted types, ordered by the preference of the client
+     * @return The negotiated type, {@code null} when no type is acceptable, the first produced type
+     * without accepted types
      */
-    public static boolean anyAcceptable(@Nullable Collection<MediaType> accepted) {
+    public static @Nullable MediaType negotiate(List<MediaType> produces, boolean producesAll, @Nullable Collection<MediaType> accepted) {
         if (accepted == null || accepted.isEmpty()) {
-            return true;
+            return produces.isEmpty() ? MediaType.APPLICATION_JSON_TYPE : concrete(produces.get(0));
+        }
+        for (MediaType range : accepted) {
+            if (isRejected(range)) {
+                continue;
+            }
+            for (MediaType type : produces) {
+                MediaType concrete = concrete(type);
+                if (covers(range, concrete) && isAcceptable(concrete, accepted)) {
+                    return concrete;
+                }
+            }
+            if (producesAll && !WILDCARD.equals(range.getType()) && !WILDCARD.equals(range.getSubtype())
+                && isAcceptable(range, accepted)) {
+                return withoutQuality(range);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * @param produced A produced media range, such as {@code text/*}
+     * @param accepted The accepted types
+     * @return Whether the range covers a concrete accepted type that is acceptable
+     */
+    public static boolean coversAcceptable(MediaType produced, Collection<MediaType> accepted) {
+        if (!WILDCARD.equals(produced.getType()) && !WILDCARD.equals(produced.getSubtype())) {
+            return false;
         }
         for (MediaType type : accepted) {
-            if (!isRejected(type) && isAcceptable(type, accepted)) {
+            if (!isRejected(type) && !WILDCARD.equals(type.getType()) && !WILDCARD.equals(type.getSubtype())
+                && produced.matches(type) && isAcceptable(type, accepted)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static MediaType concrete(MediaType type) {
+        return MediaType.ALL_TYPE.equals(type) ? MediaType.APPLICATION_JSON_TYPE : type;
+    }
+
+    private static MediaType withoutQuality(MediaType type) {
+        Map<CharSequence, String> parameters = type.getParametersMap();
+        if (parameters.isEmpty()) {
+            return type;
+        }
+        var withoutQuality = new LinkedHashMap<String, String>();
+        for (Map.Entry<CharSequence, String> parameter : parameters.entrySet()) {
+            String name = parameter.getKey().toString();
+            if (!QUALITY.equalsIgnoreCase(name)) {
+                withoutQuality.put(name, parameter.getValue());
+            }
+        }
+        return withoutQuality.size() == parameters.size() ? type : new MediaType(type.getName(), withoutQuality);
     }
 
     /**
@@ -132,11 +189,19 @@ public final class AcceptedMediaTypes {
                 continue;
             }
             String value = parameterValue(typeParameters, name);
-            if (value == null || !value.equalsIgnoreCase(parameter.getValue())) {
+            if (value == null || !sameValue(name, value, parameter.getValue())) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * Parameter values are case-sensitive, except the ones defined as case-insensitive, such as
+     * the charset, RFC 9110 8.3.1.
+     */
+    private static boolean sameValue(String name, String value, String other) {
+        return CHARSET.equalsIgnoreCase(name) ? value.equalsIgnoreCase(other) : value.equals(other);
     }
 
     private static @Nullable String parameterValue(Map<CharSequence, String> parameters, String name) {
@@ -154,11 +219,13 @@ public final class AcceptedMediaTypes {
      * less specific one, the parameters other than the quality making it more specific
      */
     private static int specificity(MediaType range) {
+        int level;
         if (WILDCARD.equals(range.getType())) {
-            return 0;
-        }
-        if (WILDCARD.equals(range.getSubtype())) {
-            return 1;
+            level = 0;
+        } else if (WILDCARD.equals(range.getSubtype())) {
+            level = 1;
+        } else {
+            level = 2;
         }
         int parameters = 0;
         for (CharSequence name : range.getParametersMap().keySet()) {
@@ -166,6 +233,7 @@ public final class AcceptedMediaTypes {
                 parameters++;
             }
         }
-        return 2 + parameters;
+        // the wildcard level first, then the parameters within the level
+        return level * LEVEL + Math.min(parameters, LEVEL - 1);
     }
 }
