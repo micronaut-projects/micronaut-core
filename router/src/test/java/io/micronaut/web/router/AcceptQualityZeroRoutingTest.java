@@ -84,6 +84,21 @@ class AcceptQualityZeroRoutingTest {
         assertNotNull(router.findClosest(get("/flowed/1", "text/plain, text/plain;format=fixed;q=0")));
     }
 
+    @Test
+    void anUnrestrictedAcceptConditionIsNotAJsonRequirement() {
+        assertTrue(RequestConditions.matches(accept(MediaType.ALL_TYPE), get("/x", "application/json;q=0, */*"), RouteConditionContext.fallback()));
+        assertTrue(RequestConditions.matches(accept(MediaType.of("text/*")), get("/x", "application/json;q=0, */*"), RouteConditionContext.fallback()));
+        assertFalse(RequestConditions.matches(accept(MediaType.ALL_TYPE), get("/x", "*/*;q=0"), RouteConditionContext.fallback()));
+        assertFalse(RequestConditions.matches(accept(MediaType.of("text/*")), get("/x", "text/*;q=0, application/json"), RouteConditionContext.fallback()));
+    }
+
+    @Test
+    void theQualityParameterNameIsCaseInsensitive() {
+        assertTrue(AcceptedMediaTypes.isRejected(MediaType.of("text/plain;Q=0")));
+        assertTrue(AcceptedMediaTypes.isRejected(MediaType.of("text/plain;Q=0.000")));
+        assertFalse(AcceptedMediaTypes.isRejected(MediaType.of("text/plain;Q=0.5")));
+    }
+
     private static List<MediaType> accepted(String... types) {
         return MediaType.orderedOf(types);
     }

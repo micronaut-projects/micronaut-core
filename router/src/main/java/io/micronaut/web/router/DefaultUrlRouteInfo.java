@@ -682,7 +682,8 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         }
         boolean hasRejected = AcceptedMediaTypes.hasRejected(acceptableTypes);
         if (producesMediaTypesContainsAll) {
-            return !hasRejected || AcceptedMediaTypes.negotiate(producesMediaTypes, true, acceptableTypes) != null;
+            // the selector negotiates the type: no default type is substituted for the wildcard
+            return !hasRejected || anyAcceptable(producesMediaTypes, acceptableTypes);
         }
         if (hasRejected) {
             return anyAcceptable(producesMediaTypes, acceptableTypes);
@@ -717,11 +718,8 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * range covers a concrete acceptable accepted type
      */
     private static boolean anyAcceptable(List<MediaType> types, Collection<MediaType> acceptedTypes) {
-        if (AcceptedMediaTypes.negotiate(types, false, acceptedTypes) != null) {
-            return true;
-        }
         for (MediaType type : types) {
-            if (AcceptedMediaTypes.coversAcceptable(type, acceptedTypes)) {
+            if (AcceptedMediaTypes.intersects(type, acceptedTypes)) {
                 return true;
             }
         }

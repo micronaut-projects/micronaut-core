@@ -268,15 +268,12 @@ public final class RequestPredicates {
         }
 
         /**
-         * With accepted types of the quality 0: a type, with its parameters, is acceptable, or a
-         * range of the types covers a concrete acceptable accepted type.
+         * With accepted types of the quality 0: one of the types, with its parameters, or ranges,
+         * has an acceptable intersection with the accepted types.
          */
         private boolean acceptable(Collection<MediaType> accepted) {
-            if (AcceptedMediaTypes.negotiate(types, false, accepted) != null) {
-                return true;
-            }
             for (MediaType candidate : types) {
-                if (AcceptedMediaTypes.coversAcceptable(candidate, accepted)) {
+                if (AcceptedMediaTypes.intersects(candidate, accepted)) {
                     return true;
                 }
             }

@@ -25,6 +25,8 @@ import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.web.router.AcceptedMediaTypes;
 import jakarta.inject.Singleton;
 
+import java.util.Collection;
+
 /**
  * Default implementation of {@link ErrorResponseProcessor}.
  * It delegates to {@link JsonErrorResponseBodyProvider} for JSON responses and to {@link HtmlErrorResponseBodyProvider} for HTML responses.
@@ -52,14 +54,26 @@ final class DefaultErrorResponseProcessor implements ErrorResponseProcessor {
             return (MutableHttpResponse<JsonError>) response;
         }
         final boolean isError = response.status().getCode() >= 400;
-        if (isError
-            && request.accept().stream().anyMatch(mediaType -> mediaType.equals(MediaType.TEXT_HTML_TYPE) && !AcceptedMediaTypes.isRejected(mediaType))
-            && request.accept().stream().noneMatch(m -> m.matchesExtension(MediaType.EXTENSION_JSON) && !AcceptedMediaTypes.isRejected(m))
-        ) {
+        if (isError && prefersHtml(request.accept())) {
             return response.body(htmlBodyErrorResponseProvider.body(errorContext, response))
                     .contentType(htmlBodyErrorResponseProvider.contentType());
         }
         return response.body(jsonBodyErrorResponseProvider.body(errorContext, response))
                 .contentType(jsonBodyErrorResponseProvider.contentType());
+    }
+
+    /**
+     * @param accepted The accepted types
+     * @return Whether the HTML error is preferred: HTML is accepted explicitly and JSON is not, or,
+     * with accepted types of the quality 0, HTML is acceptable and JSON is not
+     */
+    private boolean prefersHtml(Collection<MediaType> accepted) {
+        if (accepted.stream().anyMatch(mediaType -> mediaType.equals(MediaType.TEXT_HTML_TYPE) && !AcceptedMediaTypes.isRejected(mediaType))
+            && accepted.stream().noneMatch(m -> m.matchesExtension(MediaType.EXTENSION_JSON) && !AcceptedMediaTypes.isRejected(m))) {
+            return true;
+        }
+        return AcceptedMediaTypes.hasRejected(accepted)
+            && AcceptedMediaTypes.intersects(MediaType.of(htmlBodyErrorResponseProvider.contentType()), accepted)
+            && !AcceptedMediaTypes.intersects(MediaType.of(jsonBodyErrorResponseProvider.contentType()), accepted);
     }
 }

@@ -152,6 +152,30 @@ class AcceptQualityZeroTest {
         assertContentType(response, "text/plain;format=fixed");
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"controller/all-object", "route/all-object"})
+    void aRouteThatProducesAllTypesKeepsJsonWhenItIsAcceptable(String path) throws Exception {
+        // the body is only encodable as JSON: the preferred text/plain is not chosen over the acceptable JSON
+        String response = get("/q0/" + path, "text/plain, application/json;q=0.5, image/png;q=0");
+        assertStatus(response, 200);
+        assertContentType(response, "application/json");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"controller", "route"})
+    void theQualityParameterNameIsCaseInsensitive(String kind) throws Exception {
+        assertStatus(get("/q0/" + kind + "/plain", "text/plain;Q=0"), 406);
+        assertStatus(get("/q0/" + kind + "/plain", "text/plain;Q=0.000"), 406);
+        assertStatus(get("/q0/" + kind + "/plain", "text/plain;Q=0.5"), 200);
+    }
+
+    @Test
+    void anHtmlErrorAcceptedThroughAWildcardIsPreferredOverARejectedJson() throws Exception {
+        String response = get("/q0/missing", "text/*, application/json;q=0");
+        assertStatus(response, 404);
+        assertContentType(response, "text/html");
+    }
+
     @Test
     void aRejectedJsonTypeDoesNotSuppressAnHtmlError() throws Exception {
         String response = get("/q0/missing", "text/html, application/json;q=0");
@@ -215,6 +239,9 @@ class AcceptQualityZeroTest {
             routes.GET("/q0/route/variants")
                 .produces(MediaType.of("text/plain;format=flowed"), MediaType.of("text/plain;format=fixed"))
                 .handle((request, pathVariables) -> HttpResponse.ok("hello"));
+            routes.GET("/q0/route/all-object")
+                .produces(MediaType.ALL_TYPE)
+                .handle((request, pathVariables) -> HttpResponse.ok(Map.of("greeting", "hello")));
             routes.GET("/q0/route/all")
                 .produces(MediaType.ALL_TYPE)
                 .handle((request, pathVariables) -> HttpResponse.ok("hello"));
@@ -252,6 +279,11 @@ class AcceptQualityZeroTest {
         @Get(value = "/variants", produces = {"text/plain;format=flowed", "text/plain;format=fixed"})
         String variants() {
             return "hello";
+        }
+
+        @Get(value = "/all-object", produces = MediaType.ALL)
+        Map<String, String> allObject() {
+            return Map.of("greeting", "hello");
         }
 
         @Get(value = "/all", produces = MediaType.ALL)

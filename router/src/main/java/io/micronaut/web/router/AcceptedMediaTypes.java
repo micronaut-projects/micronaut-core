@@ -69,7 +69,9 @@ public final class AcceptedMediaTypes {
     /**
      * Negotiates the type of a response: for each accepted range, by the preference of the client,
      * the first produced type that it covers and that is acceptable, else, for a route that
-     * produces all types, the accepted type itself when it is concrete and acceptable.
+     * produces all types, the first concrete acceptable accepted type. A route that produces all
+     * types answers in its default type, JSON, whenever it is acceptable, as it does without
+     * accepted types of the quality {@code 0}: the body might not be encodable in another type.
      *
      * @param produces    The types the route produces, {@code *}{@code /*} producing JSON
      * @param producesAll Whether the route produces all types
@@ -91,26 +93,45 @@ public final class AcceptedMediaTypes {
                     return concrete;
                 }
             }
-            if (producesAll && !WILDCARD.equals(range.getType()) && !WILDCARD.equals(range.getSubtype())
-                && isAcceptable(range, accepted)) {
-                return withoutQuality(range);
+        }
+        if (producesAll) {
+            for (MediaType range : accepted) {
+                if (!isRejected(range) && !WILDCARD.equals(range.getType()) && !WILDCARD.equals(range.getSubtype())
+                    && isAcceptable(range, accepted)) {
+                    return withoutQuality(range);
+                }
             }
         }
         return null;
     }
 
     /**
-     * @param produced A produced media range, such as {@code text/*}
+     * Whether a type, possibly a range, has an acceptable intersection with the accepted types:
+     * an accepted range covers it and it is acceptable, or it is a range that covers an accepted
+     * type that is acceptable. No default type is substituted for a range.
+     *
+     * @param type     A type or a range, such as {@code text/*} or {@code *}{@code /*}
      * @param accepted The accepted types
-     * @return Whether the range covers a concrete accepted type that is acceptable
+     * @return Whether some type of the intersection is acceptable
      */
-    public static boolean coversAcceptable(MediaType produced, Collection<MediaType> accepted) {
-        if (!WILDCARD.equals(produced.getType()) && !WILDCARD.equals(produced.getSubtype())) {
-            return false;
+    public static boolean intersects(MediaType type, Collection<MediaType> accepted) {
+        if (accepted.isEmpty()) {
+            return true;
         }
-        for (MediaType type : accepted) {
-            if (!isRejected(type) && !WILDCARD.equals(type.getType()) && !WILDCARD.equals(type.getSubtype())
-                && produced.matches(type) && isAcceptable(type, accepted)) {
+        boolean range = WILDCARD.equals(type.getType()) || WILDCARD.equals(type.getSubtype());
+        for (MediaType acceptedType : accepted) {
+            if (isRejected(acceptedType)) {
+                continue;
+            }
+            MediaType candidate;
+            if (covers(acceptedType, type)) {
+                candidate = type;
+            } else if (range && type.matches(acceptedType)) {
+                candidate = acceptedType;
+            } else {
+                continue;
+            }
+            if (isAcceptable(candidate, accepted)) {
                 return true;
             }
         }
