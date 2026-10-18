@@ -66,6 +66,7 @@ class LocatorBodyTest {
     private final List<TestBody> bound = new ArrayList<>();
     private final CompletableFuture<Object> content = new CompletableFuture<>();
     private CompletableFuture<Void> releaseStage = CompletableFuture.completedFuture(null);
+    private @Nullable RuntimeException releaseThrows;
     private @Nullable ApplicationContext context;
 
     @AfterEach
@@ -237,6 +238,34 @@ class LocatorBodyTest {
     }
 
     @Test
+    void aReleaseThatThrowsWhenTheRequestIsAbandonedStillAbandonsTheRequest() {
+        releaseThrows = new IllegalStateException("release failed");
+        CompletableFuture<Object> shared = new CompletableFuture<>();
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/", (request, pathVariables) -> HttpResponse.ok()));
+        Router router = router(routes -> {
+            routes.locator("/orders")
+                .body(String.class)
+                .locateAsync((request, pathVariables, body) -> shared, target -> items);
+            // a second locator of the request, abandoned after the first
+            routes.locateAsync("/others/{id}", (request, pathVariables) -> shared, target -> items);
+        });
+
+        HttpRequest<?> request = HttpRequest.POST("/orders", "").contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE);
+        pending(() -> router.findClosest(request));
+        content.complete("order");
+        CompletionStage<?> waiting = pending(() -> router.findClosest(request));
+        HttpRequest<?> other = HttpRequest.GET("/others/1");
+        CompletionStage<?> otherWaiting = pending(() -> router.findClosest(other));
+
+        RouteLocator.abandonPendingLocations(request);
+        assertTrue(waiting.toCompletableFuture().isDone(), "the request stops waiting despite the failed release");
+        assertEquals(1, bound.getFirst().released.get());
+        assertTrue(RouteLocator.isAbandonment(assertThrows(RuntimeException.class, () -> router.findClosest(request))));
+        // another request is not affected
+        assertFalse(otherWaiting.toCompletableFuture().isDone());
+    }
+
+    @Test
     void theLocationCompletesOnceTheBodyWasReleased() {
         releaseStage = new CompletableFuture<>();
         LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/", (request, pathVariables) -> HttpResponse.ok()));
@@ -351,6 +380,7 @@ class LocatorBodyTest {
             @Override
             public AsyncRequestBody locatorBody(HttpRequest<?> request) {
                 TestBody body = new TestBody(content, null, releaseStage, request);
+                body.releaseThrows = releaseThrows;
                 bound.add(body);
                 return body;
             }
@@ -382,9 +412,15 @@ class LocatorBodyTest {
             this.request = request;
         }
 
+        private @Nullable RuntimeException releaseThrows;
+
         @Override
         public CompletionStage<Void> releaseBody() {
             released.incrementAndGet();
+            RuntimeException failure = releaseThrows;
+            if (failure != null) {
+                throw failure;
+            }
             return releaseStage;
         }
 

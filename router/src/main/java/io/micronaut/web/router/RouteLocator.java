@@ -15,6 +15,8 @@
  */
 package io.micronaut.web.router;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
@@ -85,6 +87,8 @@ public final class RouteLocator implements DynamicRouteTarget {
      * The request attribute of the targets that asynchronous locators located for the request.
      */
     private static final String LOCATED_ATTRIBUTE = "micronaut.router.located";
+
+    private static final Logger LOG = LoggerFactory.getLogger(RouteLocator.class);
     private static final String LOCATOR_NAME = "locator";
 
     private final @Nullable LocatorHandler<?> locator;
@@ -645,10 +649,13 @@ public final class RouteLocator implements DynamicRouteTarget {
                 continue;
             }
             Completion completion = outcome.completion();
-            if (completion != null) {
-                completion.release();
+            try {
+                if (completion != null) {
+                    completion.release();
+                }
+            } finally {
+                pending.complete(Boolean.TRUE);
             }
-            pending.complete(Boolean.TRUE);
         }
     }
 
@@ -877,7 +884,12 @@ public final class RouteLocator implements DynamicRouteTarget {
             waiting.set(null);
             AbandonableStage stage = owned.getAndSet(null);
             if (stage != null) {
-                stage.abandon();
+                try {
+                    stage.abandon();
+                } catch (RuntimeException e) {
+                    // the other locations of the request are abandoned too, and the request ends
+                    LOG.warn("Failed to abandon the stage of a route locator", e);
+                }
             }
         }
     }

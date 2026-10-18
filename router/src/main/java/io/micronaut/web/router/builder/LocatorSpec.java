@@ -91,6 +91,11 @@ public sealed interface LocatorSpec permits DefaultLocatorSpec {
      * {@code multipart/form-data}, as {@link FormData}, like a handler of
      * {@link HttpRouteSpec#form()}. The located route that reads the form receives the same form.
      *
+     * <p>The form is read from a copy of the body: the server must decode a form from a split
+     * of the bytes of the request, see
+     * {@link io.micronaut.http.form.FormCapableHttpRequest#getRawFormFields(io.micronaut.http.body.ByteBody)},
+     * as the Netty server does. On a server that does not, a form request under the locator fails.</p>
+     *
      * <p>The locator route still matches every request under its prefix: a request whose
      * content type is not a form, e.g. a {@code GET}, a {@code HEAD}, a CORS preflight or a JSON
      * body for a located route, is located with {@link FormData#empty() the empty form}, like a

@@ -43,6 +43,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.OutputStream;
+import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -54,6 +56,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Route locators that read the body of the request before they locate the target, like a JAX-RS
@@ -165,9 +168,18 @@ class HandlerRouteLocatorBodyTest {
     }
 
     @Test
-    void aJsonBodyWithoutAContentTypeIsDecodedLikeTheBodyOfAHandlerRoute() {
-        String response = client.toBlocking().retrieve(HttpRequest.POST("/orders/route", "{\"kind\":\"bulk\",\"id\":4}"));
-        assertEquals("bulk: order 4", response);
+    void aJsonBodyWithoutAContentTypeIsDecodedLikeTheBodyOfAHandlerRoute() throws Exception {
+        // a raw request: the HTTP client would add a content type
+        String body = "{\"kind\":\"bulk\",\"id\":4}";
+        try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+            OutputStream out = socket.getOutputStream();
+            out.write(("POST /orders/route HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nContent-Length: " + body.length()
+                + "\r\n\r\n" + body).getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+            String response = new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            assertTrue(response.startsWith("HTTP/1.1 200"), response);
+            assertTrue(response.endsWith("bulk: order 4"), response);
+        }
     }
 
     @Test

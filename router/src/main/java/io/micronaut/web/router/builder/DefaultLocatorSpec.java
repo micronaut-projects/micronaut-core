@@ -21,6 +21,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.form.FormData;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -30,6 +32,8 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -46,11 +50,14 @@ import java.util.function.Function;
  * @param prefixUri    The prefix of the locator route
  * @param declaration  The declaration of the locator route, which its terminal ends
  * @param context      Provides the body of a request
+ * @param bodyHandlers The message body readers
+ * @param consumes     The media types a handler route consumes by default
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute declaration, RouteConditionContext context) implements LocatorSpec {
+record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute declaration, RouteConditionContext context,
+                          MessageBodyHandlerRegistry bodyHandlers, List<MediaType> consumes) implements LocatorSpec {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultLocatorSpec.class);
 
@@ -67,7 +74,26 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
             LocatorBodySpec<B> body = (LocatorBodySpec<B>) body();
             return body;
         }
-        return new Body<>(this, null, (request, bound) -> bound.copy().body(bodyType));
+        // the reader a handler route of the body selects for the media types it consumes by default
+        MessageBodyReader<B> defaultReader = bodyHandlers.findReader(bodyType, consumes).orElse(null);
+        MediaType defaultType = consumes.getFirst();
+        return new Body<>(this, null, (request, bound) -> readBody(request, bound, bodyType, defaultReader, defaultType));
+    }
+
+    /**
+     * Read the body decoded to a type, like the {@code @Body} argument of a handler route: a body
+     * without a content type is decoded with the reader the route selects for the media type it
+     * consumes by default, instead of being converted, since no route is matched yet to select it.
+     */
+    private static <B extends @Nullable Object> CompletionStage<? extends B> readBody(HttpRequest<?> request, AsyncRequestBody bound,
+                                                                                    Argument<B> bodyType, @Nullable MessageBodyReader<B> defaultReader,
+                                                                                    MediaType defaultType) {
+        if (defaultReader == null || request.getContentType().isPresent() || !bound.hasBody()) {
+            // a request without a body is located with null or fails, like a missing @Body argument
+            return bound.copy().body(bodyType);
+        }
+        return bound.copy().bytes(Integer.MAX_VALUE).thenApply(bytes ->
+            defaultReader.read(bodyType, defaultType, request.getHeaders(), new ByteArrayInputStream(bytes)));
     }
 
     @Override
@@ -223,13 +249,22 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
         @Override
         public void abandon() {
             AsyncRequestBody held = body.getAndSet(null);
-            if (held instanceof ReleasableRequestBody releasable) {
-                releasable.releaseBody().whenComplete((ignored, error) -> {
-                    if (error != null) {
-                        LOG.warn("Failed to release the body read by the route locator of an abandoned request", error);
-                    }
-                });
+            if (!(held instanceof ReleasableRequestBody releasable)) {
+                return;
             }
+            CompletionStage<Void> released;
+            try {
+                released = releasable.releaseBody();
+            } catch (RuntimeException e) {
+                // the request is abandoned anyway: nobody receives the failure
+                LOG.warn("Failed to release the body read by the route locator of an abandoned request", e);
+                return;
+            }
+            released.whenComplete((ignored, error) -> {
+                if (error != null) {
+                    LOG.warn("Failed to release the body read by the route locator of an abandoned request", error);
+                }
+            });
         }
     }
 }

@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -46,7 +47,8 @@ class LocatorDeclarationTest {
 
     @Test
     void aLocatorWithoutATerminalFailsTheStartup() {
-        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> assembly(new UnendedRoutes()));
+        HttpRoutes routes = new UnendedRoutes();
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> assembly(routes));
 
         assertEquals("The route locator /accounts declared by LocatorDeclarationTest.UnendedRoutes has no handler: "
             + "end it with locate or locateAsync", failure.getMessage());
@@ -54,7 +56,8 @@ class LocatorDeclarationTest {
 
     @Test
     void aRouteAndALocatorWithoutATerminalNameTheTerminalsOfBoth() {
-        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> assembly(new BothUnendedRoutes()));
+        HttpRoutes routes = new BothUnendedRoutes();
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> assembly(routes));
 
         assertEquals("The routes GET /items declared by LocatorDeclarationTest.BothUnendedRoutes, locator /accounts declared by "
             + "LocatorDeclarationTest.BothUnendedRoutes have no handler: end each with handle, handleAsync or respond, or locate or locateAsync",
@@ -63,7 +66,8 @@ class LocatorDeclarationTest {
 
     @Test
     void aLocatorIsEndedOnce() {
-        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> assembly(new TwiceEndedRoutes()));
+        HttpRoutes routes = new TwiceEndedRoutes();
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> assembly(routes));
 
         assertEquals("The route locator /accounts declared by LocatorDeclarationTest.TwiceEndedRoutes was already ended: "
             + "give its settings before its one terminal, locate or locateAsync", failure.getMessage());
@@ -71,7 +75,8 @@ class LocatorDeclarationTest {
 
     @Test
     void anEndedLocatorStartsTheApplication() {
-        assembly(routes -> routes.locator("/accounts").form().locate((request, pathVariables, form) -> "account", ROUTES));
+        HttpRoutes routes = builder -> builder.locator("/accounts").form().locate((request, pathVariables, form) -> "account", ROUTES);
+        assertDoesNotThrow(() -> assembly(routes));
     }
 
     private static HttpRoutesAssembly assembly(HttpRoutes... routes) {

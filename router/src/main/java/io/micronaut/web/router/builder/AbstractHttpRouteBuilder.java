@@ -27,6 +27,7 @@ import io.micronaut.http.uri.UriRouteTemplate;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.AnyMethodRoutes;
 import io.micronaut.web.router.RouteArguments;
+import io.micronaut.web.router.LocatorSupport;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.RouteLocator;
 import org.jspecify.annotations.Nullable;
@@ -472,7 +473,8 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         PendingRoute declaration = new PendingRoute(this, handler -> List.of(),
             "locator " + prefixUri + (bean == null ? "" : " declared by " + beanName(bean))).locator();
         pending.add(declaration);
-        return new DefaultLocatorSpec(this, prefixUri, declaration, assembly.routeConditionContext());
+        LocatorSupport support = assembly.locatorSupport();
+        return new DefaultLocatorSpec(this, prefixUri, declaration, support.context(), support.bodyHandlers(), DEFAULT_CONSUMES);
     }
 
     /**
