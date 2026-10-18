@@ -32,7 +32,7 @@ class StaticResourcesTest {
     @Test
     void aPathUnderTheBaseIsRelative() {
         for (String path : new String[]{"", "hello.txt", "css/site.css", "a/b/c.d.e", ".well-known/x", "a..b", "..a", "a/...", "a%20b.txt", "docs/"}) {
-            assertTrue(StaticResources.isRelative(path), path);
+            assertTrue(DefaultStaticResources.isRelative(path), path);
         }
     }
 
@@ -43,7 +43,7 @@ class StaticResourcesTest {
             "/etc/passwd", "a\\..\\b", "..\\secret", "C:secret", "c:/secret", "a\0.txt",
             "%2e%2e/secret", "%2E%2E/secret", "..%2fsecret", "..%2Fsecret", "..%5csecret", "a%00.txt"
         }) {
-            assertFalse(StaticResources.isRelative(path), path);
+            assertFalse(DefaultStaticResources.isRelative(path), path);
         }
     }
 
@@ -62,7 +62,7 @@ class StaticResourcesTest {
         assertEquals(StaticResources.DEFAULT_PATH_VARIABLE, resources.pathVariable());
         assertEquals(StaticResources.DEFAULT_INDEX_FILE, resources.indexFile());
         assertNull(resources.cacheControl());
-        assertSame(StaticResources.class, configured.getClass());
+        assertSame(DefaultStaticResources.class, configured.getClass());
     }
 
     @Test

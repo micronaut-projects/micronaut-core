@@ -20,17 +20,21 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.PathVariables;
+import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.RequestHandler;
 import io.micronaut.web.router.builder.ResourceHandler;
 import io.micronaut.web.router.builder.RequestCondition;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -235,6 +239,76 @@ class ResourceRoutesTest {
         }
     }
 
+    @Test
+    void aRouteOfResourcesThatBlocksRunsOnTheBlockingExecutor() {
+        Router router = router(routes -> routes.GET("/assets").resources(resources("assets", "path")));
+
+        for (String uri : new String[]{"/assets", "/assets/site.css"}) {
+            UriRouteInfo<Object, Object> route = route(router, HttpRequest.GET(uri));
+            // no executor of that name in this router
+            Exception error = assertThrows(Exception.class, () -> route.getExecutor(ThreadSelection.MANUAL), uri);
+            assertTrue(error.getMessage().contains("blocking"), error.getMessage());
+        }
+    }
+
+    @Test
+    void theExecutorOfTheRouteReplacesTheBlockingExecutor() {
+        Router own = router(routes -> routes.GET("/own").executeOn("own-executor").resources(resources("own", "path")));
+        Router nonBlocking = router(routes -> routes.GET("/event-loop").nonBlocking().resources(resources("event-loop", "path")));
+
+        Exception error = assertThrows(Exception.class, () -> route(own, HttpRequest.GET("/own/site.css")).getExecutor(ThreadSelection.MANUAL));
+        assertTrue(error.getMessage().contains("own-executor"), error.getMessage());
+        assertNull(route(nonBlocking, HttpRequest.GET("/event-loop/site.css")).getExecutor(ThreadSelection.MANUAL));
+    }
+
+    @Test
+    void aRouteOfResourcesThatDoesNotBlockRunsLikeAnyHandler() {
+        Router router = router(routes -> routes.GET("/memory").resources(new InMemory()));
+
+        assertNull(route(router, HttpRequest.GET("/memory/site.css")).getExecutor(ThreadSelection.MANUAL));
+    }
+
+    @Test
+    void thePrefixCannotHaveThePathVariableOfTheResources() {
+        Router router = router(routes -> {
+            routes.path("/tenants/{path}", tenants ->
+                assertThrows(IllegalStateException.class, () -> tenants.GET("").resources(resources("tenants", "path"))));
+            routes.path("/sites/{path}", sites -> sites.GET("").resources(resources("sites", "file")));
+        });
+
+        // the failed route is dropped, the one with another variable is declared
+        assertNull(router.findClosest(HttpRequest.GET("/tenants/acme/site.css")));
+        assertEquals("sites", target(router, "/sites/acme/site.css"));
+    }
+
+    @Test
+    void aLocatedRouteIsNotARouteOfResources() {
+        AtomicReference<@Nullable Exception> error = new AtomicReference<>();
+        TestLocatedRoutes<Object> located = TestLocatedRoutes.of(routes -> {
+            try {
+                routes.GET("/assets").resources(resources("assets", "path"));
+            } catch (IllegalStateException e) {
+                error.set(e);
+            }
+            routes.GET("/", (request, pathVariables) -> HttpResponse.ok());
+        });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
+        builder.locate("/orders/{id}", (request, pathVariables) -> "order", target -> located);
+        builder.close();
+        assembly.addImplicitHeadRoutes();
+        Router router = new DefaultRouter(List.of(), List.of(() -> assembly));
+        // the locator declares the located routes of a request when its filter runs
+        HttpRequest<?> request = HttpRequest.GET("/orders/1/");
+        UriRouteMatch<Object, Object> match = router.findClosest(request);
+        assertNotNull(match);
+        new FilterRunner(router.findFilters(request, match), (r, propagatedContext) -> ExecutionFlow.just(HttpResponse.ok()))
+            .run(request);
+
+        assertNotNull(error.get());
+        assertTrue(error.get().getMessage().contains("located route"), error.get().getMessage());
+    }
+
     private static String path(Router router, String uri) {
         UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.GET(uri));
         assertNotNull(match, uri);
@@ -265,6 +339,23 @@ class ResourceRoutesTest {
         @Override
         public HttpResponse<?> handle(HttpRequest<?> request, PathVariables pathVariables) {
             return HttpResponse.ok(name);
+        }
+    }
+
+    private record InMemory() implements ResourceHandler {
+        @Override
+        public String pathVariable() {
+            return "path";
+        }
+
+        @Override
+        public boolean blocking() {
+            return false;
+        }
+
+        @Override
+        public HttpResponse<?> handle(HttpRequest<?> request, PathVariables pathVariables) {
+            return HttpResponse.ok("memory");
         }
     }
 

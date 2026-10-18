@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
+import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
@@ -44,6 +45,11 @@ import java.util.function.Supplier;
  */
 @Internal
 final class PendingRoute {
+
+    /**
+     * The name of the blocking executor, {@code TaskExecutors.BLOCKING}.
+     */
+    private static final String BLOCKING_EXECUTOR = "blocking";
 
     private final AbstractHttpRouteBuilder builder;
     /**
@@ -162,13 +168,20 @@ final class PendingRoute {
      * group do not apply.
      *
      * @param resources The handler of the resources
-     * @throws IllegalStateException    if the route is not a route of {@code GET} only, or its
-     *                                  template is not a URI template
+     * @throws IllegalStateException    if the route is not a route of {@code GET} only, is a
+     *                                  located route, its template is not a URI template, or its
+     *                                  prefix has the path variable of the handler
      * @throws IllegalArgumentException if the path variable of the handler is not a plain name, or
      *                                  the URI prefix has a query or a fragment
      */
     void endResources(ResourceHandler resources) {
         checkPending();
+        if (builder.located()) {
+            // the handler of the resources would not see the located target
+            drop();
+            throw new IllegalStateException("The route " + description
+                + " is a located route: a route of resources is a route of an HttpRoutes bean");
+        }
         Supplier<@Nullable String> source = getTemplate;
         if (source == null) {
             drop();
@@ -185,6 +198,10 @@ final class PendingRoute {
         try {
             RoutePrefix.checkPath(template, "a route of resources");
             pathVariable = resourcePathVariable(resources);
+            if (UriMatchTemplate.of(template).getVariableNames().contains(pathVariable)) {
+                throw new IllegalStateException("The prefix of the route " + description + " has the variable " + pathVariable
+                    + " of the path of the resources: give the resources another path variable, e.g. StaticResources.pathVariable(\"file\")");
+            }
         } catch (RuntimeException e) {
             drop();
             throw e;
@@ -207,7 +224,17 @@ final class PendingRoute {
             added.add(builder.getRoute(root, handler.get()));
             added.add(builder.getRoute(paths, handler.get()));
             return added;
-        }, null, RouteGroupDefaults.CONSUMES_SETTING | RouteGroupDefaults.PRODUCES_SETTING);
+        }, resources.blocking() ? PendingRoute::blockingResources : null, RouteGroupDefaults.CONSUMES_SETTING | RouteGroupDefaults.PRODUCES_SETTING);
+    }
+
+    /**
+     * Run the routes of resources whose reading blocks on the blocking executor: the executor of
+     * the route, or of its groups, given later, replaces it.
+     *
+     * @param route A route of resources
+     */
+    private static void blockingResources(RouteSettings route) {
+        route.executeOn(BLOCKING_EXECUTOR);
     }
 
     private static String resourcePathVariable(ResourceHandler resources) {

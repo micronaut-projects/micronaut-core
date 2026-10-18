@@ -266,9 +266,16 @@ public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits D
      * executor of the group apply, not its media types: the handler decides the media type of
      * each resource.</p>
      *
+     * <p>A handler whose reading blocks, see {@link ResourceHandler#blocking()}, e.g. the static
+     * resources of the HTTP server, runs on the blocking executor, unless the route or its groups
+     * declare an executor. A route of resources is a route of an {@code HttpRoutes} bean, not of
+     * located routes, and its prefix does not have the path variable of the handler.</p>
+     *
      * @param resources The handler of the resources
-     * @throws IllegalStateException    if the route was already ended, or is not a route of
-     *                                  {@code GET} only
+     * @throws IllegalStateException    if the route was already ended, is not a route of
+     *                                  {@code GET} only, is a located route, has a template of
+     *                                  another language, or its prefix has the path variable of
+     *                                  the handler
      * @throws IllegalArgumentException if the path variable of the handler is not a plain name, or
      *                                  the URI has a query or a fragment
      * @since 5.3.0

@@ -44,6 +44,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -76,6 +77,9 @@ public class StaticResourcesRoutesTest {
         Files.createDirectories(root.resolve("sub"));
         Files.writeString(root.resolve("sub/page.html"), "<html><body>sub page</body></html>");
         Files.writeString(tempDir.resolve("secret.txt"), "secret");
+        Files.writeString(root.resolve(".env"), "hidden");
+        Files.createDirectories(root.resolve(".git"));
+        Files.writeString(root.resolve(".git/config"), "hidden config");
     }
 
     @Test
@@ -202,6 +206,36 @@ public class StaticResourcesRoutesTest {
     }
 
     @Test
+    void aHeadRequestHasTheHeadersOfAGetRequest() throws IOException {
+        try (ServerUnderTest server = server()) {
+            for (String uri : new String[]{"/static-fn/hello.txt", "/files/hello.txt"}) {
+                HttpResponse<String> get = exchange(server, HttpRequest.GET(uri));
+                HttpResponse<String> head = exchange(server, HttpRequest.HEAD(uri));
+                assertEquals(HttpStatus.OK, head.getStatus(), uri);
+                for (String header : new String[]{HttpHeaders.CONTENT_TYPE, HttpHeaders.CONTENT_LENGTH, HttpHeaders.LAST_MODIFIED, HttpHeaders.CACHE_CONTROL}) {
+                    assertEquals(get.getHeaders().get(header), head.getHeaders().get(header), uri + " " + header);
+                }
+                assertNotNull(head.getHeaders().get(HttpHeaders.LAST_MODIFIED), uri);
+
+                HttpResponse<String> notModified = exchange(server, HttpRequest.HEAD(uri)
+                    .header(HttpHeaders.IF_MODIFIED_SINCE, get.getHeaders().get(HttpHeaders.LAST_MODIFIED)));
+                assertEquals(HttpStatus.NOT_MODIFIED, notModified.getStatus(), uri);
+            }
+        }
+    }
+
+    @Test
+    void theHiddenFilesAreNotFoundUnlessServed() throws IOException {
+        try (ServerUnderTest server = server()) {
+            for (String uri : new String[]{"/files/.env", "/files/.git/config"}) {
+                assertEquals(HttpStatus.NOT_FOUND, exchange(server, HttpRequest.GET(uri)).getStatus(), uri);
+            }
+            assertEquals("hidden", exchange(server, HttpRequest.GET("/all-files/.env")).body());
+            assertEquals("hidden config", exchange(server, HttpRequest.GET("/all-files/.git/config")).body());
+        }
+    }
+
+    @Test
     void aFileNotModifiedSinceTheRequestedDateIsNotModified() throws IOException {
         try (ServerUnderTest server = server()) {
             HttpResponse<String> first = exchange(server, HttpRequest.GET("/files/hello.txt"));
@@ -310,6 +344,7 @@ public class StaticResourcesRoutesTest {
         public void routes(HttpRouteBuilder routes) {
             routes.GET("/static-fn").resources(StaticResources.classpath("static-fn").cacheControl(CACHE_CONTROL));
             routes.GET("/files").resources(StaticResources.fileSystem(root));
+            routes.GET("/all-files").resources(StaticResources.fileSystem(root).hiddenFiles(true));
             routes.GET("/raw/{+file}", StaticResources.classpath("static-fn").pathVariable("file").indexFile(null));
             routes.GET("/static-fn/special.txt", (request, pathVariables) -> HttpResponse.ok("special handler").contentType(MediaType.TEXT_PLAIN_TYPE));
             routes.path("/grouped", group -> {

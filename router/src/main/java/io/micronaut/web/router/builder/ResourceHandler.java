@@ -40,4 +40,18 @@ public interface ResourceHandler extends RequestHandler {
      */
     String pathVariable();
 
+    /**
+     * Whether reading the resources blocks, e.g. on the files of the file system or on the jars
+     * of the classpath: the routes of the resources then run on the blocking executor, unless the
+     * route or its groups declare an executor, see {@link ExecutionSpec#executeOn(String)} and
+     * {@link ExecutionSpec#nonBlocking()}. A handler that reads its resources without blocking, e.g.
+     * from memory, returns {@code false}: its routes run on the executor selected like for any
+     * {@link RequestHandler}.
+     *
+     * @return Whether reading the resources blocks, {@code true} by default
+     */
+    default boolean blocking() {
+        return true;
+    }
+
 }

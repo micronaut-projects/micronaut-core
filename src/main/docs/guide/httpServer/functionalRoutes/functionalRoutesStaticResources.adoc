@@ -27,6 +27,7 @@ snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="group", 
 * `indexFile(name)`: the file answered for the prefix itself and for a path without an extension that is a directory, `index.html` by default; `null` for none, then such a request is answered with `404`.
 * `cacheControl(value)`: the `Cache-Control` header of the resources.
 * `pathVariable(name)`: the name of the path variable of the path of the resource, `path` by default.
+* `hiddenFiles(serve)`: whether the hidden files are served, the paths with a segment that starts with a dot, e.g. `.env`, `.git/config` or `.well-known/security.txt`. By default they are not: such a path is answered with `404`.
 
 ==== Responses
 
@@ -35,7 +36,7 @@ A file of the file system is answered as a api:http.server.types.files.SystemFil
 * the content type follows the extension of the file name;
 * the response has a `Last-Modified` header, and a request with a matching `If-Modified-Since` header is answered with `304`;
 * a `Range` request for a file of the file system is answered with `206`;
-* a `HEAD` request is answered with the headers, without reading the resource.
+* a `HEAD` request is answered with the headers of a `GET` request, including `304` to a matching `If-Modified-Since`, without the content.
 
 A request for a resource that no location has, or for a directory without an index file, is answered with `404`. So is a path that tries to leave the base: a `.` or `..` segment, a backslash, an absolute path, or a percent-encoded dot, slash or backslash, e.g. `/assets/%2e%2e/secret.txt` or `/assets/..%2fsecret.txt`.
 
@@ -44,6 +45,9 @@ A request for a resource that no location has, or for a directory without an ind
 * `resources(...)` ends a route of `GET` only, e.g. `GET(uri)` or `route(HttpMethod.GET, uri)`. On any other route, e.g. `POST(uri)`, `any(uri)` or a route of `GET` and `POST`, it throws an `IllegalStateException` while the routes are built, so the application fails at startup. It throws one too on a route already ended by another terminal.
 * The URI of the route is a prefix: it has no query or fragment, and the path variable of the handler is a plain name. Otherwise the route fails with an `IllegalArgumentException`. The prefix is a URI template: in a group whose `templates(...)` parse another language, `resources(...)` throws an `IllegalStateException`.
 * The media types of its groups do not apply, but their filters, executor, conditions, order, port, annotations and attributes do.
+* Reading the resources of the file system and of the classpath blocks, so the route runs on the blocking executor, unless the route or its groups declare an executor, e.g. `executeOn(...)` or `nonBlocking()`. A custom `ResourceHandler` that reads its resources without blocking returns `false` from `blocking()`.
+* A route of resources is a route of an `HttpRoutes` bean: on a located route, see <<functionalRoutesLocators, Locator Routes>>, it throws an `IllegalStateException`.
+* The prefix of the route, with the prefixes of its groups, does not have the path variable of the handler, e.g. `path("/tenants/{path}", ...)`: it throws an `IllegalStateException`. Give the handler another one with `pathVariable(...)`.
 
 ==== Static resources of the configuration
 
