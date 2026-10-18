@@ -21,6 +21,7 @@ import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.reactive.HotObservable;
@@ -32,6 +33,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
 import io.netty.channel.VoidChannelPromise;
+import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
@@ -61,6 +63,10 @@ abstract class MultiplexedServerHandler {
     @Nullable
     ChannelHandlerContext ctx;
     BodySizeLimits bodySizeLimits = BodySizeLimits.UNLIMITED;
+    /**
+     * Whether compressed request bodies are decompressed.
+     */
+    boolean decompress = true;
     private final RequestHandler requestHandler;
     @Nullable
     private Compressor compressor;
@@ -162,6 +168,28 @@ abstract class MultiplexedServerHandler {
         private boolean closed;
         private Compressor. @Nullable Session compressionSession;
         /**
+         * Whether the request body is compressed. The protocol counts the compressed bytes for
+         * flow control, while the body consumer reports decompressed bytes, which
+         * {@link #onDecodedBytesConsumed(int)} converts using {@link #compressedUnconsumed} and
+         * {@link #decompressedUnconsumed}.
+         */
+        private boolean decompressing;
+        /**
+         * The decompressor of the request body, or {@code null} if the body is not compressed,
+         * is fully decompressed, failed to decompress, or the stream is closed.
+         */
+        @Nullable
+        private RequestDecompressor decompressor;
+        /**
+         * The last decompressed buffer of the current data frame. It is held back so that it can
+         * be passed on together with the end of the stream.
+         */
+        @Nullable
+        private ByteBuf heldDecompressed;
+        private long decompressedLength;
+        private int compressedUnconsumed;
+        private long decompressedUnconsumed;
+        /**
          * The callbacks of {@link #whenAbandoned(Runnable)}, guarded by this stream, or
          * {@code null} if none is registered.
          */
@@ -184,7 +212,8 @@ abstract class MultiplexedServerHandler {
         /**
          * Called when the controller consumes some HTTP request data.
          *
-         * @param n The number of bytes that have been consumed
+         * @param n The number of bytes as received from the peer (i.e. compressed bytes for a
+         *          compressed body) that have been consumed
          */
         abstract void notifyDataConsumed(int n);
 
@@ -246,6 +275,18 @@ abstract class MultiplexedServerHandler {
             }
 
             this.request = headers;
+            if (!endOfStream && decompress) {
+                String contentEncoding = headers.headers().get(HttpHeaderNames.CONTENT_ENCODING);
+                if (contentEncoding != null) {
+                    decompressor = RequestDecompressor.create(requiredCtx().alloc(), contentEncoding);
+                    if (decompressor != null) {
+                        decompressing = true;
+                        // the content length is that of the compressed body
+                        headers.headers().remove(HttpHeaderNames.CONTENT_ENCODING);
+                        headers.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                    }
+                }
+            }
             if (endOfStream) {
                 requestAccepted = true;
                 requestHandler.accept(requiredCtx(), headers, NettyByteBodyFactory.empty(), this);
@@ -261,6 +302,156 @@ abstract class MultiplexedServerHandler {
          * {@link #notifyDataConsumed(int)})
          */
         final int onDataRead(ByteBuf data, boolean endOfStream) {
+            if (decompressing) {
+                return onCompressedDataRead(data, endOfStream);
+            }
+            onDecodedDataRead(data, endOfStream);
+            return 0;
+        }
+
+        private int onCompressedDataRead(ByteBuf data, boolean endOfStream) {
+            int compressedBytes = data.readableBytes();
+            RequestDecompressor decompressor = this.decompressor;
+            if (decompressor == null) {
+                // decompression failed or the stream is closed
+                data.release();
+                return compressedBytes;
+            }
+            try {
+                decompressor.add(data, this::onDecompressed);
+                if (endOfStream) {
+                    decompressor.finish(this::onDecompressed);
+                }
+            } catch (DecompressionException e) {
+                failDecompression(e);
+                return compressedBytes;
+            }
+            if (this.decompressor == null) {
+                // decompression failed or the stream was closed while it handled the data
+                return compressedBytes;
+            }
+            // count the bytes of this frame only now: if the consumer reports data of this frame
+            // as consumed while it is being decompressed, they would be returned to the peer
+            // before the rest of the frame is consumed
+            compressedUnconsumed += compressedBytes;
+            ByteBuf held = heldDecompressed;
+            heldDecompressed = null;
+            if (endOfStream) {
+                this.decompressor = null;
+                forwardDecompressed(held == null ? Unpooled.EMPTY_BUFFER : held, true);
+            } else if (held != null) {
+                forwardDecompressed(held, false);
+            }
+            if (decompressedUnconsumed == 0) {
+                // no decompressed data is pending that the consumer could report as consumed
+                // (e.g. the data so far is only a header), so return the compressed bytes now
+                int consumed = compressedUnconsumed;
+                compressedUnconsumed = 0;
+                return consumed;
+            }
+            return 0;
+        }
+
+        private void onDecompressed(ByteBuf decompressed) {
+            long newLength = decompressedLength + decompressed.readableBytes();
+            if (newLength > bodySizeLimits.maxBodySize()) {
+                decompressed.release();
+                failDecompression(new ContentLengthExceededException(bodySizeLimits.maxBodySize(), newLength));
+                return;
+            }
+            decompressedLength = newLength;
+            ByteBuf previous = heldDecompressed;
+            heldDecompressed = decompressed;
+            if (previous != null) {
+                forwardDecompressed(previous, false);
+            }
+        }
+
+        private void forwardDecompressed(ByteBuf decompressed, boolean endOfStream) {
+            decompressedUnconsumed += decompressed.readableBytes();
+            onDecodedDataRead(decompressed, endOfStream);
+        }
+
+        /**
+         * Fail the request body because it could not be decompressed. The rest of the body is
+         * discarded.
+         *
+         * @param cause The error to forward to the body consumer
+         */
+        private void failDecompression(Throwable cause) {
+            closeDecompressor();
+            if (closed) {
+                return;
+            }
+            // the consumer will not report the data it did not receive as consumed
+            int unconsumed = compressedUnconsumed;
+            compressedUnconsumed = 0;
+            decompressedUnconsumed = 0;
+            if (unconsumed > 0) {
+                notifyDataConsumed(unconsumed);
+            }
+            devolveToStreaming();
+            if (streamer != null) {
+                streamer.error(cause);
+            }
+        }
+
+        private void closeDecompressor() {
+            RequestDecompressor decompressor = this.decompressor;
+            if (decompressor != null) {
+                this.decompressor = null;
+                decompressor.close();
+            }
+            ByteBuf held = heldDecompressed;
+            if (held != null) {
+                heldDecompressed = null;
+                held.release();
+            }
+        }
+
+        /**
+         * Report request data as consumed.
+         *
+         * @param n The number of consumed bytes, after decompression
+         */
+        private void onDecodedBytesConsumed(int n) {
+            if (decompressing) {
+                n = toCompressedBytes(n);
+                if (n == 0) {
+                    return;
+                }
+            }
+            notifyDataConsumed(n);
+        }
+
+        /**
+         * Convert decompressed bytes reported as consumed to the compressed bytes they were
+         * decompressed from, in proportion to the bytes that are still unconsumed.
+         *
+         * @param decompressedBytes The consumed decompressed bytes
+         * @return The consumed compressed bytes
+         */
+        private int toCompressedBytes(int decompressedBytes) {
+            int compressedBytes;
+            if (decompressedBytes >= decompressedUnconsumed) {
+                compressedBytes = compressedUnconsumed;
+                decompressedUnconsumed = 0;
+            } else {
+                double ratio = decompressedBytes / (double) decompressedUnconsumed;
+                compressedBytes = (int) Math.min(compressedUnconsumed, Math.ceil(compressedUnconsumed * ratio));
+                decompressedUnconsumed -= decompressedBytes;
+            }
+            compressedUnconsumed -= compressedBytes;
+            return compressedBytes;
+        }
+
+        /**
+         * Called with the request data after decompression.
+         *
+         * @param data The data. Release ownership is transferred to this method
+         * @param endOfStream Whether this is the last request data
+         */
+        private void onDecodedDataRead(ByteBuf data, boolean endOfStream) {
             if (streamer == null && closed) {
                 // no request will be accepted for this stream anymore
                 data.release();
@@ -284,7 +475,7 @@ abstract class MultiplexedServerHandler {
                     bufferedContent = null;
 
                     requestAccepted = true;
-                    notifyDataConsumed(fullBody.readableBytes());
+                    onDecodedBytesConsumed(fullBody.readableBytes());
                     requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), byteBodyFactory().createChecked(bodySizeLimits, fullBody), this);
                 } else {
                     if (bufferedContent == null) {
@@ -298,7 +489,6 @@ abstract class MultiplexedServerHandler {
                     streamer.complete();
                 }
             }
-            return 0;
         }
 
         /**
@@ -312,6 +502,31 @@ abstract class MultiplexedServerHandler {
         final void onTrailersRead(HttpHeaders trailers, boolean endOfStream) {
             if (!endOfStream || closed) {
                 return;
+            }
+            if (decompressing) {
+                RequestDecompressor decompressor = this.decompressor;
+                if (decompressor == null) {
+                    // decompression failed, the body was failed already
+                    return;
+                }
+                try {
+                    decompressor.finish(this::onDecompressed);
+                } catch (DecompressionException e) {
+                    failDecompression(e);
+                    return;
+                }
+                if (this.decompressor == null) {
+                    return;
+                }
+                this.decompressor = null;
+                ByteBuf held = heldDecompressed;
+                if (held != null) {
+                    heldDecompressed = null;
+                    forwardDecompressed(held, false);
+                }
+                if (closed) {
+                    return;
+                }
             }
             if (streamer != null) {
                 streamer.completeWithTrailers(trailers);
@@ -327,7 +542,7 @@ abstract class MultiplexedServerHandler {
                     fullBody = pieces.size() == 1 ? pieces.get(0) : PipeliningServerHandler.composeBody(requiredCtx().alloc(), pieces);
                 }
                 requestAccepted = true;
-                notifyDataConsumed(fullBody.readableBytes());
+                onDecodedBytesConsumed(fullBody.readableBytes());
                 NettyByteBodyFactory byteBodyFactory = byteBodyFactory();
                 requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), byteBodyFactory.withTrailers(byteBodyFactory.createChecked(bodySizeLimits, fullBody), trailers), this);
             }
@@ -389,6 +604,7 @@ abstract class MultiplexedServerHandler {
          */
         final void discardBufferedContent() {
             closed = true;
+            closeDecompressor();
             if (bufferedContent != null) {
                 for (ByteBuf buf : bufferedContent) {
                     buf.release();
@@ -836,7 +1052,7 @@ abstract class MultiplexedServerHandler {
                 assert bytesConsumed > 0;
 
                 for (int i = 0; bytesConsumed > Integer.MAX_VALUE && i < 100; i++) {
-                    notifyDataConsumed(Integer.MAX_VALUE);
+                    onDecodedBytesConsumed(Integer.MAX_VALUE);
                     bytesConsumed -= Integer.MAX_VALUE;
                 }
                 if (bytesConsumed > Integer.MAX_VALUE) {
@@ -844,7 +1060,7 @@ abstract class MultiplexedServerHandler {
                     // so many bytes consumed at once, weird! just clamp.
                     bytesConsumed = Integer.MAX_VALUE;
                 }
-                notifyDataConsumed(Math.toIntExact(bytesConsumed));
+                onDecodedBytesConsumed(Math.toIntExact(bytesConsumed));
                 // flush any window updates
                 flush();
             }

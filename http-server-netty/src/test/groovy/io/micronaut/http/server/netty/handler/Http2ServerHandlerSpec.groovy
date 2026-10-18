@@ -6,16 +6,23 @@ import io.micronaut.http.body.stream.BodySizeLimits
 import io.micronaut.http.body.ConcatenatingSubscriber
 import io.micronaut.http.body.InternalByteBody
 import io.micronaut.http.body.stream.InputStreamByteBody
+import io.micronaut.http.exceptions.ContentLengthExceededException
 import io.micronaut.http.netty.body.NettyByteBodyFactory
 import io.micronaut.http.server.netty.EmbeddedTestUtil
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.ByteBufAllocator
+import io.netty.buffer.ByteBufUtil
 import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled
+import io.netty.channel.ChannelHandler
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.embedded.EmbeddedChannel
+import io.netty.handler.codec.compression.DecompressionException
+import io.netty.handler.codec.compression.SnappyFrameEncoder
+import io.netty.handler.codec.compression.ZlibCodecFactory
+import io.netty.handler.codec.compression.ZlibWrapper
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpHeaders
 import io.netty.handler.codec.http.DefaultHttpResponse
@@ -103,12 +110,13 @@ class Http2ServerHandlerSpec extends Specification {
         }
     }
 
-    private static Tuple3<EmbeddedChannel, EmbeddedChannel, DuplexHandler> configure(RequestHandler requestHandler) {
+    private static Tuple3<EmbeddedChannel, EmbeddedChannel, DuplexHandler> configure(RequestHandler requestHandler, BodySizeLimits bodySizeLimits = BodySizeLimits.UNLIMITED) {
         EmbeddedChannel server = new EmbeddedChannel()
         EmbeddedChannel client = new EmbeddedChannel()
         EmbeddedTestUtil.connect(server, client)
         // adding to the pipeline writes the http2 preface, so do it after connecting the server and client
         server.pipeline().addLast(new Http2ServerHandler.ConnectionHandlerBuilder(requestHandler)
+                .bodySizeLimits(bodySizeLimits)
                 .build())
         def duplexHandler = new DuplexHandler()
         client.pipeline().addLast(Http2FrameCodecBuilder.forClient().build(), duplexHandler)
@@ -122,6 +130,247 @@ class Http2ServerHandlerSpec extends Specification {
         ThreadLocalRandom.current().nextBytes(bytes)
         buf.writeBytes(bytes)
         return buf
+    }
+
+    private static ByteBuf compress(ChannelHandler compressor, ByteBuf uncompressed) {
+        def compChannel = new EmbeddedChannel(compressor)
+        compChannel.writeOutbound(uncompressed)
+        compChannel.finish()
+        CompositeByteBuf compressed = Unpooled.compositeBuffer()
+        ByteBuf part
+        while ((part = compChannel.readOutbound()) != null) {
+            compressed.addComponent(true, part)
+        }
+        return compressed
+    }
+
+    private static DefaultHttp2Headers postHeaders(CharSequence contentEncoding) {
+        def headers = new DefaultHttp2Headers()
+        headers.method(HttpMethod.POST.asciiName())
+        headers.scheme("http")
+        headers.authority("yawk.at")
+        headers.path("/")
+        headers.set(HttpHeaderNames.CONTENT_ENCODING, contentEncoding)
+        return headers
+    }
+
+    def "compressed request body is decompressed"(CharSequence contentEncoding, ChannelHandler compressor) {
+        given:
+        HttpRequest receivedRequest = null
+        byte[] receivedBody = null
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                receivedRequest = request
+                Flux.from(body.toByteArrayPublisher()).collectList().subscribe { pieces ->
+                    def out = new ByteArrayOutputStream()
+                    pieces.each { out.write(it) }
+                    receivedBody = out.toByteArray()
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyByteBodyFactory.empty())
+                }
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+        def uncompressed = randomData(10000)
+        byte[] expected = ByteBufUtil.getBytes(uncompressed)
+        def compressed = compress(compressor, uncompressed)
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        def headers = postHeaders(contentEncoding)
+        headers.setInt(HttpHeaderNames.CONTENT_LENGTH, compressed.readableBytes())
+        client.writeOutbound(new DefaultHttp2HeadersFrame(headers, false).stream(stream1))
+        // split the body over several frames
+        while (compressed.readableBytes() > 1000) {
+            client.writeOutbound(new DefaultHttp2DataFrame(compressed.readRetainedSlice(1000), false).stream(stream1))
+        }
+        client.writeOutbound(new DefaultHttp2DataFrame(compressed.readRetainedSlice(compressed.readableBytes()), true).stream(stream1))
+        compressed.release()
+        EmbeddedTestUtil.advance(server, client)
+
+        then:
+        !receivedRequest.headers().contains(HttpHeaderNames.CONTENT_ENCODING)
+        !receivedRequest.headers().contains(HttpHeaderNames.CONTENT_LENGTH)
+        Arrays.equals(receivedBody, expected)
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        "200".contentEquals(((Http2HeadersFrame) client.readInbound()).headers().status())
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+
+        where:
+        contentEncoding          | compressor
+        HttpHeaderValues.GZIP    | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.ZLIB)
+        HttpHeaderValues.DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
+        HttpHeaderValues.SNAPPY  | new SnappyFrameEncoder()
+    }
+
+    def "compressed upload backpressure"() {
+        given:
+        Subscription serverSubscription = null
+        CompositeByteBuf received = ByteBufAllocator.DEFAULT.compositeBuffer()
+        long requested = 0
+        boolean complete = false
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                NettyByteBodyFactory.toByteBufs(body).subscribe(new Subscriber<ByteBuf>() {
+                    @Override
+                    void onSubscribe(Subscription s) {
+                        serverSubscription = s
+                    }
+
+                    @Override
+                    void onNext(ByteBuf byteBuf) {
+                        requested -= byteBuf.readableBytes()
+                        received.addComponent(true, byteBuf)
+                        if (requested > 0) {
+                            serverSubscription.request(1)
+                        }
+                    }
+
+                    @Override
+                    void onError(Throwable t) {
+                        t.printStackTrace()
+                    }
+
+                    @Override
+                    void onComplete() {
+                        complete = true
+                    }
+                })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when: "send the request headers"
+        def stream1 = duplexHandler.newStream()
+        client.writeOutbound(new DefaultHttp2HeadersFrame(postHeaders(HttpHeaderValues.GZIP), false).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        def serverSettings = (Http2SettingsFrame) client.readInbound()
+        client.readInbound() instanceof Http2SettingsAckFrame
+
+        when: "enqueue two data packets, the first of which fills the window"
+        def windowSize = serverSettings.settings().initialWindowSize() ?: Http2CodecUtil.DEFAULT_WINDOW_SIZE
+        // random data does not compress, so the compressed body is larger than the window
+        def uncompressed = randomData(windowSize + 60000)
+        def expected = uncompressed.copy()
+        def compressed = compress(ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP), uncompressed)
+        def future1 = client.writeOneOutbound(new DefaultHttp2DataFrame(compressed.readRetainedSlice(windowSize), false).stream(stream1))
+        def future2 = client.writeOneOutbound(new DefaultHttp2DataFrame(compressed.readRetainedSlice(compressed.readableBytes()), true).stream(stream1))
+        compressed.release()
+        client.flushOutbound()
+        EmbeddedTestUtil.advance(server, client)
+        then: "first data packet is written because it fits the initial window, second is not"
+        client.readInbound() == null
+        future1.isDone()
+        !future2.isDone()
+
+        when: "we request all the data"
+        requested = Long.MAX_VALUE
+        serverSubscription.request(1)
+        EmbeddedTestUtil.advance(server, client)
+        then: "consuming the decompressed data opens the window for the rest of the compressed data"
+        future2.isDone()
+        complete
+        received == expected
+
+        cleanup:
+        received.release()
+        expected.release()
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    private static RequestHandler failureRecorder(List<Throwable> failures) {
+        return new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                Flux.from(body.toByteArrayPublisher()).subscribe({ }, { failures.add(it) })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                failures.add(cause)
+            }
+        }
+    }
+
+    def "truncated compressed request body is a decompression error"(boolean trailers) {
+        given:
+        List<Throwable> failures = []
+        def (server, client, duplexHandler) = configure(failureRecorder(failures))
+        def compressed = compress(ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP), randomData(1000))
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        client.writeOutbound(new DefaultHttp2HeadersFrame(postHeaders(HttpHeaderValues.GZIP), false).stream(stream1))
+        client.writeOutbound(new DefaultHttp2DataFrame(compressed.retainedSlice(0, compressed.readableBytes() - 4), !trailers).stream(stream1))
+        if (trailers) {
+            client.writeOutbound(new DefaultHttp2HeadersFrame(new DefaultHttp2Headers().set("foo", "bar"), true).stream(stream1))
+        }
+        compressed.release()
+        EmbeddedTestUtil.advance(server, client)
+
+        then:
+        failures.size() == 1
+        failures[0] instanceof DecompressionException
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+
+        where:
+        trailers << [false, true]
+    }
+
+    def "decompressed request body is limited to the max body size"(boolean endOfStream) {
+        given:
+        List<Throwable> failures = []
+        def (server, client, duplexHandler) = configure(failureRecorder(failures), new BodySizeLimits(10000, Integer.MAX_VALUE))
+        // zeros compress well, so the compressed body is far below the limit
+        def compressed = compress(ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP), Unpooled.wrappedBuffer(new byte[100000]))
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        client.writeOutbound(new DefaultHttp2HeadersFrame(postHeaders(HttpHeaderValues.GZIP), false).stream(stream1))
+        client.writeOutbound(new DefaultHttp2DataFrame(compressed, endOfStream).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+
+        then:
+        failures.size() == 1
+        failures[0] instanceof ContentLengthExceededException
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+
+        where:
+        endOfStream << [false, true]
     }
 
     def simple() {
