@@ -153,26 +153,6 @@ public final class TypeHierarchyWriter {
         return record;
     }
 
-    /**
-     * Where the record of a type goes, see {@link TypeHierarchies#recordClassName(String, String)}, or why no record
-     * can describe the type.
-     *
-     * @param recordPackage The package the record is written into
-     * @param recordName    The name of the record
-     * @param refusal       Why no record can describe the type, or null
-     */
-    private record Plan(String recordPackage, String recordName, @Nullable String refusal) {
-    }
-
-    /**
-     * The built record.
-     *
-     * @param classDef              The class of the record
-     * @param omittedSuperTypeNames The names of the super types left out of it, in the order of the closure
-     */
-    private record Built(ClassDef classDef, List<String> omittedSuperTypeNames) {
-    }
-
     private static Plan plan(ClassElement type, Element origin) {
         String recordPackage = recordPackage(type, origin);
         if (recordPackage == null) {
@@ -398,5 +378,25 @@ public final class TypeHierarchyWriter {
             }
         }
         return true;
+    }
+
+    /**
+     * Where the record of a type goes, see {@link TypeHierarchies#recordClassName(String, String)}, or why no record
+     * can describe the type.
+     *
+     * @param recordPackage The package the record is written into
+     * @param recordName    The name of the record
+     * @param refusal       Why no record can describe the type, or null
+     */
+    private record Plan(String recordPackage, String recordName, @Nullable String refusal) {
+    }
+
+    /**
+     * The built record.
+     *
+     * @param classDef              The class of the record
+     * @param omittedSuperTypeNames The names of the super types left out of it, in the order of the closure
+     */
+    private record Built(ClassDef classDef, List<String> omittedSuperTypeNames) {
     }
 }
