@@ -28,3 +28,4 @@ io.micronaut.kotlin.processing.beans.builder.AssociatedBeanSpec$AggregatingVisit
 io.micronaut.kotlin.processing.beans.builder.AssociatedBeanSpec$FailingRoundVisitor
 io.micronaut.kotlin.processing.annotations.SubclassMemberAnnotationMutationSpec$MarkingVisitor
 io.micronaut.kotlin.processing.visitor.rounds.RoundOverriddenMethodsSpec$OverridesRecordingVisitor
+io.micronaut.kotlin.processing.qualifiers.NonBindingMarkingVisitor
