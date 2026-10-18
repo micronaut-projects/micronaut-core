@@ -477,7 +477,7 @@ public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup,
      * <pre>{@code
      * routes.locator("/accounts/{id}")
      *     .form()
-     *     .locate((request, pathVariables, form) -> accounts.find(form.get("token")), accountRoutes);
+     *     .locate((request, pathVariables, form) -> accounts.find(form.getString("token")), accountRoutes);
      * }</pre>
      *
      * @param prefixUri The prefix, see {@link #locate(String, LocatorHandler, Function)}

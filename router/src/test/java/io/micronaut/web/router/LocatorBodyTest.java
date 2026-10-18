@@ -87,7 +87,7 @@ class LocatorBodyTest {
                 return pathVariables.getLong("id") + ":" + body;
             }, target -> items));
 
-        HttpRequest<?> request = HttpRequest.POST("/orders/5/items", "");
+        HttpRequest<?> request = HttpRequest.POST("/orders/5/items", "").contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE);
         CompletionStage<?> pending = pending(() -> router.findClosest(request));
         assertEquals(0, calls.get(), "the locator waits for the body");
         // not located yet: the body is not bound again
@@ -119,7 +119,7 @@ class LocatorBodyTest {
                 return body.body(String.class).thenCompose(text -> order.thenApply(t -> t + text));
             }, target -> items));
 
-        HttpRequest<?> request = HttpRequest.POST("/orders", "");
+        HttpRequest<?> request = HttpRequest.POST("/orders", "").contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE);
         CompletionStage<?> pending = pending(() -> router.findClosest(request));
         // called at once, with the copy, not the body of the request
         assertNotNull(received.get());
@@ -146,7 +146,7 @@ class LocatorBodyTest {
                 return body;
             }, target -> items));
 
-        HttpRequest<?> request = HttpRequest.POST("/orders", "");
+        HttpRequest<?> request = HttpRequest.POST("/orders", "").contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE);
         CompletionStage<?> pending = pending(() -> router.findClosest(request));
         IllegalArgumentException failure = new IllegalArgumentException("bad body");
         content.completeExceptionally(failure);
@@ -163,7 +163,7 @@ class LocatorBodyTest {
             .body(String.class)
             .locate((request, pathVariables, body) -> null, target -> items));
 
-        HttpRequest<?> request = HttpRequest.POST("/orders", "");
+        HttpRequest<?> request = HttpRequest.POST("/orders", "").contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE);
         pending(() -> router.findClosest(request));
         content.complete("none");
         assertNull(router.findClosest(request));
@@ -226,7 +226,7 @@ class LocatorBodyTest {
     }
 
     private WeakReference<HttpRequest<?>> abandonAfterTheBodyWasRead(Router router) {
-        HttpRequest<?> request = HttpRequest.POST("/orders", "");
+        HttpRequest<?> request = HttpRequest.POST("/orders", "").contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE);
         pending(() -> router.findClosest(request));
         content.complete("body");
         // the body was read: the locator waits for its own stage
@@ -244,7 +244,7 @@ class LocatorBodyTest {
             .body(String.class)
             .locate((request, pathVariables, body) -> body, target -> items));
 
-        HttpRequest<?> request = HttpRequest.POST("/orders", "");
+        HttpRequest<?> request = HttpRequest.POST("/orders", "").contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE);
         CompletionStage<?> pending = pending(() -> router.findClosest(request));
         content.complete("order");
         assertFalse(pending.toCompletableFuture().isDone(), "the release of the body is waited for");
@@ -262,7 +262,7 @@ class LocatorBodyTest {
             .body(String.class)
             .locate((request, pathVariables, body) -> body, target -> items));
 
-        HttpRequest<?> request = HttpRequest.POST("/orders", "");
+        HttpRequest<?> request = HttpRequest.POST("/orders", "").contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE);
         pending(() -> router.findClosest(request));
         content.complete("order");
         assertSame(releaseFailure, assertThrows(IllegalStateException.class, () -> router.findClosest(request)));
@@ -280,7 +280,7 @@ class LocatorBodyTest {
                 throw locatorFailure;
             }, target -> items));
 
-        HttpRequest<?> request = HttpRequest.POST("/orders", "");
+        HttpRequest<?> request = HttpRequest.POST("/orders", "").contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE);
         pending(() -> router.findClosest(request));
         content.complete("order");
         assertSame(locatorFailure, assertThrows(IllegalArgumentException.class, () -> router.findClosest(request)));
@@ -298,7 +298,7 @@ class LocatorBodyTest {
                 return body;
             }, target -> items));
 
-        HttpRequest<?> request = HttpRequest.POST("/orders", "");
+        HttpRequest<?> request = HttpRequest.POST("/orders", "").contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE);
         PropagatedContext.getOrEmpty().plus(new Trace("t-1")).propagate(() -> pending(() -> router.findClosest(request)));
         // completed outside of the context, e.g. on the thread that received the last chunk
         content.complete("order");
@@ -317,7 +317,7 @@ class LocatorBodyTest {
         assembly.addImplicitHeadRoutes();
         Router router = new DefaultRouter(List.of(), List.of(() -> assembly));
 
-        HttpRequest<?> request = HttpRequest.POST("/orders", "");
+        HttpRequest<?> request = HttpRequest.POST("/orders", "").contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE);
         IllegalStateException error = assertThrows(IllegalStateException.class, () -> router.findClosest(request));
         assertTrue(error.getMessage().contains("No HTTP server provides the body"), error.getMessage());
     }
@@ -438,7 +438,7 @@ class LocatorBodyTest {
 
         @Override
         public CompletionStage<byte[]> bytes(int maximumBytes) {
-            throw new UnsupportedOperationException();
+            return content.thenApply(value -> value.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
         }
 
         @Override

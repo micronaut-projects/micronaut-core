@@ -22,12 +22,16 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.annotation.RequestFilter;
+import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.form.FormData;
+import io.micronaut.http.server.annotation.PreMatching;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
@@ -39,6 +43,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -152,6 +157,20 @@ class HandlerRouteLocatorBodyTest {
     }
 
     @Test
+    void aFormLocatorAfterAPreMatchingFilterRewroteTheUri() {
+        String response = client.toBlocking().retrieve(HttpRequest.POST("/rewritten/accounts/7/greet", "token=gold&name=Ann")
+            .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+        assertEquals("account 7 gold: hello Ann", response);
+        assertSame(recorder.forms.get(0), recorder.forms.get(1), "the form is read once");
+    }
+
+    @Test
+    void aJsonBodyWithoutAContentTypeIsDecodedLikeTheBodyOfAHandlerRoute() {
+        String response = client.toBlocking().retrieve(HttpRequest.POST("/orders/route", "{\"kind\":\"bulk\",\"id\":4}"));
+        assertEquals("bulk: order 4", response);
+    }
+
+    @Test
     void anAsyncLocatorOfTheFormThatLocatesNothingIsNotFound() {
         BlockingHttpClient blocking = client.toBlocking();
         HttpRequest<?> request = HttpRequest.POST("/accounts/9/greet", "token=none&name=Ann").contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE);
@@ -191,6 +210,16 @@ class HandlerRouteLocatorBodyTest {
 
     @Introspected
     record Order(String kind, int id) {
+    }
+
+    @ServerFilter("/rewritten/**")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class RewritingFilter {
+        @RequestFilter
+        @PreMatching
+        void rewrite(MutableHttpRequest<?> request) {
+            request.uri(URI.create(request.getPath().substring("/rewritten".length())));
+        }
     }
 
     @Singleton

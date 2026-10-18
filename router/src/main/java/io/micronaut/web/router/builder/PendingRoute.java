@@ -66,6 +66,10 @@ final class PendingRoute {
      */
     private MediaType @Nullable [] produces;
     private boolean ended;
+    /**
+     * The terminals that end the declaration, for the messages.
+     */
+    private String terminals = "handle, handleAsync or respond";
 
     /**
      * @param builder     The builder that declared the route
@@ -126,6 +130,34 @@ final class PendingRoute {
                 + ": the upgrade request and the messages of a WebSocket route have no media types or response type");
         }
         return template;
+    }
+
+    /**
+     * Declare a locator route whose body stage is ended by {@code locate} or {@code locateAsync},
+     * see {@link LocatorSpec}: it adds no routes itself.
+     *
+     * @return This declaration
+     */
+    PendingRoute locator() {
+        terminals = "locate or locateAsync";
+        return this;
+    }
+
+    /**
+     * End the declaration of a locator route, see {@link #locator()}: its terminal declares the
+     * locator route.
+     */
+    void endLocator() {
+        checkPending();
+        ended = true;
+        builder.dropPending(this);
+    }
+
+    /**
+     * @return The terminals that end the declaration, for the messages
+     */
+    String terminals() {
+        return terminals;
     }
 
     /**
@@ -237,7 +269,7 @@ final class PendingRoute {
     private void checkPending() {
         if (ended) {
             throw new IllegalStateException("The route " + description
-                + " was already ended: give its settings before its one terminal, handle, handleAsync or respond");
+                + " was already ended: give its settings before its one terminal, " + terminals);
         }
     }
 

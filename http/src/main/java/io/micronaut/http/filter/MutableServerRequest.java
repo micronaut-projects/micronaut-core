@@ -270,6 +270,12 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
         }
 
         @Override
+        public Publisher<RawFormField> getRawFormFields(ByteBody byteBody) {
+            // e.g. the form of a copy of the body, read from a split of the bytes
+            return form().getRawFormFields(byteBody);
+        }
+
+        @Override
         public boolean hasFormBody() {
             return form().hasFormBody();
         }

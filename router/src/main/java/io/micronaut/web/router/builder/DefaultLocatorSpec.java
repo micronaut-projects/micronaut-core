@@ -35,20 +35,22 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /**
  * The body stage of a locator route, see {@link LocatorSpec}: the locator is an asynchronous
  * locator whose stage reads a copy of the body of the request first.
  *
- * @param scope    The scope the locator route is declared in
- * @param prefixUri The prefix of the locator route
- * @param context  Provides the body of a request
+ * @param scope        The scope the locator route is declared in
+ * @param prefixUri    The prefix of the locator route
+ * @param declaration  The declaration of the locator route, which its terminal ends
+ * @param context      Provides the body of a request
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, RouteConditionContext context) implements LocatorSpec {
+record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute declaration, RouteConditionContext context) implements LocatorSpec {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultLocatorSpec.class);
 
@@ -65,12 +67,12 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, RouteCondition
             LocatorBodySpec<B> body = (LocatorBodySpec<B>) body();
             return body;
         }
-        return new Body<>(this, null, copy -> copy.body(bodyType));
+        return new Body<>(this, null, (request, bound) -> bound.copy().body(bodyType));
     }
 
     @Override
     public LocatorBodySpec<AsyncRequestBody> body() {
-        return new Body<>(this, null, CompletableFuture::completedFuture);
+        return new Body<>(this, null, (request, bound) -> CompletableFuture.completedFuture(bound.copy()));
     }
 
     @Override
@@ -78,7 +80,7 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, RouteCondition
         // the form of a copy is the one form of the request; a request whose body is not a form,
         // e.g. a GET or a JSON body for a located route, is located with the empty form, and its
         // body is left unread to the located route
-        return new Body<>(this, request -> isForm(request) ? null : FormData.empty(), AsyncRequestBody::form);
+        return new Body<>(this, request -> isForm(request) ? null : FormData.empty(), (request, bound) -> bound.copy().form());
     }
 
     /**
@@ -96,12 +98,12 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, RouteCondition
      *
      * @param spec     The locator route
      * @param unread   The body to locate a request with without reading its body, {@code null} when it is read; {@code null} to read every body
-     * @param reader   Reads the body from the copy
+     * @param reader   Reads the body from a copy of the body of the request
      * @param <B>      The type of the body
      */
     record Body<B extends @Nullable Object>(DefaultLocatorSpec spec,
                                             @Nullable Function<HttpRequest<?>, @Nullable B> unread,
-                                            Function<AsyncRequestBody, CompletionStage<? extends B>> reader) implements LocatorBodySpec<B> {
+                                            BiFunction<HttpRequest<?>, AsyncRequestBody, CompletionStage<? extends B>> reader) implements LocatorBodySpec<B> {
 
         @Override
         public <T> void locate(BodyLocatorHandler<B, ? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
@@ -112,6 +114,8 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, RouteCondition
         @Override
         public <T> void locateAsync(AsyncBodyLocatorHandler<B, ? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
             Objects.requireNonNull(locator, "locator");
+            // one terminal per declaration
+            spec.declaration().endLocator();
             RouteConditionContext context = spec.context();
             spec.scope().<T>locateAsync(spec.prefixUri(), (request, pathVariables) -> locate(context, request, pathVariables, locator), routesOf);
         }
@@ -136,7 +140,7 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, RouteCondition
             CompletionStage<? extends @Nullable T> stage = null;
             try {
                 // the located route reads the body of the request again
-                stage = reader.apply(bound.copy()).thenCompose(body -> propagated.propagate(() -> {
+                stage = reader.apply(request, bound).thenCompose(body -> propagated.propagate(() -> {
                     try {
                         return Objects.requireNonNull(locator.locate(request, pathVariables, body), () -> "The locator returned no stage: " + locator);
                     } catch (Exception e) {

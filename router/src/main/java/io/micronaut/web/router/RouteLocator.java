@@ -575,7 +575,7 @@ public final class RouteLocator implements DynamicRouteTarget {
             Outcome pending = new Outcome(null, null, located, completion, location);
             completion.waitFor(outcomes, pending);
             if (stage instanceof AbandonableStage abandonable) {
-                completion.owned = abandonable;
+                completion.owned.set(abandonable);
             }
             // the locator is not called again until the stage completes
             outcomes.put(key, pending);
@@ -840,7 +840,7 @@ public final class RouteLocator implements DynamicRouteTarget {
         /**
          * The stage of the locator, when it is the request's own, see {@link AbandonableStage}.
          */
-        private volatile @Nullable AbandonableStage owned;
+        private final AtomicReference<@Nullable AbandonableStage> owned = new AtomicReference<>();
 
         /**
          * @param key The key of the outcome
@@ -875,9 +875,8 @@ public final class RouteLocator implements DynamicRouteTarget {
          */
         void release() {
             waiting.set(null);
-            AbandonableStage stage = owned;
+            AbandonableStage stage = owned.getAndSet(null);
             if (stage != null) {
-                owned = null;
                 stage.abandon();
             }
         }

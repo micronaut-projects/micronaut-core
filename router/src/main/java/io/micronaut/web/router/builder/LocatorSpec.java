@@ -32,7 +32,7 @@ import java.util.Objects;
  * <pre>{@code
  * routes.locator("/accounts/{id}")
  *     .form()
- *     .locate((request, pathVariables, form) -> new AccountResource(form.get("token")), AccountResource::routes);
+ *     .locate((request, pathVariables, form) -> new AccountResource(form.getString("token")), AccountResource::routes);
  * }</pre>
  *
  * <p>The locator reads a {@link AsyncRequestBody#copy() copy} of the body: the located route
@@ -78,7 +78,9 @@ public sealed interface LocatorSpec permits DefaultLocatorSpec {
     /**
      * The locator reads the body itself, as an {@link AsyncRequestBody}: a copy of the body of the
      * request, which the locator may read once, before or while its stage completes. What its
-     * read left open is released when the stage completes.
+     * read left open is released when the stage completes, except a form it started to read:
+     * the form of a copy is the one form of the request, which the request keeps reading and
+     * releases, and the route waits for it, as it waits for a form one of its arguments reads.
      *
      * @return The locator stage
      */
