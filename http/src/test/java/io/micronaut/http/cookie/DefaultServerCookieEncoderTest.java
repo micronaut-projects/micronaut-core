@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
@@ -38,12 +39,11 @@ class DefaultServerCookieEncoderTest {
         Locale previous = Locale.getDefault(Locale.Category.FORMAT);
         Locale.setDefault(Locale.Category.FORMAT, Locale.FRANCE);
         try {
-            ServerCookieEncoder cookieEncoder = new DefaultServerCookieEncoder();
-            String encoded = cookieEncoder.encode(Cookie.of("id", "a3fWa").maxAge(2592000)).get(0);
-            String expires = encoded.substring(encoded.indexOf(Cookie.ATTRIBUTE_EXPIRES + "=") + 8);
-            assertTrue(expires.matches(
-                "(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \\d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \\d{4} \\d{2}:\\d{2}:\\d{2} GMT"),
-                expires);
+            // builds a fresh formatter under the French default, so the result doesn't depend on
+            // whether another test already initialised DefaultServerCookieEncoder
+            DateTimeFormatter formatter = DefaultServerCookieEncoder.expiresFormatter();
+            ZonedDateTime date = ZonedDateTime.of(LocalDateTime.of(2026, 10, 6, 10, 0, 0), ZoneOffset.UTC);
+            assertEquals("Tue, 06 Oct 2026 10:00:00 GMT", date.format(formatter));
         } finally {
             Locale.setDefault(Locale.Category.FORMAT, previous);
         }
