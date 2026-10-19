@@ -76,7 +76,7 @@ tasks.processResources {
 
 noReflection {
     allowIn("io.micronaut.context.python.GraalPyContextCustomizers", "SERVICE_LOADING")
-    allowIn("io.micronaut.context.python.GraalPyContextFactory", "SERVICE_LOADING")
+    allowIn("io.micronaut.context.python.GraalPyContextFactory", "SERVICE_LOADING", "ANNOTATIONS")
     allowIn("io.micronaut.context.python.GraalPyExceptionHandler", "CLASS_LOADING", "CLASS_MEMBERS", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.context.python.GraalPyHostAccessFactory", "ANNOTATIONS", "CLASS_LOADING", "CLASS_NAMES", "SERVICE_LOADING")
     allowIn("io.micronaut.context.python.PythonCallables", "CLASS_LOADING", "CLASS_MEMBERS", "PROXY")

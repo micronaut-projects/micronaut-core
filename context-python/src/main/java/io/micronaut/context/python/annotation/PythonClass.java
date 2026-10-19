@@ -62,4 +62,10 @@ public @interface PythonClass {
      * @return The stable class cache key used by pooled contexts
      */
     String cacheKey();
+
+    /**
+     * @return Whether the Python class is a dataclass
+     * @since 5.3.0
+     */
+    boolean dataclass() default false;
 }
