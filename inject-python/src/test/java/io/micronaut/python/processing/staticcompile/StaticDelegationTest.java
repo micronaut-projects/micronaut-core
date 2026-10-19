@@ -67,6 +67,18 @@ class StaticDelegationTest {
     }
 
     @Test
+    void aParameterOfAJavaClassTakesAJavaObjectOfThatClass() {
+        Ir.Statement returned = new Ir.Return(new Ir.Const(null, Ir.NONE));
+        assertEquals("Outer$Calc#run#owner=app.Outer$Calc#kinds=java:io.micronaut.aop.MethodInvocationContext#retry",
+            StaticDelegation.target(body(List.of("io.micronaut.aop.MethodInvocationContext"), OBJECT, returned)));
+        // an Object parameter takes a Java object, as itself; a collection, a parameterized or an array type is not taken
+        assertEquals("Outer$Calc#run#owner=app.Outer$Calc#kinds=java:java.lang.Object#retry", StaticDelegation.target(body(List.of(OBJECT), OBJECT, returned)));
+        assertNull(StaticDelegation.target(body(List.of("java.util.Map"), OBJECT, returned)));
+        assertNull(StaticDelegation.target(body(List.of("java.util.function.Supplier<java.lang.String>"), OBJECT, returned)));
+        assertNull(StaticDelegation.target(body(List.of("java.lang.String[]"), OBJECT, returned)));
+    }
+
+    @Test
     void aJavaCallIsASideEffect() {
         Ir.Expression call = new Ir.InvokeJava(null, "java.lang.Math", "abs", List.of(Ir.LONG), List.of(param(Ir.LONG)), Ir.LONG);
         assertEquals("Outer$Calc#run#owner=app.Outer$Calc#kinds=long#once", StaticDelegation.target(body(List.of(Ir.LONG), Ir.LONG, new Ir.Return(call))));
