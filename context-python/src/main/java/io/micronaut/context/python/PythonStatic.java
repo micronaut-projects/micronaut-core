@@ -59,8 +59,9 @@ public final class PythonStatic {
     // the literals Python's int() and float() parse in base 10, after the digits are made ASCII
     // the repetitions are possessive: a digit run never needs to give a digit back, and possessive
     // repetition keeps a very long literal from overflowing the stack of the backtracking matcher
-    private static final Pattern PYTHON_INT = Pattern.compile("[+-]?[0-9](?:_?[0-9])*+");
-    private static final Pattern PYTHON_FLOAT = Pattern.compile("[+-]?(?:[0-9](?:_?[0-9])*+(?:\\.(?:[0-9](?:_?[0-9])*+)?)?|\\.[0-9](?:_?[0-9])*+)(?:[eE][+-]?[0-9](?:_?[0-9])*+)?");
+    private static final Pattern PYTHON_INT = Pattern.compile("[+-]?\\d(?:_?\\d)*+");
+    // a float literal is its mantissa and an optional exponent (an int literal), matched apart
+    private static final Pattern PYTHON_MANTISSA = Pattern.compile("[+-]?(?:\\d(?:_?\\d)*+(?:\\.(?:\\d(?:_?\\d)*+)?)?|\\.\\d(?:_?\\d)*+)");
     private static final String ZERO_DIVISION_ERROR = "ZeroDivisionError";
     private static final String TYPE_ERROR = "TypeError";
     private static final String ASSERTION_ERROR = "AssertionError";
@@ -1054,7 +1055,10 @@ public final class PythonStatic {
      */
     private static double parseFloat(String text) {
         String digits = asciiDigits(text);
-        if (!PYTHON_FLOAT.matcher(digits).matches()) {
+        int exponent = Math.max(digits.indexOf('e'), digits.indexOf('E'));
+        String mantissa = exponent < 0 ? digits : digits.substring(0, exponent);
+        if (!PYTHON_MANTISSA.matcher(mantissa).matches()
+            || exponent >= 0 && !PYTHON_INT.matcher(digits.substring(exponent + 1)).matches()) {
             throw new NumberFormatException(text);
         }
         return Double.parseDouble(digits.replace("_", ""));
