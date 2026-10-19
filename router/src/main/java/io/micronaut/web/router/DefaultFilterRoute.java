@@ -54,9 +54,9 @@ final class DefaultFilterRoute implements FilterRoute {
     private @Nullable AnnotationMetadata annotationMetadata;
     private final boolean isPreMatching;
     private @Nullable String matchingAnnotation;
-    // computed from the patterns and the pattern style on the first match, reset when they change
-    @SuppressWarnings("java:S3077") // the matcher is immutable, only the reference is written
-    private volatile @Nullable FilterPatternMatcher patternMatcher;
+    // built from the patterns and the pattern style whenever they change: like them, it is only
+    // changed while the route is configured, before it is matched
+    private FilterPatternMatcher patternMatcher = FilterPatternMatcher.of(null, List.of());
     // most filters have no matching annotation: the absence is kept too, not looked up for every request
     private volatile boolean matchingAnnotationResolved;
 
@@ -95,6 +95,7 @@ final class DefaultFilterRoute implements FilterRoute {
         this(filter, annotationMetadataResolver, isPreMatching);
         Objects.requireNonNull(pattern, "Pattern argument is required");
         this.patterns.add(pattern);
+        patternsChanged();
     }
 
     /**
@@ -108,6 +109,7 @@ final class DefaultFilterRoute implements FilterRoute {
         this(filter, AnnotationMetadataResolver.DEFAULT, isPreMatching);
         Objects.requireNonNull(pattern, "Pattern argument is required");
         this.patterns.add(pattern);
+        patternsChanged();
         this.annotationMetadata = annotationMetadata;
         this.matchingAnnotation = FilterRoute.super.findMatchingAnnotation();
         this.matchingAnnotationResolved = true;
@@ -191,12 +193,7 @@ final class DefaultFilterRoute implements FilterRoute {
         if (httpMethods != null && !httpMethods.contains(method)) {
             return Optional.empty();
         }
-        FilterPatternMatcher matcher = patternMatcher;
-        if (matcher == null) {
-            matcher = FilterPatternMatcher.of(patternStyle, patterns);
-            patternMatcher = matcher;
-        }
-        if (matcher.matches(path)) {
+        if (patternMatcher.matches(path)) {
             GenericHttpFilter filter = getFilter();
             if (!GenericHttpFilter.isEnabled(filter)) {
                 return Optional.empty();
@@ -210,7 +207,7 @@ final class DefaultFilterRoute implements FilterRoute {
     public FilterRoute pattern(String pattern) {
         if (StringUtils.isNotEmpty(pattern)) {
             this.patterns.add(pattern);
-            this.patternMatcher = null;
+            patternsChanged();
         }
         return this;
     }
@@ -229,7 +226,11 @@ final class DefaultFilterRoute implements FilterRoute {
     @Override
     public FilterRoute patternStyle(FilterPatternStyle patternStyle) {
         this.patternStyle = patternStyle;
-        this.patternMatcher = null;
+        patternsChanged();
         return this;
+    }
+
+    private void patternsChanged() {
+        patternMatcher = FilterPatternMatcher.of(patternStyle, patterns);
     }
 }

@@ -85,8 +85,8 @@ public final class FilterPatternMatcher {
             boolean matchAll = false;
             List<String> remaining = new ArrayList<>(patterns.size());
             for (String pattern : patterns) {
-                // only the default Ant matcher is known to treat "/**" as "starts with /"
-                if (pathMatcher == PathMatcher.ANT && Filter.MATCH_ALL_PATTERN.equals(pattern)) {
+                // the Ant style always uses PathMatcher.ANT, which treats "/**" as "starts with /"
+                if (Filter.MATCH_ALL_PATTERN.equals(pattern)) {
                     matchAll = true;
                 } else {
                     remaining.add(pattern);
