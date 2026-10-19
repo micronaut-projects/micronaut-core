@@ -1271,6 +1271,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        public void runInResponseOrder(Runnable action, Runnable discard) {
+            write(new ActionOutboundHandler(this, action, discard));
+        }
+
+        @Override
         public void writeHeadResponse(HttpResponse response) {
             writeFull(new DefaultFullHttpResponse(
                 response.protocolVersion(),
@@ -1542,6 +1547,52 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 next.discardOutbound();
                 next = null;
             }
+        }
+    }
+
+    /**
+     * Handler that runs an action in place of a response, once the responses before it are
+     * written. It stays the current handler afterwards, so that no later response is written.
+     */
+    private final class ActionOutboundHandler extends OutboundHandler {
+        private final Runnable action;
+        private final Runnable discard;
+        private boolean done = false;
+
+        ActionOutboundHandler(OutboundAccessImpl outboundAccess, Runnable action, Runnable discard) {
+            super(outboundAccess);
+            this.action = action;
+            this.discard = discard;
+        }
+
+        @Override
+        void writeSome() {
+            if (!done) {
+                done = true;
+                action.run();
+            }
+        }
+
+        @Override
+        void markCloseAfterWrite() {
+            // the action owns the connection
+        }
+
+        @Override
+        void discardOutbound() {
+            super.discardOutbound();
+            if (!done) {
+                done = true;
+                discard.run();
+                // the action did not run: the request is done with
+                markResponseWritten();
+            }
+        }
+
+        @Override
+        void discardRefused() {
+            super.discardRefused();
+            discard.run();
         }
     }
 
