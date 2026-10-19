@@ -683,19 +683,27 @@ class Calc:
         def run(self, n: int) -> int:
             return n
 ''')
-        self.assertEqual(2, apply_delegation(tree, ["Calc#label", "Calc$Inner#run", "Missing#nothing"]))
-        self.assertEqual(0, apply_delegation(tree, ["Calc#label"]))  # already rewritten
+        targets = ["Calc#label#owner=app.Calc#kinds=int,str#retry", "Calc$Inner#run#owner=app.Calc$Inner#kinds=long#once",
+                   "Missing#nothing#owner=app.Missing#kinds=#retry", "Calc#other#owner=app.Calc"]
+        self.assertEqual(2, apply_delegation(tree, targets))
+        self.assertEqual(0, apply_delegation(tree, targets))  # already rewritten
         source = ast.unparse(tree)
-        self.assertIn("__mn_java = self.__dict__.get('__micronaut_compiled__')", source)
-        self.assertIn("return __mn_java.label(count, name)", source)
-        self.assertIn("return __mn_java.run(n)", source)
-        label = tree.body[0].body[1]
+        self.assertIn("__mn_java = __class__.__micronaut_compiled__", source)
+        self.assertIn("__mn_java = __mn_java.call(self, 'app.Calc', 'label', (count, name), ('int', 'str'), True)", source)
+        self.assertIn("return __mn_java[0]", source)
+        self.assertIn("__mn_java = __mn_java.call(self, 'app.Calc$Inner', 'run', (n,), ('long',), False)", source)
+        self.assertNotIn("__dict__", source)
+        calc = tree.body[0]
+        self.assertIsInstance(calc.body[0], ast.Expr)  # the class docstring stays first
+        self.assertEqual("__micronaut_compiled__", calc.body[1].targets[0].id)
+        self.assertEqual(1, sum(1 for statement in calc.body if isinstance(statement, ast.Assign)))
+        label = calc.body[2]
         self.assertIsInstance(label.body[0], ast.Expr)  # the docstring stays first
         self.assertIsInstance(label.body[1], ast.Assign)
         self.assertIsInstance(label.body[2], ast.If)
         self.assertEqual(label.lineno, label.body[1].lineno)
-        other = tree.body[0].body[2]
-        self.assertIsInstance(other.body[0], ast.Return)
+        other = calc.body[3]
+        self.assertIsInstance(other.body[0], ast.Return)  # a target without its kinds is not delegated
         compile(tree, "delegated.py", "exec")
 
     def test_the_temporary_of_the_rewrite_never_shadows_a_name_of_the_function(self):
@@ -709,13 +717,60 @@ class Calc:
         __mn_java = 1
         return __mn_java
 ''')
-        self.assertEqual(2, apply_delegation(tree, ["Calc#echo", "Calc#marked"]))
-        self.assertEqual(0, apply_delegation(tree, ["Calc#echo", "Calc#marked"]))
+        targets = ["Calc#echo#owner=app.Calc#kinds=str#retry", "Calc#marked#owner=app.Calc#kinds=#retry"]
+        self.assertEqual(2, apply_delegation(tree, targets))
+        self.assertEqual(0, apply_delegation(tree, targets))
         source = ast.unparse(tree)
-        self.assertIn("__mn_java_1 = self.__dict__.get('__micronaut_compiled__')", source)
-        self.assertIn("return __mn_java_1.echo(__mn_java)", source)
-        self.assertIn("return __mn_java_1.marked()", source)
+        self.assertIn("__mn_java_1 = __class__.__micronaut_compiled__", source)
+        self.assertIn("__mn_java_1 = __mn_java_1.call(self, 'app.Calc', 'echo', (__mn_java,), ('str',), True)", source)
+        self.assertIn("__mn_java_1 = __mn_java_1.call(self, 'app.Calc', 'marked', (), (), True)", source)
         compile(tree, "delegated.py", "exec")
+
+    def test_each_rewritten_method_calls_the_body_of_the_class_it_is_defined_in(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse('''
+class A:
+    def m(self) -> str:
+        return "python A"
+
+
+class B(A):
+    def m(self) -> str:
+        return "python B"
+
+    def n(self) -> str:
+        return super().m()
+''')
+        apply_delegation(tree, ["A#m#owner=app.A#kinds=#retry", "B#m#owner=app.B#kinds=#retry"])
+        calls = []
+
+        class Registry:
+            """Binds every object: the body of each class answers with its owner's name."""
+
+            def call(self, instance, owner, method, arguments, kinds, retry):
+                calls.append(owner)
+                return (f"java {owner}",)
+
+        namespace = {}
+        exec(compile(tree, "delegated.py", "exec"), namespace)
+        b = namespace["B"]()
+        # nothing is bound: the Python bodies run
+        self.assertEqual("python A", b.n())
+        namespace["A"].__micronaut_compiled__ = Registry()
+        namespace["B"].__micronaut_compiled__ = namespace["A"].__micronaut_compiled__
+        self.assertEqual("java app.B", b.m())
+        self.assertEqual("java app.A", b.n())  # super().m() runs A's body
+        self.assertEqual(["app.B", "app.A"], calls)
+        self.assertNotIn("__micronaut_compiled__", vars(b))
+
+    def test_a_function_whose_parameters_the_java_body_does_not_take_positionally_is_not_rewritten(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse('''
+class Calc:
+    def keyword(self, *, n: int) -> int:
+        return n
+''')
+        self.assertEqual(0, apply_delegation(tree, ["Calc#keyword#owner=app.Calc#kinds=int#retry"]))
 
 
 if __name__ == "__main__":

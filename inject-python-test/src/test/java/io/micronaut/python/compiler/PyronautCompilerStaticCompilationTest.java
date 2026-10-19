@@ -145,10 +145,43 @@ class PyronautCompilerStaticCompilationTest {
             generated = Files.readString(paths.filter(path -> path.getFileName().toString().equals("PricingService.java")).findFirst().orElseThrow());
         }
         assertTrue(generated.contains("PythonStatic.entered(\"python.PricingService#total\")"), generated);
-        assertTrue(generated.contains("PythonStatic.bindCompiled(value, new python.PricingService.PyronautCompiled(value))"), generated);
+        assertTrue(generated.contains("PythonStatic.bindCompiled(value, \"python.PricingService\", new python.PricingService.PyronautCompiled())"), generated);
         assertTrue(generated.contains("public static final class PyronautCompiled"), generated);
-        assertTrue(generated.contains("private final Value self;"), generated);
+        // stateless: the delegate takes the Python object, so binding an object keeps nothing alive
+        assertTrue(generated.contains("public double total(Value __mnSelf, int quantity, double unit_price)"), generated);
+        assertTrue(generated.contains("throw PythonStatic.forPython(__mnSelf, "), generated);
         assertEquals(2, generated.split("Compiled from ", -1).length - 1, generated);
+    }
+
+    @Test
+    void aConditionalOperandIsGroupedInTheGeneratedJava(@TempDir Path directory) throws IOException {
+        Path output = Files.createDirectories(directory.resolve("output"));
+        PyronautCompiler.builder()
+            .pythonCode("""
+                from jakarta.inject import Singleton
+
+                @Singleton
+                class Grouping:
+                    def shifted(self, flag: bool, n: int) -> int:
+                        return (n if flag else 0) + 1
+
+                    def negated(self, flag: bool, n: int) -> int:
+                        return -(n if flag else 0)
+                """)
+            .staticCompilation(StaticCompilationMode.ALL)
+            .targetDir(output.toFile())
+            .build()
+            .compile();
+
+        String generated;
+        try (var paths = Files.walk(output)) {
+            generated = Files.readString(paths.filter(path -> path.getFileName().toString().equals("Grouping.java")).findFirst().orElseThrow());
+        }
+        // without the grouping, Java would read flag ? n : 0 + 1
+        String shifted = generated.substring(generated.indexOf("public int shifted("));
+        assertTrue(shifted.substring(0, shifted.indexOf('}')).contains("Math.addExact(PythonStatic.group(flag ? "), shifted);
+        String negated = generated.substring(generated.indexOf("public int negated("));
+        assertTrue(negated.substring(0, negated.indexOf('}')).contains("Math.negateExact(PythonStatic.group(flag ? "), negated);
     }
 
     @Test

@@ -40,12 +40,18 @@ import java.util.concurrent.atomic.LongAdder;
 public final class PythonStatic {
 
     /**
-     * The attribute of a Python object holding the delegate through which the Python side of a
-     * compiled method calls its Java body.
+     * The class attribute through which the rewritten methods of a class reach the Java bodies of
+     * the objects bound to them: {@code None} until an object of the class is bound, see
+     * {@link #bindCompiled(org.graalvm.polyglot.Value, String, Object)}.
      */
     public static final String COMPILED_MEMBER = "__micronaut_compiled__";
 
     private static final ConcurrentHashMap<String, LongAdder> ENTRIES = new ConcurrentHashMap<>();
+    private static final String ZERO_DIVISION_ERROR = "ZeroDivisionError";
+    private static final String TYPE_ERROR = "TypeError";
+    private static final String ASSERTION_ERROR = "AssertionError";
+    private static final String BIND_COMPILED = "__micronaut_bind_compiled";
+    private static final String RAISE_PYTHON = "__micronaut_raise";
     // the largest magnitude a double holds every long up to exactly
     private static final long EXACT_DOUBLE_LONG = 1L << 53;
     private static final int QUOTIENT_SHIFT = 128;
@@ -170,7 +176,7 @@ public final class PythonStatic {
      */
     public static double divide(long left, long right) {
         if (right == 0) {
-            throw new ArithmeticException("division by zero");
+            throw new PythonArithmeticError(ZERO_DIVISION_ERROR, "division by zero");
         }
         if (Math.abs(left) <= EXACT_DOUBLE_LONG && Math.abs(right) <= EXACT_DOUBLE_LONG) {
             // both convert exactly, and the division of doubles is correctly rounded
@@ -215,10 +221,10 @@ public final class PythonStatic {
      */
     public static String concat(@Nullable String left, @Nullable String right) {
         if (left == null) {
-            throw new IllegalStateException("TypeError: unsupported operand type(s) for +: 'NoneType' and 'str'");
+            throw new PythonError(TYPE_ERROR, "unsupported operand type(s) for +: 'NoneType' and 'str'");
         }
         if (right == null) {
-            throw new IllegalStateException("TypeError: can only concatenate str (not \"NoneType\") to str");
+            throw new PythonError(TYPE_ERROR, "can only concatenate str (not \"NoneType\") to str");
         }
         return left.concat(right);
     }
@@ -231,7 +237,7 @@ public final class PythonStatic {
      */
     public static double divide(double left, double right) {
         if (right == 0) {
-            throw new ArithmeticException("float division by zero");
+            throw new PythonArithmeticError(ZERO_DIVISION_ERROR, "float division by zero");
         }
         return left / right;
     }
@@ -244,7 +250,11 @@ public final class PythonStatic {
      */
     public static long floorDiv(long left, long right) {
         if (right == 0) {
-            throw new ArithmeticException("integer division or modulo by zero");
+            throw new PythonArithmeticError(ZERO_DIVISION_ERROR, "integer division or modulo by zero");
+        }
+        if (left == Long.MIN_VALUE && right == -1) {
+            // the quotient 2**63 does not fit: raised as the other exact operations raise where Python promotes
+            throw new ArithmeticException("long overflow");
         }
         return Math.floorDiv(left, right);
     }
@@ -257,7 +267,7 @@ public final class PythonStatic {
      */
     public static long floorMod(long left, long right) {
         if (right == 0) {
-            throw new ArithmeticException("integer division or modulo by zero");
+            throw new PythonArithmeticError(ZERO_DIVISION_ERROR, "integer division or modulo by zero");
         }
         return Math.floorMod(left, right);
     }
@@ -270,7 +280,7 @@ public final class PythonStatic {
      */
     public static double floorDiv(double left, double right) {
         if (right == 0) {
-            throw new ArithmeticException("float floor division by zero");
+            throw new PythonArithmeticError(ZERO_DIVISION_ERROR, "float floor division by zero");
         }
         // The parity target is the runtime the Python body would run on: GraalPy floors the
         // quotient (1.0 // 0.1 is 10.0 there), where CPython derives it from the fmod remainder
@@ -286,7 +296,7 @@ public final class PythonStatic {
      */
     public static double floorMod(double left, double right) {
         if (right == 0) {
-            throw new ArithmeticException("float modulo by zero");
+            throw new PythonArithmeticError(ZERO_DIVISION_ERROR, "float modulo by zero");
         }
         double remainder = left % right;
         if (remainder == 0) {
@@ -333,7 +343,7 @@ public final class PythonStatic {
      */
     public static void assertion(boolean condition, @Nullable String message) {
         if (!condition) {
-            throw new IllegalStateException(message == null ? "AssertionError" : "AssertionError: " + message);
+            throw new PythonError(ASSERTION_ERROR, message);
         }
     }
 
@@ -363,15 +373,43 @@ public final class PythonStatic {
     }
 
     /**
-     * Binds a Python object to the delegate of its stub: the compiled methods of the object run as
-     * Java from then on, see {@code apply_delegation}.
+     * Binds a Python object to the compiled bodies of one class of its MRO: the rewritten methods
+     * of that class run the Java bodies for the object from then on, see {@code apply_delegation}.
+     * The binding is kept outside the object, weakly, so a copy of the object is not bound and
+     * the object's attributes are its own.
      *
      * @param pythonObject The Python object of a stub
-     * @param delegate     The delegate, a plain Java object calling the stub's compiled methods
+     * @param owner        The generated class whose compiled bodies are bound, as the rewritten methods name it
+     * @param delegate     The delegate of that class: a stateless Java object whose methods take the Python object first
      */
-    public static void bindCompiled(org.graalvm.polyglot.Value pythonObject, Object delegate) {
-        PythonContextRuntime.helper(pythonObject.getContext(), "__micronaut_set_instance_property")
-            .execute(pythonObject, COMPILED_MEMBER, delegate);
+    public static void bindCompiled(org.graalvm.polyglot.Value pythonObject, String owner, Object delegate) {
+        PythonContextRuntime.helper(pythonObject.getContext(), BIND_COMPILED).execute(pythonObject, owner, delegate);
+    }
+
+    /**
+     * The exception a compiled body called from Python throws instead: a failure the body raises
+     * where Python raises one (a division by zero, an assertion, + on None) becomes that Python
+     * exception, raised through the Python object's context, and a checked exception of a Java call
+     * is thrown as itself, as a Python caller of the Java method would see it.
+     *
+     * @param self      The Python object the body ran on
+     * @param exception The exception the body threw
+     * @return The exception to throw, when it has no Python counterpart
+     */
+    public static RuntimeException forPython(org.graalvm.polyglot.Value self, RuntimeException exception) {
+        if (exception instanceof PythonFailure failure) {
+            // raises the Python exception, which reaches the Python caller as itself
+            PythonContextRuntime.helper(self.getContext(), RAISE_PYTHON).execute(failure.pythonType(), failure.pythonMessage());
+        }
+        if (exception instanceof UncheckedFailure unchecked && unchecked.getCause() instanceof Exception cause) {
+            throw PythonStatic.<RuntimeException>sneakyThrow(cause);
+        }
+        return exception;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <E extends Throwable> E sneakyThrow(Throwable throwable) throws E {
+        throw (E) throwable;
     }
 
     /**
@@ -414,7 +452,7 @@ public final class PythonStatic {
      * wrapped, as a Python exception reaches a Java caller as a runtime exception
      */
     public static RuntimeException unchecked(Exception exception) {
-        return exception instanceof RuntimeException runtime ? runtime : new IllegalStateException(exception.toString(), exception);
+        return exception instanceof RuntimeException runtime ? runtime : new UncheckedFailure(exception);
     }
 
     /**
@@ -461,5 +499,76 @@ public final class PythonStatic {
             return number.doubleValue() != 0;
         }
         return true;
+    }
+
+    /**
+     * A failure of a compiled body that Python raises as an exception of its own.
+     */
+    sealed interface PythonFailure permits PythonError, PythonArithmeticError {
+        /**
+         * @return The name of the Python builtin exception
+         */
+        String pythonType();
+
+        /**
+         * @return The message of the Python exception, or {@code null} for none
+         */
+        @Nullable String pythonMessage();
+    }
+
+    /**
+     * An assertion that failed, or an operation Python rejects with a TypeError: a runtime exception
+     * for a Java caller, as a Python exception reaches it.
+     */
+    static final class PythonError extends IllegalStateException implements PythonFailure {
+        private final String pythonType;
+        private final @Nullable String pythonMessage;
+
+        PythonError(String pythonType, @Nullable String pythonMessage) {
+            super(pythonMessage == null ? pythonType : pythonType + ": " + pythonMessage);
+            this.pythonType = pythonType;
+            this.pythonMessage = pythonMessage;
+        }
+
+        @Override
+        public String pythonType() {
+            return pythonType;
+        }
+
+        @Override
+        public @Nullable String pythonMessage() {
+            return pythonMessage;
+        }
+    }
+
+    /**
+     * A division by zero: an ArithmeticException for a Java caller, a ZeroDivisionError for a Python one.
+     */
+    static final class PythonArithmeticError extends ArithmeticException implements PythonFailure {
+        private final String pythonType;
+
+        PythonArithmeticError(String pythonType, String message) {
+            super(message);
+            this.pythonType = pythonType;
+        }
+
+        @Override
+        public String pythonType() {
+            return pythonType;
+        }
+
+        @Override
+        public @Nullable String pythonMessage() {
+            return getMessage();
+        }
+    }
+
+    /**
+     * A checked exception of a Java call of a compiled body, carried unchecked to a Java caller.
+     */
+    static final class UncheckedFailure extends IllegalStateException {
+        UncheckedFailure(Exception cause) {
+            super(cause.toString(), cause);
+        }
     }
 }

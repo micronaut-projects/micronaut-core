@@ -30,6 +30,7 @@ import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
 import io.micronaut.python.processing.staticcompile.Ir;
 import io.micronaut.python.processing.staticcompile.StaticCompilationConfiguration;
 import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
+import io.micronaut.python.processing.staticcompile.StaticDelegation;
 import io.micronaut.python.processing.typecheck.TypeCheckConfiguration;
 import io.micronaut.python.processing.util.PythonJavaTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
@@ -847,7 +848,10 @@ public final class PythonAstParser {
     /**
      * Rewrites the compiled functions of the runtime tree of a source to delegate to their Java
      * bodies when the Python object is bound to its stub, keeping the original body as the
-     * fallback for objects created in Python. A rewritten tree needs runtime bytecode.
+     * fallback for objects created in Python, and for the calls whose Python result the Java body
+     * would not give (see {@link StaticDelegation}). Only the bodies declared in this source are
+     * delegated to: a body without a location is not, since nothing ties it to a source. A
+     * rewritten tree needs runtime bytecode.
      *
      * @param transformResult The transformed source
      * @param plan            The static compilation plan
@@ -859,11 +863,14 @@ public final class PythonAstParser {
         String sourcePath = sourcePathOf(transformResult.originalSource());
         List<String> targets = new ArrayList<>();
         for (Ir.CompiledBody body : plan.bodies().values()) {
-            // the bodies declared in this source: a class of the same simple name in another package has its own
-            if (body.span() != null && !body.span().path().equals(sourcePath)) {
+            // the bodies declared in this source: a class of the same simple name in another source has its own
+            if (body.span() == null || !body.span().path().equals(sourcePath)) {
                 continue;
             }
-            targets.add(body.className().substring(body.className().lastIndexOf('.') + 1) + "#" + body.methodName());
+            String target = StaticDelegation.target(body);
+            if (target != null) {
+                targets.add(target);
+            }
         }
         if (targets.isEmpty()) {
             return 0;
