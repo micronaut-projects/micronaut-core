@@ -18,6 +18,7 @@ package io.micronaut.python.annotation.processing.test;
 /**
  * Overloads a call with two ints matches equally well, for the static compilation parity harness.
  */
+@SuppressWarnings("java:S1172") // only the parameter types matter: they make the call ambiguous
 public final class StaticOverloads {
 
     private StaticOverloads() {
