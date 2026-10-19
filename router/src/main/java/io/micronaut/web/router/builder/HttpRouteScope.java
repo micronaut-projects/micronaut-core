@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.uri.RouteTemplate;
 
 import java.util.Objects;
 import java.util.Set;
@@ -136,6 +137,43 @@ public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup,
      * @see #route(HttpMethod, String)
      */
     HttpRouteSpec route(String httpMethodName, String uri);
+
+    /**
+     * Declare a route of the requests of a method with a template that is already parsed, e.g. a
+     * template of a language a library brings, or a constant: the router uses it as it is, or
+     * mounts it under the context path, and matches requests with it. To declare routes with the
+     * text of the templates of another language, see
+     * {@link HttpRouteGroup#templates(io.micronaut.http.uri.RouteTemplateParser)}.
+     *
+     * <pre>{@code
+     * routes.route(HttpMethod.GET, ITEM_TEMPLATE).handle((request, pathVariables) -> ...);
+     * }</pre>
+     *
+     * <p>In a group with a prefix, see {@link HttpRouteBuilder#path(String, Consumer)}, a URI
+     * template is joined to the prefix, and another template is mounted under a literal prefix; a
+     * prefix with variables accepts URI templates only.</p>
+     *
+     * @param method   The HTTP method, not {@link HttpMethod#CUSTOM}
+     * @param template The template
+     * @return The pending route
+     * @throws IllegalArgumentException if the method is {@link HttpMethod#CUSTOM}, or the template
+     *                                  is not a URI template and the prefix of the group has variables
+     * @since 5.3.0
+     */
+    HttpRouteSpec route(HttpMethod method, RouteTemplate template);
+
+    /**
+     * Declare a route of the requests of a method by its name, including a custom HTTP method,
+     * with a template that is already parsed, see {@link #route(HttpMethod, RouteTemplate)}.
+     *
+     * @param httpMethodName The name of the HTTP method, a token
+     * @param template       The template
+     * @return The pending route
+     * @throws IllegalArgumentException if the name is not a token, or the template is not a URI
+     *                                  template and the prefix of the group has variables
+     * @since 5.3.0
+     */
+    HttpRouteSpec route(String httpMethodName, RouteTemplate template);
 
     /**
      * Declare the routes of the requests of any HTTP method, standard or custom, to one handler:
@@ -429,4 +467,5 @@ public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup,
         Objects.requireNonNull(routes, "routes");
         locateAsync(prefixUri, locator, target -> routes);
     }
+
 }

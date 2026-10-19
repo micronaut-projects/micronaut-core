@@ -25,6 +25,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.form.FormData;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import io.micronaut.web.router.websocket.WebSocketRouteEndpoint;
 import io.micronaut.web.router.websocket.WebSocketEndpointSpec;
 import org.jspecify.annotations.Nullable;
@@ -130,6 +131,12 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     @Override
     public HttpRouteSpec order(int order) {
         route.order(order);
+        return this;
+    }
+
+    @Override
+    public HttpRouteSpec selectedBy(@Nullable RouteMatchSelector selector) {
+        route.selectedBy(selector);
         return this;
     }
 

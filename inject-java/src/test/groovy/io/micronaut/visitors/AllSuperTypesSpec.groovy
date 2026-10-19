@@ -135,7 +135,7 @@ class Wild extends Box<java.util.List<? extends Number>> {}
         expect:
         closure(field(holder, 'strings')) == ['java.lang.String[]', 'java.io.Serializable[]', 'java.lang.Comparable<java.lang.String>[]', 'java.lang.CharSequence[]', 'java.lang.constant.Constable[]', 'java.lang.constant.ConstantDesc[]', 'java.lang.Object[]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object']
         closure(field(holder, 'boxes')) == ['test.Box<java.lang.String>[]', 'test.View<java.lang.String>[]', 'test.Named[]', 'java.lang.Object[]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object']
-        closure(field(holder, 'ints')) == ['int[][]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object']
+        closure(field(holder, 'ints')) == ['int[][]', 'java.lang.Object[]', 'java.lang.Cloneable[]', 'java.io.Serializable[]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object']
         closure(field(holder, 'primitive')) == ['int']
     }
 
