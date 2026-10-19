@@ -68,7 +68,7 @@ class StartupListener {
         Map<String, Output> outputs = [:]
         def compilation = new KotlinCompilation()
         Ksp2Kt.useKsp2(compilation)
-        compilation.languageVersion = '2.0'
+        compilation.languageVersion = '2.4'
         compilation.kotlincArguments = ['-Xsuppress-version-warnings', '-Xannotation-default-target=first-only']
         compilation.classpaths = System.getProperty('java.class.path').split(File.pathSeparator)
             .findAll { !it.isEmpty() }

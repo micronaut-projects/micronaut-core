@@ -19,6 +19,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -103,5 +104,21 @@ public interface AnnotationElement extends ClassElement {
      */
     default RetentionPolicy getRetentionPolicy() {
         return RetentionPolicy.RUNTIME;
+    }
+
+    /**
+     * The members this annotation interface declares, in declaration order: the methods of a Java or Groovy
+     * annotation interface, the properties of a Kotlin annotation class. The members are resolved from the native
+     * element under every compiler alike, where the enclosed elements differ: javac and the Groovy compiler answer
+     * the members as methods, KSP as properties and no methods, for a Java annotation on the classpath too.
+     *
+     * <p>The default implementation, for implementations that have no native element to inspect, returns an
+     * empty list.</p>
+     *
+     * @return The members, in declaration order; never {@code null}
+     * @since 5.3.0
+     */
+    default List<? extends AnnotationMemberElement> getMembers() {
+        return List.of();
     }
 }

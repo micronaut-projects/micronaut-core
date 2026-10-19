@@ -21,9 +21,12 @@ import io.micronaut.http.sse.Event;
 import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -42,14 +45,28 @@ import java.util.function.Consumer;
  * @since 5.3.0
  */
 @Internal
-final class EventStreamDecoder {
+public final class EventStreamDecoder {
     private static final byte CR = '\r';
     private static final byte LF = '\n';
     private static final byte[] BOM = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+    private static final long CR_PATTERN = 0x0D0D0D0D0D0D0D0DL;
+    private static final long LF_PATTERN = 0x0A0A0A0A0A0A0A0AL;
+    private static final long LOW_BITS = 0x0101010101010101L;
+    private static final long HIGH_BITS = 0x8080808080808080L;
 
     private final long maxBufferSize;
-    private final ByteArrayOutputStream line = new ByteArrayOutputStream();
+    /**
+     * The start of a line that continues in the next piece.
+     */
+    private final LineBuffer line = new LineBuffer();
+    /**
+     * The data of an event with more than one {@code data} line.
+     */
     private final ByteArrayOutputStream data = new ByteArrayOutputStream();
+    /**
+     * The data of an event with one {@code data} line so far, copied once.
+     */
+    private byte @Nullable [] firstData;
     private boolean firstLine = true;
     /**
      * The previous piece ended with a carriage return: a line feed that starts this one ends no
@@ -64,7 +81,7 @@ final class EventStreamDecoder {
     /**
      * @param maxBufferSize The maximum size of a line, and of the data of one event
      */
-    EventStreamDecoder(long maxBufferSize) {
+    public EventStreamDecoder(long maxBufferSize) {
         this.maxBufferSize = maxBufferSize;
     }
 
@@ -75,16 +92,30 @@ final class EventStreamDecoder {
      * @return The events the piece completes
      * @throws ContentLengthExceededException if a line or the data of an event exceeds the limit
      */
-    List<Event<byte[]>> decode(byte[] bytes) {
+    public List<Event<byte[]>> decode(byte[] bytes) {
+        return decode(bytes, 0, bytes.length);
+    }
+
+    /**
+     * Decode the next piece of the stream. A line that ends in the piece is read in place; only
+     * the start of a line that continues in the next piece is copied.
+     *
+     * @param bytes  The array of the piece
+     * @param offset The offset of the piece in the array
+     * @param length The length of the piece
+     * @return The events the piece completes
+     * @throws ContentLengthExceededException if a line or the data of an event exceeds the limit
+     */
+    public List<Event<byte[]>> decode(byte[] bytes, int offset, int length) {
         List<Event<byte[]>> events = new ArrayList<>(2);
-        decode(bytes, 0, bytes.length, events::add);
+        decode(bytes, offset, length, events::add);
         return events;
     }
 
     /**
-     * Decode the next piece of the stream. Each event is handed to the consumer as soon as its
-     * blank line is read, so the events before a line that exceeds the limit are handed out
-     * before the failure.
+     * Decode the next piece of the stream, like {@link #decode(byte[], int, int)}. Each event is
+     * handed to the consumer as soon as its blank line is read, so the events before a line that
+     * exceeds the limit are handed out before the failure.
      *
      * @param bytes  The array of the piece
      * @param offset The offset of the piece in the array
@@ -92,22 +123,29 @@ final class EventStreamDecoder {
      * @param out    Takes the events the piece completes
      * @throws ContentLengthExceededException if a line or the data of an event exceeds the limit
      */
-    void decode(byte[] bytes, int offset, int length, Consumer<? super Event<byte[]>> out) {
+    public void decode(byte[] bytes, int offset, int length, Consumer<? super Event<byte[]>> out) {
         int end = offset + length;
+        // eight bytes at a time, without reflection
+        ByteBuffer words = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
         int start = offset;
-        for (int i = offset; i < end; i++) {
+        int i;
+        while ((i = lineEnd(bytes, words, start, end)) >= 0) {
             byte b = bytes[i];
-            if (b != CR && b != LF) {
-                continue;
-            }
             if (b == LF && skipLineFeed && i == start && line.size() == 0) {
                 // the second half of a CRLF split between two pieces
                 skipLineFeed = false;
                 start = i + 1;
                 continue;
             }
-            append(bytes, start, i - start);
-            Event<byte[]> event = endLine();
+            Event<byte[]> event;
+            if (line.size() == 0) {
+                checkLine(i - start);
+                event = endLine(bytes, start, i - start);
+            } else {
+                append(bytes, start, i - start);
+                event = endLine(line.buffer(), 0, line.size());
+                line.reset();
+            }
             if (event != null) {
                 out.accept(event);
             }
@@ -128,6 +166,38 @@ final class EventStreamDecoder {
         }
     }
 
+    /**
+     * The index of the next carriage return or line feed, eight bytes at a time.
+     */
+    private static int lineEnd(byte[] bytes, ByteBuffer words, int from, int end) {
+        int i = from;
+        for (; i + Long.BYTES <= end; i += Long.BYTES) {
+            long word = words.getLong(i);
+            long found = zeroBytes(word ^ LF_PATTERN) | zeroBytes(word ^ CR_PATTERN);
+            if (found != 0) {
+                // the lowest flagged byte is always a match
+                return i + (Long.numberOfTrailingZeros(found) >>> 3);
+            }
+        }
+        for (; i < end; i++) {
+            byte b = bytes[i];
+            if (b == CR || b == LF) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static long zeroBytes(long word) {
+        return (word - LOW_BITS) & ~word & HIGH_BITS;
+    }
+
+    private void checkLine(int length) {
+        if (length > maxBufferSize) {
+            throw new ContentLengthExceededException(maxBufferSize, length);
+        }
+    }
+
     private void append(byte[] bytes, int offset, int length) {
         if (length == 0) {
             return;
@@ -139,50 +209,54 @@ final class EventStreamDecoder {
         line.write(bytes, offset, length);
     }
 
-    private @Nullable Event<byte[]> endLine() {
+    private @Nullable Event<byte[]> endLine(byte[] bytes, int offset, int length) {
         skipLineFeed = false;
-        byte[] bytes = line.toByteArray();
-        line.reset();
-        int start = 0;
+        int start = offset;
+        int end = offset + length;
         if (firstLine) {
             firstLine = false;
-            if (bytes.length >= BOM.length && bytes[0] == BOM[0] && bytes[1] == BOM[1] && bytes[2] == BOM[2]) {
-                start = BOM.length;
+            if (length >= BOM.length && bytes[start] == BOM[0] && bytes[start + 1] == BOM[1] && bytes[start + 2] == BOM[2]) {
+                start += BOM.length;
             }
         }
-        int length = bytes.length - start;
-        if (length == 0) {
+        if (start == end) {
             return dispatch();
         }
         if (bytes[start] == ':') {
             // comment
             return null;
         }
-        int colon = indexOf(bytes, start, (byte) ':');
+        int colon = indexOf(bytes, start, end, (byte) ':');
         String field;
         int valueStart;
         if (colon < 0) {
-            field = new String(bytes, start, length, StandardCharsets.UTF_8);
-            valueStart = bytes.length;
+            field = new String(bytes, start, end - start, StandardCharsets.UTF_8);
+            valueStart = end;
         } else {
             field = new String(bytes, start, colon - start, StandardCharsets.UTF_8);
             valueStart = colon + 1;
-            if (valueStart < bytes.length && bytes[valueStart] == ' ') {
+            if (valueStart < end && bytes[valueStart] == ' ') {
                 valueStart++;
             }
         }
-        int valueLength = bytes.length - valueStart;
+        int valueLength = end - valueStart;
         switch (field) {
             case "data" -> {
-                long size = (long) data.size() + valueLength + 1;
+                long size = (long) (firstData == null ? data.size() : firstData.length) + valueLength + 1;
                 if (size > maxBufferSize) {
                     throw new ContentLengthExceededException(maxBufferSize, size);
                 }
-                if (hasData) {
+                if (!hasData) {
+                    hasData = true;
+                    firstData = Arrays.copyOfRange(bytes, valueStart, end);
+                } else {
+                    if (firstData != null) {
+                        data.write(firstData, 0, firstData.length);
+                        firstData = null;
+                    }
                     data.write(LF);
+                    data.write(bytes, valueStart, valueLength);
                 }
-                hasData = true;
-                data.write(bytes, valueStart, valueLength);
             }
             case "event" -> name = new String(bytes, valueStart, valueLength, StandardCharsets.UTF_8);
             case "id" -> {
@@ -215,23 +289,34 @@ final class EventStreamDecoder {
             retry = null;
             return null;
         }
-        Event<byte[]> event = Event.of(data.toByteArray())
+        byte[] bytes = firstData == null ? data.toByteArray() : firstData;
+        Event<byte[]> event = Event.of(bytes)
             .name(name)
             .id(id)
             .retry(retry);
         data.reset();
+        firstData = null;
         hasData = false;
         name = null;
         retry = null;
         return event;
     }
 
-    private static int indexOf(byte[] bytes, int from, byte b) {
-        for (int i = from; i < bytes.length; i++) {
+    private static int indexOf(byte[] bytes, int from, int end, byte b) {
+        for (int i = from; i < end; i++) {
             if (bytes[i] == b) {
                 return i;
             }
         }
         return -1;
+    }
+
+    /**
+     * A buffer of a line that exposes its array, so that the line is read in place.
+     */
+    private static final class LineBuffer extends ByteArrayOutputStream {
+        byte[] buffer() {
+            return buf;
+        }
     }
 }

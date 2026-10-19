@@ -17,6 +17,7 @@ package io.micronaut.core.async.propagation
 
 import io.micronaut.core.annotation.Internal
 import io.micronaut.core.propagation.PropagatedContext
+import io.micronaut.core.propagation.ThreadBoundPropagation
 import kotlinx.coroutines.ThreadContextElement
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
@@ -33,7 +34,8 @@ internal class MicronautPropagatedContext internal constructor(var propagatedCon
     companion object Key : CoroutineContext.Key<MicronautPropagatedContext>
 
     override fun updateThreadContext(context: CoroutineContext): PropagatedContext.Scope {
-        return propagatedContext.propagate()
+        // A scoped value can't be bound here and unbound in restoreThreadContext, bind the context to the thread instead
+        return ThreadBoundPropagation.bind(propagatedContext)
     }
 
     override fun restoreThreadContext(context: CoroutineContext, oldState: PropagatedContext.Scope) {

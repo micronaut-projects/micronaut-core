@@ -23,6 +23,7 @@ import io.micronaut.context.env.BootstrapLocatorMarker;
 import io.micronaut.context.env.BootstrapPropertySourceLocator;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.ConfigurationPath;
+import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.EnvironmentNamesDeducer;
 import io.micronaut.context.env.EnvironmentPackagesDeducer;
@@ -42,7 +43,9 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.io.service.ServiceIndex;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
@@ -82,6 +85,9 @@ import static io.micronaut.context.env.Environment.BOOTSTRAP_NAME_PROPERTY;
  */
 @Internal
 final class DefaultApplicationContext extends DefaultBeanContext implements ConfigurableApplicationContext, PropertyResolverDelegate {
+
+    // Read by name, so that an application without a service index does not load the class
+    private static final String SERVICE_INDEX = "io.micronaut.core.io.service.ServiceIndex";
 
     private final ApplicationContextConfiguration configuration;
     private final Environment environment;
@@ -289,8 +295,26 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
 
     @Override
     public synchronized ApplicationContext start() {
-        environment.start();
-        return (ApplicationContext) super.start();
+        try {
+            environment.start();
+            return (ApplicationContext) super.start();
+        } finally {
+            // The lookups do not log whether they use a service index: the first one can come before logging is configured
+            if (StaticOptimizations.SetOnce.find(SERVICE_INDEX) != null) {
+                ServiceIndex.logCheck();
+            }
+        }
+    }
+
+    /**
+     * Development mode switched on by configuration, rather than by the system property the configuration
+     * default reads, tracks bean dependencies too, unless the builder switched tracking off. The environment
+     * has started when this is asked, and no bean has been created yet.
+     */
+    @Override
+    boolean isBeanDependencyTrackingEnabledOnStart() {
+        boolean switchedOff = configuration instanceof DefaultApplicationContextBuilder builder && builder.isBeanDependencyTrackingSwitchedOff();
+        return !switchedOff && DevelopmentMode.isEnabled(environment);
     }
 
     @Override
@@ -749,6 +773,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         private final ApplicationContextConfiguration bootstrapConfiguration;
         private final ApplicationContext parentContext;
         private final List<ApplicationContext> bootstrapContexts = new ArrayList<>();
+        private volatile Set<String> configurationFiles = Set.of(); // NOSONAR java:S3077 published whole; the set is immutable
 
         private BootstrapPropertySourcesLocator(ApplicationContextConfiguration bootstrapConfiguration, ApplicationContext parentContext) {
             this.bootstrapConfiguration = bootstrapConfiguration;
@@ -785,7 +810,13 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
                 // Lower priority than bootstrap property sources
                 bootstrapPropertySources.add(new BootstrapPropertySource(propertySource));
             }
+            configurationFiles = bootstrapContext.getEnvironment().getConfigurationFiles();
             return bootstrapPropertySources;
+        }
+
+        @Override
+        public Set<String> getConfigurationFiles() {
+            return configurationFiles;
         }
 
         @Override

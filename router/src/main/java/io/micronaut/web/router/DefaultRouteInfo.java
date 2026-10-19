@@ -125,7 +125,8 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         this.isErrorRoute = isErrorRoute;
         this.isPermitsBody = isPermitsBody;
         this.isVoid = returnType.isVoid();
-        isWebSocketRoute = annotationMetadata.hasAnnotation("io.micronaut.websocket.annotation.OnMessage");
+        isWebSocketRoute = annotationMetadata.hasAnnotation("io.micronaut.websocket.annotation.OnMessage")
+            || annotationMetadata.hasAnnotation("io.micronaut.websocket.annotation.OnOpen");
         definedStatus = annotationMetadata.enumValue(Status.class, HttpStatus.class).orElse(null);
         definedContentDisposition = annotationMetadata.findAnnotation(ContentDisposition.class)
             .map(av -> ContentDispositionUtils.toHeaderValue(
@@ -271,11 +272,18 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
 
     @Override
     public boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes) {
-        return producesMediaTypesContainsAll || anyMediaTypesMatch(producesMediaTypes, acceptableTypes);
+        if (producesMediaTypesContainsAll) {
+            // the route must be able to answer in a type that is acceptable, see RouteExecutor
+            return !AcceptedMediaTypes.hasRejected(acceptableTypes) || AcceptedMediaTypes.negotiate(producesMediaTypes, true, acceptableTypes) != null;
+        }
+        return anyMediaTypesMatch(producesMediaTypes, acceptableTypes);
     }
 
     @Override
     public boolean doesProduce(@Nullable MediaType acceptableType) {
+        if (acceptableType != null && AcceptedMediaTypes.isRejected(acceptableType)) {
+            return false;
+        }
         return producesMediaTypesContainsAll || acceptableType == null || acceptableType.equals(MediaType.ALL_TYPE) || producesMediaTypes.contains(acceptableType);
     }
 
@@ -302,6 +310,10 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     private static boolean computeAnyMediaTypesMatch(List<MediaType> producedMediaTypes, Collection<MediaType> acceptableTypes) {
+        if (AcceptedMediaTypes.hasRejected(acceptableTypes)) {
+            // an accepted type of the quality 0 is not acceptable, RFC 9110 12.4.2
+            return AcceptedMediaTypes.negotiate(producedMediaTypes, false, acceptableTypes) != null;
+        }
         for (MediaType acceptableType : acceptableTypes) {
             if (acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType)) {
                 return true;

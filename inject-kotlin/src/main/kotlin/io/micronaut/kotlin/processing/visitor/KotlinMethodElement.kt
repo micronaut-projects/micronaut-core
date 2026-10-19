@@ -19,6 +19,8 @@ import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.inject.ast.beans.BeanElementBuilder
+import io.micronaut.kotlin.processing.isCompiledFromSource
 import java.util.stream.Collectors
 
 internal open class KotlinMethodElement(
@@ -89,6 +91,9 @@ internal open class KotlinMethodElement(
 
     override fun isAbstract(): Boolean = declaration.isAbstract
 
+    @OptIn(KspExperimental::class)
+    override fun resolveThrownTypes() = visitorContext.resolver.getJvmCheckedException(declaration)
+
     override fun isPublic(): Boolean = declaration.isPublic()
 
     override fun isProtected(): Boolean = declaration.isProtected()
@@ -99,6 +104,9 @@ internal open class KotlinMethodElement(
         declaration.functionKind != FunctionKind.MEMBER && declaration.functionKind != FunctionKind.STATIC
 
     override fun isSuspend() = declaration.modifiers.contains(Modifier.SUSPEND)
+
+    // Only a vararg parameter that comes last compiles to a JVM varargs method
+    override fun isVarArgs() = declaration.parameters.lastOrNull()?.isVararg == true
 
     /**
      * The methods this method overrides as a member of its owning type, as javac reports them: the methods it
@@ -166,6 +174,13 @@ internal open class KotlinMethodElement(
         )
         copyValues(newMethod)
         return newMethod
+    }
+
+    override fun addAssociatedBean(type: ClassElement): BeanElementBuilder {
+        if (!declaration.isCompiledFromSource()) {
+            throw UnsupportedOperationException("Element of type [$javaClass] does not support adding associated beans at compilation time: [$name] is not compiled from source")
+        }
+        return visitorContext.addAssociatedBean(this, type)
     }
 
     override fun copyThis(): KotlinMethodElement {

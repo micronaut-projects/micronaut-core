@@ -26,6 +26,8 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import java.util.concurrent.CompletionStage
+
 /**
  * A filter that subscribes to the response publisher of its continuation can add values to the
  * Reactor context with {@code contextWrite}, and the route publisher must see them.
@@ -62,6 +64,17 @@ class RouteReactorContextFromFilterSpec extends Specification {
         "legacy" | "short-legacy"
     }
 
+    void "the route sees the reactor context written by a #kind filter through a downstream stage continuation"() {
+        expect:
+        client.toBlocking().retrieve("/tenant/$path") == "acme"
+
+        where:
+        kind     | path
+        "method" | "stage-method"
+        "legacy" | "stage-legacy"
+        "method" | "stage-method-io"
+    }
+
     void "a route without such a filter still completes"() {
         expect:
         client.toBlocking().retrieve("/tenant/plain") == "MISSING"
@@ -93,6 +106,22 @@ class RouteReactorContextFromFilterSpec extends Specification {
             return Mono.deferContextual { ctx -> Mono.just(ctx.getOrDefault("tenant", "MISSING")) }
         }
 
+        @Get(value = "/stage-method", produces = "text/plain")
+        Mono<String> stageMethod() {
+            return Mono.deferContextual { ctx -> Mono.just(ctx.getOrDefault("tenant", "MISSING")) }
+        }
+
+        @Get(value = "/stage-legacy", produces = "text/plain")
+        Mono<String> stageLegacy() {
+            return Mono.deferContextual { ctx -> Mono.just(ctx.getOrDefault("tenant", "MISSING")) }
+        }
+
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        @Get(value = "/stage-method-io", produces = "text/plain")
+        Mono<String> stageMethodIo() {
+            return Mono.deferContextual { ctx -> Mono.just(ctx.getOrDefault("tenant", "MISSING")) }
+        }
+
         @Get(value = "/short-method", produces = "text/plain")
         String shortMethod() {
             return "route"
@@ -110,7 +139,7 @@ class RouteReactorContextFromFilterSpec extends Specification {
     }
 
     @Requires(property = 'spec.name', value = 'RouteReactorContextFromFilterSpec')
-    @ServerFilter(["/tenant/method", "/tenant/method-io", "/tenant/short-method"])
+    @ServerFilter(["/tenant/method", "/tenant/method-io", "/tenant/short-method", "/tenant/stage-method", "/tenant/stage-method-io"])
     static class MethodTenantFilter {
 
         @RequestFilter
@@ -120,7 +149,7 @@ class RouteReactorContextFromFilterSpec extends Specification {
     }
 
     @Requires(property = 'spec.name', value = 'RouteReactorContextFromFilterSpec')
-    @Filter(["/tenant/legacy", "/tenant/legacy-io", "/tenant/short-legacy"])
+    @Filter(["/tenant/legacy", "/tenant/legacy-io", "/tenant/short-legacy", "/tenant/stage-legacy"])
     static class LegacyTenantFilter implements HttpServerFilter {
 
         @Override
@@ -144,6 +173,22 @@ class RouteReactorContextFromFilterSpec extends Specification {
             return Mono.deferContextual { ctx ->
                 Mono.just(HttpResponse.ok(ctx.getOrDefault("tenant", "MISSING")).contentType(MediaType.TEXT_PLAIN_TYPE))
             }
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'RouteReactorContextFromFilterSpec')
+    @ServerFilter(["/tenant/stage-method", "/tenant/stage-legacy", "/tenant/stage-method-io"])
+    static class DownstreamStageFilter implements Ordered {
+
+        @Override
+        int getOrder() {
+            // after the tenant filters
+            return 100
+        }
+
+        @RequestFilter
+        CompletionStage<HttpResponse<?>> around(FilterContinuation<CompletionStage<HttpResponse<?>>> continuation) {
+            return continuation.proceed()
         }
     }
 }
