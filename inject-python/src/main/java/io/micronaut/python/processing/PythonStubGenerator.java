@@ -4835,14 +4835,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
 
             @Override
-            public ExpressionDef invokeOn(ExpressionDef value, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
-                return invokePython(context, value, null, name, arguments, typeName, type);
+            public ExpressionDef invokeOn(ExpressionDef value, String owner, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+                return invokePython(context, value, owner + "." + name, name, arguments, typeName, type);
             }
 
             @Override
-            public ExpressionDef readOf(ExpressionDef value, String property, String typeName, TypeDef type) {
+            public ExpressionDef readOf(ExpressionDef value, String owner, String property, String typeName, TypeDef type) {
                 ExpressionDef member = value.invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(property));
-                return convertPythonValue(context, member, typeName, type, Optional.empty());
+                return convertPythonValue(context, hintedMember(member, owner + "." + property, type), typeName, type, Optional.empty());
             }
 
             @Override
@@ -4874,12 +4874,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
 
             @Override
-            public ExpressionDef invokeOn(ExpressionDef value, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+            public ExpressionDef invokeOn(ExpressionDef value, String owner, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
                 throw new IllegalStateException("A body of a pooled module reaches no Python object");
             }
 
             @Override
-            public ExpressionDef readOf(ExpressionDef value, String property, String typeName, TypeDef type) {
+            public ExpressionDef readOf(ExpressionDef value, String owner, String property, String typeName, TypeDef type) {
                 throw new IllegalStateException("A body of a pooled module reaches no Python object");
             }
 
@@ -4911,13 +4911,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
 
             @Override
-            public ExpressionDef invokeOn(ExpressionDef value, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
-                return members.invokeOn(value, name, arguments, typeName, type);
+            public ExpressionDef invokeOn(ExpressionDef value, String owner, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+                return members.invokeOn(value, owner, name, arguments, typeName, type);
             }
 
             @Override
-            public ExpressionDef readOf(ExpressionDef value, String property, String typeName, TypeDef type) {
-                return members.readOf(value, property, typeName, type);
+            public ExpressionDef readOf(ExpressionDef value, String owner, String property, String typeName, TypeDef type) {
+                return members.readOf(value, owner, property, typeName, type);
             }
 
             @Override
@@ -4945,14 +4945,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
 
             @Override
-            public ExpressionDef readOf(ExpressionDef value, String property, String typeName, TypeDef type) {
+            public ExpressionDef readOf(ExpressionDef value, String owner, String property, String typeName, TypeDef type) {
                 ExpressionDef member = value.invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(property));
-                return convertPythonValue(model.context(), member, typeName, type, Optional.empty());
+                return convertPythonValue(model.context(), hintedMember(member, owner + "." + property, type), typeName, type, Optional.empty());
             }
 
             @Override
-            public ExpressionDef invokeOn(ExpressionDef value, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
-                return invokePython(model.context(), value, null, name, arguments, typeName, type);
+            public ExpressionDef invokeOn(ExpressionDef value, String owner, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+                return invokePython(model.context(), value, owner + "." + name, name, arguments, typeName, type);
             }
 
             @Override
@@ -4973,10 +4973,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     /**
      * A call of a method of a Python object, as the Python code would make it: through the object,
      * so its interceptors, its overrides and its default arguments apply; the result converted by a
-     * converter so the method is invoked once. A primitive result is checked for None when
-     * {@code method} names the method for the error, see {@link #hintedReturn}.
+     * converter so the method is invoked once. A primitive result is checked for None, the error
+     * naming the method as {@code method} spells it, see {@link #hintedReturn}.
      */
-    private ExpressionDef invokePython(VisitorContext context, ExpressionDef target, @Nullable String method, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+    private ExpressionDef invokePython(VisitorContext context, ExpressionDef target, String method, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
         List<ExpressionDef> boxed = new ArrayList<>(arguments.size());
         for (ExpressionDef argument : arguments) {
             boxed.add(boxForPython(argument));
@@ -4985,7 +4985,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (TypeDef.VOID.equals(type) || type instanceof TypeDef.Primitive) {
             // converted by one call on the result: the invocation is evaluated once
             ExpressionDef result = PYTHON_INVOCATION.invokeStatic(INVOKE_PYTHON_METHOD, POLYGLOT_VALUE, target, ExpressionDef.constant(name), pythonArguments);
-            return TypeDef.VOID.equals(type) ? result : convertPythonValue(context, method == null ? result : hintedReturn(result, method, type), typeName, type, Optional.empty());
+            return TypeDef.VOID.equals(type) ? result : convertPythonValue(context, hintedReturn(result, method, type), typeName, type, Optional.empty());
         }
         // a reference conversion reads its value more than once (a null check first): the
         // result is handed to a converter, so the method is invoked once
@@ -5006,13 +5006,31 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * and its hint, see {@code PythonStatic.returned}.
      */
     private static ExpressionDef hintedReturn(ExpressionDef result, String method, TypeDef type) {
-        String hint = switch (type instanceof TypeDef.Primitive primitive ? primitive.name() : "") {
+        return PYTHON_STATIC.invokeStatic("returned", POLYGLOT_VALUE, result, ExpressionDef.constant(method), ExpressionDef.constant(pythonHint(type)));
+    }
+
+    /**
+     * An attribute of a Python object of the compilation a compiled body reads: when its hint is a
+     * primitive, the hint is trusted, and a None value fails as a TypeError naming the attribute
+     * and its hint, see {@code PythonStatic.hinted}; any other value is read as it is.
+     */
+    private static ExpressionDef hintedMember(ExpressionDef member, String attribute, TypeDef type) {
+        if (!(type instanceof TypeDef.Primitive)) {
+            return member;
+        }
+        return PYTHON_STATIC.invokeStatic("hinted", POLYGLOT_VALUE, member, ExpressionDef.constant(attribute), ExpressionDef.constant(pythonHint(type)));
+    }
+
+    /**
+     * The Python name of the hint a primitive of a compiled body stands for.
+     */
+    private static String pythonHint(TypeDef type) {
+        return switch (type instanceof TypeDef.Primitive primitive ? primitive.name() : "") {
             case DOUBLE_TYPE, FLOAT_TYPE -> "float";
             case BOOLEAN_TYPE -> "bool";
             case "char" -> "str";
             default -> "int";
         };
-        return PYTHON_STATIC.invokeStatic("returned", POLYGLOT_VALUE, result, ExpressionDef.constant(method), ExpressionDef.constant(hint));
     }
 
     /**

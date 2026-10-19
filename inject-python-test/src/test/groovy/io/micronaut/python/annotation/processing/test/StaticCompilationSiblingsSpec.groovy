@@ -194,6 +194,62 @@ class Calc:
         context?.close()
     }
 
+    void "a method or attribute of another object hinted as a primitive that is None fails as a TypeError naming it and its hint"() {
+        given:
+        mode = StaticCompilationMode.ALL
+        def context = buildContext('''
+from jakarta.inject import Singleton
+
+class Bag:
+    def __init__(self, count: int):
+        self.count = count
+
+    def _size(self) -> int:
+        if self.count < 0:
+            return None
+        return self.count
+
+    @property
+    def weight(self) -> float:
+        if self.count < 0:
+            return None
+        return self.count * 1.5
+
+@Singleton
+class Packer:
+    def size_of(self, n: int) -> int:
+        return Bag(n)._size() + 1
+
+    def weight_of(self, n: int) -> float:
+        return Bag(n).weight * 2.0
+''')
+        def packer = getBean(context, 'python.Packer')
+        Map<String, StaticCompilationDecision> compiled = decisions.collectEntries { [it.qualifiedName(), it] }
+
+        expect: "the callers are compiled and the hints are trusted for a value that is not None"
+        compiled['Packer.size_of'].outcome() == StaticCompilationDecision.Outcome.COMPILED
+        compiled['Packer.weight_of'].outcome() == StaticCompilationDecision.Outcome.COMPILED
+        packer.size_of(3) == 4
+        packer.weight_of(2) == 6.0d
+
+        when:
+        packer.size_of(-1)
+
+        then:
+        IllegalStateException e = thrown()
+        e.message == 'TypeError: Bag._size() returned None but is hinted to return int'
+
+        when:
+        packer.weight_of(-1)
+
+        then:
+        IllegalStateException f = thrown()
+        f.message == 'TypeError: Bag.weight is None but is hinted as float'
+
+        cleanup:
+        context?.close()
+    }
+
     private static Object invoke(Closure<?> call) {
         try {
             return call()
