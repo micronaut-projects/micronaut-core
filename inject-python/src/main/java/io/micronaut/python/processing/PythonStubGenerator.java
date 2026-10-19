@@ -4836,7 +4836,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
             @Override
             public ExpressionDef invokeOn(ExpressionDef value, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
-                return invokePython(context, value, name, arguments, typeName, type);
+                return invokePython(context, value, null, name, arguments, typeName, type);
             }
 
             @Override
@@ -4952,7 +4952,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
             @Override
             public ExpressionDef invokeOn(ExpressionDef value, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
-                return invokePython(model.context(), value, name, arguments, typeName, type);
+                return invokePython(model.context(), value, null, name, arguments, typeName, type);
             }
 
             @Override
@@ -4960,7 +4960,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 if (direct && stub != null) {
                     return stub.invoke(name, parameterTypes, type, arguments);
                 }
-                return invokePython(model.context(), self, name, arguments, typeName, type);
+                return invokePython(model.context(), self, model.element().getSimpleName() + "." + name, name, arguments, typeName, type);
             }
 
             @Override
@@ -4973,9 +4973,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     /**
      * A call of a method of a Python object, as the Python code would make it: through the object,
      * so its interceptors, its overrides and its default arguments apply; the result converted by a
-     * converter so the method is invoked once.
+     * converter so the method is invoked once. A primitive result is checked for None when
+     * {@code method} names the method for the error, see {@link #hintedReturn}.
      */
-    private ExpressionDef invokePython(VisitorContext context, ExpressionDef target, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+    private ExpressionDef invokePython(VisitorContext context, ExpressionDef target, @Nullable String method, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
         List<ExpressionDef> boxed = new ArrayList<>(arguments.size());
         for (ExpressionDef argument : arguments) {
             boxed.add(boxForPython(argument));
@@ -4984,7 +4985,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (TypeDef.VOID.equals(type) || type instanceof TypeDef.Primitive) {
             // converted by one call on the result: the invocation is evaluated once
             ExpressionDef result = PYTHON_INVOCATION.invokeStatic(INVOKE_PYTHON_METHOD, POLYGLOT_VALUE, target, ExpressionDef.constant(name), pythonArguments);
-            return TypeDef.VOID.equals(type) ? result : convertPythonValue(context, result, typeName, type, Optional.empty());
+            return TypeDef.VOID.equals(type) ? result : convertPythonValue(context, method == null ? result : hintedReturn(result, method, type), typeName, type, Optional.empty());
         }
         // a reference conversion reads its value more than once (a null check first): the
         // result is handed to a converter, so the method is invoked once
@@ -4997,6 +4998,21 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .build((aThis, methodParameters) -> convertPythonValue(context, methodParameters.get(0), typeName, type, Optional.empty()).returning());
         ExpressionDef converter = new ExpressionDef.Lambda(POLYGLOT_VALUE_CONVERTER, convertMethod, implementation);
         return PYTHON_STATIC.invokeStatic("invoke", TypeDef.OBJECT, target, ExpressionDef.constant(name), pythonArguments, converter).cast(type);
+    }
+
+    /**
+     * The result of a Python method a compiled body calls, whose return hint is the primitive
+     * {@code type}: the hint is trusted, and a None result fails as a TypeError naming the method
+     * and its hint, see {@code PythonStatic.returned}.
+     */
+    private static ExpressionDef hintedReturn(ExpressionDef result, String method, TypeDef type) {
+        String hint = switch (type instanceof TypeDef.Primitive primitive ? primitive.name() : "") {
+            case DOUBLE_TYPE, FLOAT_TYPE -> "float";
+            case BOOLEAN_TYPE -> "bool";
+            case "char" -> "str";
+            default -> "int";
+        };
+        return PYTHON_STATIC.invokeStatic("returned", POLYGLOT_VALUE, result, ExpressionDef.constant(method), ExpressionDef.constant(hint));
     }
 
     /**
