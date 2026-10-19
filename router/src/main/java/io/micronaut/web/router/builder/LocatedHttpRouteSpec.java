@@ -25,6 +25,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.form.FormData;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -82,6 +83,9 @@ public sealed interface LocatedHttpRouteSpec<T> extends HttpRouteSpec permits De
 
     @Override
     LocatedHttpRouteSpec<T> order(int order);
+
+    @Override
+    LocatedHttpRouteSpec<T> selectedBy(@Nullable RouteMatchSelector selector);
 
     @Override
     LocatedHttpRouteSpec<T> port(int port);

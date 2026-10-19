@@ -108,6 +108,18 @@ class FilterBodyBinderTest {
     }
 
     @Test
+    void theBodyClearedOnAMutableCopyIsBoundAsNoBytes() {
+        MutableHttpRequest<?> copy = MutableServerRequest.of(server("bytes"));
+        copy.body(null);
+
+        assertEquals("", bind(String.class, copy).orElseThrow());
+        assertArrayEquals(new byte[0], bind(byte[].class, copy).orElseThrow());
+        assertEquals(0, bind(ByteBuffer.class, copy).orElseThrow().readableBytes());
+        assertEquals("", bind(String.class, new HttpRequestWrapper<>(cast(copy))).orElseThrow());
+        assertFalse(bind(Integer.class, copy).isPresent());
+    }
+
+    @Test
     void aRequestWithoutABodyIsUnsatisfied() {
         assertFalse(bind(String.class, new SimpleHttpRequest<>(HttpMethod.POST, "/", null)).isPresent());
         assertFalse(bind(String.class, new HttpRequestWrapper<>(new SimpleHttpRequest<>(HttpMethod.POST, "/", null))).isPresent());

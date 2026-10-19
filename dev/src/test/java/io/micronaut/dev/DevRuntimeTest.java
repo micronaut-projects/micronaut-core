@@ -1,6 +1,7 @@
 package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.reload.ResourceKind;
@@ -8,6 +9,7 @@ import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.loader.GenerationClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
+import io.micronaut.dev.manifest.DevReloadStrategy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -18,18 +20,26 @@ import java.lang.instrument.UnmodifiableClassException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -137,28 +147,47 @@ class DevRuntimeTest {
             assertEquals(3, runtime.generation());
             assertTrue(third.isRunning());
 
-            // a forced restart without a change, retaining the pool again; a static file is read live from its root
+            // an edited configuration file: the watcher notices it and the running context refreshes in place,
+            // no restart, the generation and the pool untouched
+            Files.writeString(config, "app.label=beta\n");
+            long deadline = System.nanoTime() + Duration.ofSeconds(90).toNanos();
+            while (!"beta".equals(third.getEnvironment().getProperty("app.label", String.class).orElse(null)) && System.nanoTime() < deadline) {
+                Thread.sleep(200);
+            }
+            assertEquals("beta", third.getEnvironment().getProperty("app.label", String.class).orElse(null));
+            assertTrue(third.isRunning());
+            assertEquals(3, runtime.generation());
+            assertSame(pool, third.getBean(RetainedPool.class));
+
+            // a forced restart without a change, retaining the pool again; the configuration file, read live
+            // from the resource root ahead of the build output, is what the new generation sees too
+            Files.writeString(config, "app.label=gamma\n");
             Files.writeString(staticRoot.resolve("app.css"), "body { color: red }");
             assertEquals("body { color: red }", new String(third.getClassLoader().getResourceAsStream("app.css").readAllBytes()));
             runtime.restart();
             ApplicationContext fourth = runtime.awaitGeneration(4, Duration.ofMinutes(2));
             assertFalse(third.isRunning());
             assertSame(pool, fourth.getBean(RetainedPool.class));
+            assertEquals("gamma", fourth.getEnvironment().getProperty("app.label", String.class).orElse(null));
 
-            // an edited configuration file: the watcher of its root restarts the application, and the new generation
-            // reads the file live from the resource root ahead of the build output; until the configuration refresh
-            // tells which prefixes changed, the restart retains nothing, the pool among it
-            Files.writeString(config, "app.label=beta\n");
+            // a bean that injects the property directly appears: a class change restarts, and from then on an edit
+            // of that property restarts too, since no refresh reaches a @Value field, with the pool retained
+            Files.writeString(src.resolve("Labelled.java"), "package app; @jakarta.inject.Singleton public class Labelled { @io.micronaut.context.annotation.Value(\"${app.label}\") public String label; }");
+            runtime.reload();
             ApplicationContext fifth = runtime.awaitGeneration(5, Duration.ofMinutes(2));
-            assertFalse(fourth.isRunning());
-            assertEquals("beta", fifth.getEnvironment().getProperty("app.label", String.class).orElse(null));
-            assertEquals(1, RetainedPool.DESTROYED.get());
-            assertNotSame(pool, fifth.getBean(RetainedPool.class));
+            Class<?> labelled = fifth.getClassLoader().loadClass("app.Labelled");
+            assertEquals("gamma", labelled.getField("label").get(fifth.getBean(labelled)));
+            Files.writeString(config, "app.label=delta\n");
+            ApplicationContext sixth = runtime.awaitGeneration(6, Duration.ofMinutes(2));
+            assertFalse(fifth.isRunning());
+            assertSame(pool, sixth.getBean(RetainedPool.class));
+            labelled = sixth.getClassLoader().loadClass("app.Labelled");
+            assertEquals("delta", labelled.getField("label").get(sixth.getBean(labelled)));
         } finally {
             runtime.close();
         }
         assertTrue(runtime.context().map(context -> !context.isRunning()).orElse(true));
-        assertEquals(2, RetainedPool.DESTROYED.get());
+        assertEquals(1, RetainedPool.DESTROYED.get());
     }
 
     @Test
@@ -192,7 +221,7 @@ class DevRuntimeTest {
             Class<?> type = first.getClassLoader().loadClass("app.Greeter");
             Object bean = first.getBean(type);
             assertEquals("one", type.getMethod("greet").invoke(bean));
-            assertEquals(io.micronaut.dev.manifest.DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            assertEquals(DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
 
             // a body-only edit: the same generation, the same context, the same bean, a new body
             Files.writeString(greeter, greeter("two"));
@@ -245,7 +274,7 @@ class DevRuntimeTest {
         try {
             ApplicationContext first = runtime.context().orElseThrow();
             assertEquals("one", greet(first));
-            assertEquals(io.micronaut.dev.manifest.DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            assertEquals(DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
             refuseRedefinitions(runtime);
             GenerationClassLoader generation = runtime.classLoader().current();
             byte[] greeterBefore = DevRuntime.classFile(generation.roots(), "app.Greeter");
@@ -350,6 +379,161 @@ class DevRuntimeTest {
             assertEquals("two", otherType.getMethod("value").invoke(null));
         } finally {
             runtime.close();
+        }
+    }
+
+    @Test
+    void aResourceThatIsNotConfigurationUnderTheConfigurationRootReachesTheResourceWatches() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1")).mainClass(Application.class).start();
+                }
+            }
+            """);
+        Path resources = Files.createDirectories(project.resolve("src/main/resources"));
+        Path schema = Files.createDirectories(resources.resolve("graphql")).resolve("schema.graphqls");
+        Files.writeString(schema, "type Query { hello: String }");
+        Path config = resources.resolve("application.properties");
+        Files.writeString(config, "app.label=alpha\n");
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            List<ResourceChange> schemas = new CopyOnWriteArrayList<>();
+            List<ResourceChange> configuration = new CopyOnWriteArrayList<>();
+            ((DefaultBeanContext) first).resources(ResourceKind.CONFIG).include("**/*.graphqls").watch(schemas::add);
+            ((DefaultBeanContext) first).resources(ResourceKind.CONFIG).include("*.properties").watch(configuration::add);
+            assertTrue(schemas.get(0).initial());
+            schemas.clear();
+            configuration.clear();
+
+            // the schema is edited: the watch is told, nothing restarts and the configuration is not what changed
+            Files.writeString(schema, "type Query { hello: String, bye: String }");
+            awaitTrue(() -> schemas.stream().anyMatch(change -> !change.initial() && change.changed().contains(schema.toAbsolutePath())), schemas);
+            assertTrue(configuration.isEmpty(), configuration.toString());
+            assertEquals(1, runtime.generation());
+            assertTrue(first.isRunning());
+
+            // a configuration file refreshes the configuration in place, and a watch of the configuration root is told
+            Files.writeString(config, "app.label=beta\n");
+            awaitTrue(() -> "beta".equals(first.getEnvironment().getProperty("app.label", String.class).orElse(null)), configuration);
+            awaitTrue(() -> configuration.stream().anyMatch(change -> change.changed().contains(config.toAbsolutePath())), configuration);
+            assertEquals(1, runtime.generation());
+
+            // a deleted schema is reported removed
+            schemas.clear();
+            Files.delete(schema);
+            awaitTrue(() -> schemas.stream().anyMatch(change -> change.removed().contains(schema.toAbsolutePath())), schemas);
+            assertEquals(1, runtime.generation());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void theConfigurationFilesAreThoseTheEnvironmentLookedFor() throws Exception {
+        List<Path> roots = List.of(project);
+        Path absolute = project.resolve("abs.properties").toAbsolutePath();
+        // this class path reads properties files only
+        Files.writeString(project.resolve("application.properties"), """
+            micronaut.config.import[0]=optional:classpath://feature
+            micronaut.config.import[1]=optional:classpath://late.properties
+            micronaut.config.import[2]=optional:file://%s
+            """.formatted(absolute.toString().replace('\\', '/')));
+        Files.writeString(project.resolve("application-scalar.properties"), "micronaut.config.import=optional:classpath://scalar/one.properties\n");
+        Files.writeString(project.resolve("application-structured.properties"), """
+            micronaut.config.import[0].provider=classpath
+            micronaut.config.import[0].resource-path=nested/structured.properties
+            micronaut.config.import[0].optional=true
+            """);
+        try (ApplicationContext context = configurationContext().environments("dev", "scalar", "structured").start()) {
+            Environment environment = context.getEnvironment();
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("application.properties"), roots));
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("application-dev.properties"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("schema.graphqls"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("logback.xml"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("applications.yml"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("graphql/application.yml"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("messages.properties"), roots));
+            // imports of files that did not exist when the context started: indexed, scalar and structured
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("late.properties"), roots));
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("abs.properties"), roots));
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("scalar/one.properties"), roots));
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("nested/structured.properties"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("notlate.properties"), roots));
+            // an import without an extension, of a file in any format a loader reads
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("feature.properties"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("feature.graphqls"), roots));
+        }
+    }
+
+    @Test
+    void theConfigurationFilesOfOverriddenLocations() throws Exception {
+        List<Path> roots = List.of(project);
+        Path external = project.resolve("external");
+        try (ApplicationContext context = configurationContext().environments("dev").overrideConfigLocations("classpath:config/", "file:" + external).start()) {
+            Environment environment = context.getEnvironment();
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, project.resolve("config/application.properties"), roots));
+            assertTrue(ResourceNotifier.isConfigurationFile(environment, external.resolve("application-dev.properties"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("application.properties"), roots));
+            assertFalse(ResourceNotifier.isConfigurationFile(environment, project.resolve("config/schema.graphqls"), roots));
+        }
+    }
+
+    @Test
+    void noRunningContextHasNoRefresh() {
+        assertNull(DevRuntime.refreshConfiguration(null));
+    }
+
+    /**
+     * A context reading its configuration from the project only: the configuration files of the test class path
+     * stay out, and the service descriptors are read from it.
+     */
+    private ApplicationContextBuilder configurationContext() throws MalformedURLException {
+        ClassLoader services = new ClassLoader(DevRuntimeTest.class.getClassLoader()) {
+            @Override
+            public URL getResource(String name) {
+                return name.startsWith("META-INF/") ? super.getResource(name) : null;
+            }
+
+            @Override
+            public Enumeration<URL> getResources(String name) throws IOException {
+                return name.startsWith("META-INF/") ? super.getResources(name) : Collections.emptyEnumeration();
+            }
+        };
+        return ApplicationContext.builder()
+            .classLoader(new URLClassLoader(new URL[] {project.toUri().toURL()}, services))
+            .deduceEnvironment(false)
+            .deduceCloudEnvironment(false)
+            .environmentPropertySource(false)
+            .banner(false);
+    }
+
+    /**
+     * Waits for the file watcher's batch to be handled, which this branch has no direct way to report.
+     */
+    private static void awaitTrue(BooleanSupplier condition, Object state) throws InterruptedException {
+        long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+        while (!condition.getAsBoolean()) {
+            if (System.nanoTime() > deadline) {
+                throw new AssertionError("Timed out: " + state);
+            }
+            Thread.sleep(50);
         }
     }
 

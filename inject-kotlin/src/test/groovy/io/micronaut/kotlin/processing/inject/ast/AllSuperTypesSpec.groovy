@@ -73,7 +73,7 @@ class Holder {
         closures('test.Holder', 'strings', 'boxes', 'ints', 'primitive') == [
             ['java.lang.String[]', 'java.lang.Comparable<java.lang.String>[]', 'java.lang.CharSequence[]', 'java.io.Serializable[]', 'java.lang.Object[]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object'],
             ['test.Box<java.lang.String>[]', 'test.View<java.lang.String>[]', 'test.Named[]', 'java.lang.Object[]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object'],
-            ['int[][]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object'],
+            ['int[][]', 'java.lang.Object[]', 'java.lang.Cloneable[]', 'java.io.Serializable[]', 'java.lang.Cloneable', 'java.io.Serializable', 'java.lang.Object'],
             ['int'],
         ]
     }

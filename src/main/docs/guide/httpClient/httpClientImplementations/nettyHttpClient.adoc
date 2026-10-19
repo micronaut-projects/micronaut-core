@@ -6,10 +6,17 @@ dependency:micronaut-http-client[]
 
 It may be necessary in a testing or development environment to disable hostname verification.
 
-To disable hostname verification in your test classpath, you could create a <<replaces, Bean Replacement>> in `src/test/java`:
+To disable hostname verification, set `endpoint-identification` to `false`:
 
-[source,java]
+[configuration]
 ----
-include::http-client/src/test/java/io/micronaut/http/client/netty/ssl/NettyClientSslBuilderReplacement.java[indent=0]
+micronaut:
+  http:
+    client:
+      ssl:
+        endpoint-identification: false
 ----
+
+The same option applies to a client created with a `DefaultHttpClientConfiguration`, together with `SslConfiguration.setSslContext(..)` to connect with a ready `javax.net.ssl.SSLContext` instead of the configured key and trust stores. Without endpoint identification, a `javax.net.ssl.HostnameVerifier` can still check the host name after the handshake.
+
 WARNING: Disabling host name verification leaves your application potentially vulnerable to Man-in-the-Middle attacks and should only be done with the utmost care typically only in a development / testing environment. Never disable host name verification in production or in a scenario where you are making remote calls over the internet.

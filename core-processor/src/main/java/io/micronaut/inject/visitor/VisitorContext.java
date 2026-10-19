@@ -431,30 +431,76 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * Records the generic hierarchy of a type, which {@link io.micronaut.core.type.TypeHierarchies#find(Class)} finds
      * at run time as a {@link io.micronaut.core.type.TypeHierarchy}: its type variables with their bounds, its generic
      * superclass and its generic interfaces, as declared. The type can be any class the compilation sees, a class of
-     * a library or of the JDK included. The record is a small generated class, one per type, written once per
-     * compilation however many times the type is recorded. A parameterized usage of the type, the
+     * a library or of the JDK included. The record is a small generated class, written once per type and
+     * package it is written into, however many times the type is recorded from there; a type recorded from several
+     * packages has a record in each, and the lookup prefers the one in the package of the type. A parameterized usage of the type, the
      * {@code Box<String>} of a field, records the declaration {@code Box<T>}.
      *
      * <p>The record is named after the type and written into the package of the first originating element, or into
-     * the package of the type when the type, a bound or a supertype of it is not public. Every originating element is
-     * reported to the compiler, as for {@link #registerBean(ClassElement, Element...)}, and the same rule applies: the
-     * record is written with the round, and recording from {@link TypeElementVisitor#finish(VisitorContext)} is not
-     * portable.</p>
+     * the package of the type when the type itself is not public. A super type the record cannot name from its package
+     * is left out of it and named in {@link io.micronaut.core.type.TypeHierarchy#getOmittedSuperTypeNames()}; a visitor
+     * that needs to know what was left out calls {@link #recordTypeHierarchy(ClassElement, Element...)} instead. Every
+     * originating element is reported to the compiler, as for {@link #registerBean(ClassElement, Element...)}, and the
+     * same rule applies: the record is written with the round, and recording from
+     * {@link TypeElementVisitor#finish(VisitorContext)} is not portable.</p>
      *
      * @param type                The type
      * @param originatingElements The originating elements, at least one; the first must be a class, a member or a
      *                            package of the compilation
      * @return The name of the record
      * @throws IllegalArgumentException if no originating element is given, or the first one is of another kind
+     * @throws io.micronaut.inject.processing.ProcessingException if no record can describe the type, see
+     *                                                             {@link #tryRecordTypeHierarchy(ClassElement, Element...)}
      * @since 5.3.0
      */
     @Experimental
     default String importTypeHierarchy(ClassElement type, Element... originatingElements) {
+        return recordTypeHierarchy(type, originatingElements).getClassName();
+    }
+
+    /**
+     * Records the generic hierarchy of a type as {@link #importTypeHierarchy(ClassElement, Element...)} does, and
+     * reports what the record leaves out: the super types it cannot name from its package, by the names the record
+     * lists at run time.
+     *
+     * @param type                The type
+     * @param originatingElements The originating elements, at least one; the first must be a class, a member or a
+     *                            package of the compilation
+     * @return The name of the record and the names of the super types it leaves out
+     * @throws IllegalArgumentException if no originating element is given, or the first one is of another kind
+     * @throws io.micronaut.inject.processing.ProcessingException if no record can describe the type, see
+     *                                                             {@link #tryRecordTypeHierarchy(ClassElement, Element...)}
+     * @since 5.3.0
+     */
+    @Experimental
+    default TypeHierarchyRecord recordTypeHierarchy(ClassElement type, Element... originatingElements) {
+        return TypeHierarchyWriter.write(typeHierarchyDeclaration(type), this, originatingElements);
+    }
+
+    /**
+     * Records the generic hierarchy of a type as {@link #recordTypeHierarchy(ClassElement, Element...)} does, unless
+     * no record can describe the type: a type whose variables are bounded by a class the record cannot name, a type
+     * that is or extends an inner class of a generic class, or a type of the JDK that is not public. Those fail the
+     * compilation when recorded with the other methods, with the reason; here nothing is written and nothing is
+     * returned, for a visitor that keeps a description of its own in that case. A record that cannot be written for
+     * another reason still fails the compilation.
+     *
+     * @param type                The type
+     * @param originatingElements The originating elements, at least one; the first must be a class, a member or a
+     *                            package of the compilation
+     * @return The name of the record and the names of the super types it leaves out, or empty when no record can
+     * describe the type
+     * @throws IllegalArgumentException if no originating element is given, or the first one is of another kind
+     * @since 5.3.0
+     */
+    @Experimental
+    default Optional<TypeHierarchyRecord> tryRecordTypeHierarchy(ClassElement type, Element... originatingElements) {
+        return TypeHierarchyWriter.writeIfRecordable(typeHierarchyDeclaration(type), this, originatingElements);
+    }
+
+    private ClassElement typeHierarchyDeclaration(ClassElement type) {
         // the declaration, not the usage that was passed: Box<String> records Box<T> and its supertypes in terms of T
-        ClassElement declaration = type.getTypeArguments().isEmpty() ? type : getClassElement(type.getName()).orElse(type);
-        String recordName = TypeHierarchyWriter.recordClassName(declaration, originatingElements);
-        TypeHierarchyWriter.write(declaration, recordName, this, originatingElements);
-        return recordName;
+        return type.getTypeArguments().isEmpty() ? type : getClassElement(type.getName()).orElse(type);
     }
 
     /**

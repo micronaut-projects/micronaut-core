@@ -97,7 +97,7 @@ internal class KotlinElementFactory(
             elementAnnotationMetadataFactory,
             visitorContext
         )
-        if (method.returnType!!.resolve().isMarkedNullable && !kotlinMethodElement.returnType.isPrimitive) {
+        if (visitorContext.expandTypeAlias(method.returnType!!.resolve()).isMarkedNullable && !kotlinMethodElement.returnType.isPrimitive) {
             kotlinMethodElement.annotate(AnnotationUtil.NULLABLE)
         }
         return kotlinMethodElement

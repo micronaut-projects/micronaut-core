@@ -72,7 +72,14 @@ public class FilteredRouter implements Router {
 
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
-        return router.<T, R>findAny(request).stream().filter(routeFilter.filter(request)).toList();
+        // filter before a route selector selects, otherwise a route removed by the filter can hide another one;
+        // the decorated router filters the routes of a located target too
+        return router.findAny(request, routeFilter.<T, R>filter(request));
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
+        return router.findAny(request, filter.and(routeFilter.<T, R>filter(request)));
     }
 
     @Override
