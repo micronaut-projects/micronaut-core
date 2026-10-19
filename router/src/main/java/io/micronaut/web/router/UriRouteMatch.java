@@ -86,4 +86,19 @@ public interface UriRouteMatch<T, R> extends UriMatchInfo, MethodBasedRouteMatch
     default Optional<MediaType> getSelectedMediaType() {
         return Optional.empty();
     }
+
+    /**
+     * The values of the variables as they appear in the path of the request, not percent-decoded,
+     * unlike {@link #getVariableValues()}: e.g. {@code a%2Fb}, a {@code +} that is not a space,
+     * and the percent-encoded bytes of a non-ASCII value. For a route of a located target they
+     * include the raw values of the variables of the prefixes of the locator routes.
+     *
+     * @return The raw values, read-only
+     * @throws UnsupportedOperationException if this match does not have the raw values, e.g. an
+     * implementation of another router: it does not substitute the decoded ones
+     * @since 5.3.0
+     */
+    default Map<String, Object> getRawVariableValues() {
+        throw new UnsupportedOperationException("The match " + this + " does not have the raw values of its variables");
+    }
 }

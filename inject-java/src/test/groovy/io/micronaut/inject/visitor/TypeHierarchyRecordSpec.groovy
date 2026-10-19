@@ -7,6 +7,7 @@ import io.micronaut.core.type.TypeHierarchies
 import io.micronaut.core.type.TypeHierarchy
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementQuery
+import io.micronaut.inject.test.hierarchy.RecordingTypeHierarchyVisitor
 import io.micronaut.inject.test.hierarchy.TypeHierarchyFuzz
 
 
@@ -193,6 +194,70 @@ public class Holder {
         strings(sub.superTypes) == ['Supplier<String>', 'Object']
         sub.omittedSuperTypeNames == ['other.Base']
         strings(sub.getTypeClosure(Argument.of(sub.type))) == ['Sub', 'Supplier<String>', 'Object']
+    }
+
+    void "recording a type reports the super types the record leaves out, as the record lists them"() {
+        given: "a visitor that records the imported classes a second time and keeps what the API returned"
+        def classLoader = buildClassLoader('probe.Reported', '''
+package probe;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = {java.util.ArrayList.class, StringBuilder.class, java.util.jar.JarEntry.class})
+public class Reported {}
+''')
+        def arrayList = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.ArrayList', 'probe')]
+        def stringBuilder = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.lang.StringBuilder', 'probe')]
+        def jarEntry = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.jar.JarEntry', 'probe')]
+
+        expect: "a class whose closure the record names in full"
+        arrayList.className == TypeHierarchies.recordClassName('java.util.ArrayList', 'probe')
+        arrayList.omittedSuperTypeNames == []
+        arrayList.complete
+        record(classLoader, 'java.util.ArrayList', 'probe').omittedSuperTypeNames == []
+
+        and: "a class with a package-private superclass"
+        stringBuilder.className == TypeHierarchies.recordClassName('java.lang.StringBuilder', 'probe')
+        stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
+        !stringBuilder.complete
+        stringBuilder.omittedSuperTypeNames == record(classLoader, 'java.lang.StringBuilder', 'probe').omittedSuperTypeNames
+
+        and: "a class with a package-private ancestor of a third package"
+        jarEntry.omittedSuperTypeNames == ['java.util.zip.ZipConstants']
+        !jarEntry.complete
+        jarEntry.omittedSuperTypeNames == record(classLoader, 'java.util.jar.JarEntry', 'probe').omittedSuperTypeNames
+    }
+
+    void "a type no record can describe is reported instead of failing the compilation"() {
+        expect:
+        buildClassElement(new JavaFiles().add('p.Outer', '''
+package p;
+
+public class Outer<T> {
+    public class Inner implements java.util.function.Supplier<T> {
+        public T get() { return null; }
+    }
+}
+''')) { ClassElement outer, VisitorContext context ->
+            def inner = context.getClassElement('p.Outer$Inner').get()
+            def abstractStringBuilder = context.getClassElement('java.lang.AbstractStringBuilder').get()
+
+            assert context.tryRecordTypeHierarchy(inner, outer).empty
+            assert context.tryRecordTypeHierarchy(abstractStringBuilder, outer).empty
+
+            def refused = null
+            try {
+                context.recordTypeHierarchy(inner, outer)
+            } catch (io.micronaut.inject.processing.ProcessingException e) {
+                refused = e.message
+            }
+            assert refused.contains('The hierarchy of [p.Outer$Inner] cannot be recorded: it is an inner class of the generic class [p.Outer]')
+            try {
+                context.recordTypeHierarchy(abstractStringBuilder, outer)
+            } catch (io.micronaut.inject.processing.ProcessingException e) {
+                refused = e.message
+            }
+            assert refused.contains('The hierarchy of [java.lang.AbstractStringBuilder] cannot be recorded: the type is not public, and a record cannot be written into a package of the JDK')
+            true
+        }
     }
 
     void "a JDK class with a package-private ancestor is recorded in the package of the origin"() {
@@ -802,7 +867,7 @@ class FieldHolder {
     @Override
     protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
         // local visitors replace the ones found as services: the annotation visitor is kept
-        return [new TypeHierarchyImportVisitor(), new FieldTypeRecordingVisitor()]
+        return [new TypeHierarchyImportVisitor(), new FieldTypeRecordingVisitor(), new RecordingTypeHierarchyVisitor()]
     }
 
     static class FieldTypeRecordingVisitor implements TypeElementVisitor<Object, Object> {

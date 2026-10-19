@@ -229,6 +229,21 @@ public @interface Introspected {
     IntrospectionBuilder builder() default @IntrospectionBuilder();
 
     /**
+     * Whether fields and methods that are injection points, annotated with {@code jakarta.inject.Inject},
+     * {@code io.micronaut.context.annotation.Value} or {@code io.micronaut.context.annotation.Property},
+     * should be included as bean properties of the introspection.
+     *
+     * <p>By default, injection points are excluded since they are populated by the bean context. Including them
+     * allows an instance that isn't a bean, for example one registered by the application, to have its injection
+     * points populated through the introspection.</p>
+     *
+     * @return True if injection points should be included as bean properties
+     * @since 5.3.0
+     */
+    @Experimental
+    boolean includeInjected() default false;
+
+    /**
      * Whether every declared constructor of the type should be described by the introspection and
      * exposed via {@link io.micronaut.core.beans.BeanIntrospection#getConstructors()}, including
      * each constructor's annotation metadata and the annotation metadata of its parameters.

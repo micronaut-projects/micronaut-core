@@ -52,6 +52,7 @@ ioc:
     accessKind: Bean Fields
     introspectedProperty: Explicit Bean Properties
     propertyMembers: Bean Property Members
+    introspectionIncludeInjected: Injection Points as Bean Properties
     introspectionHierarchy: Type Hierarchy
     typeHierarchyRecords: Type Hierarchy Records
     atCreator: Constructor Methods
