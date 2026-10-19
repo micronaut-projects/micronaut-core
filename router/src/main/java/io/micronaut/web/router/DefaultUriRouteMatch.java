@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.inject.DelegatingExecutableMethod;
@@ -28,8 +29,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Default implementation of the {@link RouteMatch} interface for matches to URIs.
@@ -45,8 +48,10 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     private final UriMatchInfo matchInfo;
     private final UriRouteInfo<T, R> uriRouteInfo;
     private final Charset defaultCharset;
+    private final @Nullable MediaType selectedMediaType;
     @Nullable
     private Map<String, Object> variables;
+    private @Nullable Map<String, Object> rawVariables;
     private @Nullable ExecutableMethod<T, R> inheritingMethod;
 
     /**
@@ -59,10 +64,45 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
                          UriRouteInfo<T, R> routeInfo,
                          Charset defaultCharset, ConversionService conversionService
     ) {
+        this(matchInfo, routeInfo, defaultCharset, conversionService, null);
+    }
+
+    DefaultUriRouteMatch(UriMatchInfo matchInfo,
+                                 UriRouteInfo<T, R> routeInfo,
+                                 Charset defaultCharset,
+                                 ConversionService conversionService,
+                                 @Nullable MediaType selectedMediaType) {
         super(routeInfo, conversionService);
         this.matchInfo = matchInfo;
         this.uriRouteInfo = routeInfo;
         this.defaultCharset = defaultCharset;
+        this.selectedMediaType = selectedMediaType;
+    }
+
+    /**
+     * @param mediaType The media type of the response a route selector negotiated
+     * @return A new match of the same route and path with the media type
+     */
+    DefaultUriRouteMatch<T, R> withSelectedMediaType(MediaType mediaType) {
+        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, conversionService, mediaType);
+    }
+
+    /**
+     * @param matchInfo The match info of the same route, e.g. with the variables of the prefixes of locators
+     * @return A new match with the match info and the negotiated media type of this match
+     */
+    DefaultUriRouteMatch<T, R> withMatchInfo(UriMatchInfo matchInfo) {
+        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, conversionService, selectedMediaType);
+    }
+
+    @Override
+    public Optional<MediaType> getSelectedMediaType() {
+        return Optional.ofNullable(selectedMediaType);
+    }
+
+    @Override
+    @Nullable MediaType selectedMediaType() {
+        return selectedMediaType;
     }
 
     /**
@@ -132,6 +172,32 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
             }
         }
         return variables;
+    }
+
+    @Override
+    public Map<String, Object> getRawVariableValues() {
+        return Collections.unmodifiableMap(rawVariableValues());
+    }
+
+    @Override
+    Map<String, Object> rawVariableValues() {
+        Map<String, Object> raw = rawVariables;
+        if (raw == null) {
+            Map<String, Object> matchVariables = matchInfo.getVariableValues();
+            if (matchVariables.containsValue(null)) {
+                // an optional variable that is absent has no value
+                raw = CollectionUtils.newLinkedHashMap(matchVariables.size());
+                for (Map.Entry<String, Object> entry : matchVariables.entrySet()) {
+                    if (entry.getValue() != null) {
+                        raw.put(entry.getKey(), entry.getValue());
+                    }
+                }
+            } else {
+                raw = matchVariables;
+            }
+            rawVariables = raw;
+        }
+        return raw;
     }
 
     @Override
