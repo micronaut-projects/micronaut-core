@@ -22,9 +22,11 @@ class StaticCompilationParitySpec extends AbstractPythonTypeElementSpec {
     static final String SOURCE = '''
 from dataclasses import dataclass, field
 from jakarta.inject import Singleton
-from java.lang import Math, StringBuilder
 from java.lang import IllegalArgumentException
+from java.lang import Integer, Math, StringBuilder
+from io.micronaut.python.annotation.processing.test import StaticOverloads
 from java.net import URL, MalformedURLException
+from java.time import DateTimeException
 from java.util import AbstractMap, Objects
 
 
@@ -97,6 +99,7 @@ def module_shadow(module_twice: Scaler, n: int) -> int:
 @Singleton
 class Calc:
     rate: float = 1.5
+    count: int = 0
 
     def total(self, quantity: int, unit_price: float) -> float:
         subtotal = quantity * unit_price
@@ -135,7 +138,7 @@ class Calc:
         return a // b + a % b
 
     def floats(self, a: float, b: float) -> str:
-        return f"{a // b} {a % b} {a ** 2} {a / b} {-a}"
+        return f"{a // b} {a % b} {a / b} {-a}"
 
     def spell(self, flag: bool, x: float, y: float) -> str:
         return f"{flag} {x} {y} {None} {not flag}"
@@ -307,6 +310,15 @@ class Calc:
     def maybe_count(self, n: int) -> int | None:
         return n if n > 0 else None
 
+    def sized(self, n: int) -> int | None:
+        return Bag(n).maybe_size()
+
+    def spelled_size(self, n: int) -> str:
+        return str(Bag(n).maybe_size())
+
+    def spelled_limit(self, n: int) -> str:
+        return str(Bag(n).limit)
+
     def merged(self, extra: dict[str, str]) -> dict[str, str]:
         return {"a": "1", **extra, "z": "9"}
 
@@ -339,13 +351,13 @@ class Calc:
     def guarded(self, n: int) -> int:
         try:
             value = self.risky(n)
-        except IllegalArgumentException:
+        except DateTimeException:  # an IllegalArgumentException handler would catch what compiled helpers throw: refused
             return -1
         return value + 1
 
     def risky(self, n: int) -> int:
         if n == 0:
-            raise IllegalArgumentException("zero")
+            raise DateTimeException("zero")
         return n * 2
 
     def via_module(self, n: int) -> str:
@@ -383,6 +395,68 @@ class Calc:
                 break
         return count
 
+    def boxed_none(self, name: str) -> bool:
+        return Integer.getInteger(name) is None
+
+    def boxed_local(self, name: str) -> bool:
+        value = Integer.getInteger(name)
+        return value is None
+
+    def boxed_branch(self, name: str) -> str:
+        if Integer.getInteger(name) is None:
+            return "none"
+        return f"some {Integer.getInteger(name)}"
+
+    def boxed_truth(self, name: str) -> bool:
+        return not Integer.getInteger(name)
+
+    def fits(self, n: int) -> bool:
+        return Math.toIntExact(n * 1099511627776) is not None
+
+    def lazy(self, x: int, y: int) -> int:
+        assert x > 0, f"{10 // y}"
+        return x
+
+    def bump(self) -> int:
+        self.count += 1
+        return self.count
+
+    def big_ratio(self, a: int) -> float:
+        return (a * 1099511627776 + 1) / 3
+
+    def above(self, a: int, x: float) -> bool:
+        return a * 1099511627776 + 1 > x
+
+    def below(self, a: int, x: float) -> bool:
+        return x < a * 1099511627776 + 1
+
+    def exclaim(self, name: str) -> str:
+        return name + "!"
+
+    def query(self, spec: str) -> str:
+        return URL(spec).getQuery() + "?"
+
+    # refused: each would differ from Python if compiled
+
+    def mixed_local(self, flag: bool) -> str:
+        value = 1.5
+        if flag:
+            value = 2
+        return f"{value}"
+
+    def mixed_conditional(self, flag: bool) -> str:
+        return f"{1 if flag else 2.5}"
+
+    def float_power(self, a: float, b: float) -> float:
+        return a ** b
+
+    def maybe_concat(self, flag: bool) -> str:
+        name = "x" if flag else None
+        return name + "!"
+
+    def ambiguous(self, a: int, b: int) -> str:
+        return StaticOverloads.pick(a, b)
+
 @dataclass
 class Form:
     name: str = ""
@@ -403,6 +477,7 @@ class Pair:
 
 class Bag:
     label: str = "bag"
+    limit: int | None = None
 
     def __init__(self, count: int):
         self.count = count
@@ -412,6 +487,9 @@ class Bag:
 
     def _secret(self) -> int:
         return 7
+
+    def maybe_size(self) -> int | None:
+        return self.count if self.count > 0 else None
 
     def rename(self, label: str) -> None:
         self.label = label
@@ -455,9 +533,30 @@ class Bag:
         ["strict_host", ""], ["strict_host", "http://example.com/x"],
         ["maybe_name", true], ["maybe_name", false],
         ["maybe_count", 3], ["maybe_count", 0],
+        ["sized", 3], ["sized", 0], ["spelled_size", 3], ["spelled_size", 0], ["spelled_limit", 1],
         ["branch_local", true], ["branch_local", false],
         ["guarded", 3], ["guarded", 0],
+        ["boxed_none", "no.such.property"], ["boxed_none", "micronaut.static.parity"],
+        ["boxed_local", "no.such.property"], ["boxed_local", "micronaut.static.parity"],
+        ["boxed_branch", "no.such.property"], ["boxed_branch", "micronaut.static.parity"],
+        ["boxed_truth", "no.such.property"], ["boxed_truth", "micronaut.static.parity"],
+        ["fits", 0], ["fits", 1],
+        ["lazy", 1, 0], ["lazy", 0, 1],
+        ["bump"],
+        ["big_ratio", 8193], ["big_ratio", -8193],
+        ["above", 8192, 9007199254740992.0d], ["above", 8192, Double.NaN], ["below", 8192, 9007199254740992.0d], ["below", 8192, Double.NaN],
+        ["exclaim", "hi"], ["exclaim", null],
+        ["query", "http://example.com/x?a=1"], ["query", "http://example.com/x"],
+        ["mixed_local", true], ["mixed_local", false],
+        ["mixed_conditional", true],
+        ["float_power", -8.0d, 0.5d], ["float_power", 0.0d, -1.0d],
+        ["maybe_concat", true],
+        ["ambiguous", 1, 2],
     ]
+
+    // the fixture methods the compiler must refuse: compiled, each would differ from its Python body
+    static final Map<String, String> REFUSED = [mixed_local: "unknown-type", mixed_conditional: "unsupported-expression", float_power: "unsupported-expression",
+                                                maybe_concat: "unknown-type", ambiguous: "ambiguous-overload"]
 
     void "compiled bodies agree with the Python bodies on every input"() {
         given:
@@ -465,6 +564,7 @@ class Bag:
         [StaticCompilationMode.OFF, StaticCompilationMode.ALL].each { StaticCompilationMode m ->
             mode = m
             decisions.clear()
+            System.setProperty("micronaut.static.parity", "0")
             def context = buildContext(SOURCE)
             try {
                 def calc = getBean(context, 'python.Calc')
@@ -494,17 +594,38 @@ class Bag:
                     // what may be rebound or overridden while the program runs is not bound at compile time
                     assert !compiled.any { it in ['module_rated', 'module_dup', 'module_shadow', 'Scaler.run', 'Calc.calls_rebound'] }, decisions.toString()
                     assert compiled.contains('module_wrapped'), 'the decorated function compiles; its wrapper calls it, and it delegates to its static Java method'
-                    assert compiled.containsAll(CASES*.get(0).unique().collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled', 'Calc.twice', 'module_twice', 'module_upper', 'module_lengths', 'module_any']), decisions.toString()
+                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled', 'Calc.twice', 'module_twice', 'module_upper', 'module_lengths', 'module_any']), decisions.toString()
+                    REFUSED.each { name, rule ->
+                        def decision = decisions.find { it.qualifiedName() == "Calc.$name".toString() }
+                        assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
+                    }
                 }
             } finally {
                 context.close()
+                System.clearProperty("micronaut.static.parity")
             }
         }
 
         expect:
         results[StaticCompilationMode.ALL] == results[StaticCompilationMode.OFF]
         results[StaticCompilationMode.OFF][["spell", true, 1e16d, 0.1d].toString()] == "True 1e+16 0.1 None False"
-        results[StaticCompilationMode.OFF][["floats", -7.5d, 2.0d].toString()] == "-4.0 0.5 56.25 -3.75 7.5"
+        results[StaticCompilationMode.OFF][["floats", -7.5d, 2.0d].toString()] == "-4.0 0.5 -3.75 7.5"
+        results[StaticCompilationMode.OFF][["boxed_none", "no.such.property"].toString()] == true
+        results[StaticCompilationMode.OFF][["boxed_none", "micronaut.static.parity"].toString()] == false
+        results[StaticCompilationMode.OFF][["boxed_branch", "micronaut.static.parity"].toString()] == "some 0"
+        results[StaticCompilationMode.OFF][["boxed_truth", "micronaut.static.parity"].toString()] == true
+        results[StaticCompilationMode.OFF][["fits", 1].toString()] == "raised"
+        results[StaticCompilationMode.OFF][["lazy", 1, 0].toString()] == 1
+        results[StaticCompilationMode.OFF][["above", 8192, 9007199254740992.0d].toString()] == true
+        results[StaticCompilationMode.OFF][["below", 8192, Double.NaN].toString()] == false
+        results[StaticCompilationMode.OFF][["exclaim", null].toString()] == "raised"
+        // a method of a Python object hinted int | None that returns None, and an attribute that holds None
+        results[StaticCompilationMode.OFF][["sized", 0].toString()] == null
+        results[StaticCompilationMode.OFF][["sized", 3].toString()] == 3
+        results[StaticCompilationMode.OFF][["spelled_size", 0].toString()] == "None"
+        results[StaticCompilationMode.OFF][["spelled_limit", 1].toString()] == "None"
+        results[StaticCompilationMode.OFF][["query", "http://example.com/x"].toString()] == "raised"
+        results[StaticCompilationMode.OFF][["mixed_local", true].toString()] == "2"
         results[StaticCompilationMode.OFF][["ratio", 1, 0].toString()] == "raised"
         results[StaticCompilationMode.OFF][["host", "not a url"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["entry", "k", 3].toString()] == "k=3"

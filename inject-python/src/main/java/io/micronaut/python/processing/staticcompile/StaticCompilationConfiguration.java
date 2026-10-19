@@ -21,8 +21,12 @@ import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * The static compilation requested for a compilation: the mode, where the report goes, whether an
@@ -85,8 +89,12 @@ public record StaticCompilationConfiguration(StaticCompilationMode mode,
 
     /**
      * Whether the planner has anything to do for the given sources: the mode compiles by default, or
-     * a source mentions one of the switch decorators, which can switch compilation on under
-     * {@link StaticCompilationMode#OFF}. A compilation that compiles nothing does not pay for the planner.
+     * a source applies one of the switch decorators, which can switch compilation on under
+     * {@link StaticCompilationMode#OFF}. Only the forms that switch count: a decorator
+     * ({@code @CompileStatic}, {@code @module.CompileStatic}, {@code @Alias} for a name imported
+     * {@code as Alias}) or the bare module-level statement; a mention in a comment, a string or an
+     * import alone does not start the planner. A compilation that compiles nothing does not pay for
+     * the planner, nor for the type checker it needs.
      *
      * @param sources The sources of the compilation
      * @return Whether the planner runs
@@ -95,14 +103,34 @@ public record StaticCompilationConfiguration(StaticCompilationMode mode,
         if (mode != StaticCompilationMode.OFF) {
             return true;
         }
+        Set<String> simpleNames = new LinkedHashSet<>();
+        for (String name : annotationNames) {
+            simpleNames.add(name.substring(name.lastIndexOf('.') + 1));
+        }
         for (Source source : sources) {
-            String text = source.getCharacters().toString();
-            for (String name : annotationNames) {
-                if (text.contains(name.substring(name.lastIndexOf('.') + 1))) {
+            CharSequence text = source.getCharacters();
+            Set<String> names = new LinkedHashSet<>(simpleNames);
+            for (String simpleName : simpleNames) {
+                Matcher alias = Pattern.compile("\\b" + Pattern.quote(simpleName) + "[ \\t]+as[ \\t]+([A-Za-z_]\\w*)").matcher(text);
+                while (alias.find()) {
+                    names.add(alias.group(1));
+                }
+            }
+            for (String name : names) {
+                if (switchPattern(name).matcher(text).find()) {
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    /**
+     * The forms that apply a switch named {@code name}: a decorator, possibly qualified by a module,
+     * or a module-level statement, the name starting the line and called or standing alone.
+     */
+    private static Pattern switchPattern(String name) {
+        String qualified = "(?:[A-Za-z_][\\w.]*\\.)?" + Pattern.quote(name);
+        return Pattern.compile("(?m)^[ \\t]*@[ \\t]*" + qualified + "\\b|^" + qualified + "[ \\t]*(?:\\(|#|$)");
     }
 }
