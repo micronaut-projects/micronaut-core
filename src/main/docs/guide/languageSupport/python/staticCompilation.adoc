@@ -134,7 +134,7 @@ A `NOT_CANDIDATE` decision carries the reasons of the first three rows, a `SKIPP
 
 === The Supported Subset
 
-Python integers are compiled as `long`, floats as `double`, strings as `String`, booleans as `boolean` and `None` as `null`. Where Python and Java differ, the generated code calls a helper of `io.micronaut.context.python.PythonStatic` instead of approximating: `//` and `%` floor, `/` always divides as floats, `str()` spells floats, booleans and `None` as Python does, a string is indexed by code point, `len()`, `in`, negative indexes and a missing key behave as in Python.
+Python integers are compiled as `long`, floats as `double`, strings as `String`, booleans as `boolean` and `None` as `null`. Where Python and Java differ, the generated code calls a helper of `io.micronaut.context.python.PythonStatic` instead of approximating: `//` and `%` floor, `/` always divides as floats, `str()` spells floats, booleans and `None` as Python does, a string is indexed by code point, `len()`, `in`, negative indexes and a missing key behave as in Python, `int()` of a NaN or an infinity raises, `strip()` and `split()` use Python's whitespace, a tuple renders in parentheses and a literal mixing ints and floats keeps each element's type.
 
 [cols="1,2"]
 |===
@@ -219,6 +219,15 @@ A Python caller runs the Java body only when it gets what the Python body would 
 A division by zero, a failed `assert` or `+` on `None` in a Java body reaches a Python caller as the `ZeroDivisionError`, `AssertionError` or `TypeError` Python raises, and a checked exception of a Java call as itself. A body that uses a construct this check does not analyse (a loop, a collection, exception handling, a call of a sibling method) keeps the Python body for its Python callers; its Java callers run the compiled body all the same.
 
 Introspected classes keep their ownership model: their state lives in Java fields, and a compiled body reads and writes those fields, which is what a Java caller of the accessors sees. Other classes keep their state in the Python object, and a compiled body reaches it through the same member access the generated accessors use; each such access crosses into the Python runtime, which the report counts as a bridge call, so a compiled body that touches many attributes of a plain class may not be faster than the bridge it replaces.
+
+[[staticCompilationAssumptions]]
+== Assumptions and Limitations
+
+Static compilation makes two assumptions about the code it compiles, and does not check them at runtime.
+
+*Applications are compiled, not libraries.* The planner sees every subclass of the compilation: a sibling that one of them overrides is called through the Python object, and the subclass's generated class overrides the Java method. A subclass defined outside the compilation (in another module or library, inside a function, or created at runtime with `type(...)`) is not seen, and there is no runtime guard for it: if it overrides a compiled method, Java callers (a route, an injected service, the generated class's own compiled bodies calling the method on `self`) reach the compiled body of the base, not the override. So compile applications, not libraries meant to be subclassed by others, and keep every subclass that overrides a compiled method in the same compilation; a method that must stay overridable from outside is excluded with `@CompileStatic(False)`.
+
+*Return hints are trusted, and checked for `None`.* A compiled body that calls a Python method (a sibling the generated class does not declare, or a method of another object of the compilation, called through the Python object) takes the method's return hint as the type of the result, so a method hinted `-> int` gives a `long`; an attribute of another object it reads through the Python object (a `@property`, a hinted class attribute, an attribute `__init__` assigns) has the type of its hint. The hint is not verified beyond `None`: a method hinted `int`, `float` or `bool` that returns `None` fails the compiled call with a `TypeError` naming the method and its hint (`Calc._maybe() returned None but is hinted to return int`; an `IllegalStateException` for a Java caller), and such an attribute that is `None` fails the read the same way (`Bag.weight is None but is hinted as float`), where the Python body would carry the `None` on until an operation rejects it. Hint a method that may return `None` with `int | None`, which compiles to a boxed `Long`.
 
 [[staticCompilationReport]]
 == The Report

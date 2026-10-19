@@ -143,6 +143,113 @@ class Doubled(Calc):
         ['chained', 'scaled', 'through_private', 'through_public'].every { compiled["Calc.$it".toString()].outcome() == StaticCompilationDecision.Outcome.COMPILED }
     }
 
+    void "a sibling hinted to return a primitive that returns None fails as a TypeError naming the method and its hint"() {
+        given:
+        mode = StaticCompilationMode.ALL
+        def context = buildContext('''
+from jakarta.inject import Singleton
+
+@Singleton
+class Calc:
+    def _maybe(self, n: int) -> int:
+        if n < 0:
+            return None
+        return n
+
+    def _ratio(self, n: int) -> float:
+        if n < 0:
+            return None
+        return n / 2
+
+    def through_int(self, n: int) -> int:
+        return self._maybe(n) + 1
+
+    def through_float(self, n: int) -> float:
+        return self._ratio(n) * 2.0
+''')
+        def calc = getBean(context, 'python.Calc')
+        Map<String, StaticCompilationDecision> compiled = decisions.collectEntries { [it.qualifiedName(), it] }
+
+        expect: "the callers are compiled and the hints are trusted for a result that is not None"
+        compiled['Calc.through_int'].outcome() == StaticCompilationDecision.Outcome.COMPILED
+        compiled['Calc.through_float'].outcome() == StaticCompilationDecision.Outcome.COMPILED
+        calc.through_int(3) == 4
+        calc.through_float(3) == 3.0d
+
+        when:
+        calc.through_int(-1)
+
+        then:
+        IllegalStateException e = thrown()
+        e.message == 'TypeError: Calc._maybe() returned None but is hinted to return int'
+
+        when:
+        calc.through_float(-1)
+
+        then:
+        IllegalStateException f = thrown()
+        f.message == 'TypeError: Calc._ratio() returned None but is hinted to return float'
+
+        cleanup:
+        context?.close()
+    }
+
+    void "a method or attribute of another object hinted as a primitive that is None fails as a TypeError naming it and its hint"() {
+        given:
+        mode = StaticCompilationMode.ALL
+        def context = buildContext('''
+from jakarta.inject import Singleton
+
+class Bag:
+    def __init__(self, count: int):
+        self.count = count
+
+    def _size(self) -> int:
+        if self.count < 0:
+            return None
+        return self.count
+
+    @property
+    def weight(self) -> float:
+        if self.count < 0:
+            return None
+        return self.count * 1.5
+
+@Singleton
+class Packer:
+    def size_of(self, n: int) -> int:
+        return Bag(n)._size() + 1
+
+    def weight_of(self, n: int) -> float:
+        return Bag(n).weight * 2.0
+''')
+        def packer = getBean(context, 'python.Packer')
+        Map<String, StaticCompilationDecision> compiled = decisions.collectEntries { [it.qualifiedName(), it] }
+
+        expect: "the callers are compiled and the hints are trusted for a value that is not None"
+        compiled['Packer.size_of'].outcome() == StaticCompilationDecision.Outcome.COMPILED
+        compiled['Packer.weight_of'].outcome() == StaticCompilationDecision.Outcome.COMPILED
+        packer.size_of(3) == 4
+        packer.weight_of(2) == 6.0d
+
+        when:
+        packer.size_of(-1)
+
+        then:
+        IllegalStateException e = thrown()
+        e.message == 'TypeError: Bag._size() returned None but is hinted to return int'
+
+        when:
+        packer.weight_of(-1)
+
+        then:
+        IllegalStateException f = thrown()
+        f.message == 'TypeError: Bag.weight is None but is hinted as float'
+
+        cleanup:
+        context?.close()
+    }
+
     private static Object invoke(Closure<?> call) {
         try {
             return call()
