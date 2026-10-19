@@ -2102,7 +2102,8 @@ class Calc:
         self.assertIsInstance(label.body[0], ast.Expr)  # the docstring stays first
         self.assertIsInstance(label.body[1], ast.Assign)
         self.assertIsInstance(label.body[2], ast.If)
-        self.assertIsInstance(label.body[2].body[0], ast.Try)
+        self.assertIsInstance(label.body[2].body[0], ast.Assign)  # the Python exception, None until a Java one carries it
+        self.assertIsInstance(label.body[2].body[1], ast.Try)  # the call of the registry, translating its exception
         self.assertEqual(label.lineno, label.body[1].lineno)
         other = calc.body[3]
         self.assertIsInstance(other.body[0], ast.Return)  # a target without its kinds is not delegated
