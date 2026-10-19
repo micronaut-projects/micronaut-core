@@ -437,6 +437,306 @@ class ModuleFunctionTest(unittest.TestCase):
             self.assertEqual(["unsupported-expression"], rules(self.decisions[name]), name)
 
 
+BINDINGS = '''
+from jakarta.inject import Singleton
+from micronaut.context.python.annotation import CompileStatic
+
+RATE = 2
+STABLE = 3
+TWICE = 1
+TWICE = 2
+if True:
+    BRANCHED = 1
+
+
+def bump(rate: int) -> None:
+    global RATE
+    RATE = rate
+
+
+def rated(n: int) -> int:
+    return n * RATE
+
+
+def stable(n: int) -> int:
+    return n * STABLE
+
+
+def twiced(n: int) -> int:
+    return n * TWICE
+
+
+def branched(n: int) -> int:
+    return n * BRANCHED
+
+
+def helper(n: int) -> int:
+    return n + 1
+
+
+def dup(n: int) -> int:
+    return n + 1
+
+
+def dup(n: int) -> int:
+    return n + 2
+
+
+def wrap(fn):
+    return fn
+
+
+@wrap
+def wrapped(n: int) -> int:
+    return n
+
+
+@CompileStatic
+def switched(n: int) -> int:
+    return n
+
+
+def later(n: int) -> int:
+    return n
+
+
+later = wrap(later)
+
+
+def rebound_global(n: int) -> int:
+    return n
+
+
+def rebind() -> None:
+    global rebound_global
+    rebound_global = wrap(rebound_global)
+
+
+def len(value: str) -> int:
+    return 42
+
+
+def summed(values: list[int]) -> int:
+    return 7
+
+
+def calls_dup(n: int) -> int:
+    return dup(n)
+
+
+def calls_wrapped(n: int) -> int:
+    return wrapped(n)
+
+
+def calls_switched(n: int) -> int:
+    return switched(n)
+
+
+def calls_later(n: int) -> int:
+    return later(n)
+
+
+def calls_rebound_global(n: int) -> int:
+    return rebound_global(n)
+
+
+def calls_len(value: str) -> int:
+    return len(value)
+
+
+def apply(helper: "Scaler", n: int) -> int:
+    return helper(n)
+
+
+def assigned_later(n: int) -> int:
+    result = helper(n)
+    helper = 5
+    return result + helper
+
+
+def via_summed(values: list[int]) -> int:
+    return summed([v * 2 for v in values])
+
+
+def subscripted(d: dict[str, int], k: str, values: list[int]) -> int:
+    return d[k] + summed([v for v in values])
+
+
+def leading(n: int, values: list[int]) -> int:
+    return n + summed([v for v in values])
+
+
+def asserted(values: list[int]) -> None:
+    assert values, ",".join([str(v) for v in values])
+
+
+class Scaler:
+    def run(self, n: int) -> int:
+        return self.scale(n)
+
+    @staticmethod
+    def scale(n: int) -> int:
+        return n * 3
+
+
+class Quad(Scaler):
+    @staticmethod
+    def scale(n: int) -> int:
+        return n * 4
+
+
+class Lone:
+    def run(self, n: int) -> int:
+        return self.scale(n)
+
+    @staticmethod
+    def scale(n: int) -> int:
+        return n * 3
+'''
+
+
+class SwitchDescription:
+    """What the planner asks of the description of the CompileStatic switch: an annotation of no executable kind."""
+
+    def annotation(self):
+        return True
+
+    def interceptorBinding(self):
+        return False
+
+    def validationConstraint(self):
+        return False
+
+    def executable(self):
+        return False
+
+    def introduction(self):
+        return False
+
+
+class SwitchFacts(FakeFacts):
+    """Facts describing the CompileStatic switch, which leaves a module-level function a static method."""
+
+    def describeAnnotation(self, name):
+        return SwitchDescription() if name in NAMES else None
+
+
+class ModuleBindingTest(unittest.TestCase):
+    """A module-level name is bound at compile time only when nothing can rebind it while the program runs."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.decisions, cls.planner = plan(BINDINGS, MODE_ALL, facts=SwitchFacts())
+        cls.bodies = {body.methodName(): body for body in cls.planner.bodies}
+
+    def _decided(self, name):
+        decision = self.decisions[name]
+        return decision.outcome().name(), rules(decision), [reason.message() for reason in decision.reasons()]
+
+    def _returned(self, name):
+        outcome, found, messages = self._decided(name)
+        self.assertEqual("COMPILED", outcome, (found, messages))
+        return _uncast(list(self.bodies[name.rsplit(".", 1)[-1]].body().statements())[-1].value())
+
+    def test_a_module_global_rebound_anywhere_is_not_inlined(self):
+        for name, constant in (("rated", "RATE"), ("twiced", "TWICE")):
+            outcome, found, messages = self._decided(name)
+            self.assertEqual("SKIPPED", outcome, name)
+            self.assertEqual(["unknown-type"], found, name)
+            self.assertIn(f"the module global [{constant}] may be rebound", messages[0])
+        self.assertEqual(("SKIPPED", ["unknown-type"]), self._decided("branched")[:2])  # assigned in a compound statement: no constant
+        returned = self._returned("stable")
+        self.assertEqual(3, _uncast(returned.right()).value())  # bound once and never declared global: inlined
+
+    def test_a_module_function_that_may_be_rebound_is_not_called_statically(self):
+        for name, callee, why in (("calls_dup", "dup", "may be rebound"), ("calls_later", "later", "may be rebound"),
+                                  ("calls_rebound_global", "rebound_global", "may be rebound"), ("calls_wrapped", "wrapped", "has a decorator")):
+            outcome, found, messages = self._decided(name)
+            self.assertEqual("SKIPPED", outcome, name)
+            self.assertEqual(["dynamic-call"], found, name)
+            self.assertIn(f"the module-level function [{callee}] {why}", messages[0])
+        # the CompileStatic switch does not wrap the function
+        self.assertEqual("switched", self._returned("calls_switched").name())
+
+    def test_a_function_defined_twice_is_not_compiled(self):
+        outcome, found, messages = self._decided("dup")
+        self.assertNotEqual("COMPILED", outcome)
+        self.assertIn("unsupported-statement", found)
+
+    def test_a_module_function_hides_the_builtin_of_its_name(self):
+        returned = self._returned("calls_len")
+        self.assertEqual("InvokeJava", returned.getClass().getSimpleName())
+        self.assertEqual(("pkg.Module", "len"), (returned.owner(), returned.name()))
+
+    def test_a_parameter_or_local_hides_the_module_function_of_its_name(self):
+        for name in ("apply", "assigned_later"):
+            outcome, found, messages = self._decided(name)
+            # Python calls the parameter, or raises for the local read before it is assigned
+            self.assertEqual(("SKIPPED", ["dynamic-call"], ["the call resolves to no Java method or constructor"]), (outcome, found, messages), name)
+
+    def test_a_comprehension_argument_is_hoisted_once(self):
+        kinds = [statement.getClass().getSimpleName() for statement in self.bodies["via_summed"].body().statements()]
+        self.assertEqual(1, kinds.count("ForEach"), kinds)
+        self.assertEqual(["Local", "ForEach", "Return"], kinds[-3:])
+
+    def test_a_comprehension_after_an_evaluation_that_may_raise_is_refused(self):
+        outcome, found, messages = self._decided("subscripted")
+        self.assertEqual(("SKIPPED", ["unsupported-expression"]), (outcome, found))
+        self.assertIn("a comprehension after an evaluation of the same statement", messages[0])
+        self.assertEqual("COMPILED", self._decided("leading")[0], self._decided("leading"))  # after a name: nothing runs first
+
+    def test_a_comprehension_in_an_assertion_message_is_refused(self):
+        outcome, found, messages = self._decided("asserted")
+        self.assertEqual(("SKIPPED", ["unsupported-expression"]), (outcome, found))
+        self.assertIn("evaluated lazily or repeatedly", messages[0])
+
+    def test_a_static_method_on_self_a_subclass_overrides_is_refused(self):
+        outcome, found, messages = self._decided("Scaler.run")
+        self.assertEqual(("SKIPPED", ["sibling-call"]), (outcome, found))
+        self.assertIn("a subclass of the compilation may override it", messages[0])
+        returned = self._returned("Lone.run")
+        self.assertEqual(("pkg.Lone", "scale"), (returned.owner(), returned.name()))
+        self.assertIsNone(returned.receiver())
+
+
+class ImportedBindingTest(unittest.TestCase):
+    """A constant imported from another module is inlined only when that module binds it once and for good."""
+
+    def test_an_imported_constant_is_inlined_only_when_its_module_never_rebinds_it(self):
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as source_root:
+            os.makedirs(os.path.join(source_root, "pkg"))
+            with open(os.path.join(source_root, "pkg", "consts.py"), "w") as handle:
+                handle.write("LIMIT = 3\nRATE = 1\nRATE = 2\n")
+            source = ("from .consts import LIMIT, RATE\n\n\n"
+                      "def limited(n: int) -> int:\n    return n * LIMIT\n\n\n"
+                      "def rated(n: int) -> int:\n    return n * RATE\n")
+            path = os.path.join(source_root, "pkg", "module.py")
+            checker = TypeChecker("off", [])
+            visitor = MicronautAstVisitor(Callback(), "pkg", "module.py", None, source_root, source_path=path, source_text=source, type_checker=checker)
+            visitor.visit(ast.parse(source))
+            from micronaut_typecheck import PythonClasses
+            checker.facts = FakeFacts()
+            checker.python_classes = PythonClasses(checker)
+            planner = StaticPlanner(MODE_ALL, NAMES)
+            decisions = {decision.qualifiedName(): decision for decision in planner.plan(checker)}
+        self.assertEqual("COMPILED", decisions["limited"].outcome().name(), rules(decisions["limited"]))
+        self.assertEqual("SKIPPED", decisions["rated"].outcome().name())
+        self.assertEqual(["unknown-type"], rules(decisions["rated"]))
+
+
+class OuterReadTest(unittest.TestCase):
+    """Whether a statement reads a local: a comprehension or lambda binding the name still evaluates its first iterable or its defaults outside."""
+
+    def test_reads_outside_the_scope_of_a_comprehension_or_lambda(self):
+        from micronaut_lowering import _reads
+        for source, expected in (("x = [c for c in c]", True), ("x = [c for c in d]", False),
+                                 ("x = [c for d in e for c in d]", False), ("x = [c for d in c for c in d]", True),
+                                 ("f = lambda c=c: c", True), ("f = lambda c: c", False), ("f = lambda *, c=c: c", True)):
+            self.assertEqual(expected, _reads("c", ast.parse(source).body), source)
+
+
 SOURCE = '''
 from micronaut.context.python.annotation import CompileStatic
 from pyronaut.build import CompileStatic as BuildCompileStatic
@@ -1354,6 +1654,26 @@ class Calc:
         self.assertIsInstance(tree.body[3], ast.FunctionDef)
         self.assertEqual("_mn_static_class", tree.body[3].name)
         compile(tree, "delegated.py", "exec")
+
+    def test_a_static_delegation_runs_the_python_body_when_the_generated_class_is_missing(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse("def helper(n: int) -> list[int]:\n    return [n + 1]\n")
+        self.assertEqual(1, apply_delegation(tree, ["#helper#static=pkg.Missing#list"]))
+        namespace = {}
+        exec(compile(tree, "fallback.py", "exec"), namespace)
+        # the class is not on the class path: the lookup fails once, is cached, and the original body runs
+        self.assertEqual([4], namespace["helper"](3))
+        self.assertEqual({"pkg.Missing": None}, namespace["_mn_static_classes"])
+        self.assertEqual([5], namespace["helper"](4))
+
+        class Generated:
+            @staticmethod
+            def helper(n):
+                return (n * 100,)
+
+        # once found, the static Java method runs, its collection converted for the Python caller
+        namespace["_mn_static_classes"]["pkg.Missing"] = Generated
+        self.assertEqual([300], namespace["helper"](3))
 
     def test_the_temporary_of_the_rewrite_never_shadows_a_name_of_the_function(self):
         from micronaut_static import apply_delegation
