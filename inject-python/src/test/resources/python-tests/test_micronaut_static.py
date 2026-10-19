@@ -867,6 +867,128 @@ class AdviceTest(unittest.TestCase):
         self.assertFalse(bodies["plain"].advised())
 
 
+
+class Description:
+    """The description of an annotation, with the flags the planner reads."""
+
+    def __init__(self, scope=False, executable=False, interceptor=False, constraint=False):
+        self._scope, self._executable, self._interceptor, self._constraint = scope, executable, interceptor, constraint
+
+    def annotation(self):
+        return True
+
+    def interceptorBinding(self):
+        return self._interceptor
+
+    def validationConstraint(self):
+        return self._constraint
+
+    def executable(self):
+        return self._executable
+
+    def introduction(self):
+        return False
+
+    def scope(self):
+        return self._scope
+
+
+class ScriptFacts(FakeFacts):
+    """Facts describing the annotations of a module of routes as Micronaut declares them."""
+
+    DESCRIPTIONS = {
+        "Singleton": Description(scope=True, executable=True),
+        "ContextPooled": Description(scope=True, executable=True),
+        "Controller": Description(executable=True),
+        "Requires": Description(),
+        "Get": Description(executable=True),
+        "NotBlank": Description(constraint=True),
+        "Logged": Description(executable=True, interceptor=True),
+    }
+
+    def describeAnnotation(self, name):
+        return self.DESCRIPTIONS.get(name.rsplit(".", 1)[-1])
+
+
+SCRIPTED = '''
+from typing import Annotated
+from jakarta.inject import Singleton
+from jakarta.validation.constraints import NotBlank
+from micronaut.context.annotation import Requires
+from micronaut.context.python.scope import ContextPooled
+from micronaut.http.annotation import Controller, Get
+
+
+def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
+    def decorator(func):
+        return func
+    return decorator
+
+
+@micronaut_annotation("pkg.Logged")
+def Logged():
+    def decorator(target):
+        return target
+    return decorator
+
+
+{module}
+
+
+class Cart:
+    def __init__(self, owner: str):
+        self.owner = owner
+
+
+@Get("/peek")
+def peek(cart: Cart) -> str:
+    return cart.owner
+
+
+@Get("/plain/{{n}}")
+def plain(n: int) -> int:
+    return n + 1
+
+
+@Get("/checked/{{name}}")
+def checked(name: Annotated[str, NotBlank]) -> str:
+    return name
+
+
+@Get("/logged/{{n}}")
+@Logged
+def logged(n: int) -> int:
+    return n
+'''
+
+
+class ScriptTest(unittest.TestCase):
+    def test_a_module_level_annotation_that_declares_no_scope_keeps_the_module_pooled(self):
+        # PythonScriptElement pools every bean module that declares no scope: @Controller or @Requires do not
+        for module in ("", 'Controller("/c")', 'Requires(property="x")', 'Controller("/c")\nContextPooled()'):
+            decisions, _ = plan(SCRIPTED.format(module=module), MODE_ALL, facts=ScriptFacts())
+            self.assertEqual("SKIPPED", decisions["peek"].outcome().name(), module)
+            self.assertEqual(["pooled-module"], rules(decisions["peek"]), module)
+            self.assertEqual("COMPILED", decisions["plain"].outcome().name(), module)
+
+    def test_a_module_declaring_a_scope_reaches_python_objects(self):
+        decisions, _ = plan(SCRIPTED.format(module='Controller("/c")\nSingleton()'), MODE_ALL, facts=ScriptFacts())
+        self.assertEqual("COMPILED", decisions["peek"].outcome().name(), [(r.rule(), r.message()) for r in decisions["peek"].reasons()])
+
+    def test_an_advised_module_function_is_not_compiled(self):
+        # the generated class of a module runs no compiled advice: validation and around bindings would be bypassed
+        for module in ("", 'Controller("/c")\nSingleton()'):
+            decisions, _ = plan(SCRIPTED.format(module=module), MODE_ALL, facts=ScriptFacts())
+            for name, advice in (("checked", "NotBlank"), ("logged", "Logged")):
+                self.assertEqual("NOT_CANDIDATE", decisions[name].outcome().name(), name)
+                self.assertEqual(["intercepted-method"], rules(decisions[name]), name)
+                self.assertIn(f"[{advice}]", decisions[name].reasons()[0].message())
+
+    def test_a_module_level_around_binding_advises_every_function(self):
+        decisions, _ = plan(SCRIPTED.format(module='Logged()'), MODE_ALL, facts=ScriptFacts())
+        self.assertEqual("NOT_CANDIDATE", decisions["plain"].outcome().name())
+        self.assertEqual(["intercepted-method"], rules(decisions["plain"]))
+
 class LoweringTest(unittest.TestCase):
     def setUp(self):
         self.decisions, self.planner = plan(LOWERED, MODE_ALL, facts=FakeFacts())

@@ -108,16 +108,18 @@ def route_add(title: Annotated[str, NotBlank]) -> str:
         server.start()
         def client = context.createBean(HttpClient, server.URL).toBlocking()
 
-        expect: "every method of the flow is compiled"
+        expect: "every method of the flow is compiled, but the validated module route: a module runs no compiled advice"
         def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
         def expected = ['Library.add', 'Library.size', 'Library.shelf', 'Library.longest',
                         'LibraryController.add', 'LibraryController.size', 'LibraryController.shelf', 'LibraryController.longest',
-                        'route_size', 'route_add']
+                        'route_size']
         def notCompiled = expected.collect { name -> decisions.find { it.qualifiedName() == name } }
             .findAll { it == null || it.outcome() != StaticCompilationDecision.Outcome.COMPILED }
             .collect { "${it?.qualifiedName()}: ${it?.reasons()*.rule()} ${it?.reasons()*.message()}".toString() }
         notCompiled == []
         compiled.containsAll(expected)
+        decisions.find { it.qualifiedName() == 'route_add' }.outcome() == StaticCompilationDecision.Outcome.NOT_CANDIDATE
+        decisions.find { it.qualifiedName() == 'route_add' }.reasons()*.rule() == ['intercepted-method']
 
         when:
         def added = client.retrieve(io.micronaut.http.HttpRequest.POST("/library/Dune", ""))
@@ -139,7 +141,7 @@ def route_add(title: Annotated[str, NotBlank]) -> str:
         PythonStatic.entries('python.LibraryController#shelf') == 1
         PythonStatic.entries('python.LibraryController#longest') == 1
         PythonStatic.entries('python.Script#route_size') == 1
-        PythonStatic.entries('python.Script#route_add') == 1
+        PythonStatic.entries('python.Script#route_add') == 0
         PythonStatic.entries('python.Library#add') == 2
         PythonStatic.entries('python.Library#size') == 2
         PythonStatic.entries('python.Library#shelf') == 1
