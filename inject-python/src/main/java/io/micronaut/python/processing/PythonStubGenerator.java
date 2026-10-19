@@ -148,6 +148,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String JAVA_LANG_SHORT = "java.lang.Short";
     private static final String JAVA_LANG_DOUBLE = "java.lang.Double";
     private static final String JAVA_LANG_FLOAT = "java.lang.Float";
+    private static final String JAVA_LANG_BOOLEAN = "java.lang.Boolean";
+    private static final String JAVA_LANG_BYTE = "java.lang.Byte";
+    private static final String JAVA_LANG_INTEGER = "java.lang.Integer";
+    private static final String JAVA_LANG_LONG = "java.lang.Long";
     private static final String AS_SHORT = "asShort";
     private static final String AS_INT = "asInt";
     private static final String AS_LONG = "asLong";
@@ -4816,9 +4820,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static boolean introducedReturnConverts(TypeDef returnType) {
         String name = erased(erasedTypeName(returnType, Map.of()));
         return switch (name) {
-            case "void", "boolean", "byte", "short", "int", "long", "float", "double",
-                 "java.lang.Boolean", "java.lang.Byte", "java.lang.Short", "java.lang.Integer", "java.lang.Long",
-                 "java.lang.Float", "java.lang.Double", "java.lang.String", "java.lang.Object" -> true;
+            case "void", BOOLEAN_TYPE, "byte", SHORT_TYPE, "int", "long", FLOAT_TYPE, DOUBLE_TYPE,
+                 JAVA_LANG_BOOLEAN, JAVA_LANG_BYTE, JAVA_LANG_SHORT, JAVA_LANG_INTEGER, JAVA_LANG_LONG,
+                 JAVA_LANG_FLOAT, JAVA_LANG_DOUBLE, JAVA_LANG_STRING, "java.lang.Object" -> true;
             default -> false;
         };
     }
