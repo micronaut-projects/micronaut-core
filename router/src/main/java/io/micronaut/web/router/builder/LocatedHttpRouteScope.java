@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.uri.RouteTemplate;
 
 import java.util.Objects;
 import java.util.Set;
@@ -169,6 +170,31 @@ public sealed interface LocatedHttpRouteScope<T> extends HttpRouteScope permits 
         Objects.requireNonNull(routes, "routes");
         locateAsync(prefixUri, locator, target -> routes);
     }
+
+    /**
+     * Declare a route of the requests of a method with a template that is already parsed,
+     * relative to the prefix of the locator, see {@link #route(HttpMethod, String)}.
+     *
+     * @param method   The HTTP method
+     * @param template The template, relative to the prefix of the locator
+     * @return The pending route
+     * @see HttpRouteScope#route(HttpMethod, RouteTemplate)
+     */
+    @Override
+    LocatedHttpRouteSpec<T> route(HttpMethod method, RouteTemplate template);
+
+    /**
+     * Declare a route of the requests of a method by its name with a template that is already
+     * parsed, relative to the prefix of the locator, see
+     * {@link #route(HttpMethod, String)}.
+     *
+     * @param httpMethodName The name of the HTTP method, a token
+     * @param template       The template, relative to the prefix of the locator
+     * @return The pending route
+     * @see HttpRouteScope#route(String, RouteTemplate)
+     */
+    @Override
+    LocatedHttpRouteSpec<T> route(String httpMethodName, RouteTemplate template);
 
     /**
      * Declare a group of the routes of the located targets, whose filters and settings apply to

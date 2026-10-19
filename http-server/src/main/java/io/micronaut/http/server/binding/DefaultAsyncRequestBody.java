@@ -35,6 +35,7 @@ import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
+import io.micronaut.http.body.FormOptions;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyReader;
@@ -59,8 +60,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -112,6 +115,9 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         }
     };
 
+    // every ASCII character, which a raw value of a URL-encoded form keeps
+    private static final byte[] ASCII_BYTES = asciiBytes();
+    private static final String ASCII = new String(ASCII_BYTES, StandardCharsets.US_ASCII);
     private static final Logger LOG = LoggerFactory.getLogger(DefaultAsyncRequestBody.class);
     private static final List<String> ELEMENT_MEDIA_TYPES = List.of(MediaType.APPLICATION_JSON, MediaType.APPLICATION_JSON_STREAM);
     private static final List<String> FORM_MEDIA_TYPES = List.of(MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA);
@@ -354,6 +360,71 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         synchronized (lock) {
             return startForm();
         }
+    }
+
+    @Override
+    public CompletionStage<FormData> form(FormOptions options) {
+        MediaType contentType = request.getContentType().orElse(null);
+        if (!options.rawValues() || contentType == null || !contentType.matches(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
+            // a multipart form has no percent-encoding
+            return form();
+        }
+        synchronized (lock) {
+            if (decoded) {
+                // a filter set the body to an object: its values are not the ones of the body
+                throw new IllegalStateException("The raw values of the form cannot be read: a filter replaced the body");
+            }
+            claimBytes("form");
+            try {
+                if (cleared != null) {
+                    // no body: a form without fields
+                    return CompletableFuture.completedFuture(new DefaultFormData(Map.of(), Map.of(), binder.conversionService));
+                }
+                FormCapableHttpRequest<?> formRequest = formRequest();
+                // decoded by the decoder of the form, with its limits and its validation, but the
+                // values are kept as they appear: ASCII, unless the client sent other bytes
+                Charset charset = request.getCharacterEncoding();
+                UploadContext context = UploadContext.of(binder.formFactory(), formRequest, isAsciiCompatible(charset) ? charset : StandardCharsets.ISO_8859_1);
+                CloseableByteBody body = readBytes("form");
+                FormDataArgumentBinder.Collection collection = FormDataArgumentBinder.start(context, binder.formFactory(), binder.conversionService, formRequest,
+                    () -> encodedFields(formRequest, body));
+                owned(() -> {
+                    collection.cancel();
+                    return CompletableFuture.completedStage(null);
+                });
+                return collection.result().minimalCompletionStage();
+            } catch (Throwable e) {
+                return CompletableFuture.failedStage(e);
+            }
+        }
+    }
+
+    private static byte[] asciiBytes() {
+        byte[] bytes = new byte[128];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) i;
+        }
+        return bytes;
+    }
+
+    private static Publisher<RawFormField> encodedFields(FormCapableHttpRequest<?> formRequest, CloseableByteBody body) {
+        try {
+            return formRequest.getEncodedFormFields(body);
+        } catch (Throwable e) {
+            // no publisher took the body
+            body.close();
+            throw e;
+        }
+    }
+
+    /**
+     * @param charset A charset
+     * @return Whether it encodes and decodes every ASCII character as its ASCII byte: the raw value
+     * of a field keeps any ASCII character, e.g. {@code ~}, which some charsets map elsewhere
+     */
+    private static boolean isAsciiCompatible(Charset charset) {
+        return charset.equals(StandardCharsets.UTF_8) || charset.equals(StandardCharsets.ISO_8859_1) || charset.equals(StandardCharsets.US_ASCII)
+            || Arrays.equals(ASCII.getBytes(charset), ASCII_BYTES) && new String(ASCII_BYTES, charset).equals(ASCII);
     }
 
     private CompletionStage<FormData> startForm() {
