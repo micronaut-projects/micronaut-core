@@ -453,8 +453,8 @@ public final class StaticBodyGenerator {
             case Ir.SelfProperty property -> self.read(property.property(), property.type(), type(property.type()), property.accessor());
             case Ir.InvokeJava call -> invoke(call);
             case Ir.InvokeSibling call -> self.invoke(call.name(), types(call.parameterTypes()), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()), "java".equals(call.dispatch()));
-            case Ir.InvokePython call -> self.invokeOn(pythonObject(call.receiver()), call.name(), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()));
-            case Ir.PythonMember member -> self.readOf(pythonObject(member.receiver()), member.name(), member.type(), type(member.type()));
+            case Ir.InvokePython call -> self.invokeOn(pythonObject(call.receiver()), pythonClass(call.receiver()), call.name(), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()));
+            case Ir.PythonMember member -> self.readOf(pythonObject(member.receiver()), pythonClass(member.receiver()), member.name(), member.type(), type(member.type()));
             case Ir.ModuleAttribute attribute -> self.injected(injectedField(attribute.name()), type(attribute.type()));
             case Ir.NewJava construction -> classType(construction.type()).instantiate(types(construction.parameterTypes()), expressions(construction.arguments()));
             case Ir.StaticField field -> classType(field.owner()).getStaticField(field.name(), type(field.type()));
@@ -636,6 +636,16 @@ public final class StaticBodyGenerator {
         return expression(receiver).cast(VALUE_COERCIBLE_TYPE).invoke("asPolyglotValue", POLYGLOT_VALUE_TYPE);
     }
 
+    /**
+     * The name of the Python class of a receiver of the compilation, as an error names it.
+     */
+    private static String pythonClass(Ir.Expression receiver) {
+        String name = receiver.type();
+        int generics = name.indexOf('<');
+        name = generics < 0 ? name : name.substring(0, generics);
+        return name.substring(name.lastIndexOf('.') + 1).replace('$', '.');
+    }
+
     private ExpressionDef.ConditionExpressionDef condition(Ir.Expression test) {
         ExpressionDef value = expression(test);
         return value instanceof ExpressionDef.ConditionExpressionDef condition ? condition : operand(value).isTrue();
@@ -763,22 +773,24 @@ public final class StaticBodyGenerator {
 
         /**
          * @param value     The Python object of another object of the compilation
+         * @param owner     The name of its Python class, which a None result of a primitive hint names
          * @param name      The method to invoke on it
          * @param arguments The arguments, boxed
          * @param typeName  The Java return type as the IR spells it, {@code void} for none
          * @param type      The Java return type
          * @return The expression invoking it and converting the result
          */
-        ExpressionDef invokeOn(ExpressionDef value, String name, List<ExpressionDef> arguments, String typeName, TypeDef type);
+        ExpressionDef invokeOn(ExpressionDef value, String owner, String name, List<ExpressionDef> arguments, String typeName, TypeDef type);
 
         /**
          * @param value    The Python object of another object of the compilation
+         * @param owner    The name of its Python class, which a None value of a primitive hint names
          * @param property The attribute to read
          * @param typeName The Java type of the value as the IR spells it
          * @param type     The Java type of the value
          * @return The expression reading and converting it
          */
-        ExpressionDef readOf(ExpressionDef value, String property, String typeName, TypeDef type);
+        ExpressionDef readOf(ExpressionDef value, String owner, String property, String typeName, TypeDef type);
 
         /**
          * @param property The property
