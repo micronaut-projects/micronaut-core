@@ -82,15 +82,20 @@ public record StaticCompilationPlan(List<StaticCompilationDecision> decisions,
     }
 
     /**
-     * @return Whether static compilation is on: a function of the compilation was considered for it
-     * (the planner records every function as excluded when the mode is off)
+     * Whether a function is switched on for static compilation: the planner decided it and did not
+     * exclude it. The mode alone does not say it, since a function no {@code CompileStatic} switches
+     * on is excluded in modes {@code off} and {@code annotated}, and a switch can exclude a scope in
+     * mode {@code all}.
+     *
+     * @param sourcePath    The path of the source declaring the function, or {@code null} to match any source
+     * @param qualifiedName The name of the function as its decision spells it: {@code Class.method}
+     * @return Whether the function is switched on
      */
-    public boolean active() {
-        if (!bodies.isEmpty()) {
-            return true;
-        }
+    public boolean switchedOn(@Nullable String sourcePath, String qualifiedName) {
         for (StaticCompilationDecision decision : decisions) {
-            if (decision.outcome() != StaticCompilationDecision.Outcome.EXCLUDED) {
+            if (decision.qualifiedName().equals(qualifiedName)
+                && (sourcePath == null || decision.sourcePath() == null || sourcePath.equals(decision.sourcePath()))
+                && decision.outcome() != StaticCompilationDecision.Outcome.EXCLUDED) {
                 return true;
             }
         }

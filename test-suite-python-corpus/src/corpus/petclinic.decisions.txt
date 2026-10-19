@@ -12,7 +12,7 @@
 petclinic/controllers.py init_find_form COMPILED
 petclinic/controllers.py init_owner_creation_form COMPILED
 petclinic/controllers.py init_owner_update_form COMPILED
-petclinic/controllers.py init_pet_creation_form COMPILED
+petclinic/controllers.py init_pet_creation_form SKIPPED
 petclinic/controllers.py init_pet_update_form COMPILED
 petclinic/controllers.py init_visit_creation_form COMPILED
 petclinic/controllers.py locale COMPILED

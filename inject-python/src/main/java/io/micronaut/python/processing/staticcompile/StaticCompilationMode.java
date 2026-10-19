@@ -29,11 +29,18 @@ import java.util.Locale;
 @Experimental
 public enum StaticCompilationMode {
     /**
-     * Nothing is compiled unless switched on by a {@code CompileStatic} decorator.
+     * Nothing is compiled unless switched on by a {@code CompileStatic} decorator. The planner, and
+     * the type checker it needs, only run when a source applies such a decorator; otherwise the
+     * compilation pays nothing and no report is written.
      */
     OFF,
     /**
-     * Only the scopes carrying a {@code CompileStatic} decorator are compiled.
+     * Only the scopes carrying a {@code CompileStatic} decorator are compiled: exactly the functions
+     * {@link #OFF} compiles, with the same warnings for a switch that cannot be honoured. The
+     * difference is the cost and the report: the planner and the type checker always run over every
+     * source, and the report, when a directory is configured, is always written with a decision for
+     * every function, {@code EXCLUDED} for those no switch reaches. Use it to audit a code base
+     * without changing what is compiled.
      */
     ANNOTATED,
     /**
@@ -42,7 +49,9 @@ public enum StaticCompilationMode {
     ALL;
 
     /**
-     * The name of the annotation processor option carrying the mode.
+     * The name of the annotation processor option carrying the mode: {@code off} (the default),
+     * {@code annotated} or {@code all}. {@code off} and {@code annotated} compile the same functions,
+     * see {@link #ANNOTATED} for what differs.
      */
     public static final String OPTION = "micronaut.python.compile.static";
 
