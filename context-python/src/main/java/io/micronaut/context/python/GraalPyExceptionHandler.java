@@ -131,6 +131,35 @@ final class GraalPyExceptionHandler {
         return new RuntimeException(exception.toString());
     }
 
+    /**
+     * The Java exception of a Python exception a compiled body raises, as {@link #rethrowHostRuntimeException}
+     * maps one raised in Python: the Java object the Python exception is already bound to, else its
+     * generated class created through the {@code Value} constructor, else what Java code sees of it.
+     * The generated class is the one the compiled body names, found through its own class loader:
+     * a compiled body runs with whatever context class loader its caller has.
+     *
+     * @param generatedClass The generated class of the exception class
+     * @param exception      The Python exception
+     * @return The Java exception
+     */
+    static RuntimeException raised(Class<?> generatedClass, Value exception) {
+        RuntimeException generated = mappedException(exception, RuntimeException.class);
+        if (generated == null) {
+            generated = instantiateGeneratedException(generatedClass.getName(), exception, RuntimeException.class, generatedClass.getClassLoader());
+        }
+        if (generated != null) {
+            return generated;
+        }
+        Throwable thrown = toHostThrowable(exception);
+        if (thrown instanceof RuntimeException runtimeException) {
+            return runtimeException;
+        }
+        if (thrown instanceof Error error) {
+            throw error;
+        }
+        return new IllegalStateException(thrown);
+    }
+
     private static @Nullable RuntimeException toGeneratedRuntimeException(PolyglotException exception) {
         return toGeneratedException(exception, RuntimeException.class, Thread.currentThread().getContextClassLoader());
     }

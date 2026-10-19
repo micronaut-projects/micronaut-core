@@ -477,9 +477,9 @@ public final class StaticBodyGenerator {
     }
 
     /**
-     * {@code new E(PythonContextRuntime.newInstance(<the class reference of E>, new Object[] {args}))}:
-     * the Python exception created by its Python class, wrapped through the {@code Value} constructor
-     * of its generated class, as the runtime wraps a Python exception that reaches Java code.
+     * {@code PythonStatic.raised(E.class, PythonContextRuntime.newInstance(<the class reference of E>, new Object[] {args}))}:
+     * the Python exception created by its Python class, wrapped in its generated class as the runtime
+     * wraps a Python exception that reaches Java code (through the {@code Value} constructor).
      */
     private ExpressionDef newPythonException(Ir.NewPythonException construction) {
         ExpressionDef value = PYTHON_CONTEXT_RUNTIME.invokeStatic(
@@ -489,7 +489,8 @@ public final class StaticBodyGenerator {
             self.pythonClassReference(construction.type()),
             TypeDef.OBJECT.array().instantiate(expressions(construction.arguments()))
         );
-        return classType(construction.type()).instantiate(List.of(POLYGLOT_VALUE_TYPE), List.of(value));
+        return PYTHON_STATIC.invokeStatic("raised", List.of(TypeDef.CLASS, POLYGLOT_VALUE_TYPE), ClassTypeDef.of(RuntimeException.class),
+            classType(construction.type()).getStaticField("class", TypeDef.CLASS), value);
     }
 
     private static ExpressionDef constant(Ir.Const constant) {
