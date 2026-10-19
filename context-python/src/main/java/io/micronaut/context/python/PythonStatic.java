@@ -371,7 +371,8 @@ public final class PythonStatic {
         }
         if (Math.abs(left) <= EXACT_DOUBLE_LONG || Double.isInfinite(right)) {
             double exact = left;
-            return exact < right ? -1.0 : exact > right ? 1.0 : 0.0;
+            // the difference of two doubles is zero only when they are equal (0 and -0.0 included)
+            return Math.signum(exact - right);
         }
         return new BigDecimal(left).compareTo(new BigDecimal(right));
     }
