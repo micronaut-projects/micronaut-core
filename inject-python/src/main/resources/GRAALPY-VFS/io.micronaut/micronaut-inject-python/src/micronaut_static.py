@@ -257,6 +257,10 @@ class StaticPlanner:
             if any(decorator.annotationName() == MICRONAUT_TEST for decorator in module.decorators):
                 reasons.append(("class-not-eligible", "the functions of a test module are its tests", span))
                 return reasons
+            if sum(1 for other, _ in module.functions if other.name() == function_def.name()) > 1:
+                # the generated class holds one static method of the name, and the Python callers delegating by it could reach the other body
+                reasons.append(("unsupported-statement", f"the module defines [{function_def.name()}] more than once; only one static Java method of the name can be generated", span))
+                return reasons
         else:
             if id(class_def) not in self._ineligibility:
                 self._ineligibility[id(class_def)] = self._class_ineligibility(class_def, class_node)
@@ -759,7 +763,11 @@ def _guarded_return(temporary, result):
                 __mn_p = _mn_python_exception(__mn_e)
                 if __mn_p is None:
                     raise
-                raise __mn_p from __mn_p.__cause__
+            raise __mn_p
+
+    The Python exception is raised after the handler, so it keeps its own cause and context: inside
+    the handler Python would chain the Java exception as its context, and ``raise ... from`` would
+    suppress the context of the caller's own handler.
     """
     caught = temporary + "_e"
     found = temporary + "_p"
@@ -776,13 +784,12 @@ def _guarded_return(temporary, result):
                 body=[ast.Raise(exc=None, cause=None)],
                 orelse=[],
             ),
-            ast.Raise(exc=ast.Name(id=found, ctx=ast.Load()), cause=ast.Attribute(value=ast.Name(id=found, ctx=ast.Load()), attr="__cause__", ctx=ast.Load())),
         ],
     )
     attempt = ast.Try(body=[ast.Return(value=result)], handlers=[handler], orelse=[], finalbody=[])
     return ast.If(
         test=ast.Compare(left=ast.Name(id=temporary, ctx=ast.Load()), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
-        body=[attempt],
+        body=[attempt, ast.Raise(exc=ast.Name(id=found, ctx=ast.Load()), cause=None)],
         orelse=[],
     )
 

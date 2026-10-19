@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
+import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -131,6 +132,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String GENERATED_PROPERTY_MEMBERS = "io.micronaut.context.python.ValueCoercible$GeneratedPropertyMembers";
     private static final String GENERATED_PROPERTY_MEMBERS_CANONICAL = "io.micronaut.context.python.ValueCoercible.GeneratedPropertyMembers";
     private static final String MEMBER_PRE_DESTROY = "preDestroy";
+    private static final String COMPILED_FROM = "Compiled from ";
     private static final String PUT_MEMBER = "putMember";
     private static final String CLASS_FIELD = "class";
     public static final TypeDef POLYGLOT_CONTEXT = TypeDef.of(Context.class);
@@ -2229,15 +2231,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             if (!isJunit5Test && element instanceof AbstractPythonClassElement pythonClass && pythonClass.extendsPythonException() && pythonClass.getNativeType().constructor() == null) {
                 // Exception(*args) in Python, for a class extending Exception or a Python class that does: a
                 // message constructor for Java callers and for the compiled bodies that raise the class,
-                // creating the Python exception with the message as its argument
+                // creating the Python exception with the message as its argument; a null message is no
+                // message, Exception() (whose Java getMessage() is null), not Exception(None)
                 builder.addMethod(MethodDef.constructor()
                     .addModifiers(Modifier.PUBLIC)
                     .addParameter(ParameterDef.of("message", TypeDef.STRING))
-                    .build((aThis, methodParameters) -> invokeValueConstructor(aThis, PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                        NEW_INSTANCE,
-                        POLYGLOT_VALUE,
-                        List.of(pythonClassReference(element, pythonClassReference), methodParameters.get(0).cast(TypeDef.OBJECT))
-                    )))
+                    .build((aThis, methodParameters) -> {
+                        ExpressionDef message = methodParameters.get(0);
+                        ExpressionDef classReference = pythonClassReference(element, pythonClassReference);
+                        ExpressionDef withoutMessage = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INSTANCE, POLYGLOT_VALUE, List.of(classReference));
+                        ExpressionDef withMessage = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INSTANCE, POLYGLOT_VALUE, List.of(classReference, message.cast(TypeDef.OBJECT)));
+                        return invokeValueConstructor(aThis, message.isNull().doIfElse(withoutMessage, withMessage));
+                    })
                 );
             }
         }
@@ -4788,7 +4793,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 methodBuilder.addParameter(ParameterDef.of(body.parameterNames().get(i), StaticBodyGenerator.type(body.parameterTypes().get(i))));
             }
             if (body.span() != null) {
-                methodBuilder.addJavadoc("Compiled from " + body.span().location());
+                methodBuilder.addJavadoc(COMPILED_FROM + body.span().location());
             }
             builder.addMethod(methodBuilder.build((aThis, methodParameters) ->
                 StaticBodyGenerator.generate(body, methodParameters, access, trace)));
@@ -4908,54 +4913,30 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
-     * How the compiled body of a module-level function reaches Python objects: the module's
-     * generated class has no {@code self}; the objects of the compilation the body holds are
-     * reached through their own Python objects.
-     */
-    /**
      * How a static method of a module's generated class reaches what it needs: the injected
      * attributes of the module are static fields of the class; there is no instance.
      */
     private StaticBodyGenerator.SelfAccess staticScriptSelfAccess(VisitorContext context, ClassTypeDef thisType) {
-        return new StaticBodyGenerator.SelfAccess() {
-            @Override
-            public ExpressionDef injected(String field, TypeDef type) {
-                return thisType.getStaticField(field, type);
-            }
-
-            @Override
-            public ExpressionDef read(String property, String typeName, TypeDef type, boolean accessor) {
-                throw new IllegalStateException("A module-level function has no self to read [" + property + "] of");
-            }
-
-            @Override
-            public ExpressionDef invoke(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type, boolean direct) {
-                throw new IllegalStateException("A module-level function has no self to call [" + name + "] on");
-            }
-
-            @Override
-            public ExpressionDef invokeOn(ExpressionDef value, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
-                return invokePython(context, value, name, arguments, typeName, type);
-            }
-
-            @Override
-            public ExpressionDef readOf(ExpressionDef value, String property, String typeName, TypeDef type) {
-                ExpressionDef member = value.invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(property));
-                return convertPythonValue(context, member, typeName, type, Optional.empty());
-            }
-
-            @Override
-            public StatementDef write(String property, TypeDef type, ExpressionDef value, boolean accessor) {
-                throw new IllegalStateException("A module-level function has no self to write [" + property + "] of");
-            }
-        };
+        return scriptSelfAccess(context, thisType::getStaticField);
     }
 
     private StaticBodyGenerator.SelfAccess scriptSelfAccess(VisitorContext context, VariableDef.This aThis) {
+        return scriptSelfAccess(context, aThis::field);
+    }
+
+    /**
+     * How the compiled body of a module-level function reaches Python objects: the module's
+     * generated class has no {@code self}; the objects of the compilation the body holds are
+     * reached through their own Python objects.
+     *
+     * @param context  The visitor context
+     * @param injected The read of an injected attribute of the module, by its field name and type
+     */
+    private StaticBodyGenerator.SelfAccess scriptSelfAccess(VisitorContext context, BiFunction<String, TypeDef, ExpressionDef> injected) {
         return new StaticBodyGenerator.SelfAccess() {
             @Override
             public ExpressionDef injected(String field, TypeDef type) {
-                return aThis.field(field, type);
+                return injected.apply(field, type);
             }
 
             @Override
@@ -4986,53 +4967,35 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         };
     }
 
-    /**
-     * The access of a compiled body of a module served by a context pool: the planner compiles
-     * such a body only when it reaches no Python object, so nothing here is ever called.
-     */
     /**
      * How a static method of a pooled module's generated class reaches what it needs: nothing of the
      * module, whose injected beans live in the instance Micronaut creates, and no Python object.
      */
     static StaticBodyGenerator.SelfAccess pooledStaticAccess() {
-        return new StaticBodyGenerator.SelfAccess() {
-            @Override
-            public ExpressionDef injected(String field, TypeDef type) {
-                throw new IllegalStateException("A static method of a pooled module has no instance holding the injected [" + field + "]");
-            }
-
-            @Override
-            public ExpressionDef read(String property, String typeName, TypeDef type, boolean accessor) {
-                throw new IllegalStateException("A body of a pooled module reaches no Python object");
-            }
-
-            @Override
-            public ExpressionDef invoke(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type, boolean direct) {
-                throw new IllegalStateException("A body of a pooled module reaches no Python object");
-            }
-
-            @Override
-            public ExpressionDef invokeOn(ExpressionDef value, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
-                throw new IllegalStateException("A body of a pooled module reaches no Python object");
-            }
-
-            @Override
-            public ExpressionDef readOf(ExpressionDef value, String property, String typeName, TypeDef type) {
-                throw new IllegalStateException("A body of a pooled module reaches no Python object");
-            }
-
-            @Override
-            public StatementDef write(String property, TypeDef type, ExpressionDef value, boolean accessor) {
-                throw new IllegalStateException("A body of a pooled module reaches no Python object");
-            }
-        };
+        return pooledScriptAccess((field, type) -> {
+            throw new IllegalStateException("A static method of a pooled module has no instance holding the injected [" + field + "]");
+        });
     }
 
+    /**
+     * @param aThis The instance of the pooled module's generated class, holding its injected attributes
+     * @return The access of a compiled instance method of a pooled module
+     */
     static StaticBodyGenerator.SelfAccess pooledScriptAccess(VariableDef.This aThis) {
+        return pooledScriptAccess(aThis::field);
+    }
+
+    /**
+     * The access of a compiled body of a module served by a context pool: the planner compiles
+     * such a body only when it reaches no Python object, so nothing here is ever called.
+     *
+     * @param injected The read of an injected attribute of the module, by its field name and type
+     */
+    private static StaticBodyGenerator.SelfAccess pooledScriptAccess(BiFunction<String, TypeDef, ExpressionDef> injected) {
         return new StaticBodyGenerator.SelfAccess() {
             @Override
             public ExpressionDef injected(String field, TypeDef type) {
-                return aThis.field(field, type);
+                return injected.apply(field, type);
             }
 
             @Override
@@ -5297,7 +5260,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 method.addParameter(ParameterDef.of(body.parameterNames().get(i), StaticBodyGenerator.type(body.parameterTypes().get(i))));
             }
             if (body.span() != null) {
-                method.addJavadoc("Compiled from " + body.span().location());
+                method.addJavadoc(COMPILED_FROM + body.span().location());
             }
             delegate.addMethod(method.build((aThis, parameters) ->
                 StaticBodyGenerator.generate(body, parameters, pythonSelfAccess(model, aThis.field(selfField), aThis.field(stubField)), plan.trace())));
@@ -5445,7 +5408,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (compiledBody != null && sameLayout(compiledBody, parameterDefs, methodTypeVariables, methodSourceReturnType, genericToArray)) {
             // the body runs as Java: no crossing into Python for callers of the stub
             if (compiledBody.span() != null) {
-                methodBuilder.addJavadoc("Compiled from " + compiledBody.span().location());
+                methodBuilder.addJavadoc(COMPILED_FROM + compiledBody.span().location());
             }
             boolean trace = staticCompilationPlan(visitorContext).trace();
             builder.addMethod(methodBuilder.build((aThis, methodParameters) -> StatementDef.multi(

@@ -26,14 +26,11 @@ val fullstackProcessorPath = corpusClasspath("fullstackProcessorPath")
 val petclinicClasspath = corpusClasspath("petclinicClasspath")
 val petclinicProcessorPath = corpusClasspath("petclinicProcessorPath")
 
-// the dependency lists of the applications' pyproject.toml files, minus the artifacts a compilation does not load
+// the dependency lists of the applications' pyproject.toml files, minus the artifacts a compilation does not
+// load: the JDBC drivers and pools, Flyway and the control panel, which no source imports, only run the applications
 val fullstackDependencies = listOf(
     "io.micronaut:micronaut-http-server-netty",
     "io.micronaut.data:micronaut-data-jdbc",
-    "io.micronaut.sql:micronaut-jdbc-hikari",
-    "com.mysql:mysql-connector-j",
-    "io.micronaut.flyway:micronaut-flyway",
-    "org.flywaydb:flyway-mysql",
     "io.micronaut.serde:micronaut-serde-jackson",
     "io.micronaut.validation:micronaut-validation",
     "io.micronaut.security:micronaut-security-jwt",
@@ -43,7 +40,6 @@ val fullstackDependencies = listOf(
     "io.micronaut.email:micronaut-email-template",
     "org.eclipse.angus:angus-mail",
     "io.micronaut.views:micronaut-views-react:6.2.0",
-    "io.micronaut.controlpanel:micronaut-control-panel-datasource",
     "io.micronaut:micronaut-context-python",
 )
 val fullstackProcessors = listOf(
@@ -58,15 +54,10 @@ val petclinicDependencies = listOf(
     "io.micronaut:micronaut-http-server-netty",
     "io.micronaut.cache:micronaut-cache-core",
     "io.micronaut.data:micronaut-data-jdbc",
-    "io.micronaut.flyway:micronaut-flyway:8.1.1",
     "io.micronaut.serde:micronaut-serde-jackson",
     "com.fasterxml.jackson.core:jackson-databind:2.22.1",
-    "io.micronaut.sql:micronaut-jdbc-ucp",
     "io.micronaut.validation:micronaut-validation",
     "io.micronaut.views:micronaut-views-jinjava",
-    "com.oracle.database.jdbc:ojdbc11",
-    "org.flywaydb:flyway-database-oracle",
-    "io.micronaut.controlpanel:micronaut-control-panel-datasource",
     "io.micronaut:micronaut-context-python",
 )
 val petclinicProcessors = listOf(
@@ -98,16 +89,25 @@ tasks.named<Test>("test") {
     useJUnitPlatform()
     maxHeapSize = "4g"
     inputs.files(fullstackClasspath, fullstackProcessorPath, petclinicClasspath, petclinicProcessorPath)
-    inputs.dir("src/corpus")
+        .withPropertyName("corpusClasspaths").withNormalizer(ClasspathNormalizer::class.java)
+    inputs.dir("src/corpus").withPropertyName("corpus").withPathSensitivity(PathSensitivity.RELATIVE)
+    // the test cleans and writes build/corpus/<name>: the classes, the report and the decisions of each compilation
+    outputs.dir(layout.buildDirectory.dir("corpus")).withPropertyName("corpusOutput")
+    // a checkout of an application instead of its pinned copy: -Dcorpus.<name>.dir=<path to src>, its
+    // path (a system property of the test) and its sources inputs of the task as the copy is
+    listOf("fullstack", "petclinic").forEach { corpus ->
+        val override = providers.systemProperty("corpus.$corpus.dir")
+        if (override.isPresent) {
+            systemProperty("corpus.$corpus.dir", override.get())
+        }
+        inputs.files(override.map { files(it) }.orElse(files()))
+            .withPropertyName("corpus.$corpus.dir").withPathSensitivity(PathSensitivity.RELATIVE)
+    }
     // the class paths of the applications, given to the compiler by the test
     doFirst {
         systemProperty("corpus.fullstack.classpath", fullstackClasspath.asPath)
         systemProperty("corpus.fullstack.processorPath", fullstackProcessorPath.asPath)
         systemProperty("corpus.petclinic.classpath", petclinicClasspath.asPath)
         systemProperty("corpus.petclinic.processorPath", petclinicProcessorPath.asPath)
-        // a checkout of an application instead of its pinned copy: -Dcorpus.<name>.dir=<path to src>
-        listOf("fullstack", "petclinic").forEach { corpus ->
-            System.getProperty("corpus.$corpus.dir")?.let { systemProperty("corpus.$corpus.dir", it) }
-        }
     }
 }
