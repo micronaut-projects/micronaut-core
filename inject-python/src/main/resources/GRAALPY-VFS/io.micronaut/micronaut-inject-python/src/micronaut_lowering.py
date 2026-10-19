@@ -1680,7 +1680,8 @@ class Lowering:
             read = PythonMember(receiver, node.attr, stub_type)
         else:
             self._refuse("unsupported-expression", f"reading [{node.attr}] of [{model.name}], which is not an attribute, has no static lowering", node)
-        used = JAVA_NUMBERS.get(stub_type, stub_type)
+        # an attribute that may be None stays boxed, a primitive is widened
+        used = JAVA_PRIMITIVE_NUMBERS.get(stub_type, stub_type)
         return Cast(read, used) if used != stub_type else read
 
     def _python_receiver_call(self, model, receiver_node, name, node):
@@ -1734,7 +1735,8 @@ class Lowering:
             lowered_arguments = [self._expression(argument) for argument in node.args]
             self.bridge_calls += 1
             call = InvokePython(self._expression(receiver_node), name, [self._boxed(argument, node) for argument in lowered_arguments], return_type)
-        used = JAVA_NUMBERS.get(return_type, return_type)
+        # a boxed result may be null, which Python sees as None: it stays boxed, a primitive is widened
+        used = JAVA_PRIMITIVE_NUMBERS.get(return_type, return_type)
         return Cast(call, used) if used != return_type else call
 
     def _python_construction(self, class_def, node):
