@@ -618,7 +618,10 @@ final class PythonPooledStubGenerator {
         StaticCompilationPlan plan = PythonStubGenerator.staticCompilationPlan(context);
         Ir.CompiledBody compiledBody = plan == null || methodElement.isStatic() || isAsyncPythonMethod(methodElement)
             ? null : plan.body(scriptElement.getName(), pythonFunctionName);
-        if (compiledBody != null && compiledBody.parameterNames().size() == methodElement.getParameters().length) {
+        // a body reaching a Python object needs a leased context: the planner refuses one for a pooled
+        // module, and should the two ever disagree on the pooling, the bridge runs it
+        if (compiledBody != null && compiledBody.stats().bridgeCalls() == 0
+            && compiledBody.parameterNames().size() == methodElement.getParameters().length) {
             // the body runs as Java, outside any Python context: no context is leased for the call
             if (compiledBody.span() != null) {
                 methodBuilder.addJavadoc("Compiled from " + compiledBody.span().location());

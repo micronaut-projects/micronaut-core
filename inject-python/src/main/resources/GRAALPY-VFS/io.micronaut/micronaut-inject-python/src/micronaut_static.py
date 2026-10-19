@@ -143,9 +143,9 @@ class StaticPlanner:
         body, reasons = self._lower(module, class_def, function_def, node)
         if body is None:
             return self._record(qualified, span, "SKIPPED", scope, reasons, statements, explicit=scope != "MODE")
-        if class_def is None and not module.decorators and body.stats().bridgeCalls() > 0:
-            # a module without a module-level annotation is served by a context pool: a body of its
-            # generated class runs outside any Python context, so it cannot reach a Python object
+        if class_def is None and body.stats().bridgeCalls() > 0 and self._pooled_module(module):
+            # a module served by a context pool: a body of its generated class runs outside any
+            # Python context, so it cannot reach a Python object
             reason = ("pooled-module", "the module is served by a context pool; a body reaching a Python object has no context to reach it in", span)
             return self._record(qualified, span, "SKIPPED", scope, [reason], statements, explicit=scope != "MODE")
         self.bodies.append(body)
@@ -192,6 +192,10 @@ class StaticPlanner:
             if not self._bridged(function_def):
                 reasons.append(("class-not-eligible", "a module-level function without an executable decorator is not a method of the generated class", span))
                 return reasons
+            advice = self._advice(None, function_def, module.decorators)
+            if advice is not None:
+                # the generated class of a module binds no compiled advice: a compiled body would run without its chain
+                reasons.append(("intercepted-method", f"the function is advised by [{advice}]; the generated class of a module does not run the interceptor chain of a compiled body; not compiled yet", span))
         else:
             ineligible = self._class_ineligibility(class_def, class_node)
             if ineligible is not None:
@@ -228,18 +232,19 @@ class StaticPlanner:
                 return True
         return False
 
-    def _advice(self, class_def, function_def):
+    def _advice(self, class_def, function_def, module_decorators=()):
         """
-        The annotation advising the method, or None: an around or introduction binding on the method
-        or its class, or a validation constraint on a parameter or the return, which validates the
-        call. The Java method of an advised method runs the interceptor chain its proxy binds before
+        The annotation advising the method, or None: an around or introduction binding on the method,
+        its class or, for a module-level function, its module, or a validation constraint on a
+        parameter or the return, which validates the call. The Java method of an advised method runs the interceptor chain its proxy binds before
         the body; a Python caller reaches the chain on the Python object, which runs the body through
         the delegate.
         """
         facts = getattr(self.checker, "facts", None)
         if facts is None:
             return None
-        for decorator in list(function_def.decorators()) + (list(class_def.decorators()) if class_def is not None else []):
+        enclosing = list(class_def.decorators()) if class_def is not None else list(module_decorators or ())
+        for decorator in list(function_def.decorators()) + enclosing:
             description = self._annotation(facts, decorator)
             if description is not None and description.interceptorBinding():
                 return decorator.annotationName().rsplit(".", 1)[-1]
@@ -252,6 +257,23 @@ class StaticPlanner:
             if description is not None and description.validationConstraint():
                 return decorator.annotationName().rsplit(".", 1)[-1]
         return None
+
+    def _pooled_module(self, module):
+        """
+        Whether the generated class of the module is served by a context pool, as the script element
+        decides: unless a module-level annotation declares a scope (``@ContextPooled`` itself being
+        one that pools). A module-level annotation that is no scope (``@Controller``, ``@Requires``)
+        keeps the module pooled; an annotation without facts counts as no scope, so the planner errs
+        on the side of the refusal.
+        """
+        facts = getattr(self.checker, "facts", None)
+        for decorator in module.decorators or ():
+            if decorator.annotationName().rsplit(".", 1)[-1] == POOLED_DECORATOR:
+                return True
+            description = self._annotation(facts, decorator) if facts is not None else None
+            if description is not None and description.scope():
+                return False
+        return True
 
     def _bridged(self, function_def):
         """Whether the stub generator gives a module-level function a Java method: a decorator of an executable kind."""
