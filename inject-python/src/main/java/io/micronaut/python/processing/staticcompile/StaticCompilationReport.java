@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,12 +83,39 @@ public final class StaticCompilationReport {
      * @return Every decision the report now holds: the retained ones, then this build's
      */
     public static List<StaticCompilationDecision> write(Path directory, StaticCompilationMode mode, List<StaticCompilationDecision> decisions, @Nullable Set<String> plannedSources) {
+        return write(directory, mode, decisions, plannedSources, plannedSources != null);
+    }
+
+    /**
+     * Writes the report, keeping the decisions of the previous report for every source not in
+     * {@code plannedSources}, see {@link #write(Path, StaticCompilationMode, List, Set)}. The
+     * planned sources and the sources of the retained decisions are compared as paths, whatever
+     * their form: relative or absolute, through a symbolic link or not.
+     *
+     * @param directory      The directory, created when missing
+     * @param mode           The mode of the compilation
+     * @param decisions      The decisions of this build
+     * @param plannedSources The paths of the sources this write replaces the decisions of, or {@code null} to replace them all
+     * @param incremental    Whether the build planned the affected sources only, which the plan record says
+     * @return Every decision the report now holds: the retained ones, then this build's
+     * @throws UncheckedIOException When the directory or a file of the report cannot be written
+     * @since 5.3.0
+     */
+    public static List<StaticCompilationDecision> write(Path directory,
+                                                        StaticCompilationMode mode,
+                                                        List<StaticCompilationDecision> decisions,
+                                                        @Nullable Set<String> plannedSources,
+                                                        boolean incremental) {
         try {
             Files.createDirectories(directory);
             List<StaticCompilationDecision> all = new ArrayList<>();
             if (plannedSources != null) {
+                Set<String> planned = new HashSet<>();
+                for (String plannedSource : plannedSources) {
+                    planned.add(sourceKey(plannedSource));
+                }
                 for (StaticCompilationDecision retained : readState(directory.resolve(STATE_FILE))) {
-                    if (retained.sourcePath() == null || !plannedSources.contains(retained.sourcePath())) {
+                    if (retained.sourcePath() == null || !planned.contains(sourceKey(retained.sourcePath()))) {
                         all.add(retained);
                     }
                 }
@@ -98,7 +126,7 @@ public final class StaticCompilationReport {
             lines.add(new JsonWriter().beginObject()
                 .name("record").value("plan")
                 .name("mode").value(mode.optionValue())
-                .name("coverage").value(plannedSources == null ? "full" : "incremental")
+                .name("coverage").value(incremental ? "incremental" : "full")
                 .endObject().toString());
             for (StaticCompilationDecision decision : all) {
                 lines.add(decision.toJson());
@@ -108,6 +136,30 @@ public final class StaticCompilationReport {
             return List.copyOf(all);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write the static compilation report to " + directory, e);
+        }
+    }
+
+    /**
+     * The form a source path is compared in: absolute, normalized, with the symbolic links of its
+     * longest existing prefix resolved, so a removed source still matches the path it was planned
+     * under. A value that is not a path, the name of an unnamed source, is compared as it is.
+     *
+     * @param sourcePath The path of a source, in any form
+     * @return The key
+     */
+    static String sourceKey(String sourcePath) {
+        try {
+            Path path = Path.of(sourcePath).toAbsolutePath().normalize();
+            Path existing = path;
+            while (existing != null && !Files.exists(existing)) {
+                existing = existing.getParent();
+            }
+            if (existing == null) {
+                return path.toString();
+            }
+            return existing.toRealPath().resolve(existing.relativize(path)).normalize().toString();
+        } catch (IOException | RuntimeException e) {
+            return sourcePath;
         }
     }
 

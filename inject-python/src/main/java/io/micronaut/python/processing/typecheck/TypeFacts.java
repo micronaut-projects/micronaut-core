@@ -369,14 +369,14 @@ public final class TypeFacts {
             parameterTypes.add(typeName(parameter.getGenericType()));
             erasedParameterTypes.add(erasure(parameter.getType()));
         }
-        boolean throwsChecked = false;
+        List<String> checkedExceptions = new ArrayList<>();
         for (ClassElement thrown : method.getThrownTypes()) {
             if (!thrown.isAssignable(RuntimeException.class) && !thrown.isAssignable(Error.class)) {
-                throwsChecked = true;
+                checkedExceptions.add(thrown.getName());
             }
         }
-        return new MethodSignature(parameterTypes, method.isVarArgs(), method.isStatic(), typeName(method.getGenericReturnType()), throwsChecked, typeArguments(method.getGenericReturnType()), method.isDefault(),
-            erasedParameterTypes, erasure(method.getReturnType()));
+        return new MethodSignature(parameterTypes, method.isVarArgs(), method.isStatic(), typeName(method.getGenericReturnType()), !checkedExceptions.isEmpty(), typeArguments(method.getGenericReturnType()),
+            checkedExceptions, method.isDefault(), erasedParameterTypes, erasure(method.getReturnType()));
     }
 
     /**
@@ -562,6 +562,7 @@ public final class TypeFacts {
      * @param returnTypeArguments The qualified names of the type arguments of the return type, in
      *                       declaration order; empty when the return type is not parameterized or
      *                       an argument is a type variable
+     * @param checkedExceptions The qualified names of the checked exceptions the method declares
      * @param isDefault      Whether the method is a default method of an interface
      * @param erasedParameterTypes The erasures of the declared parameter types, which the method's
      *                       descriptor names: {@code Object} for a {@code T} the receiver binds to a
@@ -569,12 +570,13 @@ public final class TypeFacts {
      * @param erasedReturnType The erasure of the declared return type, which the method's descriptor
      *                       names
      */
-    public record MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked, List<String> returnTypeArguments, boolean isDefault,
-                                  List<String> erasedParameterTypes, String erasedReturnType) {
+    public record MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked, List<String> returnTypeArguments,
+                                  List<String> checkedExceptions, boolean isDefault, List<String> erasedParameterTypes, String erasedReturnType) {
 
         public MethodSignature {
             parameterTypes = List.copyOf(parameterTypes);
             returnTypeArguments = returnTypeArguments == null ? List.of() : List.copyOf(returnTypeArguments);
+            checkedExceptions = checkedExceptions == null ? List.of() : List.copyOf(checkedExceptions);
             erasedParameterTypes = List.copyOf(erasedParameterTypes);
         }
 
@@ -587,10 +589,26 @@ public final class TypeFacts {
          * @param returnType     The return type
          * @param throwsChecked  Whether the method declares a checked exception
          * @param returnTypeArguments The type arguments of the return type
+         * @param checkedExceptions The qualified names of the checked exceptions the method declares
          * @param isDefault      Whether the method is a default method of an interface
          */
-        public MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked, List<String> returnTypeArguments, boolean isDefault) {
-            this(parameterTypes, varargs, isStatic, returnType, throwsChecked, returnTypeArguments, isDefault, parameterTypes, returnType);
+        public MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked, List<String> returnTypeArguments,
+                               List<String> checkedExceptions, boolean isDefault) {
+            this(parameterTypes, varargs, isStatic, returnType, throwsChecked, returnTypeArguments, checkedExceptions, isDefault, parameterTypes, returnType);
+        }
+
+        /**
+         * A signature that names none of the checked exceptions it declares.
+         *
+         * @param parameterTypes      The parameter types
+         * @param varargs             Whether the last parameter takes the remaining arguments
+         * @param isStatic            Whether the method is static
+         * @param returnType          The return type
+         * @param throwsChecked       Whether the method declares a checked exception
+         * @param returnTypeArguments The type arguments of the return type
+         */
+        public MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked, List<String> returnTypeArguments) {
+            this(parameterTypes, varargs, isStatic, returnType, throwsChecked, returnTypeArguments, List.of(), false);
         }
 
         /**
@@ -603,7 +621,7 @@ public final class TypeFacts {
          * @param throwsChecked  Whether the method declares a checked exception
          */
         public MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked) {
-            this(parameterTypes, varargs, isStatic, returnType, throwsChecked, List.of(), false);
+            this(parameterTypes, varargs, isStatic, returnType, throwsChecked, List.of(), List.of(), false);
         }
 
         /**
