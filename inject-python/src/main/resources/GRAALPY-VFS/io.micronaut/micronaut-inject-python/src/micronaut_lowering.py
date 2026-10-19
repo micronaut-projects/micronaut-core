@@ -1506,12 +1506,21 @@ class Lowering:
         if kind == "dict":
             key, value = self._expression(node.key), self._expression(node.value)
             key_type, value_type = self._element_type(key.type()), self._element_type(value.type())
+            self._loose_elements(key_type, node, "the keys of a dict comprehension")
             marker.container_type = f"{MAP}<{key_type},{value_type}>"
             return [Eval(Helper("setItem", [LocalRef(result, marker.container_type), self._boxed(key, node), self._boxed(value, node)], VOID))]
         element = self._expression(node.elt)
         element_type = self._element_type(element.type())
+        if kind == "set":
+            self._loose_elements(element_type, node, "the elements of a set comprehension")
         marker.container_type = f"{SET if kind == 'set' else LIST}<{element_type}>"
         return [Eval(Helper("add" if kind == "set" else "append", [LocalRef(result, marker.container_type), self._boxed(element, node)], NONE))]
+
+    def _loose_elements(self, type_name, node, what):
+        """Refuse the keys of a dict or the elements of a set a comprehension builds that may be numbers of any type, which Python's numeric equality may merge."""
+        kind = _equality_kind(type_name)
+        if kind in _LOOSE_KINDS:
+            self._refuse("unsupported-expression", f"{what} of [{kind}] values have no static lowering: Python compares numbers across their types", node)
 
     @staticmethod
     def _element_type(type_name):
