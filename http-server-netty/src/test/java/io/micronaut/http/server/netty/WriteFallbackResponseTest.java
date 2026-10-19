@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import org.junit.jupiter.api.Test;
@@ -83,6 +84,12 @@ class WriteFallbackResponseTest {
             if (writeFailure != null) {
                 throw writeFailure;
             }
+        }
+
+        @Override
+        public void writeFull(FullHttpResponse response) {
+            calls.add("writeFull " + response.status().code());
+            response.release();
         }
 
         @Override

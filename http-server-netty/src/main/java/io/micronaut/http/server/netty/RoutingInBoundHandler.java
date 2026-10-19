@@ -133,6 +133,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
      * Resolved on first use, see {@link #resolveTerminatedEventFilter()}.
      */
     private @Nullable Predicate<NettyHttpRequest<?>> terminatedEventFilter;
+    /**
+     * The direct routes of the application, answered before the request is created, or
+     * {@code null} if it has none.
+     */
+    private final @Nullable NettyDirectRoutes directRoutes;
 
     /**
      * @param serverConfiguration               The Netty HTTP server configuration
@@ -164,6 +169,8 @@ public final class RoutingInBoundHandler implements RequestHandler {
         this.routeExecutor = embeddedServerContext.getRouteExecutor();
         this.conversionService = conversionService;
         this.applicationContext = embeddedServerContext.getApplicationContext();
+        this.directRoutes = NettyDirectRoutes.of(applicationContext, serverConfiguration, messageBodyHandlerRegistry,
+            ioExecutor, this::acceptOrdinary);
     }
 
     private boolean shouldPublishTerminatedEvent(NettyHttpRequest<?> request) {
@@ -289,6 +296,25 @@ public final class RoutingInBoundHandler implements RequestHandler {
             });
             return;
         }
+        NettyDirectRoutes direct = directRoutes;
+        if (direct != null && direct.answer(ctx, request, body, outboundAccess)) {
+            // answered from the Netty request, or held until an asynchronous direct route answers it
+            // or declines it: no HttpRequest, no filter, no route
+            return;
+        }
+        acceptOrdinary(ctx, request, body, outboundAccess);
+    }
+
+    /**
+     * Handle a request no direct route answers: create the {@link NettyHttpRequest}, then run the
+     * filters and the route.
+     *
+     * @param ctx            The context this request came in on
+     * @param request        The request line and headers
+     * @param body           The request body
+     * @param outboundAccess Writes the response
+     */
+    private void acceptOrdinary(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
         NettyHttpRequest<Object> mnRequest;
         try {
             mnRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);

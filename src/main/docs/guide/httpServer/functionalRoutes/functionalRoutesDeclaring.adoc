@@ -5,11 +5,11 @@ A route is declared in four steps, in this order:
 . optionally, a *body stage*, e.g. `.body(Item.class)`, declares the body the handler receives;
 . a *terminal*, e.g. `.handle(...)`, gives the handler or the response, and adds the route.
 
-* The creators: `GET(uri)`, `POST(uri)`, `PUT(uri)`, `PATCH(uri)` and `DELETE(uri)`, `route(HttpMethod, uri)` for any standard method, `route(Set<HttpMethod>, uri)` for several methods, `route(String, uri)` for a method by its name, custom methods included, and `any(uri)` for every method.
+* The creators: `GET(uri)`, `POST(uri)`, `PUT(uri)`, `PATCH(uri)`, `DELETE(uri)`, `HEAD(uri)` and `OPTIONS(uri)`, `route(HttpMethod, uri)` for any standard method, `route(Set<HttpMethod>, uri)` for several methods, `route(String, uri)` for a method by its name, custom methods included, and `any(uri)` for every method.
 * The body stages: `body(Class)` or `body(Argument)` for the decoded body, `form()` for a submitted form and `body()` for the body the handler reads itself.
 * The terminals: `handle(...)` for a handler that returns the response, `handleAsync(...)` for one that completes it later, and `respond(...)` for a response without a handler, see <<functionalRoutesRespond, Responses Without a Handler>>.
 
-A route without settings has a shortcut per method, `GET(uri, handler)`, `POST(uri, handler)`, `PUT(uri, handler)`, `PATCH(uri, handler)`, `DELETE(uri, handler)` and `any(uri, handler)`, the same as `GET(uri).handle(handler)`:
+A route without settings has a shortcut per method, `GET(uri, handler)`, `POST(uri, handler)`, `PUT(uri, handler)`, `PATCH(uri, handler)`, `DELETE(uri, handler)`, `HEAD(uri, handler)`, `OPTIONS(uri, handler)` and `any(uri, handler)`, the same as `GET(uri).handle(handler)`:
 
 snippet::io.micronaut.docs.server.functional.ItemRoutes[tags="imports,clazz", indent=0, title="Declaring handler routes"]
 
@@ -27,7 +27,7 @@ snippet::io.micronaut.docs.server.functional.ItemRoutes[tags="imports,clazz", in
 
 The settings of a route come before its terminal, which returns nothing: a route is declared by one statement, and a setting cannot follow the handler. A route whose declaration is not ended with a terminal is an error: the application fails to start with an `IllegalStateException` naming the route and its `HttpRoutes` bean, e.g. `The route GET /items/{id} declared by ItemRoutes has no handler: end it with handle, handleAsync or respond`. A route declared in a group is checked when the lambda of the group returns. A pending route ends with one terminal: a second one, or a setting after it, fails.
 
-A `GET` route gets an implicit `HEAD` route, and a request with another method is answered with `405` and an `Allow` header listing the methods of the path, as for a controller. `OPTIONS` requests and CORS preflight requests are answered for handler routes as for controllers, see <<cors, Configuring CORS>>.
+A `GET` route gets an implicit `HEAD` route, which a `HEAD(uri)` route of the same URI template replaces, and a request with another method is answered with `405` and an `Allow` header listing the methods of the path, as for a controller. `OPTIONS` requests and CORS preflight requests are answered for handler routes as for controllers, see <<cors, Configuring CORS>>: an `OPTIONS(uri)` route answers the `OPTIONS` requests of its URI, but not a CORS preflight request, which the CORS filter answers before any route when CORS is enabled for its origin.
 
 `any(uri)` routes every HTTP method, standard or custom, to one handler, with the same stages and terminals as the other creators, e.g. `any(uri).body(Item.class).handle(...)`, and the shortcut `any(uri, handler)`. A route of a specific method on the same path answers its method instead, and so does the implicit `HEAD` route of a `GET` route; the CORS filter still answers a preflight request, so `any` answers the other `OPTIONS` and `HEAD` requests. A path with an `any` route is never answered with `405`. The route of a specific method wins only when it matches as closely: a more specific `any` route, e.g. `/files/special`, answers before `GET /files/{name}`.
 

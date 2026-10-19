@@ -295,6 +295,7 @@ public final class RequestConditions {
             case ValueMatcher.StartsWith _ -> COST_AFFIX;
             case ValueMatcher.EndsWith _ -> COST_AFFIX;
             case ValueMatcher.Contains _ -> COST_AFFIX;
+            case ValueMatcher.EntityTag _ -> COST_AFFIX;
             case ValueMatcher.Regex _ -> COST_REGEX;
             case ValueMatcher.Not not -> cost(not.matcher());
             case ValueMatcher.AllOf allOf -> maxMatcherCost(allOf.matchers());
@@ -370,7 +371,7 @@ public final class RequestConditions {
             || request.getMethod() == HttpMethod.CUSTOM && method.methods().contains(HttpMethod.CUSTOM.name());
     }
 
-    private static boolean anyValue(ValueMatcher matcher, List<String> values) {
+    static boolean anyValue(ValueMatcher matcher, List<String> values) {
         if (values.isEmpty()) {
             return matches(matcher, null);
         }
@@ -389,12 +390,23 @@ public final class RequestConditions {
      */
     private static boolean cookie(RequestCondition.Cookie cookie, HttpRequest<?> request) {
         List<String> headers = request.getHeaders().getAll(HttpHeaders.COOKIE);
+        if (headers.isEmpty()) {
+            io.micronaut.http.cookie.Cookie found = request.getCookies().findCookie(cookie.name()).orElse(null);
+            return matches(cookie.value(), found == null ? null : found.getValue());
+        }
+        return cookie(cookie, headers);
+    }
+
+    /**
+     * Scan {@code Cookie} headers for the cookies of the name: the other cookies are not decoded.
+     *
+     * @param cookie  The condition
+     * @param headers The values of the {@code Cookie} headers
+     * @return Whether a cookie of the name matches, or none is present and the matcher matches an absent value
+     */
+    static boolean cookie(RequestCondition.Cookie cookie, List<String> headers) {
         String name = cookie.name();
         ValueMatcher matcher = cookie.value();
-        if (headers.isEmpty()) {
-            io.micronaut.http.cookie.Cookie found = request.getCookies().findCookie(name).orElse(null);
-            return matches(matcher, found == null ? null : found.getValue());
-        }
         boolean found = false;
         for (String header : headers) {
             int length = header.length();
@@ -446,7 +458,7 @@ public final class RequestConditions {
      * Match the host of a resolved value, a host, a host and a port, or a URI with a scheme,
      * without the scheme, the port and a final dot, in place.
      */
-    private static boolean host(ValueMatcher matcher, @Nullable String resolved) {
+    static boolean host(ValueMatcher matcher, @Nullable String resolved) {
         if (resolved == null) {
             return matches(matcher, null);
         }
@@ -489,7 +501,7 @@ public final class RequestConditions {
             .orElse(false);
     }
 
-    private static boolean inRanges(List<Cidr> ranges, byte @Nullable [] address) {
+    static boolean inRanges(List<Cidr> ranges, byte @Nullable [] address) {
         if (address == null) {
             return false;
         }
@@ -501,7 +513,7 @@ public final class RequestConditions {
         return false;
     }
 
-    private static boolean timeWindow(TimeWindow timeWindow, Instant now) {
+    static boolean timeWindow(TimeWindow timeWindow, Instant now) {
         Instant after = timeWindow.after();
         Instant before = timeWindow.before();
         return (after == null || !now.isBefore(after)) && (before == null || now.isBefore(before));
@@ -566,6 +578,7 @@ public final class RequestConditions {
             case ValueMatcher.OneOf oneOf -> oneOf(oneOf, value, from, to);
             case ValueMatcher.Regex regex -> regex.pattern().matcher(value).region(from, to).matches();
             case ValueMatcher.Present _ -> true;
+            case ValueMatcher.EntityTag entityTag -> entityTag(value, from, to, entityTag.opaqueTag());
             case ValueMatcher.Not not -> !matches(not.matcher(), value, from, to);
             case ValueMatcher.AllOf allOf -> {
                 for (ValueMatcher part : allOf.matchers()) {
@@ -584,6 +597,44 @@ public final class RequestConditions {
                 yield false;
             }
         };
+    }
+
+    /**
+     * Read a list of entity tags tag by tag: a quoted opaque tag may contain a comma, so the list
+     * is not split.
+     */
+    private static boolean entityTag(CharSequence value, int from, int to, String opaqueTag) {
+        int i = from;
+        while (i < to) {
+            char c = value.charAt(i);
+            if (c == ' ' || c == '\t' || c == ',') {
+                i++;
+                continue;
+            }
+            if (c == '*') {
+                return true;
+            }
+            int start = i;
+            if (c == 'W' && i + 1 < to && value.charAt(i + 1) == '/') {
+                start += 2;
+            }
+            if (start >= to || value.charAt(start) != '"') {
+                // malformed: nothing after it is read
+                return false;
+            }
+            int end = start + 1;
+            while (end < to && value.charAt(end) != '"') {
+                end++;
+            }
+            if (end >= to) {
+                return false;
+            }
+            if (end + 1 - start == opaqueTag.length() && regionMatches(value, start, opaqueTag, false)) {
+                return true;
+            }
+            i = end + 1;
+        }
+        return false;
     }
 
     private static boolean contains(CharSequence value, int from, int to, String part, boolean ignoreCase) {

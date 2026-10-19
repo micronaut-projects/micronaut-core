@@ -32,6 +32,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
 import io.netty.channel.VoidChannelPromise;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
@@ -564,6 +565,18 @@ abstract class MultiplexedServerHandler {
         public void writeHeadResponse(HttpResponse response) {
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             writeFull(response, Unpooled.EMPTY_BUFFER);
+        }
+
+        @Override
+        public void writeFull(FullHttpResponse response) {
+            ByteBuf content = response.content();
+            response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
+            if (PipeliningServerHandler.canHaveBody(response.status())) {
+                ContentLengthValues.set(response.headers(), content.readableBytes());
+            } else {
+                response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+            }
+            writeFull(response, content);
         }
 
         private void writeFull(HttpResponse response, ByteBuf content) {

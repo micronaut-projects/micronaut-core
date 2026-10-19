@@ -1362,6 +1362,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             ), true);
         }
 
+        @Override
+        public void writeFull(FullHttpResponse response) {
+            writeFull(response, false);
+        }
+
         private void writeFull(FullHttpResponse response, boolean headResponse) {
             FullOutboundHandler oh;
             try {
