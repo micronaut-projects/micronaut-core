@@ -17,16 +17,20 @@ package io.micronaut.core.annotation.builder;
 
 import io.micronaut.core.annotation.AnnotationBuilder;
 import io.micronaut.core.annotation.AnnotationBuilderRegistry;
+import io.micronaut.core.annotation.AnnotationConversionUtils;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueProvider;
 import io.micronaut.core.convert.ConversionService;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -94,6 +98,60 @@ class AnnotationBuilderRegistryTest {
         assertThrows(IllegalArgumentException.class, () -> registry.build("not.An.Annotation", Map.of(), ConversionService.SHARED));
         Map<String, Object> wrong = Map.of("value", "v", "level", "not a number");
         assertThrows(IllegalArgumentException.class, () -> registry.build(TestFlag.class, wrong));
+    }
+
+    @Test
+    void readsTheMembersOfAnAnnotationAsTyped() {
+        AnnotationBuilder<TestFlag> builder = registry.find(TestFlag.class).orElseThrow();
+        TestFlag flag = builder.build(Map.of("value", "v", "level", 4));
+        Map<String, Object> members = builder.toMap(flag);
+        assertEquals(Map.of("value", "v", "level", 4), members);
+        assertEquals(List.of("value", "level"), List.copyOf(members.keySet()));
+        assertEquals(Integer.class, members.get("level").getClass());
+    }
+
+    @Test
+    void readsTheMembersOfAnAnnotationValueWithTheDefaults() {
+        AnnotationBuilder<TestFlag> builder = registry.find(TestFlag.class).orElseThrow();
+        AnnotationValue<TestFlag> value = AnnotationValue.builder(TestFlag.class).member("value", "av").build();
+        assertEquals(Map.of("value", "av", "level", 1), builder.toMap(value, ConversionService.SHARED));
+        AnnotationValue<Deprecated> other = AnnotationValue.builder(Deprecated.class).build();
+        assertThrows(IllegalArgumentException.class, () -> builder.toMap(other, ConversionService.SHARED));
+    }
+
+    @Test
+    void aBuilderOfAnEarlierVersionDoesNotReadAnnotations() {
+        AnnotationBuilder<TestFlag> current = registry.find(TestFlag.class).orElseThrow();
+        AnnotationBuilder<TestFlag> earlier = new AnnotationBuilder<>() {
+            @Override
+            public Class<TestFlag> annotationType() {
+                return TestFlag.class;
+            }
+
+            @Override
+            public TestFlag build(Map<? extends CharSequence, ?> values, ConversionService conversionService) {
+                return current.build(values, conversionService);
+            }
+        };
+        TestFlag flag = earlier.build(Map.of("value", "v"));
+        assertThrows(UnsupportedOperationException.class, () -> earlier.toMap(flag));
+        AnnotationValue<TestFlag> value = AnnotationValue.builder(TestFlag.class).member("value", "v").build();
+        assertThrows(UnsupportedOperationException.class, () -> earlier.toMap(value, ConversionService.SHARED));
+    }
+
+    @Test
+    void putMemberCopiesArraysAndLeavesOutWhatIsNotSet() {
+        String[] names = {"a"};
+        int[] numbers = {1};
+        Map<String, Object> members = new java.util.LinkedHashMap<>();
+        AnnotationConversionUtils.putMember(members, "names", names);
+        AnnotationConversionUtils.putMember(members, "numbers", numbers);
+        AnnotationConversionUtils.putMember(members, "missing", null);
+        assertNotSame(names, members.get("names"));
+        assertArrayEquals(names, (String[]) members.get("names"));
+        assertNotSame(numbers, members.get("numbers"));
+        assertArrayEquals(numbers, (int[]) members.get("numbers"));
+        assertFalse(members.containsKey("missing"));
     }
 
     @Test
