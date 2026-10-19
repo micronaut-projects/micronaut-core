@@ -349,22 +349,26 @@ public final class StaticBodyGenerator {
             }
             case Ir.ForRange loop -> {
                 List<StatementDef> out = new ArrayList<>();
-                // declared in the enclosing block: a fresh Java name, so a later loop over the same
-                // Python name, or a local of that name assigned after the loop, declares its own
-                VariableDef.Local variable = new VariableDef.Local(fresh(loop.variable()), LONG);
+                // the range advances a hidden counter: the body may assign the loop variable, which in
+                // Python changes the variable until the next value of the range, never the range itself
+                VariableDef.Local counter = new VariableDef.Local(fresh("counter" + loop.loop()), LONG);
                 VariableDef.Local stop = new VariableDef.Local(fresh("stop" + loop.loop()), LONG);
                 VariableDef.Local step = new VariableDef.Local(fresh("step" + loop.loop()), LONG);
-                locals.put(loop.variable(), variable);
-                out.add(new StatementDef.DefineAndAssign(variable, expression(loop.start())));
+                out.add(new StatementDef.DefineAndAssign(counter, expression(loop.start())));
                 out.add(new StatementDef.DefineAndAssign(stop, expression(loop.stop())));
                 out.add(new StatementDef.DefineAndAssign(step, PYTHON_STATIC.invokeStatic("step", List.of(LONG), LONG, expression(loop.step()))));
                 Loop context = enterLoop(loop.loop(), loop.hasBreak(), loop.hasContinue(), out);
-                ExpressionDef.ConditionExpressionDef test = loopCondition(context, PYTHON_STATIC.invokeStatic("inRange", List.of(LONG, LONG, LONG), BOOLEAN, variable, stop, step).isTrue());
-                StatementDef advance = variable.assign(PYTHON_STATIC.invokeStatic("advance", List.of(LONG, LONG, LONG), LONG, variable, stop, step));
+                ExpressionDef.ConditionExpressionDef test = loopCondition(context, PYTHON_STATIC.invokeStatic("inRange", List.of(LONG, LONG, LONG), BOOLEAN, counter, stop, step).isTrue());
+                // declared per iteration under a fresh Java name, so a later loop over the same Python
+                // name, or a local of that name assigned after the loop, declares its own
+                VariableDef.Local variable = new VariableDef.Local(fresh(loop.variable()), LONG);
+                locals.put(loop.variable(), variable);
+                StatementDef bind = new StatementDef.DefineAndAssign(variable, counter);
+                StatementDef advance = counter.assign(PYTHON_STATIC.invokeStatic("advance", List.of(LONG, LONG, LONG), LONG, counter, stop, step));
                 if (context.broken() != null) {
                     advance = context.broken().isFalse().doIf(advance);
                 }
-                out.add(test.whileLoop(loopBody(context, loop.body(), List.of(advance))));
+                out.add(test.whileLoop(StatementDef.multi(bind, loopBody(context, loop.body(), List.of(advance)))));
                 yield StatementDef.multi(out);
             }
             case Ir.ForEach loop -> {
