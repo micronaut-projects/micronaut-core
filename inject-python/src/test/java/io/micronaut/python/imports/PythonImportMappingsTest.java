@@ -89,7 +89,7 @@ class PythonImportMappingsTest {
             .constants("io.micronaut.http.HttpMethod", "GET")
             .build()), "pyronaut.http");
 
-        assertEquals(List.of("Controller", "GET", "Get", "ok"), List.copyOf(http.members().keySet()));
+        assertEquals(List.of("Controller", "GET", "Get", "controller", "get", "ok"), List.copyOf(http.members().keySet()));
     }
 
     @Test
@@ -205,7 +205,7 @@ class PythonImportMappingsTest {
             .exclude("Controller")
             .build()), "pyronaut.http");
 
-        assertEquals(List.of("Get"), List.copyOf(http.members().keySet()));
+        assertEquals(List.of("Get", "get"), List.copyOf(http.members().keySet()));
     }
 
     @Test
@@ -222,6 +222,96 @@ class PythonImportMappingsTest {
         assertTrue(sql.inactiveReason().contains("io.micronaut.sql.annotation"), sql.inactiveReason());
         assertTrue(sql.inactiveReason().contains("io.micronaut.sql:micronaut-jdbc"), sql.inactiveReason());
         assertTrue(mappings.resolver(index).resolve("pyronaut.unknown").isEmpty());
+    }
+
+    @Test
+    void annotationsAreAlsoExportedUnderTheirSnakeCaseNames() {
+        FakeIndex annotations = new FakeIndex()
+            .annotation("io.micronaut.serde.annotation.Serdeable")
+            .annotation("io.micronaut.context.annotation.ConfigurationProperties")
+            .annotation("io.micronaut.jms.annotations.JMSListener")
+            .type("io.micronaut.serde.ObjectMapper", TypeKind.INTERFACE);
+        ResolvedModule serde = mappings(PythonModuleMapping.builder("pyronaut.serde")
+            .javaPackage("io.micronaut.serde.annotation")
+            .javaPackage("io.micronaut.context.annotation")
+            .javaPackage("io.micronaut.jms.annotations")
+            .javaPackage("io.micronaut.serde")
+            .build()).resolver(annotations).resolve("pyronaut.serde").orElseThrow();
+
+        assertEquals(new Member("serdeable", Kind.ANNOTATION, "io.micronaut.serde.annotation.Serdeable", null), serde.members().get("serdeable"));
+        assertEquals("io.micronaut.context.annotation.ConfigurationProperties", serde.members().get("configuration_properties").binaryName());
+        assertEquals("io.micronaut.jms.annotations.JMSListener", serde.members().get("jms_listener").binaryName());
+        assertTrue(serde.members().containsKey("Serdeable"), "the Java name stays");
+        assertFalse(serde.members().containsKey("object_mapper"), "only annotations take an alias");
+        assertEquals(List.copyOf(serde.members().keySet()), serde.members().keySet().stream().sorted().toList());
+    }
+
+    @Test
+    void snakeCaseAliasesGiveWayToTakenNames() {
+        FakeIndex annotations = new FakeIndex()
+            .annotation("io.micronaut.http.annotation.Get")
+            .annotation("io.micronaut.http.annotation.Status")
+            .annotation("io.micronaut.http.annotation.Error")
+            .annotation("io.micronaut.http.annotation.Filter")
+            .annotation("io.micronaut.context.annotation.Property")
+            .annotation("io.micronaut.http.annotation.JsonValue")
+            .annotation("io.micronaut.http.annotation.JSONValue")
+            .annotation("io.micronaut.http.annotation.Async")
+            .type("io.micronaut.http.HttpResponse", TypeKind.INTERFACE)
+            .type("io.micronaut.http.HttpStatus", TypeKind.ENUM)
+            .statics("io.micronaut.http.HttpResponse", "error")
+            .constants("io.micronaut.http.HttpStatus", "OK");
+        PythonImportMappings mappings = mappings(PythonModuleMapping.builder("pyronaut.http")
+            .javaPackage("io.micronaut.http.annotation")
+            .javaPackage("io.micronaut.context.annotation")
+            .javaPackage("io.micronaut.http")
+            .staticMethods("io.micronaut.http.HttpResponse")
+            .build(), PythonModuleMapping.builder("pyronaut.http.status")
+            .constants("io.micronaut.http.HttpStatus")
+            .build());
+        ResolvedModule http = mappings.resolver(annotations).resolve("pyronaut.http").orElseThrow();
+
+        assertEquals("io.micronaut.http.annotation.Get", http.members().get("get").binaryName());
+        // a nested module and a static method keep their names
+        assertEquals(Kind.MODULE, http.members().get("status").kind());
+        assertEquals(Kind.STATIC_METHOD, http.members().get("error").kind());
+        assertTrue(http.clashes().stream().anyMatch(clash -> clash.name().equals("error")
+            && clash.winner().kind() == Kind.STATIC_METHOD && clash.reason().contains("snake_case")));
+        // builtins and keywords are not shadowed
+        assertFalse(http.members().containsKey("filter"));
+        assertFalse(http.members().containsKey("property"));
+        assertFalse(http.members().containsKey("async"));
+        assertFalse(http.members().containsKey("async_"));
+        // two annotations sharing a snake_case name: neither takes it
+        assertFalse(http.members().containsKey("json_value"));
+    }
+
+    @Test
+    void snakeCaseAliasesCanBeTurnedOffOrExcluded() {
+        ResolvedModule off = resolve(mappings(PythonModuleMapping.builder("pyronaut.http")
+            .javaPackage("io.micronaut.http.annotation")
+            .snakeCaseAliases(false)
+            .build()), "pyronaut.http");
+        assertFalse(off.members().containsKey("get"));
+        assertTrue(off.members().containsKey("Get"));
+
+        ResolvedModule excluded = resolve(mappings(PythonModuleMapping.builder("pyronaut.http")
+            .javaPackage("io.micronaut.http.annotation")
+            .exclude("get")
+            .build()), "pyronaut.http");
+        assertFalse(excluded.members().containsKey("get"));
+        assertTrue(excluded.members().containsKey("controller"));
+    }
+
+    @Test
+    void snakeCaseSpellsJavaNames() {
+        assertEquals("serdeable", PythonImportMappings.snakeCase("Serdeable"));
+        assertEquals("configuration_properties", PythonImportMappings.snakeCase("ConfigurationProperties"));
+        assertEquals("jms_listener", PythonImportMappings.snakeCase("JMSListener"));
+        assertEquals("each_bean", PythonImportMappings.snakeCase("EachBean"));
+        assertEquals("not_blank", PythonImportMappings.snakeCase("NotBlank"));
+        assertEquals("http_method_mapping", PythonImportMappings.snakeCase("HttpMethodMapping"));
+        assertEquals("get", PythonImportMappings.snakeCase("get"));
     }
 
     @Test

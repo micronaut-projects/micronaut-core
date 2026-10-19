@@ -37,7 +37,7 @@ import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.Origin
-import io.micronaut.core.annotation.Internal
+import com.google.devtools.ksp.symbol.Variance
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.value.MutableConvertibleValues
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
@@ -147,6 +147,18 @@ internal class KotlinVisitorContext(
      */
     private val jvmNameCache: MutableMap<KSAnnotated, String?> = HashMap()
     private val classByNameCache: MutableMap<String, KSClassDeclaration?> = HashMap()
+
+    // The source files read to find context parameters, which KSP does not expose
+    private val contextParameters = KotlinContextParameters()
+
+    /**
+     * Whether a function or property declares Kotlin context parameters. KSP leaves them out of the
+     * parameters it reports, see [KotlinContextParameters].
+     *
+     * @param declaration The function or property
+     * @return `true` if its source declares context parameters
+     */
+    fun hasContextParameters(declaration: KSDeclaration) = contextParameters.declares(declaration)
 
     fun getBinaryName(function: KSFunctionDeclaration): String {
         val binaryName = jvmNameCache.getOrCache(function) {
@@ -288,6 +300,58 @@ internal class KotlinVisitorContext(
             else -> {
                 return resolver.getJavaClassByName(Object::class.java.name)!!
             }
+        }
+    }
+
+    /**
+     * Expands the use of a type alias to the type the alias stands for. KSP reports the use of an alias as a type
+     * declared by the alias, carrying the arguments and the nullability written at the use, so the arguments of an
+     * alias of `Array<String>`, the `?` of an alias of `String?` and the order of the arguments of an alias that
+     * renames or reorders them are only found in the type the alias expands to. Aliases of aliases are expanded
+     * until a type that is not an alias is reached.
+     *
+     * @param type The type
+     * @return The type, or the type its alias expands to
+     */
+    internal fun expandTypeAlias(type: KSType): KSType {
+        var expanded = type
+        while (true) {
+            val alias = expanded.declaration as? KSTypeAlias ?: return expanded
+            var target = alias.type.resolve()
+            if (alias.typeParameters.isNotEmpty() && alias.typeParameters.size == expanded.arguments.size) {
+                val substitutions = alias.typeParameters.map { it.name.asString() }.zip(expanded.arguments).toMap()
+                target = substituteTypeArguments(target, substitutions)
+            }
+            expanded = if (expanded.isMarkedNullable) target.makeNullable() else target
+        }
+    }
+
+    private fun substituteTypeArguments(type: KSType, substitutions: Map<String, KSTypeArgument>): KSType {
+        val declaration = type.declaration
+        if (declaration is KSTypeParameter) {
+            val substitution = substitutions[declaration.name.asString()]?.type?.resolve() ?: return type
+            return if (type.isMarkedNullable) substitution.makeNullable() else substitution
+        }
+        if (type.arguments.isEmpty()) {
+            return type
+        }
+        return type.replace(type.arguments.map { substituteTypeArgument(it, substitutions) })
+    }
+
+    private fun substituteTypeArgument(argument: KSTypeArgument, substitutions: Map<String, KSTypeArgument>): KSTypeArgument {
+        val argumentType = argument.type?.resolve() ?: return argument
+        val argumentDeclaration = argumentType.declaration
+        val substitution = if (argumentDeclaration is KSTypeParameter) substitutions[argumentDeclaration.name.asString()] else null
+        if (substitution != null && (substitution.variance == Variance.STAR || substitution.type == null)) {
+            // The alias is used with a star projection: List<*> for an alias of List<T>
+            return substitution
+        }
+        val variance = if (substitution != null && argument.variance == Variance.INVARIANT) substitution.variance else argument.variance
+        val substituted = substituteTypeArguments(argumentType, substitutions)
+        return if (substituted === argumentType && variance == argument.variance) {
+            argument
+        } else {
+            resolver.getTypeArgument(resolver.createKSTypeReferenceFromKSType(substituted), variance)
         }
     }
 
@@ -459,16 +523,6 @@ internal class KotlinVisitorContext(
         originatingElement: Element
     ) {
         outputVisitor.visitServiceDescriptor(type, classname, originatingElement)
-    }
-
-    @Internal
-    override fun visitServiceDescriptor(
-        type: String,
-        classname: String,
-        originatingElement: Element,
-        content: ByteArray?
-    ) {
-        outputVisitor.visitServiceDescriptor(type, classname, originatingElement, content)
     }
 
     override fun visitMetaInfFile(

@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
@@ -22,7 +23,11 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.visitor.TypeElementVisitor;
+import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.writer.OriginatingElements;
+import io.micronaut.sourcegen.model.ObjectDef;
 import org.jspecify.annotations.Nullable;
 
 import javax.annotation.processing.AbstractProcessor;
@@ -324,6 +329,34 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
 
     private void illegalState() {
         throw new IllegalStateException("No messager set. Ensure processing environment is initialized");
+    }
+
+    /**
+     * Writes a generated class and, when it is a service, its service entry, or produces a compile error.
+     *
+     * @param outputObjectDef The generated class
+     * @param visitorContext The visitor context
+     */
+    final void write(OutputObjectDef outputObjectDef, VisitorContext visitorContext) {
+        try {
+            ObjectDef objectDef = outputObjectDef.objectDef();
+            Class<?> serviceClass = outputObjectDef.serviceClass();
+            OriginatingElements originatingElements = outputObjectDef.originatingElements();
+            if (serviceClass != null) {
+                classWriterOutputVisitor.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
+            }
+            // Through the context, which writes the class as the bytecode or the source its language writes
+            visitorContext.visitObjectDef(objectDef, originatingElements.getOriginatingElements());
+        } catch (Exception e) {
+            // raise a compile error
+            String message = e.getMessage();
+            Element javaElement = null;
+            io.micronaut.inject.ast.Element astElement = outputObjectDef.originatingElements().getOriginatingElements()[0];
+            if (astElement.getNativeType() instanceof JavaNativeElement javaNativeElement) {
+                javaElement = javaNativeElement.element();
+            }
+            error(javaElement, "Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
+        }
     }
 
     /**

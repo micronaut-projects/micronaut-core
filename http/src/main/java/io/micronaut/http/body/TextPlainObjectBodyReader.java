@@ -22,6 +22,8 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.stream.BodyPublishers;
+import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecException;
@@ -29,7 +31,6 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -92,7 +93,13 @@ public final class TextPlainObjectBodyReader<T> implements TypedMessageBodyReade
 
     @Override
     public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        return Flux.from(input).map(byteBuffer -> read0(type, byteBuffer, getCharset(mediaType)));
+        return BodyPublishers.map(input, byteBuffer -> read0(type, byteBuffer, getCharset(mediaType)));
+    }
+
+    @Override
+    public PieceReader<T> openPieceReader(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
+        Charset charset = getCharset(mediaType);
+        return PieceReaders.eachPiece(byteBuffer -> read0(type, byteBuffer, charset));
     }
 
     /**
@@ -100,6 +107,14 @@ public final class TextPlainObjectBodyReader<T> implements TypedMessageBodyReade
      * {@code Accept-Charset} header is a preference for the response and is not consulted.
      */
     private Charset getCharset(@Nullable MediaType mediaType) {
-        return mediaType == null ? defaultCharset : mediaType.getCharset().orElse(defaultCharset);
+        if (mediaType == null) {
+            return defaultCharset;
+        }
+        try {
+            return mediaType.getCharset().orElse(defaultCharset);
+        } catch (IllegalArgumentException e) {
+            // IllegalCharsetNameException or UnsupportedCharsetException: the client sent a bad charset
+            throw new CodecException("Unsupported charset in content type: " + mediaType, e);
+        }
     }
 }

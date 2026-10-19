@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -88,7 +89,7 @@ final class DefaultLocatedHttpBodyRouteSpec<T, B extends @Nullable Object> imple
     }
 
     @Override
-    public LocatedHttpBodyRouteSpec<T, B> where(RouteCondition condition) {
+    public LocatedHttpBodyRouteSpec<T, B> where(RequestCondition condition) {
         route.where(condition);
         return this;
     }
@@ -102,6 +103,12 @@ final class DefaultLocatedHttpBodyRouteSpec<T, B extends @Nullable Object> imple
     @Override
     public LocatedHttpBodyRouteSpec<T, B> order(int order) {
         route.order(order);
+        return this;
+    }
+
+    @Override
+    public LocatedHttpBodyRouteSpec<T, B> selectedBy(@Nullable RouteMatchSelector selector) {
+        route.selectedBy(selector);
         return this;
     }
 

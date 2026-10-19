@@ -78,6 +78,7 @@ micronautBuild {
 }
 
 noReflection {
+    allowIn("io.micronaut.annotation.processing.AbstractInjectAnnotationProcessor", "CLASS_NAMES")
     allowIn("io.micronaut.annotation.processing.AnnotationUtils", "SERVICE_LOADING")
     allowIn("io.micronaut.annotation.processing.BeanDefinitionInjectProcessor", "CLASS_NAMES")
     allowIn("io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder", "CLASS_LOADING", "ENUM_CONSTANTS", "REFLECTIVE_ACCESS")

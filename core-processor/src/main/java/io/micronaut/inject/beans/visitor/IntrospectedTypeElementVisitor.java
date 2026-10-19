@@ -204,7 +204,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     context
                 );
 
-                describeHierarchy(writer, ce, introspected);
+                describeHierarchy(writer, ce, introspected, context, element);
                 processElement(
                     metadata,
                     members,
@@ -240,7 +240,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         );
 
 
-                        describeHierarchy(writer, classElement, introspected);
+                        describeHierarchy(writer, classElement, introspected, context, element);
                         processElement(metadata,
                             members,
                             indexedAnnotations,
@@ -275,7 +275,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     context
                 );
             }
-            describeHierarchy(writer, element, introspected);
+            describeHierarchy(writer, element, introspected, context, element);
             processElement(metadata, members, indexedAnnotations, element, writer, ignoreSettersWithDifferingType, isDescribeConstructors(element, introspected), context);
         }
     }
@@ -285,11 +285,14 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     }
 
     /**
-     * Has the introspection describe the hierarchy of the type when the type asks for it.
+     * Has the introspection describe the hierarchy of the type when the type asks for it, and records the generic
+     * hierarchy of the type beside it, which {@link io.micronaut.core.beans.BeanTypeHierarchy#getGenericHierarchy()} reads.
      */
-    private static void describeHierarchy(BeanIntrospectionWriter writer, ClassElement ce, AnnotationValue<Introspected> introspected) {
+    private static void describeHierarchy(BeanIntrospectionWriter writer, ClassElement ce, AnnotationValue<Introspected> introspected,
+                                          VisitorContext context, ClassElement originatingElement) {
         if (ce.findAnnotation(Introspected.class).orElse(introspected).booleanValue("hierarchy").orElse(false)) {
             writer.describeHierarchy();
+            context.importTypeHierarchy(ce, originatingElement);
         }
     }
 

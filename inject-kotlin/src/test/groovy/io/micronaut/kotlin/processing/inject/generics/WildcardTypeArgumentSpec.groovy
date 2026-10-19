@@ -21,7 +21,6 @@ import io.micronaut.core.type.Argument
 import io.micronaut.core.type.WildcardArgument
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
-import spock.lang.PendingFeature
 import spock.lang.Shared
 import spock.lang.Unroll
 
@@ -164,7 +163,6 @@ class Bean<B : Book>(
         upper(foo) == [foo.type.name] && lower(foo) == []
     }
 
-    @PendingFeature(reason = "the Kotlin processor drops the type arguments of a projection's bound")
     void "a projection keeps the type arguments of its bound"() {
         given:
         Argument<?> comparable = constructorArguments().parameterizedBound.typeParameters[0]

@@ -100,7 +100,6 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Indexed;
-import io.micronaut.core.annotation.Indexes;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.convert.ConversionService;
@@ -196,8 +195,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -646,7 +643,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private static final Method METHOD_QUALIFIER_BY_TYPE = ReflectionUtils.getRequiredMethod(Qualifiers.class, "byType", Class[].class);
 
-    private static final Method METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY = ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "markDependentAsFactory");
+    private static final Method METHOD_BEAN_RESOLUTION_CONTEXT_GET_FACTORY_BEAN = ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "getFactoryBean", BeanDefinition.class, Class.class, Qualifier.class);
 
     private static final Method METHOD_PROXY_TARGET_TYPE = ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetDefinitionType");
 
@@ -771,12 +768,6 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private final Map<String, Boolean> isLifeCycleCache = new HashMap<>(2);
     private ExecutableMethodsDefinitionWriter executableMethodsDefinitionWriter;
     private boolean generateExecutableMethodsDefinitionWriter = true;
-
-    // What the static initializer is generated from, for the descriptor of the definition
-    private Collection<String> descriptorExposedTypes = List.of();
-    private List<String> indexedTypeNames = List.of();
-    private List<Condition> preLoadConditions = List.of();
-    private boolean hasPostLoadConditions;
 
     private boolean disabled = false;
 
@@ -1662,114 +1653,12 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             // Only the Signature attribute of the bytecode, which already names the bean type in the superclass
             classDefBuilder.addSuperinterface(TypeDef.parameterized(beanDefinitionInterface, beanDefinitionTypeArgument));
         }
-        classes.add(new OutputObjectDef(classDefBuilder.build(), BeanDefinitionReference.class, originatingElements, describe().toByteArray()));
+        classes.add(new OutputObjectDef(classDefBuilder.build(), BeanDefinitionReference.class, originatingElements));
         if (executableMethodsClass != null) {
             classes.add(executableMethodsClass);
         }
         classes.addAll(evaluatedExpressionProcessor.build());
         return classes;
-    }
-
-    /**
-     * What the reference of the definition answers before the definition is loaded, for the content of its
-     * {@code META-INF/micronaut} entry. It is taken from what the class was just generated from, so that the two
-     * agree.
-     *
-     * @return The descriptor of the definition
-     */
-    private BeanDefinitionDescriptor describe() {
-        int flags = 0;
-        if (annotationMetadata.hasDeclaredAnnotation(Context.class)) {
-            flags |= BeanDefinitionDescriptor.FLAG_CONTEXT_SCOPE;
-        }
-        if (annotationMetadata.hasStereotype(Parallel.class)) {
-            flags |= BeanDefinitionDescriptor.FLAG_PARALLEL;
-        }
-        if (proxiedBean) {
-            flags |= BeanDefinitionDescriptor.FLAG_PROXIED_BEAN;
-        }
-        if (isProxyTarget) {
-            flags |= BeanDefinitionDescriptor.FLAG_PROXY_TARGET;
-        }
-        if (isSingleton(annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).orElse(null))) {
-            flags |= BeanDefinitionDescriptor.FLAG_SINGLETON;
-        }
-        if (annotationMetadata.hasDeclaredStereotype(Primary.class)) {
-            flags |= BeanDefinitionDescriptor.FLAG_PRIMARY;
-        }
-        if (isConfigurationProperties) {
-            flags |= BeanDefinitionDescriptor.FLAG_CONFIGURATION_PROPERTIES;
-        }
-        if (isContainerType()) {
-            flags |= BeanDefinitionDescriptor.FLAG_CONTAINER_TYPE;
-        }
-        if (executableMethodsDefinitionWriter != null && executableMethodsDefinitionWriter.requiresMethodProcessing()) {
-            flags |= BeanDefinitionDescriptor.FLAG_REQUIRES_METHOD_PROCESSING;
-        }
-        if (hasPostLoadConditions) {
-            flags |= BeanDefinitionDescriptor.FLAG_POST_LOAD_CONDITIONS;
-        }
-
-        AnnotationMetadata runtimeMetadata = AnnotationMetadataGenUtils.runtimeMetadata(annotationMetadata);
-        Set<String> annotationNames = new LinkedHashSet<>(runtimeMetadata.getAnnotationNames());
-        annotationNames.addAll(runtimeMetadata.getDeclaredAnnotationNames());
-        annotationNames.addAll(runtimeMetadata.getStereotypeAnnotationNames());
-        annotationNames.addAll(runtimeMetadata.getDeclaredStereotypeAnnotationNames());
-        SortedMap<String, Integer> annotations = new TreeMap<>();
-        for (String annotationName : annotationNames) {
-            int membership = 0;
-            if (runtimeMetadata.hasDeclaredAnnotation(annotationName)) {
-                membership |= BeanDefinitionDescriptor.MEMBERSHIP_DECLARED_ANNOTATION;
-            }
-            if (runtimeMetadata.hasAnnotation(annotationName)) {
-                membership |= BeanDefinitionDescriptor.MEMBERSHIP_ANNOTATION;
-            }
-            if (runtimeMetadata.hasDeclaredStereotype(annotationName)) {
-                membership |= BeanDefinitionDescriptor.MEMBERSHIP_DECLARED_STEREOTYPE;
-            }
-            if (runtimeMetadata.hasStereotype(annotationName)) {
-                membership |= BeanDefinitionDescriptor.MEMBERSHIP_STEREOTYPE;
-            }
-            annotations.put(annotationName, membership);
-        }
-
-        // the qualifiers are the ones of what the bean declares, as QualifiedBeanType#getDeclaredQualifier reads them
-        AnnotationMetadata declaredMetadata = runtimeMetadata instanceof AnnotationMetadataHierarchy hierarchy ? hierarchy.getDeclaredMetadata() : runtimeMetadata;
-
-        return new BeanDefinitionDescriptor(
-            flags,
-            getClassName(beanTypeElement),
-            List.copyOf(descriptorExposedTypes),
-            indexedTypeNames.isEmpty() ? indexedTypeNames(runtimeMetadata) : indexedTypeNames,
-            annotations,
-            new TreeMap<>(AnnotationMetadataGenUtils.repeatableAnnotationContainers(annotationMetadataDefaults)),
-            List.of(AnnotationUtil.resolveNonBindingMembers(declaredMetadata)),
-            new ArrayList<>(AnnotationUtil.findQualifierAnnotations(declaredMetadata)),
-            preLoadConditions
-        );
-    }
-
-    /**
-     * The types {@link BeanDefinitionReference#getIndexes()} reads from the annotation metadata, which is what a
-     * definition that declares no index of its own answers with: a bean of a factory is indexed as its factory is.
-     *
-     * @param annotationMetadata The annotation metadata of the generated class
-     * @return The names of the types
-     */
-    private static List<String> indexedTypeNames(AnnotationMetadata annotationMetadata) {
-        List<String> names = new ArrayList<>();
-        Iterable<AnnotationMetadata> levels = annotationMetadata instanceof AnnotationMetadataHierarchy hierarchy ? hierarchy : List.of(annotationMetadata);
-        for (AnnotationMetadata level : levels) {
-            AnnotationValue<Indexes> indexes = level.getAnnotation(Indexes.class);
-            if (indexes != null) {
-                for (AnnotationValue<Indexed> indexed : indexes.getAnnotations(AnnotationMetadata.VALUE_MEMBER, Indexed.class)) {
-                    for (AnnotationClassValue<?> type : indexed.annotationClassValues(AnnotationMetadata.VALUE_MEMBER)) {
-                        names.add(type.getName());
-                    }
-                }
-            }
-        }
-        return names;
     }
 
     private ExecutableMethodsDefinitionWriter createExecutableMethodsDefinitionWriter() {
@@ -2346,29 +2235,31 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             }
             case FieldDefinition<?, ?> fd -> {
                 FieldDefinition<ClassElement, FieldElement> fieldDefinition = (FieldDefinition<ClassElement, FieldElement>) fd;
-                yield buildFactoryFieldCall(methodParameters, additionalStatements, fieldDefinition);
+                yield buildFactoryFieldCall(aThis, methodParameters, additionalStatements, fieldDefinition);
             }
             case MethodDefinition<?, ?> md -> {
                 MethodDefinition<ClassElement, MethodElement> methodDefinition = (MethodDefinition<ClassElement, MethodElement>) md;
-                yield buildFactoryMethodCall(methodParameters, methodDefinition, additionalStatements, values);
+                yield buildFactoryMethodCall(aThis, methodParameters, methodDefinition, additionalStatements, values);
             }
         };
     }
 
-    private ExpressionDef buildFactoryMethodCall(List<VariableDef.MethodParameter> methodParameters,
+    private ExpressionDef buildFactoryMethodCall(VariableDef.This aThis,
+                                                 List<VariableDef.MethodParameter> methodParameters,
                                                  MethodDefinition<ClassElement, MethodElement> factorMethodDefinition,
                                                  List<StatementDef> additionalStatements,
                                                  List<? extends ExpressionDef> values) {
         MethodElement methodElement = factorMethodDefinition.methodElement();
-        ExpressionDef factoryBean = getFactoryBean(methodParameters, methodElement.getOwningType(), methodElement.isStatic(), additionalStatements);
+        ExpressionDef factoryBean = getFactoryBean(aThis, methodParameters, methodElement.getOwningType(), methodElement.isStatic(), additionalStatements);
         return getBeanFromFactoryMethod(factorMethodDefinition, factoryBean, values);
     }
 
-    private ExpressionDef buildFactoryFieldCall(List<VariableDef.MethodParameter> methodParameters,
+    private ExpressionDef buildFactoryFieldCall(VariableDef.This aThis,
+                                                List<VariableDef.MethodParameter> methodParameters,
                                                 List<StatementDef> additionalStatements,
                                                 FieldDefinition<ClassElement, FieldElement> factoryFieldDefinition) {
         FieldElement fieldElement = factoryFieldDefinition.fieldElement();
-        ExpressionDef factoryBean = getFactoryBean(methodParameters, fieldElement.getDeclaringType(), fieldElement.isStatic(), additionalStatements);
+        ExpressionDef factoryBean = getFactoryBean(aThis, methodParameters, fieldElement.getDeclaringType(), fieldElement.isStatic(), additionalStatements);
         return getBeanFromFactoryField(factoryFieldDefinition, factoryBean);
     }
 
@@ -2510,7 +2401,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         return annotationMetadata.stringValue(Property.class, "name");
     }
 
-    private ExpressionDef getFactoryBean(List<VariableDef.MethodParameter> parameters,
+    private ExpressionDef getFactoryBean(VariableDef.This aThis,
+                                         List<VariableDef.MethodParameter> parameters,
                                          ClassElement factoryClass,
                                          boolean isStaticMember,
                                          List<StatementDef> additionalStatements) {
@@ -2530,15 +2422,18 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         );
 
         ExpressionDef beanResolutionContxt = parameters.getFirst();
+        // the factory is marked as the dependent factory; a context recording the dependency graph also attributes
+        // the lookup to the produced definition, so the graph records the factory as a dependency of the bean it produces
         StatementDef.DefineAndAssign defineAndAssign = beanResolutionContxt
-            .invoke(BEAN_LOCATOR_METHOD_GET_BEAN,
-                // first argument is the bean type
+            .invoke(METHOD_BEAN_RESOLUTION_CONTEXT_GET_FACTORY_BEAN,
+                // the definition of the produced bean
+                aThis,
+                // the factory type
                 ExpressionDef.constant(factoryTypeDef),
-                // second argument is the qualifier for the factory if any
+                // the qualifier for the factory if any
                 getQualifier(factoryClass, argumentExpression)
             ).cast(factoryTypeDef).newLocal("factoryBean");
         additionalStatements.add(defineAndAssign);
-        additionalStatements.add(beanResolutionContxt.invoke(METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY));
         return defineAndAssign.variable();
     }
 
@@ -2677,7 +2572,6 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
         List<AnnotationValue<Indexed>> indexes = declaredAnnotationMetadata.getAnnotationValuesByType(Indexed.class);
         if (!indexes.isEmpty()) {
-            indexedTypeNames = indexes.stream().map(av -> av.stringValue().orElseThrow()).toList();
             TypeDef.Array arrayOfClasses = TypeDef.Primitive.CLASS.array();
             FieldDef indexesField = FieldDef.builder("$INDEXES")
                 .ofType(arrayOfClasses)
@@ -2688,7 +2582,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             statements.add(StatementDef.doTry(
                     staticFieldIndexes.put(
                         arrayOfClasses.instantiate(
-                            indexedTypeNames.stream().map(this::asClassExpression).toArray(ExpressionDef[]::new)
+                            indexes.stream().map(av -> asClassExpression(av.stringValue().orElseThrow())).toArray(ExpressionDef[]::new)
                         )
                     )
                 ).doCatch(Throwable.class,
@@ -2840,8 +2734,6 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             }
             postConditions.add(new MatchesDynamicCondition(annotationMetadata));
         }
-        preLoadConditions = preConditions;
-        hasPostLoadConditions = !postConditions.isEmpty();
 
         Function<Condition, ExpressionDef> writer = new Function<>() {
             @Override
@@ -3056,7 +2948,6 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             // This should never happen
             return StatementDef.multi();
         }
-        descriptorExposedTypes = exposedTypeNames;
         FieldDef exposedTypesField = FieldDef.builder(FIELD_EXPOSED_TYPES, TypeDef.parameterized(Set.class, TypeDef.Primitive.CLASS))
             .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
             .build();

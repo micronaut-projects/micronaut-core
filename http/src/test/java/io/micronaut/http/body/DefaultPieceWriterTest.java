@@ -86,6 +86,16 @@ class DefaultPieceWriterTest {
     }
 
     @Test
+    void aStreamedPieceDoesNotRetainTheCallersSeparator() throws IOException {
+        ReadBuffer separator = bodyFactory.readBufferFactory().copyOf(",", StandardCharsets.UTF_8);
+        CloseableByteBody piece = bodyFactory.adapt(Flux.just(bodyFactory.readBufferFactory().copyOf("value", StandardCharsets.UTF_8)));
+        CloseableByteBody result = DefaultPieceWriter.prepend(bodyFactory, separator, piece);
+        assertEquals(1, separator.readable());
+        separator.close();
+        assertEquals(",value", text(result));
+    }
+
+    @Test
     void separatorIsNotConsumed() throws IOException {
         MessageBodyWriter<String> plain = (type, mediaType, object, outgoingHeaders, outputStream) -> {
             try {

@@ -72,7 +72,6 @@ import io.netty.util.Attribute;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 
 import java.io.EOFException;
 import java.util.ArrayDeque;
@@ -843,7 +842,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * Handler that exposes incoming content as a {@link Flux}.
+     * Handler that exposes incoming content as a {@link org.reactivestreams.Publisher}.
      */
     private final class StreamingInboundHandler extends InboundHandler implements BufferConsumer.Upstream {
         final StreamingNettyByteBody.SharedBuffer dest;
@@ -1186,7 +1185,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // code is 1xx or 204, also a status code 304 may not have a Content-Length or Transfer-Encoding set.
             // A kept HTTP/1.0 connection has a known length: a HEAD response without Content-Length
             // has no body either
-            if (!http10KeptAlive && !HttpUtil.isContentLengthSet(message) && !HttpUtil.isTransferEncodingChunked(message) && canHaveBody(message.status())) {
+            // A HEAD response never has a body, so its end is known without a length either
+            if (!http10KeptAlive && !HttpMethod.HEAD.equals(request.method()) && !HttpUtil.isContentLengthSet(message) && !HttpUtil.isTransferEncodingChunked(message) && canHaveBody(message.status())) {
                 HttpUtil.setKeepAlive(message, false);
                 closeAfterWrite();
             }
