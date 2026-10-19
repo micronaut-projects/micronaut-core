@@ -183,7 +183,9 @@ class PyronautCompilerStaticCompilationTest {
                     return quantity * 2
             """);
         compileIncrementally(python, java, output, cache, report);
-        assertEquals(List.of("Orders.place", "Orders.cancel", "Pricing.total"), reportedNames(report));
+        // the decisions follow the order the processor visits the sources in, which differs between file systems
+        assertEquals(Set.of("Orders.place", "Orders.cancel", "Pricing.total"), Set.copyOf(reportedNames(report)));
+        assertEquals(3, reportedNames(report).size());
 
         Files.writeString(orders, """
             class Orders:
