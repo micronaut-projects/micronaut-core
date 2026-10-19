@@ -458,8 +458,13 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 UpgradedHttpResponse<?> upgraded = encodedResponse.code() == HttpResponseStatus.SWITCHING_PROTOCOLS.code()
                     ? UpgradedHttpResponse.unwrap(encodedResponse) : null;
                 if (upgraded != null) {
-                    // the response is a connection to relay, not a body to write: it stays open
-                    switchProtocols(outboundAccess, nettyHttpRequest, NettyMutableHttpResponse.toNoBodyResponse(encodedResponse), upgraded);
+                    // the response is a connection to relay, not a body to write: it stays open. The
+                    // switch waits for the responses of earlier pipelined requests
+                    io.netty.handler.codec.http.HttpResponse head = NettyMutableHttpResponse.toNoBodyResponse(encodedResponse);
+                    outboundAccess.runInResponseOrder(
+                        () -> switchProtocols(outboundAccess, nettyHttpRequest, head, upgraded),
+                        upgraded::close
+                    );
                     return;
                 }
                 try (encodedResponse) {

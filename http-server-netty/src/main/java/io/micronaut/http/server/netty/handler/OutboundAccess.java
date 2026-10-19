@@ -65,4 +65,19 @@ public interface OutboundAccess extends NettyWriteContext {
      * @since 5.2.16
      */
     void abort();
+
+    /**
+     * Run an action in place of writing a response for this request, once the responses of all
+     * earlier requests on this HTTP/1.1 connection are written, e.g. to switch the connection to
+     * another protocol. No later response is written after the action: the connection belongs to
+     * it. If the connection goes away before it is the turn of this request, the discard callback
+     * runs instead. HTTP/2 runs the action right away.
+     *
+     * @param action  The action, run on the event loop
+     * @param discard Runs instead of the action when the action cannot run
+     * @since 5.3.0
+     */
+    default void runInResponseOrder(Runnable action, Runnable discard) {
+        action.run();
+    }
 }
