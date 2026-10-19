@@ -229,7 +229,6 @@ public final class StaticBodyGenerator {
             case "/" -> PYTHON_STATIC.invokeStatic("divide", List.of(DOUBLE, DOUBLE), DOUBLE, left, right);
             case "//" -> PYTHON_STATIC.invokeStatic("floorDiv", List.of(DOUBLE, DOUBLE), DOUBLE, left, right);
             case "%" -> PYTHON_STATIC.invokeStatic("floorMod", List.of(DOUBLE, DOUBLE), DOUBLE, left, right);
-            case "**" -> MATH.invokeStatic("pow", List.of(DOUBLE, DOUBLE), DOUBLE, left, right);
             default -> throw new IllegalStateException("No float lowering of the operator " + binary.op());
         };
     }
