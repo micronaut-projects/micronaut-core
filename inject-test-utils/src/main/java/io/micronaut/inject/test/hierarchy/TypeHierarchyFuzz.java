@@ -20,6 +20,7 @@ import io.micronaut.core.type.TypeHierarchy;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.GenericArrayType;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -43,9 +45,10 @@ import java.util.stream.Collectors;
  * closure of the declaration, of a raw parameterization and of a concrete one.
  *
  * <p>The grammar covers type variables with simple, recursive and intersection bounds, nested type arguments,
- * arrays, the three kinds of wildcard, raw and parameterized super classes, and diamonds. A language that lacks a
- * feature (Kotlin has no raw types, Python has neither wildcards nor arrays) leaves it out. A type naming the class
- * being declared is never produced: the javac element resolves the arguments of such a self reference to Object.</p>
+ * arrays and arrays of arrays, of a primitive among them, the three kinds of wildcard, raw and parameterized super
+ * classes, and diamonds. A language that lacks a feature (Kotlin has no raw types, Python has neither wildcards nor
+ * arrays) leaves it out. A type naming the class being declared is never produced: the javac element resolves the
+ * arguments of such a self reference to Object.</p>
  */
 public final class TypeHierarchyFuzz {
 
@@ -67,6 +70,7 @@ public final class TypeHierarchyFuzz {
         import java.io.Serializable;
         import java.util.*;
         import java.util.function.*;
+        import java.util.concurrent.atomic.LongAdder;
 
         interface Top<A> {}
         interface Left<A> extends Top<A> {}
@@ -85,6 +89,7 @@ public final class TypeHierarchyFuzz {
         import java.util.function.BiFunction
         import java.util.function.Consumer
         import java.util.function.Supplier
+        import java.util.concurrent.atomic.LongAdder
 
         interface Top<A>
         interface Left<A> : Top<A>
@@ -154,8 +159,11 @@ public final class TypeHierarchyFuzz {
     public static List<String> check(Generated g, Class<?> type, TypeHierarchy hierarchy, Predicate<Class<?>> ignoreInterface) {
         List<String> mismatches = new ArrayList<>();
         // a Python type variable is named after its class as well, T0 for the T of Fuzz0: reflection and the record agree on it
+        Set<String> omitted = new LinkedHashSet<>();
         compare(mismatches, g, g.declaration() + " declaration", TypeStrings.strings(hierarchy.getTypeClosure(hierarchy.getDeclaration())),
-            Oracle.closure(type, Oracle.identity(type), false, ignoreInterface));
+            Oracle.closure(type, Oracle.identity(type), false, ignoreInterface, Oracle.recordPackage(hierarchy.getClass()), omitted));
+        // a super type the record cannot name, LongAdder's Striped64, is named by the record instead
+        compare(mismatches, g, g.declaration() + " omitted", hierarchy.getOmittedSuperTypeNames(), new ArrayList<>(omitted));
         if (type.getTypeParameters().length > 0) {
             compare(mismatches, g, g.declaration() + " raw", TypeStrings.strings(hierarchy.getTypeClosure(Argument.of(type))),
                 Oracle.closure(type, Map.of(), true, ignoreInterface));
@@ -417,7 +425,8 @@ public final class TypeHierarchyFuzz {
 
             List<String> superPool = new ArrayList<>(List.of("", "", "Base1", "Base2", "Base3"));
             if (!python()) {
-                superPool.addAll(List.of("ArrayList", "HashMap", "AbstractList"));
+                // LongAdder extends the package-private Striped64, which the record leaves out
+                superPool.addAll(List.of("ArrayList", "HashMap", "AbstractList", "LongAdder"));
             }
             String superName = pick(superPool);
             SuperType superclass = null;
@@ -466,7 +475,7 @@ public final class TypeHierarchyFuzz {
 
         private static int arity(String name) {
             return switch (name) {
-                case "Serializable" -> 0;
+                case "Serializable", "LongAdder" -> 0;
                 case "Base2", "HashMap", "Function" -> 2;
                 case "Base3", "BiFunction" -> 3;
                 default -> 1;
@@ -481,14 +490,19 @@ public final class TypeHierarchyFuzz {
             return args;
         }
 
-        /** A type argument: a variable, a class, a nested generic with a wildcard inside, an array. */
+        /** A type argument: a variable, a class, a nested generic with a wildcard inside, an array, an array of arrays. */
         private TypeExpr typeArgument(List<String> variables, int depth) {
             List<TypeExpr> choices = new ArrayList<>(List.of(new Cls("String"), new Cls("Integer")));
+            if (!python()) {
+                choices.add(new Arr(new Arr(new Cls("String"))));
+                choices.add(new Arr(new Arr(new Cls("int"))));
+            }
             if (!variables.isEmpty()) {
                 choices.add(new Var(variables.get(random.nextInt(variables.size()))));
                 if (!python() && !(language == Language.GROOVY && depth > 0)) {
                     // Groovy: an array of a variable only outside wildcard bounds, see Language.GROOVY
                     choices.add(new Arr(new Var(variables.get(0))));
+                    choices.add(new Arr(new Arr(new Var(variables.get(0)))));
                 }
             }
             if (depth < 3) {
@@ -521,6 +535,7 @@ public final class TypeHierarchyFuzz {
                 choices.add(new Var(variables.get(random.nextInt(variables.size()))));
                 if (language != Language.GROOVY) {
                     choices.add(new Arr(new Var(variables.get(0))));
+                    choices.add(new Arr(new Arr(new Var(variables.get(0)))));
                 }
             }
             if (depth < 3) {
@@ -636,7 +651,8 @@ public final class TypeHierarchyFuzz {
                 return name + "<" + p.args().stream().map(this::kotlin).collect(Collectors.joining(", ")) + ">";
             }
             if (t instanceof Arr a) {
-                return "Array<" + kotlin(a.component()) + ">";
+                // an array of int is a primitive array in Kotlin, an Array<Int> being an Integer[]
+                return a.component() instanceof Cls c && c.name().equals("int") ? "IntArray" : "Array<" + kotlin(a.component()) + ">";
             }
             Wild w = (Wild) t;
             if (w.lower() != null) {
@@ -797,6 +813,8 @@ public final class TypeHierarchyFuzz {
         }
 
         /**
+         * The closure of a record written into the package of the type.
+         *
          * @param type            The type
          * @param substitutions   What each type variable of the type stands for
          * @param raw             Whether the parameterization is raw
@@ -804,12 +822,48 @@ public final class TypeHierarchyFuzz {
          * @return The closure, rendered
          */
         public static List<String> closure(Class<?> type, Map<TypeVariable<?>, String> substitutions, boolean raw, Predicate<Class<?>> ignoreInterface) {
+            return closure(type, substitutions, raw, ignoreInterface, type.getPackageName(), new LinkedHashSet<>());
+        }
+
+        /**
+         * The closure of a record written into a package. A super type whose declaration names a class that cannot
+         * be named from that package, a class that is not public and of another package, or one enclosed in such a
+         * class, in itself, its arguments, the bounds of their wildcards or the components of their arrays, or that
+         * is reached through a variable standing for such a declaration, is left out with the types above it kept.
+         * Whether it can be named is a property of the declaration, before the substitution.
+         *
+         * @param type            The type
+         * @param substitutions   What each type variable of the type stands for
+         * @param raw             Whether the parameterization is raw
+         * @param ignoreInterface Interfaces to leave out
+         * @param recordPackage   The package the record is written into, the package of its origin
+         * @param omitted         Receives the names of the classes of the super types left out, in the order met
+         * @return The closure, rendered, without the super types left out
+         */
+        public static List<String> closure(Class<?> type, Map<TypeVariable<?>, String> substitutions, boolean raw, Predicate<Class<?>> ignoreInterface,
+                                           String recordPackage, Set<String> omitted) {
             Set<String> closure = new LinkedHashSet<>();
             closure.add(raw ? type.getSimpleName() : renderClass(type, substitutions));
-            walkSuperTypes(type, substitutions, raw, closure, ignoreInterface);
+            walkSuperTypes(type, substitutions, Set.of(), raw, closure, ignoreInterface, recordPackage, omitted, new HashSet<>());
             closure.remove("Object");
             closure.add("Object");
             return new ArrayList<>(closure);
+        }
+
+        /**
+         * The package a record of the given class is written into: the package of its origin, which a record
+         * written outside the package of its type names before the {@code $$} segment.
+         *
+         * @param recordClass The class of the record
+         * @return The package
+         */
+        public static String recordPackage(Class<?> recordClass) {
+            String name = recordClass.getPackageName();
+            if (name.startsWith("$$")) {
+                return "";
+            }
+            int relocated = name.indexOf(".$$");
+            return relocated < 0 ? name : name.substring(0, relocated);
         }
 
         private static String renderClass(Class<?> type, Map<TypeVariable<?>, String> substitutions) {
@@ -821,6 +875,16 @@ public final class TypeHierarchyFuzz {
         }
 
         static void walkSuperTypes(Class<?> type, Map<TypeVariable<?>, String> substitutions, boolean raw, Set<String> closure, Predicate<Class<?>> ignoreInterface) {
+            walkSuperTypes(type, substitutions, Set.of(), raw, closure, ignoreInterface, type.getPackageName(), new LinkedHashSet<>(), new HashSet<>());
+        }
+
+        /**
+         * @param hidden  The variables of the type that stand for a declaration the record cannot name
+         * @param omitted The names of the classes of the super types left out
+         * @param walked  The renderings of the super types left out that were walked
+         */
+        private static void walkSuperTypes(Class<?> type, Map<TypeVariable<?>, String> substitutions, Set<TypeVariable<?>> hidden, boolean raw,
+                                           Set<String> closure, Predicate<Class<?>> ignoreInterface, String recordPackage, Set<String> omitted, Set<String> walked) {
             List<Type> parents = new ArrayList<>();
             if (type.getGenericSuperclass() != null) {
                 parents.add(type.getGenericSuperclass());
@@ -834,18 +898,68 @@ public final class TypeHierarchyFuzz {
                 Class<?> erasure = erasure(parent);
                 boolean parentRaw = raw || (parent instanceof Class<?> && erasure.getTypeParameters().length > 0);
                 Map<TypeVariable<?>, String> parentSubstitutions = new LinkedHashMap<>();
+                Set<TypeVariable<?>> parentHidden = new HashSet<>();
                 if (!parentRaw && parent instanceof ParameterizedType parameterized) {
                     Type[] arguments = parameterized.getActualTypeArguments();
                     TypeVariable<?>[] variables = erasure.getTypeParameters();
                     for (int i = 0; i < variables.length; i++) {
                         parentSubstitutions.put(variables[i], render(arguments[i], substitutions));
+                        if (!isNameable(arguments[i], recordPackage, hidden)) {
+                            parentHidden.add(variables[i]);
+                        }
                     }
                 }
                 String rendering = parentRaw ? erasure.getSimpleName() : render(parent, substitutions);
-                if (closure.add(rendering)) {
-                    walkSuperTypes(erasure, parentSubstitutions, parentRaw, closure, ignoreInterface);
+                // a raw super type is written without its arguments: its class alone is named
+                boolean nameable = parentRaw ? isNameableClass(erasure, recordPackage) : isNameable(parent, recordPackage, hidden);
+                if (!nameable) {
+                    // left out of the record by name, the types above it kept
+                    omitted.add(erasure.getName());
+                    if (walked.add(rendering)) {
+                        walkSuperTypes(erasure, parentSubstitutions, parentHidden, parentRaw, closure, ignoreInterface, recordPackage, omitted, walked);
+                    }
+                } else if (closure.add(rendering)) {
+                    walkSuperTypes(erasure, parentSubstitutions, parentHidden, parentRaw, closure, ignoreInterface, recordPackage, omitted, walked);
                 }
             }
+        }
+
+        private static boolean isNameable(Type type, String recordPackage, Set<TypeVariable<?>> hidden) {
+            if (type instanceof Class<?> cls) {
+                return isNameableClass(cls, recordPackage);
+            }
+            if (type instanceof ParameterizedType parameterized) {
+                if (!isNameableClass((Class<?>) parameterized.getRawType(), recordPackage)
+                    || parameterized.getOwnerType() != null && !isNameable(parameterized.getOwnerType(), recordPackage, hidden)) {
+                    return false;
+                }
+                return Arrays.stream(parameterized.getActualTypeArguments()).allMatch(argument -> isNameable(argument, recordPackage, hidden));
+            }
+            if (type instanceof GenericArrayType array) {
+                return isNameable(array.getGenericComponentType(), recordPackage, hidden);
+            }
+            if (type instanceof WildcardType wildcard) {
+                return Arrays.stream(wildcard.getUpperBounds()).allMatch(bound -> isNameable(bound, recordPackage, hidden))
+                    && Arrays.stream(wildcard.getLowerBounds()).allMatch(bound -> isNameable(bound, recordPackage, hidden));
+            }
+            // a variable of the type: its bounds are nameable, or the type would not have been recorded
+            return !(type instanceof TypeVariable<?> variable) || !hidden.contains(variable);
+        }
+
+        private static boolean isNameableClass(Class<?> type, String recordPackage) {
+            Class<?> component = type;
+            while (component.isArray()) {
+                component = component.getComponentType();
+            }
+            if (component.isPrimitive() || component.getPackageName().equals(recordPackage)) {
+                return true;
+            }
+            for (Class<?> current = component; current != null; current = current.getEnclosingClass()) {
+                if (!Modifier.isPublic(current.getModifiers())) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         private static Class<?> erasure(Type type) {

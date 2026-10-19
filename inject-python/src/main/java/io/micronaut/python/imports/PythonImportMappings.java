@@ -35,6 +35,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -45,6 +46,13 @@ import java.util.TreeSet;
 /**
  * The curated Python modules the {@link PythonImportMapper mappers} on a class path contribute, and their
  * resolution against a {@link ClassIndex}.
+ *
+ * <p>Unless a contribution turns {@link PythonModuleMapping#snakeCaseAliases() snake_case aliases} off, a module
+ * also exports each annotation under its snake_case name, the spelling Python decorators conventionally take:
+ * {@code @serde.serdeable} applies {@code Serdeable}, as {@code @serde.Serdeable} does. The alias is left out
+ * when the module already exports the name (a member, or a nested module such as {@code http.status} for
+ * {@code Status}), when two annotations of the module share it, when it is a Python keyword, or when it is the
+ * name of a Python builtin ({@code property}, {@code filter}), which importing it would shadow.</p>
  *
  * @author Graeme Rocher
  * @since 5.3.0
@@ -58,6 +66,19 @@ public final class PythonImportMappings {
         "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda",
         "nonlocal", "not", "or", "pass", "raise", "return", "try", "while", "with", "yield"
     );
+    /**
+     * The builtins of Python 3.13, which a snake_case alias does not take: importing it would shadow the builtin.
+     */
+    private static final Set<String> PYTHON_BUILTINS = Set.of(
+        "abs", "aiter", "all", "anext", "any", "ascii", "bin", "bool", "breakpoint", "bytearray", "bytes", "callable",
+        "chr", "classmethod", "compile", "complex", "copyright", "credits", "delattr", "dict", "dir", "divmod",
+        "enumerate", "eval", "exec", "exit", "filter", "float", "format", "frozenset", "getattr", "globals", "hasattr",
+        "hash", "help", "hex", "id", "input", "int", "isinstance", "issubclass", "iter", "len", "license", "list",
+        "locals", "map", "max", "memoryview", "min", "next", "object", "oct", "open", "ord", "pow", "print", "property",
+        "quit", "range", "repr", "reversed", "round", "set", "setattr", "slice", "sorted", "staticmethod", "str", "sum",
+        "super", "tuple", "type", "vars", "zip"
+    );
+    private static final String SNAKE_CASE_ALIAS = "a member wins over a snake_case alias";
     private static final Set<String> SKIPPED_TYPE_NAMES = Set.of("package-info", "module-info");
     private static final String PYTHON_MODULE = "Python module [";
     private static final String JAVA_TYPE = "the Java type [";
@@ -239,6 +260,18 @@ public final class PythonImportMappings {
     }
 
     /**
+     * The snake_case spelling of a Python name: {@code Serdeable} as {@code serdeable}, {@code ConfigurationProperties}
+     * as {@code configuration_properties}, {@code JMSListener} as {@code jms_listener}.
+     *
+     * @param name The name
+     * @return The snake_case name
+     */
+    static String snakeCase(String name) {
+        String words = name.replaceAll("([A-Z]+)([A-Z][a-z])", "$1_$2").replaceAll("([a-z0-9])([A-Z])", "$1_$2");
+        return words.toLowerCase(Locale.ROOT);
+    }
+
+    /**
      * Resolves the mapped modules against one class index, caching every module it resolves.
      */
     public final class Resolver {
@@ -336,6 +369,7 @@ public final class PythonImportMappings {
                     excluded.addAll(mapping.exclude());
                 }
                 addNestedModules(module, members, clashes, excluded);
+                addSnakeCaseAliases(members, owners, clashes, excluded);
             }
             if (!errors.isEmpty()) {
                 throw new PythonImportMappingException(String.join(System.lineSeparator(), errors));
@@ -362,6 +396,40 @@ public final class PythonImportMappings {
                     members.put(name, nested);
                 }
             }
+        }
+
+        /**
+         * Exports each annotation of a contribution that has snake_case aliases also under its snake_case name, once
+         * every other member and the nested modules are known, so that an alias never displaces one of them.
+         */
+        private void addSnakeCaseAliases(Map<String, Member> members, Map<String, PythonModuleMapping> owners,
+                                         List<Clash> clashes, Set<String> excluded) {
+            Map<String, List<Member>> annotationsByAlias = new TreeMap<>();
+            for (Member member : members.values()) {
+                PythonModuleMapping owner = owners.get(member.name());
+                if (member.kind() != Kind.ANNOTATION || owner == null || !owner.snakeCaseAliases()) {
+                    continue;
+                }
+                String alias = snakeCase(member.name());
+                if (!alias.equals(member.name()) && !excluded.contains(alias) && !PYTHON_KEYWORDS.contains(alias)
+                    && !PYTHON_BUILTINS.contains(alias)) {
+                    annotationsByAlias.computeIfAbsent(alias, k -> new ArrayList<>()).add(member);
+                }
+            }
+            annotationsByAlias.forEach((alias, annotations) -> {
+                if (annotations.size() > 1) {
+                    // which annotation the name would stand for is not obvious: neither takes it
+                    return;
+                }
+                Member annotation = annotations.getFirst();
+                Member aliasMember = new Member(alias, Kind.ANNOTATION, annotation.binaryName(), null);
+                Member existing = members.get(alias);
+                if (existing == null) {
+                    members.put(alias, aliasMember);
+                } else if (!existing.target().equals(aliasMember.target())) {
+                    clashes.add(new Clash(alias, List.of(existing, aliasMember), existing, SNAKE_CASE_ALIAS));
+                }
+            });
         }
 
         private Map<String, Member> resolveContribution(String module, PythonModuleMapping mapping, List<Clash> clashes, List<String> errors) {
