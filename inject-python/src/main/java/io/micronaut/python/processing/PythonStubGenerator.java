@@ -196,6 +196,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final ClassTypeDef STATIC_ADVICE_TARGET = ClassTypeDef.of("io.micronaut.context.python.aop.StaticAdviceTarget");
     private static final String STATIC_ADVICE_FIELD = "__mn_advice";
     private static final String STATIC_ADVICE_BIND = "bindStaticAdvice";
+    // the parameter of a compiled delegate method carrying the Python object
+    private static final String COMPILED_SELF = "__mnSelf";
     public static final ClassTypeDef PYTHON_ASYNCIO_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonAsyncioRuntime");
     public static final ClassTypeDef PYTHON_CONTEXT_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime");
     public static final ClassTypeDef PYTHON_JAVA_BASES = ClassTypeDef.of("io.micronaut.context.python.PythonJavaBases");
@@ -1264,7 +1266,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     assigns.add(aThis.field(pythonValueFinal).assign(val));
                                 }
                                 assigns.addAll(polyglotValuePropertyAssignments(aThis, val, beanProperties, propertyFields, syncSnapshotFields));
-                                assigns.add(bindWrapper(model, aThis, val));
+                                assigns.add(bindWrapper(model, val));
                                 return StatementDef.multi(assigns);
                             })
                         ));
@@ -1277,13 +1279,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 if (extendsPythonClass) {
                                     return StatementDef.multi(
                                         aThis.superRef().invokeSuperConstructor(methodParameters.get(0)),
-                                        bindWrapper(model, aThis, methodParameters.get(0))
+                                        bindWrapper(model, methodParameters.get(0))
                                     );
                                 } else {
                                     return StatementDef.multi(
                                         aThis.field(pythonValueField(model)).assign(methodParameters.get(0)),
                                         aThis.field(ownedClassReferenceField(model)).assign(ExpressionDef.nullValue()),
-                                        bindWrapper(model, aThis, methodParameters.get(0))
+                                        bindWrapper(model, methodParameters.get(0))
                                     );
                                 }
                             })
@@ -1300,13 +1302,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     // the object lives in the base stub's field: reached through asPolyglotValue()
                                     return StatementDef.multi(
                                         invokeOwnedObjectSuperConstructor(aThis, superType, methodParameters.get(0)),
-                                        bindWrapper(model, aThis, aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE))
+                                        bindWrapper(model, aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE))
                                     );
                                 }
                                 return StatementDef.multi(
                                     aThis.field(pythonValueField(model)).assign(newInstanceUnlessProxy(aThis, methodParameters.get(0))),
                                     aThis.field(ownedClassReferenceField(model)).assign(methodParameters.get(0)),
-                                    bindWrapper(model, aThis, aThis.field(pythonValueField(model)))
+                                    bindWrapper(model, aThis.field(pythonValueField(model)))
                                 );
                             })
                         ));
@@ -1468,7 +1470,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         for (MethodElement methodElement : publicMethods) {
             addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(isJunit5TestMethod(methodElement)), builder, context, addedMethodNames, model);
         }
-        if (bindsWrapper(model)) {
+        if (declaresCompiledDelegate(model)) {
             builder.addInnerType(compiledDelegate(model));
         }
         declareStaticAdvice(model);
@@ -1615,7 +1617,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 storedValue.returning(),
                 StatementDef.multi(
                     aThis.field(pythonValueField(model)).assign(newValue),
-                    bindWrapper(model, aThis, aThis.field(pythonValueField(model))),
+                    bindWrapper(model, aThis.field(pythonValueField(model))),
                     aThis.field(pythonValueField(model)).returning()
                 )
             );
@@ -1915,7 +1917,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         .doIf(StatementDef.multi(
                                             value.assign(newInstance),
                                             aThis.field(pythonValueFinal).assign(value),
-                                            bindWrapper(model, aThis, value)
+                                            bindWrapper(model, value)
                                         ))
                                 ))),
                             value.returning()
@@ -4786,7 +4788,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     /**
      * The interceptor chain of a compiled advised method: when the instance is the proxy of the
      * bean, the advice it binds runs the interceptors and calls the method on the target bean,
-     * which runs the body; the target itself binds no advice and runs the body directly.
+     * which runs the body; the target itself binds no advice and runs the body directly. What the
+     * chain returns is converted to the return type as the bridge converts a Python result, since
+     * an interceptor may answer with a value of another type (a Python int is a {@code Long}).
      */
     private static StatementDef adviceChain(VariableDef.This aThis, String methodName, List<String> parameterTypeNames, List<VariableDef.MethodParameter> methodParameters, TypeDef returnType) {
         VariableDef.Field advice = aThis.field(STATIC_ADVICE_FIELD, STATIC_ADVICE);
@@ -4799,15 +4803,26 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             ExpressionDef.constant(methodName), TypeDef.STRING.array().instantiate(parameterTypes), TypeDef.OBJECT.array().instantiate(arguments));
         StatementDef intercepted = TypeDef.VOID.equals(returnType)
             ? StatementDef.multi((StatementDef) proceed, new StatementDef.Return(null))
-            : proceed.cast(returnType).returning();
+            : STATIC_ADVICE.invokeStatic("result", TypeDef.OBJECT, proceed, ExpressionDef.constant(erased(erasedTypeName(returnType, Map.of()))))
+                .cast(returnType).returning();
         return advice.isNonNull().doIf(intercepted);
     }
 
     /**
-     * Declares the advice of a class with compiled advised methods: a field the proxy binds and
-     * the binding method. A class whose Java superclass is a generated class with advised methods
-     * inherits both.
+     * Whether the chain of an introduced method can answer for the bridge: its return type is one
+     * whose conversion from what an interceptor returns is the bridge's (void, a primitive or its box,
+     * a string or an object). An introduced method returning another type keeps its bridge.
      */
+    private static boolean introducedReturnConverts(TypeDef returnType) {
+        String name = erased(erasedTypeName(returnType, Map.of()));
+        return switch (name) {
+            case "void", "boolean", "byte", "short", "int", "long", "float", "double",
+                 "java.lang.Boolean", "java.lang.Byte", "java.lang.Short", "java.lang.Integer", "java.lang.Long",
+                 "java.lang.Float", "java.lang.Double", "java.lang.String", "java.lang.Object" -> true;
+            default -> false;
+        };
+    }
+
     /**
      * A Java type name as the IR spells it, without type arguments and with nested types dotted.
      */
@@ -4837,12 +4852,29 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     /**
      * Whether the abstract methods of an introduction class run their chain in the generated class:
-     * the class is an abstract introduction bean and static compilation is on.
+     * the class is an abstract introduction bean and static compilation switches one of its abstract
+     * methods on (a {@code CompileStatic} scope, or mode {@code all} without one excluding it).
      */
     private static boolean staticIntroduction(ClassElement element, @Nullable StaticCompilationPlan plan) {
-        return plan != null && plan.active() && element.isAbstract() && element.hasStereotype(Introduction.class);
+        if (plan == null || !element.isAbstract() || !element.hasStereotype(Introduction.class)
+            || !(element instanceof AbstractPythonClassElement pythonClass)) {
+            return false;
+        }
+        io.micronaut.python.processing.model.ClassDef classDef = pythonClass.getNativeType();
+        String sourcePath = classDef.span() == null ? null : classDef.span().path();
+        for (FunctionDef function : classDef.functions()) {
+            if ((function.isAbstract() || function.hasPlaceholderBody()) && plan.switchedOn(sourcePath, classDef.name() + "." + function.name())) {
+                return true;
+            }
+        }
+        return false;
     }
 
+    /**
+     * Declares the advice of a class with compiled advised methods, or of an introduction class
+     * whose abstract methods run their chain in Java: a field the proxy binds and the binding
+     * method. A class whose Java superclass is a generated class with advised methods inherits both.
+     */
     private static void declareStaticAdvice(ClassStubModel model) {
         StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
         if (plan == null || !(advisesCompiled(plan, model.element().getName()) || staticIntroduction(model.element(), plan)) || inheritsStaticAdvice(model, plan)) {
@@ -5049,9 +5081,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     /**
      * How a compiled body reaches the properties of {@code self} through the Python object: its
      * members, converted as the accessors of the stub convert them. A body the Python side runs
-     * sees the attributes the Python code sees, whichever stubs wrap the object.
+     * sees the attributes the Python code sees, whichever stubs wrap the object. A sibling the stub
+     * declares is called on the stub, when there is one; the compiled delegate has none (it is
+     * stateless, see {@link #compiledDelegate}), so it calls the sibling through the Python object,
+     * as the Python code does.
      */
-    private StaticBodyGenerator.SelfAccess pythonSelfAccess(ClassStubModel model, ExpressionDef self, ExpressionDef stub) {
+    private StaticBodyGenerator.SelfAccess pythonSelfAccess(ClassStubModel model, ExpressionDef self, @Nullable ExpressionDef stub) {
         return new StaticBodyGenerator.SelfAccess() {
             @Override
             public ExpressionDef read(String property, String typeName, TypeDef type, boolean accessor) {
@@ -5072,7 +5107,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
             @Override
             public ExpressionDef invoke(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type, boolean direct) {
-                if (direct) {
+                if (direct && stub != null) {
                     return stub.invoke(name, parameterTypes, type, arguments);
                 }
                 return invokePython(model.context(), self, name, arguments, typeName, type);
@@ -5162,91 +5197,113 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
-     * Whether the Python object of the stub is bound to the stub: a class with compiled bodies
-     * binds every object it creates or wraps, so the Python side of a compiled method delegates
-     * to the Java body (see {@code apply_delegation}).
+     * Whether the stub declares the delegate of its own compiled bodies.
      */
-    private static boolean bindsWrapper(ClassStubModel model) {
+    private static boolean declaresCompiledDelegate(ClassStubModel model) {
         StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
-        return plan != null && !compiledBodiesOf(plan, model).isEmpty();
+        return plan != null && !instanceBodiesOf(plan, model.element().getName()).isEmpty();
     }
 
     /**
-     * The statement binding the Python object of this stub to the delegate through which the Python
-     * side of a compiled method reaches the Java body, when the class has compiled bodies, else nothing.
-     * The stub itself cannot be handed to Python: a generated wrapper entering Python becomes its
-     * Python object again, so the delegate is a plain Java object over the Python object.
+     * The compiled bodies of the instance methods of a class, which its delegate carries: a static
+     * method or a module-level function is a static Java method of the generated class, which its
+     * Python callers call directly (see {@code apply_delegation}).
      */
-    private static StatementDef bindWrapper(ClassStubModel model, VariableDef.This aThis, ExpressionDef value) {
-        if (!bindsWrapper(model)) {
+    private static List<Ir.CompiledBody> instanceBodiesOf(StaticCompilationPlan plan, String className) {
+        List<Ir.CompiledBody> bodies = new ArrayList<>();
+        for (Ir.CompiledBody body : plan.bodiesOf(className)) {
+            if (!body.staticMethod() && !body.moduleLevel()) {
+                bodies.add(body);
+            }
+        }
+        return bodies;
+    }
+
+    /**
+     * The statements binding the Python object of this stub to the compiled bodies of every class of
+     * its MRO that has some, when there are any, else nothing. Each class binds its own delegate, so a
+     * rewritten method runs the body of the class it is defined in: {@code super().m()} from a
+     * subclass reaches the base's body, not the override. The stub itself cannot be handed to
+     * Python: a generated wrapper entering Python becomes its Python object again, so each delegate
+     * is a stateless Java object that takes the Python object first.
+     */
+    private static StatementDef bindWrapper(ClassStubModel model, ExpressionDef value) {
+        StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
+        if (plan == null) {
             return StatementDef.multi();
         }
-        ExpressionDef delegate = compiledDelegateType(model).instantiate(aThis, value);
-        return value.isNonNull().doIf(PYTHON_STATIC.invokeStatic("bindCompiled", TypeDef.VOID, value, delegate));
+        List<ClassElement> owners = compiledOwnersOf(plan, model);
+        if (owners.isEmpty()) {
+            return StatementDef.multi();
+        }
+        List<StatementDef> binds = new ArrayList<>(owners.size());
+        for (ClassElement owner : owners) {
+            binds.add(PYTHON_STATIC.invokeStatic("bindCompiled", TypeDef.VOID, value, ExpressionDef.constant(owner.getName()), compiledDelegateType(owner).instantiate()));
+        }
+        return value.isNonNull().doIf(StatementDef.multi(binds));
     }
 
     /**
-     * The compiled bodies a delegate exposes: those of the class and those it inherits from its Python
-     * bases, since the object of a subclass is bound to the subclass's delegate alone and the
-     * rewritten inherited methods call it too. A method the class compiles itself wins over the base's.
+     * The classes of the MRO of the stub's class with compiled bodies of their own: the class
+     * itself and its Python bases, in the order Python resolves a method.
      */
-    private static List<Ir.CompiledBody> compiledBodiesOf(StaticCompilationPlan plan, ClassStubModel model) {
-        Map<String, Ir.CompiledBody> byName = new LinkedHashMap<>();
+    private static List<ClassElement> compiledOwnersOf(StaticCompilationPlan plan, ClassStubModel model) {
         List<ClassElement> chain = new ArrayList<>();
         chain.add(model.element());
         if (model.element() instanceof PythonClassElement pythonClass) {
             // every Python base, in the order Python resolves a method (a class with several bases included)
             chain.addAll(pythonClass.pythonMro());
         }
+        List<ClassElement> owners = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
         for (ClassElement current : chain) {
-            for (Ir.CompiledBody body : plan.bodiesOf(current.getName())) {
-                byName.putIfAbsent(body.methodName(), body);
+            if (seen.add(current.getName()) && !instanceBodiesOf(plan, current.getName()).isEmpty()) {
+                owners.add(current);
             }
         }
-        return new ArrayList<>(byName.values());
+        return owners;
     }
 
-    private static ClassTypeDef compiledDelegateType(ClassStubModel model) {
-        return ClassTypeDef.of(model.element().getName().replace('$', '.') + "." + COMPILED_DELEGATE);
+    private static ClassTypeDef compiledDelegateType(ClassElement owner) {
+        return ClassTypeDef.of(owner.getName().replace('$', '.') + "." + COMPILED_DELEGATE);
     }
 
     /**
-     * The nested class holding one Java method per compiled body of the stub, each running the body
-     * over the Python object: the Python side of a compiled method calls these, see
-     * {@code apply_delegation}. The body reads and writes the attributes of the Python object, as the
-     * Python code it replaces does; a bridge of the stub carrying the same body cannot be called
-     * instead, since not every compiled method has one (a test method, an override of a Java
-     * method, a method the stub does not bridge), and the bridge would enter Python again.
+     * The nested class holding one Java method per compiled body of the stub's own class, each
+     * running the body over the Python object it is given: the Python side of a compiled method
+     * calls these, see {@code apply_delegation}. The body reads and writes the attributes of the
+     * Python object, as the Python code it replaces does; a bridge of the stub carrying the same body
+     * cannot be called instead, since not every compiled method has one (a test method, an override
+     * of a Java method, a method the stub does not bridge), and the bridge would enter Python again.
+     * A failure Python raises as an exception of its own reaches the Python caller as that
+     * exception, see {@code PythonStatic.forPython}.
      */
     private ClassDef compiledDelegate(ClassStubModel model) {
         StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
-        ClassTypeDef stubType = ClassTypeDef.of(model.element().getName().replace('$', '.'));
         ClassDef.ClassDefBuilder delegate = ClassDef.builder(model.element().getPackageName() + "." + COMPILED_DELEGATE)
             .addModifiers(Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL);
-        // the stub, for the sibling methods it declares; the Python object, for the state and everything else
-        FieldDef stubField = FieldDef.builder("stub").ofType(stubType).addModifiers(Modifier.PRIVATE, Modifier.FINAL).build();
-        FieldDef selfField = FieldDef.builder("self").ofType(POLYGLOT_VALUE).addModifiers(Modifier.PRIVATE, Modifier.FINAL).build();
-        delegate.addField(stubField);
-        delegate.addField(selfField);
-        delegate.addMethod(MethodDef.constructor()
-            .addModifiers(Modifier.PUBLIC)
-            .addParameter(ParameterDef.of("stub", stubType))
-            .addParameter(ParameterDef.of("self", POLYGLOT_VALUE))
-            .build((aThis, parameters) -> StatementDef.multi(
-                aThis.field(stubField).assign(parameters.get(0)),
-                aThis.field(selfField).assign(parameters.get(1))
-            )));
-        for (Ir.CompiledBody body : compiledBodiesOf(plan, model)) {
+        delegate.addMethod(MethodDef.constructor().addModifiers(Modifier.PUBLIC).build((aThis, parameters) -> StatementDef.multi()));
+        for (Ir.CompiledBody body : instanceBodiesOf(plan, model.element().getName())) {
             TypeDef returnType = Ir.VOID.equals(body.returnType()) ? TypeDef.VOID : StaticBodyGenerator.type(body.returnType());
             MethodDef.MethodDefBuilder method = MethodDef.builder(body.methodName()).addModifiers(Modifier.PUBLIC).returns(returnType);
+            // the Python object, under a name none of the Python parameters has
+            String selfName = COMPILED_SELF;
+            while (body.parameterNames().contains(selfName)) {
+                selfName = "_" + selfName;
+            }
+            method.addParameter(ParameterDef.of(selfName, POLYGLOT_VALUE));
             for (int i = 0; i < body.parameterNames().size(); i++) {
                 method.addParameter(ParameterDef.of(body.parameterNames().get(i), StaticBodyGenerator.type(body.parameterTypes().get(i))));
             }
             if (body.span() != null) {
                 method.addJavadoc(COMPILED_FROM + body.span().location());
             }
-            delegate.addMethod(method.build((aThis, parameters) ->
-                StaticBodyGenerator.generate(body, parameters, pythonSelfAccess(model, aThis.field(selfField), aThis.field(stubField)), plan.trace())));
+            delegate.addMethod(method.build((aThis, parameters) -> {
+                VariableDef.MethodParameter self = parameters.get(0);
+                StatementDef statements = StaticBodyGenerator.generate(body, parameters.subList(1, parameters.size()), pythonSelfAccess(model, self, null), plan.trace());
+                return new StatementDef.Try(statements).doCatch(RuntimeException.class, exception ->
+                    PYTHON_STATIC.invokeStatic("forPython", List.of(POLYGLOT_VALUE, ClassTypeDef.of(RuntimeException.class)), ClassTypeDef.of(RuntimeException.class), self, exception).doThrow());
+            }));
         }
         return delegate.build();
     }
@@ -5258,7 +5315,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static StatementDef assignPythonValue(ClassStubModel model, VariableDef.This aThis, ExpressionDef value) {
         return StatementDef.multi(
             aThis.field(pythonValueField(model)).assign(value),
-            bindWrapper(model, aThis, aThis.field(pythonValueField(model)))
+            bindWrapper(model, aThis.field(pythonValueField(model)))
         );
     }
 
@@ -5268,8 +5325,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static StatementDef bindStoredValue(ClassStubModel model, VariableDef.This aThis) {
         // a subclass stub keeps the object in its base stub's field: reached through asPolyglotValue()
         return model.pythonValue() == null
-            ? bindWrapper(model, aThis, aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE))
-            : bindWrapper(model, aThis, aThis.field(model.pythonValue()));
+            ? bindWrapper(model, aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE))
+            : bindWrapper(model, aThis.field(model.pythonValue()));
     }
 
     private static Optional<PropertyElement> propertyElement(ClassStubModel model, String property) {
@@ -5399,7 +5456,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 StaticBodyGenerator.generate(compiledBody, methodParameters, model != null ? selfAccess(model, aThis) : scriptSelfAccess(visitorContext, aThis), trace))));
             return;
         }
-        if (methodElement.isAbstract() && staticIntroduction(bridgeOwner, staticCompilationPlan(visitorContext))) {
+        if (methodElement.isAbstract() && introducedReturnConverts(methodSourceReturnType) && staticIntroduction(bridgeOwner, staticCompilationPlan(visitorContext))) {
             // the abstract method of an introduction: the proxy binds the introduction's chain, which runs in Java
             List<String> parameterTypes = new ArrayList<>();
             for (ParameterDef parameterDef : parameterDefs) {

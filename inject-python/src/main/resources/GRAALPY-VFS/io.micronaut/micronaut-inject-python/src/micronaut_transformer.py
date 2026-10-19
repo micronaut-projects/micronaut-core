@@ -194,12 +194,14 @@ class AnnotationFunctionScanner:
     to a call. Imported modules of the same source root are scanned in turn, so a bare ``@Ann`` can be told
     from a factory call ``@Ann(...)`` wherever ``Ann`` is used.
 
-    The scan results of imported modules are cached for the duration of one scan (one module transform),
-    not across compilations: a module's answer depends on the modules it imports and on the class path.
+    The scan results of imported modules are shared by the modules of one compilation, not kept across
+    compilations: a module's answer depends on the modules it imports and on the class path. An answer
+    computed while a circular import was cut short at a module further up the stack depends on where the
+    scan entered the cycle, so it is not cached.
     """
 
     def __init__(self, callback_get_class_element, package_name: str = '', source_root: str = '',
-                 cache: dict | None = None, loading: set | None = None,
+                 cache: dict | None = None, loading: dict | None = None,
                  import_files: dict | None = None):
         self.callback_get_class_element = callback_get_class_element
         self.package_name = package_name or ''
@@ -208,7 +210,10 @@ class AnnotationFunctionScanner:
         self.annotation_functions: dict = {}
         self.annotation_type_targets: set = set()
         self._cache: dict = {} if cache is None else cache
-        self._loading: set = set() if loading is None else loading
+        # the source file of each module being scanned -> its depth in the stack of scans
+        self._loading: dict = {} if loading is None else loading
+        # the smallest depth of a module whose circular import this scan cut short, or None
+        self.cut_short_at: int | None = None
         # (source root, package, level, module) -> the source file an import names, or None: the
         # file system is asked once per compilation, not once per importing module
         self._import_files = {} if import_files is None else import_files
@@ -263,10 +268,15 @@ class AnnotationFunctionScanner:
         cached = self._cache.get(key)
         if cached is not None:
             return cached
-        if key in self._loading:
-            # a circular import: the module is being scanned higher up the stack
+        loading_depth = self._loading.get(key)
+        if loading_depth is not None:
+            # a circular import: the module is being scanned higher up the stack, so the answers that
+            # depend on it until that scan completes are incomplete
+            self._cut_short(loading_depth)
             return {}
-        self._loading.add(key)
+        depth = len(self._loading)
+        self._loading[key] = depth
+        scanner = None
         try:
             with open(module_file, 'r', encoding='utf-8') as source:
                 module = ast.parse(source.read(), filename=module_file)
@@ -282,9 +292,19 @@ class AnnotationFunctionScanner:
         except (OSError, SyntaxError, ValueError):
             names = {}
         finally:
-            self._loading.discard(key)
-        self._cache[key] = names
+            del self._loading[key]
+        cut_short_at = scanner.cut_short_at if scanner is not None else None
+        if cut_short_at is not None and cut_short_at < depth:
+            # the scan cut short a cycle through a module further up the stack: the answer depends on the
+            # module the scan entered the cycle at, so it is neither cached nor complete for the caller
+            self._cut_short(cut_short_at)
+        else:
+            self._cache[key] = names
         return names
+
+    def _cut_short(self, depth: int) -> None:
+        if self.cut_short_at is None or depth < self.cut_short_at:
+            self.cut_short_at = depth
 
 # A single leading underscore: a double-underscore name is mangled when it is referenced inside a class
 # body, and the decorator is applied to classes defined inside a class or a method as well
@@ -625,7 +645,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         """
         scanner = AnnotationFunctionScanner(
             self.callback_get_class_element, self.package_name, self.source_root,
-            self._caches.setdefault("scan", {}), self._caches.setdefault("loading", set()), self._caches.setdefault("imports", {})
+            self._caches.setdefault("scan", {}), self._caches.setdefault("loading", {}), self._caches.setdefault("imports", {})
         )
         self.annotation_functions.update(scanner.scan(node))
 
