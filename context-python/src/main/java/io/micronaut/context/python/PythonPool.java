@@ -961,7 +961,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
                 applicationContext.getClassLoader(),
                 contextConfiguration,
                 GraalPyContextFactory.APPLICATION_MAIN,
-                GraalPyContextFactory.dataclassWrapperClasses(applicationContext)
+                GraalPyContextFactory.dataclasses(applicationContext)
             );
         } catch (IOException e) {
             throw new ApplicationStartupException("Failed to create Python context: " + e.getMessage(), e);

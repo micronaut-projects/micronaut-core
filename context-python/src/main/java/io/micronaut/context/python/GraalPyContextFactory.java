@@ -21,7 +21,6 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
-import io.micronaut.context.python.annotation.PythonClass;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.Ordered;
@@ -48,8 +47,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -299,7 +298,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             LOG.debug("Building Primary GraalPy context");
             long now = System.currentTimeMillis();
             var context = buildContext(hostAccess, engine, classLoader, contextConfiguration,
-                APPLICATION_MAIN, dataclassWrapperClasses(applicationContext));
+                APPLICATION_MAIN, dataclasses(applicationContext));
 
             // Make context available to bridge classes
             runtime.set(PythonContextRuntime.setContext(context, classLoader));
@@ -390,34 +389,28 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         return new GraalPyHostAccessFactory().hostAccess(mappings, classLoader);
     }
 
-    @SuppressWarnings("rawtypes")
-    private static Class<?>[] dataclassWrapperClasses(ClassLoader classLoader) {
-        return dataclassWrapperClasses(SoftServiceLoader.load(TargetTypeMapping.class, classLoader).collectAll());
+    private static List<PythonDataclassProvider.Entry> dataclasses(ClassLoader classLoader) {
+        return dataclasses(SoftServiceLoader.load(PythonDataclassProvider.class, classLoader).collectAll());
     }
 
-    static Class<?>[] dataclassWrapperClasses(BeanContext beanContext) {
-        return dataclassWrapperClasses(beanContext.getBeansOfType(TargetTypeMapping.class));
+    static List<PythonDataclassProvider.Entry> dataclasses(BeanContext beanContext) {
+        return dataclasses(beanContext.getBeansOfType(PythonDataclassProvider.class));
     }
 
-    @SuppressWarnings("rawtypes")
-    private static Class<?>[] dataclassWrapperClasses(Collection<TargetTypeMapping> mappings) {
-        return mappings.stream()
-            .<Class<?>>map(mapping -> mapping.targetType())
-            .distinct()
-            .filter(type -> {
-                PythonClass annotation = type.getAnnotation(PythonClass.class);
-                return annotation != null && annotation.dataclass();
-            })
-            .toArray(Class<?>[]::new);
+    static List<PythonDataclassProvider.Entry> dataclasses(Collection<PythonDataclassProvider> providers) {
+        Map<Class<?>, PythonDataclassProvider.Entry> dataclasses = new LinkedHashMap<>();
+        for (PythonDataclassProvider provider : providers) {
+            for (PythonDataclassProvider.Entry entry : provider.entries()) {
+                dataclasses.putIfAbsent(entry.type(), entry);
+            }
+        }
+        return List.copyOf(dataclasses.values());
     }
 
-    private static ProxyExecutable[] dataclassResolvers(Context context, Class<?>[] dataclassClasses) {
-        return Arrays.stream(dataclassClasses).map(type -> {
-            PythonClass annotation = type.getAnnotation(PythonClass.class);
-            var reference = new PythonContextRuntime.PythonClassReference(annotation.packageName(),
-                annotation.rootName(), annotation.nestedMemberNames(), annotation.displayName(), annotation.cacheKey());
-            return (ProxyExecutable) arguments -> PythonContextRuntime.findClass(reference, context);
-        }).toArray(ProxyExecutable[]::new);
+    private static ProxyExecutable[] dataclassResolvers(Context context, List<PythonDataclassProvider.Entry> dataclasses) {
+        return dataclasses.stream()
+            .map(entry -> (ProxyExecutable) arguments -> PythonContextRuntime.findClass(entry.pythonClass(), context))
+            .toArray(ProxyExecutable[]::new);
     }
 
     static Context buildContext(HostAccess hostAccess, Engine engine, ClassLoader classLoader) throws IOException {
@@ -437,7 +430,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                                 GraalPyContextConfiguration contextConfiguration,
                                 String applicationMain) throws IOException {
         return buildContext(hostAccess, engine, classLoader, contextConfiguration,
-            applicationMain, dataclassWrapperClasses(classLoader));
+            applicationMain, dataclasses(classLoader));
     }
 
     static Context buildContext(HostAccess hostAccess,
@@ -445,7 +438,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                                 ClassLoader classLoader,
                                 GraalPyContextConfiguration contextConfiguration,
                                 String applicationMain,
-                                Class<?>[] dataclassClasses) throws IOException {
+                                List<PythonDataclassProvider.Entry> dataclasses) throws IOException {
         System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");
         System.setProperty("org.graalvm.python.vfs.multiple_vfs_checks_as_warning", "true");
         long now = System.currentTimeMillis();
@@ -497,7 +490,9 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         boolean bootstrapped = false;
         try {
             PythonContextRuntime.helper(context, "__micronaut_register_java_wrapper_view", JAVA_WRAPPER_VIEW_SOURCE)
-                .executeVoid(ValueCoercible.class, dataclassClasses, dataclassResolvers(context, dataclassClasses));
+                .executeVoid(ValueCoercible.class,
+                    dataclasses.stream().map(PythonDataclassProvider.Entry::type).toArray(Class<?>[]::new),
+                    dataclassResolvers(context, dataclasses));
             // The per-context builtin is only needed by context-reuse tests. Avoid
             // evaluating another Python snippet during normal application startup.
             if (Boolean.getBoolean(CONTEXT_ID_PROPERTY)) {

@@ -3941,19 +3941,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     static AnnotationDef pythonClassAnnotation(ClassElement element) {
         PythonClassReferenceDef classReference = pythonClassReferenceDef(element);
-        var annotation = AnnotationDef.builder(PYTHON_CLASS_ANNOTATION)
+        return AnnotationDef.builder(PYTHON_CLASS_ANNOTATION)
             .addMember("packageName", classReference.packageName())
             .addMember("rootName", classReference.rootName())
             .addMember("nestedMemberNames", classReference.nestedMemberNames())
             .addMember("displayName", classReference.displayName())
-            .addMember("cacheKey", classReference.cacheKey());
-        if (isPythonDataclassType(element)) {
-            annotation.addMember("dataclass", true);
-        }
-        return annotation.build();
+            .addMember("cacheKey", classReference.cacheKey())
+            .build();
     }
 
-    private static boolean isPythonDataclassType(ClassElement element) {
+    static boolean isPythonDataclassType(ClassElement element) {
         return isPythonDataclass(element)
             || element.getAllSuperTypes().stream().anyMatch(PythonStubGenerator::isPythonDataclass);
     }

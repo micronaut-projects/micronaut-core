@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.logging.LoggingSystem;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
+import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.graalvm.python.embedding.GraalPyResources;
@@ -27,8 +28,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
@@ -46,6 +49,34 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 final class GraalPyContextFactoryTest {
     @TempDir
     Path temporaryDirectory;
+
+    @Test
+    void wrapperMetadataDoesNotRediscoverTargetTypeMappings() throws IOException {
+        ClassLoader classLoader = new ClassLoader(getClass().getClassLoader()) {
+            @Override
+            public Enumeration<URL> getResources(String name) throws IOException {
+                assertFalse(name.contains(TargetTypeMapping.class.getName()),
+                    "TargetTypeMapping discovery belongs to host access setup, not wrapper metadata");
+                return super.getResources(name);
+            }
+        };
+        try (Engine engine = GraalPyEngineFactory.buildPythonEngine();
+             Context context = GraalPyContextFactory.buildContext(HostAccess.ALL, engine, classLoader)) {
+            assertEquals(2, context.eval(PYTHON, "1 + 1").asInt());
+        }
+    }
+
+    @Test
+    void registersEachDataclassOnceWhenProvidersOverlap() {
+        var first = new PythonDataclassProvider.Entry(String.class,
+            new PythonContextRuntime.PythonClassReference("python", "Book", new String[0], "Book", "first"));
+        var duplicate = new PythonDataclassProvider.Entry(String.class,
+            new PythonContextRuntime.PythonClassReference("python", "Book", new String[0], "Book", "second"));
+        PythonDataclassProvider firstProvider = () -> List.of(first);
+        PythonDataclassProvider secondProvider = () -> List.of(duplicate);
+
+        assertEquals(List.of(first), GraalPyContextFactory.dataclasses(List.of(firstProvider, secondProvider)));
+    }
 
     @Test
     void loadsMainFromTheConfiguredVfsMountPoint() throws IOException {

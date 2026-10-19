@@ -650,6 +650,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 try (var _ = CompilationProfiler.span(profiler, "python.functional-interfaces")) {
                     generateFunctionalInterfaceProvider(allImports, processingEnvironment, originatingElement);
                 }
+                var dataclasses = new PythonDataclassProviderGenerator(javaVisitorContext);
+                processingEnvironment.classes().values().forEach(dataclasses::referencePythonType);
+                dataclasses.generate(originatingElement);
             }
             CompilationProfiler.increment(profiler, "python.unique-decorators", allDecorators.size());
 
@@ -1198,7 +1201,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
     }
 
-    private static String contentHash(String content) {
+    static String contentHash(String content) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(content.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest, 0, 8);

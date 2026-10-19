@@ -507,6 +507,54 @@ final class PyronautCompilerIncrementalTest {
     }
 
     @Test
+    void removesTheDataclassProviderWhenNoDataclassRemains(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = python.resolve("alpha.py");
+        Files.writeString(alpha, """
+            from dataclasses import dataclass
+            @dataclass
+            class Alpha:
+                value: int = 1
+            """);
+
+        compilePython(python, java, output, cache);
+        Set<String> providerOutputs = providerOutputs(output, "PythonDataclasses$");
+        String providerSource = providerOutputs.stream().filter(path -> path.endsWith(".java")).findFirst().orElseThrow();
+        assertTrue(providerOutputs.contains(providerSource.substring(0, providerSource.length() - ".java".length()) + ".class"));
+        assertTrue(providerOutputs.stream().anyMatch(path -> path.endsWith("$Definition.class")));
+        assertTrue(providerOutputs.stream().anyMatch(path -> path.startsWith(
+            "META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/"
+        )));
+        assertTrue(providerOutputs.stream().anyMatch(path -> path.startsWith(
+            "META-INF/micronaut/io.micronaut.context.python.PythonDataclassProvider/"
+        )));
+        assertEquals("true", state(cache).getProperty("processor.compatible"));
+        assertTrue(decodeStateList(state(cache).getProperty("python.aggregating.outputs")).containsAll(providerOutputs));
+
+        Files.writeString(alpha, """
+            from jakarta.inject import Singleton
+            @Singleton
+            class Alpha:
+                value: int = 1
+            """);
+        compilePython(python, java, output, cache);
+
+        assertTrue(providerOutputs(output, "PythonDataclasses$").isEmpty());
+        assertEquals("true", state(cache).getProperty("processor.compatible"));
+
+        Path alphaBean = findOutput(output, "Alpha$Definition.class");
+        Files.setLastModifiedTime(alphaBean, UNCHANGED_MARKER);
+        Files.writeString(alpha, Files.readString(alpha).replace("value: int = 1", "value: int = 2"));
+        compilePython(python, java, output, cache);
+        assertNotEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(alphaBean));
+        assertTrue(providerOutputs(output, "PythonDataclasses$").isEmpty());
+        assertEquals("true", state(cache).getProperty("processor.compatible"));
+    }
+
+    @Test
     void preservesUnchangedPythonSourceOutputs(@TempDir Path directory) throws Exception {
         Path python = Files.createDirectories(directory.resolve("python"));
         Path java = Files.createDirectories(directory.resolve("java"));
@@ -2006,9 +2054,13 @@ final class PyronautCompilerIncrementalTest {
     }
 
     private static Set<String> functionalInterfaceProviderOutputs(Path output) throws Exception {
+        return providerOutputs(output, "$PythonFunctionalInterfaces$");
+    }
+
+    private static Set<String> providerOutputs(Path output, String prefix) throws Exception {
         try (var paths = Files.walk(output)) {
             return paths.filter(Files::isRegularFile)
-                .filter(path -> path.getFileName().toString().contains("$PythonFunctionalInterfaces$"))
+                .filter(path -> path.getFileName().toString().contains(prefix))
                 .map(path -> output.relativize(path).toString().replace('\\', '/'))
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
         }
