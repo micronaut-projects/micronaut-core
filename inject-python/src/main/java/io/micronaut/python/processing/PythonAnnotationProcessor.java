@@ -27,7 +27,11 @@ import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
 import io.micronaut.python.imports.PythonImportMappingException;
 import io.micronaut.python.imports.PythonImportMappings;
 import io.micronaut.python.imports.ResolvedModule;
+import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
+import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
 import io.micronaut.python.processing.model.ClassDef;
+import io.micronaut.python.processing.typecheck.TypeCheckConfiguration;
+import io.micronaut.python.processing.typecheck.TypeCheckMode;
 import io.micronaut.python.processing.util.PythonAnnotationTypes;
 import io.micronaut.python.processing.util.VisitorContextClassIndex;
 import io.micronaut.python.processing.util.PythonKeywords;
@@ -61,6 +65,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -273,6 +278,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         """;
     private PythonAstParser parser;
     private Consumer<ClassElement> classElementCallback;
+    private Consumer<PythonDiagnostic> diagnosticCallback;
     private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
     private ClassLoader classLoader;
     private boolean compilePythonBytecode;
@@ -292,6 +298,45 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
      */
     public void setClassElementCallback(Consumer<ClassElement> callback) {
         this.classElementCallback = callback;
+    }
+
+    /**
+     * Set the callback to be invoked for each problem found in the Python sources, before it is
+     * reported through the messager.
+     *
+     * @param callback The callback function
+     * @since 5.3.0
+     */
+    public void setDiagnosticCallback(Consumer<PythonDiagnostic> callback) {
+        this.diagnosticCallback = callback;
+    }
+
+    @Override
+    public Set<String> getSupportedOptions() {
+        Set<String> options = new HashSet<>(super.getSupportedOptions());
+        options.add(SOURCE_ROOT_OPTION);
+        options.add(TypeCheckMode.OPTION);
+        options.add(TypeCheckMode.ANNOTATIONS_OPTION);
+        return options;
+    }
+
+    /**
+     * The type checking requested through the processor options.
+     */
+    private TypeCheckConfiguration typeCheckConfiguration() {
+        Map<String, String> options = processingEnv.getOptions();
+        TypeCheckMode mode;
+        try {
+            mode = TypeCheckMode.fromOption(options.get(TypeCheckMode.OPTION));
+        } catch (IllegalArgumentException e) {
+            throw new ProcessingException(null, e.getMessage());
+        }
+        String annotations = options.get(TypeCheckMode.ANNOTATIONS_OPTION);
+        List<String> annotationNames = annotations == null ? List.of() : Arrays.stream(annotations.split(","))
+            .map(String::trim)
+            .filter(name -> !name.isEmpty())
+            .toList();
+        return new TypeCheckConfiguration(mode, annotationNames);
     }
 
     /**
@@ -455,18 +500,19 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             try (var _ = CompilationProfiler.span(profiler, "python.source-visitors")) {
                 processPythonSourceVisitors(transformedList, values);
             }
-            transformedList.stream()
-                .flatMap(transformResult -> transformResult.validationErrors().stream())
-                .findFirst()
-                .ifPresent(message -> {
-                    throw new ProcessingException(originatingElement, message);
-                });
+            reportDiagnostics(
+                transformedList.stream().flatMap(transformResult -> transformResult.validationErrors().stream()).toList(),
+                transformedList,
+                element,
+                originatingElement
+            );
 
             // Then parse the transformed code
             String[] srcDirs = values.src();
             boolean hasSrcDirs = srcDirs != null && srcDirs.length != 0;
             if (hasSrcDirs) {
                 environment = parseModel(transformedList, srcDirs, originatingElement);
+                reportDiagnostics(environment.diagnostics(), transformedList, element, originatingElement);
             }
 
             StringBuilder filesList = new StringBuilder();
@@ -568,6 +614,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             PythonProcessingEnvironment processingEnvironment =
                 new PythonProcessingEnvironment(environment, javaVisitorContext, element);
 
+            // Every class of the compilation is modelled and registered: check the Python code against
+            // the Java types it uses, and stop before any stub is generated when the check fails
+            reportDiagnostics(parser.typeCheck(processingEnvironment.visitorContext()), transformedList, element, originatingElement);
+
             Map<String, String> allDecorators = new LinkedHashMap<>();
             Map<String, List<Map<String, String>>> allImports = new LinkedHashMap<>();
             Set<String> allFacades = new TreeSet<>();
@@ -657,11 +707,12 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         } catch (ProcessingException e) {
             String ls = System.lineSeparator();
             io.micronaut.inject.ast.Element el = e.getElement();
+            // the message is not a format string: a Python message may well contain a percent sign
             if (el != null) {
                 String description = el.getDescription(true);
-                error(e.getMessage() + ls + ls + " -> " + description + ls + ls);
+                error("%s", e.getMessage() + ls + ls + " -> " + description + ls + ls);
             } else {
-                error(e.getMessage());
+                error("%s", e.getMessage());
             }
         } catch (Exception e) {
             StringWriter sw = new StringWriter();
@@ -736,14 +787,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                          String[] srcDirs,
                                          ClassElement originatingElement) {
         try (var _ = CompilationProfiler.span(profiler, "python.model")) {
-            List<Source> sourceList = transformedList
-                .stream()
-                .map(PythonAstParser.TransformResult::transformedSource)
-                .toList();
-            PythonEnvironment environment = parser.parse(
-                sourceList,
+            PythonEnvironment environment = parser.parseTransformed(
+                transformedList,
                 Arrays.asList(srcDirs),
-                javaVisitorContext
+                javaVisitorContext,
+                typeCheckConfiguration()
             );
             Map<String, ClassDef> retained = PythonClassExclusions.retain(
                 environment.classes(),
@@ -752,15 +800,54 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             if (retained.size() == environment.classes().size()) {
                 return environment;
             }
+            // the problems found in the excluded classes' sources are reported all the same
             return new PythonEnvironment(
                 retained,
                 environment.scripts(),
                 environment.decorators(),
                 environment.shadowedTypes(),
+                environment.diagnostics(),
                 environment.context()
             );
+        } catch (ProcessingException e) {
+            throw e;
         } catch (Exception e) {
             throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
+        }
+    }
+
+    /**
+     * Reports every problem found in the Python sources, rendered with its location and an excerpt of
+     * the source, and fails the processing when any of them is an error. Every problem is reported,
+     * not only the first one, so a build shows all of them at once.
+     */
+    private void reportDiagnostics(List<PythonDiagnostic> diagnostics,
+                                   List<PythonAstParser.TransformResult> transformedList,
+                                   TypeElement element,
+                                   ClassElement originatingElement) {
+        if (diagnostics.isEmpty()) {
+            return;
+        }
+        Map<String, CharSequence> sources = new HashMap<>();
+        for (PythonAstParser.TransformResult transformResult : transformedList) {
+            Source source = transformResult.originalSource();
+            sources.put(PythonAstParser.sourcePathOf(source), source.getCharacters());
+        }
+        int errors = 0;
+        for (PythonDiagnostic diagnostic : diagnostics) {
+            if (diagnosticCallback != null) {
+                diagnosticCallback.accept(diagnostic);
+            }
+            String rendered = PythonDiagnostics.render(diagnostic, sources::get);
+            if (diagnostic.isError()) {
+                errors++;
+                error(element, "%s", rendered);
+            } else {
+                warning(element, "%s", rendered);
+            }
+        }
+        if (errors > 0) {
+            throw new ProcessingException(originatingElement, "Python processing found " + errors + (errors == 1 ? " error" : " errors"));
         }
     }
 

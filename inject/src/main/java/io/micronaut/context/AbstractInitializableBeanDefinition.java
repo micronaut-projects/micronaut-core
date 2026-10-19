@@ -59,6 +59,7 @@ import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
+import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.qualifiers.TypeAnnotationQualifier;
@@ -2826,7 +2827,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                 throw new DependencyInjectionException(resolutionContext, "Cannot resolve bean registrations. Argument [" + returnType + "] missing generic type information.");
             }
             qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
-            Collection<BeanRegistration<I>> beanRegistrations = resolutionContext.getBeanRegistrations(beanType, qualifier);
+            Collection<BeanRegistration<I>> beanRegistrations = injectsOwnInterceptors(qualifier)
+                ? resolutionContext.getInterceptorRegistrations(beanType, qualifier)
+                : resolutionContext.getBeanRegistrations(beanType, qualifier);
             return coerceCollectionToCorrectType(returnType.getType(), beanRegistrations, resolutionContext, returnType);
         } catch (NoSuchBeanException e) {
             if (returnType.isNullable()) {
@@ -2834,6 +2837,21 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             }
             throw new DependencyInjectionException(resolutionContext, e);
         }
+    }
+
+    /**
+     * Whether an injection point qualified by an interceptor binding injects the interceptors of this bean itself.
+     * The subclass or introduction proxy the processor generates is the intercepted bean, and is injected with the
+     * interceptors bound to it in its constructor: they are created for it, as the interceptors of its lifecycle
+     * are, so an unscoped one is told the bean, see {@link InterceptionTarget}, and is found again by the other
+     * interception points of the bean. A proxy with a separate target is injected with interceptors of its own,
+     * shared by every target it fronts, which are resolved as any other dependency.
+     *
+     * @param qualifier The qualifier of the injection point
+     * @return True if the interceptors are the bean's own
+     */
+    private boolean injectsOwnInterceptors(@Nullable Qualifier<?> qualifier) {
+        return qualifier instanceof InterceptorBindingQualifier && !InterceptedBeanProxy.class.isAssignableFrom(getBeanType());
     }
 
     private <K> Argument<K> resolveArgument(BeanContext context, int argIndex, Argument<?> [] arguments) {

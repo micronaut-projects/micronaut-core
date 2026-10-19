@@ -92,9 +92,14 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Nullable
     private Boolean bootstrapEnvironment = null;
     private boolean enableDefaultPropertySources = true;
-    private BeanResolutionTraceConfiguration traceConfiguration = new BeanResolutionTraceConfiguration();
+    // The default is created when the context asks for it: it reads a logger, and creating the builder must not
+    // configure logging, so that Micronaut.start() can begin a bean definition prefetch first
+    @Nullable
+    private BeanResolutionTraceConfiguration traceConfiguration;
     private final List<BeanResolutionTracer> beanResolutionTracers = new ArrayList<>(2);
-    private boolean beanResolutionTracerDiscovery = BeanResolutionTraceMode.isTracerDiscoveryEnabledByDefault();
+    // Also resolved when the context asks for it, as reading the default loads the trace mode, which reads a logger
+    @Nullable
+    private Boolean beanResolutionTracerDiscovery;
     private ResourceLoadStrategy configurationLoadStrategy = ResourceLoadStrategy.defaultStrategy();
     private BeanDefinitionsProvider beanDefinitionsProvider = new DefaultBeanDefinitionsProvider();
     private boolean eagerBeansEnabled = true;
@@ -138,7 +143,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
 
     @Override
     public BeanResolutionTraceConfiguration getTraceConfiguration() {
-        return this.traceConfiguration;
+        return traceConfiguration != null ? traceConfiguration : new BeanResolutionTraceConfiguration();
     }
 
     @Override
@@ -160,7 +165,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
 
     @Override
     public boolean isBeanResolutionTracerDiscoveryEnabled() {
-        return beanResolutionTracerDiscovery;
+        return beanResolutionTracerDiscovery != null ? beanResolutionTracerDiscovery : BeanResolutionTraceMode.isTracerDiscoveryEnabledByDefault();
     }
 
     @Override

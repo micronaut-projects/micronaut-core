@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
@@ -110,7 +111,13 @@ record HandlerRoutes(List<RouteSettings> routes, RouteGroupDefaults.@Nullable In
         }
     }
 
-    void where(RouteCondition condition) {
+    void selectedBy(@Nullable RouteMatchSelector selector) {
+        for (RouteSettings route : routes) {
+            route.selectedBy(selector);
+        }
+    }
+
+    void where(RequestCondition condition) {
         for (RouteSettings route : routes) {
             route.where(condition);
         }
