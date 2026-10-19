@@ -80,6 +80,54 @@ def plain(name: str) -> str:
         context?.close()
     }
 
+    void "a pooled route raises a python exception class as java, which its exception handler handles"() {
+        given:
+        PythonStatic.resetEntries()
+        ApplicationContext context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.http import HttpRequest, HttpResponse
+from micronaut.http.annotation import Get, Produces
+from micronaut.http.server.exceptions import ExceptionHandler
+
+
+class Missing(Exception):
+    pass
+
+
+@Singleton
+@Produces("text/plain")
+class MissingHandler(ExceptionHandler[Missing, HttpResponse]):
+    def handle(self, request: HttpRequest, exception: Missing) -> HttpResponse:
+        return HttpResponse.ok("missing")
+
+
+@Get("/routes/find/{name}")
+def find(name: str) -> str:
+    if name == "x":
+        raise Missing(name)
+    return name
+''', true)
+        def server = context.getBean(EmbeddedServer)
+        server.start()
+        def client = context.createBean(HttpClient, server.URL)
+
+        expect:
+        decisions.find { it.qualifiedName() == 'find' }.outcome() == StaticCompilationDecision.Outcome.COMPILED
+
+        when:
+        def found = client.toBlocking().retrieve("/routes/find/a")
+        def missing = client.toBlocking().retrieve("/routes/find/x")
+
+        then: "the compiled route ran as Java and threw the generated class, which the handler declared for the Python class matched"
+        found == "a"
+        missing == "missing"
+        PythonStatic.entries('python.Script#find') == 2
+
+        cleanup:
+        client?.close()
+        context?.close()
+    }
+
     static final String CONTROLLER_MODULE = '''
 from typing import Annotated
 from jakarta.inject import Inject, Singleton
