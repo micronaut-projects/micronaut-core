@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,6 +46,9 @@ public final class PythonStatic {
     public static final String COMPILED_MEMBER = "__micronaut_compiled__";
 
     private static final ConcurrentHashMap<String, LongAdder> ENTRIES = new ConcurrentHashMap<>();
+    // the largest magnitude a double holds every long up to exactly
+    private static final long EXACT_DOUBLE_LONG = 1L << 53;
+    private static final int QUOTIENT_SHIFT = 128;
 
     private PythonStatic() {
     }
@@ -160,14 +164,63 @@ public final class PythonStatic {
     /**
      * @param left  The dividend
      * @param right The divisor
-     * @return {@code left / right}: always a float
+     * @return {@code left / right}: always a float, the quotient correctly rounded as Python
+     * rounds it, also for operands a double does not hold exactly
      * @throws ArithmeticException On a zero divisor, as Python raises ZeroDivisionError
      */
     public static double divide(long left, long right) {
         if (right == 0) {
             throw new ArithmeticException("division by zero");
         }
-        return (double) left / right;
+        if (Math.abs(left) <= EXACT_DOUBLE_LONG && Math.abs(right) <= EXACT_DOUBLE_LONG) {
+            // both convert exactly, and the division of doubles is correctly rounded
+            return (double) left / right;
+        }
+        // the quotient scaled by 2**128 has more than 64 bits; the sticky bit of a remainder makes
+        // its rounding to 53 bits the rounding of the exact quotient, and the scaling back is exact
+        BigInteger[] quotient = BigInteger.valueOf(left).abs().shiftLeft(QUOTIENT_SHIFT).divideAndRemainder(BigInteger.valueOf(right).abs());
+        BigInteger scaled = quotient[1].signum() == 0 ? quotient[0] : quotient[0].setBit(0);
+        double magnitude = Math.scalb(scaled.doubleValue(), -QUOTIENT_SHIFT);
+        return (left < 0) != (right < 0) ? -magnitude : magnitude;
+    }
+
+    /**
+     * An int compared with a float, exactly as Python compares them: a long above 2**53 is not
+     * rounded to a double first.
+     *
+     * @param left  The int
+     * @param right The float
+     * @return The sign of {@code left - right}, as -1.0, 0.0 or 1.0, or NaN when {@code right} is
+     * NaN, so that comparing the result with 0.0 answers every comparison as Python does
+     */
+    public static double compare(long left, double right) {
+        if (Double.isNaN(right)) {
+            return Double.NaN;
+        }
+        if (Math.abs(left) <= EXACT_DOUBLE_LONG || Double.isInfinite(right)) {
+            double exact = left;
+            return exact < right ? -1.0 : exact > right ? 1.0 : 0.0;
+        }
+        return new BigDecimal(left).compareTo(new BigDecimal(right));
+    }
+
+    /**
+     * {@code left + right} on two Python strings, either of which may be a null a Java call
+     * returned or a Java caller passed.
+     *
+     * @param left  The left operand
+     * @param right The right operand
+     * @return The concatenation
+     * @throws IllegalStateException When an operand is null, as Python raises TypeError on None
+     */
+    public static String concat(@Nullable String left, @Nullable String right) {
+        if (left == null) {
+            throw new IllegalStateException("TypeError: unsupported operand type(s) for +: 'NoneType' and 'str'");
+        }
+        if (right == null) {
+            throw new IllegalStateException("TypeError: can only concatenate str (not \"NoneType\") to str");
+        }
+        return left.concat(right);
     }
 
     /**

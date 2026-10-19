@@ -364,6 +364,20 @@ class WarningTest(unittest.TestCase):
         self.assertEqual(["[Legacy.slow] cannot be compiled statically: [varargs-signature] parameter [*values] collects the positional arguments"],
                          [diagnostic.message() for diagnostic in planner.diagnostics])
 
+    def test_planning_again_reports_every_decision_and_warning_once(self):
+        checker = TypeChecker("off", [])
+        visitor = MicronautAstVisitor(Callback(), "pkg", "module.py", None, None, source_path="module.py", source_text=SOURCE, type_checker=checker)
+        visitor.visit(ast.parse(SOURCE))
+        planner = StaticPlanner(MODE_ANNOTATED, NAMES)
+        first = [decision.qualifiedName() for decision in planner.plan(checker)]
+        first_diagnostics = [diagnostic.message() for diagnostic in planner.diagnostics]
+        # a second compilation element planned by the same planner
+        second = [decision.qualifiedName() for decision in planner.plan(checker)]
+        self.assertEqual(first, second)
+        self.assertEqual(len(set(second)), len(second), second)
+        self.assertEqual(first_diagnostics, [diagnostic.message() for diagnostic in planner.diagnostics])
+        self.assertEqual(2, len(planner.diagnostics))
+
 
 LOWERED = '''
 from typing import Optional
@@ -372,6 +386,8 @@ from jakarta.inject import Singleton
 
 @Singleton
 class Pricing:
+    count: int = 0
+
     def __init__(self, rate: float):
         self.rate = rate
 
@@ -455,6 +471,48 @@ class Pricing:
     def switched(self, n: int) -> int:
         switch = n
         return switch
+
+    def lazy_message(self, n: int, d: int) -> int:
+        assert n > 0, f"{10 // d}"
+        return n
+
+    def counted(self) -> int:
+        self.count += 1
+        return self.count
+
+    def rate_is_none(self) -> bool:
+        return self.rate is None
+
+    def n_is_none(self, n: int) -> bool:
+        return n is None
+
+    def mixed_local(self, flag: bool) -> str:
+        value = 1.5
+        if flag:
+            value = 2
+        return f"{value}"
+
+    def hinted_float(self) -> float:
+        value: float = 1
+        return value
+
+    def mixed_conditional(self, flag: bool) -> float:
+        return 1 if flag else 2.5
+
+    def float_power(self, a: float) -> float:
+        return a ** 2
+
+    def maybe_concat(self, s: str | None) -> str:
+        return s + "x"
+
+    def concat(self, s: str) -> str:
+        return s + "x" + "y"
+
+    def exact_compare(self, n: int, x: float) -> bool:
+        return n > x
+
+    def literal_compare(self, x: float) -> bool:
+        return x > 100
 '''
 
 
@@ -532,6 +590,11 @@ class LoweringTest(unittest.TestCase):
             "via_property": "sibling-call",
             "maybe": "unsupported-expression",
             "switched": "java-reserved-name",
+            "mixed_local": "unknown-type",
+            "hinted_float": "unknown-type",
+            "mixed_conditional": "unsupported-expression",
+            "float_power": "unsupported-expression",
+            "maybe_concat": "unknown-type",
         }
         for name, rule in expectations.items():
             decision = self.decisions[f"Pricing.{name}"]
@@ -549,8 +612,57 @@ class LoweringTest(unittest.TestCase):
     def test_assertions_raise_through_the_helper(self):
         guarded = self.bodies["guarded"]
         statements = list(guarded.body().statements())
-        self.assertEqual("assertion", statements[0].expression().name())
-        self.assertEqual(">", list(statements[0].expression().arguments())[0].op())
+        self.assertEqual("If", statements[0].getClass().getSimpleName())
+        self.assertEqual("not", statements[0].test().op())
+        self.assertEqual(">", statements[0].test().operand().op())
+        failure = list(statements[0].then().statements())[0].expression()
+        self.assertEqual("assertion", failure.name())
+        self.assertEqual(False, list(failure.arguments())[0].value())
+
+    def test_the_assertion_message_is_evaluated_only_when_the_assertion_fails(self):
+        statements = list(self.bodies["lazy_message"].body().statements())
+        self.assertEqual("If", statements[0].getClass().getSimpleName())
+        self.assertIsNone(statements[0].orElse())
+        message = list(list(statements[0].then().statements())[0].expression().arguments())[1]
+        self.assertEqual("StrJoin", message.getClass().getSimpleName())
+        formatted = list(message.parts())[0]  # the f-string, spelled by str()
+        self.assertEqual("//", list(formatted.parts())[0].op())
+
+    def test_an_int_attribute_is_updated_in_place(self):
+        statements = list(self.bodies["counted"].body().statements())
+        self.assertEqual("PutSelf", statements[0].getClass().getSimpleName())
+        self.assertEqual("int", statements[0].type())
+        self.assertEqual("+", statements[0].value().operand().op())
+
+    def test_a_none_test_keeps_the_value_it_tests(self):
+        returned = list(self.bodies["rate_is_none"].body().statements())[0].value()
+        self.assertEqual("Compare", returned.getClass().getSimpleName())
+        self.assertEqual("is None", returned.op())
+        self.assertEqual("java.lang.Double", returned.left().type())
+        self.assertEqual("SelfProperty", returned.left().operand().getClass().getSimpleName())
+        # a parameter of a number is never None, and reading it twice is reading it once
+        returned = list(self.bodies["n_is_none"].body().statements())[0].value()
+        self.assertEqual("Const", returned.getClass().getSimpleName())
+        self.assertEqual(False, returned.value())
+
+    def test_a_str_that_may_be_null_is_concatenated_through_the_helper(self):
+        returned = list(self.bodies["concat"].body().statements())[0].value()
+        self.assertEqual("Binary", returned.getClass().getSimpleName())
+        self.assertEqual("concat", returned.op())
+        self.assertEqual("Helper", returned.left().getClass().getSimpleName())
+        self.assertEqual("concat", returned.left().name())
+        self.assertEqual("Param", list(returned.left().arguments())[0].getClass().getSimpleName())
+        self.assertIn("may be None", self.decisions["Pricing.maybe_concat"].reasons()[0].message())
+
+    def test_an_int_and_a_float_compare_exactly(self):
+        returned = list(self.bodies["exact_compare"].body().statements())[0].value()
+        self.assertEqual(">", returned.op())
+        self.assertEqual("compare", returned.left().name())
+        self.assertEqual(0.0, returned.right().value())
+        # a literal a double holds exactly compares as a double
+        returned = list(self.bodies["literal_compare"].body().statements())[0].value()
+        self.assertEqual(">", returned.op())
+        self.assertEqual("Cast", returned.right().getClass().getSimpleName())
 
 
 class DelegationTest(unittest.TestCase):
