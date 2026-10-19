@@ -748,7 +748,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             return ExecutionFlow.error(decorate(new HttpClientException("The client is closed, unable to connect for websocket.")));
         }
 
-        ExecutionFlow<NettyWebSocketClientHandler<T>> flow = connectionManager.connectForWebsocket(requestKey, handler)
+        ExecutionFlow<NettyWebSocketClientHandler<T>> flow = connectionManager.connectForWebsocket(requestKey, handler, maxFramePayloadLength)
             .onErrorResume(error -> {
                 handler.connectFailed(error);
                 return ExecutionFlow.error(error);

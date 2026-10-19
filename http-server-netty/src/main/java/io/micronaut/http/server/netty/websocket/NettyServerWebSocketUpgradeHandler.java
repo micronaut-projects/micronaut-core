@@ -281,7 +281,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         ChannelPipeline pipeline = ctx.pipeline();
 
         try {
-            installCompressionHandler(ctx, msg.getNativeRequest());
+            installCompressionHandler(ctx, msg.getNativeRequest(), maxFramePayloadLength(webSocketBean));
             handleHandshake(ctx, msg, webSocketBean, actualResponse);
         } catch (Throwable e) {
             releaseRequest.run();
@@ -358,10 +358,14 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
      *
      * @param ctx The context of the HTTP request handler
      * @param request The upgrade request
+     * @param maxFramePayloadLength The maximum payload length of a frame, which bounds the size a
+     *                              compressed frame may inflate to
      */
-    private void installCompressionHandler(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request) {
+    private void installCompressionHandler(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, int maxFramePayloadLength) {
         ChannelPipeline pipeline = ctx.pipeline();
-        WebSocketServerCompressionHandler compressionHandler = new WebSocketServerCompressionHandler();
+        // the frame decoder checks the limit on the compressed frame, so the decompressor caps
+        // what it inflates, as the request decompressor of PipeliningServerHandler does
+        WebSocketServerCompressionHandler compressionHandler = new WebSocketServerCompressionHandler(maxFramePayloadLength);
         pipeline.addBefore(ctx.name(), COMPRESSION_HANDLER, compressionHandler);
         pipeline.addBefore(ctx.name(), UpgradeRequestSink.ID, UpgradeRequestSink.INSTANCE);
         try {
@@ -378,6 +382,12 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         }
     }
 
+    private static int maxFramePayloadLength(WebSocketBean<?> webSocketBean) {
+        return webSocketBean.messageMethod()
+                .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
+                .orElse(65536)).orElse(65536);
+    }
+
     /**
      * Do the handshaking for WebSocket request.
      *
@@ -388,9 +398,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
      * @return The channel future
      **/
     private ChannelFuture handleHandshake(ChannelHandlerContext ctx, NettyHttpRequest req, WebSocketBean<?> webSocketBean, HttpResponse<?> response) {
-        int maxFramePayloadLength = webSocketBean.messageMethod()
-                .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
-                .orElse(65536)).orElse(65536);
+        int maxFramePayloadLength = maxFramePayloadLength(webSocketBean);
         WebSocketServerHandshakerFactory wsFactory =
                 new WebSocketServerHandshakerFactory(
                         getWebSocketURL(ctx, req),
