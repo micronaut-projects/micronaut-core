@@ -118,6 +118,18 @@ public final class ReflectionBeanIntrospector implements BeanIntrospector {
         return delegate.findIntrospectedTypes(filter);
     }
 
+    /**
+     * Returns what the delegate registers for the name: describing a class reflectively needs the class, which a
+     * lookup by name does not load.
+     *
+     * @param className The binary name of the bean type
+     * @return An optional introspection
+     */
+    @Override
+    public Optional<BeanIntrospection<?>> findIntrospection(String className) {
+        return delegate.findIntrospection(className);
+    }
+
     @Override
     @SuppressWarnings("unchecked")
     public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {

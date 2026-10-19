@@ -135,6 +135,59 @@ class DefaultBeanIntrospectorInvalidateSpec extends Specification {
         unrelated.close()
     }
 
+    void "the generated-only introspector is invalidated like the default one and finds a name after it"() {
+        given: "a generated-only introspector of a loader that lists no introspection of the bean yet"
+        URLClassLoader own = new URLClassLoader([root.toUri().toURL()] as URL[], getClass().classLoader)
+        DefaultBeanIntrospector introspector = (DefaultBeanIntrospector) BeanIntrospector.generatedOnly(own)
+
+        expect:
+        introspector.findIntrospection(ReloadedBean.name).empty
+
+        when: "the loader starts listing one"
+        listReference()
+
+        then: "the cached index still answers"
+        introspector.findIntrospection(ReloadedBean.name).empty
+
+        when: "the service entries are cleared and its own loader is invalidated, as a launcher does"
+        MicronautMetaServiceLoaderUtils.invalidate()
+        introspector.invalidate(own)
+
+        then: "the introspection is found by class and by name, and no fallback was ever resolved"
+        introspector.findIntrospection(ReloadedBean.name).get().beanType == ReloadedBean
+        introspector.findIntrospection(ReloadedBean).get().beanType == ReloadedBean
+        introspector.@fallbacks == null
+        introspector.@otherFallbacks.isEmpty()
+
+        cleanup:
+        MicronautMetaServiceLoaderUtils.invalidate()
+        own.close()
+    }
+
+    void "the shared generated-only introspector is invalidated with the shared one"() {
+        given:
+        listReference()
+        DefaultBeanIntrospector generatedOnly = (DefaultBeanIntrospector) BeanIntrospector.generatedOnly()
+        URLClassLoader changed = new URLClassLoader([root.toUri().toURL()] as URL[], getClass().classLoader)
+        def changedIndex = generatedOnly.getIntrospections(changed)
+
+        expect:
+        changedIndex.containsKey(ReloadedBean.name)
+        generatedOnly.@otherIntrospections.containsKey(changed)
+
+        when:
+        ReloadableBeanIntrospector.invalidateShared(changed)
+
+        then:
+        !generatedOnly.@otherIntrospections.containsKey(changed)
+        !generatedOnly.getIntrospections(changed).is(changedIndex)
+
+        cleanup:
+        ReloadableBeanIntrospector.invalidateShared(changed)
+        MicronautMetaServiceLoaderUtils.invalidate()
+        changed.close()
+    }
+
     private void listReference() {
         Path entries = Files.createDirectories(root.resolve(REFERENCE_ENTRY))
         Files.writeString(entries.resolve(ReloadedReference.name), "")

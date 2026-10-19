@@ -248,6 +248,69 @@ class ReflectionIntrospectionPolicySpec extends Specification {
         services.deleteDir()
     }
 
+    void "the generated-only introspector never describes a type reflectively"() {
+        given: "every type allowed, so the reflective fallback would describe any of them"
+        ReflectionIntrospectionPolicy.allow("*")
+        def generatedOnly = BeanIntrospector.generatedOnly(getClass().classLoader)
+
+        expect: "a type without a generated introspection is a miss"
+        BeanIntrospector.generatedOnly().findIntrospection(Allowed).empty
+        generatedOnly.findIntrospection(Allowed).empty
+        generatedOnly.findIntrospection(Warehouse).empty
+
+        and: "a lookup by name never reflects either, not even through the shared introspector"
+        BeanIntrospector.SHARED.findIntrospection(Allowed.name).empty
+        BeanIntrospector.generatedOnly().findIntrospection(Allowed.name).empty
+
+        and: "a generated introspection is served, by class and by name"
+        !(BeanIntrospector.generatedOnly().findIntrospection(Generated).get() instanceof ReflectionBeanIntrospection)
+        !(generatedOnly.findIntrospection(Generated).get() instanceof ReflectionBeanIntrospection)
+        generatedOnly.findIntrospection(Generated.name).get().beanType == Generated
+
+        and: "the default introspector, with the same policy, does reflect"
+        BeanIntrospector.SHARED.findIntrospection(Allowed).get() instanceof ReflectionBeanIntrospection
+    }
+
+    void "the generated-only introspector does not load the fallbacks of its loader"() {
+        given: "a class loader registering a fallback that counts its instances"
+        def services = Files.createTempDirectory("fallbacks").toFile()
+        def descriptors = new File(services, "META-INF/services")
+        descriptors.mkdirs()
+        new File(descriptors, BeanIntrospectionFallback.name).text = CountingFallback.name
+        def classLoader = new URLClassLoader([services.toURI().toURL()] as URL[], getClass().classLoader)
+        ReflectionIntrospectionPolicy.allow("*")
+
+        expect:
+        BeanIntrospector.generatedOnly(classLoader).findIntrospection(Warehouse).empty
+        CountingFallback.INSTANCES.get() == 0
+
+        and: "the default introspector of the same loader does instantiate it"
+        BeanIntrospector.forClassLoader(classLoader).findIntrospection(Warehouse).present
+        CountingFallback.INSTANCES.get() > 0
+
+        cleanup:
+        CountingFallback.INSTANCES.set(0)
+        classLoader.close()
+        services.deleteDir()
+    }
+
+    /**
+     * A fallback counting its instances.
+     */
+    static class CountingFallback implements BeanIntrospectionFallback {
+
+        static final AtomicInteger INSTANCES = new AtomicInteger()
+
+        CountingFallback() {
+            INSTANCES.incrementAndGet()
+        }
+
+        @Override
+        public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {
+            Optional.empty()
+        }
+    }
+
     @Introspected
     static class Generated {
         String name

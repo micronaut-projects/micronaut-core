@@ -15,11 +15,13 @@
  */
 package io.micronaut.core.beans;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.util.ArgumentUtils;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Optional;
 import java.util.function.Predicate;
 
@@ -52,6 +54,38 @@ public interface BeanIntrospector {
     }
 
     /**
+     * The shared bean introspector that serves the registered introspection references only, those generated at
+     * compilation time: a type without one is a miss, and no {@link BeanIntrospectionFallback} is loaded or asked,
+     * so no introspection is ever built by reflection.
+     *
+     * <p>It selects the class loader as {@link #SHARED} does, keeps its own index and is invalidated with it.
+     * "Generated" means registered as a reference: an introspection a library registers by hand is served as well,
+     * since nothing tells the two apart.</p>
+     *
+     * @return The generated-only bean introspector
+     * @since 5.3.0
+     */
+    @Experimental
+    static BeanIntrospector generatedOnly() {
+        return DefaultBeanIntrospector.sharedGeneratedOnly();
+    }
+
+    /**
+     * Creates a bean introspector that uses the given class loader and serves the registered introspection
+     * references only, as {@link #generatedOnly()} does: a type without one is a miss, and no
+     * {@link BeanIntrospectionFallback} is loaded or asked.
+     *
+     * @param classLoader The class loader to load introspections
+     * @return A new generated-only bean introspector
+     * @since 5.3.0
+     */
+    @Experimental
+    static BeanIntrospector generatedOnly(ClassLoader classLoader) {
+        ArgumentUtils.requireNonNull("classLoader", classLoader);
+        return DefaultBeanIntrospector.generatedOnly(classLoader);
+    }
+
+    /**
      * Finds introspections with the given filter.
      * @param filter A filter that receives a {@link BeanIntrospectionReference}
      * @return A collection of introspections
@@ -74,6 +108,26 @@ public interface BeanIntrospector {
      * @return An optional introspection
      */
  <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType);
+
+    /**
+     * Finds the {@link BeanIntrospection} registered for the class of the given name, without loading the class by name
+     * and without consulting a {@link BeanIntrospectionFallback}, which needs the class.
+     *
+     * <p>The name is the binary name, as {@link Class#getName()} returns it: {@code com.example.Outer$Inner} for a
+     * nested class. The default implementation filters the references through
+     * {@link #findIntrospections(Predicate)}; the default introspector looks the name up in its index and loads only
+     * the matching reference.</p>
+     *
+     * @param className The binary name of the bean type
+     * @return An optional introspection
+     * @since 5.3.0
+     */
+    @Experimental
+    default Optional<BeanIntrospection<?>> findIntrospection(String className) {
+        ArgumentUtils.requireNonNull("className", className);
+        Iterator<BeanIntrospection<Object>> introspections = findIntrospections(ref -> className.equals(ref.getName())).iterator();
+        return introspections.hasNext() ? Optional.of(introspections.next()) : Optional.empty();
+    }
 
     /**
      * Finds introspections for classes annotated with the given stereotype.

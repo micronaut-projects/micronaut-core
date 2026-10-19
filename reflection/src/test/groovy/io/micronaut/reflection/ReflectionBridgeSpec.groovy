@@ -176,6 +176,16 @@ class ReflectionBridgeSpec extends Specification {
         !new ReflectionBeanIntrospector(BeanIntrospector.SHARED, { false }).findIntrospection(Book).present
     }
 
+    void "the reflective introspector looks a name up in the delegate only"() {
+        given:
+        def introspector = new ReflectionBeanIntrospector(BeanIntrospector.SHARED)
+
+        expect: "a generated introspection is found by its binary name, a type without one is not reflected by name"
+        introspector.findIntrospection(Generated.name).get().beanType == Generated
+        introspector.findIntrospection(Book.name).empty
+        introspector.findIntrospection(Book).present
+    }
+
     @Introspected
     static class Generated {
         String name

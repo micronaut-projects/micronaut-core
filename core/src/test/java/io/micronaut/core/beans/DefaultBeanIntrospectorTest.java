@@ -20,12 +20,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DefaultBeanIntrospectorTest {
@@ -193,6 +195,230 @@ class DefaultBeanIntrospectorTest {
         }
     }
 
+    @Test
+    void generatedOnlyIntrospectorNeverLoadsOrAsksAFallback() throws Exception {
+        Path servicesDir = tempDir.resolve("services");
+        writeFallbackService(servicesDir);
+        CountingFallback.reset();
+        try (URLClassLoader classLoader = new URLClassLoader(new URL[] { servicesDir.toUri().toURL() }, getClass().getClassLoader())) {
+            BeanIntrospector generatedOnly = BeanIntrospector.generatedOnly(classLoader);
+
+            assertTrue(generatedOnly.findIntrospection(Unregistered.class).isEmpty());
+            assertTrue(generatedOnly.findIntrospection(Unregistered.class.getName()).isEmpty());
+            assertEquals(0, CountingFallback.INSTANCES.get(), "the fallback service is never instantiated");
+            assertEquals(0, CountingFallback.CALLS.get());
+
+            // the same loader with fallbacks enabled proves the service is registered and would have answered
+            Optional<BeanIntrospection<Unregistered>> fallback = BeanIntrospector.forClassLoader(classLoader).findIntrospection(Unregistered.class);
+            assertTrue(fallback.isPresent());
+            assertEquals(1, CountingFallback.INSTANCES.get());
+            assertEquals(1, CountingFallback.CALLS.get());
+
+            assertTrue(BeanIntrospector.forClassLoader(classLoader).findIntrospection(Unregistered.class.getName()).isEmpty(),
+                "a lookup by name never asks a fallback");
+            assertEquals(1, CountingFallback.CALLS.get());
+        } finally {
+            CountingFallback.reset();
+        }
+    }
+
+    @Test
+    void generatedOnlyIntrospectorServesARegisteredReference() throws Exception {
+        Path classesDir = tempDir.resolve("classes");
+        compileChildLoaderIntrospection(classesDir);
+        writeMicronautServiceEntry(classesDir);
+
+        try (URLClassLoader childClassLoader = new URLClassLoader(new URL[] { classesDir.toUri().toURL() }, getClass().getClassLoader())) {
+            Class<?> beanType = childClassLoader.loadClass("example.ChildBean");
+
+            Optional<? extends BeanIntrospection<?>> introspection = BeanIntrospector.generatedOnly(childClassLoader).findIntrospection(beanType);
+            assertTrue(introspection.isPresent());
+            assertEquals(beanType, introspection.get().getBeanType());
+            assertEquals("example.$ChildBean$Introspection", introspection.get().getClass().getName());
+        }
+    }
+
+    @Test
+    void sharedGeneratedOnlyIntrospectorFallsBackToBeanTypeClassLoader() throws Exception {
+        Path classesDir = tempDir.resolve("classes");
+        compileChildLoaderIntrospection(classesDir);
+        writeMicronautServiceEntry(classesDir);
+
+        Thread thread = Thread.currentThread();
+        ClassLoader previousContextClassLoader = thread.getContextClassLoader();
+        String previousProperty = System.getProperty(CONTEXT_CLASSLOADER_PROPERTY);
+        try (URLClassLoader childClassLoader = new URLClassLoader(new URL[] { classesDir.toUri().toURL() }, getClass().getClassLoader())) {
+            thread.setContextClassLoader(getClass().getClassLoader());
+            System.clearProperty(CONTEXT_CLASSLOADER_PROPERTY);
+
+            Class<?> beanType = childClassLoader.loadClass("example.ChildBean");
+
+            assertSame(BeanIntrospector.generatedOnly(), BeanIntrospector.generatedOnly(), "the generated-only introspector is shared");
+            assertTrue(BeanIntrospector.generatedOnly().findIntrospection(beanType).isPresent());
+            // a name has no class whose loader could be asked: the introspector's own loader does not list it
+            assertTrue(BeanIntrospector.generatedOnly().findIntrospection("example.ChildBean").isEmpty());
+        } finally {
+            thread.setContextClassLoader(previousContextClassLoader);
+            restoreProperty(previousProperty);
+        }
+    }
+
+    @Test
+    void findIntrospectionByNameIsolatesClassLoaders() throws Exception {
+        Path classesDir = tempDir.resolve("classes");
+        compileChildLoaderIntrospection(classesDir);
+        writeMicronautServiceEntry(classesDir);
+
+        Thread thread = Thread.currentThread();
+        ClassLoader previousContextClassLoader = thread.getContextClassLoader();
+        String previousProperty = System.getProperty(CONTEXT_CLASSLOADER_PROPERTY);
+        try (URLClassLoader childClassLoader = new URLClassLoader(new URL[] { classesDir.toUri().toURL() }, getClass().getClassLoader())) {
+            assertTrue(BeanIntrospector.forClassLoader(getClass().getClassLoader()).findIntrospection("example.ChildBean").isEmpty());
+            assertTrue(BeanIntrospector.generatedOnly(getClass().getClassLoader()).findIntrospection("example.ChildBean").isEmpty());
+
+            Optional<BeanIntrospection<?>> introspection = BeanIntrospector.forClassLoader(childClassLoader).findIntrospection("example.ChildBean");
+            assertTrue(introspection.isPresent());
+            assertEquals(childClassLoader, introspection.get().getBeanType().getClassLoader());
+            assertTrue(BeanIntrospector.generatedOnly(childClassLoader).findIntrospection("example.ChildBean").isPresent());
+
+            // the shared introspectors follow the context class loader when the setting asks for it
+            System.setProperty(CONTEXT_CLASSLOADER_PROPERTY, "true");
+            thread.setContextClassLoader(childClassLoader);
+            assertTrue(BeanIntrospector.SHARED.findIntrospection("example.ChildBean").isPresent());
+            assertTrue(BeanIntrospector.generatedOnly().findIntrospection("example.ChildBean").isPresent());
+        } finally {
+            thread.setContextClassLoader(previousContextClassLoader);
+            restoreProperty(previousProperty);
+        }
+    }
+
+    @Test
+    void findIntrospectionByNameLoadsOnlyTheMatchingReference() {
+        CountingReference nested = new CountingReference(Map.Entry.class);
+        CountingReference unrelated = new CountingReference(String.class);
+        CountingReference other = new CountingReference(Integer.class);
+        List<BeanIntrospectionReference<Object>> references = List.of(unrelated, nested, other);
+
+        BeanIntrospectionsProvider previous = BeanIntrospectionProviders.set(classLoader -> references);
+        try {
+            for (BeanIntrospector introspector : List.of(
+                new DefaultBeanIntrospector(getClass().getClassLoader()),
+                BeanIntrospector.generatedOnly(getClass().getClassLoader()))) {
+
+                assertTrue(introspector.findIntrospection("java.util.Map.Entry").isEmpty(), "the canonical name is not the binary name");
+                assertTrue(introspector.findIntrospection("example.Missing").isEmpty());
+                assertEquals(Map.Entry.class, introspector.findIntrospection("java.util.Map$Entry").orElseThrow().getBeanType());
+            }
+            assertEquals(2, nested.loads);
+            assertEquals(0, unrelated.loads, "an unrelated reference is never loaded");
+            assertEquals(0, other.loads);
+        } finally {
+            BeanIntrospectionProviders.set(previous);
+        }
+    }
+
+    @Test
+    void defaultFindIntrospectionByNameFiltersTheReferences() {
+        CountingReference nested = new CountingReference(Map.Entry.class);
+        CountingReference unrelated = new CountingReference(String.class);
+        List<BeanIntrospectionReference<Object>> references = List.of(unrelated, nested);
+        BeanIntrospector introspector = new BeanIntrospector() {
+            @Override
+            public Collection<BeanIntrospection<Object>> findIntrospections(Predicate<? super BeanIntrospectionReference<?>> filter) {
+                return references.stream().filter(filter).map(BeanIntrospectionReference::load).toList();
+            }
+
+            @Override
+            public Collection<Class<?>> findIntrospectedTypes(Predicate<? super BeanIntrospectionReference<?>> filter) {
+                return references.stream().filter(filter).<Class<?>>map(BeanIntrospectionReference::getBeanType).toList();
+            }
+
+            @Override
+            public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {
+                return Optional.empty();
+            }
+        };
+
+        assertEquals(Map.Entry.class, introspector.findIntrospection("java.util.Map$Entry").orElseThrow().getBeanType());
+        assertTrue(introspector.findIntrospection("java.util.Map.Entry").isEmpty());
+        assertEquals(1, nested.loads);
+        assertEquals(0, unrelated.loads);
+    }
+
+    private static void writeFallbackService(Path servicesDir) throws Exception {
+        Path descriptors = servicesDir.resolve("META-INF/services");
+        Files.createDirectories(descriptors);
+        Files.writeString(descriptors.resolve(BeanIntrospectionFallback.class.getName()), CountingFallback.class.getName(), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * A type no reference is registered for.
+     */
+    public static final class Unregistered {
+    }
+
+    /**
+     * A fallback counting how often it is created and asked, answering for {@link Unregistered} only.
+     */
+    public static final class CountingFallback implements BeanIntrospectionFallback {
+
+        static final AtomicInteger INSTANCES = new AtomicInteger();
+        static final AtomicInteger CALLS = new AtomicInteger();
+
+        public CountingFallback() {
+            INSTANCES.incrementAndGet();
+        }
+
+        static void reset() {
+            INSTANCES.set(0);
+            CALLS.set(0);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {
+            CALLS.incrementAndGet();
+            if (beanType != Unregistered.class) {
+                return Optional.empty();
+            }
+            return Optional.of((BeanIntrospection<T>) new StubReference(Unregistered.class).load());
+        }
+    }
+
+    /**
+     * A reference counting how often its introspection is loaded.
+     */
+    private static final class CountingReference implements BeanIntrospectionReference<Object> {
+
+        private final StubReference stub;
+        private int loads;
+
+        CountingReference(Class<?> beanType) {
+            this.stub = new StubReference(beanType);
+        }
+
+        @Override
+        public boolean isPresent() {
+            return true;
+        }
+
+        @Override
+        public Class<Object> getBeanType() {
+            return stub.getBeanType();
+        }
+
+        @Override
+        public BeanIntrospection<Object> load() {
+            loads++;
+            return stub.load();
+        }
+
+        @Override
+        public String getName() {
+            return stub.getName();
+        }
+    }
+
     private static final class StubReference implements BeanIntrospectionReference<Object> {
 
         private final Class<Object> beanType;
@@ -261,6 +487,7 @@ class DefaultBeanIntrospectorTest {
             import java.util.Collection;
             import java.util.List;
             import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
             public final class $ChildBean$Introspection implements BeanIntrospection<ChildBean>, BeanIntrospectionReference<ChildBean> {
                 @Override

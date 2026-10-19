@@ -59,6 +59,10 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
     private final ClassLoader classLoader;
     private final boolean useContextClassLoader;
     /**
+     * Whether a miss of the registered references is final, without loading or asking a {@link BeanIntrospectionFallback}.
+     */
+    private final boolean generatedOnly;
+    /**
      * The indexes of loaders other than this introspector's own. The values are held softly because a
      * generated reference strongly refers to the loader that is the key, so a strongly held value would
      * keep a retired loader alive; a softly held one is collected under memory pressure and the loader with it.
@@ -79,7 +83,7 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
      * Creates an introspector that uses this class' class loader and may follow the context class loader setting.
      */
     DefaultBeanIntrospector() {
-        this(DefaultBeanIntrospector.class.getClassLoader(), true);
+        this(DefaultBeanIntrospector.class.getClassLoader(), true, false);
     }
 
     /**
@@ -88,7 +92,7 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
      * @param classLoader The class loader to load introspections
      */
     DefaultBeanIntrospector(ClassLoader classLoader) {
-        this(classLoader, false);
+        this(classLoader, false, false);
     }
 
     /**
@@ -96,10 +100,32 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
      *
      * @param classLoader The class loader to load introspections
      * @param useContextClassLoader Whether to allow the context class loader setting to override the supplied class loader
+     * @param generatedOnly Whether to serve the registered references only, never consulting a {@link BeanIntrospectionFallback}
      */
-    private DefaultBeanIntrospector(ClassLoader classLoader, boolean useContextClassLoader) {
+    private DefaultBeanIntrospector(ClassLoader classLoader, boolean useContextClassLoader, boolean generatedOnly) {
         this.classLoader = classLoader;
         this.useContextClassLoader = useContextClassLoader;
+        this.generatedOnly = generatedOnly;
+    }
+
+    /**
+     * The generated-only counterpart of {@link BeanIntrospector#SHARED}: the same class loader selection, created on
+     * first use.
+     *
+     * @return The shared generated-only introspector
+     */
+    static DefaultBeanIntrospector sharedGeneratedOnly() {
+        return SharedGeneratedOnly.INSTANCE;
+    }
+
+    /**
+     * Creates a generated-only introspector bound to the supplied class loader.
+     *
+     * @param classLoader The class loader to load introspections
+     * @return The introspector
+     */
+    static DefaultBeanIntrospector generatedOnly(ClassLoader classLoader) {
+        return new DefaultBeanIntrospector(classLoader, false, true);
     }
 
     @Override
@@ -143,6 +169,12 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
         } catch (Throwable e) {
             throw new IntrospectionException("Error loading BeanIntrospection for type [" + beanType + "]: " + e.getMessage(), e);
         }
+        if (generatedOnly) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("No generated BeanIntrospection found for bean type: {}", beanType);
+            }
+            return Optional.empty();
+        }
         // a fallback describes a class it was never compiled against, so asking it can fail on a type it does
         // not serve - reading a member whose type is an absent optional dependency throws NoClassDefFoundError -
         // and a failure of one fallback must stay a lookup miss, which is what the callers of a find expect.
@@ -166,6 +198,29 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
             LOG.debug("No BeanIntrospection found for bean type: {}", beanType);
         }
         return Optional.empty();
+    }
+
+    /**
+     * Looks the name up in the index of the class loader the introspections are resolved with. Unlike a lookup by
+     * class there is no bean type whose class loader could be asked as well, and no fallback is consulted: a fallback
+     * describes a class, which a name would have to be loaded into first.
+     */
+    @Override
+    @SuppressWarnings("java:S1181")
+    public Optional<BeanIntrospection<?>> findIntrospection(String className) {
+        ArgumentUtils.requireNonNull("className", className);
+        BeanIntrospectionReference<Object> reference = getIntrospections(resolveClassLoader()).get(className);
+        if (reference == null) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("No BeanIntrospection found for class name: {}", className);
+            }
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(reference.load());
+        } catch (Throwable e) {
+            throw new IntrospectionException("Error loading BeanIntrospection for type [" + className + "]: " + e.getMessage(), e);
+        }
     }
 
     /**
@@ -331,5 +386,12 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
             resolvedIntrospectionMap.put(reference.getName(), reference);
         }
         return Collections.unmodifiableMap(resolvedIntrospectionMap);
+    }
+
+    /**
+     * Holds the shared generated-only introspector, so that it is only created when it is asked for.
+     */
+    private static final class SharedGeneratedOnly {
+        private static final DefaultBeanIntrospector INSTANCE = new DefaultBeanIntrospector(DefaultBeanIntrospector.class.getClassLoader(), true, true);
     }
 }

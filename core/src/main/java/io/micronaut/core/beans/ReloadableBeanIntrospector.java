@@ -45,7 +45,8 @@ public interface ReloadableBeanIntrospector extends BeanIntrospector {
     void invalidate(ClassLoader changed);
 
     /**
-     * Forgets what the {@link BeanIntrospector#SHARED shared introspector} indexed for the given loader, if it keeps an
+     * Forgets what the {@link BeanIntrospector#SHARED shared introspector} and the shared
+     * {@link BeanIntrospector#generatedOnly() generated-only introspector} indexed for the given loader, if they keep an
      * index.
      *
      * @param changed The class loader whose visible classes changed
@@ -53,6 +54,9 @@ public interface ReloadableBeanIntrospector extends BeanIntrospector {
      */
     static void invalidateShared(ClassLoader changed) {
         if (BeanIntrospector.SHARED instanceof ReloadableBeanIntrospector reloadable) {
+            reloadable.invalidate(changed);
+        }
+        if (BeanIntrospector.generatedOnly() instanceof ReloadableBeanIntrospector reloadable) {
             reloadable.invalidate(changed);
         }
     }
