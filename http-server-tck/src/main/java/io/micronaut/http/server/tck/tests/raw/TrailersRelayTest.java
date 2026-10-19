@@ -43,6 +43,7 @@ import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
@@ -76,8 +77,14 @@ import java.util.concurrent.TimeUnit;
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "java:S1192", // It's more readable without the constant
 })
+@Tag(TrailersRelayTest.TRAILERS)
 public final class TrailersRelayTest {
     public static final String SPEC_NAME = "TrailersRelayTest";
+    /**
+     * Tags the tests that need the trailers of a request or a response; the JDK HttpServer has no API for them,
+     * and relaying them through a servlet container depends on the container.
+     */
+    public static final String TRAILERS = "trailers";
     private static final long TIMEOUT_SECONDS = 10;
     private static final String REQUEST_BODY = "5\r\nhello\r\n0\r\nx-checksum: abc\r\n\r\n";
 

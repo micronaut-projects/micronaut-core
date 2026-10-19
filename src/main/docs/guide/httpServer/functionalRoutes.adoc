@@ -11,7 +11,7 @@ A handler route is a route like the route of a controller method, not a separate
 * the error routes: `@Error` methods and api:http.server.exceptions.ExceptionHandler[] beans, which receive checked exceptions unwrapped;
 * the executors (`@ExecuteOn`, `@NonBlocking` and the thread selection of the server), and the propagated context.
 
-Functional routes add what is natural to declare in code: groups of routes with a common path prefix and common filters, filters on a single route, request conditions and error routes local to a group.
+Functional routes add what is natural to declare in code: groups of routes with a common path prefix and common filters, filters on a single route, request conditions, error routes local to a group, and routes to targets located at runtime.
 
 Every `HttpRoutes` bean adds its routes next to the controllers, under `micronaut.server.context-path` if one is configured. Declare an `HttpRoutes` bean as a class, as above, or return a lambda from a factory method, as in the next section. The order of the `HttpRoutes` beans only orders the beans: it never decides which route answers a request.
 

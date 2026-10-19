@@ -14,7 +14,7 @@ snippet::io.micronaut.docs.server.functional.ErrorRoutes[tags="imports,clazz", i
 The error route of a failed handler route is looked up:
 
 . in the local error routes of the bean class, when the route <<functionalRoutesAnnotations, implements>> a bean method;
-. in the innermost group of the route, then in the groups around it;
+. in the innermost group of the route, then in the groups around it, then in the groups of the locator routes that located it;
 . among the global error routes, functional ones and `@Error(global = true)` methods.
 
 Within each level, the error route of the closest exception type answers, so a group's error route for a supertype wins over a global one for the exact type. Status routes are looked up in the same order, for a response of that status or an api:http.exceptions.HttpStatusException[] of a route. A request that no route matched, e.g. a `404` or a `405` under the prefix of a group, is answered by the global error and status routes only.

@@ -102,7 +102,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         if (!borrowed.isEmpty()) {
             removeAttribute(PROXY_INTERCEPTORS);
         }
-        BeanCreationState state = new BeanCreationState(definition, borrowed);
+        BeanCreationState state = new BeanCreationState(definition, borrowed, creationState);
         creationState = state;
         return state;
     }
@@ -110,6 +110,24 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public @Nullable BeanDependencyGroup getBeanDependencyGroup() {
         return creationState == null ? null : new DefaultBeanDependencyResolver(context, creationState.dependencies);
+    }
+
+    @Override
+    public @Nullable BeanDependencyResolver getDependencyResolver() {
+        Segment<?, ?> segment = path.peek();
+        if (segment == null) {
+            return null;
+        }
+        BeanDefinition<?> owner = segment.getDeclaringType();
+        // The bean the segment injects into is still being created, with the creation of the bean being injected
+        // nested in it. The segment names the definition that declares the injection point, which the qualified
+        // delegate being created wraps.
+        for (BeanCreationState state = creationState; state != null; state = state.parent) {
+            if (state.isCreating(owner)) {
+                return new DefaultBeanDependencyResolver(context, state.dependencies);
+            }
+        }
+        return null;
     }
 
     @Override
@@ -351,6 +369,20 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public <T> T getBean(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return getBean(Argument.of(beanType), qualifier);
+    }
+
+    @Override
+    public <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType) {
+        T bean = context.getBeanRegistration(this, definition, beanType).getBean();
+        if (tracer != null) {
+            tracer.traceBeanResolved(
+                this,
+                beanType,
+                null,
+                bean
+            );
+        }
+        return bean;
     }
 
     @Override

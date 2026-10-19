@@ -31,7 +31,7 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Internal
-sealed interface ContextFilterSpec<S extends RouteFilterSpec<S>> extends RouteFilterSpec<S> permits DefaultHttpRouteSpec, DefaultHttpBodyRouteSpec, DefaultHttpRouteGroup, DefaultServerFilterSpec {
+sealed interface ContextFilterSpec<S extends RouteFilterSpec<S>> extends RouteFilterSpec<S> permits DefaultHttpRouteSpec, DefaultHttpBodyRouteSpec, AbstractHttpRouteGroup, DefaultServerFilterSpec {
 
     /**
      * Add a filter.

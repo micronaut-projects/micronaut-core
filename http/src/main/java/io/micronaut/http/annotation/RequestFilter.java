@@ -42,12 +42,15 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * <ul>
  *     <li>{@link HttpRequest} or {@link MutableHttpRequest}, to access the request</li>
  *     <li>{@link FilterContinuation}&lt;{@link HttpResponse}&gt;,
+ *     {@link FilterContinuation}&lt;{@link java.util.concurrent.CompletionStage}&lt;{@link HttpResponse}&gt;&gt;
+ *     (or {@link java.util.concurrent.CompletableFuture}), or
  *     {@link FilterContinuation}&lt;{@link Publisher}&lt;{@link HttpResponse}&gt;&gt;. A call to
  *     the continuation (and, for the reactive variant, subscribing to the {@link Publisher}) will
  *     trigger execution of downstream filters, and finally perform the request. The response
  *     returned by the continuation will be the response produced by the downstream, and can be
- *     modified and returned. Note that if you call a non-reactive continuation, the call will
- *     block, which may block the netty event loop. For that reason, always mark such a filter with
+ *     modified and returned. Note that if you call a blocking continuation
+ *     ({@code FilterContinuation<HttpResponse>}), the call will block, which may block the netty
+ *     event loop. For that reason, always mark such a filter with
  *     {@link io.micronaut.scheduling.annotation.ExecuteOn}</li>
  *     <li>A {@code @}{@link Header}, {@code @}{@link QueryValue} or {@code @}{@link CookieValue}
  *     parameter</li>
@@ -69,7 +72,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *     <li>A {@link HttpResponse} to skip execution of the request</li>
  *     <li>A {@link Publisher} (or other reactive type) that produces any of these return types, to
  *     delay further execution</li>
- *     <li>A {@link java.util.concurrent.CompletionStage}.
+ *     <li>A {@link java.util.concurrent.CompletionStage} that produces any of these return types.</li>
  *     <li>A {@link java.util.concurrent.CompletableFuture}. Suppose you must write a filter that proceeds with the request in some scenarios. You can use {@code CompletableFuture<@ Nullable  HttpResponse<?>>} as the return type. Then, to proceed with the request, return  {@code CompletableFuture.completedFuture(null)}.</li>
  * </ul>
  *

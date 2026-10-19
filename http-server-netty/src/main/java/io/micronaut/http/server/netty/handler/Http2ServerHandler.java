@@ -126,6 +126,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 Http2Stream stream = s.getProperty(key);
                 if (stream != null) {
                     stream.discardBufferedContent();
+                    stream.onStreamClosed();
                 }
             }
         });

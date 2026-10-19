@@ -5,9 +5,8 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.Prototype;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -20,7 +19,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 class LoggedInterceptor implements MethodInterceptor<Object, Object> {
 
     static final AtomicInteger INSTANCES = new AtomicInteger();
-    static final List<String> INVOCATIONS = Collections.synchronizedList(new ArrayList<>());
+    // Copy on write: a @Scheduled target keeps appending from the scheduler thread while a spec iterates
+    static final List<String> INVOCATIONS = new CopyOnWriteArrayList<>();
 
     LoggedInterceptor() {
         INSTANCES.incrementAndGet();

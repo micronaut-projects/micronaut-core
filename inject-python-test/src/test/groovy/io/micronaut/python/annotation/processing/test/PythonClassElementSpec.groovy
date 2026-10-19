@@ -1458,6 +1458,41 @@ class DefaultRepository(Repository):
         }
     }
 
+    def "test inherited method reports the interface methods the subclass introduces"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from java.lang import Runnable
+
+class Deep(ABC):
+    @abstractmethod
+    def run(self) -> None:
+        ...
+
+class Contract(ABC):
+    @abstractmethod
+    def run(self) -> None:
+        ...
+
+class Parent(Deep):
+    def run(self) -> None:
+        pass
+
+class Child(Parent, Contract, Runnable):
+    def stop(self) -> None:
+        pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "Child") { ClassElement element ->
+            MethodElement method = element.getEnclosedElements(ElementQuery.ALL_METHODS.named("run"))
+                .find { it.declaringType.name == "python.Parent" }
+
+            assert method.overriddenMethods*.declaringType*.name == ["python.Deep", "python.Contract", "java.lang.Runnable"]
+            return element
+        }
+    }
+
     def "test client override with class header keeps client interceptor binding"() {
         given:
         def pythonCode = '''

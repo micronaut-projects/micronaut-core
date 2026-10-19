@@ -130,6 +130,30 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     PropertyResolver getPropertyResolver();
 
     /**
+     * Resolves the bean of the given definition as the given bean type, on behalf of the bean this context resolves
+     * for.
+     *
+     * <p>The bean is the one {@link #getBean(Argument, Qualifier)} returns for the bean type when its lookup picks this
+     * definition, without the lookup: the caller has already chosen the definition, so no other candidate is
+     * considered and no candidate lookup or cache is involved. The bean is resolved in the scope of the definition and
+     * with its declared qualifier, as {@link BeanDefinitionRegistry#getBeanRegistration(BeanDefinition, Argument)}
+     * resolves it, and a bean that has no scope of its own is a dependent of the bean this context resolves for and
+     * is destroyed with it, as one {@link #getBean(Argument, Qualifier)} creates is.</p>
+     *
+     * <p>The definition may be of a subtype of the bean type: a definition of an implementation is resolved as an
+     * interface it implements.</p>
+     *
+     * @param definition The bean definition
+     * @param beanType   The potentially parameterized bean type to resolve the definition as
+     * @param <T>        The bean type
+     * @return The bean
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the bean
+     *                                                             type
+     * @since 5.3.0
+     */
+    <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType);
+
+    /**
      * Obtains the bean registrations for the given type and qualifier.
      *
      * @param beanType          The bean type
@@ -166,6 +190,29 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 5.3.0
      */
     default @Nullable BeanDependencyGroup getBeanDependencyGroup() {
+        return null;
+    }
+
+    /**
+     * Returns a resolver owned by the bean the current segment of the path belongs to: the bean a field, constructor
+     * argument or method argument is being injected into, or the bean itself when it is resolved by a lookup rather
+     * than injected.
+     *
+     * <p>A bean built for the injection point it is injected into, such as one of an
+     * {@link io.micronaut.inject.provider.AbstractInjectionPointBeanDefinition}, uses it to resolve dependencies on
+     * behalf of the bean it is injected into: a dependent the resolver creates is destroyed with that bean, under the
+     * rules of an injected {@link BeanDependencyResolver}, and can be destroyed earlier with
+     * {@link BeanDependencyResolver#destroy(BeanRegistration)}. The resolver can be retained after the injection.</p>
+     *
+     * <p>The resolver does not share the path of this context: it must not be used to resolve the bean it is owned by
+     * while that bean is being created.</p>
+     *
+     * @return The resolver, or {@code null} if there is no current segment, the bean of the segment is not being
+     * created through this context, or the context does not track bean ownership
+     * @since 5.3.0
+     */
+    @Experimental
+    default @Nullable BeanDependencyResolver getDependencyResolver() {
         return null;
     }
 

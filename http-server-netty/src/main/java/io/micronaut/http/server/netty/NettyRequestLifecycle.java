@@ -30,6 +30,7 @@ import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
@@ -42,6 +43,7 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
 @Internal
@@ -113,6 +115,12 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
             HttpResponse<?> response = value instanceof NettyMutableHttpResponse<?> mut ? mut : (HttpResponse<?>) value;
             rib.writeResponse(outboundAccess, request, response, imperativeFlow.getError(), writeErrorHandler);
         } else {
+            // a request that waits for an asynchronous route locator before it is matched, e.g. a
+            // CORS preflight request, stops waiting when it is abandoned, like one being matched
+            CompletionStage<?> located = RouteLocator.whenLocated(request);
+            if (located != null) {
+                onPendingLocation(request, located);
+            }
             result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, request, response, throwable, writeErrorHandler));
         }
     }
@@ -128,6 +136,17 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
     public ExecutionFlow<HttpResponse<?>> apply(Throwable throwable) {
         NettyHttpRequest<?> request = Objects.requireNonNull(nettyRequest);
         return Objects.requireNonNull(writeErrorContext).propagate(() -> onWriteError(request, throwable));
+    }
+
+    @Override
+    protected void onPendingLocation(HttpRequest<?> request, CompletionStage<?> located) {
+        if (this.nettyRequest == null) {
+            return;
+        }
+        // the client abandons the request, closing the HTTP/1.1 connection or resetting the
+        // HTTP/2 stream: no one waits for the target any more
+        Runnable remove = outboundAccess.whenAbandoned(() -> RouteLocator.abandonPendingLocations(request));
+        located.whenComplete((ignored, error) -> remove.run());
     }
 
     @Nullable

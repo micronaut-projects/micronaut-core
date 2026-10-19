@@ -131,8 +131,9 @@ class RoutePortTest {
         new DefaultHttpRouteBuilder(assembly).GET("/metrics").port(MANAGEMENT_PORT).handle(RoutePortTest::ok);
 
         assertEquals(Set.of(MANAGEMENT_PORT), assembly.exposedPorts());
-        assertThrows(UnsupportedOperationException.class, () -> assembly.exposedPorts().add(OTHER_PORT));
-        assertThrows(UnsupportedOperationException.class, () -> assembly.exposedPorts().clear());
+        Set<Integer> exposedPorts = assembly.exposedPorts();
+        assertThrows(UnsupportedOperationException.class, () -> exposedPorts.add(OTHER_PORT));
+        assertThrows(UnsupportedOperationException.class, exposedPorts::clear);
     }
 
     @Test

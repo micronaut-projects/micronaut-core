@@ -25,9 +25,9 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
 
 import java.io.IOException;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -110,7 +110,7 @@ final class JsonChunkedProcessor {
         return Flux.concat(input
                 .concatMap(b -> Flux.<ByteBuffer<?>>create(s -> {
                     try {
-                        countComponents(s, b);
+                        countComponents(s::next, b);
                         s.complete();
                     } catch (IOException | ContentLengthExceededException e) {
                         s.error(e);
@@ -119,7 +119,7 @@ final class JsonChunkedProcessor {
                     }
                 })), Flux.create(s -> {
                 try {
-                    complete(s);
+                    complete(s::next);
                     s.complete();
                 } catch (Throwable e) {
                     s.error(e);
@@ -132,7 +132,38 @@ final class JsonChunkedProcessor {
             .doOnDiscard(ByteBuf.class, ByteBuf::release);
     }
 
-    private static void release(ByteBuffer<?> buffer) {
+    /**
+     * Feed a piece of the input, without Reactive Streams: the values it completes are handed to
+     * the consumer, which takes them over. The piece is not released.
+     *
+     * @param content The piece
+     * @param out     Takes the values the piece completes
+     * @throws IOException If the input is malformed
+     */
+    void feed(ByteBuf content, Consumer<? super ByteBuffer<?>> out) throws IOException {
+        countComponents(out, content);
+    }
+
+    /**
+     * The end of the input, without Reactive Streams: the value that only the end completes is
+     * handed to the consumer.
+     *
+     * @param out Takes the value the end completes
+     * @throws IOException If the input ends inside a value
+     */
+    void finish(Consumer<? super ByteBuffer<?>> out) throws IOException {
+        complete(out);
+    }
+
+    /**
+     * Release what is buffered of a value that is not complete. What the processing buffers
+     * after this is released at once.
+     */
+    void discard() {
+        releaseBuffers();
+    }
+
+    static void release(ByteBuffer<?> buffer) {
         if (buffer.asNativeBuffer() instanceof ByteBuf buf) {
             buf.release();
         } else if (buffer instanceof ReferenceCounted counted) {
@@ -160,7 +191,7 @@ final class JsonChunkedProcessor {
      * takes input in any number of pieces, and a value spanning components is buffered like one
      * spanning chunks. The parts share the reference count of their component.
      */
-    private void countComponents(FluxSink<? super ByteBuffer<?>> out, ByteBuf content) throws IOException {
+    private void countComponents(Consumer<? super ByteBuffer<?>> out, ByteBuf content) throws IOException {
         if (content instanceof CompositeByteBuf composite && composite.numComponents() > 1) {
             for (ByteBuf part : composite.decompose(composite.readerIndex(), composite.readableBytes())) {
                 countLoop(out, part);
@@ -171,7 +202,7 @@ final class JsonChunkedProcessor {
         }
     }
 
-    private void countLoop(FluxSink<? super ByteBuffer<?>> out, ByteBuf content) throws IOException {
+    private void countLoop(Consumer<? super ByteBuffer<?>> out, ByteBuf content) throws IOException {
         long initialPosition = counter.position();
         long bias = initialPosition - content.readerIndex();
         while (content.isReadable()) {
@@ -220,11 +251,11 @@ final class JsonChunkedProcessor {
         }
     }
 
-    private void flush(FluxSink<? super ByteBuffer<?>> out) {
+    private void flush(Consumer<? super ByteBuffer<?>> out) {
         ByteBuf completedNode = take();
         if (completedNode != null) {
             // emitted without the lock: the subscriber may cancel meanwhile
-            out.next(NettyByteBufferFactory.DEFAULT.wrap(completedNode));
+            out.accept(NettyByteBufferFactory.DEFAULT.wrap(completedNode));
         }
     }
 
@@ -239,7 +270,7 @@ final class JsonChunkedProcessor {
         return completedNode;
     }
 
-    private void complete(FluxSink<? super ByteBuffer<?>> out) throws IOException {
+    private void complete(Consumer<? super ByteBuffer<?>> out) throws IOException {
         counter.noMoreInput();
         flush(out);
     }

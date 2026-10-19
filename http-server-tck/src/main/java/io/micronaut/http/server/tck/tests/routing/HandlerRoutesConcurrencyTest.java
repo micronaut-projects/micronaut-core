@@ -28,6 +28,7 @@ import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
@@ -99,6 +100,31 @@ public class HandlerRoutesConcurrencyTest {
         }
     }
 
+    @Test
+    void concurrentRequestsOfAnAsynchronousLocatorSeeOnlyTheirOwnTargets() throws Exception {
+        try (ServerUnderTest server = server()) {
+            List<String> failures = runConcurrently(THREADS, REQUESTS_PER_THREAD, (thread, n) -> {
+                String id = thread + "-" + n;
+                HttpRequest<?> request = HttpRequest.GET("/conc/located/" + id + "/show");
+                HttpResponse<String> response = server.exchange(((MutableHttpRequest<?>) request).header(ID, id), String.class);
+                List<String> problems = new ArrayList<>();
+                if (response.getStatus() != HttpStatus.OK) {
+                    problems.add("status " + response.getStatus());
+                }
+                if (!("located " + id).equals(response.body())) {
+                    problems.add("body '" + response.body() + "' expected 'located " + id + "'");
+                }
+                for (String header : List.of("X-Server-Filter", "X-Group-Filter", "X-Route-Filter")) {
+                    if (!id.equals(response.getHeaders().get(header))) {
+                        problems.add(header + "=" + response.getHeaders().get(header));
+                    }
+                }
+                return problems.isEmpty() ? null : request.getPath() + ": " + String.join(", ", problems);
+            });
+            assertTrue(failures.isEmpty(), () -> failures.size() + " failures, first: " + failures.subList(0, Math.min(5, failures.size())));
+        }
+    }
+
     private static ServerUnderTest server() {
         return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
     }
@@ -152,6 +178,9 @@ public class HandlerRoutesConcurrencyTest {
     record RequestId(String id) implements PropagatedContextElement {
     }
 
+    record Located(String id) {
+    }
+
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class ConcurrentRoutes implements HttpRoutes {
@@ -166,6 +195,9 @@ public class HandlerRoutesConcurrencyTest {
             routes.serverFilter("/conc/**").before((request, propagatedContext) -> {
                 propagatedContext.add(new RequestId(id(request)));
             }).and().after((request, response) -> response.header("X-Server-Filter", PropagatedContext.getOrEmpty().find(RequestId.class).map(RequestId::id).orElse("none")));
+            LocatedRoutes<Located> located = TckLocatedRoutes.of(Located.class, table -> table.GET("/show")
+                .after((request, response) -> response.header("X-Route-Filter", pathVariables(request))).and()
+                .handle((request, pathVariables, target) -> text("located " + target.id())));
             routes.path("/conc", group -> {
                 group.beforeAsync(request -> CompletableFuture.supplyAsync(() -> {
                     request.setAttribute("group-id", id(request));
@@ -185,6 +217,10 @@ public class HandlerRoutesConcurrencyTest {
                     .afterAsync((request, response) -> CompletableFuture.runAsync(() -> response.header("X-Route-Filter", id(request)), executor)).and()
                     .body().handleAsync((request, pathVariables, body) -> body.text()
                         .thenApply(value -> text("echo " + pathVariables.getString("id") + ": " + value)));
+                group.locateAsync("/located/{id}", (request, pathVariables) -> {
+                    String id = pathVariables.getString("id");
+                    return CompletableFuture.supplyAsync(() -> new Located(id), executor);
+                }, located);
                 group.GET("/context/{id}")
                     .after((request, response) -> response.header("X-Route-Filter", id(request))).and()
                     .handle((request, pathVariables) ->
@@ -193,7 +229,7 @@ public class HandlerRoutesConcurrencyTest {
         }
 
         /**
-         * The third segment of the path: the id of {@code /conc/sync/{id}}.
+         * The third segment of the path: the id of {@code /conc/sync/{id}} and {@code /conc/located/{id}/show}.
          */
         private static String pathVariables(HttpRequest<?> request) {
             String path = request.getPath();

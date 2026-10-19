@@ -226,14 +226,14 @@ class Log {
         ctx.close()
     }
 
-    void "resolution stops before the owner's pre-destroy callback"() {
+    void "the owner's pre-destroy callback may still resolve, and what it creates is destroyed with the owner"() {
         given:
         def ctx = buildContext(HEADER + '''
 @Singleton class Owner {
     final BeanDependencyResolver resolver;
     Owner(BeanDependencyResolver resolver) { this.resolver = resolver; }
     @PreDestroy void close() {
-        try { resolver.getBean(Resource.class); }
+        try { resolver.getBean(Resource.class); Log.EVENTS.add("resolved"); }
         catch (IllegalStateException expected) { Log.EVENTS.add("rejected"); }
     }
 }
@@ -245,7 +245,13 @@ class Log {
         ctx.destroyBean(owner)
 
         then:
-        log.EVENTS == ['rejected']
+        log.EVENTS == ['resolved', 'resource1']
+
+        when:
+        owner.resolver.getBean(ctx.classLoader.loadClass('test.Resource'))
+
+        then:
+        thrown(IllegalStateException)
 
         cleanup:
         ctx.close()

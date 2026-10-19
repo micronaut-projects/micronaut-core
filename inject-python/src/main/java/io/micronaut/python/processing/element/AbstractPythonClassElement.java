@@ -394,10 +394,11 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         }
         ParameterElement[] pythonParameters = pythonMethod.getParameters();
         ParameterElement[] parameters = inheritedMethod.getParameters().clone();
-        // When the Python hints resolve to the Java method, it is among the overridden methods and the Python
-        // parameters already inherit its annotations (see PythonMethodElement#resolveParameters); inheriting
-        // them again here would only repeat the same metadata in the hierarchy.
-        boolean metadataInherited = pythonMethod.getOverriddenMethods().contains(inheritedMethod);
+        // When the Python hints resolve to the Java method, it is among the methods overridden in the hierarchy of
+        // the declaring type and the Python parameters already inherit its annotations (see
+        // PythonMethodElement#resolveParameters); inheriting them again here would only repeat the same metadata
+        // in the hierarchy.
+        boolean metadataInherited = pythonMethod.getDeclaringTypeOverriddenMethods().contains(inheritedMethod);
         if (pythonParameters.length == parameters.length) {
             for (int i = 0; i < parameters.length; i++) {
                 ParameterElement pythonParameter = pythonParameters[i];

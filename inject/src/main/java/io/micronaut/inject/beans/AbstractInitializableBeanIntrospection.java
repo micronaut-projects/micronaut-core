@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.TargetConstructorCache;
 import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanTypeHierarchy;
 import io.micronaut.core.beans.BeanMethod;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.beans.BeanPropertyMember;
@@ -103,6 +104,12 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
     @Nullable
     private IntrospectionBuilderData builderData;
+
+    private static final Object NO_TYPE_HIERARCHY = new Object();
+
+    // null until built, then the hierarchy or NO_TYPE_HIERARCHY; immutable once published
+    @SuppressWarnings("java:S3077")
+    private volatile @Nullable Object typeHierarchy;
 
     protected AbstractInitializableBeanIntrospection(Class<B> beanType,
                                                      @Nullable AnnotationMetadata annotationMetadata,
@@ -983,6 +990,36 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
+    }
+
+    @Override
+    public final Optional<BeanTypeHierarchy> getTypeHierarchy() {
+        Object hierarchy = typeHierarchy;
+        if (hierarchy == null) {
+            // built once, when first asked for, so every caller sees the same instance
+            synchronized (this) {
+                hierarchy = typeHierarchy;
+                if (hierarchy == null) {
+                    BeanTypeHierarchy built = buildTypeHierarchy();
+                    hierarchy = built == null ? NO_TYPE_HIERARCHY : built;
+                    typeHierarchy = hierarchy;
+                }
+            }
+        }
+        return hierarchy instanceof BeanTypeHierarchy beanTypeHierarchy ? Optional.of(beanTypeHierarchy) : Optional.empty();
+    }
+
+    /**
+     * Builds the hierarchy of the bean type; generated for an introspection compiled with
+     * {@link io.micronaut.core.annotation.Introspected#hierarchy()}.
+     *
+     * @return The hierarchy, or {@code null} if the introspection does not describe it
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    protected @Nullable BeanTypeHierarchy buildTypeHierarchy() {
+        return null;
     }
 
     @Override

@@ -50,8 +50,9 @@ class GroupRoutesTest {
         assertEquals("v1", orders.getHeaders().get("X-Api"));
         assertEquals("api", orders.getHeaders().get("X-Served-By"));
 
+        var noTenantRequest = HttpRequest.GET("/api/orders");
         HttpClientResponseException noTenant = assertThrows(HttpClientResponseException.class,
-            () -> http.exchange(HttpRequest.GET("/api/orders"), String.class));
+            () -> http.exchange(noTenantRequest, String.class));
         assertEquals(HttpStatus.BAD_REQUEST, noTenant.getStatus());
         assertEquals("v1", noTenant.getResponse().getHeaders().get("X-Api"));
     }
@@ -64,8 +65,9 @@ class GroupRoutesTest {
     @Test
     void aNestedGroupAddsItsFilters() {
         BlockingHttpClient http = client.toBlocking();
+        var forbiddenRequest = HttpRequest.GET("/api/admin/users").header("X-Tenant", "acme");
         HttpClientResponseException forbidden = assertThrows(HttpClientResponseException.class,
-            () -> http.exchange(HttpRequest.GET("/api/admin/users").header("X-Tenant", "acme"), String.class));
+            () -> http.exchange(forbiddenRequest, String.class));
         assertEquals(HttpStatus.FORBIDDEN, forbidden.getStatus());
         assertEquals("users", http.retrieve(HttpRequest.GET("/api/admin/users").header("X-Tenant", "acme").header("X-Role", "admin")));
     }
@@ -74,16 +76,18 @@ class GroupRoutesTest {
     void routeFiltersChangeTheRequestAndReplaceTheResponse() {
         BlockingHttpClient http = client.toBlocking();
         assertEquals("report 7 as summary", http.retrieve(HttpRequest.GET("/api/reports/7").header("X-Tenant", "acme")));
+        var goneRequest = HttpRequest.GET("/api/reports/7").header("X-Tenant", "acme").header("X-Legacy", "true");
         HttpClientResponseException gone = assertThrows(HttpClientResponseException.class,
-            () -> http.exchange(HttpRequest.GET("/api/reports/7").header("X-Tenant", "acme").header("X-Legacy", "true"), String.class));
+            () -> http.exchange(goneRequest, String.class));
         assertEquals(HttpStatus.GONE, gone.getStatus());
     }
 
     @Test
     void serverFiltersFilterEveryRequestOfTheirPatterns() {
         BlockingHttpClient http = client.toBlocking();
+        var notFoundRequest = HttpRequest.GET("/api/missing").header("X-Tenant", "acme");
         HttpClientResponseException notFound = assertThrows(HttpClientResponseException.class,
-            () -> http.exchange(HttpRequest.GET("/api/missing").header("X-Tenant", "acme"), String.class));
+            () -> http.exchange(notFoundRequest, String.class));
         assertEquals(HttpStatus.NOT_FOUND, notFound.getStatus());
         assertEquals("api", notFound.getResponse().getHeaders().get("X-Served-By"));
         assertNull(notFound.getResponse().getHeaders().get("X-Api"));
@@ -97,8 +101,9 @@ class GroupRoutesTest {
         HttpResponse<String> saved = http.exchange(HttpRequest.POST("/notes", "hello").contentType(MediaType.TEXT_PLAIN_TYPE), String.class);
         assertEquals("saved hello", saved.body());
         assertEquals(MediaType.TEXT_PLAIN, saved.getContentType().map(MediaType::getName).orElse(null));
+        var unsupportedRequest = HttpRequest.POST("/notes", "{}").contentType(MediaType.APPLICATION_JSON_TYPE);
         HttpClientResponseException unsupported = assertThrows(HttpClientResponseException.class,
-            () -> http.exchange(HttpRequest.POST("/notes", "{}").contentType(MediaType.APPLICATION_JSON_TYPE), String.class));
+            () -> http.exchange(unsupportedRequest, String.class));
         assertEquals(HttpStatus.UNSUPPORTED_MEDIA_TYPE, unsupported.getStatus());
 
         assertEquals("saved pen", http.retrieve(HttpRequest.POST("/notes/items", new Item(1, "pen"))
@@ -108,8 +113,9 @@ class GroupRoutesTest {
         HttpResponse<String> drafts = http.exchange(HttpRequest.GET("/notes/drafts"), String.class);
         assertEquals(MediaType.APPLICATION_JSON, drafts.getContentType().map(MediaType::getName).orElse(null));
         assertEquals("[{\"id\":1,\"name\":\"draft\"}]", drafts.body());
+        var notAcceptableRequest = HttpRequest.GET("/notes/drafts").accept(MediaType.TEXT_PLAIN_TYPE);
         HttpClientResponseException notAcceptable = assertThrows(HttpClientResponseException.class,
-            () -> http.exchange(HttpRequest.GET("/notes/drafts").accept(MediaType.TEXT_PLAIN_TYPE), String.class));
+            () -> http.exchange(notAcceptableRequest, String.class));
         assertEquals(HttpStatus.NOT_ACCEPTABLE, notAcceptable.getStatus());
     }
 

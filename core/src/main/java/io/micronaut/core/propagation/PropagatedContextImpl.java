@@ -46,6 +46,9 @@ final class PropagatedContextImpl implements PropagatedContext {
 
     static final PropagatedContextImpl EMPTY = new PropagatedContextImpl(new PropagatedContextElement[0], false, false);
 
+    static final Scope NOOP_SCOPE = () -> {
+    };
+
     final PropagatedContextElement[] elements;
     final boolean containsThreadElements;
     final boolean containsScopedValueElements;
@@ -243,6 +246,7 @@ final class PropagatedContextImpl implements PropagatedContext {
     public Scope propagate() {
         return switch (PropagatedContextConfiguration.get()) {
             case THREAD_LOCAL -> ThreadContext.propagate(ThreadContext.get(), this);
+            // A ScopedValue is only bound for the extent of Carrier.run/call, it cannot be bound now and unbound by a later call
             case SCOPED_VALUE ->
                 throw new IllegalStateException("Scope propagation requires thread-local support. Set 'micronaut.propagation' to 'thread-local'.");
         };

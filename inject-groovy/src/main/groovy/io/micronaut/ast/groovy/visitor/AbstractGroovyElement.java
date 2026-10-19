@@ -31,7 +31,9 @@ import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import org.codehaus.groovy.ast.AnnotatedNode;
+import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -40,6 +42,7 @@ import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
+import java.lang.annotation.ElementType;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -141,6 +144,22 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
         return newClassElement(getNativeType(), type, genericsSpec, new HashSet<>(), false, false);
     }
 
+    /**
+     * Obtain the class element for the type of a field, method or parameter.
+     *
+     * @param type The type
+     * @param genericsSpec The generics spec or null
+     * @param use The field, method or parameter declared with this type, whose declaration
+     *            annotations applicable to type uses apply to a type variable type
+     * @return The class element
+     */
+    @NonNull
+    protected final ClassElement newClassElement(@NonNull ClassNode type,
+                                                 @Nullable Map<String, ClassElement> genericsSpec,
+                                                 AnnotatedNode use) {
+        return newClassElement(getNativeType(), type, genericsSpec == null ? Collections.emptyMap() : genericsSpec, new HashSet<>(), false, false, false, use);
+    }
+
     @NonNull
     protected final ClassElement newClassElement(GenericsType genericsType) {
         return newClassElement(getNativeType(), getNativeType().annotatedNode(), genericsType, genericsType, Collections.emptyMap(), new HashSet<>(), false);
@@ -159,6 +178,19 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
                                          Map<String, ClassElement> parentTypeArguments,
                                          Set<Object> visitedTypes,
                                          boolean isRawType) {
+        return newClassElement(declaredElement, genericsOwner, genericsType, redirectType, parentTypeArguments, visitedTypes, isRawType, null, null);
+    }
+
+    @NonNull
+    private ClassElement newClassElement(@Nullable GroovyNativeElement declaredElement,
+                                         AnnotatedNode genericsOwner,
+                                         GenericsType genericsType,
+                                         GenericsType redirectType,
+                                         Map<String, ClassElement> parentTypeArguments,
+                                         Set<Object> visitedTypes,
+                                         boolean isRawType,
+                                         @Nullable ClassNode placeholderUse,
+                                         @Nullable AnnotatedNode use) {
         if (parentTypeArguments == null) {
             parentTypeArguments = Collections.emptyMap();
         }
@@ -166,7 +198,7 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
             return resolveWildcard(declaredElement, genericsOwner, genericsType, redirectType, parentTypeArguments, visitedTypes);
         }
         if (genericsType.isPlaceholder()) {
-            return resolvePlaceholder(declaredElement, genericsOwner, genericsType, redirectType, parentTypeArguments, visitedTypes, isRawType);
+            return resolvePlaceholder(declaredElement, genericsOwner, genericsType, redirectType, parentTypeArguments, visitedTypes, isRawType, placeholderUse, use);
         }
         return newClassElement(declaredElement, genericsType.getType(), parentTypeArguments, visitedTypes, genericsType.isPlaceholder(), isRawType);
     }
@@ -189,13 +221,41 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
                                          boolean isTypeVariable,
                                          boolean isRawTypeParameter,
                                          boolean stripTypeArguments) {
+        return newClassElement(declaredElement, classNode, parentTypeArguments, visitedTypes, isTypeVariable, isRawTypeParameter, stripTypeArguments, null);
+    }
+
+    @NonNull
+    private ClassElement newClassElement(@Nullable GroovyNativeElement declaredElement,
+                                         ClassNode classNode,
+                                         Map<String, ClassElement> parentTypeArguments,
+                                         Set<Object> visitedTypes,
+                                         boolean isTypeVariable,
+                                         boolean isRawTypeParameter,
+                                         boolean stripTypeArguments,
+                                         @Nullable AnnotatedNode use) {
         if (parentTypeArguments == null) {
             parentTypeArguments = Collections.emptyMap();
         }
         if (classNode.isArray()) {
             ClassNode componentType = classNode.getComponentType();
-            return newClassElement(declaredElement, componentType, parentTypeArguments, visitedTypes, isTypeVariable, isRawTypeParameter)
-                .toArray();
+            ClassElement component = newClassElement(declaredElement, componentType, parentTypeArguments, visitedTypes, isTypeVariable, isRawTypeParameter, false, use);
+            // Keep every dimension separately from the legacy element type metadata, innermost first: those of
+            // the component, a resolved T of T[] included, and then that of this dimension
+            List<MutableAnnotationMetadataDelegate<AnnotationMetadata>> annotations = new ArrayList<>();
+            for (ClassElement dimension = component; dimension.isArray(); dimension = dimension.fromArray()) {
+                annotations.add(dimension.getTypeAnnotationMetadata());
+            }
+            Collections.reverse(annotations);
+            annotations.add(elementAnnotationMetadataFactory.buildTypeAnnotations(
+                visitorContext.getAnnotationMetadataBuilder().lookupOrBuildForTypeAnnotations(classNode), classNode));
+            ClassElement array = component.toArray();
+            if (array instanceof GroovyClassElement groovyArray) {
+                return groovyArray.withArrayTypeAnnotations(annotations);
+            }
+            if (array instanceof PrimitiveElement primitiveArray) {
+                return primitiveArray.withArrayTypeAnnotations(annotations);
+            }
+            return array;
         }
         if (classNode.isGenericsPlaceHolder()) {
             GenericsType genericsType;
@@ -214,7 +274,8 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
                 genericsType = new GenericsType(classNode.redirect());
                 redirectType = genericsType;
             }
-            return newClassElement(declaredElement, getNativeType().annotatedNode(), genericsType, redirectType, parentTypeArguments, visitedTypes, isRawTypeParameter);
+            // The use carries its own type annotations, the generics type is the declaration
+            return newClassElement(declaredElement, getNativeType().annotatedNode(), genericsType, redirectType, parentTypeArguments, visitedTypes, isRawTypeParameter, classNode, use);
         }
         if (ClassHelper.isPrimitiveType(classNode)) {
             PrimitiveElement primitiveElement = PrimitiveElement.valueOf(classNode.getName());
@@ -247,6 +308,31 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
         return new GroovyClassElement(visitorContext, groovyNativeElement, elementAnnotationMetadataFactory, newTypeArguments, 0, isTypeVariable);
     }
 
+    /**
+     * The type annotations of a type variable declaration or use.
+     * An annotation of the field, method or parameter declared with the type variable as its type
+     * that is also applicable to type uses applies to the type (JLS 9.7.4).
+     *
+     * @param placeholder The type variable declaration or use
+     * @param use The field, method or parameter
+     * @return The annotations
+     */
+    private static List<AnnotationNode> typeAnnotations(ClassNode placeholder, @Nullable AnnotatedNode use) {
+        List<AnnotationNode> typeAnnotations = placeholder.getTypeAnnotations();
+        if (use == null) {
+            return typeAnnotations;
+        }
+        List<AnnotationNode> annotations = new ArrayList<>(typeAnnotations.size() + 1);
+        for (AnnotationNode annotation : use.getAnnotations()) {
+            if (GroovyAnnotationElement.getTargets(annotation.getClassNode()).contains(ElementType.TYPE_USE)
+                && typeAnnotations.stream().noneMatch(a -> a.getClassNode().equals(annotation.getClassNode()))) {
+                annotations.add(annotation);
+            }
+        }
+        annotations.addAll(typeAnnotations);
+        return annotations;
+    }
+
     @NonNull
     private ClassElement resolvePlaceholder(GroovyNativeElement owner,
                                             AnnotatedNode genericsOwner,
@@ -254,8 +340,10 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
                                             GenericsType redirectType,
                                             Map<String, ClassElement> parentTypeArguments,
                                             Set<Object> visitedTypes,
-                                            boolean isRawType) {
-        ClassNode placeholderClassNode = genericsType.getType();
+                                            boolean isRawType,
+                                            @Nullable ClassNode placeholderUse,
+                                            @Nullable AnnotatedNode use) {
+        ClassNode placeholderClassNode = placeholderUse != null ? placeholderUse : genericsType.getType();
         String variableName = genericsType.getName();
 
         ClassElement resolvedBound = parentTypeArguments.get(variableName);
@@ -283,7 +371,7 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
                 return resolvedBound;
             }
         }
-        GroovyNativeElement groovyPlaceholderNativeElement = new GroovyNativeElement.Placeholder(placeholderClassNode, owner, variableName);
+        GroovyNativeElement groovyPlaceholderNativeElement = new GroovyNativeElement.Placeholder(placeholderClassNode, owner, variableName, typeAnnotations(placeholderClassNode, use));
         if (bounds == null) {
             List<ClassNode> classNodeBounds = new ArrayList<>();
             addBounds(genericsType, classNodeBounds);

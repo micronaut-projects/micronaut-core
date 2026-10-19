@@ -367,11 +367,7 @@ internal class KotlinAnnotationMetadataBuilder(
         if (annotationValue.isEmpty()) {
             val arrayType = type.resolve()
             if (arrayType.declaration.qualifiedName?.asString() == "kotlin.Array") {
-                val className = visitorContext.getBinaryName(arrayType.arguments[0].type!!.resolve().declaration)
-                val optionalClassName = findJavaClass(className)
-                if (optionalClassName.isPresent) {
-                    valueType = optionalClassName.get() as Class<Any>
-                }
+                valueType = emptyArrayComponentType(arrayType.arguments[0].type!!.resolve().declaration)
             }
         }
         val collection = annotationValue.filterNotNull().map {
@@ -380,6 +376,33 @@ internal class KotlinAnnotationMetadataBuilder(
             v
         } // annotation values can't be null
         return ArrayUtils.toArray(collection, valueType)
+    }
+
+    /**
+     * Resolves the component type of an array member that is given no element. It is the type the value of an element
+     * has, so that the member holds the same type whether or not it is given one, which is what javac does. Only the
+     * elements of a `kotlin.Array` are resolved here: the elements of a primitive array are held as objects.
+     *
+     * @param elementDeclaration The declaration of the element type the member declares
+     * @return The component type the empty array is created with
+     */
+    private fun emptyArrayComponentType(elementDeclaration: KSDeclaration): Class<Any> {
+        if (elementDeclaration is KSTypeAlias) {
+            // the value of an element is read through the alias, so the empty array is typed through it too
+            return emptyArrayComponentType(elementDeclaration.type.resolve().declaration)
+        }
+        val elementName = elementDeclaration.qualifiedName?.asString()
+        val classKind = (elementDeclaration as? KSClassDeclaration)?.classKind
+        val componentType = when {
+            // a class is read as a class value, and KSP presents a Java Class<?> member as an Array<KClass<*>>
+            elementName == "kotlin.reflect.KClass" || elementName == "java.lang.Class" ->
+                AnnotationClassValue::class.java
+            classKind == ClassKind.ANNOTATION_CLASS -> AnnotationValue::class.java
+            // an enum constant is read as its name
+            classKind == ClassKind.ENUM_CLASS -> String::class.java
+            else -> findJavaClass(visitorContext.getBinaryName(elementDeclaration)).orElse(Any::class.java)
+        }
+        return componentType as Class<Any>
     }
 
     override fun readAnnotationDefaultValues(

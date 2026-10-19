@@ -226,4 +226,63 @@ class ExactContainerResolverSpec extends AbstractTypeElementSpec {
         cleanup:
         context.close()
     }
+
+    void 'a provider resolves an exact definition as the requested type and a dependent it creates belongs to the owner'() {
+        given:
+        def context = buildContext('test.exactdefinition.Consumer', '''
+            package test.exactdefinition;
+            import jakarta.inject.*;
+            import jakarta.annotation.PreDestroy;
+            import io.micronaut.context.*;
+            import io.micronaut.context.annotation.*;
+            import io.micronaut.core.type.Argument;
+            import io.micronaut.inject.BeanDefinition;
+            interface Service {}
+            @Prototype class DependentService implements Service { static int destroyed; @PreDestroy void close() { destroyed++; } }
+            @Singleton class SharedService implements Service { static int destroyed; @PreDestroy void close() { destroyed++; } }
+            abstract class DefinitionProvider implements BeanInjectionProvider {
+                abstract Class<?> implementation();
+                @SuppressWarnings("unchecked")
+                public <T> T get(BeanResolutionContext context, Argument<T> argument,
+                    io.micronaut.context.Qualifier<T> qualifier, boolean nullable) {
+                    if (context.getPath().peek() == null) throw new AssertionError("No requesting path");
+                    BeanDefinition<? extends T> definition = (BeanDefinition<? extends T>) context.getContext().getBeanDefinition(implementation());
+                    return context.getBean(definition, argument);
+                }
+            }
+            @Singleton class DependentProvider extends DefinitionProvider { Class<?> implementation() { return DependentService.class; } }
+            @Singleton class SharedProvider extends DefinitionProvider { Class<?> implementation() { return SharedService.class; } }
+            @Prototype class Consumer {
+                @Inject @ResolveWith(DependentProvider.class) Service dependent;
+                @Inject @ResolveWith(SharedProvider.class) Service shared;
+                final Service constructorDependent;
+                Consumer(@ResolveWith(DependentProvider.class) Service constructorDependent) {
+                    this.constructorDependent = constructorDependent;
+                }
+            }
+        ''')
+        def consumerType = context.classLoader.loadClass('test.exactdefinition.Consumer')
+        def dependentType = context.classLoader.loadClass('test.exactdefinition.DependentService')
+        def sharedType = context.classLoader.loadClass('test.exactdefinition.SharedService')
+
+        when:
+        def registration = context.getBeanRegistration(consumerType, null)
+
+        then:
+        dependentType.isInstance(registration.bean.dependent)
+        dependentType.isInstance(registration.bean.constructorDependent)
+        !registration.bean.dependent.is(registration.bean.constructorDependent)
+        registration.bean.shared.is(context.getBean(sharedType))
+        dependentType.destroyed == 0
+
+        when:
+        registration.close()
+
+        then: "the dependents are destroyed with the owner, the singleton stays in its scope"
+        dependentType.destroyed == 2
+        sharedType.destroyed == 0
+
+        cleanup:
+        context.close()
+    }
 }

@@ -28,7 +28,6 @@ import io.micronaut.web.router.builder.RequestPredicates;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.function.Predicate;
 
 import static io.micronaut.web.router.builder.RequestPredicates.accept;
 import static io.micronaut.web.router.builder.RequestPredicates.all;

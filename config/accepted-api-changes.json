@@ -1366,5 +1366,65 @@
     "type": "io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor",
     "member": "Implemented interface io.micronaut.core.util.Toggleable",
     "reason": "Compiler writer internals changed by the sourcegen-backed bean definition writer refactor"
+  },
+  {
+    "type": "io.micronaut.http.netty.channel.loom.LoomCarrierConfiguration",
+    "member": "Constructor io.micronaut.http.netty.channel.loom.LoomCarrierConfiguration(java.time.Duration,java.time.Duration,java.time.Duration,java.time.Duration,java.time.Duration,int,int,int)",
+    "reason": "Experimental configuration record, added the workSpillMinQueueAge component"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.visitor.JavaNativeElement$Placeholder",
+    "member": "Constructor io.micronaut.annotation.processing.visitor.JavaNativeElement$Placeholder(javax.lang.model.element.Element,javax.lang.model.type.TypeVariable,io.micronaut.annotation.processing.visitor.JavaNativeElement)",
+    "reason": "JavaNativeElement is @Internal. Its placeholder metadata now distinguishes declarations and type uses; this compiler representation is not a user API."
+  },
+  {
+    "type": "io.micronaut.ast.groovy.TypeElementVisitorTransform$__clinit__closure1",
+    "member": "Field __$stMC",
+    "reason": "Groovy compiler-generated static-initializer closure, not a source API. Replacing the ThreadLocal initializer removed this generated class."
+  },
+  {
+    "type": "io.micronaut.ast.groovy.TypeElementVisitorTransform$__clinit__closure1",
+    "member": "Constructor io.micronaut.ast.groovy.TypeElementVisitorTransform$__clinit__closure1(java.lang.Object,java.lang.Object)",
+    "reason": "Groovy compiler-generated static-initializer closure, not a source API. Replacing the ThreadLocal initializer removed this generated class."
+  },
+  {
+    "type": "io.micronaut.ast.groovy.TypeElementVisitorTransform$__clinit__closure1",
+    "member": "Implemented interface groovy.lang.GroovyObject",
+    "reason": "Groovy compiler-generated static-initializer closure, not a source API. Replacing the ThreadLocal initializer removed this generated class."
+  },
+  {
+    "type": "io.micronaut.ast.groovy.TypeElementVisitorTransform$__clinit__closure1",
+    "member": "Implemented interface java.lang.Cloneable",
+    "reason": "Groovy compiler-generated static-initializer closure, not a source API. Replacing the ThreadLocal initializer removed this generated class."
+  },
+  {
+    "type": "io.micronaut.ast.groovy.TypeElementVisitorTransform$__clinit__closure1",
+    "member": "Implemented interface org.codehaus.groovy.runtime.GeneratedClosure",
+    "reason": "Groovy compiler-generated static-initializer closure, not a source API. Replacing the ThreadLocal initializer removed this generated class."
+  },
+  {
+    "type": "io.micronaut.ast.groovy.TypeElementVisitorTransform$__clinit__closure1",
+    "member": "Implemented interface java.util.concurrent.Callable",
+    "reason": "Groovy compiler-generated static-initializer closure, not a source API. Replacing the ThreadLocal initializer removed this generated class."
+  },
+  {
+    "type": "io.micronaut.ast.groovy.TypeElementVisitorTransform$__clinit__closure1",
+    "member": "Implemented interface groovy.lang.GroovyCallable",
+    "reason": "Groovy compiler-generated static-initializer closure, not a source API. Replacing the ThreadLocal initializer removed this generated class."
+  },
+  {
+    "type": "io.micronaut.ast.groovy.TypeElementVisitorTransform$__clinit__closure1",
+    "member": "Implemented interface java.lang.Runnable",
+    "reason": "Groovy compiler-generated static-initializer closure, not a source API. Replacing the ThreadLocal initializer removed this generated class."
+  },
+  {
+    "type": "io.micronaut.ast.groovy.TypeElementVisitorTransform$__clinit__closure1",
+    "member": "Implemented interface java.io.Serializable",
+    "reason": "Groovy compiler-generated static-initializer closure, not a source API. Replacing the ThreadLocal initializer removed this generated class."
+  },
+  {
+    "type": "io.micronaut.ast.groovy.visitor.GroovyNativeElement$Placeholder",
+    "member": "Constructor io.micronaut.ast.groovy.visitor.GroovyNativeElement$Placeholder(org.codehaus.groovy.ast.ClassNode,io.micronaut.ast.groovy.visitor.GroovyNativeElement,java.lang.String)",
+    "reason": "GroovyNativeElement is @Internal. Its placeholder metadata now carries declaration/use type annotations; this compiler representation is not a user API."
   }
 ]

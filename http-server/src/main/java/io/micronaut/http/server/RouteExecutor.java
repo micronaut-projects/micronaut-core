@@ -29,6 +29,7 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -40,9 +41,11 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
+import io.micronaut.http.body.stream.ReleasingBodyElements;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
@@ -54,16 +57,19 @@ import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
+import io.micronaut.http.server.stream.ResponseStreams;
 import io.micronaut.http.server.util.HttpDateHeader;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.GroupErrorRoutes;
 import io.micronaut.web.router.MethodBasedRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
@@ -128,6 +134,11 @@ public final class RouteExecutor {
      */
     private final boolean suspendedRoutesNeedReactorContext;
     private final ConversionService conversionService;
+    /**
+     * The executor that may block, which closes the elements of a response body that would be
+     * closed on an event loop.
+     */
+    private final Supplier<@Nullable ExecutorService> blockingExecutor;
 
     /**
      * Default constructor.
@@ -154,6 +165,7 @@ public final class RouteExecutor {
         this.coroutineHelper = beanContext.findBean(CoroutineHelper.class);
         this.suspendedRoutesNeedReactorContext = coroutineHelper.isPresent() && coroutineHelper.get().isReactorContextPropagated();
         this.conversionService = beanContext.getConversionService();
+        this.blockingExecutor = SupplierUtil.memoized(() -> executorSelector.select(TaskExecutors.BLOCKING).orElse(null));
     }
 
     /**
@@ -199,7 +211,8 @@ public final class RouteExecutor {
 
     static void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
         setRouteAttributes(request, (RouteMatch<?>) route);
-        BasicHttpAttributes.setUriTemplate(request, route.getRouteInfo().getUriMatchTemplate().toString());
+        // a located route has the template under the prefixes of its locator routes
+        BasicHttpAttributes.setUriTemplate(request, RouteLocator.uriTemplate(route));
     }
 
     static void setRouteAttributes(HttpRequest<?> request, RouteMatch<?> route) {
@@ -305,7 +318,9 @@ public final class RouteExecutor {
     }
 
     static boolean isIgnorable(Throwable cause) {
-        if (cause instanceof ClosedChannelException || cause instanceof BaseSharedBuffer.IncorrectContentLengthException) {
+        if (cause instanceof ClosedChannelException || cause instanceof BaseSharedBuffer.IncorrectContentLengthException
+            || RouteLocator.isAbandonment(cause)) {
+            // the client went away, e.g. before a route locator located its target
             return true;
         }
         String message = cause.getMessage();
@@ -368,7 +383,7 @@ public final class RouteExecutor {
                 }
                 if (errorRoute == null) {
                     // handle error with a status route of the groups of the handler route
-                    errorRoute = GroupErrorRoutes.findStatusRoute(httpRequest, failedRoute, errorStatus.getCode());
+                    errorRoute = GroupErrorRoutes.findStatusRoute(httpRequest, failedRoute, errorStatus.getCode(), cause);
                 }
                 if (errorRoute == null) {
                     // handle error with a method that is global with bad request
@@ -753,6 +768,9 @@ public final class RouteExecutor {
             return response;
         }
         Object body = response.body();
+        if (body instanceof BodyElements<?> elements) {
+            return response.body(releaseWhenClosed(request, elements));
+        }
         if (body == null || body instanceof HttpResponse<?> || !Publishers.isConvertibleToPublisher(body)) {
             return response;
         }
@@ -763,12 +781,48 @@ public final class RouteExecutor {
         return response.body(releaseWhenStreamEnds(request, publisher));
     }
 
+    /**
+     * Release the bodies the route of the request was invoked with when the
+     * {@link BodyElements} body of its response is closed, like {@link #releaseWhenStreamEnds}
+     * does for a stream: the elements may be made of the reads of the body. The server closes
+     * them once: when the response ends, fails, or the client disconnects, or when a filter
+     * replaces the response.
+     *
+     * @param request  The request of the route
+     * @param elements The elements of the response body
+     * @param <T>      The type of an element
+     * @return The elements, which release the bodies when they are closed
+     */
+    private static <T> BodyElements<T> releaseWhenClosed(HttpRequest<?> request, BodyElements<T> elements) {
+        ReleasableRequestBody bodies = BasicHttpAttributes.takeRouteBodies(request);
+        if (bodies == null) {
+            return elements;
+        }
+        // the elements keep their own operations, e.g. the elements of the request body
+        return ReleasingBodyElements.onClose(elements, () -> releaseLogged(request, bodies));
+    }
+
+    /**
+     * Close the {@link BodyElements} of a response body that is not written: on the blocking
+     * executor when the current thread is an event loop, since closing them may block, e.g. a
+     * database cursor.
+     *
+     * @param request  The request
+     * @param elements The elements
+     */
+    void discardElements(HttpRequest<?> request, BodyElements<?> elements) {
+        ResponseStreams.discard(elements, request, blockingExecutor.get());
+    }
+
     private MutableHttpResponse<?> finaliseResponse(@Nullable HttpRequest<?> request, RouteInfo<?> routeInfo, @Nullable RouteMatch<?> routeMatch, MutableHttpResponse<?> response) {
         // for head request we never emit the body
         if (request != null && request.getMethod().equals(HttpMethod.HEAD)) {
             final Object o = response.getBody().orElse(null);
             if (o instanceof ReferenceCounted referenceCounted) {
                 referenceCounted.release();
+            } else if (o instanceof BodyElements<?> elements) {
+                // they are never pulled
+                discardElements(request, elements);
             }
             response.body(null);
             if (o != null) {
@@ -834,7 +888,7 @@ public final class RouteExecutor {
             // full response case: the publisher is subscribed to right away, a publisher that
             // completes synchronously yields an imperative flow and the rest of the lifecycle
             // stays free of Reactor operators
-            return subscribeSingle(propagatedContext, request, publisher)
+            return subscribeSingle(propagatedContext, request, publisher, routeInfo)
                 .<MutableHttpResponse<?>>flatMap(o -> {
                     if (o instanceof Optional<?> optional) {
                         o = optional.isPresent() ? optional.get() : EMPTY;
@@ -887,22 +941,31 @@ public final class RouteExecutor {
      * request and the propagated context are available in the Reactor context of the publisher, and
      * the propagated context is bound as a thread-local for the subscription and the signals.
      * <p>The publisher is subscribed to right away, so a publisher that completes synchronously
-     * yields an imperative flow. The exception is a filter that subscribes to the response
-     * publisher itself ({@link ReactiveFilterChainElement}): it may add values to the Reactor
-     * context, so the publisher stays lazy and is subscribed to by the filter.
+     * yields an imperative flow. A value that arrives during the subscription is only seen once
+     * the subscription returns, which is soon on the event loop, where nothing may block. There
+     * are two exceptions, where the publisher stays lazy and is subscribed to by the consumer of
+     * the response, so its value is passed on as it arrives:
+     * <ul>
+     *     <li>A filter that subscribes to the response publisher itself
+     *     ({@link ReactiveFilterChainElement}): it may add values to the Reactor context.</li>
+     *     <li>A route on an executor: it may block. A publisher that emits the response and then
+     *     keeps the thread, e.g. a {@code Mono.create} that emits the first event of a streamed
+     *     body and goes on working, would hold the response until it is done.</li>
+     * </ul>
      *
      * @param propagatedContext The propagated context
      * @param request           The request
      * @param publisher         The publisher
+     * @param routeInfo         The route
      * @return The flow of the first value, immediate if the publisher completed synchronously
      */
-    private ExecutionFlow<Object> subscribeSingle(PropagatedContext propagatedContext, HttpRequest<?> request, Publisher<Object> publisher) {
+    private ExecutionFlow<Object> subscribeSingle(PropagatedContext propagatedContext, HttpRequest<?> request, Publisher<Object> publisher, RouteInfo<?> routeInfo) {
         if (publisher instanceof Fuseable.ScalarCallable<?>) {
             // Mono.just, Mono.empty, Mono.error: nothing observes the context
             return ReactiveExecutionFlow.fromPublisherEager(publisher, propagatedContext)
                 .map(o -> o == null ? EMPTY : o);
         }
-        if (ReactiveFilterChainElement.isPresent(propagatedContext)) {
+        if (ReactiveFilterChainElement.isPresent(propagatedContext) || routeInfo.getExecutor(serverConfiguration.getThreadSelection()) != null) {
             Mono<Object> lazy = Mono.from(publisher)
                 .contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request))
                 .defaultIfEmpty(EMPTY);
@@ -1011,7 +1074,7 @@ public final class RouteExecutor {
                                                                        RouteInfo<?> routeInfo) {
         if (isSinglePublisher) {
             // the single value is the body, an empty publisher is a missing body
-            return subscribeSingle(propagatedContext, request, bodyPublisher)
+            return subscribeSingle(propagatedContext, request, bodyPublisher, routeInfo)
                 .map(b -> b == EMPTY ? emptyResponse(request, routeInfo) : response.body(b));
         }
         MediaType mediaType = response.getContentType().orElseGet(() -> resolveDefaultResponseContentType(request, routeInfo));

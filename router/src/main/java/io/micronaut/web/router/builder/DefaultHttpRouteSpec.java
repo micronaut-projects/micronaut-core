@@ -28,6 +28,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -40,8 +41,11 @@ import java.util.function.Supplier;
  */
 @Internal
 final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<HttpRouteSpec> {
+    private static final String HANDLER = "handler";
 
     private static final String RESPONSE = "response";
+
+    private static final MediaType[] EVENT_STREAM = {MediaType.TEXT_EVENT_STREAM_TYPE};
 
     private static final Argument<AsyncRequestBody> ASYNC_BODY = Argument.of(AsyncRequestBody.class);
 
@@ -138,6 +142,20 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
         return this;
     }
 
+    /**
+     * Check the handler of a terminal: a terminal without a handler drops the route and fails.
+     *
+     * @param handler The handler
+     * @param <H>     Its type
+     * @return The handler
+     */
+    <H> H checked(@Nullable H handler) {
+        if (handler == null) {
+            throw route.missing(HANDLER);
+        }
+        return handler;
+    }
+
     @Override
     public FilterSpec<HttpRouteSpec> addFilter(FilterRegistration filter) {
         route.filter(filter);
@@ -162,13 +180,13 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
 
     @Override
     public void handle(RequestHandler handler) {
-        RequestHandler checked = route.terminal(handler, "handler");
+        RequestHandler checked = route.terminal(handler, HANDLER);
         route.end(() -> HandlerMethod.of(checked), null, 0);
     }
 
     @Override
     public void handleAsync(AsyncRequestHandler handler) {
-        AsyncRequestHandler checked = route.terminal(handler, "handler");
+        AsyncRequestHandler checked = route.terminal(handler, HANDLER);
         route.end(() -> HandlerMethod.of(checked), null, 0);
     }
 
@@ -188,6 +206,31 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     public void respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response) {
         Function<? super PathVariables, ? extends HttpResponse<?>> checked = route.terminal(response, RESPONSE);
         respond(() -> HandlerMethod.respond(checked), null, false);
+    }
+
+    @Override
+    public void sse(SseHandler handler) {
+        SseHandler checked = route.terminal(handler, HANDLER);
+        endSse(route, () -> HandlerMethod.of(checked), null, 0);
+    }
+
+    /**
+     * End a server-sent events route: it produces {@code text/event-stream}, its own type and not
+     * the type its group produces, or the types it declared, which must include it.
+     *
+     * @param route   The route
+     * @param handler Creates the handler method of a route
+     * @param init    Gives a route the other settings of the terminal, or {@code null}
+     * @param own     The other settings of the terminal, which the routes do not inherit from their groups
+     */
+    static void endSse(PendingRoute route, Supplier<HandlerMethod<?>> handler, @Nullable Consumer<RouteSettings> init, int own) {
+        route.producesIncluding(MediaType.TEXT_EVENT_STREAM_TYPE, "sse");
+        route.end(handler, settings -> {
+            settings.produces(EVENT_STREAM);
+            if (init != null) {
+                init.accept(settings);
+            }
+        }, own | RouteGroupDefaults.PRODUCES_SETTING);
     }
 
     /**

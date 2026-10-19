@@ -32,6 +32,7 @@ import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
@@ -67,12 +68,18 @@ import java.util.concurrent.atomic.AtomicLong;
 })
 public final class UpgradeRelayTest {
     public static final String SPEC_NAME = "UpgradeRelayTest";
+    /**
+     * Tags the tests that need the server to hand over its connection after a 101 Switching Protocols response;
+     * a servlet container cannot, so its runners exclude this tag.
+     */
+    public static final String PROTOCOL_UPGRADE = "protocol-upgrade";
     private static final long TIMEOUT_SECONDS = 10;
     private static final int LARGE_STREAM_CHUNK = 16 * 1024;
     private static final int LARGE_STREAM_CHUNKS = 1024;
     private static final long LARGE_STREAM_SIZE = (long) LARGE_STREAM_CHUNK * LARGE_STREAM_CHUNKS;
 
     @Test
+    @Tag(PROTOCOL_UPGRADE)
     void switchedProtocolIsRelayedBothWays() throws Exception {
         try (EchoUpstream upstream = new EchoUpstream();
              ServerUnderTest server = server();
@@ -103,6 +110,7 @@ public final class UpgradeRelayTest {
     }
 
     @Test
+    @Tag(PROTOCOL_UPGRADE)
     void oneOfTheOfferedProtocolsIsRelayed() throws Exception {
         try (EchoUpstream upstream = new EchoUpstream();
              ServerUnderTest server = server();
@@ -142,6 +150,7 @@ public final class UpgradeRelayTest {
     }
 
     @Test
+    @Tag(PROTOCOL_UPGRADE)
     void bytesSentWithTheUpgradeRequestReachTheUpstream() throws Exception {
         try (EchoUpstream upstream = new EchoUpstream();
              ServerUnderTest server = server();
@@ -165,6 +174,7 @@ public final class UpgradeRelayTest {
     }
 
     @Test
+    @Tag(PROTOCOL_UPGRADE)
     void largeStreamFromTheClientReachesTheUpstream() throws Exception {
         try (EchoUpstream upstream = new EchoUpstream();
              ServerUnderTest server = server();
@@ -191,6 +201,7 @@ public final class UpgradeRelayTest {
     }
 
     @Test
+    @Tag(PROTOCOL_UPGRADE)
     void largeStreamFromTheUpstreamReachesTheClient() throws Exception {
         try (EchoUpstream upstream = new EchoUpstream();
              ServerUnderTest server = server();

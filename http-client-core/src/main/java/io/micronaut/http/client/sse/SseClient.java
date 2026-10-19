@@ -19,6 +19,8 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.sse.Event;
 import org.reactivestreams.Publisher;
@@ -113,6 +115,74 @@ public interface SseClient {
      */
     default <B> Publisher<Event<B>> eventStream(String uri, Argument<B> eventType) {
         return eventStream(HttpRequest.GET(uri), eventType);
+    }
+
+    /**
+     * <p>Perform an HTTP request whose response is either a stream of SSE {@link Event} objects or a single body, and
+     * receive each event wrapped in an {@link HttpResponse} that exposes the response status and headers.</p>
+     *
+     * <p>This suits protocols where the server decides per request whether to answer with a single body or with
+     * {@code text/event-stream}, such as the
+     * <a href="https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http">MCP Streamable HTTP transport</a>:</p>
+     *
+     * <ul>
+     *     <li>The {@code Accept} header of the request is kept when it accepts {@code text/event-stream}, for example
+     *     {@code application/json, text/event-stream}. Otherwise {@code text/event-stream} is added to it.</li>
+     *     <li>When the content type of the response is {@code text/event-stream}, the body is decoded as events, and each
+     *     event is emitted as soon as it arrives. The data of each event is decoded as JSON into the event type.</li>
+     *     <li>Otherwise the whole body is decoded into the event type, using the content type of the response, and
+     *     emitted as a single event.</li>
+     *     <li>When the body holds no event, for example a {@code 202 Accepted} response, a single response without a body
+     *     is emitted, so the status and headers are always available.</li>
+     *     <li>When the response has an error status, the publisher fails with an
+     *     {@link io.micronaut.http.client.exceptions.HttpClientResponseException} carrying the response and its body,
+     *     decoded into the error type.</li>
+     * </ul>
+     *
+     * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription</p>
+     *
+     * @param request   The {@link HttpRequest} to execute
+     * @param eventType The event data type
+     * @param errorType The type that the response body should be coerced into if the server responds with an error
+     * @param <I>       The request body type
+     * @param <B>       The event body type
+     * @return A {@link Publisher} that emits the events of the response, each wrapped in an {@link HttpResponse}
+     * @since 5.3.0
+     */
+    default <I, B> Publisher<HttpResponse<Event<B>>> exchangeEventStream(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
+        throw new UnsupportedOperationException("exchangeEventStream is not supported by " + getClass().getName());
+    }
+
+    /**
+     * <p>Perform an HTTP request whose response is either a stream of SSE {@link Event} objects or a single body, and
+     * receive each event wrapped in an {@link HttpResponse} that exposes the response status and headers.</p>
+     *
+     * @param request   The {@link HttpRequest} to execute
+     * @param eventType The event data type
+     * @param <I>       The request body type
+     * @param <B>       The event body type
+     * @return A {@link Publisher} that emits the events of the response, each wrapped in an {@link HttpResponse}
+     * @see #exchangeEventStream(HttpRequest, Argument, Argument)
+     * @since 5.3.0
+     */
+    default <I, B> Publisher<HttpResponse<Event<B>>> exchangeEventStream(HttpRequest<I> request, Argument<B> eventType) {
+        return exchangeEventStream(request, eventType, HttpClient.DEFAULT_ERROR_TYPE);
+    }
+
+    /**
+     * <p>Perform an HTTP request whose response is either a stream of SSE {@link Event} objects or a single body, and
+     * receive each event wrapped in an {@link HttpResponse} that exposes the response status and headers.</p>
+     *
+     * @param request   The {@link HttpRequest} to execute
+     * @param eventType The event data type
+     * @param <I>       The request body type
+     * @param <B>       The event body type
+     * @return A {@link Publisher} that emits the events of the response, each wrapped in an {@link HttpResponse}
+     * @see #exchangeEventStream(HttpRequest, Argument, Argument)
+     * @since 5.3.0
+     */
+    default <I, B> Publisher<HttpResponse<Event<B>>> exchangeEventStream(HttpRequest<I> request, Class<B> eventType) {
+        return exchangeEventStream(request, Argument.of(eventType));
     }
 
     /**

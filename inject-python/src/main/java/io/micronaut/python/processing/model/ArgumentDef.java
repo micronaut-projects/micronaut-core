@@ -36,6 +36,7 @@ import java.util.Objects;
  * @param documentation The parameter documentation string.
  * @param declaringFunction The function that declares this argument.
  * @param variadic Whether the parameter collects the remaining positional arguments ({@code *args}); its type is the array of the annotated element type.
+ * @param injected Whether the parameter is injected with a bean by its default ({@code ctx: ApplicationContext = Inject()}) rather than passed by the caller.
  * @author Micronaut Team
  * @since 5.2.0
  */
@@ -49,7 +50,8 @@ public record ArgumentDef(
     List<DecoratorDef> decorators,
     String documentation,
     FunctionDef declaringFunction,
-    boolean variadic
+    boolean variadic,
+    boolean injected
 ) implements ElementDef {
 
     public ArgumentDef {
@@ -58,6 +60,24 @@ public record ArgumentDef(
         if (decorators == null) {
             decorators = List.of();
         }
+    }
+
+    /**
+     * The definition of an argument that is not injected with a bean.
+     *
+     * @param name The parameter name
+     * @param annotation The full type annotation string
+     * @param typeAnnotation The extracted type annotation
+     * @param defaultValue The default value, or null if no default
+     * @param hasDefaultValue Whether the parameter declaration includes a default value
+     * @param decorators The decorators applied to this parameter
+     * @param documentation The parameter documentation string
+     * @param declaringFunction The function that declares this argument
+     * @param variadic Whether the parameter collects the remaining positional arguments
+     */
+    public ArgumentDef(String name, String annotation, TypeRef typeAnnotation, Object defaultValue, boolean hasDefaultValue,
+                       List<DecoratorDef> decorators, String documentation, FunctionDef declaringFunction, boolean variadic) {
+        this(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic, false);
     }
 
     public ArgumentDef(String name, TypeRef typeAnnotation) {
@@ -182,7 +202,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef with the declaring function set
      */
     public ArgumentDef withDeclaringFunction(FunctionDef declaringFunction) {
-        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic);
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic, injected);
     }
 
     /**
@@ -192,6 +212,17 @@ public record ArgumentDef(
      * @return A new ArgumentDef with the variadic flag set
      */
     public ArgumentDef withVariadic(boolean variadic) {
-        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic);
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic, injected);
+    }
+
+    /**
+     * Creates a new ArgumentDef marked as injected with a bean by its default ({@code ctx: ApplicationContext = Inject()}).
+     *
+     * @param injected Whether the parameter is injected
+     * @return A new ArgumentDef with the injected flag set
+     * @since 5.3.0
+     */
+    public ArgumentDef withInjected(boolean injected) {
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic, injected);
     }
 }

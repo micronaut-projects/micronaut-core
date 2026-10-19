@@ -99,7 +99,7 @@ class GroovyEnumElement extends GroovyClassElement implements EnumElement {
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new GroovyEnumElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, arrayDimensions);
+        return copyArrayTypeAnnotations(new GroovyEnumElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, arrayDimensions));
     }
 
 }

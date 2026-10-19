@@ -84,8 +84,9 @@ class AuditedRoutesTest {
         assertEquals("true", deleted.getHeaders().get("X-Audited"));
 
         // the routes of the group answer the version 2 only
+        var v1Request = HttpRequest.GET("/admin/users").header("X-API-VERSION", "1");
         HttpClientResponseException v1 = assertThrows(HttpClientResponseException.class,
-            () -> http.exchange(HttpRequest.GET("/admin/users").header("X-API-VERSION", "1"), String.class));
+            () -> http.exchange(v1Request, String.class));
         assertEquals(HttpStatus.NOT_FOUND, v1.getStatus());
     }
 

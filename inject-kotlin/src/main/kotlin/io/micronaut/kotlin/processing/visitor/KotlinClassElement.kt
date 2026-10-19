@@ -59,9 +59,11 @@ import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.PropertyElementQuery
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
+import io.micronaut.inject.ast.beans.BeanElementBuilder
 import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery
 import io.micronaut.inject.processing.ProcessingException
+import io.micronaut.kotlin.processing.isCompiledFromSource
 import java.util.Optional
 import java.util.function.Function
 import java.util.stream.Stream
@@ -79,6 +81,9 @@ internal open class KotlinClassElement(
     visitorContext
 ),
     ArrayableClassElement {
+
+    // Innermost dimension first. These describe type uses, not the legacy metadata of the component.
+    internal var arrayTypeAnnotations: List<MutableAnnotationMetadataDelegate<AnnotationMetadata>> = emptyList()
 
     private val definedType: KSType? by lazy {
         nativeType.type
@@ -263,7 +268,8 @@ internal open class KotlinClassElement(
                 AnnotationMetadataHierarchy(
                     true,
                     super<AbstractKotlinElement>.getAnnotationMetadata(),
-                    typeAnnotationMetadata
+                    // An array keeps the legacy convention: the type annotations of its component
+                    if (isArray) resolvedTypeAnnotationMetadata else typeAnnotationMetadata
                 )
             } else {
                 super<AbstractKotlinElement>.getAnnotationMetadata()
@@ -625,23 +631,23 @@ internal open class KotlinClassElement(
         return super.isAssignable(type)
     }
 
-    override fun copyThis() = KotlinClassElement(
+    override fun copyThis() = copyArrayTypeAnnotations(KotlinClassElement(
         nativeType,
         elementAnnotationMetadataFactory,
         resolvedTypeArguments,
         visitorContext,
         arrayDimensions,
         typeVariable
-    )
+    ))
 
-    override fun withTypeArguments(typeArguments: Map<String, ClassElement>) = KotlinClassElement(
+    override fun withTypeArguments(typeArguments: Map<String, ClassElement>) = copyArrayTypeAnnotations(KotlinClassElement(
         nativeType,
         elementAnnotationMetadataFactory,
         typeArguments,
         visitorContext,
         arrayDimensions,
         typeVariable
-    )
+    ))
 
     override fun withTypeArguments(typeArguments: Collection<ClassElement>): ClassElement {
         if (getTypeArguments() == typeArguments) {
@@ -685,16 +691,52 @@ internal open class KotlinClassElement(
 
     override fun isArray() = arrayDimensions > 0
 
+    override fun addAssociatedBean(type: ClassElement): BeanElementBuilder {
+        if (isArray || typeVariable || !declaration.isCompiledFromSource()) {
+            throw UnsupportedOperationException("Element of type [$javaClass] does not support adding associated beans at compilation time: [$name] is not compiled from source")
+        }
+        return visitorContext.addAssociatedBean(this, type)
+    }
+
     override fun getArrayDimensions() = internalArrayDimensions
 
-    override fun withArrayDimensions(arrayDimensions: Int) = KotlinClassElement(
+    override fun withArrayDimensions(arrayDimensions: Int) = copyArrayTypeAnnotations(KotlinClassElement(
         nativeType,
         elementAnnotationMetadataFactory,
         resolvedTypeArguments,
         visitorContext,
         arrayDimensions,
         typeVariable
-    )
+    ))
+
+    /**
+     * A copy with the annotations of each array dimension, innermost dimension first.
+     */
+    internal fun withArrayTypeAnnotations(annotations: List<MutableAnnotationMetadataDelegate<AnnotationMetadata>>): ClassElement {
+        val copy = withArrayDimensions(arrayDimensions) as KotlinClassElement
+        copy.arrayTypeAnnotations = annotations.toList()
+        return copy
+    }
+
+    internal fun <T : KotlinClassElement> copyArrayTypeAnnotations(copy: T): T {
+        copy.arrayTypeAnnotations = arrayTypeAnnotations
+        return copy
+    }
+
+    /**
+     * The annotations of the current array dimension, or null if this is not an array use that keeps them.
+     */
+    protected fun arrayDimensionTypeAnnotationMetadata(): MutableAnnotationMetadataDelegate<AnnotationMetadata>? {
+        if (!isArray || arrayTypeAnnotations.isEmpty()) {
+            return null
+        }
+        return if (arrayDimensions <= arrayTypeAnnotations.size) {
+            arrayTypeAnnotations[arrayDimensions - 1]
+        } else {
+            @Suppress("UNCHECKED_CAST")
+            MutableAnnotationMetadataDelegate.EMPTY as MutableAnnotationMetadataDelegate<AnnotationMetadata>
+        }
+    }
 
     override fun isInner() = outerType != null
 
@@ -729,11 +771,12 @@ internal open class KotlinClassElement(
         return Optional.empty()
     }
 
-    override fun getAnnotationMetadataToWrite() = resolvedAnnotationMetadataToWrite
+    override fun getAnnotationMetadataToWrite(): MutableAnnotationMetadataDelegate<*> =
+        arrayDimensionTypeAnnotationMetadata() ?: resolvedAnnotationMetadataToWrite
 
     override fun getAnnotationMetadata() = resolvedAnnotationMetadata
 
-    override fun getTypeAnnotationMetadata() = resolvedTypeAnnotationMetadata
+    override fun getTypeAnnotationMetadata() = arrayDimensionTypeAnnotationMetadata() ?: resolvedTypeAnnotationMetadata
 
     override fun <T : Element> getEnclosedElements(query: ElementQuery<T>): List<T> =
         enclosedElementsQuery.getEnclosedElements(this, query)

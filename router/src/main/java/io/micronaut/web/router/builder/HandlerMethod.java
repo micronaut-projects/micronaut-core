@@ -26,16 +26,24 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpResponseWrapper;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.body.AsyncRequestBody;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ReleasableRequestBody;
+import io.micronaut.http.body.stream.ReleasingBodyElements;
+import io.micronaut.http.sse.SseEmitter;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.http.form.FormData;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -71,10 +79,18 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     private static final String HANDLE = "handle";
 
+    /**
+     * The name of the body type parameter of the factories, for the messages.
+     */
+    private static final String BODY_TYPE = "bodyType";
+
+    private static final Logger LOG = LoggerFactory.getLogger(HandlerMethod.class);
+
     private static final Argument<HttpRequest> REQUEST = Argument.of(HttpRequest.class, "request");
     private static final Argument<PathVariables> PATH_VARIABLES = Argument.of(PathVariables.class, "pathVariables");
     private static final Argument<AsyncRequestBody> ASYNC_BODY = Argument.of(AsyncRequestBody.class, BODY_ARGUMENT);
     private static final Argument<FormData> FORM = Argument.of(FormData.class, "form");
+    private static final Argument<SseResponder> SSE_RESPONDER = Argument.of(SseResponder.class, "events");
 
     /**
      * The metadata of a {@code @Body} parameter, which selects the body binder.
@@ -211,7 +227,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     @SuppressWarnings("unchecked")
     public static <B> HandlerMethod<CompletionStage<? extends HttpResponse<?>>> ofAsync(Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
-        Objects.requireNonNull(bodyType, "bodyType");
+        Objects.requireNonNull(bodyType, BODY_TYPE);
         if (isAsyncBody(bodyType)) {
             return new HandlerMethod<>(
                 handler,
@@ -262,7 +278,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     @SuppressWarnings("unchecked")
     public static <B> HandlerMethod<HttpResponse<?>> of(Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        Objects.requireNonNull(bodyType, "bodyType");
+        Objects.requireNonNull(bodyType, BODY_TYPE);
         return new HandlerMethod<>(
             handler,
             BodyRequestHandler.class,
@@ -340,6 +356,62 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
+     * The method of a server-sent events route: the server binds the {@link SseResponder}, which
+     * creates the emitter and runs the handler, and the result completes with the response when
+     * the first event is sent.
+     *
+     * @param handler The handler
+     * @return The method that calls it
+     */
+    public static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(SseHandler handler) {
+        return new HandlerMethod<>(
+            handler,
+            SseHandler.class,
+            // like a RequestHandler: nothing reads the body
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, SSE_RESPONDER},
+            returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
+            args -> ((SseResponder) args[2]).respond(events -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], events))
+        );
+    }
+
+    /**
+     * The method of a server-sent events route that receives the body: the
+     * {@link AsyncRequestBody} the handler reads itself, which no binder decodes, or the body
+     * decoded to a type, bound like a {@code @Body} argument, see {@link #bodyArgument(Argument)}.
+     * The {@link SseResponder} keeps what the binding of the body left open until the stream ends.
+     *
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The method that calls it
+     */
+    public static <B> HandlerMethod<CompletionStage<? extends HttpResponse<?>>> ofSse(Argument<B> bodyType, SseBodyHandler<B> handler) {
+        Objects.requireNonNull(bodyType, BODY_TYPE);
+        return sseBody(handler, isAsyncBody(bodyType) ? ASYNC_BODY : bodyArgument(bodyType));
+    }
+
+    /**
+     * The method of a server-sent events route that receives the whole submitted form.
+     *
+     * @param handler The handler
+     * @return The method that calls it
+     */
+    static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> formSse(SseBodyHandler<FormData> handler) {
+        return sseBody(handler, FORM);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <B> HandlerMethod<CompletionStage<? extends HttpResponse<?>>> sseBody(SseBodyHandler<B> handler, Argument<?> body) {
+        return new HandlerMethod<>(
+            handler,
+            SseBodyHandler.class,
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, body, SSE_RESPONDER},
+            returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
+            args -> ((SseResponder) args[3]).respond(events -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (B) args[2], events))
+        );
+    }
+
+    /**
      * @param handler The handler
      * @return The method that calls it
      */
@@ -353,9 +425,28 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         );
     }
 
+    /**
+     * The target of a locator route: the router resolves the route to a route of the located
+     * target, so the method is never invoked.
+     *
+     * @param locator The locator
+     * @return The method
+     */
+    public static HandlerMethod<Object> of(RouteLocator locator) {
+        return new HandlerMethod<>(
+            locator,
+            RouteLocator.class,
+            new Argument<?>[0],
+            returnType(Object.class),
+            args -> {
+                throw new IllegalStateException("The router resolves a locator route to a route of the located target: " + locator);
+            }
+        );
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <R> ReturnType<R> returnType(Class<?> type, Argument<?>... typeArguments) {
-        return (ReturnType<R>) ReturnType.of((Class) type, typeArguments);
+        return (ReturnType<R>) ReturnType.of(type, typeArguments);
     }
 
     @Override
@@ -401,6 +492,15 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             throw new UnsupportedOperationException("The route to " + this + " calls a handler function, which has no Java method");
         }
         return target.getTargetMethod();
+    }
+
+    /**
+     * @return Whether the route implements a bean method that has a target method
+     */
+    @Override
+    public boolean hasTargetMethod() {
+        ExecutableMethod<?, ?> target = implemented();
+        return target != null && target.hasTargetMethod();
     }
 
     @Override
@@ -488,6 +588,30 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         this.annotationMetadata = metadata;
         // like the return type of a method, it has the annotations of the method
         this.annotatedReturnType = new AnnotatedReturnType<>(returnType, metadata);
+    }
+
+    /**
+     * The same handler with annotations it inherits, e.g. a located route with the annotations
+     * of the groups of its locator routes: the annotations of this method override them, like the
+     * annotations of a route override the ones of its groups.
+     *
+     * @param inherited The inherited annotations
+     * @return The method with the annotations of both, or this method if it inherits none
+     */
+    @Internal
+    public HandlerMethod<R> inheriting(AnnotationMetadata inherited) {
+        if (inherited.isEmpty()) {
+            return this;
+        }
+        AnnotationMetadata own = annotationMetadata;
+        AnnotationMetadata metadata = own.isEmpty() ? inherited : new AnnotationMetadataHierarchy(true, inherited, own);
+        HandlerMethod<R> method = new HandlerMethod<>(handler, handlerType, arguments, returnType, invoker);
+        method.annotationMetadataProvider = annotationMetadataProvider;
+        method.groupAnnotations = groupAnnotations;
+        method.annotationMetadata = metadata;
+        // like the return type of a method, it has the annotations of the method
+        method.annotatedReturnType = new AnnotatedReturnType<>(returnType, metadata);
+        return method;
     }
 
     /**
@@ -605,6 +729,9 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         if (target != null) {
             return withoutPackage(target.getDeclaringType().getName()) + '#' + target.getMethodName();
         }
+        if (handlerType == RouteLocator.class) {
+            return "locator " + handler;
+        }
         String name = handler.getClass().getName();
         int lambda = name.indexOf("$$Lambda");
         String description = lambda < 0
@@ -653,6 +780,13 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         }
         CompletableFuture<HttpResponse<?>> result = new CompletableFuture<>();
         stage.whenComplete((response, error) -> {
+            MutableHttpResponse<?> mutable = error == null ? holderOf(response) : null;
+            if (mutable != null && mutable.body() instanceof BodyElements<?> elements) {
+                // the elements may be reads of the body: it is released when they are closed
+                mutable.body(releaseWhenClosed(elements, handlerRequest));
+                result.complete(response);
+                return;
+            }
             CompletionStage<Void> released;
             try {
                 released = handlerRequest.releaseBody();
@@ -674,6 +808,51 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             });
         });
         return result;
+    }
+
+    /**
+     * The {@link BodyElements} body of the response of the handler, releasing what the
+     * handler's read of the body left open when the server closes them: when the response ends,
+     * fails, or the client disconnects, or when a filter replaces the response. The response is
+     * committed by then: a failure to release is logged.
+     *
+     * @param elements The elements
+     * @param request  The body of the handler
+     * @param <T>      The type of an element
+     * @return The elements, which release the body when they are closed
+     */
+    private static <T> BodyElements<T> releaseWhenClosed(BodyElements<T> elements, ReleasableRequestBody request) {
+        // the elements keep their own operations, e.g. the elements of the request body
+        return ReleasingBodyElements.onClose(elements, () -> {
+            CompletionStage<Void> released;
+            try {
+                released = request.releaseBody();
+            } catch (Throwable e) {
+                released = CompletableFuture.failedFuture(e);
+            }
+            released.whenComplete((ignored, error) -> {
+                if (error != null && LOG.isWarnEnabled()) {
+                    LOG.warn("Failed to release what the reads of the body left open when the streamed response of {} ended", elements, error);
+                }
+            });
+        });
+    }
+
+    /**
+     * The mutable response that holds the body of a response, through its wrappers: a wrapper
+     * delegates its body to the response it wraps.
+     *
+     * @param response The response
+     * @return The mutable response, or {@code null}
+     */
+    private static @Nullable MutableHttpResponse<?> holderOf(@Nullable HttpResponse<?> response) {
+        while (response != null) {
+            if (response instanceof MutableHttpResponse<?> mutable) {
+                return mutable;
+            }
+            response = response instanceof HttpResponseWrapper<?> wrapper ? wrapper.getDelegate() : null;
+        }
+        return null;
     }
 
     /**
@@ -762,6 +941,37 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         @Override
         public Argument<R> asArgument() {
             return Argument.of(getType(), annotationMetadata, getTypeParameters());
+        }
+    }
+
+    /**
+     * Runs the handler of a server-sent events route, bound by the server for the invocation of
+     * the route: it creates the {@link SseEmitter} of the response, and keeps what the binding of
+     * the body of the route left open until the stream ends. <b>Internal API.</b>
+     */
+    @Internal
+    @FunctionalInterface
+    public interface SseResponder {
+
+        /**
+         * Run the handler with a new emitter.
+         *
+         * @param handler Runs the handler with the emitter
+         * @return Completes with the response when the first event is sent or the stream ends, or
+         * exceptionally when the handler fails before
+         */
+        CompletionStage<HttpResponse<?>> respond(Handler handler);
+
+        /**
+         * Runs the handler of the route.
+         */
+        @FunctionalInterface
+        interface Handler {
+            /**
+             * @param events The emitter
+             * @throws Exception An error of the handler
+             */
+            void handle(SseEmitter events) throws Exception;
         }
     }
 

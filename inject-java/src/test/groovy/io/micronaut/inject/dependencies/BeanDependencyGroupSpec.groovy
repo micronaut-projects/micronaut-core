@@ -1,6 +1,8 @@
 package io.micronaut.inject.dependencies
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.type.Argument
 
 import java.util.concurrent.CompletableFuture
@@ -90,6 +92,63 @@ class Log { static final List<String> events = new CopyOnWriteArrayList<>(); }
 
         when:
         group.getBeanRegistration(type)
+
+        then:
+        thrown(IllegalStateException)
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "groups resolve an exact definition in its scope without a candidate lookup and own a dependent it creates"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+interface Service {}
+@Prototype class DependentService implements Service {
+    @PreDestroy void stop() { Log.events.add("dependent"); }
+}
+''')
+        def serviceType = Argument.of(ctx.classLoader.loadClass('test.Service'))
+        def sharedType = ctx.classLoader.loadClass('test.Shared')
+        def dependentDefinition = ctx.getBeanDefinition(ctx.classLoader.loadClass('test.DependentService'))
+        def sharedDefinition = ctx.getBeanDefinition(sharedType)
+        def log = ctx.classLoader.loadClass('test.Log')
+        def group = ctx.createDependencyGroup()
+        def candidateCache = DefaultBeanContext.getDeclaredField('beanConcreteCandidateCache').tap { accessible = true }.get(ctx) as Map
+        def cachedCandidates = new HashSet(candidateCache.keySet())
+
+        when: "an implementation's definition is resolved as its interface"
+        def first = group.getBean(dependentDefinition, serviceType)
+        def second = group.getBeanRegistration(dependentDefinition, serviceType)
+        def shared = group.getBean(sharedDefinition, Argument.of(sharedType))
+
+        then: "a dependent is created for every resolution, a singleton is the scope's instance"
+        first.class.name == 'test.DependentService'
+        second.bean().class.name == 'test.DependentService'
+        !first.is(second.bean())
+        candidateCache.keySet() == cachedCandidates
+        shared.is(ctx.getBean(sharedType))
+
+        when:
+        group.getBean(sharedDefinition, serviceType)
+
+        then: "a definition that is not a candidate for the type is rejected"
+        thrown(NoSuchBeanException)
+
+        when:
+        group.destroy(second)
+
+        then:
+        log.events == ['dependent']
+
+        when:
+        group.close()
+
+        then: "the group destroys what it owns, and leaves the shared bean in its scope"
+        log.events == ['dependent', 'dependent']
+
+        when:
+        group.getBean(dependentDefinition, serviceType)
 
         then:
         thrown(IllegalStateException)

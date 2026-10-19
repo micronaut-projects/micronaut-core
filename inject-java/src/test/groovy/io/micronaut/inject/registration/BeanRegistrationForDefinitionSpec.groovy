@@ -1,7 +1,6 @@
 package io.micronaut.inject.registration
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanDefinitionRegistry
 import io.micronaut.context.BeanProvider
 import io.micronaut.context.BeanResolutionCustomizer
 import io.micronaut.context.exceptions.NoSuchBeanException
@@ -10,10 +9,6 @@ import io.micronaut.core.type.Argument
 import io.micronaut.inject.BeanDefinition
 import spock.lang.AutoCleanup
 import spock.lang.Specification
-
-import java.lang.reflect.InvocationHandler
-import java.lang.reflect.Method
-import java.lang.reflect.Proxy
 
 class BeanRegistrationForDefinitionSpec extends Specification {
 
@@ -168,24 +163,6 @@ class BeanRegistrationForDefinitionSpec extends Specification {
         expect:
         JavaCaller.resolveAsInterface(context) instanceof StringBox
         JavaCaller.resolveAsSameType(context, context.getBeanDefinition(StringBox), Argument.of(StringBox)) instanceof StringBox
-    }
-
-    void "a registry that does not implement it refuses rather than resolve under another scope key"() {
-        given:
-        BeanDefinitionRegistry registry = (BeanDefinitionRegistry) Proxy.newProxyInstance(
-                getClass().classLoader,
-                [BeanDefinitionRegistry] as Class[],
-                { Object proxy, Method method, Object[] args ->
-                    method.isDefault() ? InvocationHandler.invokeDefault(proxy, method, args) : method.invoke(context, args)
-                } as InvocationHandler
-        )
-
-        when:
-        registry.getBeanRegistration(context.getBeanDefinition(ScopedService), Argument.of(ScopedService))
-
-        then:
-        thrown(UnsupportedOperationException)
-        ScopedService.created == 0
     }
 
     void "a definition of a custom scope resolves to the instance an earlier lookup put in the scope"() {

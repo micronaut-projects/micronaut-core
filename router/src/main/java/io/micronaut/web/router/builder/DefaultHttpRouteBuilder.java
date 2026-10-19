@@ -20,6 +20,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
 
+import java.util.function.Consumer;
+
 /**
  * The {@link HttpRouteBuilder}: adds the routes to handler functions to a {@link RouteAssembly},
  * like the legacy route builder adds its routes, without depending on it. It has no route filter
@@ -46,6 +48,16 @@ public final class DefaultHttpRouteBuilder extends AbstractHttpRouteBuilder impl
      */
     public DefaultHttpRouteBuilder(RouteAssembly assembly, @Nullable PropertyPlaceholderResolver placeholderResolver) {
         super(assembly, null, null, null, placeholderResolver);
+    }
+
+    @Override
+    public void group(Consumer<HttpRouteGroup> routes) {
+        declareGroup(DefaultHttpRouteGroup::new, routes);
+    }
+
+    @Override
+    public void path(String prefix, Consumer<HttpRouteGroup> routes) {
+        declarePath(prefix, DefaultHttpRouteGroup::new, routes);
     }
 
     @Override

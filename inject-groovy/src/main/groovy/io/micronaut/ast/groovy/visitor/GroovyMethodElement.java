@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementModifier;
+import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -34,6 +35,7 @@ import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -215,7 +217,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     @Override
     public ClassElement getGenericReturnType() {
         if (genericReturnType == null) {
-            genericReturnType = newClassElement(methodNode.getReturnType(), getTypeArguments());
+            genericReturnType = newClassElement(methodNode.getReturnType(), getTypeArguments(), methodNode);
         }
         return genericReturnType;
     }
@@ -224,7 +226,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     @NonNull
     public ClassElement getReturnType() {
         if (returnType == null) {
-            returnType = newClassElement(methodNode.getReturnType());
+            returnType = newClassElement(methodNode.getReturnType(), null, methodNode);
         }
         return returnType;
     }
@@ -277,12 +279,19 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
             .toList();
     }
 
+    /**
+     * The methods this method overrides as a member of its owning type, as javac reports them: the methods it
+     * overrides in the hierarchy of its declaring type and, for an inherited method, the methods it implements of
+     * the interfaces the owning type introduces.
+     *
+     * @return The overridden methods
+     */
     @Override
     public Collection<MethodElement> getOverriddenMethods() {
-        return visitorContext.getNativeElementHelper()
+        List<MethodElement> overriddenMethods = visitorContext.getNativeElementHelper()
             .findOverriddenMethods(owningType.classNode, methodNode)
             .stream()
-            .map(overriddenMethod -> new GroovyMethodElement(
+            .map(overriddenMethod -> (MethodElement) new GroovyMethodElement(
                     owningType,
                     visitorContext,
                     new GroovyNativeElement.Method(overriddenMethod),
@@ -290,6 +299,40 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
                     elementAnnotationMetadataFactory
                 )
             ).collect(Collectors.toList());
+        for (MethodElement implementedMethod : findImplementedMethods()) {
+            if (overriddenMethods.stream().noneMatch(overridden -> overridden.getDeclaringType().getName().equals(implementedMethod.getDeclaringType().getName()))) {
+                overriddenMethods.add(implementedMethod);
+            }
+        }
+        return overriddenMethods;
+    }
+
+    /**
+     * The methods an inherited method implements of the interfaces the owning type, or a class between it and the
+     * declaring type, introduces. The interfaces the declaring type implements itself are covered by the methods it
+     * overrides in the hierarchy of its declaring type.
+     */
+    private List<MethodElement> findImplementedMethods() {
+        ClassElement declaringClass = getDeclaringType();
+        if (isAbstract() || isStatic() || isPrivate() || declaringClass.getName().equals(owningType.getName())) {
+            return List.of();
+        }
+        List<MethodElement> implementedMethods = new ArrayList<>();
+        ClassElement type = owningType;
+        while (type != null && !type.getName().equals(declaringClass.getName())) {
+            for (ClassElement anInterface : type.getInterfaces()) {
+                if (declaringClass.isAssignable(anInterface)) {
+                    continue;
+                }
+                for (MethodElement candidate : anInterface.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance().named(getName()))) {
+                    if (!candidate.isPrivate() && isSubSignature(candidate) && !implementedMethods.contains(candidate)) {
+                        implementedMethods.add(candidate);
+                    }
+                }
+            }
+            type = type.getSuperType().orElse(null);
+        }
+        return implementedMethods;
     }
 
 }

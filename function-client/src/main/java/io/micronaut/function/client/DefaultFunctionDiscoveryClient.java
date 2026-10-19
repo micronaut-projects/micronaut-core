@@ -18,6 +18,7 @@ package io.micronaut.function.client;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.DiscoveryClient;
+import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import io.micronaut.health.HealthStatus;
@@ -35,6 +36,7 @@ import java.util.Optional;
  *
  * @author graemerocher
  * @since 1.0
+ * @see DefaultAsyncFunctionDiscoveryClient
  */
 @Singleton
 public class DefaultFunctionDiscoveryClient implements FunctionDiscoveryClient {
@@ -51,16 +53,7 @@ public class DefaultFunctionDiscoveryClient implements FunctionDiscoveryClient {
      */
     public DefaultFunctionDiscoveryClient(DiscoveryClient discoveryClient, FunctionDefinitionProvider[] providers, FunctionDefinition... definitions) {
         this.discoveryClient = discoveryClient;
-        this.functionDefinitionMap = CollectionUtils.newHashMap(definitions.length);
-        for (FunctionDefinition definition : definitions) {
-            functionDefinitionMap.put(definition.getName(), definition);
-        }
-        for (FunctionDefinitionProvider provider : providers) {
-            Collection<FunctionDefinition> functionDefinitions = provider.getFunctionDefinitions();
-            for (FunctionDefinition definition : functionDefinitions) {
-                functionDefinitionMap.put(definition.getName(), definition);
-            }
-        }
+        this.functionDefinitionMap = functionDefinitions(providers, definitions);
     }
 
     @Override
@@ -72,32 +65,48 @@ public class DefaultFunctionDiscoveryClient implements FunctionDiscoveryClient {
             .flatMap(Flux::fromIterable)
             .flatMap(discoveryClient::getInstances)
             .flatMap(Flux::fromIterable)
-            .filter(instance -> {
-                    boolean isAvailable = instance.getHealthStatus().equals(HealthStatus.UP);
-                    return isAvailable && instance.getMetadata().names().stream()
-                        .anyMatch(k -> k.equals(LocalFunctionRegistry.FUNCTION_PREFIX + functionName));
+            .filter(instance -> isFunctionInstance(instance, functionName))
+            .switchIfEmpty(Flux.error(new FunctionNotFoundException(functionName)))
+            .map(instance -> toFunctionDefinition(instance, functionName));
+    }
+
+    static Map<String, FunctionDefinition> functionDefinitions(FunctionDefinitionProvider[] providers, FunctionDefinition... definitions) {
+        Map<String, FunctionDefinition> functionDefinitionMap = CollectionUtils.newHashMap(definitions.length);
+        for (FunctionDefinition definition : definitions) {
+            functionDefinitionMap.put(definition.getName(), definition);
+        }
+        for (FunctionDefinitionProvider provider : providers) {
+            Collection<FunctionDefinition> functionDefinitions = provider.getFunctionDefinitions();
+            for (FunctionDefinition definition : functionDefinitions) {
+                functionDefinitionMap.put(definition.getName(), definition);
+            }
+        }
+        return functionDefinitionMap;
+    }
+
+    static boolean isFunctionInstance(ServiceInstance instance, String functionName) {
+        boolean isAvailable = instance.getHealthStatus().equals(HealthStatus.UP);
+        return isAvailable && instance.getMetadata().names().stream()
+            .anyMatch(k -> k.equals(LocalFunctionRegistry.FUNCTION_PREFIX + functionName));
+    }
+
+    static FunctionDefinition toFunctionDefinition(ServiceInstance instance, String functionName) {
+        Optional<String> uri = instance.getMetadata().get(LocalFunctionRegistry.FUNCTION_PREFIX + functionName, String.class);
+        if (uri.isPresent()) {
+            URI resolvedURI = instance.getURI().resolve(uri.get());
+            return new FunctionDefinition() {
+
+                @Override
+                public String getName() {
+                    return functionName;
                 }
 
-            ).switchIfEmpty(Flux.error(new FunctionNotFoundException(functionName)))
-            .map(instance -> {
-                    Optional<String> uri = instance.getMetadata().get(LocalFunctionRegistry.FUNCTION_PREFIX + functionName, String.class);
-                    if (uri.isPresent()) {
-                        URI resolvedURI = instance.getURI().resolve(uri.get());
-                        return new FunctionDefinition() {
-
-                            @Override
-                            public String getName() {
-                                return functionName;
-                            }
-
-                            @Override
-                            public Optional<URI> getURI() {
-                                return Optional.of(resolvedURI);
-                            }
-                        };
-                    }
-                    throw new FunctionNotFoundException(functionName);
+                @Override
+                public Optional<URI> getURI() {
+                    return Optional.of(resolvedURI);
                 }
-            );
+            };
+        }
+        throw new FunctionNotFoundException(functionName);
     }
 }

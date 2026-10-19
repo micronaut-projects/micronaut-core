@@ -50,15 +50,15 @@ class HttpRoutesServerFiltersTest {
     void serverFiltersRunByOrderThenInTheOrderDeclared() {
         List<String> trace = new ArrayList<>();
         Router router = router(null, routes -> {
-            routes.serverFilter("/**").before(request -> record(trace, "a0"));
+            routes.serverFilter("/**").before(request -> traced(trace, "a0"));
             routes.serverFilter("/**").order(10)
-                .before(request -> record(trace, "b10-1"))
+                .before(request -> traced(trace, "b10-1"))
                 .and()
                 .after((request, response) -> trace.add("b10-after"))
                 .and()
-                .before(request -> record(trace, "b10-2"));
-            routes.serverFilter("/**").order(-10).before(request -> record(trace, "c-10")).and().after((request, response) -> trace.add("c-10-after"));
-            routes.serverFilter("/**").before(request -> record(trace, "d0"));
+                .before(request -> traced(trace, "b10-2"));
+            routes.serverFilter("/**").order(-10).before(request -> traced(trace, "c-10")).and().after((request, response) -> trace.add("c-10-after"));
+            routes.serverFilter("/**").before(request -> traced(trace, "d0"));
         });
 
         run(router, HttpRequest.GET("/anything"), trace);
@@ -69,9 +69,9 @@ class HttpRoutesServerFiltersTest {
     void aServerFilterFiltersItsPatternsAndMethodsOnly() {
         List<String> trace = new ArrayList<>();
         Router router = router(null, routes -> {
-            routes.serverFilter("/api/**", "/admin").before(request -> record(trace, "api"));
-            routes.serverFilter("/**").methods(HttpMethod.POST, HttpMethod.PUT).before(request -> record(trace, "writes"));
-            routes.serverFilter("^/regex/[0-9]+$").patternStyle(FilterPatternStyle.REGEX).before(request -> record(trace, "regex"));
+            routes.serverFilter("/api/**", "/admin").before(request -> traced(trace, "api"));
+            routes.serverFilter("/**").methods(HttpMethod.POST, HttpMethod.PUT).before(request -> traced(trace, "writes"));
+            routes.serverFilter("^/regex/[0-9]+$").patternStyle(FilterPatternStyle.REGEX).before(request -> traced(trace, "regex"));
         });
 
         assertEquals(List.of("api", "handler"), run(router, HttpRequest.GET("/api/orders"), trace));
@@ -86,9 +86,9 @@ class HttpRoutesServerFiltersTest {
     void thePatternsAreUnderTheContextPathLikeThoseOfAServerFilterBean() {
         List<String> trace = new ArrayList<>();
         Router router = router("/ctx", routes -> {
-            routes.serverFilter("/api/**").before(request -> record(trace, "under"));
-            routes.serverFilter("/ctx/already/**").before(request -> record(trace, "already"));
-            routes.serverFilter("/raw/**").appendContextPath(false).before(request -> record(trace, "raw"));
+            routes.serverFilter("/api/**").before(request -> traced(trace, "under"));
+            routes.serverFilter("/ctx/already/**").before(request -> traced(trace, "already"));
+            routes.serverFilter("/raw/**").appendContextPath(false).before(request -> traced(trace, "raw"));
         });
 
         assertEquals(List.of("under", "handler"), run(router, HttpRequest.GET("/ctx/api/x"), trace));
@@ -101,8 +101,8 @@ class HttpRoutesServerFiltersTest {
     void aServerFilterIsDeclaredOnTheBuilderOnly() {
         List<String> trace = new ArrayList<>();
         Router router = router(null, routes -> {
-            routes.path("/api", api -> api.before(request -> record(trace, "group")));
-            routes.serverFilter("/other/**").before(request -> record(trace, "server"));
+            routes.path("/api", api -> api.before(request -> traced(trace, "group")));
+            routes.serverFilter("/other/**").before(request -> traced(trace, "server"));
         });
 
         // not under the prefix of the group, and without the filters of the group
@@ -114,13 +114,13 @@ class HttpRoutesServerFiltersTest {
         List<String> trace = new ArrayList<>();
         Router router = router(null, routes -> {
             ServerFilterSpec same = routes.serverFilter("/**")
-                .before(request -> record(trace, "before"))
+                .before(request -> traced(trace, "before"))
                 .and()
-                .before((request, propagatedContext) -> record(trace, "context-before"))
+                .before((request, propagatedContext) -> traced(trace, "context-before"))
                 .and()
-                .beforeAsync(request -> CompletableFuture.completedFuture(record(trace, "async-before")))
+                .beforeAsync(request -> CompletableFuture.completedFuture(traced(trace, "async-before")))
                 .and()
-                .beforeAsync((request, propagatedContext) -> CompletableFuture.completedFuture(record(trace, "async-context-before")))
+                .beforeAsync((request, propagatedContext) -> CompletableFuture.completedFuture(traced(trace, "async-context-before")))
                 .and()
                 .after((request, response) -> trace.add("after"))
                 .and()
@@ -143,11 +143,12 @@ class HttpRoutesServerFiltersTest {
 
     @Test
     void aServerFilterNeedsAPatternAndAnOpenBuilder() {
-        assertThrows(IllegalArgumentException.class, () -> router(null, routes -> routes.serverFilter()));
+        assertThrows(IllegalArgumentException.class, () -> router(null, HttpRouteBuilder::serverFilter));
         assertThrows(IllegalArgumentException.class, () -> router(null, routes -> routes.serverFilter("")));
         AtomicReference<HttpRouteGroup> leaked = new AtomicReference<>();
         router(null, routes -> routes.group(leaked::set));
-        assertThrows(IllegalStateException.class, () -> leaked.get().before(request -> { }));
+        HttpRouteGroup closed = leaked.get();
+        assertThrows(IllegalStateException.class, () -> closed.before(request -> { }));
     }
 
     /**
@@ -163,7 +164,7 @@ class HttpRoutesServerFiltersTest {
         return List.copyOf(trace);
     }
 
-    private static HttpResponse<?> record(List<String> trace, String step) {
+    private static HttpResponse<?> traced(List<String> trace, String step) {
         trace.add(step);
         return null;
     }

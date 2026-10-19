@@ -280,7 +280,8 @@ class MyBean {
             def saveAll2 = definition.findMethod("saveAll2", List.class).get()
             def listTypeArgument2 = saveAll2.getArguments()[0].getTypeParameters()[0]
         then:
-            listTypeArgument2.getAnnotationMetadata().hasAnnotation(TypeUseRuntimeAnn.class)
+            // The annotations of the type parameter declaration don't apply to its uses
+            !listTypeArgument2.getAnnotationMetadata().hasAnnotation(TypeUseRuntimeAnn.class)
 
             !saveAll2.hasAnnotation(RequiresValidation)
             !saveAll2.hasStereotype(RequiresValidation)
@@ -294,7 +295,8 @@ class MyBean {
             def saveAll3 = definition.findMethod("saveAll3", List.class).get()
             def listTypeArgument3 = saveAll3.getArguments()[0].getTypeParameters()[0]
         then:
-            listTypeArgument3.getAnnotationMetadata().hasAnnotation(TypeUseRuntimeAnn.class)
+            // The annotations of the type parameter declaration don't apply to its uses
+            !listTypeArgument3.getAnnotationMetadata().hasAnnotation(TypeUseRuntimeAnn.class)
 
             !saveAll3.hasAnnotation(RequiresValidation)
             !saveAll3.hasStereotype(RequiresValidation)
@@ -322,7 +324,8 @@ class MyBean {
             def save3 = definition.findMethod("save3", Book.class).get()
             def parameter3 = save3.getArguments()[0]
         then:
-            parameter3.getAnnotationMetadata().hasAnnotation(TypeUseRuntimeAnn.class)
+            // The annotations of the type parameter declaration don't apply to its uses
+            !parameter3.getAnnotationMetadata().hasAnnotation(TypeUseRuntimeAnn.class)
 
             !save3.hasAnnotation(RequiresValidation)
             !save3.hasStereotype(RequiresValidation)
@@ -413,13 +416,13 @@ class MyBean {
             def saveAll2 = bd.findMethod("saveAll2", List).get()
             def listTypeArgument2 = saveAll2.getArguments()[0].getTypeParameters()[0]
         then:
-            validateBookArgument(listTypeArgument2)
+            validateBookArgumentOfAnnotatedTypeParameter(listTypeArgument2)
 
         when:
             def saveAll3 = bd.findMethod("saveAll3", List).get()
             def listTypeArgument3 = saveAll3.getArguments()[0].getTypeParameters()[0]
         then:
-            validateBookArgument(listTypeArgument3)
+            validateBookArgumentOfAnnotatedTypeParameter(listTypeArgument3)
 
         when:
             def saveAll4 = bd.findMethod("saveAll4", List).get()
@@ -443,7 +446,7 @@ class MyBean {
             def save3 = bd.findMethod("save3", Book).get()
             def parameter3 = save3.getArguments()[0]
         then:
-            validateBookArgument(parameter3)
+            validateBookArgumentOfAnnotatedTypeParameter(parameter3)
 
         when:
             def save4 = bd.findMethod("save4", Book).get()
@@ -468,6 +471,14 @@ class MyBean {
             // + Class annotations
             assert am.hasStereotype(AnnotationUtil.SINGLETON)
             assert am.hasStereotype(Executable)
+    }
+
+    void validateBookArgumentOfAnnotatedTypeParameter(Argument argument) {
+        // The annotations of the type parameter declaration don't apply to its uses
+        def am = argument.getAnnotationMetadata();
+        assert !am.hasAnnotation(TypeUseRuntimeAnn.class)
+        assert !am.hasAnnotation(MyEntity.class)
+        assert !am.hasAnnotation(Introspected.class)
     }
 
     void validateBookArgument(Argument argument) {

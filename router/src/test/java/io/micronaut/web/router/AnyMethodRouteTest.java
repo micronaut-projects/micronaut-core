@@ -36,6 +36,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -161,6 +162,16 @@ class AnyMethodRouteTest {
         assertNull(router.findClosest(HttpRequest.PATCH("/form", "{}").contentType(MediaType.APPLICATION_JSON_TYPE)),
             "a form route consumes the form media types");
         assertEquals("pathless", target(router, HttpRequest.DELETE("/prefix")));
+    }
+
+    @Test
+    void aRouteToAHandlerFunctionHasNoTargetMethod() {
+        Router router = router(routes -> routes.any("/things/{id}", handler("any")));
+        UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.GET("/things/1"));
+
+        assertNotNull(match);
+        assertFalse(match.getRouteInfo().getTargetMethod().hasTargetMethod());
+        assertFalse(match.hasTargetMethod());
     }
 
     private static String target(Router router, MutableHttpRequest<?> request) {

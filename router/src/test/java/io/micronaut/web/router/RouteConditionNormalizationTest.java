@@ -125,7 +125,7 @@ class RouteConditionNormalizationTest {
     @Test
     void theEvaluationStopsAtThePartThatDecides() {
         List<String> evaluated = new ArrayList<>();
-        RouteCondition condition = RouteConditions.normalize(all(record(evaluated, "lambda"), header("X-A"), method(HttpMethod.POST)));
+        RouteCondition condition = RouteConditions.normalize(all(recorded(evaluated, "lambda"), header("X-A"), method(HttpMethod.POST)));
 
         assertFalse(meets(condition, HttpRequest.GET("/x").header("X-A", "1")));
         assertEquals(List.of(), evaluated, "the method decides before the lambda runs");
@@ -133,12 +133,12 @@ class RouteConditionNormalizationTest {
         assertEquals(List.of("lambda"), evaluated);
 
         evaluated.clear();
-        RouteCondition either = RouteConditions.normalize(any(record(evaluated, "lambda"), header("X-A")));
+        RouteCondition either = RouteConditions.normalize(any(recorded(evaluated, "lambda"), header("X-A")));
         assertTrue(meets(either, HttpRequest.GET("/x").header("X-A", "1")));
         assertEquals(List.of(), evaluated, "the header decides before the lambda runs");
     }
 
-    private static RouteCondition record(List<String> evaluated, String name) {
+    private static RouteCondition recorded(List<String> evaluated, String name) {
         return custom(request -> {
             evaluated.add(name);
             return true;

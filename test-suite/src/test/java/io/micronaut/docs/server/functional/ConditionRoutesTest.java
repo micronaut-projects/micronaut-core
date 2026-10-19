@@ -56,8 +56,9 @@ class ConditionRoutesTest {
     void aConstraintOnThePathVariables() {
         BlockingHttpClient http = client.toBlocking();
         assertEquals("stock of north", http.retrieve(HttpRequest.GET("/shops/north/stock")));
+        var notFoundRequest = HttpRequest.GET("/shops/west/stock");
         HttpClientResponseException notFound = assertThrows(HttpClientResponseException.class,
-            () -> http.retrieve(HttpRequest.GET("/shops/west/stock")));
+            () -> http.retrieve(notFoundRequest));
         assertEquals(HttpStatus.NOT_FOUND, notFound.getStatus());
         assertEquals("item 5", http.retrieve(HttpRequest.GET("/items/5")));
         assertEquals("item named lamp", http.retrieve(HttpRequest.GET("/items/lamp")));
@@ -71,11 +72,13 @@ class ConditionRoutesTest {
         assertEquals("download app.zip", http.retrieve(HttpRequest.GET("/downloads/app.zip").cookie(Cookie.of("channel", "beta"))));
         // the address of the peer, not a forwarded one
         assertEquals("download app.zip", http.retrieve(HttpRequest.GET("/downloads/app.zip").header("X-Channel", "beta").header("X-Forwarded-For", "203.0.113.9")));
+        var noChannelRequest = HttpRequest.GET("/downloads/app.zip");
         HttpClientResponseException noChannel = assertThrows(HttpClientResponseException.class,
-            () -> http.retrieve(HttpRequest.GET("/downloads/app.zip")));
+            () -> http.retrieve(noChannelRequest));
         assertEquals(HttpStatus.NOT_FOUND, noChannel.getStatus());
+        var notAZipRequest = HttpRequest.GET("/downloads/app.txt").header("X-Channel", "beta");
         HttpClientResponseException notAZip = assertThrows(HttpClientResponseException.class,
-            () -> http.retrieve(HttpRequest.GET("/downloads/app.txt").header("X-Channel", "beta")));
+            () -> http.retrieve(notAZipRequest));
         assertEquals(HttpStatus.NOT_FOUND, notAZip.getStatus());
     }
 
@@ -83,16 +86,19 @@ class ConditionRoutesTest {
     void aFilterReadsTheAttributesOfTheRoute() {
         BlockingHttpClient http = client.toBlocking();
         assertEquals("daily report", http.retrieve(HttpRequest.GET("/reports/daily").header("X-Role", "auditor")));
+        var forbiddenRequest = HttpRequest.GET("/reports/salaries").header("X-Role", "auditor");
         HttpClientResponseException forbidden = assertThrows(HttpClientResponseException.class,
-            () -> http.retrieve(HttpRequest.GET("/reports/salaries").header("X-Role", "auditor")));
+            () -> http.retrieve(forbiddenRequest));
         assertEquals(HttpStatus.FORBIDDEN, forbidden.getStatus());
         assertEquals("salaries", http.retrieve(HttpRequest.GET("/reports/salaries").header("X-Role", "admin")));
     }
 
     @Test
     void aRouteOnAnotherPort() throws Exception {
+        var blockingClient = client.toBlocking();
+        var notFoundRequest = HttpRequest.GET("/management/health");
         HttpClientResponseException notFound = assertThrows(HttpClientResponseException.class,
-            () -> client.toBlocking().retrieve(HttpRequest.GET("/management/health")));
+            () -> blockingClient.retrieve(notFoundRequest));
         assertEquals(HttpStatus.NOT_FOUND, notFound.getStatus());
         try (HttpClient management = HttpClient.create(URI.create("http://" + server.getHost() + ":" + managementPort).toURL())) {
             assertEquals("UP", management.toBlocking().retrieve(HttpRequest.GET("/management/health")));

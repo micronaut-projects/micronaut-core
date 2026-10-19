@@ -54,12 +54,17 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.CustomHttpMethod;
 import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientRegistry;
 import io.micronaut.http.client.ReactiveClientResultTransformer;
+import io.micronaut.http.client.AsyncStreamingHttpClient;
+import io.micronaut.http.client.ElementsResponse;
+import io.micronaut.http.client.ElementsStages;
+import io.micronaut.http.client.MappedBodyElements;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
@@ -92,9 +97,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -350,8 +357,19 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 future.complete(binderResult.errorResult());
             } else {
                 MutableHttpRequest<?> request = Objects.requireNonNull(binderResult.request());
-                AsyncHttpClient asyncHttpClient = httpClient.toAsync();
-                CompletionStage<?> responseStage = httpClientResponseStage(asyncHttpClient, request, returnType, errorType, valueType);
+                boolean bodyElements = isBodyElements(valueType);
+                CompletionStage<?> responseStage = bodyElements
+                    ? httpClientElementsStage(httpClient, request, valueType, errorType)
+                    : httpClientResponseStage(httpClient.toAsync(), request, returnType, errorType, valueType);
+                if (bodyElements) {
+                    // cancelling the future of the method, e.g. a cancelled coroutine, cancels the
+                    // exchange, and the elements of a response that arrives anyway are closed
+                    future.whenComplete((result, throwable) -> {
+                        if (throwable instanceof CancellationException) {
+                            cancel(responseStage);
+                        }
+                    });
+                }
                 responseStage.whenComplete((result, throwable) -> {
                     if (throwable != null) {
                         Throwable cause = (throwable instanceof CompletionException completionException && completionException.getCause() != null)
@@ -361,7 +379,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             LOG.debug(HTTP_ERROR_RESPONSE_LOG_MESSAGE, declaringType.getName(), cause.getMessage(), cause);
                         }
                         if (cause instanceof HttpClientResponseException e && e.code() == HttpStatus.NOT_FOUND.getCode()) {
-                            if (reactiveValueType == Optional.class) {
+                            if (bodyElements) {
+                                // no element, as a streaming publisher emits none
+                                BodyElements<Object> none = BodyElements.of(() -> CompletableFuture.completedStage(Optional.empty()));
+                                future.complete(HttpResponse.class.isAssignableFrom(reactiveValueType) ? ElementsResponse.of(e.getResponse(), none) : none);
+                                return;
+                            } else if (reactiveValueType == Optional.class) {
                                 future.complete(Optional.empty());
                                 return;
                             } else if (HttpResponse.class.isAssignableFrom(reactiveValueType)) {
@@ -373,8 +396,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             }
                         }
                         future.completeExceptionally(cause);
-                    } else {
-                        future.complete(result);
+                    } else if (!future.complete(result) && result != null && bodyElements) {
+                        // cancelled meanwhile: nobody reads the elements
+                        closeElements(result);
                     }
                 });
             }
@@ -675,6 +699,98 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return Flux.error(new ConfigurationException("Cannot create the generated HTTP client's " +
             "required return type, since no TypeConverter from ByteBuffer to " +
             reactiveValueType + " is registered"));
+    }
+
+    private static void cancel(CompletionStage<?> stage) {
+        try {
+            stage.toCompletableFuture().cancel(false);
+        } catch (UnsupportedOperationException ignored) {
+            // a stage that cannot be cancelled: its elements are closed when they arrive
+        }
+    }
+
+    private static void closeElements(Object result) {
+        if (result instanceof BodyElements<?> elements) {
+            elements.close();
+        } else if (result instanceof HttpResponse<?> response) {
+            ElementsStages.closeElements(response);
+        }
+    }
+
+    /**
+     * Whether the value of a stage is the elements of the response body, or the response with
+     * them: the asynchronous counterpart of a streaming publisher.
+     *
+     * @param valueArgument The value of the stage
+     * @return Whether the value is streamed as {@link BodyElements}
+     */
+    private static boolean isBodyElements(Argument<?> valueArgument) {
+        Class<?> type = valueArgument.getType();
+        if (HttpResponse.class.isAssignableFrom(type)) {
+            return valueArgument.getFirstTypeVariable().map(body -> BodyElements.class == body.getType()).orElse(false);
+        }
+        return BodyElements.class == type;
+    }
+
+    /**
+     * The stage of a method that returns {@code CompletionStage<BodyElements<T>>} or
+     * {@code CompletionStage<HttpResponse<BodyElements<T>>>}, read like a streaming publisher:
+     * the events of an event stream, the elements of JSON, or the pieces of the body.
+     *
+     * @param httpClient    The client
+     * @param request       The request
+     * @param valueArgument The value of the stage
+     * @param errorType     The error type
+     * @return The stage of the elements, or of the response with them
+     */
+    @SuppressWarnings("unchecked")
+    private CompletionStage<?> httpClientElementsStage(HttpClient httpClient,
+                                                       MutableHttpRequest<?> request,
+                                                       Argument<?> valueArgument,
+                                                       Argument<?> errorType) {
+        boolean exchange = HttpResponse.class.isAssignableFrom(valueArgument.getType());
+        Argument<?> elementsArgument = exchange ? valueArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) : valueArgument;
+        Argument<?> elementArgument = elementsArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        Collection<MediaType> acceptTypes = request.accept();
+
+        if (!(httpClient instanceof StreamingHttpClient streamingHttpClient)) {
+            return CompletableFuture.failedStage(new ConfigurationException("The HTTP client " + httpClient.getClass().getName()
+                + " does not stream response bodies, which the return type BodyElements needs"));
+        }
+        AsyncStreamingHttpClient asyncStreamingHttpClient = streamingHttpClient.toAsyncStreaming();
+        if (acceptTypes.contains(MediaType.TEXT_EVENT_STREAM_TYPE)) {
+            boolean events = elementArgument.getType() == Event.class;
+            Argument<Object> dataArgument = (Argument<Object>) (events ? elementArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) : elementArgument);
+            Function<BodyElements<Event<Object>>, BodyElements<?>> elements = events ? e -> e : e -> MappedBodyElements.map(e, Event::getData);
+            if (exchange) {
+                return ElementsStages.mapResponse(asyncStreamingHttpClient.exchangeEventStream(request, dataArgument, errorType),
+                    response -> ElementsResponse.of(response, elements.apply(Objects.requireNonNull(response.body()))));
+            }
+            return ElementsStages.mapElements(asyncStreamingHttpClient.eventStream(request, dataArgument, errorType), elements);
+        }
+        if (isJsonParsedMediaType(acceptTypes)) {
+            Argument<Object> jsonArgument = (Argument<Object>) elementArgument;
+            if (exchange) {
+                return ElementsStages.mapResponse(asyncStreamingHttpClient.exchangeJsonStream(request, jsonArgument, errorType), Function.identity());
+            }
+            return ElementsStages.mapElements(asyncStreamingHttpClient.jsonStream(request, jsonArgument, errorType), Function.identity());
+        }
+        Class<?> elementType = elementArgument.getType();
+        Function<BodyElements<ByteBuffer<?>>, BodyElements<?>> elements;
+        if (elementType == ByteBuffer.class) {
+            elements = e -> e;
+        } else if (conversionService.canConvert(ByteBuffer.class, elementType)) {
+            elements = e -> MappedBodyElements.map(e, value -> conversionService.convert(value, elementType).orElseThrow());
+        } else {
+            return CompletableFuture.failedStage(new ConfigurationException("Cannot create the generated HTTP client's " +
+                "required return type, since no TypeConverter from ByteBuffer to " +
+                elementType + " is registered"));
+        }
+        if (exchange) {
+            return ElementsStages.mapResponse(asyncStreamingHttpClient.exchangeStream(request, errorType),
+                response -> ElementsResponse.of(response, elements.apply(Objects.requireNonNull(response.body()))));
+        }
+        return ElementsStages.mapElements(asyncStreamingHttpClient.dataStream(request, errorType), elements);
     }
 
     private CompletionStage<?> httpClientResponseStage(AsyncHttpClient asyncHttpClient,

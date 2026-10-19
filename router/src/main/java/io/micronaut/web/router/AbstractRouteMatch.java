@@ -180,6 +180,11 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     }
 
     @Override
+    public boolean hasTargetMethod() {
+        return routeInfo.getTargetMethod().hasTargetMethod();
+    }
+
+    @Override
     public String getMethodName() {
         return executableMethod.getMethodName();
     }

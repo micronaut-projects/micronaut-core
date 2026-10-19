@@ -96,6 +96,10 @@ public final class RouteAssembly {
     final List<ErrorRoute> errorRoutes = new ArrayList<>();
     final Set<Integer> exposedPorts = new HashSet<>(5);
     @Nullable DefaultUriRoute currentParentRoute;
+    /**
+     * The tables of the located targets of the routes, shared with the located tables.
+     */
+    @Nullable RouteTableFactory locatedTables;
     private final @Nullable ExecutorSelector executorSelector;
     private final ThreadSelection threadSelection;
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
@@ -104,6 +108,7 @@ public final class RouteAssembly {
     private final List<ServerFilters> serverFilters = new ArrayList<>(0);
     private final @Nullable String contextPath;
     private final RouteConditionContext conditionContext;
+    private final @Nullable Object beanLocator;
 
     /**
      * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
@@ -131,6 +136,7 @@ public final class RouteAssembly {
                          Consumer<DefaultUriRoute> routeCreated,
                          @Nullable String contextPath) {
         this.contextPath = contextPath;
+        this.beanLocator = beanLocator;
         this.conversionService = conversionService;
         this.routeUri = routeUri;
         this.routeCreated = routeCreated;
@@ -151,6 +157,41 @@ public final class RouteAssembly {
             this.threadSelection = ThreadSelection.MANUAL;
             this.messageBodyHandlerRegistry = MessageBodyHandlerRegistry.EMPTY;
         }
+    }
+
+    /**
+     * An assembly of the routes of located targets, without routes, with the beans and the
+     * settings of an assembly already resolved: the routes of a located target are declared
+     * while a request is matched, which looks no bean up.
+     *
+     * @param resolved The assembly whose beans and settings the assembly uses
+     */
+    RouteAssembly(RouteAssembly resolved) {
+        this.contextPath = null;
+        this.beanLocator = resolved.beanLocator;
+        this.conversionService = resolved.conversionService;
+        // the URIs of located routes are relative to the prefix of their locator
+        this.routeUri = uri -> uri;
+        this.routeCreated = route -> { };
+        this.defaultCharset = resolved.defaultCharset;
+        this.executorSelector = resolved.executorSelector;
+        this.threadSelection = resolved.threadSelection;
+        this.messageBodyHandlerRegistry = resolved.messageBodyHandlerRegistry;
+        this.conditionContext = resolved.conditionContext;
+    }
+
+    /**
+     * @return The factory of the tables of the targets that the locator routes of the assembly
+     * locate, shared by the assembly and those tables
+     */
+    public RouteTableFactory locatedTables() {
+        RouteTableFactory tables = locatedTables;
+        if (tables == null) {
+            // the beans and the settings of this assembly, without its routes
+            tables = new RouteTableFactory(new RouteAssembly(this));
+            locatedTables = tables;
+        }
+        return tables;
     }
 
     /**
@@ -1328,13 +1369,33 @@ public final class RouteAssembly {
                 attributes(),
                 errorScope,
                 settings.isAnyMethod(),
-                constraints(group)
+                constraints(group),
+                declaredSettings(),
+                null
             );
             if (errorScope != null) {
                 // built now: a duplicate fails when the router is built
                 errorScope.buildErrorAndStatusRoutes();
             }
             return routeInfo;
+        }
+
+        /**
+         * @return The settings the route, or a group of it, declares, which it does not inherit at
+         * a location, see {@link DefaultUrlRouteInfo#inheriting(LocationInheritance)}
+         */
+        private int declaredSettings() {
+            int declared = 0;
+            if (settings.getConsumes() != null) {
+                declared |= DefaultUrlRouteInfo.DECLARED_CONSUMES;
+            }
+            if (settings.getProduces() != null) {
+                declared |= DefaultUrlRouteInfo.DECLARED_PRODUCES;
+            }
+            if (settings.getExecutorName() != null || settings.isNonBlocking()) {
+                declared |= DefaultUrlRouteInfo.DECLARED_EXECUTOR;
+            }
+            return declared;
         }
 
         /**
@@ -1597,7 +1658,9 @@ public final class RouteAssembly {
                     return Optional.empty();
                 }
                 if (RouteAssembly.this.executorSelector != null) {
-                    return RouteAssembly.this.executorSelector.select(targetMethod.getExecutableMethod(), threadSelection);
+                    // the handler of a located route has the annotations it inherits, e.g. an @ExecuteOn of a group of its locator route
+                    MethodReference<?, ?> annotated = method instanceof HandlerMethod<?> handler ? handler : targetMethod.getExecutableMethod();
+                    return RouteAssembly.this.executorSelector.select(annotated, threadSelection);
                 } else {
                     return Optional.empty();
                 }

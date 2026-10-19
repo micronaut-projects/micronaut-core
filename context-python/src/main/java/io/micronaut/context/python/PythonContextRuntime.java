@@ -929,6 +929,21 @@ public final class PythonContextRuntime {
      * @param args Arguments
      * @return The polyglot result
      */
+    /**
+     * An attribute of a pooled module: the bean injected for a parameter of a module function
+     * ({@code ctx: ApplicationContext = Inject()}), which the generated bridge passes to the function.
+     *
+     * @param packageName The package name
+     * @param scriptName  The module name
+     * @param name        The attribute name
+     * @return The attribute value
+     * @since 5.3.0
+     */
+    @UsedByGeneratedCode
+    public static Value pooledScriptAttribute(String packageName, String scriptName, String name) {
+        return withPooledScript(packageName, scriptName, module -> module.getMember(name));
+    }
+
     @UsedByGeneratedCode
     public static Value invokePooledScript(String packageName, String scriptName, String methodName, Object... args) {
         return withPooledScript(packageName, scriptName, v -> v.getMember(methodName).execute(
@@ -1453,6 +1468,21 @@ public final class PythonContextRuntime {
         } else {
             throw new InstantiationException("Cannot find Python module: " + packageName);
         }
+    }
+
+    /**
+     * An attribute of the module or class a generated class stands for, such as the bean injected for a parameter of a
+     * module function ({@code ctx: ApplicationContext = Inject()}).
+     *
+     * @param classReference The class reference
+     * @param name           The attribute name
+     * @return The attribute value
+     * @since 5.3.0
+     */
+    @UsedByGeneratedCode
+    public static Value getStaticAttribute(PythonClassReference classReference, String name) {
+        Context ctx = getContext();
+        return PythonContextRegistry.withExecutionFrame(ctx, () -> findClass(classReference, ctx).getMember(name));
     }
 
     /**
