@@ -25,7 +25,7 @@ The annotation processor option `micronaut.python.compile.static` selects the mo
 |Option |Purpose
 
 |`micronaut.python.compile.static.report`
-|A directory `decisions.jsonl` and `summary.txt` are written to, one record per method, see <<staticCompilationReport, the report>>. Unset, no files are written; the callback still receives every decision.
+|A directory `decisions.jsonl` and `summary.txt` are written to, one record per function, see <<staticCompilationReport, the report>>. Unset, no files are written; the callback still receives every decision.
 
 |`micronaut.python.compile.static.strict`
 |`true` makes an explicit `CompileStatic` that cannot be honoured an error instead of a warning.
@@ -34,7 +34,7 @@ The annotation processor option `micronaut.python.compile.static` selects the mo
 |The qualified names of the decorators accepted as the switch, comma separated; the default accepts `io.micronaut.context.python.annotation.CompileStatic` and `pyronaut.build.CompileStatic`.
 
 |`micronaut.python.compile.static.trace`
-|`true` makes every compiled body count its entries in `PythonStatic.entries("package.Class#method")`, for tests and for anyone diagnosing what runs as Java.
+|`true` makes every compiled body count its entries in `PythonStatic.entries(key)`, the key being the qualified name of the class and the method, `shop.PricingService#total`, for tests and for anyone diagnosing what runs as Java.
 |===
 
 Pass the options to `javac` as `-Amicronaut.python.compile.static=all`, or set them on the compiler API:
@@ -56,7 +56,9 @@ PyronautCompiler.builder()
 The `CompileStatic` annotation switches compilation for a class, a function or, applied as a bare statement, a module, with the scope rules of `TypeChecked`: the nearest declaration wins.
 
 [source,python]
+.shop/PricingService.py
 ----
+import inflect
 from jakarta.inject import Singleton
 from micronaut.context.python.annotation import CompileStatic
 
@@ -69,15 +71,25 @@ class PricingService:
     def total(self, quantity: int, unit_price: float) -> float:
         return quantity * unit_price * self.rate
 
-    @CompileStatic(False)       # <2>
+    def discounted(self, prices: list[float]) -> list[float]:
+        return [price * self.rate for price in prices]     # <2>
+
+    @CompileStatic(False)       # <3>
     def describe(self, sku: str) -> str:
         return inflect.engine().plural(sku)
 ----
 
-<1> Every eligible method of the class is compiled, in mode `annotated` as in mode `all`
-<2> The method stays in Python: it uses a third-party library
+<1> Every eligible method of the class is compiled, in every mode
+<2> A comprehension has no lowering: the method stays in Python and gets a warning
+<3> The method stays in Python: it uses a third-party library
 
-A function carrying `CompileStatic` that is skipped, and a class carrying it whose candidate methods are all skipped, get a warning naming the first reason. Methods that are never candidates (a constructor, a dunder, a static method, a method of an ineligible class) are recorded as `NOT_CANDIDATE` in the report without a warning, so a class opt-in covering only such methods is silent: the report is the place to look. The annotation is kept in the source only.
+A `CompileStatic` that switches a function on without the function being compiled gets a warning naming the first reason (an error when `micronaut.python.compile.static.strict` is `true`):
+
+* on a function, the switch warns whenever the function is not compiled, in every mode, including a function that can never be compiled (a static, async or special method);
+* on a class or a module, the switch warns once for each method of its scope that is skipped, except in mode `all`, where skipping is the expected common case and only function-level switches warn. Methods of the scope that are never candidates (a constructor, a dunder, a static method, a method of an ineligible class) are recorded as `NOT_CANDIDATE` in the report without a warning, so a class opt-in covering only such methods is silent: the report is the place to look;
+* the mode alone never warns.
+
+The annotation is kept in the source only.
 
 == What Is Compiled
 
@@ -93,8 +105,8 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |`pooled-module`
 |The function belongs to a module without a module-level annotation, which the runtime serves from a pool of Python contexts, and its body reaches a Python object (an attribute of a class of the compilation, a method the generated class does not declare), which no context is leased for. A pooled route that only calls Java and the generated classes of the compilation is compiled and runs without leasing a context at all.
 
-|`special-method`, `async-function`, `generator-function`, `static-method`
-|The method is a dunder (`__init__` runs in Python so the instance keeps its Python semantics), an `async def`, a generator, or a static or class method.
+|`special-method`, `async-function`, `generator-function`, `static-method`, `abstract-method`
+|The method is a dunder (`__init__` runs in Python so the instance keeps its Python semantics), an `async def`, a generator, a static or class method, or an abstract method or one whose body is a placeholder (`...`): a call of it runs the implementation of the object.
 
 |`overriding-java-method`, `intercepted-method`
 |The method implements a method of a Java base or interface, whose bridge keeps the Java signature; or it is an advised method of an introduction, whose chain runs on the Python object. Other advised methods (an around binding or a validation constraint on a method, its class or a parameter) are compiled: the Java method of a class runs the interceptor chain the bean's proxy binds before the body, as a proxy compiled for a Java bean does, and a module's generated class is proxied by Micronaut like any Java bean; so validation and around advice cost no crossing into Python.
@@ -109,11 +121,16 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |A call resolves to no Java method or constructor, more than one overload fits the argument types equally well, keyword arguments are given to a Java method or a builtin, or a static, class, async or generator method of the class is called on `self`.
 
 |`python-builtin-not-lowered`, `unsupported-statement`, `unsupported-expression`
-|A builtin, a method of a Python value, a statement kind or an expression kind outside the supported subset below.
+|A builtin, a method of a Python value, a statement kind or an expression kind outside the supported subset below, or a form of a supported statement that is not (see the list after the table).
 
 |`unbounded-integer-op`, `equality-on-object`, `truthiness-of-java-object`, `python-exception`
-|An operation whose Python semantics the lowering does not reproduce: `**` on integers or an integer literal outside `long`, `==` between Java objects, `if x:` on a Java object that is not a collection or a string, raising or catching a Python exception.
+|An operation whose Python semantics the lowering does not reproduce: `**` on integers or an integer literal outside `long`, `==` between Java objects, `if x:` on a Java object that is not a collection or a string, raising or catching a Python exception, a bare `except:`.
+
+|The rules of the <<typeChecking, type checker>>
+|A body the checker's inference flags carries the checker's rule (an unknown method, an argument of the wrong type, ...) as its reason.
 |===
+
+A `NOT_CANDIDATE` decision carries the reasons of the first three rows, a `SKIPPED` one the others.
 
 === The Supported Subset
 
@@ -169,7 +186,7 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 |The generated class's own Java method when it declares one for the call (a public method with a hinted signature the call fills exactly, that no advice intercepts and no subclass of the compilation overrides), else the method of the Python object, which runs its interceptors, overrides and default arguments as Python would.
 |===
 
-Not compiled: comprehensions, lambdas and nested functions, `with`, `match`, `del`, `global`, `nonlocal`, `yield`, slices, starred arguments, chained comparisons, calls of module-level functions, and `Optional` hints.
+Not compiled: comprehensions, lambdas and nested functions, `with`, `match`, `del`, `global`, `nonlocal`, `yield`, slices, starred arguments, chained comparisons, calls of module-level functions, and `Optional` hints; nor the `else` clause of a `for`, `while` or `try` statement, unpacking in a `for` target (`for k, v in ...`) or in an assignment (`a, b = ...`), a chained assignment (`a = b = 0`) and a bare `except:`.
 
 == One Implementation
 
@@ -180,24 +197,58 @@ Introspected classes keep their ownership model: their state lives in Java field
 [[staticCompilationReport]]
 == The Report
 
-One record per candidate method, delivered to the builder callback as `StaticCompilationDecision` and, when a report directory is configured, written to `decisions.jsonl` (one JSON object per line, stable field names, merged incrementally across rounds) and `summary.txt`, with `decisions.properties` alongside them: the state an incremental build reads back to keep both files complete:
+One record per function of the compilation, delivered to the builder callback as `StaticCompilationDecision` and, when a report directory is configured, written to `decisions.jsonl` (a first record describing the plan, then one JSON object per decision, stable field names, merged incrementally across rounds) and `summary.txt`, with `decisions.properties` alongside them: the state an incremental build reads back to keep both files complete. A function is named by its class and its name; its location, the path of the source as the compiler read it, tells the module. The `summary.txt` of the example above, compiled in mode `annotated`:
 
 [source]
 ----
-COMPILED      shop.OrderController.summary  shop/OrderController.py:11:5
-              statements 8 · java calls 4 · bridge calls 1 · helpers 2
-SKIPPED       shop.PricingService.describe  shop/PricingService.py:19:5
-              [unknown-type] shop/PricingService.py:20:16  [inflect] is a third-party Python module; its members have no static type
-EXCLUDED      shop.LegacyAdapter.convert  shop/LegacyAdapter.py:8:5
+COMPILED      PricingService.total  src/main/python/shop/PricingService.py:11:5
+              statements 1 · java calls 0 · bridge calls 1 · helpers 0
+SKIPPED       PricingService.discounted  src/main/python/shop/PricingService.py:14:5
+              [unsupported-expression] src/main/python/shop/PricingService.py:15:16  a list comprehension has no static lowering
+EXCLUDED      PricingService.describe  src/main/python/shop/PricingService.py:18:5
+NOT_CANDIDATE PricingService.__init__  src/main/python/shop/PricingService.py:8:5
+              [special-method] src/main/python/shop/PricingService.py:8:5  the constructor runs in Python so the instance keeps its Python semantics
 
 COMPILED      1
+CANDIDATE     0
 SKIPPED       1
 EXCLUDED      1
+NOT_CANDIDATE 1
 
-unknown-type                     1
+special-method                   1
+unsupported-expression           1
 ----
 
-The outcomes are `COMPILED`, `SKIPPED` (a candidate with reasons), `CANDIDATE` (a body that would compile, in mode `off`), `EXCLUDED` (switched off by a decorator) and `NOT_CANDIDATE`. The totals per reason at the end put the most common blocker one glance away.
+`self.rate` is one bridge call: `PricingService` is not introspected, so its state lives in the Python object. The matching record of `decisions.jsonl`:
+
+[source,json]
+----
+{"record":"decision","name":"PricingService.discounted","source":"src/main/python/shop/PricingService.py","line":14,"column":5,"outcome":"SKIPPED","scope":"CLASS","reasons":[{"rule":"unsupported-expression","message":"a list comprehension has no static lowering","location":"src/main/python/shop/PricingService.py:15:16"}],"stats":{"statements":1,"javaCalls":0,"bridgeCalls":0,"helperCalls":0}}
+----
+
+`scope` names the declaration that decided whether the function is compiled: `FUNCTION`, `CLASS` or `MODULE` for the nearest `CompileStatic`, `MODE` when none applies. The outcomes are:
+
+[cols="1,3"]
+|===
+|Outcome |Meaning
+
+|`COMPILED`
+|The body is compiled to Java.
+
+|`SKIPPED`
+|The function is switched on and could be compiled in principle, but its signature or body carries reasons.
+
+|`EXCLUDED`
+|The function is not switched on: the nearest `CompileStatic` switches it, its class or its module off, or no declaration switches it on and the mode is not `all`. In modes `off` and `annotated` this is the outcome of every function no `CompileStatic` switches on, with the scope `MODE`.
+
+|`NOT_CANDIDATE`
+|The function is switched on but can never be compiled, whatever its body: its reasons say why (an ineligible class, a special, static, async, generator or abstract method, an advised method, ...).
+
+|`CANDIDATE`
+|The function passes every check the planner made, but the planner had no syntax tree of it or no facts of the type checker, so its body was not lowered. A build rarely produces it.
+|===
+
+The totals per reason at the end of `summary.txt` put the most common blocker one glance away.
 
 == Running the Existing Tests with Compilation On
 
