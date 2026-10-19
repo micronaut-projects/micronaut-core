@@ -486,6 +486,20 @@ class WarningTest(unittest.TestCase):
         self.assertEqual(["[Legacy.slow] cannot be compiled statically: [varargs-signature] parameter [*values] collects the positional arguments"],
                          [diagnostic.message() for diagnostic in planner.diagnostics])
 
+    def test_planning_again_reports_every_decision_and_warning_once(self):
+        checker = TypeChecker("off", [])
+        visitor = MicronautAstVisitor(Callback(), "pkg", "module.py", None, None, source_path="module.py", source_text=SOURCE, type_checker=checker)
+        visitor.visit(ast.parse(SOURCE))
+        planner = StaticPlanner(MODE_ANNOTATED, NAMES)
+        first = [decision.qualifiedName() for decision in planner.plan(checker)]
+        first_diagnostics = [diagnostic.message() for diagnostic in planner.diagnostics]
+        # a second compilation element planned by the same planner
+        second = [decision.qualifiedName() for decision in planner.plan(checker)]
+        self.assertEqual(first, second)
+        self.assertEqual(len(set(second)), len(second), second)
+        self.assertEqual(first_diagnostics, [diagnostic.message() for diagnostic in planner.diagnostics])
+        self.assertEqual(2, len(planner.diagnostics))
+
 
 LOWERED = '''
 from typing import Annotated, Optional, Protocol
@@ -519,6 +533,8 @@ class Cart:
 
 @Singleton
 class Pricing:
+    count: int = 0
+
     def __init__(self, rate: float):
         self.rate = rate
 
@@ -722,6 +738,47 @@ class Pricing:
     def counted(self, counts: dict[str, int], values: list[str]) -> int:
         counts["added"] = len(values)
         return counts["added"]
+    def lazy_message(self, n: int, d: int) -> int:
+        assert n > 0, f"{10 // d}"
+        return n
+
+    def bumped(self) -> int:
+        self.count += 1
+        return self.count
+
+    def rate_is_none(self) -> bool:
+        return self.rate is None
+
+    def n_is_none(self, n: int) -> bool:
+        return n is None
+
+    def mixed_local(self, flag: bool) -> str:
+        value = 1.5
+        if flag:
+            value = 2
+        return f"{value}"
+
+    def hinted_float(self) -> float:
+        value: float = 1
+        return value
+
+    def mixed_conditional(self, flag: bool) -> float:
+        return 1 if flag else 2.5
+
+    def float_power(self, a: float) -> float:
+        return a ** 2
+
+    def maybe_concat(self, s: str | None) -> str:
+        return s + "x"
+
+    def concat(self, s: str) -> str:
+        return s + "x" + "y"
+
+    def exact_compare(self, n: int, x: float) -> bool:
+        return n > x
+
+    def literal_compare(self, x: float) -> bool:
+        return x > 100
 
     def tagged(self, cart: Cart, n: int) -> int:
         return cart.tag(n)
@@ -1156,6 +1213,11 @@ class LoweringTest(unittest.TestCase):
             "maybe_missing": "python-builtin-not-lowered",
             "crossed": "unsupported-expression",
             "charred": "unsupported-expression",
+            "mixed_local": "unknown-type",
+            "hinted_float": "unknown-type",
+            "mixed_conditional": "unsupported-expression",
+            "float_power": "unsupported-expression",
+            "maybe_concat": "unknown-type",
         }
         for name, rule in expectations.items():
             decision = self.decisions[f"Pricing.{name}"]
@@ -1223,8 +1285,57 @@ class LoweringTest(unittest.TestCase):
     def test_assertions_raise_through_the_helper(self):
         guarded = self.bodies["guarded"]
         statements = list(guarded.body().statements())
-        self.assertEqual("assertion", statements[0].expression().name())
-        self.assertEqual(">", list(statements[0].expression().arguments())[0].op())
+        self.assertEqual("If", statements[0].getClass().getSimpleName())
+        self.assertEqual("not", statements[0].test().op())
+        self.assertEqual(">", statements[0].test().operand().op())
+        failure = list(statements[0].then().statements())[0].expression()
+        self.assertEqual("assertion", failure.name())
+        self.assertEqual(False, list(failure.arguments())[0].value())
+
+    def test_the_assertion_message_is_evaluated_only_when_the_assertion_fails(self):
+        statements = list(self.bodies["lazy_message"].body().statements())
+        self.assertEqual("If", statements[0].getClass().getSimpleName())
+        self.assertIsNone(statements[0].orElse())
+        message = list(list(statements[0].then().statements())[0].expression().arguments())[1]
+        self.assertEqual("StrJoin", message.getClass().getSimpleName())
+        formatted = list(message.parts())[0]  # the f-string, spelled by str()
+        self.assertEqual("//", list(formatted.parts())[0].op())
+
+    def test_an_int_attribute_is_updated_in_place(self):
+        statements = list(self.bodies["bumped"].body().statements())
+        self.assertEqual("PutSelf", statements[0].getClass().getSimpleName())
+        self.assertEqual("int", statements[0].type())
+        self.assertEqual("+", statements[0].value().operand().op())
+
+    def test_a_none_test_keeps_the_value_it_tests(self):
+        returned = list(self.bodies["rate_is_none"].body().statements())[0].value()
+        self.assertEqual("Compare", returned.getClass().getSimpleName())
+        self.assertEqual("is None", returned.op())
+        self.assertEqual("java.lang.Double", returned.left().type())
+        self.assertEqual("SelfProperty", returned.left().operand().getClass().getSimpleName())
+        # a parameter of a number is never None, and reading it twice is reading it once
+        returned = list(self.bodies["n_is_none"].body().statements())[0].value()
+        self.assertEqual("Const", returned.getClass().getSimpleName())
+        self.assertEqual(False, returned.value())
+
+    def test_a_str_that_may_be_null_is_concatenated_through_the_helper(self):
+        returned = list(self.bodies["concat"].body().statements())[0].value()
+        self.assertEqual("Binary", returned.getClass().getSimpleName())
+        self.assertEqual("concat", returned.op())
+        self.assertEqual("Helper", returned.left().getClass().getSimpleName())
+        self.assertEqual("concat", returned.left().name())
+        self.assertEqual("Param", list(returned.left().arguments())[0].getClass().getSimpleName())
+        self.assertIn("may be None", self.decisions["Pricing.maybe_concat"].reasons()[0].message())
+
+    def test_an_int_and_a_float_compare_exactly(self):
+        returned = list(self.bodies["exact_compare"].body().statements())[0].value()
+        self.assertEqual(">", returned.op())
+        self.assertEqual("compare", returned.left().name())
+        self.assertEqual(0.0, returned.right().value())
+        # a literal a double holds exactly compares as a double
+        returned = list(self.bodies["literal_compare"].body().statements())[0].value()
+        self.assertEqual(">", returned.op())
+        self.assertEqual("Cast", returned.right().getClass().getSimpleName())
 
 
 class DelegationTest(unittest.TestCase):
@@ -1245,19 +1356,27 @@ class Calc:
         def run(self, n: int) -> int:
             return n
 ''')
-        self.assertEqual(2, apply_delegation(tree, ["Calc#label", "Calc$Inner#run", "Missing#nothing"]))
-        self.assertEqual(0, apply_delegation(tree, ["Calc#label"]))  # already rewritten
+        targets = ["Calc#label#owner=app.Calc#kinds=int,str#retry", "Calc$Inner#run#owner=app.Calc$Inner#kinds=long#once",
+                   "Missing#nothing#owner=app.Missing#kinds=#retry", "Calc#other#owner=app.Calc"]
+        self.assertEqual(2, apply_delegation(tree, targets))
+        self.assertEqual(0, apply_delegation(tree, targets))  # already rewritten
         source = ast.unparse(tree)
-        self.assertIn("__mn_java = self.__dict__.get('__micronaut_compiled__')", source)
-        self.assertIn("return __mn_java.label(count, name)", source)
-        self.assertIn("return __mn_java.run(n)", source)
-        label = tree.body[0].body[1]
+        self.assertIn("__mn_java = __class__.__micronaut_compiled__", source)
+        self.assertIn("__mn_java = __mn_java.call(self, 'app.Calc', 'label', (count, name), ('int', 'str'), True)", source)
+        self.assertIn("return __mn_java[0]", source)
+        self.assertIn("__mn_java = __mn_java.call(self, 'app.Calc$Inner', 'run', (n,), ('long',), False)", source)
+        self.assertNotIn("__dict__", source)
+        calc = tree.body[0]
+        self.assertIsInstance(calc.body[0], ast.Expr)  # the class docstring stays first
+        self.assertEqual("__micronaut_compiled__", calc.body[1].targets[0].id)
+        self.assertEqual(1, sum(1 for statement in calc.body if isinstance(statement, ast.Assign)))
+        label = calc.body[2]
         self.assertIsInstance(label.body[0], ast.Expr)  # the docstring stays first
         self.assertIsInstance(label.body[1], ast.Assign)
         self.assertIsInstance(label.body[2], ast.If)
         self.assertEqual(label.lineno, label.body[1].lineno)
-        other = tree.body[0].body[2]
-        self.assertIsInstance(other.body[0], ast.Return)
+        other = calc.body[3]
+        self.assertIsInstance(other.body[0], ast.Return)  # a target without its kinds is not delegated
         compile(tree, "delegated.py", "exec")
 
     def test_the_temporary_of_the_rewrite_never_shadows_a_name_of_the_function(self):
@@ -1271,13 +1390,167 @@ class Calc:
         __mn_java = 1
         return __mn_java
 ''')
-        self.assertEqual(2, apply_delegation(tree, ["Calc#echo", "Calc#marked"]))
-        self.assertEqual(0, apply_delegation(tree, ["Calc#echo", "Calc#marked"]))
+        targets = ["Calc#echo#owner=app.Calc#kinds=str#retry", "Calc#marked#owner=app.Calc#kinds=#retry"]
+        self.assertEqual(2, apply_delegation(tree, targets))
+        self.assertEqual(0, apply_delegation(tree, targets))
         source = ast.unparse(tree)
-        self.assertIn("__mn_java_1 = self.__dict__.get('__micronaut_compiled__')", source)
-        self.assertIn("return __mn_java_1.echo(__mn_java)", source)
-        self.assertIn("return __mn_java_1.marked()", source)
+        self.assertIn("__mn_java_1 = __class__.__micronaut_compiled__", source)
+        self.assertIn("__mn_java_1 = __mn_java_1.call(self, 'app.Calc', 'echo', (__mn_java,), ('str',), True)", source)
+        self.assertIn("__mn_java_1 = __mn_java_1.call(self, 'app.Calc', 'marked', (), (), True)", source)
         compile(tree, "delegated.py", "exec")
+
+    def test_each_rewritten_method_calls_the_body_of_the_class_it_is_defined_in(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse('''
+class A:
+    def m(self) -> str:
+        return "python A"
+
+
+class B(A):
+    def m(self) -> str:
+        return "python B"
+
+    def n(self) -> str:
+        return super().m()
+''')
+        apply_delegation(tree, ["A#m#owner=app.A#kinds=#retry", "B#m#owner=app.B#kinds=#retry"])
+        calls = []
+
+        class Registry:
+            """Binds every object: the body of each class answers with its owner's name."""
+
+            def call(self, instance, owner, method, arguments, kinds, retry):
+                calls.append(owner)
+                return (f"java {owner}",)
+
+        namespace = {}
+        exec(compile(tree, "delegated.py", "exec"), namespace)
+        b = namespace["B"]()
+        # nothing is bound: the Python bodies run
+        self.assertEqual("python A", b.n())
+        namespace["A"].__micronaut_compiled__ = Registry()
+        namespace["B"].__micronaut_compiled__ = namespace["A"].__micronaut_compiled__
+        self.assertEqual("java app.B", b.m())
+        self.assertEqual("java app.A", b.n())  # super().m() runs A's body
+        self.assertEqual(["app.B", "app.A"], calls)
+        self.assertNotIn("__micronaut_compiled__", vars(b))
+
+    def test_a_function_whose_parameters_the_java_body_does_not_take_positionally_is_not_rewritten(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse('''
+class Calc:
+    def keyword(self, *, n: int) -> int:
+        return n
+''')
+        self.assertEqual(0, apply_delegation(tree, ["Calc#keyword#owner=app.Calc#kinds=int#retry"]))
+
+    def test_a_collection_the_java_body_returns_reaches_a_python_caller_as_a_python_one(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse('''
+class Calc:
+    def names(self) -> list[str]:
+        return ["python"]
+
+    def prices(self) -> dict[str, int]:
+        return {"python": 1}
+''')
+        self.assertEqual(2, apply_delegation(tree, ["Calc#names#owner=app.Calc#kinds=#once#list", "Calc#prices#owner=app.Calc#kinds=#once#dict"]))
+
+        class JavaMap:
+            """A Java map, read through its interop members."""
+
+            def keySet(self):
+                return ["java"]
+
+            def get(self, key):
+                return 2
+
+        class Registry:
+            """Binds every object: the Java bodies answer with Java collections."""
+
+            def call(self, instance, owner, method, arguments, kinds, retry):
+                return (("java",) if method == "names" else JavaMap(),)
+
+        namespace = {}
+        exec(compile(tree, "delegated.py", "exec"), namespace)
+        calc = namespace["Calc"]()
+        namespace["Calc"].__micronaut_compiled__ = Registry()
+        self.assertEqual(["java"], calc.names())
+        self.assertEqual({"java": 2}, calc.prices())
+    def test_a_private_method_delegates_by_the_name_the_java_delegate_has(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse('''
+class Calc:
+    def __helper(self, n: int) -> int:
+        return n
+''')
+        self.assertEqual(1, apply_delegation(tree, ["Calc#__helper#owner=app.Calc#kinds=long#once"]))
+        source = ast.unparse(tree)
+        # the registry looks the Java method up by its name: an attribute read would be mangled to
+        # _Calc__helper inside the class body
+        self.assertIn("__mn_java.call(self, 'app.Calc', '__helper', (n,), ('long',), False)", source)
+        self.assertNotIn("__mn_java.__helper", source)
+
+
+SIBLINGS = '''
+from jakarta.inject import Singleton
+
+
+@Singleton
+class Base:
+    def __secret(self, n: int) -> int:
+        return n
+
+    def helper(self, n: int) -> int:
+        return n + 1
+
+    def kept(self, n: int) -> int:
+        return n
+
+    def run(self, n: int) -> int:
+        return self.__secret(n) + self.helper(n) + self.kept(n)
+
+    def checked(self, n: int) -> bool:
+        return self.helper(n) is None
+
+    def counted(self) -> int:
+        return self.__count
+
+
+class Inheriting(Base):
+    pass
+
+
+class Overriding(Inheriting):
+    def helper(self, n: int) -> int:
+        return n * 2
+'''
+
+
+class SiblingTest(unittest.TestCase):
+    def setUp(self):
+        self.decisions, self.planner = plan(SIBLINGS, MODE_ALL, facts=FakeFacts())
+        self.bodies = {(body.className().split(".")[-1], body.methodName()): body for body in self.planner.bodies}
+        decision = self.decisions["Base.run"]
+        self.assertEqual("COMPILED", decision.outcome().name(), [(r.rule(), r.message()) for r in decision.reasons()])
+
+    def test_a_private_method_is_invoked_by_its_mangled_name(self):
+        run = self.bodies[("Base", "run")]
+        total = _uncast(list(run.body().statements())[0].value())
+        secret = _uncast(_uncast(total.left()).left())
+        self.assertEqual("_Base__secret", secret.name())
+        self.assertEqual("python", secret.dispatch())
+
+    def test_only_a_subclass_that_overrides_a_method_sends_it_through_python(self):
+        run = self.bodies[("Base", "run")]
+        total = _uncast(list(run.body().statements())[0].value())
+        self.assertEqual("python", _uncast(_uncast(total.left()).right()).dispatch())  # Overriding.helper, a grandchild's
+        self.assertEqual("java", _uncast(total.right()).dispatch())  # inherited by every subclass, overridden by none
+
+    def test_a_none_test_of_a_sibling_result_and_a_mangled_attribute_are_refused(self):
+        self.assertEqual(["unsupported-expression"], rules(self.decisions["Base.checked"]))
+        self.assertEqual(["unsupported-expression"], rules(self.decisions["Base.counted"]))
 
 
 if __name__ == "__main__":

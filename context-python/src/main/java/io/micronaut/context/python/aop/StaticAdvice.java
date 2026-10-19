@@ -23,7 +23,6 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -47,7 +46,6 @@ import java.util.function.Supplier;
  */
 @Experimental
 @Internal
-@NullMarked
 public final class StaticAdvice<T> {
     private final Map<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> interceptedByName = new LinkedHashMap<>();
     private final RuntimeProxyDefinition<T> proxyDefinition;
