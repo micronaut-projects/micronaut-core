@@ -243,6 +243,15 @@ class Calc:
     def maybe_count(self, n: int) -> int | None:
         return n if n > 0 else None
 
+    def sized(self, n: int) -> int | None:
+        return Bag(n).maybe_size()
+
+    def spelled_size(self, n: int) -> str:
+        return str(Bag(n).maybe_size())
+
+    def spelled_limit(self, n: int) -> str:
+        return str(Bag(n).limit)
+
     def merged(self, extra: dict[str, str]) -> dict[str, str]:
         return {"a": "1", **extra, "z": "9"}
 
@@ -374,6 +383,7 @@ class Pair:
 
 class Bag:
     label: str = "bag"
+    limit: int | None = None
 
     def __init__(self, count: int):
         self.count = count
@@ -383,6 +393,9 @@ class Bag:
 
     def _secret(self) -> int:
         return 7
+
+    def maybe_size(self) -> int | None:
+        return self.count if self.count > 0 else None
 
     def rename(self, label: str) -> None:
         self.label = label
@@ -424,6 +437,7 @@ class Bag:
         ["strict_host", ""], ["strict_host", "http://example.com/x"],
         ["maybe_name", true], ["maybe_name", false],
         ["maybe_count", 3], ["maybe_count", 0],
+        ["sized", 3], ["sized", 0], ["spelled_size", 3], ["spelled_size", 0], ["spelled_limit", 1],
         ["branch_local", true], ["branch_local", false],
         ["guarded", 3], ["guarded", 0],
         ["boxed_none", "no.such.property"], ["boxed_none", "micronaut.static.parity"],
@@ -503,6 +517,11 @@ class Bag:
         results[StaticCompilationMode.OFF][["above", 8192, 9007199254740992.0d].toString()] == true
         results[StaticCompilationMode.OFF][["below", 8192, Double.NaN].toString()] == false
         results[StaticCompilationMode.OFF][["exclaim", null].toString()] == "raised"
+        // a method of a Python object hinted int | None that returns None, and an attribute that holds None
+        results[StaticCompilationMode.OFF][["sized", 0].toString()] == null
+        results[StaticCompilationMode.OFF][["sized", 3].toString()] == 3
+        results[StaticCompilationMode.OFF][["spelled_size", 0].toString()] == "None"
+        results[StaticCompilationMode.OFF][["spelled_limit", 1].toString()] == "None"
         results[StaticCompilationMode.OFF][["query", "http://example.com/x"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["mixed_local", true].toString()] == "2"
         results[StaticCompilationMode.OFF][["ratio", 1, 0].toString()] == "raised"
